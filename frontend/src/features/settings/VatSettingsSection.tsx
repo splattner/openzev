@@ -11,7 +11,7 @@ import { CivilDateInput } from '../../components/CivilDateInput'
 import { useToast } from '../../lib/toast'
 import { ConfirmDialog, useConfirmDialog } from '../../components/ConfirmDialog'
 import { StatCard } from '../../components/StatCard'
-import { todayLocalIso } from '../../lib/dates'
+import { todayBusinessIso } from '../../lib/dates'
 import type { VatRate, VatRateInput } from '../../types/api'
 
 type VatRateFormState = {
@@ -22,7 +22,7 @@ type VatRateFormState = {
 
 const makeDefaultForm = (): VatRateFormState => ({
     rate_percent: '8.1',
-    valid_from: todayLocalIso(),
+    valid_from: todayBusinessIso(),
     valid_to: null,
 })
 
@@ -44,7 +44,7 @@ export function VatSettingsSection() {
     })
 
     const vatRates = vatRatesQuery.data ?? EMPTY_VAT_RATES
-    const today = todayLocalIso()
+    const today = todayBusinessIso()
 
     const activeVatRate = useMemo(
         () => vatRates.find((rate) => rate.valid_from <= today && (!rate.valid_to || rate.valid_to >= today)) ?? null,

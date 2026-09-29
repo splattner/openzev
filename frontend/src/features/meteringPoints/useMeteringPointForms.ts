@@ -1,4 +1,4 @@
-import { todayLocalIso } from '../../lib/dates'
+import { todayBusinessIso } from '../../lib/dates'
 import type {
   MeteringPoint,
   MeteringPointAssignment,
@@ -18,7 +18,7 @@ export const defaultMeteringPointForm = (): MeteringPointInput => ({
 export const defaultAssignmentForm = (meteringPointId = ''): MeteringPointAssignmentInput => ({
   metering_point: meteringPointId,
   participant: '',
-  valid_from: todayLocalIso(),
+  valid_from: todayBusinessIso(),
   valid_to: null,
   allocation_mode: 'personal',
 })

@@ -1,4 +1,4 @@
-import type { CsvDetectResult, ImportPreviewResult } from '../../types/api'
+import type { CsvDetectResult, ImportPreviewResult, ImportTimestampTimezone } from '../../types/api'
 
 export type CsvColumnMap = {
     meter_id: string
@@ -58,6 +58,7 @@ export function settingsFromDetection(result: CsvDetectResult): {
     delimiter: string
     formatProfile: CsvFormatProfile
     timestampFormat: string
+    timestampTimezone: ImportTimestampTimezone
     intervalMinutes: string
     valuesCount: string
     columnMap: CsvColumnMap
@@ -72,6 +73,7 @@ export function settingsFromDetection(result: CsvDetectResult): {
         delimiter: settings.delimiter === '\t' ? '\\t' : settings.delimiter,
         formatProfile: settings.format_profile,
         timestampFormat: settings.timestamp_format,
+        timestampTimezone: settings.timestamp_timezone,
         intervalMinutes: String(settings.interval_minutes),
         valuesCount: String(settings.values_count),
         columnMap: {
@@ -109,6 +111,7 @@ export type PreviewStamp = {
     delimiter: string
     formatProfile: string
     timestampFormat: string
+    timestampTimezone: ImportTimestampTimezone
     intervalMinutes: string
     valuesCount: string
     overwriteExisting: boolean

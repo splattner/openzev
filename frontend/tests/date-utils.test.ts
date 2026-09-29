@@ -1,5 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { daysInPeriod, formatIsoDate, formatUtcIsoDate, isValidIsoDate, todayLocalIso } from '../src/lib/dates'
+import {
+  BUSINESS_TIME_ZONE,
+  businessDayStartMs,
+  daysInPeriod,
+  formatBusinessIsoDate,
+  formatIsoDate,
+  formatUtcIsoDate,
+  isValidIsoDate,
+  nextIsoDate,
+  todayBusinessIso,
+  zonedParts,
+} from '../src/lib/dates'
 
 const SAVED_TZ = process.env.TZ
 
@@ -29,9 +40,35 @@ describe('formatUtcIsoDate', () => {
   })
 })
 
-describe('todayLocalIso', () => {
-  it('returns today in the local timezone', () => {
-    expect(todayLocalIso()).toBe(formatIsoDate(new Date()))
+describe('todayBusinessIso', () => {
+  it('returns today in the business timezone', () => {
+    expect(todayBusinessIso()).toBe(formatBusinessIsoDate(new Date()))
+  })
+})
+
+describe('business timezone', () => {
+  it('is Europe/Zurich, like the backend settings.TIME_ZONE', () => {
+    expect(BUSINESS_TIME_ZONE).toBe('Europe/Zurich')
+  })
+
+  it('reads instants in Swiss time in winter and summer, whatever the viewer zone', () => {
+    expect(zonedParts(new Date('2026-01-15T13:30:00Z'))).toEqual({ year: 2026, month: 1, day: 15, hours: 14, minutes: 30 })
+    expect(zonedParts(new Date('2026-07-15T22:15:00Z'))).toEqual({ year: 2026, month: 7, day: 16, hours: 0, minutes: 15 })
+  })
+
+  it('finds Swiss midnight on ordinary and DST days', () => {
+    expect(new Date(businessDayStartMs('2026-01-15')).toISOString()).toBe('2026-01-14T23:00:00.000Z')
+    expect(new Date(businessDayStartMs('2026-07-15')).toISOString()).toBe('2026-07-14T22:00:00.000Z')
+    expect(new Date(businessDayStartMs('2026-03-29')).toISOString()).toBe('2026-03-28T23:00:00.000Z')
+    expect(new Date(businessDayStartMs('2026-03-30')).toISOString()).toBe('2026-03-29T22:00:00.000Z')
+    expect(new Date(businessDayStartMs('2026-10-25')).toISOString()).toBe('2026-10-24T22:00:00.000Z')
+    expect(new Date(businessDayStartMs('2026-10-26')).toISOString()).toBe('2026-10-25T23:00:00.000Z')
+  })
+
+  it('steps to the next civil date across month and year ends', () => {
+    expect(nextIsoDate('2026-01-31')).toBe('2026-02-01')
+    expect(nextIsoDate('2026-12-31')).toBe('2027-01-01')
+    expect(nextIsoDate('2026-03-29')).toBe('2026-03-30')
   })
 })
 

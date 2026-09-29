@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
 import { formatDateTime, formatShortDate } from '../../lib/appSettings'
-import { todayLocalIso } from '../../lib/dates'
+import { todayBusinessIso } from '../../lib/dates'
 import type { AppSettings, MeteringPoint, MeteringPointAssignment } from '../../types/api'
 import {
   assignmentStateBadgeClass,
@@ -73,7 +73,7 @@ export function MeteringPointsList({
   onDeleteAssignment,
 }: MeteringPointsListProps) {
   const { t } = useTranslation()
-  const todayIso = todayLocalIso()
+  const todayIso = todayBusinessIso()
 
   // Shared by both the compact (single current holder) and expanded assignment
   // rendering below — Remove lives in the overflow menu everywhere, matching

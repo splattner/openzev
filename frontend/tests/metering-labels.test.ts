@@ -12,9 +12,8 @@ const settings: AppSettings = {
 }
 
 beforeAll(() => {
-  // The backend buckets metering readings in UTC (TruncDay/TruncHour/TruncMonth
-  // with tzinfo=utc). West of UTC is where local-getter drift would show up
-  // first: a UTC-midnight bucket rolls back to the previous local day.
+  // Buckets are instants labelled in Swiss time (ADR 0026). Running west of
+  // UTC proves the viewer's own zone never leaks into the label.
   process.env.TZ = 'America/New_York'
 })
 
@@ -27,18 +26,25 @@ afterAll(() => {
 })
 
 describe('formatMeteringBucketLabel', () => {
-  it('keeps the UTC day for a daily bucket, not the local-getter-shifted day', () => {
-    // UTC midnight on Jan 2 is still Jan 1 evening in America/New_York.
-    expect(formatMeteringBucketLabel('2026-01-02T00:00:00+00:00', 'day', settings)).toBe('02.01.2026')
+  it('labels a day bucket with its Swiss civil day', () => {
+    // Swiss midnight on Jan 2 is still Jan 1 evening in America/New_York.
+    expect(formatMeteringBucketLabel('2026-01-02T00:00:00+01:00', 'day', settings)).toBe('02.01.2026')
+    expect(formatMeteringBucketLabel('2026-07-01T00:00:00+02:00', 'day', settings)).toBe('01.07.2026')
   })
 
-  it('keeps the UTC hour for an hourly bucket, not the local-getter-shifted hour', () => {
-    expect(formatMeteringBucketLabel('2026-01-02T14:00:00+00:00', 'hour', settings)).toBe('02.01.2026 14:00')
+  it('labels a UTC-truncated hour bucket with the Swiss hour', () => {
+    expect(formatMeteringBucketLabel('2026-01-02T13:00:00Z', 'hour', settings)).toBe('02.01.2026 14:00')
+    expect(formatMeteringBucketLabel('2026-07-01T02:00:00Z', 'hour', settings)).toBe('01.07.2026 04:00')
   })
 
-  it('keeps the UTC month for a monthly bucket at a year boundary', () => {
-    // UTC midnight on Jan 1 is still December 31 evening in America/New_York.
-    expect(formatMeteringBucketLabel('2026-01-01T00:00:00+00:00', 'month', settings)).toBe('Jan 2026')
+  it('labels both 02:00 hours of the autumn DST change as 02:00', () => {
+    expect(formatMeteringBucketLabel('2026-10-25T00:00:00Z', 'hour', settings)).toBe('25.10.2026 02:00')
+    expect(formatMeteringBucketLabel('2026-10-25T01:00:00Z', 'hour', settings)).toBe('25.10.2026 02:00')
+  })
+
+  it('labels a month bucket with its Swiss month at a year boundary', () => {
+    // Swiss midnight on Jan 1 is still December 31 evening in America/New_York.
+    expect(formatMeteringBucketLabel('2026-01-01T00:00:00+01:00', 'month', settings)).toBe('Jan 2026')
   })
 
   it('falls back to the raw bucket string when it cannot be parsed', () => {

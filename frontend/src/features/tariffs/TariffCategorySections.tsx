@@ -7,7 +7,7 @@ import {
     faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
-import { todayLocalIso } from '../../lib/dates'
+import { todayBusinessIso } from '../../lib/dates'
 import type { AppSettings, Tariff, TariffSeries } from '../../types/api'
 import { seriesKeyOf, useTariffDisplay } from './useTariffDisplay'
 
@@ -39,7 +39,7 @@ export function TariffCategorySections({
     onOpenDetail,
 }: TariffCategorySectionsProps) {
     const { t } = useTranslation()
-    const today = todayLocalIso()
+    const today = todayBusinessIso()
     const { sourceById, validityBadge, pricingLabelFor, pricingTooltipFor } = useTariffDisplay(settings, today)
 
     return (

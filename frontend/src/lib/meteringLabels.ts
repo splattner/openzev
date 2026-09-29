@@ -1,38 +1,34 @@
 import type { AppSettings, MeteringPoint } from '../types/api'
+import { BUSINESS_TIME_ZONE, zonedParts } from './dates'
 
 /**
- * The backend buckets metering readings in UTC (``TruncDay``/``TruncHour``/
- * ``TruncMonth`` with ``tzinfo=utc`` in ``metering/views.py``) to match how
- * the importer stamps naive CSV timestamps. Formatting a bucket via the
- * shared ``formatDateTime``/``formatShortDate``/``formatMonthYear`` helpers
- * (which read local-time components) would disagree with that UTC bucketing
- * — off by the viewer's UTC offset, and by a whole day for daily/monthly
- * buckets in negative-offset timezones — and with ``RawMeteringTable``,
- * which deliberately reads UTC components for the same reason. So bucket
- * labels get their own UTC-aware formatting here instead of reusing the
- * local-time helpers.
+ * The backend truncates day and month buckets at Swiss midnight and hour
+ * buckets at UTC hours, and serializes each with its offset (ADR 0026). A
+ * bucket is an instant, so its label is read in the business timezone —
+ * never from the string's date part and never in the viewer's own zone,
+ * which would put someone abroad on a different day than the invoice.
  */
 
 function pad(value: number): string {
     return String(value).padStart(2, '0')
 }
 
-function utcParts(date: Date) {
+function bucketParts(date: Date) {
+    const p = zonedParts(date)
     return {
-        day: date.getUTCDate(),
-        dayPadded: pad(date.getUTCDate()),
-        monthPadded: pad(date.getUTCMonth() + 1),
-        monthShort: new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: 'UTC' }).format(date),
-        year: date.getUTCFullYear(),
-        hoursPadded: pad(date.getUTCHours()),
-        minutesPadded: pad(date.getUTCMinutes()),
+        dayPadded: pad(p.day),
+        monthPadded: pad(p.month),
+        monthShort: new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: BUSINESS_TIME_ZONE }).format(date),
+        year: p.year,
+        hoursPadded: pad(p.hours),
+        minutesPadded: pad(p.minutes),
     }
 }
 
-function formatUtcShortDate(bucket: string, settings: AppSettings): string {
+function formatBucketShortDate(bucket: string, settings: AppSettings): string {
     const date = new Date(bucket)
     if (isNaN(date.getTime())) return bucket
-    const p = utcParts(date)
+    const p = bucketParts(date)
     switch (settings.date_format_short) {
         case 'dd.MM.yyyy':
             return `${p.dayPadded}.${p.monthPadded}.${p.year}`
@@ -47,10 +43,10 @@ function formatUtcShortDate(bucket: string, settings: AppSettings): string {
     }
 }
 
-function formatUtcDateTime(bucket: string, settings: AppSettings): string {
+function formatBucketDateTime(bucket: string, settings: AppSettings): string {
     const date = new Date(bucket)
     if (isNaN(date.getTime())) return bucket
-    const p = utcParts(date)
+    const p = bucketParts(date)
     switch (settings.date_time_format) {
         case 'dd.MM.yyyy HH:mm':
             return `${p.dayPadded}.${p.monthPadded}.${p.year} ${p.hoursPadded}:${p.minutesPadded}`
@@ -65,10 +61,10 @@ function formatUtcDateTime(bucket: string, settings: AppSettings): string {
     }
 }
 
-function formatUtcMonthYear(bucket: string): string {
+function formatBucketMonthYear(bucket: string): string {
     const date = new Date(bucket)
     if (isNaN(date.getTime())) return bucket
-    const p = utcParts(date)
+    const p = bucketParts(date)
     return `${p.monthShort} ${p.year}`
 }
 
@@ -83,12 +79,12 @@ export function formatMeteringBucketLabel(
 ): string {
     try {
         if (resolution === 'hour') {
-            return formatUtcDateTime(bucket, settings)
+            return formatBucketDateTime(bucket, settings)
         }
         if (resolution === 'month') {
-            return formatUtcMonthYear(bucket)
+            return formatBucketMonthYear(bucket)
         }
-        return formatUtcShortDate(bucket, settings)
+        return formatBucketShortDate(bucket, settings)
     } catch {
         return bucket
     }

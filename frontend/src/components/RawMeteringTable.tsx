@@ -9,6 +9,7 @@ import { fetchRawMeteringData, fetchRawMeteringDay } from '../lib/api/metering'
 import { fetchMeteringPointAssignments } from '../lib/api/zev'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
+import { zonedParts } from '../lib/dates'
 import { outReadingLabelKey } from '../lib/meteringLabels'
 import { PageSkeleton } from './PageSkeleton'
 import type { MeteringPoint, MeteringPointAssignment, RawMeteringDailyRow, RawMeteringReading } from '../types/api'
@@ -65,11 +66,12 @@ export function readingAnomalies(readings: RawMeteringReading[]): {
     return { negativeCount, duplicateCount }
 }
 
-/** UTC HH:MM — matches how the importer stored the timestamps (naive stamped as UTC). */
+/** HH:MM in the business timezone (ADR 0026); a DST day lists 92 or 100 rows. */
 function formatTimeOnly(ts: string): string {
     const d = new Date(ts)
     if (isNaN(d.getTime())) return ts
-    return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+    const { hours, minutes } = zonedParts(d)
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }
 
 interface IntervalRow {
@@ -119,15 +121,19 @@ const DAYS_PER_PAGE = 31
 const SLOT_MINUTES = [0, 15, 30, 45]
 const HOURS = Array.from({ length: 24 }, (_, h) => h)
 
-/** Arrange one direction's readings into a [slot][hour] matrix of kWh values (UTC). */
+/**
+ * Arrange one direction's readings into a [slot][hour] matrix of kWh values,
+ * by Swiss hour. The autumn DST day's two 02:00 hours add up in one cell; the
+ * spring day has no 02:00 hour at all.
+ */
 function buildHourGrid(readings: RawMeteringReading[], direction: 'in' | 'out'): (number | null)[][] {
     const grid: (number | null)[][] = SLOT_MINUTES.map(() => Array<number | null>(24).fill(null))
     for (const r of readings) {
         if (r.direction !== direction) continue
         const d = new Date(r.timestamp)
         if (isNaN(d.getTime())) continue
-        const slot = SLOT_MINUTES.indexOf(d.getUTCMinutes())
-        const hour = d.getUTCHours()
+        const { hours: hour, minutes } = zonedParts(d)
+        const slot = SLOT_MINUTES.indexOf(minutes)
         if (slot >= 0 && hour >= 0 && hour < 24) {
             grid[slot][hour] = (grid[slot][hour] ?? 0) + r.energy_kwh
         }

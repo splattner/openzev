@@ -1186,6 +1186,9 @@ export interface PaginatedResponse<T> {
     results: T[]
 }
 
+/** Zone offset-less import timestamps are read in (ADR 0026). */
+export type ImportTimestampTimezone = 'Europe/Zurich' | 'UTC'
+
 export interface ImportLog {
     id: string
     batch_id?: string
@@ -1201,6 +1204,8 @@ export interface ImportLog {
     source: string
     errors?: Array<{ row: number | null; error: string; meter_id?: string | null }>
     warnings?: Array<{ row: number | null; warning: string }>
+    /** '' for batches imported before ADR 0026 (offset-less values read as UTC). */
+    timestamp_timezone?: ImportTimestampTimezone | ''
     created_at: string
 }
 
@@ -1208,7 +1213,7 @@ export interface ImportDeletionResult {
     deleted_logs: number
     deleted_readings: number
     mode?: 'all' | 'period'
-    timezone?: 'UTC'
+    timezone?: 'Europe/Zurich'
 }
 
 export interface ImportPreviewRow {
@@ -1236,6 +1241,7 @@ export interface CsvDetectResult {
         delimiter: string
         format_profile: 'standard' | 'daily_15min'
         timestamp_format: string
+        timestamp_timezone: ImportTimestampTimezone
         interval_minutes: number
         values_count: number
         column_map: {
@@ -1260,6 +1266,9 @@ export interface ImportPreviewResult {
     }
     missing_meter_ids: string[]
     errors: Array<{ row: number | null; error: string }>
+    timestamp_timezone: ImportTimestampTimezone
+    /** Zero-energy rows at a time that does not exist in Swiss time (DST start); skipped, not errors. */
+    rows_skipped_dst_gap: number
 }
 
 export interface ChartDataPoint {

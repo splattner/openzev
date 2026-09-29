@@ -32,7 +32,7 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { EmptyState } from '../components/EmptyState'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
-import { todayLocalIso } from '../lib/dates'
+import { todayBusinessIso } from '../lib/dates'
 import { isValidIban, normalizeIban } from '../lib/iban'
 import { getDefaultZevForm, mapZevToForm } from '../lib/zevForm'
 import { copyToClipboard } from '../lib/clipboard'
@@ -44,7 +44,7 @@ import { GridOperatorSuggestion } from '../features/zev/GridOperatorSuggestion'
 
 const defaultCreateForm = (): ZevWizardInput => ({
     name: '',
-    start_date: todayLocalIso(),
+    start_date: todayBusinessIso(),
     zev_type: 'vzev',
     grid_operator: '',
     billing_interval: 'monthly',

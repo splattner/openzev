@@ -1,4 +1,4 @@
-import { todayLocalIso } from './dates'
+import { todayBusinessIso } from './dates'
 import { isValidIban } from './iban'
 import type { Zev, ZevInput } from '../types/api'
 
@@ -7,7 +7,7 @@ export type ZevSettingsTab = 'general' | 'billing' | 'documents' | 'audit' | 'ex
 export function getDefaultZevForm(): ZevInput {
     return {
         name: '',
-        start_date: todayLocalIso(),
+        start_date: todayBusinessIso(),
         zev_type: 'vzev',
         postal_code: '',
         grid_operator: '',

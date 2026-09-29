@@ -20,7 +20,7 @@ import { fetchTariffSeries } from '../lib/api/tariffs'
 import { downloadTariffOverview } from '../lib/api/invoices'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
-import { todayLocalIso } from '../lib/dates'
+import { todayBusinessIso } from '../lib/dates'
 import { downloadBlob } from '../lib/downloadBlob'
 import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
@@ -49,7 +49,7 @@ export function TariffsPage() {
     const [searchParams, setSearchParams] = useSearchParams()
     // Shared with the validity badge on each card, so the filter and the badge
     // can never disagree about whether a tariff is in force.
-    const today = useMemo(() => todayLocalIso(), [])
+    const today = useMemo(() => todayBusinessIso(), [])
 
     // One query, not three: the series endpoint already groups versions, names
     // the active one, detects gaps, and nests each version's price bands. The

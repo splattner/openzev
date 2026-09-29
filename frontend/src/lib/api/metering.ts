@@ -6,6 +6,7 @@ import type {
   ImportDeletionResult,
   ImportLog,
   ImportPreviewResult,
+  ImportTimestampTimezone,
   MeteringDashboardSummary,
   RawMeteringDailyRow,
   RawMeteringReading,
@@ -52,6 +53,7 @@ export type UploadMeteringFilePayload = {
   delimiter?: string
   formatProfile?: 'standard' | 'daily_15min'
   timestampFormat?: string
+  timestampTimezone?: ImportTimestampTimezone
   intervalMinutes?: number
   valuesCount?: number
   overwriteExisting?: boolean
@@ -71,6 +73,7 @@ export async function uploadMeteringFile(payload: UploadMeteringFilePayload): Pr
     formData.append('delimiter', payload.delimiter ?? ',')
     formData.append('format_profile', payload.formatProfile ?? 'standard')
     if (payload.timestampFormat) formData.append('timestamp_format', payload.timestampFormat)
+    if (payload.timestampTimezone) formData.append('timestamp_timezone', payload.timestampTimezone)
     if (payload.intervalMinutes != null) formData.append('interval_minutes', String(payload.intervalMinutes))
     if (payload.valuesCount != null) formData.append('values_count', String(payload.valuesCount))
     formData.append('overwrite_existing', String(payload.overwriteExisting ?? false))
@@ -98,6 +101,7 @@ export type PreviewCsvImportPayload = {
   delimiter?: string
   formatProfile?: 'standard' | 'daily_15min'
   timestampFormat?: string
+  timestampTimezone?: ImportTimestampTimezone
   intervalMinutes?: number
   valuesCount?: number
   overwriteExisting?: boolean
@@ -119,6 +123,7 @@ export async function previewCsvImport(payload: PreviewCsvImportPayload): Promis
   formData.append('delimiter', payload.delimiter ?? ',')
   formData.append('format_profile', payload.formatProfile ?? 'standard')
   if (payload.timestampFormat) formData.append('timestamp_format', payload.timestampFormat)
+  if (payload.timestampTimezone) formData.append('timestamp_timezone', payload.timestampTimezone)
   if (payload.intervalMinutes != null) formData.append('interval_minutes', String(payload.intervalMinutes))
   if (payload.valuesCount != null) formData.append('values_count', String(payload.valuesCount))
 

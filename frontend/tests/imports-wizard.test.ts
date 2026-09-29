@@ -854,6 +854,7 @@ describe('ImportsPage settings detection', () => {
                 delimiter: ';',
                 format_profile: 'standard',
                 timestamp_format: '%d.%m.%Y %H:%M',
+                timestamp_timezone: 'Europe/Zurich',
                 interval_minutes: 15,
                 values_count: 96,
                 column_map: { meter_id: '0', timestamp: '1', energy_kwh: '2', direction: null, energy_start: null },
@@ -889,8 +890,24 @@ describe('ImportsPage settings detection', () => {
             delimiter: ';',
             formatProfile: 'standard',
             timestampFormat: '%d.%m.%Y %H:%M',
+            timestampTimezone: 'Europe/Zurich',
             columnMap: { meter_id: '0', timestamp: '1', energy_kwh: '2', direction: '', energy_start: '' },
         })
+    })
+
+    it('sends the chosen zone for offset-less timestamps with the preview (ADR 0026)', () => {
+        detectResult = detected()
+        pickAndNext('readings.csv')
+        const zone = Array.from(container.querySelectorAll('select')).find((select) =>
+            Array.from(select.options).some((option) => option.value === 'UTC'),
+        ) as HTMLSelectElement
+        expect(zone.value).toBe('Europe/Zurich')
+        act(() => {
+            zone.value = 'UTC'
+            zone.dispatchEvent(new Event('change', { bubbles: true }))
+        })
+        loadPreview()
+        expect(mutateCalls[0].vars).toMatchObject({ timestampTimezone: 'UTC' })
     })
 
     it('applies a daily-profile detection with interval settings', () => {

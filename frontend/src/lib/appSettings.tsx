@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchAppSettings } from './api/auth'
 import { queryKeys } from './api/queryKeys'
 import { useAuth } from './auth'
+import { BUSINESS_TIME_ZONE, zonedParts } from './dates'
 import type { AppSettings, DateTimeFormat, LongDateFormat, ShortDateFormat } from '../types/api'
 
 const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -46,40 +47,54 @@ function pad(value: number) {
     return String(value).padStart(2, '0')
 }
 
-function parseDateValue(value: string): Date | null {
+interface ParsedDateValue {
+    date: Date
+    /** A bare `YYYY-MM-DD`: a civil date, not an instant. */
+    dateOnly: boolean
+}
+
+function parseDateValue(value: string): ParsedDateValue | null {
     if (!value) return null
 
     const isoDateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
     if (isoDateMatch) {
         const [, year, month, day] = isoDateMatch
-        return new Date(Number(year), Number(month) - 1, Number(day))
+        return { date: new Date(Number(year), Number(month) - 1, Number(day)), dateOnly: true }
     }
 
     const parsed = new Date(value)
-    return Number.isNaN(parsed.getTime()) ? null : parsed
+    return Number.isNaN(parsed.getTime()) ? null : { date: parsed, dateOnly: false }
 }
 
-function formatDateParts(date: Date) {
+/**
+ * Calendar and clock fields for display. A civil date is shown as written; an
+ * instant is shown in the business timezone, not the viewer's (ADR 0026).
+ */
+function formatDateParts({ date, dateOnly }: ParsedDateValue) {
+    const fields = dateOnly
+        ? { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate(), hours: 0, minutes: 0 }
+        : zonedParts(date)
+    const monthZone = dateOnly ? undefined : BUSINESS_TIME_ZONE
     return {
-        day: date.getDate(),
-        dayPadded: pad(date.getDate()),
-        hoursPadded: pad(date.getHours()),
-        minutesPadded: pad(date.getMinutes()),
-        month: date.getMonth() + 1,
-        monthPadded: pad(date.getMonth() + 1),
-        monthLong: new Intl.DateTimeFormat(undefined, { month: 'long' }).format(date),
-        monthShort: new Intl.DateTimeFormat(undefined, { month: 'short' }).format(date),
-        year: date.getFullYear(),
+        day: fields.day,
+        dayPadded: pad(fields.day),
+        hoursPadded: pad(fields.hours),
+        minutesPadded: pad(fields.minutes),
+        month: fields.month,
+        monthPadded: pad(fields.month),
+        monthLong: new Intl.DateTimeFormat(undefined, { month: 'long', timeZone: monthZone }).format(date),
+        monthShort: new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: monthZone }).format(date),
+        year: fields.year,
     }
 }
 
 export function formatDateByPattern(value: string | null | undefined, pattern: ShortDateFormat | LongDateFormat): string {
     if (!value) return '—'
 
-    const date = parseDateValue(value)
-    if (!date) return value
+    const parsed = parseDateValue(value)
+    if (!parsed) return value
 
-    const parts = formatDateParts(date)
+    const parts = formatDateParts(parsed)
 
     switch (pattern) {
         case 'dd.MM.yyyy':
@@ -108,10 +123,10 @@ export function formatShortDate(value: string | null | undefined, settings: AppS
 export function formatDateTime(value: string | null | undefined, settings: AppSettings = DEFAULT_APP_SETTINGS): string {
     if (!value) return '—'
 
-    const date = parseDateValue(value)
-    if (!date) return value
+    const parsed = parseDateValue(value)
+    if (!parsed) return value
 
-    const parts = formatDateParts(date)
+    const parts = formatDateParts(parsed)
     if (!value.includes('T') && !value.includes(' ')) {
         return formatDateByPattern(value, settings.date_time_format.split(' ')[0] as ShortDateFormat)
     }
@@ -133,10 +148,10 @@ export function formatDateTime(value: string | null | undefined, settings: AppSe
 export function formatMonthYear(value: string | null | undefined): string {
     if (!value) return '—'
 
-    const date = parseDateValue(value)
-    if (!date) return value
+    const parsed = parseDateValue(value)
+    if (!parsed) return value
 
-    const parts = formatDateParts(date)
+    const parts = formatDateParts(parsed)
     return `${parts.monthShort} ${parts.year}`
 }
 

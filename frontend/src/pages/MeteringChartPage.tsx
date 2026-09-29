@@ -33,7 +33,7 @@ import {
     getCurrentBillingPeriod,
 } from '../lib/billingPeriod'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
-import { daysInPeriod, formatUtcIsoDate } from '../lib/dates'
+import { daysInPeriod, formatBusinessIsoDate } from '../lib/dates'
 import { formatKwh } from '../lib/numbers'
 import { formatMeteringBucketLabel, meteringPointOptionLabel, outReadingLabelKey } from '../lib/meteringLabels'
 import type { AppSettings, ChartDataPoint, DataQualitySeverity, MeteringPoint, MeteringPointDataQuality } from '../types/api'
@@ -133,9 +133,9 @@ export function readPeriodFromSearchParams(searchParams: URLSearchParams): { fro
  * if it has none yet. Used to turn the "no readings for this period" dead
  * end into a jump to a period that does have data (#642).
  *
- * `first_reading_at`/`last_reading_at` are full timestamps; converted with
- * UTC getters to match how the backend buckets/labels metering days
- * everywhere else on this page (#635).
+ * `first_reading_at`/`last_reading_at` are instants; their civil dates are
+ * read in the business timezone, the same days the backend buckets by
+ * (ADR 0026).
  */
 export function meteringPointDataRange(
     mp: Pick<MeteringPoint, 'first_reading_at' | 'last_reading_at'> | undefined,
@@ -144,8 +144,8 @@ export function meteringPointDataRange(
         return null
     }
     return {
-        from: formatUtcIsoDate(new Date(mp.first_reading_at)),
-        to: formatUtcIsoDate(new Date(mp.last_reading_at)),
+        from: formatBusinessIsoDate(new Date(mp.first_reading_at)),
+        to: formatBusinessIsoDate(new Date(mp.last_reading_at)),
     }
 }
 

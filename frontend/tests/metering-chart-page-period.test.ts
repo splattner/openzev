@@ -79,17 +79,18 @@ describe('meteringPointDataRange', () => {
   it('converts first/last reading timestamps to a civil-day range (#642)', () => {
     const range = meteringPointDataRange({
       first_reading_at: '2026-01-02T14:00:00Z',
-      last_reading_at: '2026-03-15T23:45:00Z',
+      last_reading_at: '2026-03-15T22:45:00Z',
     })
     expect(range).toEqual({ from: '2026-01-02', to: '2026-03-15' })
   })
 
-  it('uses UTC getters, not local ones, for the civil day (#635)', () => {
+  it('reads the civil day in Swiss time, not UTC or the viewer zone (#635, ADR 0026)', () => {
+    // 23:30 UTC on Jan 1 is already 00:30 on Jan 2 in Zurich.
     const range = meteringPointDataRange({
-      first_reading_at: '2026-01-02T00:30:00Z',
-      last_reading_at: '2026-01-02T00:30:00Z',
+      first_reading_at: '2026-01-01T23:30:00Z',
+      last_reading_at: '2026-07-01T21:45:00Z',
     })
-    expect(range).toEqual({ from: '2026-01-02', to: '2026-01-02' })
+    expect(range).toEqual({ from: '2026-01-02', to: '2026-07-01' })
   })
 
   it('returns null when the meter has never received a reading', () => {

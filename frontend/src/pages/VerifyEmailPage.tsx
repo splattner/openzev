@@ -5,7 +5,7 @@ import { useAuth } from '../lib/auth'
 import { verifyEmail, setInitialPassword } from '../lib/api/auth'
 import { createSelfSetupZev } from '../lib/api/zev'
 import { formatApiError } from '../lib/api/errors'
-import { todayLocalIso } from '../lib/dates'
+import { todayBusinessIso } from '../lib/dates'
 import { isValidIban, normalizeIban } from '../lib/iban'
 import type { SelfSetupZevInput } from '../types/api'
 import { GridOperatorField } from '../features/zev/GridOperatorField'
@@ -31,7 +31,7 @@ export function VerifyEmailPage() {
     // Create-ZEV step state
     const [zevForm, setZevForm] = useState<SelfSetupZevInput>({
         name: '',
-        start_date: todayLocalIso(),
+        start_date: todayBusinessIso(),
         zev_type: 'zev',
         billing_interval: 'annual',
         grid_operator: '',

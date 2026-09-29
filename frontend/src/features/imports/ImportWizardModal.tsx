@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
 import { MAX_UPLOAD_BYTES, type CsvColumnMap, type CsvFormatProfile, type DetectionState, type FilePreview } from './importUtils'
 import { formatBytes } from '../../lib/numbers'
+import type { ImportTimestampTimezone } from '../../types/api'
 
 /**
  * Where a previewed row's readings will land. A row can carry both directions
@@ -52,6 +53,7 @@ export interface ImportWizardModalProps {
     formatProfile: FormatProfile
     timestampFormat: string
     timestampFormatError: string | null
+    timestampTimezone: ImportTimestampTimezone
     intervalMinutes: string
     intervalMinutesError: string | null
     valuesCount: string
@@ -79,6 +81,7 @@ export interface ImportWizardModalProps {
     onDelimiterChange: (value: string) => void
     onFormatProfileChange: (profile: FormatProfile) => void
     onTimestampFormatChange: (value: string) => void
+    onTimestampTimezoneChange: (value: ImportTimestampTimezone) => void
     onIntervalMinutesChange: (value: string) => void
     onValuesCountChange: (value: string) => void
     onColumnMapChange: (patch: Partial<CsvColumnMap>) => void
@@ -228,7 +231,7 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
     }, [props.files])
     const {
         step, source, files, fileErrors, hasHeader, delimiter, delimiterError,
-        formatProfile, timestampFormat, timestampFormatError, intervalMinutes,
+        formatProfile, timestampFormat, timestampFormatError, timestampTimezone, intervalMinutes,
         intervalMinutesError, valuesCount, valuesCountError, overwriteExisting,
         columnMap, previews, detection, missingMeterIds, previewOutdated, previewLoading, missingMeteringPoints,
         scopedZevId, selectedZevName, canGoStep2, canStartImport,
@@ -369,6 +372,17 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                             {timestampFormatError && (
                                                 <span className="field-error">{timestampFormatError}</span>
                                             )}
+                                        </label>
+                                        <label>
+                                            <span>{t('pages.imports.wizard.timestampTimezone')}</span>
+                                            <select
+                                                value={timestampTimezone}
+                                                onChange={(event) => props.onTimestampTimezoneChange(event.target.value as ImportTimestampTimezone)}
+                                            >
+                                                <option value="Europe/Zurich">{t('pages.imports.wizard.timestampTimezoneZurich')}</option>
+                                                <option value="UTC">{t('pages.imports.wizard.timestampTimezoneUtc')}</option>
+                                            </select>
+                                            <span className="muted" style={{ fontSize: '0.82rem' }}>{t('pages.imports.wizard.timestampTimezoneHint')}</span>
                                         </label>
                                     </div>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

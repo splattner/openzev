@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { todayLocalIso } from '../../lib/dates'
+import { todayBusinessIso } from '../../lib/dates'
 import type { Tariff, TariffInput, TariffPeriod, TariffPeriodInput } from '../../types/api'
 
 export type TariffFormValues = {
@@ -172,7 +172,7 @@ export const defaultTariffFormValues: TariffFormValues = {
   fixed_price_chf: '',
   initial_percentage: '',
   split_key: 'equal',
-  valid_from: todayLocalIso(),
+  valid_from: todayBusinessIso(),
   valid_to: '',
   notes: '',
   dynamic_source: '',

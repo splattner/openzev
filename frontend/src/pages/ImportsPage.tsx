@@ -20,10 +20,11 @@ import {
 } from '../lib/api/metering'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
+import { businessDayStartMs, nextIsoDate } from '../lib/dates'
 import { useManagedZev } from '../lib/managedZev'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
-import type { ImportLog } from '../types/api'
+import type { ImportLog, ImportTimestampTimezone } from '../types/api'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { BulkDeleteModal } from '../features/imports/BulkDeleteModal'
 import { ImportHistoryTable } from '../features/imports/ImportHistoryTable'
@@ -79,6 +80,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     const [delimiter, setDelimiter] = useState(',')
     const [formatProfile, setFormatProfile] = useState<CsvFormatProfile>('daily_15min')
     const [timestampFormat, setTimestampFormat] = useState('%d.%m.%Y')
+    const [timestampTimezone, setTimestampTimezone] = useState<ImportTimestampTimezone>('Europe/Zurich')
     const [intervalMinutes, setIntervalMinutes] = useState('15')
     const [valuesCount, setValuesCount] = useState('96')
     const [overwriteExisting, setOverwriteExisting] = useState(false)
@@ -116,12 +118,13 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
             delimiter,
             formatProfile,
             timestampFormat,
+            timestampTimezone,
             intervalMinutes,
             valuesCount,
             overwriteExisting,
             columnMap,
         }
-    }, [files, source, scopedZevId, hasHeader, delimiter, formatProfile, timestampFormat, intervalMinutes, valuesCount, overwriteExisting, columnMap])
+    }, [files, source, scopedZevId, hasHeader, delimiter, formatProfile, timestampFormat, timestampTimezone, intervalMinutes, valuesCount, overwriteExisting, columnMap])
 
     const previewStampMatches = previewStampsEqual(previewStamp, currentStamp)
 
@@ -461,6 +464,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                     setDelimiter(next.delimiter)
                     setFormatProfile(next.formatProfile)
                     setTimestampFormat(next.timestampFormat)
+                    setTimestampTimezone(next.timestampTimezone)
                     setIntervalMinutes(next.intervalMinutes)
                     setValuesCount(next.valuesCount)
                     setColumnMap(next.columnMap)
@@ -488,6 +492,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         setDelimiter(cfg.delimiter)
         setFormatProfile('daily_15min')
         setTimestampFormat('%d.%m.%Y')
+        setTimestampTimezone('Europe/Zurich')
         setIntervalMinutes('15')
         setValuesCount('96')
         setOverwriteExisting(false)
@@ -611,6 +616,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                 delimiter,
                 formatProfile,
                 timestampFormat,
+                timestampTimezone,
                 intervalMinutes: parsedIntervalMinutes,
                 valuesCount: parsedValuesCount,
                 overwriteExisting,
@@ -676,6 +682,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                     delimiter,
                     formatProfile,
                     timestampFormat,
+                    timestampTimezone,
                     intervalMinutes: parsedIntervalMinutes,
                     valuesCount: parsedValuesCount,
                     overwriteExisting,
@@ -713,10 +720,10 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         if (bulkDeleteMode === 'all') return importLogs
         // Table search/filter never narrows deletion: the scope must come
         // from exactly the backend scope (ZEV + dates). Both sides compare
-        // instants in the same half-open UTC range.
+        // instants in the same half-open range of Swiss civil days.
         if (!bulkDeleteFrom || !bulkDeleteTo) return []
-        const start = new Date(`${bulkDeleteFrom}T00:00:00Z`).getTime()
-        const end = new Date(`${bulkDeleteTo}T00:00:00Z`).getTime() + 24 * 60 * 60 * 1000
+        const start = businessDayStartMs(bulkDeleteFrom)
+        const end = businessDayStartMs(nextIsoDate(bulkDeleteTo))
         return importLogs.filter((log) => {
             const createdAt = new Date(log.created_at).getTime()
             return createdAt >= start && createdAt < end
@@ -831,6 +838,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                 formatProfile={formatProfile}
                 timestampFormat={timestampFormat}
                 timestampFormatError={timestampFormatError}
+                timestampTimezone={timestampTimezone}
                 intervalMinutes={intervalMinutes}
                 intervalMinutesError={intervalMinutesError}
                 valuesCount={valuesCount}
@@ -858,6 +866,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                 onDelimiterChange={setDelimiter}
                 onFormatProfileChange={handleFormatProfileChange}
                 onTimestampFormatChange={setTimestampFormat}
+                onTimestampTimezoneChange={setTimestampTimezone}
                 onIntervalMinutesChange={setIntervalMinutes}
                 onValuesCountChange={setValuesCount}
                 onColumnMapChange={(patch) => setColumnMap((prev) => ({ ...prev, ...patch }))}

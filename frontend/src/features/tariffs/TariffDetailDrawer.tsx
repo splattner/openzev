@@ -14,7 +14,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 import { formatDateTime, formatShortDate } from '../../lib/appSettings'
-import { todayLocalIso } from '../../lib/dates'
+import { todayBusinessIso } from '../../lib/dates'
 import type { AppSettings, TariffPeriod, TariffSeries, TariffVersion } from '../../types/api'
 import { bandName } from './bands'
 import { MONTH_KEYS, formatSeason } from './recurrence'
@@ -73,7 +73,7 @@ export function TariffDetailDrawer({
     const monthNames = MONTH_KEYS.map(
         (key) => t(`pages.tariffs.monthsShort.${key}` as Parameters<typeof t>[0]),
     )
-    const today = todayLocalIso()
+    const today = todayBusinessIso()
     const { sourceById, validityBadge, priceSummary, pricingLabelFor, pricingTooltipFor } = useTariffDisplay(settings, today)
 
     // Kept so the closing animation still shows the tariff that was open,

@@ -9,6 +9,12 @@ export function ImportProtocolModal({ log, onClose }: { log: ImportLog | null; o
     const { t } = useTranslation()
     const { settings } = useAppSettings()
 
+    function timestampTimezoneLabel(zone: ImportLog['timestamp_timezone']) {
+        if (zone === 'Europe/Zurich') return t('pages.imports.wizard.timestampTimezoneZurich')
+        if (zone === 'UTC') return t('pages.imports.wizard.timestampTimezoneUtc')
+        return t('pages.imports.protocol.timestampTimezoneLegacy')
+    }
+
     const columns = useMemo<ColumnDef<NonNullable<ImportLog['errors']>[number], unknown>[]>(
         () => [
             {
@@ -38,6 +44,9 @@ export function ImportProtocolModal({ log, onClose }: { log: ImportLog | null; o
                     <div><strong>{t('pages.imports.protocol.zev')}</strong> {log.zev_name || log.zev || '-'}</div>
                     <div><strong>{t('pages.imports.protocol.importedBy')}</strong> {log.imported_by_display || '-'}</div>
                     <div><strong>{t('pages.imports.protocol.batchId')}</strong> {log.batch_id || '-'}</div>
+                    {log.source === 'csv' && (
+                        <div><strong>{t('pages.imports.protocol.timestampTimezone')}</strong> {timestampTimezoneLabel(log.timestamp_timezone)}</div>
+                    )}
                     <div><strong>{t('pages.imports.protocol.filename')}</strong> {log.filename || '-'}</div>
                     <div><strong>{t('pages.imports.protocol.totalRows')}</strong> {log.rows_total ?? '-'}</div>
                     <div><strong>{t('pages.imports.protocol.importedRows')}</strong> {log.rows_imported}</div>

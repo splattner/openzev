@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import i18n from '../../i18n'
-import { todayLocalIso } from '../../lib/dates'
+import { todayBusinessIso } from '../../lib/dates'
 import type { Participant, ParticipantInput } from '../../types/api'
 
 export type ParticipantFormValues = {
@@ -59,7 +59,7 @@ export const defaultParticipantFormValues: ParticipantFormValues = {
   postal_code: '',
   city: '',
   notes: '',
-  valid_from: todayLocalIso(),
+  valid_from: todayBusinessIso(),
   valid_to: '',
   allocation_weight: '',
 }

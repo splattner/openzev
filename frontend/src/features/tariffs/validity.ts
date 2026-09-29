@@ -7,7 +7,7 @@ export type ValidityState = 'active' | 'scheduled' | 'expired'
  *
  * Compared as ISO strings rather than `Date` objects: `new Date('2026-01-01')`
  * parses as UTC midnight, which reintroduces the offset that
- * `lib/dates.todayLocalIso` exists to avoid. Lexicographic comparison of two
+ * `lib/dates.todayBusinessIso` exists to avoid. Lexicographic comparison of two
  * `YYYY-MM-DD` strings is exact.
  *
  * Both bounds are inclusive, so a tariff whose window opens or closes today is

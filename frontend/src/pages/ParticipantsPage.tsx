@@ -32,7 +32,7 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
-import { todayLocalIso } from '../lib/dates'
+import { todayBusinessIso } from '../lib/dates'
 import { formatParticipantName } from '../lib/participantFormat'
 import { getTitleLabelMap } from '../lib/participantTitle'
 import type { Participant, ParticipantInput } from '../types/api'
@@ -277,7 +277,7 @@ export function ParticipantsPage() {
     const ownerIdByZevId = new Map((zevsQuery.data ?? []).map((zev) => [zev.id, zev.owner]))
     const isOwnerParticipant = (participant: Participant) => ownerIdByZevId.get(participant.zev) === participant.user
     const editingParticipant = participants.find((participant) => participant.id === editingId)
-    const todayIso = todayLocalIso()
+    const todayIso = todayBusinessIso()
     const participantCards = [...participants]
         .map((participant) => {
             const warnings = participantWarnings(participant)

@@ -10,7 +10,7 @@ import { fetchDynamicPriceHistory } from '../../lib/api/tariffs'
 import { formatDateTime, formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { AXIS_COLOR, CHART_GRIDLINE, CONS_COLORS } from '../../lib/chartTokens'
 import { CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
-import { formatIsoDate, todayLocalIso } from '../../lib/dates'
+import { formatIsoDate, todayBusinessIso } from '../../lib/dates'
 import { queryKeys } from '../../lib/api/queryKeys'
 import type { DynamicPriceHistory, DynamicPricePoint, DynamicTariffSource, Tariff } from '../../types/api'
 
@@ -148,7 +148,7 @@ type PanelProps = {
 export function DynamicPriceHistoryPanel({ source, tariff }: PanelProps) {
   const { t } = useTranslation()
   const { settings } = useAppSettings()
-  const today = todayLocalIso()
+  const today = todayBusinessIso()
   const [dateFrom, setDateFrom] = useState(daysBefore(today, 6))
   const [dateTo, setDateTo] = useState(today)
 

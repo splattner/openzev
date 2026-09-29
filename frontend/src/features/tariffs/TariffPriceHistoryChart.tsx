@@ -12,7 +12,7 @@ import {
     YAxis,
 } from 'recharts'
 import { formatShortDate } from '../../lib/appSettings'
-import { formatUtcIsoDate, todayLocalIso } from '../../lib/dates'
+import { formatUtcIsoDate, todayBusinessIso } from '../../lib/dates'
 import type { AppSettings, TariffSeries } from '../../types/api'
 import { buildPriceHistory, type BandKey, type PriceUnit } from './priceHistory'
 import { AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CONS_COLORS, FLOW_LOCAL_CONS, NEGATIVE_COLOR } from '../../lib/chartTokens'
@@ -49,7 +49,7 @@ function decimalsFor(unit: PriceUnit): number {
 
 export function TariffPriceHistoryChart({ series, allSeries, settings }: Props) {
     const { t } = useTranslation()
-    const today = todayLocalIso()
+    const today = todayBusinessIso()
 
     const history = useMemo(
         () => buildPriceHistory(series, allSeries, today),

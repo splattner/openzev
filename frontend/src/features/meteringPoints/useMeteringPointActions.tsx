@@ -19,7 +19,7 @@ import { formatApiError } from '../../lib/api/errors'
 import { fetchMeteringDataQualityStatus } from '../../lib/api/metering'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
-import { todayLocalIso } from '../../lib/dates'
+import { todayBusinessIso } from '../../lib/dates'
 import { useToast } from '../../lib/toast'
 import {
     defaultAssignmentForm,
@@ -145,7 +145,7 @@ export function useMeteringPointActions({
 
     // Plain value, not a hook — safe to compute once up front and reuse
     // everywhere below (assignment prefill, counts, health).
-    const todayIso = todayLocalIso()
+    const todayIso = todayBusinessIso()
 
     // ── Modal form state ──────────────────────────────────────────────────────────
 
