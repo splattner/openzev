@@ -48,7 +48,7 @@ SERVER_TITLE = "OpenZEV"
 INSTRUCTIONS = (
     "OpenZEV data returned here is scoped to the signed-in user: an admin sees "
     "every ZEV, a ZEV owner only their own. Call list_zevs first to find a "
-    "zev_id for the other tools. Dates are YYYY-MM-DD, amounts are CHF strings, "
+    "zev_id for the other tools, and list_participants to find a participant_id. Dates are YYYY-MM-DD, amounts are CHF strings, "
     "energy is in kWh. Metering data is aggregated (daily/monthly buckets); raw "
     "15-minute readings are not available through MCP. Every tool is read-only."
 )

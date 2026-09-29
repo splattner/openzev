@@ -210,12 +210,12 @@ class TestPing:
 
 
 class TestToolsList:
-    def test_lists_all_eight_tools_read_only(self, admin_mcp_client):
+    def test_lists_all_nine_tools_read_only(self, admin_mcp_client):
         response = rpc(admin_mcp_client, "tools/list")
         tools = response.json()["result"]["tools"]
         names = {t["name"] for t in tools}
         assert names == {
-            "list_zevs", "period_readiness", "find_invoices", "explain_invoice",
+            "list_zevs", "list_participants", "period_readiness", "find_invoices", "explain_invoice",
             "import_triage", "consumption_summary", "data_gaps", "audit_query",
         }
         assert all(t["annotations"]["readOnlyHint"] is True for t in tools)

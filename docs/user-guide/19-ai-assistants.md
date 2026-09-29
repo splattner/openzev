@@ -87,13 +87,14 @@ a header credential: `Authorization: Bearer ozv_3f9a1c04b7e2_kR8vN2pQ...`.
 
 ## What you can ask
 
-Once connected, the assistant has eight tools. You do not need to know their
+Once connected, the assistant has nine tools. You do not need to know their
 names — asking a normal question is enough — but knowing what exists helps
 you phrase a better question:
 
 | Tool | Answers |
 | --- | --- |
 | `list_zevs` | Which ZEVs can I see? (call this first to get a ZEV's id) |
+| `list_participants` | Who is in this ZEV, since when, and which metering points are they assigned to? (names and dates only — no email, phone, address or IBAN) |
 | `period_readiness` | Can this billing period be invoiced, and what is blocking it? |
 | `find_invoices` | Which invoices match this participant / period / status? |
 | `explain_invoice` | Break one invoice down into its line items, and compare it with the participant's previous invoice |
@@ -106,6 +107,7 @@ Example questions:
 
 - "List the ZEVs I have access to."
 - "Is the current period ready to bill for ZEV Sonnenhof?"
+- "Who are the current participants of ZEV Sonnenhof, and which meters do they have?"
 - "Find Anna Muster's invoices from this year."
 - "Explain invoice OZV-00013 — why did it go up from last quarter?"
 - "What errors came up in yesterday's metering import?"

@@ -55,6 +55,78 @@ class TestListZevs:
         assert {str(z1.id), str(z2.id)} <= ids
 
 
+class TestListParticipants:
+    def test_lists_participants_with_assignments_and_no_contact_details(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        anna = ParticipantFactory(
+            zev=zev, first_name="Anna", last_name="Muster",
+            email="anna@example.com", phone="+41 79 000 00 00",
+            valid_from=date(2025, 1, 1),
+        )
+        meter = MeteringPointFactory(zev=zev, meter_id="CH-MCP-0001")
+        MeteringPointAssignmentFactory(metering_point=meter, participant=anna, valid_from=date(2025, 1, 1))
+
+        result = _structured(call_tool(owner_mcp_client, "list_participants", {"zev_id": str(zev.id)}))
+
+        assert len(result["participants"]) == 1
+        row = result["participants"][0]
+        assert row["id"] == str(anna.id)
+        assert row["full_name"] == "Anna Muster"
+        assert row["metering_points"] == [
+            {"meter_id": "CH-MCP-0001", "meter_type": meter.meter_type, "valid_from": "2025-01-01", "valid_to": None}
+        ]
+        assert set(row) == {
+            "id", "full_name", "valid_from", "valid_to", "has_account", "onboarding_status", "metering_points",
+        }
+        assert "anna@example.com" not in str(result)
+
+    def test_query_filters_by_name(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        ParticipantFactory(zev=zev, first_name="Anna", last_name="Muster", valid_from=date(2025, 1, 1))
+        ParticipantFactory(zev=zev, first_name="Ben", last_name="Baumann", valid_from=date(2025, 1, 1))
+
+        result = _structured(
+            call_tool(owner_mcp_client, "list_participants", {"zev_id": str(zev.id), "query": "baum"})
+        )
+        assert [p["full_name"] for p in result["participants"]] == ["Ben Baumann"]
+
+    def test_active_on_hides_former_participants_unless_include_inactive(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        ParticipantFactory(zev=zev, first_name="Old", last_name="Tenant",
+                           valid_from=date(2024, 1, 1), valid_to=date(2025, 10, 31))
+        ParticipantFactory(zev=zev, first_name="New", last_name="Tenant", valid_from=date(2025, 11, 1))
+        args = {"zev_id": str(zev.id), "active_on": "2025-12-01"}
+
+        result = _structured(call_tool(owner_mcp_client, "list_participants", args))
+        assert [p["full_name"] for p in result["participants"]] == ["New Tenant"]
+        assert result["active_on"] == "2025-12-01"
+
+        result = _structured(
+            call_tool(owner_mcp_client, "list_participants", {**args, "include_inactive": True})
+        )
+        assert {p["full_name"] for p in result["participants"]} == {"Old Tenant", "New Tenant"}
+
+    def test_limit_caps_and_reports_truncation(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        for i in range(3):
+            ParticipantFactory(zev=zev, last_name=f"P{i}", valid_from=date(2025, 1, 1))
+
+        result = _structured(
+            call_tool(owner_mcp_client, "list_participants", {"zev_id": str(zev.id), "limit": 2})
+        )
+        assert len(result["participants"]) == 2
+        assert result["truncated"] is True
+        assert result["total"] == 3
+
+    def test_owner_cannot_list_another_owners_participants(self, owner_mcp_client):
+        other_zev = ZevFactory()
+        ParticipantFactory(zev=other_zev, first_name="Secret", last_name="Person", valid_from=date(2025, 1, 1))
+
+        response = call_tool(owner_mcp_client, "list_participants", {"zev_id": str(other_zev.id)})
+        assert _is_error(response)
+        assert "Secret" not in str(response.json())
+
+
 class TestPeriodReadiness:
     def test_invalid_arguments_missing_zev_id(self, owner_mcp_client):
         response = call_tool(owner_mcp_client, "period_readiness", {})
@@ -109,6 +181,18 @@ class TestFindInvoices:
         )
         assert len(result["invoices"]) == 1
         assert result["invoices"][0]["participant_name"] == "Anna Muster"
+
+    def test_participant_id_narrows_server_side(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        anna = ParticipantFactory(zev=zev, first_name="Anna", last_name="Muster")
+        ben = ParticipantFactory(zev=zev, first_name="Ben", last_name="Baumann")
+        InvoiceFactory(zev=zev, participant=anna, period_start=date(2026, 1, 1), period_end=date(2026, 1, 31))
+        InvoiceFactory(zev=zev, participant=ben, period_start=date(2026, 1, 1), period_end=date(2026, 1, 31))
+
+        result = _structured(
+            call_tool(owner_mcp_client, "find_invoices", {"zev_id": str(zev.id), "participant_id": str(ben.id)})
+        )
+        assert [r["participant_id"] for r in result["invoices"]] == [str(ben.id)]
 
     def test_limit_caps_and_reports_truncation(self, owner_mcp_client, owner_user):
         zev = ZevFactory(owner=owner_user)

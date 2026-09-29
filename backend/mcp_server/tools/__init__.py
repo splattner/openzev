@@ -13,6 +13,7 @@ from .data_gaps import DataGapsTool
 from .explain_invoice import ExplainInvoiceTool
 from .find_invoices import FindInvoicesTool
 from .import_triage import ImportTriageTool
+from .list_participants import ListParticipantsTool
 from .list_zevs import ListZevsTool
 from .period_readiness import PeriodReadinessTool
 
@@ -20,6 +21,7 @@ TOOLS: dict[str, Tool] = {
     tool.name: tool
     for tool in (
         ListZevsTool(),
+        ListParticipantsTool(),
         PeriodReadinessTool(),
         FindInvoicesTool(),
         ExplainInvoiceTool(),

@@ -31,13 +31,15 @@ class FindInvoicesTool(Tool):
     name = "find_invoices"
     title = "Find invoices"
     description = (
-        "Locate invoices for a ZEV, narrowed by participant name, period or "
-        "status — use this before explain_invoice to find an invoice id."
+        "Locate invoices for a ZEV, narrowed by participant (participant_id from "
+        "list_participants, or a name substring), period or status — use this "
+        "before explain_invoice to find an invoice id."
     )
     input_schema = {
         "type": "object",
         "properties": {
             "zev_id": {"type": "string", "format": "uuid"},
+            "participant_id": {"type": "string", "format": "uuid"},
             "participant_query": {"type": "string", "minLength": 1},
             "period_start": {"type": "string", "format": "date"},
             "period_end": {"type": "string", "format": "date"},
@@ -52,6 +54,8 @@ class FindInvoicesTool(Tool):
     def run(self, ctx: ToolContext, arguments: dict) -> dict:
         limit = arguments.get("limit", 20)
         params: dict = {"zev_id": arguments["zev_id"]}
+        if arguments.get("participant_id"):
+            params["participant_id"] = arguments["participant_id"]
         if arguments.get("status"):
             params["status"] = arguments["status"]
         if arguments.get("period_start"):
@@ -59,10 +63,10 @@ class FindInvoicesTool(Tool):
         if arguments.get("period_end"):
             params["period_to"] = arguments["period_end"]
 
-        # Fetch a bit beyond `limit` when filtering client-side by
-        # participant name (the REST list has no name filter), then cap
-        # after. period_start/period_end narrow server-side via the
-        # participant_id-style filters added to InvoiceViewSet.
+        # participant_id and period_start/period_end narrow server-side (the
+        # filters added to InvoiceViewSet). A participant *name* has no REST
+        # filter, so participant_query fetches without a limit, filters the
+        # rows here, and caps after.
         fetch_limit = None if arguments.get("participant_query") else limit
         rows, truncated, total = ctx.get_all(
             "/api/v1/invoices/invoices/",

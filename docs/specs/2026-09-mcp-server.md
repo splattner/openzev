@@ -35,7 +35,7 @@ more — and every tool call is traceable in the audit log.
 | Protocol | JSON-RPC 2.0: `initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call`; batches |
 | Auth | Existing API keys via `Authorization: Api-Key ozv_…` or `Authorization: Bearer ozv_…`; roles `admin`, `zev_owner` |
 | Feature flag | `mcp_server_enabled`, default off; `404` while off |
-| Tools | 8 read-only tools (§6) built on in-process sub-requests to existing REST GET endpoints |
+| Tools | 9 read-only tools (§6) built on in-process sub-requests to existing REST GET endpoints |
 | Audit | `AuditEventSource.MCP`; one `mcp.tool.call` event per `tools/call` |
 | Throttling | One API-key throttle hit per MCP HTTP request; sub-requests are not throttled again |
 | Docs | New user-guide chapter `19-ai-assistants.md`; `mkdocs.yml` nav; baseline spec updates (§11) |
@@ -178,7 +178,7 @@ Batches are capped at 10 messages (`-32600` if more).
 ### 5.5 `instructions`
 
 A short English text telling the assistant: data is scoped to the signed-in user; call
-`list_zevs` first to find ZEV ids; dates are `YYYY-MM-DD`; amounts are CHF; energy is kWh;
+`list_zevs` first to find ZEV ids and `list_participants` to find participant ids; dates are `YYYY-MM-DD`; amounts are CHF; energy is kWh;
 readings are aggregated, raw 15-minute data is not available through MCP.
 
 ## 6. Tools
@@ -206,6 +206,41 @@ Find the ZEVs the caller can see.
   — `is_disabled` is derived from the serializer's `disabled_at` (`is_disabled = disabled_at is not None`);
   `ZevSerializer` has no `participant_count` field, so it is not offered (computing it would mean the tool
   querying the ORM itself, which ADR 0025 rules out).
+
+### 6.1a `list_participants`
+
+Who is in a ZEV, and which metering points they are assigned to. The only way for an
+assistant to obtain a `participant_id` for `consumption_summary` / `find_invoices`
+without the participant already having an invoice.
+
+- Input: `zev_id` (uuid, required); `query` (string, optional, case-insensitive substring of
+  `full_name`, which includes the title, e.g. "Ms. Anna Consumer"); `active_on` (date, optional,
+  default today); `include_inactive` (bool, default false — when true, `active_on` is ignored and
+  former/future participants are included); `limit` (1–100, default 50).
+- Sub-requests: `GET /api/v1/zev/zevs/<zev_id>/` first — the participant list answers an empty
+  page for a ZEV the caller cannot see, which would read as "no participants", so the detail
+  request surfaces the view's own 404/403 as a tool error instead; then
+  `GET /api/v1/zev/participants/?zev_id=…` (hard cap 5 pages) and
+  `GET /api/v1/zev/metering-point-assignments/?zev_id=…` (hard cap 10 pages), joined on
+  `participant`.
+- Filtering: a participant is kept when `valid_from <= active_on` and (`valid_to` is null or
+  `valid_to >= active_on`). Assignments are **not** filtered by date — a participant's full
+  assignment history is returned so move-in/move-out questions can be answered.
+- Output:
+  ```json
+  {"participants": [{"id", "full_name", "valid_from", "valid_to", "has_account",
+                     "onboarding_status",
+                     "metering_points": [{"meter_id", "meter_type", "valid_from", "valid_to"}]}],
+   "active_on"?: "YYYY-MM-DD", "truncated"?: true, "total"?: int}
+  ```
+  Sorted by `full_name` (case-insensitive); assignments by `valid_from`. `has_account` is
+  `ParticipantSerializer.user is not None`; `onboarding_status` is passed through
+  (`not_sent`/`sent`/`active`/`revoked`/`expired`); `meter_id`/`meter_type` come from the
+  participant row's nested `metering_points`. **Deliberately omitted** although the REST
+  response carries them: `email`, `phone`, `title`, address fields, `building_footprint`,
+  `account_username`, onboarding link expiry — contact data the assistant does not need and that
+  would otherwise be sent to the LLM provider (§1, privacy note in the user guide).
+  `truncated`/`total` appear when `limit` cut the list or either sub-list hit its page cap.
 
 ### 6.2 `period_readiness`
 
@@ -243,11 +278,12 @@ Can a billing period be billed, and what is blocking it.
 
 Locate invoices before explaining one.
 
-- Input: `zev_id` (uuid, required); `participant_query` (string, optional, case-insensitive
-  substring of participant name); `period_start`/`period_end` (date, optional — invoices whose
+- Input: `zev_id` (uuid, required); `participant_id` (uuid, optional — from
+  `list_participants`; narrows server-side); `participant_query` (string, optional,
+  case-insensitive substring of participant name); `period_start`/`period_end` (date, optional — invoices whose
   period overlaps); `status` (enum of `InvoiceStatus` values, optional); `limit` (1–50,
   default 20).
-- Sub-requests: `GET /api/v1/invoices/invoices/?zev_id=…[&status=…&period_from=…&period_to=…]`
+- Sub-requests: `GET /api/v1/invoices/invoices/?zev_id=…[&participant_id=…&status=…&period_from=…&period_to=…]`
   paging until `limit` matches or the list ends (hard cap 10 pages). `period_start`/`period_end`
   arguments map onto the `period_from`/`period_to` narrow-only filters added to `InvoiceViewSet`
   for this tool (documented in `2026-03-invoice-lifecycle-and-communication.md` §5.1).
@@ -385,6 +421,7 @@ method other than `GET`:
 | Tool | Path (URL name) |
 |---|---|
 | `list_zevs` | `/api/v1/zev/zevs/` (`zev-list`) |
+| `list_participants` | `zev-detail`, `participant-list`, `meteringpointassignment-list` |
 | `period_readiness` | `invoice-readiness`, `invoice-attention` |
 | `find_invoices`, `explain_invoice` | `invoice-list`, `invoice-detail` |
 | `import_triage` | `importlog-list` |
@@ -479,16 +516,16 @@ No new env vars.
 
 ## 10. Tests (`backend/mcp_server/tests/`)
 
-61 tests across four modules (`backend/mcp_server/tests/__init__.py` makes it a package;
+67 tests across four modules (`backend/mcp_server/tests/__init__.py` makes it a package;
 fixtures live in `backend/mcp_server/tests/conftest.py` — an autouse `mcp_server_enabled`
 fixture, `admin_mcp_client`/`owner_mcp_client`, and `rpc`/`call_tool` request helpers built
 on `APIClient`).
 
 | Module | Count | Classes | Covers |
 |---|---|---|---|
-| `test_transport.py` | 28 | `TestFeatureFlagGate`, `TestMethodNotAllowed`, `TestAuthentication`, `TestRole`, `TestOrigin`, `TestBodyParsing`, `TestBatch`, `TestInitialize`, `TestPing`, `TestToolsList`, `TestToolsCall` | flag off → 404 (unauthenticated and with a valid key); `GET`/`DELETE` → 405 (authenticated); no auth → 401 with `WWW-Authenticate`; cookie JWT alone → 401; `Api-Key` and `Bearer` both accepted; revoked/expired key → 401; participant → 403; admin/owner → 200; untrusted `Origin` → 403, no `Origin` passes, trusted `Origin` passes; malformed JSON → `-32700`/400; non-object message → `-32600`; unknown method → `-32601`; batch (mixed request + notification), batch > 10 → `-32600`, notification-only → 202 with empty body; `initialize` version negotiation (requested-and-supported, and fallback for unsupported); `ping`; `tools/list` returns exactly the 8 tools, all `readOnlyHint: true`; unknown tool and invalid arguments → `-32602` with `data.errors` |
+| `test_transport.py` | 28 | `TestFeatureFlagGate`, `TestMethodNotAllowed`, `TestAuthentication`, `TestRole`, `TestOrigin`, `TestBodyParsing`, `TestBatch`, `TestInitialize`, `TestPing`, `TestToolsList`, `TestToolsCall` | flag off → 404 (unauthenticated and with a valid key); `GET`/`DELETE` → 405 (authenticated); no auth → 401 with `WWW-Authenticate`; cookie JWT alone → 401; `Api-Key` and `Bearer` both accepted; revoked/expired key → 401; participant → 403; admin/owner → 200; untrusted `Origin` → 403, no `Origin` passes, trusted `Origin` passes; malformed JSON → `-32700`/400; non-object message → `-32600`; unknown method → `-32601`; batch (mixed request + notification), batch > 10 → `-32600`, notification-only → 202 with empty body; `initialize` version negotiation (requested-and-supported, and fallback for unsupported); `ping`; `tools/list` returns exactly the 9 tools, all `readOnlyHint: true`; unknown tool and invalid arguments → `-32602` with `data.errors` |
 | `test_dispatch.py` | 5 | `TestAllowList`, `TestForcedAuth`, `TestThrottleSkip` | non-allow-listed URL raises `DispatchError`; an allow-listed URL succeeds; a sub-request resolves data as the forced user (proves `_force_auth_user`/`_force_auth_token` took effect); `ApiKeyRateThrottle.get_cache_key` returns `None` when `mcp_subrequest` is set and a real cache key otherwise |
-| `test_tools.py` | 22 | `TestListZevs`, `TestPeriodReadiness`, `TestFindInvoices`, `TestExplainInvoice`, `TestImportTriage`, `TestConsumptionSummary`, `TestDataGaps`, `TestAuditQuery` | one class per tool: happy-path shape; owner cannot see another owner's ZEV/invoice (`isError` with the view's own message, e.g. "Permission denied.", no data leaked); admin sees any ZEV; invalid arguments → `-32602`; caps/truncation (`find_invoices`, `import_triage`); `explain_invoice` previous-invoice selection skips a cancelled invoice and picks the correct prior period, and `compare_previous: false` skips the lookup; `import_triage` extracts meter ids from error text and respects `only_problems`; `consumption_summary` span > 400 days is a `ToolError` (`isError: true`, not `-32602` — see §6.6); `data_gaps` marks a meter with zero readings fully incomplete |
+| `test_tools.py` | 28 | `TestListZevs`, `TestListParticipants`, `TestPeriodReadiness`, `TestFindInvoices`, `TestExplainInvoice`, `TestImportTriage`, `TestConsumptionSummary`, `TestDataGaps`, `TestAuditQuery` | one class per tool: happy-path shape; owner cannot see another owner's ZEV/invoice (`isError` with the view's own message, e.g. "Permission denied.", no data leaked); admin sees any ZEV; invalid arguments → `-32602`; caps/truncation (`find_invoices`, `import_triage`); `explain_invoice` previous-invoice selection skips a cancelled invoice and picks the correct prior period, and `compare_previous: false` skips the lookup; `import_triage` extracts meter ids from error text and respects `only_problems`; `consumption_summary` span > 400 days is a `ToolError` (`isError: true`, not `-32602` — see §6.6); `data_gaps` marks a meter with zero readings fully incomplete; `list_participants` returns assignments and none of the contact fields, filters by `query` and `active_on` (and `include_inactive`), caps with `truncated`/`total`, and gives an owner naming another owner's ZEV a tool error with no participant data; `find_invoices` `participant_id` narrows server-side |
 | `test_audit.py` | 6 | `TestToolCallAudit` | successful call recorded with `source = mcp`, `mcp.Tool`/tool-name target, `api_key_prefix`/`duration_ms`/`subrequests` in metadata; `zev_id` argument attaches the `Zev` row only when it is visible to the caller (an owner naming another owner's ZEV gets `zev = null` **and** `status = denied`, not a leak); a failed tool call is recorded `failed` or `denied`; `tools/list` and `initialize` write no `mcp.tool.call` event |
 
 `accounts/test_throttling.py` gains `McpSubrequestThrottleTests` (1 test,
