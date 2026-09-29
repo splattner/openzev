@@ -8,7 +8,7 @@
 - Created: 2026-03-24
 - Target Release: Ongoing baseline
 - Related Issues: n/a (baseline)
-- Related ADRs: 0002, 0006, 0007
+- Related ADRs: 0002, 0006, 0026 (supersedes 0007)
 - Impacted Areas: backend, frontend, docs
 
 ## 1. Problem and outcome
@@ -212,7 +212,14 @@ reads through `OrderBy` expressions to the column they sort on).
 The frontend sorts again for display, by season first
 (`features/tariffs/recurrence.ts`, `seasonSortKey`).
 
-**Period matching rules** (evaluated per-timestamp, `tariffs.periods.resolve_band`, which `invoices/engine.py:_resolve_tariff_band` delegates to):
+**Period matching rules** (evaluated per-timestamp, `tariffs.periods.resolve_band`, which `invoices/engine.py:_resolve_tariff_band` delegates to).
+Months, weekdays and hours describe the **Swiss wall clock**: `resolve_band`
+first converts an aware `ts` (the ORM returns UTC) with
+`allocation.validity.wall_clock`, so HT 06:00–22:00 means 06:00 in Zurich in
+winter and summer alike, for every import source (ADR 0026). A naive `ts` —
+only synthetic ones, e.g. `average_percentage`'s reference year — is taken as a
+wall clock already. On the autumn DST day both 02:00 hours resolve at 02:xx;
+on the spring day there is no 02:xx reading.
 
 1. Restrict to periods whose `months` contain the timestamp's month. A blank
    mask matches every month, so every period predating seasonal support
@@ -355,7 +362,17 @@ covers a three-band contract printing every band.
 `backend/tariffs/test_midnight_bands.py` (8, #837): `in_window` for ordinary,
 wrapping, end-at-midnight and whole-day windows; an HT/NT tariff with NT
 22:00–06:00 billing night hours at NT and day hours at HT; the weekday being the
-timestamp's own; and a stored night band resolved through the engine. Frontend:
+timestamp's own; and a stored night band resolved through the engine.
+`backend/tariffs/test_band_timezone.py::BandsResolveInSwissLocalTimeTests` (5,
+ADR 0026): UTC-aware timestamps resolve on the Swiss wall clock — 06:30 and
+22:30 CEST, 06:30 CET, Saturday 00:30 CET (Friday in UTC) and 1 April 00:30
+CEST (31 March in UTC).
+`backend/invoices/test_civil_time_billing.py` (5): a reading at 23:45 CET on
+31 January bills in January and 00:00 in February; a full Swiss summer day of
+hourly readings bills 16 h HT and 8 h NT; a move-out takes effect at Swiss
+midnight; an offset-less CSV reading is priced with the dynamic price of the
+same Swiss quarter-hour; SDAT production and Swiss-time CSV consumption share
+one timestamp and allocate. Frontend:
 `frontend/tests/tariff-bands.test.ts` (11) covers band naming and the chart
 giving each unnamed band its own labelled series while leaving HT/NT and flat
 tariffs as they were.
@@ -497,7 +514,7 @@ assignment gap belong to nobody.
 
 | Reading set | Metering points | Direction | Time window |
 |---|---|---|---|
-| `participant_readings` | Participant's consumption MPs | `IN` | `[period_start 00:00 UTC, period_end+1 00:00 UTC)` |
+| `participant_readings` | Participant's consumption MPs | `IN` | `period_window(period_start, period_end)`: `[period_start 00:00, period_end+1 00:00)` Europe/Zurich, as UTC instants |
 | `feedin_readings` | Participant's production MPs | `OUT` | same |
 | `zev_production_by_ts` | ZEV-wide production MPs | `OUT` | same, grouped by timestamp |
 | `zev_consumption_by_ts` | ZEV-wide consumption MPs | `IN` | same, grouped by timestamp |
@@ -537,7 +554,7 @@ Before shared metering points (`SPEC-2026-08-shared-metering-points`), this gate
 
 **Pool coverage:** the pool is physical — `zev_consumption_at_ts`/`zev_production_at_ts` sum over **every** metering point of the ZEV, with or without an assignment in the period and regardless of the `is_active` flag. A never-assigned meter feeds the pool but is billed to nobody; a deactivated meter (`is_active = False`) still feeds the pool, and its readings are still attributed to its assignment holder — deactivation does not remove a meter from allocation. This matches across the engine, dashboards, PDFs, and annual statement (ADR 0013 pool decision). `is_active` gates nothing in the billing engine at all (§4.6.5) — it is a list/admin status only. A metering point with no assignment overlapping the period still counts in the pool but is billed to nobody; that is a data-quality condition rather than a valid steady state — every metering point should have a holder for each period it has readings (a common-area *Allgemein* meter is assigned to a community / Verwaltung participant), and such holder-less readings are surfaced by the metering data-quality status check.
 
-**Assignment matching** uses the *UTC civil date* of the reading's timestamp (`_utc_date(ts)` — `ts.astimezone(tz.utc).date()`), consistent with period, tariff, and completeness conventions (ADR 0007 — all timestamps are stored and queried in UTC). A reading at 22:30 UTC on the day an assignment ends still belongs to that day's holder even though Zurich is already on the next civil day.
+**Assignment matching** uses the *civil date* of the reading's timestamp in Europe/Zurich (`allocation.validity.civil_date(ts)` — raises on a naive datetime), consistent with period, tariff-validity, and completeness conventions (ADR 0026). A reading at 23:45 Swiss time on the day an assignment ends belongs to that day's holder; 00:15 the next day belongs to the next holder, whatever the UTC date.
 
 **Fail-fast contracts** (implemented in `allocation/split.py`): all inputs must be `Decimal` (`TypeError` otherwise) and non-negative (`InvalidAllocationInputError`); a participant's draw above the community's total consumption, a producer's output above the community's total production, or a participant's share above the total in `proportional_share`, raises `InvalidAllocationInputError` — with consistent data these are impossible (the total includes the participant's own reading), so they indicate duplicate readings or the wrong metering-point scope. No arithmetic is clamped silently. All allocation failures (`InvalidAllocationInputError`, and `OverlappingAssignmentWindowsError` from the assignment-window index) derive from `AllocationError` (a `ValueError`), so the billing API reports them as HTTP `400` with the underlying message instead of the `409` reserved for an existing invoice (ADR 0013).
 
@@ -555,7 +572,7 @@ FOR EACH community reading (metering points with a COMMUNITY assignment overlapp
     IF resolution is None OR resolution.allocation_mode != COMMUNITY:
         SKIP    (a gap, or this window is personal — billed in §4.3 instead)
 
-    day = _utc_date(ts)
+    day = civil_date(ts)
     IF NOT (participant.valid_from ≤ day ≤ participant.valid_to or open-ended):
         SKIP    (a mid-period joiner pays no share of readings before their join date;
                  a leaver's share stops at their leave date)
@@ -597,7 +614,7 @@ After computing `r_local` and `r_grid` for a reading at timestamp `ts`:
 
 For each `(energy_type, quantity)` in `{(local, r_local), (grid, r_grid)}` where `quantity > 0`:
 
-1. Find all tariffs where `billing_mode = energy`, `energy_type` matches, and tariff is active on `_utc_date(ts)`.
+1. Find all tariffs where `billing_mode = energy`, `energy_type` matches, and tariff is active on `civil_date(ts)`.
 2. For each matching tariff, resolve the price via period matching (§3.2).
 3. Accumulate: `quantity` kWh at `quantity × price` CHF.
 
@@ -611,7 +628,7 @@ rule as §3.2/§3.2b/§3.2c — see SPEC-2026-percentage-tariff-bands for the fu
 design (data model, migration from the single-percentage shape, engine,
 documents, transfer archive, frontend).
 
-1. **Grid base price sum** = sum of `price_chf_per_kwh` at `ts` for all tariffs where `billing_mode = energy` AND `energy_type = grid` AND active at `_utc_date(ts)`.
+1. **Grid base price sum** = sum of `price_chf_per_kwh` at `ts` for all tariffs where `billing_mode = energy` AND `energy_type = grid` AND active at `civil_date(ts)`.
 2. For each percentage tariff with at least one band, resolve the band at `ts` (`TariffResolver.percentage_at`, delegating to `invoices.engine._resolve_tariff_band` / `tariffs.periods.resolve_band`). When the resolved band's percentage is non-zero and the tariff's `energy_type` matches (a zero-percent band produces no line and does not resolve the grid base):
    - `effective_price = grid_base_price_sum × (band.percentage / 100)`
    - Accumulate: `quantity` kWh at `quantity × effective_price` CHF, keyed by the resolved band so §4.7a can itemise it like an energy band.
@@ -624,8 +641,10 @@ it exactly like a static tariff — the branch is entirely inside price
 resolution, not in which tariffs are selected.
 
 Generation records `InvoiceDynamicSourceEvidence` for every applicable dynamic
-tariff before committing. Each row freezes the source, tariff UUID and the UTC
-intersection of invoice and tariff validity. These rows survive tariff edits
+tariff before committing. Each row freezes the source, tariff UUID and the
+intersection of invoice and tariff validity as a `period_window` (Swiss
+midnights, stored as UTC instants; rows written before ADR 0026 keep their
+UTC-midnight windows and stay valid protected ranges). These rows survive tariff edits
 and use `PROTECT` on the source. Storage and clearing take the same source-row
 locks before checking retained evidence. Drafts protect prices; cancelled
 invoices no longer protect points but still retain the source row. Applicable
@@ -687,7 +706,7 @@ ELSE:
     exported_kwh   = 0
 ```
 
-Same assignment matching (UTC civil date), fail-fast contracts, and gap logging as §4.3.
+Same assignment matching (civil date), fail-fast contracts, and gap logging as §4.3.
 
 #### 4.5.1 Local energy credit
 
@@ -1155,7 +1174,7 @@ Within the same sort order, items are sorted by `tariff.name` (case-insensitive)
 - Tariffs: local = 0.15 CHF/kWh, grid = 0.25 CHF/kWh, feed-in = 0.08 CHF/kWh (all flat)
 - Period: January 2026
 
-**Readings at 2026-01-15 00:00 UTC:**
+**Readings at 2026-01-15 00:00 (Swiss time):**
 - Consumption MP: 10.0 kWh IN
 - Production MP: 6.0 kWh OUT
 
@@ -1391,7 +1410,7 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 | Assignment windows: overlap handling, boundary dates, gaps | §4.1 attribution index |
 | Non-`Decimal` input, negative inputs, totals above the community total | §4.3 fail-fast contracts |
 | Overlapping assignment windows raise; adjacent (non-overlapping) windows pass | Fail-fast on direct-DB corruption |
-| UTC civil-date matching at 22:30/00:30 boundaries, incl. a Zurich-tz timestamp | §4.3 UTC-date assignment matching |
+| Swiss civil-date matching at 23:30/00:30 boundaries, the same instant expressed in UTC and CEST (`test_matching_uses_the_swiss_civil_date_of_the_timestamp`) | §4.3 civil-date assignment matching |
 | Conservation invariants (Σ local == pool; producer sold == consumer local) | §4.3 pool conservation |
 | Exact Decimal arithmetic where floats would drift | §4.3/5 Decimal end-to-end billing contract |
 

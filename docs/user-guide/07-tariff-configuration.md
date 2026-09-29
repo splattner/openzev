@@ -523,7 +523,9 @@ To add one:
 2. Click **Add Period** in the Tariff Periods section
 3. Enter:
    - **Period type** (see above) and, for a time band, a **Band name**
-   - **Time from** / **Time to** — HH:MM (24-hour format)
+   - **Time from** / **Time to** — HH:MM (24-hour format), in Swiss time
+     (CET/CEST): 06:00 means 06:00 on the clock in Switzerland in winter and
+     summer alike, whatever format the readings were imported in
    - **Weekdays** and **Months** the period applies to (all selected means
      every day / all year)
    - **CHF/kWh** (per-kWh tariff), or **Percentage** (percentage tariff)

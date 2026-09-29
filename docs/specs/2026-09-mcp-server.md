@@ -389,7 +389,7 @@ per-participant breakdown) or for one participant.
   `self_sufficiency_pct = 100 * self_consumed_kwh / consumed_kwh` (`null` if `consumed_kwh` is 0).
   `series` is the payload's `timeline`, capped at 168 entries for `bucket=hour`, 31 for
   `bucket=day` or 14 for `bucket=month` (`truncated: true` if the cap bit). Buckets are the
-  endpoint's own (UTC-truncated, ADR 0007).
+  endpoint's own: days and months are Swiss civil days and months, hours are Swiss hours (ADR 0026).
 
   **Per-participant breakdown** (only without `participant_id`): `participants` is the payload's
   `participant_stats` (already sorted by `total_consumed_kwh` descending), capped at 50

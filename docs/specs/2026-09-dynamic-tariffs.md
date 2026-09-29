@@ -213,7 +213,7 @@ the source link and receive no bands.
 | `invoice` | FK → Invoice, CASCADE | related_name `dynamic_evidence` |
 | `source` | FK → DynamicTariffSource, PROTECT | related_name `invoice_evidence` |
 | `tariff_id_snapshot` | UUIDField | copied value, not a mutable tariff FK |
-| `evidence_from` / `evidence_to` | DateTimeField | half-open UTC interval; end strictly after start |
+| `evidence_from` / `evidence_to` | DateTimeField | half-open interval (UTC instants of Swiss midnights, `period_window`); end strictly after start. Rows written before ADR 0026 keep UTC-midnight bounds |
 
 Unique on `(invoice, tariff_id_snapshot)`; ordered by invoice_id, source_id, id.
 Generation records each applicable dynamic tariff's intersection with the invoice
@@ -278,7 +278,7 @@ into Python merely to locate a few gaps.
 
 Coverage is **never** derived from a count. An operator-local quarter-hour day
 can contain 92, 96, or 100 intervals around DST transitions. Billing and
-readiness use UTC civil-day windows under ADR 0007. Interval coverage handles
+readiness use civil-day windows (Swiss midnight to Swiss midnight, `allocation.validity.period_window`) under ADR 0026. Interval coverage handles
 both publication offsets and hourly prices without a resolution assumption.
 
 Holes are ordinary: an endpoint may omit an interval when its upstream source
@@ -300,9 +300,11 @@ Backfills use 31-day chunks to remain below the HTTP size and timeout limits.
 | No range support | One request, without a requested time window |
 
 Starting no later than yesterday retains the first hours of operator-local days
-that begin before UTC midnight. These UTC transport buffers deliberately differ
-from UI history bounds: `local_civil_day_window()` converts Europe/Zurich civil
-dates to UTC, while evidence guards use `allocation.validity` UTC billing bounds.
+that begin before UTC midnight. These UTC transport buffers deliberately stay wider
+than any civil day. UI history bounds and evidence guards both use
+`allocation.validity.period_window` (Europe/Zurich civil days, ADR 0026); the
+former `local_civil_day_window()` helper is gone because it computed the same
+window.
 Failed/refused windows retain the earliest
 recovery cursor, including failures in old backfill chunks. Only requests are
 clamped: a later success or failure cannot erase an older, unattempted cursor,
@@ -445,8 +447,8 @@ returns the same structured 409 response, allowing the frontend to direct the
 operator to refresh the named source instead of claiming an invoice collision.
 
 Before `generate-all` queues Celery, `preflight_dynamic_prices` validates every
-applicable source configuration, then checks coverage at the actual UTC reading
-timestamps and energy types the batch engine can price. This includes a dynamic
+applicable source configuration, then checks coverage at the actual reading
+instants and energy types the batch engine can price. This includes a dynamic
 grid source used as the base of an applicable percentage tariff, but excludes
 period gaps where no invoice would perform a price lookup. Owner/ZEV permission
 checks run first. The first known price-use gap returns the same structured HTTP
@@ -476,7 +478,7 @@ does not recompute it. Reported through the existing `tariffs` step
 (`_tariffs_step_from_list`); no new `ReadinessStepKey`, so no frontend or
 locale changes were needed for this part.
 
-Coverage uses stored intervals over UTC civil-day windows, never a fixed
+Coverage uses stored intervals over civil-day windows (Europe/Zurich), never a fixed
 number of readings. The existing continuous-interval test demonstrates coverage
 across a DST date; parser fixtures separately verify offset normalization.
 

@@ -93,8 +93,10 @@ Opening a day expands it into a compact intraday chart plus an hour ×
 15-minute grid of the exact values, so you can spot an individual anomalous
 reading the aggregated chart may hide. The expanded detail also flags
 negative individual readings and duplicate (timestamp, direction) readings,
-if any. Readings are grouped by their UTC calendar day, matching how imported
-timestamps are stored.
+if any. Readings are grouped by their Swiss calendar day, the same day used
+for billing periods and tariffs. The day on which clocks go forward has 92
+quarter-hours and the day they go back has 100; in the grid, that day's two
+02:00 hours add up in one cell.
 
 ## Data Quality View
 

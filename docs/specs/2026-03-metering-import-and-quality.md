@@ -8,7 +8,7 @@
 - Created: 2026-03-24
 - Target Release: Ongoing baseline
 - Related Issues: n/a (baseline)
-- Related ADRs: 0005, 0007
+- Related ADRs: 0005, 0026 (supersedes 0007)
 - Impacted Areas: backend, frontend, async jobs
 
 ## 1. Problem and outcome
@@ -57,7 +57,7 @@ import and quality features from scratch.
 |---|---|---|
 | `id` | `UUIDField` (PK) | Auto-generated |
 | `metering_point` | FK → `MeteringPoint` (`CASCADE`) | Source meter |
-| `timestamp` | `DateTimeField` | Start of measurement interval (UTC) |
+| `timestamp` | `DateTimeField` | Start of measurement interval, a UTC instant; its civil day and hour are read in Europe/Zurich (ADR 0026) |
 | `energy_kwh` | `Decimal(12,4)` | Energy value in kWh |
 | `direction` | `ReadingDirection` | `in` (consumption) or `out` (production/feed-in) |
 | `resolution` | `ReadingResolution` | `15min`, `hourly`, or `daily` |
@@ -113,7 +113,8 @@ Ordering: `["metering_point", "timestamp"]`.
 | `rows_overwritten` | `PositiveIntegerField` (default `0`) | CSV writes that replaced an existing reading (also included in `rows_imported`); nonzero protects the import from deletion |
 | `rows_skipped` | `IntegerField` | Skipped/duplicate count |
 | `errors` | `JSONField` (default `[]`) | Array of error objects: CSV uses `{row, meter_id?, error}` (`meter_id` attached whenever the row names a meter), SDAT-CH uses `{meter_id?, error}` or `{error}` |
-| `warnings` | `JSONField` (default `[]`) | Informational notes, never failures: CSV overwrite reports `{row: null, warning: "Overwrote N existing readings."}` here so success toasts stay success |
+| `warnings` | `JSONField` (default `[]`) | Informational notes, never failures: CSV overwrite reports `{row: null, warning: "Overwrote N existing readings."}` and zero-energy rows in the spring DST gap report `{row: null, warning: "Skipped N rows at <date> 02:00–02:59: that hour does not exist in Swiss time (DST start)."}` here so success toasts stay success |
+| `timestamp_timezone` | `CharField(40, blank)` (default `""`) | Zone offset-less timestamps were read in: `"Europe/Zurich"` or `"UTC"` for CSV (the import setting), `"Europe/Zurich"` for SDAT-CH. `""` marks imports from before ADR 0026, which read them as UTC — the batches `reanchor_readings` operates on (spec `2026-09-swiss-civil-time.md` §6.3). Migration `0006_importlog_timestamp_timezone` |
 | `created_at` | `DateTimeField` (auto) | Import timestamp |
 
 Ordering: `["-created_at", "id"]` (matches `metering/models.py:ImportLog.Meta.ordering`).
@@ -153,6 +154,7 @@ is rejected with an explicit error asking for `.xlsx` or CSV.
 | `delimiter` | `,` | Column separator for CSV |
 | `format_profile` | `standard` | `standard` or `daily_15min` |
 | `timestamp_format` | auto-detect | Python `strftime` format string |
+| `timestamp_timezone` | `Europe/Zurich` | Zone for offset-less timestamps and daily-profile dates: `Europe/Zurich` or `UTC`; anything else is a 400 |
 | `interval_minutes` | `15` | Interval duration for `daily_15min` profile |
 | `values_count` | `96` | Number of interval columns per row in `daily_15min` profile |
 | `overwrite_existing` | `false` | Replace existing readings vs skip duplicates |
@@ -194,7 +196,7 @@ positional `daily_15min` interval slots are read the same way.
 | Direction cells | The mapped `direction` column accepts the literals `in`/`out` (case-insensitive) and OBIS identifiers of the form `[A-B:]C.D.E[*F]` — e.g. `1-1:1.29.0*255`, `1.29.0`, `1-0:2.8.0`. The C group decides the flow for active energy: `1` → `in` (grid import), `2` → `out` (feed-in). Any other C group (reactive energy `3`/`4` included) is rejected rather than guessed. An empty cell falls back to meter-type inference. The column applies to both format profiles |
 | Missing values | An absent cell reports "Missing …"; a whitespace-only cell reports "Empty …" |
 | Numbers | Comma decimal separators are accepted. Non-finite values (`nan`, `inf`) are rejected. Unparseable numbers report `Invalid numeric value '<input>'` rather than leaking `decimal` conversion codes. Magnitudes above `99999999.9999` kWh (the `DecimalField(max_digits=12, decimal_places=4)` bound) are rejected with an actionable error in both preview and import, so no `DataError` can escape the import transaction on PostgreSQL |
-| Timestamps | `timestamp_format` (a `strptime` string) wins if supplied and is interpreted as UTC: a parsed offset is converted to UTC (`astimezone`), never discarded — except native Excel datetime cells, which are used as-is (assumed UTC when naive, converted when aware). Otherwise ISO-8601 is parsed first, falling back to a lenient parser; naive values are assumed UTC. For `daily_15min`, non-ISO dates are parsed day-first to suit European exports |
+| Timestamps | `timestamp_format` (a `strptime` string) wins if supplied; otherwise ISO-8601 is parsed first, falling back to a lenient parser. A parsed offset is converted to UTC (`astimezone`), never discarded. An offset-less value — text or a native Excel datetime cell — is a wall-clock time in `timestamp_timezone` (default Europe/Zurich), with the DST rules of §4.1.1. For `daily_15min`, non-ISO dates are parsed day-first to suit European exports |
 | Truncated daily rows | Missing interval columns or an invalid slot value reject the whole row atomically (one error, one `rows_skipped`, zero `rows_imported`); preview shares `_parse_daily_values` so both report the identical message. A row with no interval values at all is skipped with a "no interval values" error in both paths |
 | Daily duplicates / gap-fill | Without overwrite, existing slots are skipped per slot and missing slots imported: a partially duplicate row imports its new slots with no row error; a fully duplicate row (all slots in DB or earlier in the file) is skipped with one `Duplicate reading` error. Preview sets `existing_data` for partial and full duplicates without returning blocking errors. Fully existing daily rows increment `summary.rows_skipped_existing` (including intra-file duplicates tracked by the written-set); the wizard shows a localized skip notice and permits merge re-imports. With overwrite, all slots upsert and the skip count is zero while `existing_data` remains set |
 | Standard duplicates | Standard rows are interpreted by the shared `_interpret_standard_row` helper, so preview and import validate timestamps, values and directions identically. Preview prefetches existing `(metering_point, timestamp, direction)` pairs with chunked exact-timestamp queries (no range scan) and sets `existing_data` for rows matching the database or an earlier row in the same file; duplicates without overwrite increment `summary.rows_skipped_existing` without blocking errors, mirroring the daily contract. `summary.readings_existing` counts exact matching reading keys across the whole file — one per duplicate standard row, one per duplicate daily slot, including repeated writes within the file (validation failures excluded; data may change before execution) — and feeds the overwrite confirmation count |
@@ -236,14 +238,42 @@ surface the same single error per row.
 **Decimal parsing:** values are parsed via `Decimal`, with comma → dot
 substitution, quantized to 4 decimal places.
 
-**Timestamp handling:**
-- Explicit `timestamp_format` → `strptime` + UTC. A parsed offset is converted to UTC (`astimezone`); naive results are stamped UTC. The format must contain `%` and capture the full calendar date: year-less formats (e.g. `%d.%m`) are rejected up front, otherwise data would silently land in 1900; day-of-year (`%Y-%j`) and week-based (`%U`/`%W`/`%V`) patterns count as month+day. The frontend `isValidTimestampFormat` mirrors this (year + (month+day | `%j` | week)). The validation probe is timezone-aware so offset-bearing formats (`%z`/`%Z`) round-trip. Unparseable timestamps report `Invalid timestamp value '<input>'` (standard) / `Invalid date value '<input>'` (daily), never dateutil internals.
+**Timestamp handling** (all through `TimestampReader`, §4.1.1):
+- Explicit `timestamp_format` → `strptime`. A parsed offset is converted to UTC (`astimezone`); naive results are wall-clock times in `timestamp_timezone`. The format must contain `%` and capture the full calendar date: year-less formats (e.g. `%d.%m`) are rejected up front, otherwise data would silently land in 1900; day-of-year (`%Y-%j`) and week-based (`%U`/`%W`/`%V`) patterns count as month+day. The frontend `isValidTimestampFormat` mirrors this (year + (month+day | `%j` | week)). The validation probe is timezone-aware so offset-bearing formats (`%z`/`%Z`) round-trip. Unparseable timestamps report `Invalid timestamp value '<input>'` (standard) / `Invalid date value '<input>'` (daily), never dateutil internals.
 - Timezone-aware timestamps → normalized to UTC.
-- Naive timestamps → assume UTC.
+- Naive timestamps → wall-clock time in `timestamp_timezone` (default
+  Europe/Zurich; `UTC` keeps the pre-ADR-0026 behaviour).
 - `daily_15min` profile → the declared calendar day wins: parse the date's
-  year/month/day and anchor it at midnight UTC, then offset each slot by
-  `interval_minutes × slot_index` (an offset-bearing value does not shift the
-  billing day).
+  year/month/day, anchor it at midnight in `timestamp_timezone`, then offset
+  each slot by `interval_minutes × slot_index` in UTC arithmetic (an
+  offset-bearing value does not shift the billing day). In Europe/Zurich the
+  row is fitted to the day's real length first (§4.1.1).
+
+#### 4.1.1 Declared zone and daylight saving (ADR 0026)
+
+One `TimestampReader(timestamp_format, zone_name)` per pass over the file
+(prefetch, preview, import) turns cells into instants: `parse()` returns an
+aware UTC value or a naive wall clock, `resolve(parsed, series_key)` localizes
+a wall clock, and `day_window()` returns a daily row's `DayWindow(day, start,
+end)` — local midnight to local midnight, as UTC. `_parse_datetime_utc` remains
+only for the transfer-archive importer, whose timestamps carry offsets.
+
+- **Autumn hour** (02:00–02:59 on the last Sunday of October occurs twice):
+  per meter and direction, in file order, the first occurrence is summer time
+  and the second winter time.
+- **Spring hour** (02:00–02:59 on the last Sunday of March does not exist): a
+  standard row with energy `0` is skipped — counted in `rows_skipped`, one
+  warning per day on the log, and `rows_skipped_dst_gap` in the preview — and a
+  row with energy is a row error `Timestamp <value> does not exist in Swiss time (DST start).`
+- **Daily rows** (`_fit_daily_values`): a Swiss day has 92, 96 or 100
+  quarter-hours. Surplus trailing empty values are dropped; on the spring day
+  an empty or zero 02:00 hour is dropped; a 25-hour day given an ordinary
+  day's values, or any other surplus, is a row error
+  `<date> has <L> intervals in Swiss time (DST start|DST end), but the row has <n> values.`
+  Rows shorter than an ordinary day are kept (partial days). `UTC` rows pass
+  through unchanged.
+
+Details and every message: `2026-09-swiss-civil-time.md` §6.1.
 
 **Write modes:**
 
@@ -333,7 +363,9 @@ token is required or checked.
     "rows_skipped_existing": 0
   },
   "missing_meter_ids": ["CH-MISSING-1", "CH-MISSING-2"],
-  "errors": []
+  "errors": [],
+  "timestamp_timezone": "Europe/Zurich",
+  "rows_skipped_dst_gap": 0
 }
 ```
 
@@ -350,7 +382,7 @@ direction column is visible before anything is written.
 For `daily_15min` profile, each preview row includes `interval_minutes` and
 `values_count` instead of `energy`. `existing_data` is direction-aware and
 uses one range query per contiguous block of file days: it flags any stored
-reading on the row's UTC day with a direction that row would import. It also
+reading on the row's civil day (`DayWindow`) with a direction that row would import. It also
 flags exact duplicate slots earlier in the file. The flag remains visible in
 overwrite mode. In skip mode, fully duplicate daily rows contribute to
 `summary.rows_skipped_existing` instead of blocking errors. This count covers
@@ -371,7 +403,7 @@ Response:
   "undetected": [],
   "settings": {
     "has_header": true, "delimiter": ",", "format_profile": "standard",
-    "timestamp_format": "%d.%m.%Y", "interval_minutes": 15, "values_count": 96,
+    "timestamp_format": "%d.%m.%Y", "timestamp_timezone": "Europe/Zurich", "interval_minutes": 15, "values_count": 96,
     "column_map": {"meter_id": "meter_id", "timestamp": "timestamp", "energy_kwh": "energy_kwh", "direction": null, "energy_start": null}
   }
 }
@@ -453,20 +485,22 @@ All metering endpoints are routed under `/api/v1/metering/` via DRF routers.
 direction within each time bucket.
 
 **Participant visibility:** filter each reading by an assignment belonging to
-the caller that covers the reading's UTC civil date, before aggregation
+the caller that covers the reading's civil date (Europe/Zurich), before aggregation
 (§6.1). Selecting a meter does not grant access to its previous or next
 holder's readings, even when no date bounds are supplied.
 
-**Date bounds:** explicit UTC start/end construction (via
-`allocation.validity.period_window`) to avoid Django timezone conversion
-artifacts (ADR 0007).
+**Date bounds:** explicit start/end instants from
+`allocation.validity.period_window` — Swiss midnights converted to UTC — never
+Django `__date` lookups (ADR 0026).
 
-**Bucket boundaries:** `TruncHour`, `TruncDay`, and `TruncMonth` receive UTC
-explicitly. Response bucket timestamps therefore use `+00:00`; daily and
-monthly buckets cannot move across the filtered UTC date range, and the two
-distinct UTC hours during a local DST fallback remain separate. Presentation
-code may format those timestamps for the user's locale, but it must not change
-the aggregation boundary (ADR 0007).
+**Bucket boundaries** (`_bucket_trunc(bucket)`): `TruncDay` and `TruncMonth`
+receive `business_tz()` (Europe/Zurich), so day and month buckets are civil
+days and months and serialize with their offset (`2026-07-01T00:00:00+02:00`).
+`TruncHour` receives UTC: Zurich's offset is a whole number of hours, so the
+boundaries are identical, and the two 02:00 hours of the autumn DST change stay
+separate (`…T00:00:00Z`, `…T01:00:00Z`). The frontend labels every bucket in
+Europe/Zurich (`formatMeteringBucketLabel`), never from the string's date part
+(ADR 0026).
 
 ### 5.3 Raw data
 
@@ -562,8 +596,8 @@ routing, ADR 0013.)
 For each timestamp $t$:
 
 0. Attribute the reading to the participant whose assignment is active on
-   $t$'s UTC civil date (`ts.date()`, ADR 0013/0007 — timestamps are always
-   UTC, so the UTC date is also the period and tariff day). Readings with no
+   $t$'s civil date (`allocation.validity.civil_date`, Europe/Zurich — the
+   same day the period and the tariff use, ADR 0013/0026). Readings with no
    active assignment (gap readings) are excluded from per-participant totals
    and the timeline, but remain in the ZEV-level aggregates (§"ZEV-level
    aggregates" below).
@@ -658,13 +692,13 @@ is looked up for display (one batched query); meters with no current
 assignment show `"Unassigned"`.
 
 **Unassigned-holder detection:** a reading whose metering point has no
-assignment active at the reading's UTC civil date is billed to nobody but
+assignment active at the reading's civil date is billed to nobody but
 still inflates the ZEV pool (ADR 0013); that is always a misconfiguration,
 not a valid state. Such readings are counted per metering point as
 `unassigned_readings` plus the distinct `unassigned_days` they fall on, so
 an operator can assign the meter (e.g. to an *Allgemein* / community
 participant) or confirm the exclusion. Holders are resolved through the
-shared `AssignmentWindows` with the same UTC-civil-date semantics as billing
+shared `AssignmentWindows` with the same civil-date semantics as billing
 (`AssignmentWindows.participant_on`), once per distinct day rather than once
 per reading — assignment validity is date-granular, so day-level resolution
 is exactly equivalent. `unassigned_readings` counts reading *rows*: a
@@ -736,6 +770,7 @@ All import endpoints use `MultiPartParser` and `FormParser`.
 | `delimiter` | No | CSV separator (default `,`) |
 | `format_profile` | No | `standard` or `daily_15min` |
 | `timestamp_format` | No | Python strftime string |
+| `timestamp_timezone` | No | `Europe/Zurich` (default) or `UTC`; any other value → 400 `timestamp_timezone must be one of Europe/Zurich, UTC.` |
 | `interval_minutes` | No | Minutes per interval (default `15`) |
 | `values_count` | No | Interval columns per row (default `96`) |
 | `overwrite_existing` | No | `true`/`false` (default `false`) |
@@ -776,11 +811,11 @@ and missing meters still block the wizard.
 - An unprotected single-log delete removes the selected `ImportLog` and all `MeterReading` rows with `import_batch == batch_id`.
 - Bulk delete operates on the same scoped queryset as the list endpoint.
 - Bulk delete accepts `mode = all | period`.
-- `mode = period` requires `date_from` and `date_to` and filters with the half-open UTC range `[date_from 00:00Z, date_to + 1 day 00:00Z)` on `ImportLog.created_at`. History timestamps render in local time; the delete dialog labels the range as UTC so display, selection and deletion stay consistent.
+- `mode = period` requires `date_from` and `date_to` and filters `ImportLog.created_at` with `period_window(date_from, date_to)` — Swiss calendar days, the same days the history shows.
 - Bulk delete validates an optional `zev_id` as a UUID before filtering. Invalid calendar dates, non-string dates, reversed ranges, and `date_to=9999-12-31` return 400 rather than overflowing the exclusive end bound.
-- History table filename/source filters are client-side only and never narrow bulk delete: the UI copy names the selected ZEV (or "all visible ZEVs" when none is selected), and the count uses the same half-open UTC instants as the backend.
+- History table filename/source filters are client-side only and never narrow bulk delete: the UI copy names the selected ZEV (or "all visible ZEVs" when none is selected), and the count uses the same instants as the backend (`businessDayStartMs(from)` to `businessDayStartMs(nextIsoDate(to))`).
 - Both endpoints write an audit event (`import_log.delete`, `import_log.bulk_delete`) scoped to the ZEV of the deleted logs, so the owning ZEV owner sees it in their audit log. Bulk delete writes one event per affected ZEV (metadata carries the request filters plus that ZEV's `deleted_logs`/`deleted_readings`). The ZEV is taken from the deleted logs, never from the request's `zev_id`; a bulk delete that removes nothing, or removes only logs without a ZEV, writes a single unscoped (admin-only) event.
-- Delete responses return counts for both deleted logs and deleted readings; bulk deletion also returns `timezone: "UTC"`; the frontend invalidates both import-log and metering queries so charts/quality refresh.
+- Delete responses return counts for both deleted logs and deleted readings; bulk deletion also returns `timezone: "Europe/Zurich"` (also in its audit metadata); the frontend invalidates both import-log and metering queries so charts/quality refresh.
 
 ---
 
@@ -792,11 +827,11 @@ and missing meters still block the wizard.
 |---|---|
 | `admin` | All readings |
 | `zev_owner` | Readings for meters in `zev__owner = user` |
-| `participant` | Readings with an assignment for the same meter whose `participant.user = user` and whose validity window contains the reading's UTC civil date |
+| `participant` | Readings with an assignment for the same meter whose `participant.user = user` and whose validity window contains the reading's civil date |
 
 `MeterReadingViewSet._scope_by_role()` delegates admin/owner scoping to
 `ZevScopedQuerySetMixin`. For non-manager callers, it aliases `reading_day`
-with `TruncDate("timestamp", tzinfo=UTC)` and filters using a correlated
+with `TruncDate("timestamp", tzinfo=business_tz())` and filters using a correlated
 `Exists` over `MeteringPointAssignment`: `metering_point_id` equals the outer
 reading's meter, `participant__user` equals the caller, `valid_from <=
 reading_day`, and `valid_to IS NULL OR valid_to >= reading_day`. All conditions
@@ -829,10 +864,14 @@ owner/admin-only; raw-data and chart-data retain their response shapes.
 
 ## 7. Timezone policy
 
-Per ADR 0007, all metering timestamps are stored and queried in UTC.
+Per ADR 0026 (superseding ADR 0007), metering timestamps are stored as UTC
+instants, and every calendar question — which day, hour, weekday or month a
+reading belongs to — is answered in Europe/Zurich (`settings.TIME_ZONE`) through
+`allocation.validity` (`business_tz`, `civil_date`, `wall_clock`, `day_length`,
+`period_window`). A civil day is 23, 24 or 25 hours long.
 
 **Query boundary construction:** date parameters (`date_from`, `date_to`) are
-converted to explicit UTC bounds via `allocation.validity`:
+converted to local-midnight instants via `allocation.validity`:
 
 ```python
 start, end = period_window(date_from, date_to)
@@ -842,13 +881,20 @@ start, end = period_window(date_from, date_to)
 A lone `date_from`/`date_to` still filters one-sided
 (`period_start_dt`/`period_end_exclusive_dt`); both parameters are optional
 wherever the endpoint documents them as such. This avoids Django's `__date`
-lookup which applies `USE_TZ` / `TIME_ZONE` conversion and can
-drop/duplicate readings near midnight boundaries.
+lookup, whose result depends on the connection timezone rather than the helper.
 
 **Import normalization:**
 - Timezone-aware timestamps → converted to UTC.
-- Naive timestamps → assumed UTC.
-- SDAT-CH timestamps → ISO 8601 with `Z` or offset → parsed to UTC.
+- Naive CSV/Excel timestamps → wall-clock time in the import's
+  `timestamp_timezone` (default Europe/Zurich), §4.1.1.
+- SDAT-CH timestamps → ISO 8601 with `Z` or offset → parsed to UTC; an
+  offset-less one is read as Europe/Zurich explicitly, independent of the
+  process timezone.
+
+**Legacy data:** readings imported from offset-less files before ADR 0026 are
+stored as "Swiss wall clock labelled UTC". `python manage.py reanchor_readings`
+moves selected legacy batches to the real instant (dry run by default); see
+`2026-09-swiss-civil-time.md` §6.3.
 
 ---
 
@@ -889,6 +935,7 @@ interface ImportLog {
   rows_skipped: number
   source: string
   errors?: Array<{ row: number | null; error: string; meter_id?: string | null }>
+  timestamp_timezone?: 'Europe/Zurich' | 'UTC' | ''  // '' = imported before ADR 0026
   created_at: string
 }
 
@@ -914,6 +961,8 @@ interface ImportPreviewResult {
   }
   missing_meter_ids: string[]         // sorted distinct missing IDs over the whole file, capped at 50
   errors: Array<{ row: number | null; error: string }>
+  timestamp_timezone: 'Europe/Zurich' | 'UTC'
+  rows_skipped_dst_gap: number        // zero-energy rows in the spring DST gap, skipped (not errors)
 }
 
 interface ChartDataPoint {
@@ -984,7 +1033,7 @@ type MeteringDashboardSummary =
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Incorrect column mapping producing wrong readings | High | Preview-first validation with meter existence check and row-level feedback (§4.3) |
-| Timezone misalignment causing off-by-one-day errors | High | Explicit UTC boundary construction in all date queries (§7, ADR 0007) |
+| Timezone misalignment causing off-by-one-day errors | High | All day bounds and civil dates come from `allocation.validity` (§7, ADR 0026) |
 | Partial import writes with mixed valid/invalid rows | Medium | Per-row error handling; failed rows are skipped; successful rows are written (§4.1) |
 | Duplicate readings inflating billing totals | High | Unique constraint `(metering_point, timestamp, direction)` + skip-existing default (§3.1) |
 | Overwrite mode silently changing billing-critical data | Medium | Overwrite requires explicit `overwrite_existing=true`; `warnings` reports the count of overwrites |
@@ -1007,7 +1056,8 @@ type MeteringDashboardSummary =
 | `ParticipantImportRestrictionTests` | §6.2: participant cannot list import logs, preview CSV, or upload CSV (all 403) |
 | `ImportParserRobustnessTests` | §4.1: malformed CSV reported without crash; malformed SDAT-CH reported without crash; timezone offset normalized to UTC; duplicate rows skipped; idempotent re-import; overwrite mode updates value without creating new row |
 | `MeteringRawDataEndpointTests` | §5.3: owner gets daily-grouped raw rows with correct direction sums; participant can read own metering point's raw data |
-| `ChartDataEndpointTests` | §5.2: direction aggregates; UTC day/month boundaries agree with raw data; hourly buckets stay distinct across both DST transitions |
+| `ChartDataEndpointTests` | §5.2: direction aggregates; Swiss day/month boundaries agree with raw data (`test_daily_bucket_uses_the_same_civil_day_as_raw_data`, `test_month_bucket_does_not_cross_the_civil_month_boundary`); hourly buckets stay distinct across both DST transitions |
+| `DashboardCivilDayBucketingTests` | §5.4: a 23:45 Swiss-time reading stays in its civil-day bucket (`+02:00`); 00:00 the next day is excluded |
 | `DataQualityStatusTests` | §5.5: owner sees gaps and severity; participant sees own meters; default 30-day range; fully assigned readings report no unassigned; holder-less meter flags every reading; assignment-gap readings flagged unassigned; overlapping windows flag only the corrupt meter (others still report) |
 
 ### Backend (`metering/test_import_csv.py`, `metering/test_import_csv_characterization.py`, `metering/test_import_limits.py`)
@@ -1020,6 +1070,8 @@ type MeteringDashboardSummary =
 | `metering/testing.py` | Shared `upload_csv`/`preview_csv`/`detect_csv` helpers used by the import modules (the upload/preview helpers always exercise the required-`zev_id` path) |
 | `metering/test_import_csv_detect.py` | §4.3.1: delimiter, header, column, layout, interval and timestamp-format detection across standard/headerless/OBIS/daily/hourly-with-total/Excel files, each detected configuration round-tripped through the real preview endpoint (no errors, no missing meters); undetected reporting; bounded sample; 400 for missing/legacy files; role gating |
 | `metering/test_import_logs.py::ImportLogDeletionTests` | §3.3/§5.7/§8.2: deletion/rollback plus list-payload identity (`zev_name`, `imported_by_display`, `batch_id` alongside the raw IDs); bulk delete without `zev_id` covers all visible ZEVs but never foreign ones; delete/bulk-delete audit events are ZEV-scoped (one per ZEV for bulk), hidden from other owners, and never scoped from an unowned `zev_id` |
+| `metering/test_import_timezone.py::ImportTimezoneTests` (18) / `SdatTimestampTests` (2) | §4.1.1/§5.6: default Swiss zone, `UTC` option, offsets win, autumn hour per meter and direction, spring-gap skip and error, preview `rows_skipped_dst_gap`, invalid zone 400, daily rows at Swiss midnight and fitted to 92/96/100 slots, civil-day existing check; SDAT offset-less timestamps read as Zurich whatever the process `TZ` |
+| `metering/test_reanchor_readings.py` (12) | §7 legacy data: `reanchor_readings` list, dry run, apply, idempotency, refusals (SDAT, collisions outside the selection, spring-gap readings with energy, invoiced periods without `--allow-invoiced`), adjacent batches planned together, audit event |
 
 ### Backend (`metering/test_reading_visibility.py`)
 
@@ -1028,7 +1080,7 @@ day/hour/month chart buckets:
 
 | Test function | Cases | Validates |
 |---|---|---|
-| `test_only_assignment_days_are_visible_without_duplicate_totals` | 35 | Before/after-transfer exclusion, inclusive UTC boundaries, gaps, returning-holder windows, open-ended assignments through DST, and unduplicated IN/OUT totals |
+| `test_only_assignment_days_are_visible_without_duplicate_totals` | 35 | Before/after-transfer exclusion, inclusive civil-day boundaries (fixtures in Swiss time), gaps, returning-holder windows, open-ended assignments through DST, and unduplicated IN/OUT totals |
 | `test_next_holder_can_read_their_own_readings` | 5 | The next holder retains access during their own window |
 | `test_unbounded_requests_only_aggregate_owned_readings` | 2 | Requests without date bounds aggregate only owned readings, including exact raw reading counts |
 | `test_assignment_to_one_meter_does_not_grant_access_to_another` | 5 | Assignment correlation includes the meter, not only caller/date |
@@ -1119,6 +1171,6 @@ component test infra exists).
 - [ ] Dashboard readings are attributed per assignment timestamp; gap readings appear in ZEV aggregates but on no participant's totals (§5.4)
 - [ ] Data quality status returns per-metering-point gap detection with severity thresholds (§5.5)
 - [ ] Data quality status flags holder-less readings and overlapping windows per metering point without failing the whole response (§5.5)
-- [ ] All date queries use explicit UTC boundary construction (§7)
+- [ ] All date queries and civil dates go through `allocation.validity` (§7)
 - [ ] Participants cannot import or access import logs (§6.2)
 - [ ] Metering data filters and date ranges behave consistently across all endpoints (§7)

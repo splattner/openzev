@@ -179,8 +179,10 @@ One price of a per-kWh tariff, with the times, weekdays and months it applies (f
 Specific point in time when a reading was recorded (e.g., 2026-01-15 14:00:00).
 
 **Timezone**
-Offset used to interpret a timestamp. Readings are stored on the UTC timeline;
-there is no timezone selector in the import UI. See [Metering Imports](05-metering-import.md#timestamp-handling).
+Offset used to interpret a timestamp. Readings are stored as exact moments in
+time; days, billing periods, tariff hours and charts use Swiss time
+(CET/CEST). Timestamps without an offset in an import file are read as Swiss
+time unless the import says *UTC*. See [Metering Imports](05-metering-import.md#timestamp-handling).
 
 ## V
 

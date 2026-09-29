@@ -8,7 +8,7 @@
 - Created: 2026-03-24
 - Target Release: Ongoing baseline
 - Related Issues: n/a (baseline)
-- Related ADRs: 0001, 0005, 0007, 0009
+- Related ADRs: 0001, 0005, 0009, 0026 (supersedes 0007)
 - Impacted Areas: backend, frontend, docs
 
 ## 1. Problem and outcome
@@ -186,7 +186,7 @@ Routed under `/api/v1/zev/metering-points/` via DRF `ModelViewSet`.
 | `GET` | `/metering-points/{id}/` | Authenticated (scoped) | Retrieve single metering point |
 | `PUT/PATCH` | `/metering-points/{id}/` | `MeteringPointPermission` | Update metering point |
 | `DELETE` | `/metering-points/{id}/` | `MeteringPointPermission` | Delete metering point |
-| `POST` | `/metering-points/{id}/delete-readings/` | `IsAdmin` | Delete every reading or an inclusive UTC date range after request validation |
+| `POST` | `/metering-points/{id}/delete-readings/` | `IsAdmin` | Delete every reading or an inclusive civil-date range (Europe/Zurich) after request validation |
 
 #### Delete readings request
 
@@ -196,8 +196,8 @@ any reading is counted or deleted:
 | Field | Type | Required | Semantics |
 |---|---|---|---|
 | `delete_all` | `BooleanField` | No (default `false`) | Only a value accepted by DRF as true enables whole-meter deletion; accepted false strings such as `"false"`, `"0"`, and `"off"` use bounded deletion |
-| `date_from` | `DateField` | When `delete_all=false` | Inclusive UTC civil-date lower bound |
-| `date_to` | `DateField` | When `delete_all=false` | Inclusive UTC civil-date upper bound; must be on or after `date_from` |
+| `date_from` | `DateField` | When `delete_all=false` | Inclusive civil-date lower bound (Swiss midnight, via `period_window`) |
+| `date_to` | `DateField` | When `delete_all=false` | Inclusive civil-date upper bound (to the next Swiss midnight); must be on or after `date_from` |
 
 An omitted `delete_all` value defaults to false. Missing, malformed, or
 reversed date ranges and invalid boolean values return HTTP 400 with field-keyed
@@ -373,8 +373,8 @@ Only assignments overlapping the billing period are included.  The engine reads
 
 **Per-timestamp attribution (ADR 0013):** the overlap filter above only selects
 metering points. Each reading is then attributed to the participant whose
-assignment is active on the reading's UTC date (`ts.date()` — timestamps are
-always UTC, ADR 0007 — falling inside an assignment's `[valid_from, valid_to]`),
+assignment is active on the reading's civil date (`allocation.validity.civil_date`,
+Europe/Zurich, ADR 0026 — falling inside an assignment's `[valid_from, valid_to]`),
 so a mid-period transfer splits the period's readings between both holders.
 Readings dated in an assignment gap belong to nobody and are excluded from
 every bill, the invoice PDF stats, the annual statement, and the dashboards —

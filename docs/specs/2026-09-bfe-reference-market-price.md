@@ -134,7 +134,10 @@ database, no network, no Django.
 - **Period → interval:** `[start, end)` built from **Europe/Zurich civil**
   month boundaries and converted to UTC, so a quarter runs e.g.
   `2026-03-31T22:00Z … 2026-06-30T22:00Z`. Consecutive periods are contiguous
-  by construction, so the series has no boundary gaps.
+  by construction, so the series has no boundary gaps. Since ADR 0026 billing
+  periods start at the same Swiss midnights, so a quarter's price covers
+  exactly the readings of its civil months, and a published quarter reports
+  its last day (30 June) as fully covered.
 - A blank price cell is skipped, not an error: BFE leaves the current period
   blank rather than omitting the row.
 - Rows are sorted and checked for overlap before storage —

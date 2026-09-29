@@ -818,7 +818,7 @@ the billing period. Only rendered when sub-daily metering data is available
 (15-min or hourly resolution). Returns `None` for daily-only data.
 
 Readings are attributed per timestamp (ADR 0013): a reading only counts while
-the participant held the metering point on the reading's UTC date.
+the participant held the metering point on the reading's civil date (Europe/Zurich, ADR 0026); the chart's hours are Swiss hours.
 Pre-assignment and gap readings are excluded from the profile, so a
 mid-period transfer leaves the outgoing holder's profile shaped only by their
 own readings. The profile arithmetic is `Decimal` end to end; values are

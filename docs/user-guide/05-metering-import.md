@@ -88,10 +88,12 @@ alike. Delimiter may be any single character (for example `,`, `;`, `|`, or tab)
      - `Energy column` or `First interval column` → which column?
      - `Direction column` (optional) → which column says consumption vs. feed-in?
    - Set **Date/time format** as a Python `strptime` pattern (e.g. `%d.%m.%Y`, `%Y-%m-%dT%H:%M:%S%z`), or leave empty for auto-detect. The format must capture the full calendar date (year + month + day); `%d.%m` is rejected. Day-of-year (`%Y-%j`) is accepted.
+   - Set **Timestamps without an offset are** to *Swiss time (CET/CEST)* (the
+     default) or *UTC* — see [Timestamp Handling](#timestamp-handling).
    - For daily profiles set **Intervals per row** and **Minutes per interval**.
 
    Native Excel datetime cells ignore **Date/time format** — they are read
-   as-is (assumed UTC). The format only applies to text cells.
+   as-is, in the zone chosen above. The format only applies to text cells.
 
 4. **Preview (required for CSV)**
    - Click **Load Preview**. Configuration changes, including toggling overwrite, invalidate the preview — reload before importing. Selecting or removing a file also requires a new preview. With several files, each gets its own preview section; one file with errors blocks the whole import, and a meter missing from any file is listed once.
@@ -148,30 +150,68 @@ OpenZEV supports the Swiss **SDAT-CH** metering data standard (used by utility p
 
 ## Timestamp Handling
 
-OpenZEV stores all readings on the UTC timeline, and there is **no timezone
-selector** in the import UI:
+OpenZEV stores every reading as an exact moment in time and does all
+calendar work — days, billing periods, tariff hours, charts — in **Swiss
+time**. What matters on import is how a timestamp in your file is read:
 
 - A timestamp **with** an offset (`2026-01-15T14:00:00+01:00`, as in SDAT-CH
-  files) is converted to UTC correctly.
-- A timestamp **without** an offset (`2026-01-15 14:00:00`) is read as
-  **UTC**, not Swiss time.
-- A daily-profile row's first interval starts at **00:00 UTC** of its date.
-- Billing periods also run from 00:00 UTC to 00:00 UTC.
+  files, or `…Z` for UTC) is read exactly as written.
+- A timestamp **without** an offset (`2026-01-15 14:00:00`) is read in the zone
+  you choose under **Timestamps without an offset are**: *Swiss time
+  (CET/CEST)* by default, which is what Swiss meter and grid-operator exports
+  use. Choose *UTC* only for a source that really exports UTC without saying so.
+- A daily-profile row covers its Swiss calendar day: its first interval starts
+  at 00:00 Swiss time.
 
-So a file of Swiss local times without offsets lands one hour (winter) or two
-hours (summer) late. Within a period that changes nothing, but readings near
-a period boundary can fall into the neighbouring period. If your files carry
-local time, prefer an export with offsets and a format such as
-`%Y-%m-%dT%H:%M:%S%z`.
- The **Date/time format** field is a Python
+**Daylight saving time** is handled for Swiss-time files:
+
+- On the last Sunday of **October**, 02:00–02:59 happens twice. When a file
+  lists that hour twice for a meter, the first occurrence is read as summer
+  time and the second as winter time — both are imported.
+- On the last Sunday of **March**, 02:00–02:59 does not exist. Rows at those
+  times with energy 0 are skipped with a warning in the import protocol; a row
+  with energy there is reported as an error.
+- A daily-profile row has 92 quarter-hours on the March day, 96 on ordinary
+  days and 100 on the October day. On the March day, a 96-column row may leave
+  the missing 02:00 hour empty (or 0), or leave the last four columns empty. On
+  the October day the row needs all 100 values: set **Intervals per row** to
+  100 for such files (the extra columns stay empty on ordinary days).
+
+The import protocol shows which zone each CSV import used.
+
+The **Date/time format** field is a Python
 `strptime` pattern controlling how text timestamps are parsed; empty means
 auto-detect (ISO first, then day-first European fallback for dates like
 `07.01.2026`). The pattern must include the full date — `%d.%m.%Y`,
 `%Y-%m-%dT%H:%M:%S%z`, `%Y-%j` — while `%d.%m` or `%H:%M` are rejected.
 
-Whatever you choose, use one consistent timestamp interpretation across all
-your import files: mixing local-time and UTC files for the same meter creates
-overlaps and gaps an hour wide.
+Pick the zone per file to match what the file contains: a UTC file imported as
+Swiss time lands one or two hours early, and a Swiss-time file imported as UTC
+one or two hours late.
+
+### Imports from before October 2026
+
+Earlier versions read timestamps without an offset as UTC. If your files were
+in Swiss time, those readings sit one hour (winter) or two hours (summer) late:
+the first hours of a month show up on the last day of the previous month, and
+tariff hours and period boundaries are off by the same amount. The protocol of
+such an import shows *UTC (imported before October 2026)*.
+
+Your server operator can move these imports to the right time with a
+management command. It lists the affected imports, shows what would change
+without writing anything, and only applies when asked:
+
+```bash
+python manage.py reanchor_readings --list
+python manage.py reanchor_readings --batch <batch-id> --batch <batch-id>
+python manage.py reanchor_readings --batch <batch-id> --batch <batch-id> --apply
+```
+
+Select all months of a meter together — a month's first hours move onto the
+previous month's last hours. Each import can be moved only once. If invoices
+that are already approved, sent or paid cover the moved readings, the command
+asks for `--allow-invoiced`; those invoices themselves never change. Regenerate
+draft invoices afterwards.
 
 ## Common Import Scenarios
 
@@ -264,9 +304,8 @@ If you find errors in imported data:
 
 > **Best practice:** Leave overwrite off unless you mean to change history.
 > To remove bad imports entirely, delete the import log (single or period
-> bulk-delete) — period deletion uses **UTC days** on import creation time,
-> while history timestamps render locally, so check the UTC note in the
-> delete dialog.
+> bulk-delete) — period deletion uses the **Swiss calendar days** on which
+> the imports were created, the same days the history shows.
 
 ## Deleting imports
 
@@ -278,9 +317,9 @@ If a bulk selection includes a protected import, the entire deletion is rejected
 and nothing is removed. The bulk dialog lists the blocking protected imports
 (filename and creation time) and disables confirmation while any is included.
 To correct an overwrite import, upload corrected values
-with overwrite enabled. Period bulk-delete matches
-`created_at` in the half-open UTC range `[date_from 00:00Z, date_to+1d 00:00Z)` —
-the visible-count preview uses the same UTC math as the backend.
+with overwrite enabled. Period bulk-delete matches imports created from
+00:00 Swiss time on the first day up to midnight after the last day — the
+visible-count preview counts exactly the same imports.
 
 ## Data Quality Checks
 
