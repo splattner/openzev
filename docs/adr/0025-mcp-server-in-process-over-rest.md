@@ -1,6 +1,6 @@
 # ADR 0025: The MCP server runs inside Django and answers through the REST views
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-29
 
 ## Context

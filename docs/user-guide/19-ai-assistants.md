@@ -139,17 +139,18 @@ including how an administrator can revoke it on your behalf.
 
 ## Audit trail
 
-Every question the assistant asks OpenZEV is recorded in the audit log with
-source **MCP**, naming the tool, the key that was used, and the ZEV it
-concerned (when the question named one). If you want to know exactly what an
-assistant looked at, filter the audit log by source, or ask the assistant
-itself — `audit_query` can answer that question too.
+Every tool call the assistant makes is recorded in the audit log as an
+`mcp.tool.call` event, naming the tool, the arguments, the key that was used
+(by its prefix), and the ZEV it concerned (when the question named one you can
+see). The event details show source `mcp`. To see exactly what an assistant
+looked at, filter the audit log by action type `mcp.tool.call` — or ask the
+assistant itself, since `audit_query` can answer that question too.
 
 ## Troubleshooting
 
 | Symptom | Cause |
 | --- | --- |
-| `404` on the endpoint | `mcp_server_enabled` is off — ask an administrator to enable it (or you are not signed in with a key that has ever worked, in which case the flag state is indistinguishable from a genuinely missing endpoint by design). |
+| `404` on the endpoint | `mcp_server_enabled` is off — ask an administrator to enable it. The endpoint answers `404` to everyone while the flag is off, so this is the first thing to check. |
 | `401` | Missing, wrong, revoked or expired key. Same causes as any other API key — see [API Keys → Troubleshooting](16-api-keys.md#troubleshooting). |
 | `403` | You are signed in as a participant, or your key's account role changed. Only `admin` and `zev_owner` can use MCP. |
 | The assistant says a tool failed with "Permission denied" or "not found" | You (or the assistant) named a ZEV or invoice your account cannot see. This is the same scoping the REST API enforces — it is not a bug. |

@@ -355,7 +355,7 @@ metadata:
 | `request.audit_request_id` | Upstream `X-Request-ID` only when it matches `^[A-Za-z0-9._:-]{1,64}$`; otherwise a server-generated UUID4 (never truncate a client value) |
 | `request.audit_ip_address` | `config.client_ip.client_ip(request)`: `REMOTE_ADDR` when `NUM_PROXIES=0` or `X-Forwarded-For` is absent; otherwise the entry `-min(NUM_PROXIES, number of entries)` in the comma-separated header, stripped of whitespace |
 | `request.audit_user_agent` | Request header, truncated to 500 chars before save |
-| `request.audit_source` | `api` |
+| `request.audit_source` | `api`; overridden per request by `ApiKeyAuthentication` (`api_key`), `McpApiKeyAuthentication` and MCP sub-requests (`mcp`), and the public invoice/onboarding-link views (`invoice_link`, `onboarding_link`) |
 
 The middleware must not persist events itself. It only prepares context for the
 audit service.
@@ -409,6 +409,7 @@ The first implementation slices must instrument these existing modules:
 | `backend/invoices/views.py` | generate, generate-all, approve, mark-sent, mark-paid, cancel, delete, generate-pdf, send-email, retry-email |
 | `backend/metering/views.py` | import preview/import commit/delete-data and import log–adjacent actions |
 | `backend/invoices/tasks.py` | send-email queued/success/failure/retry outcome |
+| `backend/mcp_server/views.py` | `mcp.tool.call` (category `system`, source `mcp`) once per MCP `tools/call` — success/failed/denied; see SPEC-2026-mcp-server §8 |
 
 ### 6.4 Async event rules
 
@@ -561,7 +562,7 @@ export interface AuditEvent {
   status: AuditEventStatus
   request_id: string | null
   correlation_id: string | null
-  source: 'api' | 'celery' | 'system' | 'management_command' | 'mcp'
+  source: 'api' | 'api_key' | 'invoice_link' | 'onboarding_link' | 'celery' | 'system' | 'management_command' | 'mcp'
   ip_address: string | null
   user_agent: string
   summary: string

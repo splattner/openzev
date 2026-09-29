@@ -1141,7 +1141,7 @@ export interface AuditEvent {
     status: AuditEventStatus
     request_id: string | null
     correlation_id: string | null
-    source: 'api' | 'celery' | 'system' | 'management_command' | 'mcp'
+    source: 'api' | 'api_key' | 'invoice_link' | 'onboarding_link' | 'celery' | 'system' | 'management_command' | 'mcp'
     ip_address: string | null
     user_agent: string
     summary: string
