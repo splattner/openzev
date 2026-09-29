@@ -352,6 +352,82 @@ class TestConsumptionSummary:
         assert result["totals"]["self_consumption_pct"] is None
         assert result["series"] == []
 
+    @staticmethod
+    def _consumer(zev, name, kwh, ts=datetime(2026, 1, 10, 18, 0, tzinfo=timezone.utc)):
+        participant = ParticipantFactory(zev=zev, first_name=name, last_name="Test", valid_from=date(2026, 1, 1))
+        meter = MeteringPointFactory(zev=zev, meter_type="consumption")
+        MeteringPointAssignmentFactory(metering_point=meter, participant=participant, valid_from=date(2026, 1, 1))
+        MeterReading.objects.create(
+            metering_point=meter, timestamp=ts, energy_kwh=Decimal(kwh),
+            direction=ReadingDirection.IN, resolution=ReadingResolution.FIFTEEN_MIN,
+        )
+        return participant
+
+    def test_zev_wide_call_breaks_down_per_participant(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        small = self._consumer(zev, "Small", "2.0000")
+        big = self._consumer(zev, "Big", "8.0000")
+
+        result = _structured(call_tool(owner_mcp_client, "consumption_summary", {
+            "zev_id": str(zev.id), "date_from": "2026-01-01", "date_to": "2026-01-31",
+        }))
+
+        assert [p["participant_id"] for p in result["participants"]] == [str(big.id), str(small.id)]
+        top = result["participants"][0]
+        assert set(top) == {
+            "participant_id", "participant_name", "consumed_kwh", "from_zev_kwh",
+            "from_grid_kwh", "produced_kwh", "local_share_pct",
+        }
+        assert top["consumed_kwh"] == 8.0
+        assert top["local_share_pct"] == 0.0
+        assert result["totals"]["consumed_kwh"] == 10.0
+
+    def test_participant_call_is_scoped_and_has_no_breakdown(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        self._consumer(zev, "Small", "2.0000")
+        big = self._consumer(zev, "Big", "8.0000")
+
+        result = _structured(call_tool(owner_mcp_client, "consumption_summary", {
+            "zev_id": str(zev.id), "date_from": "2026-01-01", "date_to": "2026-01-31",
+            "participant_id": str(big.id),
+        }))
+
+        assert "participants" not in result
+        assert result["participant_id"] == str(big.id)
+        assert result["totals"]["consumed_kwh"] == 8.0
+
+    def test_participant_without_readings_is_not_given_zev_totals(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        self._consumer(zev, "Big", "8.0000")
+        idle = ParticipantFactory(zev=zev, valid_from=date(2026, 1, 1))
+
+        result = _structured(call_tool(owner_mcp_client, "consumption_summary", {
+            "zev_id": str(zev.id), "date_from": "2026-01-01", "date_to": "2026-01-31",
+            "participant_id": str(idle.id),
+        }))
+
+        assert result["totals"]["consumed_kwh"] == 0.0
+        assert result["series"] == []
+        assert "note" in result
+
+    def test_hour_bucket_within_a_week(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        self._consumer(zev, "Big", "8.0000")
+
+        result = _structured(call_tool(owner_mcp_client, "consumption_summary", {
+            "zev_id": str(zev.id), "date_from": "2026-01-10", "date_to": "2026-01-16", "bucket": "hour",
+        }))
+
+        assert result["bucket"] == "hour"
+        assert [e["bucket"][:13] for e in result["series"]] == ["2026-01-10T18"]
+
+    def test_hour_bucket_over_a_week_is_rejected(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        response = call_tool(owner_mcp_client, "consumption_summary", {
+            "zev_id": str(zev.id), "date_from": "2026-01-01", "date_to": "2026-01-08", "bucket": "hour",
+        })
+        assert _is_error(response) is True
+
 
 class TestConsumptionProfile:
     @staticmethod

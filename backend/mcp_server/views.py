@@ -49,7 +49,7 @@ INSTRUCTIONS = (
     "OpenZEV data returned here is scoped to the signed-in user: an admin sees "
     "every ZEV, a ZEV owner only their own. Call list_zevs first to find a "
     "zev_id for the other tools, and list_participants to find a participant_id. Dates are YYYY-MM-DD, amounts are CHF strings, "
-    "energy is in kWh. Metering data is aggregated (daily/monthly buckets); raw "
+    "energy is in kWh. Metering data is aggregated (monthly, daily, or hourly for up to a week); raw "
     "15-minute readings are not available through MCP. Every tool is read-only."
 )
 

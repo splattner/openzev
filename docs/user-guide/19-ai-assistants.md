@@ -99,7 +99,7 @@ you phrase a better question:
 | `find_invoices` | Which invoices match this participant / period / status? |
 | `explain_invoice` | Break one invoice down into its line items, and compare it with the participant's previous invoice |
 | `import_triage` | What happened in recent metering imports, and what went wrong? |
-| `consumption_summary` | Aggregated consumption, production and self-consumption over a date range |
+| `consumption_summary` | Consumption, production and self-consumption over a date range, by month, day or hour (hour for up to a week); for the whole ZEV it also shows each participant's consumption and how much of it came from the ZEV |
 | `consumption_profile` | A participant's average day: how much they use in each hour, and how much of it comes from the ZEV's own solar |
 | `data_gaps` | Which metering points are missing readings, and where? |
 | `audit_query` | Who did what, and when? |
@@ -113,6 +113,7 @@ Example questions:
 - "Explain invoice OZV-00013 — why did it go up from last quarter?"
 - "What errors came up in yesterday's metering import?"
 - "How much energy did ZEV Sonnenhof self-consume in August, by day?"
+- "Which participants used the most electricity last quarter, and how much of it was solar?"
 - "When in the day does Anna Muster use the most electricity, and how much of that is covered by solar?"
 - "Which metering points have gaps in the last 30 days?"
 - "Who approved invoices for ZEV Sonnenhof last week?"
@@ -121,8 +122,9 @@ Example questions:
 
 - **Read-only.** No tool changes anything. A future release may add write
   tools (approving or sending invoices) with an explicit confirmation step.
-- **No raw meter data.** Consumption is aggregated into daily or monthly
-  buckets; the underlying 15-minute readings are not exposed through MCP.
+- **No raw meter data.** Consumption is aggregated into monthly, daily or
+  (for up to a week) hourly buckets; the underlying 15-minute readings are not
+  exposed through MCP.
 - **Scoped to your account.** An assistant connected with a ZEV owner's key
   sees only that owner's ZEVs — the same tenant isolation that protects the
   REST API protects MCP, because MCP tools call the same REST endpoints

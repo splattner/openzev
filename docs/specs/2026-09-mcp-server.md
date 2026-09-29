@@ -357,10 +357,12 @@ Summarise recent imports and what went wrong.
 
 ### 6.6 `consumption_summary`
 
-Aggregated consumption, production and self-consumption.
+Aggregated consumption, production and self-consumption, for the whole ZEV (with a
+per-participant breakdown) or for one participant.
 
 - Input: `zev_id` (uuid, required); `date_from`, `date_to` (date, required); `bucket`
-  (`day` | `month`, default `month`; `hour` not offered); `participant_id` (uuid, optional).
+  (`hour` | `day` | `month`, default `month`; `hour` only for spans of at most 7 days — a longer
+  span with `bucket=hour` is a `ToolError`); `participant_id` (uuid, optional).
   The span (`date_to - date_from`, inclusive) is validated at *run time*, not by the JSON
   Schema (dates aren't arithmetic-comparable in JSON Schema): a span over 400 days, or
   `date_to` before `date_from`, is a `ToolError` (`isError: true`), not a `-32602` schema
@@ -373,7 +375,10 @@ Aggregated consumption, production and self-consumption.
     "totals": {"consumed_kwh", "produced_kwh", "imported_kwh", "exported_kwh",
                "self_consumed_kwh", "self_consumption_pct", "self_sufficiency_pct"},
     "series": [{"bucket", "consumed_kwh", "produced_kwh", "imported_kwh", "exported_kwh"}],
-    "participant_id"?, "participant_name"?, "truncated"?
+    "participants"?: [{"participant_id", "participant_name", "consumed_kwh", "from_zev_kwh",
+                       "from_grid_kwh", "produced_kwh", "local_share_pct"}],
+    "participants_truncated"?, "participants_total"?,
+    "participant_id"?, "participant_name"?, "note"?, "truncated"?
   }
   ```
   `owner_dashboard_summary` (`metering/analytics.py`) returns `totals`/`timeline` keyed by
@@ -382,11 +387,25 @@ Aggregated consumption, production and self-consumption.
   `self_consumed_kwh = consumed_kwh - imported_kwh`,
   `self_consumption_pct = 100 * self_consumed_kwh / produced_kwh` (`null` if `produced_kwh` is 0),
   `self_sufficiency_pct = 100 * self_consumed_kwh / consumed_kwh` (`null` if `consumed_kwh` is 0).
-  `series` is the payload's `timeline`, capped at 31 entries for `bucket=day` or 14 for
-  `bucket=month` (`truncated: true` if the cap bit). When `participant_id` is given, the
+  `series` is the payload's `timeline`, capped at 168 entries for `bucket=hour`, 31 for
+  `bucket=day` or 14 for `bucket=month` (`truncated: true` if the cap bit). Buckets are the
+  endpoint's own (UTC-truncated, ADR 0007).
+
+  **Per-participant breakdown** (only without `participant_id`): `participants` is the payload's
+  `participant_stats` (already sorted by `total_consumed_kwh` descending), capped at 50
+  (`participants_truncated: true` and `participants_total` if the cap bit), mapped as
+  `consumed_kwh ← total_consumed_kwh`, `produced_kwh ← total_produced_kwh`, `from_zev_kwh`,
+  `from_grid_kwh` passed through, and `local_share_pct = 100 * from_zev_kwh / consumed_kwh`
+  (`null` if nothing was consumed). Names and ids only — no contact data (§6.1a). When `participant_id` is given, the
   endpoint's own totals/timeline are already scoped to that participant (not the whole ZEV);
   `participant_id`/`participant_name` echo `selected_participant_id`/`selected_participant_name`
-  from the payload.
+  from the payload, and no `participants` breakdown is returned.
+
+  **Participant without readings:** `owner_dashboard_summary` only swaps in the selected
+  participant's totals/timeline when that participant has readings in the range; otherwise it
+  leaves the **ZEV-wide** totals in place and returns `selected_participant_name: null`. The tool
+  detects that (`participant_name is None`) and returns zeroed `totals`, an empty `series` and a
+  `note`, rather than attributing the whole ZEV's consumption to the participant.
 
 ### 6.6a `consumption_profile`
 
@@ -542,7 +561,7 @@ No new env vars.
 
 ## 10. Tests (`backend/mcp_server/tests/`)
 
-73 tests across four modules (`backend/mcp_server/tests/__init__.py` makes it a package;
+78 tests across four modules (`backend/mcp_server/tests/__init__.py` makes it a package;
 fixtures live in `backend/mcp_server/tests/conftest.py` — an autouse `mcp_server_enabled`
 fixture, `admin_mcp_client`/`owner_mcp_client`, and `rpc`/`call_tool` request helpers built
 on `APIClient`).
@@ -551,7 +570,7 @@ on `APIClient`).
 |---|---|---|---|
 | `test_transport.py` | 28 | `TestFeatureFlagGate`, `TestMethodNotAllowed`, `TestAuthentication`, `TestRole`, `TestOrigin`, `TestBodyParsing`, `TestBatch`, `TestInitialize`, `TestPing`, `TestToolsList`, `TestToolsCall` | flag off → 404 (unauthenticated and with a valid key); `GET`/`DELETE` → 405 (authenticated); no auth → 401 with `WWW-Authenticate`; cookie JWT alone → 401; `Api-Key` and `Bearer` both accepted; revoked/expired key → 401; participant → 403; admin/owner → 200; untrusted `Origin` → 403, no `Origin` passes, trusted `Origin` passes; malformed JSON → `-32700`/400; non-object message → `-32600`; unknown method → `-32601`; batch (mixed request + notification), batch > 10 → `-32600`, notification-only → 202 with empty body; `initialize` version negotiation (requested-and-supported, and fallback for unsupported); `ping`; `tools/list` returns exactly the 10 tools, all `readOnlyHint: true`; unknown tool and invalid arguments → `-32602` with `data.errors` |
 | `test_dispatch.py` | 5 | `TestAllowList`, `TestForcedAuth`, `TestThrottleSkip` | non-allow-listed URL raises `DispatchError`; an allow-listed URL succeeds; a sub-request resolves data as the forced user (proves `_force_auth_user`/`_force_auth_token` took effect); `ApiKeyRateThrottle.get_cache_key` returns `None` when `mcp_subrequest` is set and a real cache key otherwise |
-| `test_tools.py` | 34 | `TestListZevs`, `TestListParticipants`, `TestPeriodReadiness`, `TestFindInvoices`, `TestExplainInvoice`, `TestImportTriage`, `TestConsumptionSummary`, `TestConsumptionProfile`, `TestDataGaps`, `TestAuditQuery` | one class per tool: happy-path shape; owner cannot see another owner's ZEV/invoice (`isError` with the view's own message, e.g. "Permission denied.", no data leaked); admin sees any ZEV; invalid arguments → `-32602`; caps/truncation (`find_invoices`, `import_triage`); `explain_invoice` previous-invoice selection skips a cancelled invoice and picks the correct prior period, and `compare_previous: false` skips the lookup; `import_triage` extracts meter ids from error text and respects `only_problems`; `consumption_summary` span > 400 days is a `ToolError` (`isError: true`, not `-32602` — see §6.6); `data_gaps` marks a meter with zero readings fully incomplete; `list_participants` returns assignments and none of the contact fields, filters by `query` and `active_on` (and `include_inactive`), caps with `truncated`/`total`, and gives an owner naming another owner's ZEV a tool error with no participant data; `find_invoices` `participant_id` narrows server-side; `consumption_profile` returns 24 rows with the correct peak hour, daily average and local share, `profile: null` plus a note without readings, `-32602` without `participant_id`, a tool error for a participant of another ZEV or another owner's ZEV, and a `ToolError` for a span over 400 days |
+| `test_tools.py` | 39 | `TestListZevs`, `TestListParticipants`, `TestPeriodReadiness`, `TestFindInvoices`, `TestExplainInvoice`, `TestImportTriage`, `TestConsumptionSummary`, `TestConsumptionProfile`, `TestDataGaps`, `TestAuditQuery` | one class per tool: happy-path shape; owner cannot see another owner's ZEV/invoice (`isError` with the view's own message, e.g. "Permission denied.", no data leaked); admin sees any ZEV; invalid arguments → `-32602`; caps/truncation (`find_invoices`, `import_triage`); `explain_invoice` previous-invoice selection skips a cancelled invoice and picks the correct prior period, and `compare_previous: false` skips the lookup; `import_triage` extracts meter ids from error text and respects `only_problems`; `consumption_summary` span > 400 days is a `ToolError` (`isError: true`, not `-32602` — see §6.6), the ZEV-wide call returns a per-participant breakdown sorted by consumption with `local_share_pct` and no contact fields, a `participant_id` call is scoped and has no breakdown, a participant without readings gets zeroed totals and a `note` (not the ZEV's totals), and `bucket=hour` works within 7 days and is a `ToolError` beyond; `data_gaps` marks a meter with zero readings fully incomplete; `list_participants` returns assignments and none of the contact fields, filters by `query` and `active_on` (and `include_inactive`), caps with `truncated`/`total`, and gives an owner naming another owner's ZEV a tool error with no participant data; `find_invoices` `participant_id` narrows server-side; `consumption_profile` returns 24 rows with the correct peak hour, daily average and local share, `profile: null` plus a note without readings, `-32602` without `participant_id`, a tool error for a participant of another ZEV or another owner's ZEV, and a `ToolError` for a span over 400 days |
 | `test_audit.py` | 6 | `TestToolCallAudit` | successful call recorded with `source = mcp`, `mcp.Tool`/tool-name target, `api_key_prefix`/`duration_ms`/`subrequests` in metadata; `zev_id` argument attaches the `Zev` row only when it is visible to the caller (an owner naming another owner's ZEV gets `zev = null` **and** `status = denied`, not a leak); a failed tool call is recorded `failed` or `denied`; `tools/list` and `initialize` write no `mcp.tool.call` event |
 
 `accounts/test_throttling.py` gains `McpSubrequestThrottleTests` (1 test,
