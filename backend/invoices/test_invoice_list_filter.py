@@ -188,3 +188,67 @@ class InvoiceStatusFilterScopingTests(_TwoPopulatedCommunitiesMixin, TestCase):
         self.participant_a.user = member
         self.participant_a.save(update_fields=["user"])
         return self._as(member)
+
+
+class InvoiceParticipantAndPeriodFilterTests(_TwoPopulatedCommunitiesMixin, TestCase):
+    """``?participant_id=`` and ``?period_from=``/``?period_to=`` — narrow-only
+    filters added for the MCP ``find_invoices``/``explain_invoice`` tools
+    (SPEC-2026-mcp-server §6.3/§6.4)."""
+
+    def test_participant_id_narrows_to_that_participant(self):
+        response = self.client.get(INVOICES, {"participant_id": str(self.participant_a.id)})
+        self.assertEqual(response.status_code, 200, response.content)
+        rows = _rows(response)
+        self.assertEqual(len(rows), len(InvoiceStatus.values))
+        self.assertTrue(all(row["participant"] == str(self.participant_a.id) for row in rows))
+
+    def test_participant_id_composes_with_status(self):
+        response = self.client.get(
+            INVOICES, {"participant_id": str(self.participant_a.id), "status": "paid"}
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual([row["invoice_number"] for row in _rows(response)], ["A-paid"])
+
+    def test_participant_id_cannot_widen_an_owners_scope(self):
+        # Naming a participant of a ZEV this owner does not own yields
+        # nothing — the filter only narrows, matching ?zev_id='s contract.
+        response = self._as(self.owner_a).get(
+            INVOICES, {"participant_id": str(self.participant_b.id)}
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(_rows(response), [])
+
+    def test_participant_id_must_be_a_uuid(self):
+        response = self.client.get(INVOICES, {"participant_id": "not-a-uuid"})
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("participant_id", response.json())
+
+    def test_period_overlap_narrows_to_matching_invoices(self):
+        # Add a second, later period for participant A alongside the
+        # existing 2026-01 invoices from _populate().
+        Invoice.objects.create(
+            zev=self.zev_a, participant=self.participant_a, invoice_number="A-feb-sent",
+            period_start=date(2026, 2, 1), period_end=date(2026, 2, 28),
+            status=InvoiceStatus.SENT,
+        )
+        response = self.client.get(
+            INVOICES, {"participant_id": str(self.participant_a.id),
+                       "period_from": "2026-02-01", "period_to": "2026-02-28"}
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual([row["invoice_number"] for row in _rows(response)], ["A-feb-sent"])
+
+    def test_period_to_alone_excludes_invoices_starting_after_it(self):
+        response = self.client.get(INVOICES, {"period_to": "2025-12-31"})
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(_rows(response), [])
+
+    def test_period_from_alone_excludes_invoices_ending_before_it(self):
+        response = self.client.get(INVOICES, {"period_from": "2026-02-01"})
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(_rows(response), [])
+
+    def test_malformed_period_date_returns_400(self):
+        response = self.client.get(INVOICES, {"period_from": "01-01-2026"})
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("period_from", response.json())

@@ -208,7 +208,7 @@ All invoice endpoints are routed under `/api/v1/invoices/invoices/` via a DRF `G
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `GET` | `/invoices/` | Authenticated | List invoices (scoped by role, see §6); optional `status` filter — comma-separated `InvoiceStatus` values (e.g. `approved,sent`), conjunctive with role/`zev_id` scoping; unknown → `400` with `status` in the body. Uses `InvoiceListSerializer` — **no** nested `items`/`email_logs` (see §9.1) |
+| `GET` | `/invoices/` | Authenticated | List invoices (scoped by role, see §6); optional `status` filter — comma-separated `InvoiceStatus` values (e.g. `approved,sent`), conjunctive with role/`zev_id` scoping; unknown → `400` with `status` in the body. Also accepts `participant_id` (UUID, narrow-only; `400` with `participant_id` in the body if malformed) and `period_from`/`period_to` (`YYYY-MM-DD`, narrow-only, either may be given alone; invoices whose period overlaps `[period_from, period_to]`; `400` with the offending field name if malformed) — added for the MCP `find_invoices`/`explain_invoice` tools (SPEC-2026-mcp-server §6.3/§6.4), list-only like `status`, and conjunctive with every other filter and with role/`zev_id` scoping (never widens it). Uses `InvoiceListSerializer` — **no** nested `items`/`email_logs` (see §9.1) |
 | `GET` | `/invoices/{id}/` | Authenticated | Retrieve single invoice (with items + email_logs) |
 | `DELETE` | `/invoices/{id}/` | ZEV owner or admin | Delete (see §4.5 rules) |
 
@@ -993,6 +993,7 @@ the cockpit readiness and attention caches.
 | File | Test class | Validates |
 |---|---|---|
 | `test_invoice_list_filter.py` | `InvoiceStatusFilterTests`, `InvoiceStatusFilterScopingTests` | §5.1: comma-separated `?status=` (single/repeated values, whitespace tolerance, empty = absent, all unknown values → 400, list-only so detail routes are unaffected), status × `zev_id` + role scoping (participant cannot enumerate another ZEV's open invoices), composes with pagination |
+| `test_invoice_list_filter.py` | `InvoiceParticipantAndPeriodFilterTests` | §5.1: `?participant_id=` narrows to that participant and composes with `?status=`, cannot widen an owner's scope, malformed UUID → 400; `?period_from=`/`?period_to=` narrow by period overlap (either alone, both together), malformed date → 400 |
 | `tests.py` | `InvoiceRBACTests` | §6: admin sees all, owner sees own ZEV, participant sees own invoices; participant cannot approve/cancel; PDF template access restricted to admin; deletion rules by role and status; generic POST create returns 405 (creation only via generate); serializer ignores forged billing/workflow fields |
 | `tests.py` | `InvoiceBillingIntegrationTests` | §5.2: end-to-end generation via API with metering data; allocation failures reported as 400, not the 409 duplicate-invoice message |
 | `test_workflow.py` | `InvoiceWorkflowTests` | §4.2: approve draft ✓, approve non-draft ✗, mark-sent from approved ✓, mark-sent from draft ✗, mark-paid from sent ✓, mark-paid from draft ✗, cancel from draft/approved/sent ✓, cancel from paid ✗, cancel already-cancelled ✗ |

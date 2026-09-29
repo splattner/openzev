@@ -153,28 +153,78 @@ class InvoiceViewSet(
         if self.action != "list":
             return queryset
         raw_statuses = self.request.query_params.getlist("status")
-        if not raw_statuses:
+        if raw_statuses:
+            statuses = [
+                value.strip()
+                for raw in raw_statuses
+                for value in raw.split(",")
+                if value.strip()
+            ]
+            if statuses:
+                unknown = [value for value in statuses if value not in InvoiceStatus.values]
+                if unknown:
+                    raise ValidationError(
+                        {
+                            "status": [
+                                "Unknown status value(s): "
+                                + ", ".join(f"'{value}'" for value in unknown)
+                                + f". Expected one of: {', '.join(InvoiceStatus.values)}."
+                            ]
+                        }
+                    )
+                queryset = queryset.filter(status__in=statuses)
+        queryset = self._filter_by_participant_id(queryset)
+        queryset = self._filter_by_period_overlap(queryset)
+        return queryset
+
+    def _filter_by_participant_id(self, queryset):
+        """``?participant_id=`` — narrow-only, added for the MCP ``find_invoices``
+        and ``explain_invoice`` tools (SPEC-2026-mcp-server §6.3/§6.4), which need
+        to locate a participant's invoices without walking every invoice of a
+        ZEV. Like ``?status=``, this only narrows what the caller could already
+        see — it never widens the role/ZEV scoping ``get_queryset`` applies.
+        """
+        raw = self.request.query_params.get("participant_id")
+        if not raw:
             return queryset
-        statuses = [
-            value.strip()
-            for raw in raw_statuses
-            for value in raw.split(",")
-            if value.strip()
-        ]
-        if not statuses:
+        try:
+            import uuid as _uuid
+
+            _uuid.UUID(str(raw))
+        except (ValueError, AttributeError, TypeError):
+            raise ValidationError({"participant_id": ["Must be a valid UUID."]})
+        return queryset.filter(participant_id=raw)
+
+    def _filter_by_period_overlap(self, queryset):
+        """``?period_from=``/``?period_to=`` — narrow-only, added for the same
+        MCP tools as ``_filter_by_participant_id``. Selects invoices whose
+        billing period overlaps the given range; either bound may be given
+        alone. Both must be ``YYYY-MM-DD`` or a 400 is raised, matching the
+        strict date parsing used elsewhere in this app
+        (``invoices/views_readiness.py::_parse_period``).
+        """
+        raw_from = self.request.query_params.get("period_from")
+        raw_to = self.request.query_params.get("period_to")
+        if not raw_from and not raw_to:
             return queryset
-        unknown = [value for value in statuses if value not in InvoiceStatus.values]
-        if unknown:
-            raise ValidationError(
-                {
-                    "status": [
-                        "Unknown status value(s): "
-                        + ", ".join(f"'{value}'" for value in unknown)
-                        + f". Expected one of: {', '.join(InvoiceStatus.values)}."
-                    ]
-                }
-            )
-        return queryset.filter(status__in=statuses)
+        parsed_from = self._parse_strict_date("period_from", raw_from) if raw_from else None
+        parsed_to = self._parse_strict_date("period_to", raw_to) if raw_to else None
+        if parsed_from is not None:
+            queryset = queryset.filter(period_end__gte=parsed_from)
+        if parsed_to is not None:
+            queryset = queryset.filter(period_start__lte=parsed_to)
+        return queryset
+
+    @staticmethod
+    def _parse_strict_date(field_name, raw):
+        import re as _re
+
+        if not _re.match(r"^\d{4}-\d{2}-\d{2}$", raw):
+            raise ValidationError({field_name: ["Must be YYYY-MM-DD."]})
+        try:
+            return date_type.fromisoformat(raw)
+        except ValueError:
+            raise ValidationError({field_name: ["Must be YYYY-MM-DD."]})
 
     def destroy(self, request, *args, **kwargs):
         invoice = self.get_object()
