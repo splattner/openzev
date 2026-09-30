@@ -16,6 +16,11 @@ vi.mock('@tanstack/react-query', () => ({
 }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: vi.fn() }) }))
+vi.mock('../src/lib/appSettings', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/lib/appSettings')>()
+  const settings = { date_format_short: 'dd.MM.yyyy', date_format_long: 'd MMMM yyyy', date_time_format: 'dd.MM.yyyy HH:mm', updated_at: '' }
+  return { ...actual, useAppSettings: () => ({ settings, isLoading: false }) }
+})
 
 let container: HTMLDivElement
 let root: ReturnType<typeof createRoot>
@@ -60,4 +65,19 @@ it('keeps transfer warnings visible until the operator closes the result', () =>
   const close = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'common.close')!
   act(() => close.click())
   expect(onImported).toHaveBeenCalledWith('restored')
+})
+
+it('shows the archive export time in Swiss time, not the browser zone (ADR 0026)', () => {
+  const savedTz = process.env.TZ
+  process.env.TZ = 'America/New_York'
+  try {
+    act(() => root.render(createElement(ZevImportModal, { isOpen: true, onClose: vi.fn(), onImported: vi.fn() })))
+    act(() => mutations[0].onSuccess({
+      format_version: 1, exported_at: '2026-07-15T21:15:00+00:00', source_instance: 'x',
+      sections: ['zev'], counts: {}, source_zev: { id: 'z', name: 'Source' },
+    }))
+    expect(container.textContent).toContain('15.07.2026 23:15')
+  } finally {
+    process.env.TZ = savedTz
+  }
 })

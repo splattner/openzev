@@ -5,6 +5,7 @@ import { useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
 import { formatApiError } from '../../lib/api/errors'
+import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { queryKeys } from '../../lib/api/queryKeys'
 import {
   fetchTransferSections,
@@ -26,6 +27,7 @@ type ZevImportModalProps = {
 
 export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalProps) {
   const { t } = useTranslation()
+  const { settings } = useAppSettings()
   const { pushToast } = useToast()
 
   const [file, setFile] = useState<File | null>(null)
@@ -171,7 +173,7 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
               <dt className="muted">{t('zevTransfer.sourceZev')}</dt>
               <dd style={{ margin: 0 }}>{manifest.source_zev?.name || '—'}</dd>
               <dt className="muted">{t('zevTransfer.exportedAt')}</dt>
-              <dd style={{ margin: 0 }}>{new Date(manifest.exported_at).toLocaleString()}</dd>
+              <dd style={{ margin: 0 }}>{formatDateTime(manifest.exported_at, settings)}</dd>
               <dt className="muted">{t('zevTransfer.formatVersion')}</dt>
               <dd style={{ margin: 0 }}>{manifest.format_version}</dd>
             </dl>

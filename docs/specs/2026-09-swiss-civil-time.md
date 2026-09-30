@@ -417,6 +417,7 @@ unchanged. The module comment is rewritten for ADR 0026. Consumers
 | `pages/MeteringChartPage.tsx` | `formatUtcIsoDate(new Date(mp.first_reading_at))` / `last_reading_at` | Business-zone date of the instant (`formatBusinessIsoDate`, new in `lib/dates.ts`) |
 | `pages/ImportsPage.tsx` | bulk-delete visible count from `T00:00:00Z` bounds | `businessDayStartMs(from)` … `businessDayStartMs(nextIsoDate(to))`, matching §5.2 |
 | `features/tariffs/DynamicPriceHistoryModal.tsx` | `formatDateTime(new Date(value).toISOString(), ...)` | Unchanged call; now renders in `Europe/Zurich` via §7.1 |
+| `features/zev/ZevImportModal.tsx` | archive `exported_at` via `new Date(...).toLocaleString()` (browser zone and locale) | `formatDateTime(manifest.exported_at, settings)`: Swiss time in the user's date-time format |
 
 ### 7.4 Import wizard — `frontend/src/features/imports/ImportWizardModal.tsx`
 
@@ -621,6 +622,7 @@ Tests that encoded UTC days or hours now express the same intent in Swiss time:
   buckets with offsets label as the Swiss day/month; UTC hour buckets label as
   the Swiss hour; both 02:00 hours of the autumn change label 02:00.
 - `tests/metering-chart-page-period.test.ts`: first/last reading dates in Swiss time.
+- `tests/import-warning-modals.test.ts`: the ZEV archive's export time shows as Swiss time under `TZ=America/New_York`.
 - `tests/imports-wizard.test.ts`: detection prefill carries `timestampTimezone`;
   the select defaults to `Europe/Zurich` and a changed zone is sent with the preview.
 - `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-hex.mjs`,
