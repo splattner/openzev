@@ -394,7 +394,7 @@ record `timestamp_timezone="Europe/Zurich"`. `seed_demo`'s UTC-midnight
 - `formatDateParts` takes a `ParsedDateValue { date, dateOnly }` from
   `parseDateValue`; month names for instants use
   `timeZone: BUSINESS_TIME_ZONE`.
-- `formatIsoDate`, `formatUtcIsoDate`, `daysInPeriod`, `isValidIsoDate` and
+- `formatIsoDate`, `formatUtcIsoDate`, `daysInPeriod` and
   `lib/billingPeriod.ts` stay as they are: they operate on date strings, not
   instants. `todayLocalIso` is renamed `todayBusinessIso()` (today's date in
   `Europe/Zurich`, matching the backend's `timezone.localdate()`), with every

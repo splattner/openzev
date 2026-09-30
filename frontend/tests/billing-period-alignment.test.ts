@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-    billingPeriodFromRange,
     billingRangeFromParams,
     firstAlignedBillingPeriod,
     getCurrentBillingPeriod,
@@ -42,35 +41,6 @@ describe('isBillingAlignedPeriod', () => {
   it('rejects an empty range', () => {
     expect(isBillingAlignedPeriod('', '', 'monthly')).toBe(false)
     expect(isBillingAlignedPeriod('2026-05-01', '', 'monthly')).toBe(false)
-  })
-})
-
-describe('billingPeriodFromRange (readiness/attention destination contract)', () => {
-  it('accepts a range that exactly spans one billing period', () => {
-    expect(billingPeriodFromRange('2026-08-01', '2026-08-31', 'monthly')).toEqual({
-      from: '2026-08-01',
-      to: '2026-08-31',
-    })
-    expect(billingPeriodFromRange('2026-10-01', '2026-12-31', 'quarterly')).toEqual({
-      from: '2026-10-01',
-      to: '2026-12-31',
-    })
-  })
-
-  it('falls back to the page default when either bound is missing', () => {
-    expect(billingPeriodFromRange(null, '2026-08-31', 'monthly')).toBeNull()
-    expect(billingPeriodFromRange('2026-08-01', undefined, 'monthly')).toBeNull()
-    expect(billingPeriodFromRange('', '', 'monthly')).toBeNull()
-  })
-
-  it('rejects a range that does not span the whole period', () => {
-    expect(billingPeriodFromRange('2026-08-01', '2026-08-15', 'monthly')).toBeNull()
-    expect(billingPeriodFromRange('2026-08-01', '2026-08-31', 'quarterly')).toBeNull()
-  })
-
-  it('rejects a period before the community existed (floor)', () => {
-    expect(billingPeriodFromRange('2025-01-01', '2025-01-31', 'monthly', '2026-03-01')).toBeNull()
-    expect(billingPeriodFromRange('2026-08-01', '2026-08-31', 'monthly', '2026-03-01')).not.toBeNull()
   })
 })
 

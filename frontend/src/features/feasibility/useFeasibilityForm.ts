@@ -113,7 +113,7 @@ function toFixedString(value: number, decimalPlaces: number): string {
 
 // Annual PV production can be entered directly (kWh) or derived from an
 // installed capacity (kWp) times an assumed specific yield (kWh/kWp/year).
-// Mirrors backend/feasibility/calculator.py's estimate_annual_production_kwh.
+// Resolved here only: the API receives annual production in kWh.
 export function resolveAnnualProductionKwh(values: FeasibilityFormValues): number {
   if (values.annual_production_mode === 'from_kwp') {
     return Number(values.pv_kwp) * Number(values.specific_yield_kwh_per_kwp)

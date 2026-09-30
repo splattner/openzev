@@ -1098,7 +1098,6 @@ export const it = {
             viewCoveringInvoice: 'Vedi la fattura di copertura',
             settledCovered: 'Già fatturato',
             openDetails: 'Apri dettagli',
-            viewLogs: 'Mostra log',
             moreActions: 'Altro',
             moreBatchActions: 'Altre azioni di gruppo',
             approve: 'Approva',

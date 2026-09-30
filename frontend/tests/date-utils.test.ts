@@ -6,7 +6,6 @@ import {
   formatBusinessIsoDate,
   formatIsoDate,
   formatUtcIsoDate,
-  isValidIsoDate,
   nextIsoDate,
   todayBusinessIso,
   zonedParts,
@@ -91,23 +90,5 @@ describe('daysInPeriod', () => {
     expect(daysInPeriod('', '2026-01-31')).toBe(0)
     expect(daysInPeriod('2026-01-01', '')).toBe(0)
     expect(daysInPeriod('not-a-date', '2026-01-31')).toBe(0)
-  })
-})
-
-describe('isValidIsoDate', () => {
-  it('accepts a well-formed calendar date', () => {
-    expect(isValidIsoDate('2026-01-31')).toBe(true)
-  })
-
-  it('rejects a date-shaped string that is not a real calendar date', () => {
-    expect(isValidIsoDate('2026-02-30')).toBe(false)
-  })
-
-  it('rejects malformed, empty, and missing values', () => {
-    expect(isValidIsoDate('2026-1-1')).toBe(false)
-    expect(isValidIsoDate('not-a-date')).toBe(false)
-    expect(isValidIsoDate('')).toBe(false)
-    expect(isValidIsoDate(null)).toBe(false)
-    expect(isValidIsoDate(undefined)).toBe(false)
   })
 })

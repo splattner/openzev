@@ -5,7 +5,6 @@ import {
   hourlyKwhTick,
   hourlyKwhTooltipValue,
   kwhTick,
-  kwhTooltipValue,
 } from '../src/lib/dashboardFormatting'
 
 describe('dashboard chart formatting', () => {
@@ -19,10 +18,6 @@ describe('dashboard chart formatting', () => {
 
   it('uses up to four decimals for hourly-profile axis ticks', () => {
     expect(hourlyKwhTick(0.005)).toBe('0.005')
-  })
-
-  it('keeps period tooltip values at up to two decimals', () => {
-    expect(kwhTooltipValue(0.005)).toBe('0.01 kWh')
   })
 
   it('keeps hourly tooltip values at up to four decimals', () => {

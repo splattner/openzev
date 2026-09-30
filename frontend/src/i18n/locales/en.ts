@@ -1107,7 +1107,6 @@ export const en = {
             viewCoveringInvoice: 'View covering invoice',
             settledCovered: 'Already billed',
             openDetails: 'Open details',
-            viewLogs: 'View logs',
             moreActions: 'More',
             moreBatchActions: 'More batch actions',
             approve: 'Approve',

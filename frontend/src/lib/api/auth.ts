@@ -93,11 +93,6 @@ export async function regenerateRecoveryCodes(): Promise<{ recovery_codes: strin
   return data
 }
 
-export async function fetchPasskeys(): Promise<Passkey[]> {
-  const { data } = await api.get<Passkey[]>('/auth/me/passkeys/')
-  return data
-}
-
 /** Options for navigator.credentials.create(), in the backend's JSON form. */
 export async function passkeyRegisterBegin(): Promise<CreationOptionsJSON> {
   const { data } = await api.post<CreationOptionsJSON>('/auth/me/passkeys/register/begin/')

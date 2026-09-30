@@ -1098,7 +1098,6 @@ export const de = {
             viewCoveringInvoice: 'Abdeckende Rechnung ansehen',
             settledCovered: 'Bereits abgerechnet',
             openDetails: 'Details öffnen',
-            viewLogs: 'Logs anzeigen',
             moreActions: 'Mehr',
             moreBatchActions: 'Weitere Sammelaktionen',
             approve: 'Genehmigen',

@@ -14,5 +14,3 @@ export function AppFooter() {
         </div>
     )
 }
-
-export default AppFooter

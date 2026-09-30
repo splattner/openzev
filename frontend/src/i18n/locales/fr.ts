@@ -1098,7 +1098,6 @@ export const fr = {
             viewCoveringInvoice: 'Voir la facture couvrante',
             settledCovered: 'Déjà facturé',
             openDetails: 'Voir les détails',
-            viewLogs: 'Voir les journaux',
             moreActions: 'Plus',
             moreBatchActions: 'Plus d\'actions groupées',
             approve: 'Approuver',

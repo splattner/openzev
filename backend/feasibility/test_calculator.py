@@ -11,7 +11,6 @@ from .calculator import (
     FeasibilityInput,
     ParticipantInput,
     compute_feasibility,
-    estimate_annual_production_kwh,
 )
 
 
@@ -303,12 +302,6 @@ class TestValidation:
         # 0 and 1 are valid boundaries, must not raise.
         compute_feasibility(_typical_input(self_consumption_rate=Decimal("0")))
         compute_feasibility(_typical_input(self_consumption_rate=Decimal("1")))
-
-
-class TestEstimateAnnualProduction:
-    def test_multiplies_kwp_by_specific_yield(self):
-        result = estimate_annual_production_kwh(Decimal("10"), Decimal("950"))
-        assert result == Decimal("9500")
 
 
 class TestMultiParticipant:

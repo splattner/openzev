@@ -6,10 +6,6 @@ export const kwhTick = (value: number): string => formatKwh(value, { maxDecimals
 /** Hourly-profile Y axes match tooltip precision (up to four decimals). */
 export const hourlyKwhTick = (value: number): string => formatKwh(value, { maxDecimals: 4 })
 
-/** Period-bucket tooltip (up to two decimals). */
-export const kwhTooltipValue = (value: unknown): string =>
-    `${formatKwh(Number(value), { maxDecimals: 2 })} kWh`
-
 /** Hourly-profile tooltip (up to four decimals). */
 export const hourlyKwhTooltipValue = (value: unknown): string =>
     `${formatKwh(Number(value), { maxDecimals: 4 })} kWh`

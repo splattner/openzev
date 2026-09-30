@@ -145,16 +145,6 @@ export function formatDateTime(value: string | null | undefined, settings: AppSe
     }
 }
 
-export function formatMonthYear(value: string | null | undefined): string {
-    if (!value) return '—'
-
-    const parsed = parseDateValue(value)
-    if (!parsed) return value
-
-    const parts = formatDateParts(parsed)
-    return `${parts.monthShort} ${parts.year}`
-}
-
 export function toDayJsDateFormat(pattern: ShortDateFormat): string {
     switch (pattern) {
         case 'dd.MM.yyyy':

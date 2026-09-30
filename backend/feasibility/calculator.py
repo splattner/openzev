@@ -445,8 +445,3 @@ def compute_feasibility(inputs: FeasibilityInput) -> FeasibilityResult:
         fair_price_range=_fair_price_range(inputs, self_consumed),
         participants=_build_participant_results(inputs, self_consumed),
     )
-
-
-def estimate_annual_production_kwh(pv_kwp: Decimal, specific_yield_kwh_per_kwp: Decimal) -> Decimal:
-    """Estimate annual PV production from installed capacity and a specific-yield assumption."""
-    return pv_kwp * specific_yield_kwh_per_kwp

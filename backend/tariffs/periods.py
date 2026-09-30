@@ -58,10 +58,6 @@ def weekdays_of(period) -> frozenset[int]:
     return _cached(period, "weekdays", _WEEKDAYS_CACHE, ALL_WEEKDAYS)
 
 
-def is_seasonal(period) -> bool:
-    return months_of(period) != ALL_MONTHS
-
-
 def month_ranges(months) -> list[tuple[int, int]]:
     """Contiguous runs of months, as ``(first, last)`` pairs.
 

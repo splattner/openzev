@@ -664,7 +664,6 @@ export interface TotpEnrolment {
 | `confirmTotpEnrolment(code)` | POST | `/auth/me/mfa/totp/confirm/` |
 | `removeTotp()` | DELETE | `/auth/me/mfa/totp/` |
 | `regenerateRecoveryCodes()` | POST | `/auth/me/mfa/recovery-codes/` |
-| `fetchPasskeys()` | GET | `/auth/me/passkeys/` |
 | `passkeyRegisterBegin()` | POST | `/auth/me/passkeys/register/begin/` |
 | `passkeyRegisterComplete(credential, name)` | POST | `/auth/me/passkeys/register/complete/` |
 | `renamePasskey(id, name)` | PATCH | `/auth/me/passkeys/<id>/` |

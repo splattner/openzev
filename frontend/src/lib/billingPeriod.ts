@@ -26,26 +26,6 @@ export function getCurrentBillingPeriod(interval: BillingInterval): { from: stri
     }
 }
 
-/**
- * The aligned billing period encoded in a range, or null.
- *
- * Destination contract for readiness/attention links: pages open on the exact
- * `period_start`/`period_end` the item carried instead of their own default.
- * Only an exact whole period of the ZEV's interval counts; `floorIso` rejects
- * periods before the community existed.
- */
-export function billingPeriodFromRange(
-    fromIso: string | null | undefined,
-    toIso: string | null | undefined,
-    interval: BillingInterval,
-    floorIso?: string | null,
-): { from: string; to: string } | null {
-    if (!fromIso || !toIso) return null
-    if (!isBillingAlignedPeriod(fromIso, toIso, interval)) return null
-    if (floorIso && fromIso < floorIso) return null
-    return { from: fromIso, to: toIso }
-}
-
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
 
 function isValidIsoDay(iso: string): boolean {

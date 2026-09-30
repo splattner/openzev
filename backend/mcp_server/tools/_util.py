@@ -17,9 +17,3 @@ def chf(value) -> str | None:
     if value is None:
         return None
     return str(value)
-
-
-def cap_list(items: list, limit: int) -> tuple[list, bool]:
-    if len(items) > limit:
-        return items[:limit], True
-    return items, False
