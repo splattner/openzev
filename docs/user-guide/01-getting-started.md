@@ -328,8 +328,8 @@ If logged in as a ZEV owner:
 - Go to **Metering Points** to see participant meters
 - Go to **Metering** for consumption charts, data quality, and import history
 - Go to **Tariffs** to configure energy pricing
-- Go to **Billing** to generate and manage invoices, inspect/retry email delivery, and download statements
-- Go to **Reports** for annual statements and financial summaries
+- Go to **Billing** to generate and manage invoices and inspect/retry email delivery
+- Go to **Reports** for the annual report (self-consumption, self-sufficiency, participant savings), annual statements, and tax overviews
 
 ![Manager Overview](screenshots/02-dashboard.png)
 

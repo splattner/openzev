@@ -86,7 +86,7 @@ Draft → Approved → Sent → Paid
 
 Only admins can delete an invoice that is approved, sent or paid.
 
-## Billing Hub (Invoices · Emails · Statements)
+## Billing Hub (Invoices · Emails)
 
 The sidebar entry **Billing** (`/billing/invoices`) opens the invoice-first
 billing hub. Its tabs are routes — each is directly linkable:
@@ -96,9 +96,10 @@ billing hub. Its tabs are routes — each is directly linkable:
   invoices: the latest email status per invoice, a filter by status, a
   failed-email banner, **View history** for the actual attempt log, and an
   inline **Retry** per failed latest attempt.
-- **Statements** (`/billing/statements`) — the yearly whole-ZEV annual-statement
-  ZIP downloads (see
-  [Annual Statements and Tax Overviews](#annual-statements-and-tax-overviews-billing--reports)).
+
+The yearly whole-ZEV annual-statement ZIP is on **Reports** (see
+[Reports: Annual Report, Statements and Tax Overviews](#reports-annual-report-statements-and-tax-overviews)).
+The former `/billing/statements` address redirects there.
 
 The per-period work cards live on **Overview**. The running period is separated
 as **Collecting data** and never exposes readiness actions. Ended periods with
@@ -121,8 +122,6 @@ After a retry is accepted, the tab shows it as pending while the worker
 starts. It updates automatically when the next delivery attempt is recorded.
 Invoice rows themselves keep only the latest delivery-state badge; detailed
 attempts and errors are kept in the Emails tab's history panel.
-
-![Annual statement downloads](screenshots/08f-billing-statements.png)
 
 ## Period-Based Invoice View
 
@@ -338,15 +337,39 @@ Invoices can be deleted to clean up incorrect or test data.
 
 Deletion is permanent; the invoice is removed from the database.
 
-## Annual Statements and Tax Overviews (Billing + Reports)
+## Reports: Annual Report, Statements and Tax Overviews
 
-Select a year at the top of the page. The default is the last completed year.
+Open **Reports** (`/reports`) and select a year at the top of the page. The
+default is the last completed year.
 
-**Admins and ZEV owners:** Open **Billing → Statements** (`/billing/statements`)
-to prepare a ZIP of the selected ZEV's annual statements. Download it when
-ready. You can return after reloading; links expire after 24 hours. Partial
-exports include an `omitted.txt` listing statements that could not be generated.
-The ZEV tax overview is also available under **Reports** (`/reports`).
+**Admins and ZEV owners** see the selected ZEV's annual report first:
+
+- **Key figures** — the year's **self-consumption rate** (share of the ZEV's
+  production used inside the ZEV), **self-sufficiency rate** (share of the
+  ZEV's consumption covered by its own production), total production and
+  consumption, and the participants' total savings. When the previous year has
+  metering data, its rates are shown below this year's for comparison.
+- **Over the year** — both rates month by month. The previous year is drawn
+  as dashed lines; months without data are left empty.
+- **Benefit per participant** — each participant's consumption, how much of it
+  came from the ZEV, their self-sufficiency rate, and their savings: what their
+  ZEV electricity was billed at, what the same kWh would have cost at the
+  average grid rate on their invoices, and the difference. These are the same
+  savings figures as on each participant's annual statement. Cancelled
+  invoices do not count, and a participant without invoices for the year shows
+  no savings.
+
+The rates use the same definitions as **Energy balance**, so the figures
+match. A year without metering data shows a short notice instead.
+
+Below the report, under **Annual documents**:
+
+- **Tax Overview** — download the ZEV's yearly tax overview for producers as a
+  PDF.
+- **Annual Statement** — prepare a ZIP of the selected ZEV's annual statements
+  for all participants. Download it when ready. You can return after
+  reloading; links expire after 24 hours. Partial exports include an
+  `omitted.txt` listing statements that could not be generated.
 
 ![Reports page](screenshots/23-reports.png)
 

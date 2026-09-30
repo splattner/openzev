@@ -1281,7 +1281,8 @@ render `/zev-settings` through `AppRoutes` must use the data-router setup —
 | `/metering-data` | any authenticated | alias → `/metering/chart`, except `?tab=quality` → guarded `/metering/quality`; `tab` is always stripped, remaining params preserved |
 | `/imports` | `admin`, `zev_owner` | alias → `/metering/imports` (query preserved) |
 | `/tariffs` | `admin`, `zev_owner` | `TariffsPage` |
-| `/billing/invoices` · `/billing/emails` · `/billing/statements` | `admin`, `zev_owner` | `BillingHubPage tab=…` (invoices · email delivery/history + retry · owner annual statements) |
+| `/billing/invoices` · `/billing/emails` | `admin`, `zev_owner` | `BillingHubPage tab=…` (invoices · email delivery/history + retry) |
+| `/billing/statements` | any authenticated | alias → `/reports` (the annual-statement ZIP moved there with the other yearly documents) |
 | `/billing/periods` | `admin`, `zev_owner` | compatibility alias → `/`, where period work lives on manager Overview |
 | `/billing/invoices?period_start&period_end` | `admin`, `zev_owner` | deep link from the Overview period table preselects that period |
 | `/billing` | `admin`, `zev_owner` | alias → `/billing/invoices` |
@@ -1289,7 +1290,7 @@ render `/zev-settings` through `AppRoutes` must use the data-router setup —
 | `/invoices/:invoiceId` · `/billing/invoices/:invoiceId` | any authenticated | `InvoiceDetailPage` (own invoices only for participants, backend-enforced) |
 | `/me/statement` | `participant` | `ReportsPage` (participant branch; impersonating admins carry the participant role) |
 | `/me/invoices` | `participant` | `MyInvoicesPage` (own invoices, read-only; reuses the role-scoped invoice list — no new grant, recorded exception 2) |
-| `/reports` | any authenticated | `ReportsPage` (participants: own downloads; owners/admins: ZEV-level tax overview plus planned analytics) |
+| `/reports` | any authenticated | `ReportsPage` (participants: own downloads; owners/admins: annual ZEV report, tax overview, and annual-statement ZIP) |
 | `/login` | public | `LoginPage` |
 | `/verify-email` | public | `VerifyEmailPage` |
 

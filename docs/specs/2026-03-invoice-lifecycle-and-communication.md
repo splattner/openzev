@@ -302,10 +302,13 @@ coverage runs against PostgreSQL only (§13, `test_workflow.py`).
 The single-document endpoints below are consumed from the **/reports** route
 (`frontend/src/pages/ReportsPage.tsx`) — the owner/admin Reports view;
 participants reach the same page (participant branch) via **/me/statement**
-in the sidebar. The whole-ZEV ZIP is produced asynchronously and lives in
-the Billing hub's Annual statements tab (**/billing/statements**,
-`BillingStatementsPage`): the frontend creates an export job, polls its
-status, and downloads the artifact when it completes (§8.1, ADR 0017).
+in the sidebar. The whole-ZEV ZIP is produced asynchronously and lives on
+the same page's owner/admin branch, under **Annual documents** next to the
+tax overview (`AnnualStatementsExportCard`; the former Billing tab
+**/billing/statements** redirects to **/reports**): the frontend creates an
+export job, polls its status, and downloads the artifact when it completes
+(§8.1, ADR 0017). The owner/admin branch also shows the annual ZEV report
+(`docs/specs/2026-09-annual-zev-report.md`).
 
 | Method | URL | Permission | Frontend usage |
 |---|---|---|---|
