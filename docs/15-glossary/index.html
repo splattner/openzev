@@ -2039,8 +2039,10 @@ One price of a per-kWh tariff, with the times, weekdays and months it applies (f
 <p><strong>Timestamp</strong>
 Specific point in time when a reading was recorded (e.g., 2026-01-15 14:00:00).</p>
 <p><strong>Timezone</strong>
-Offset used to interpret a timestamp. Readings are stored on the UTC timeline;
-there is no timezone selector in the import UI. See <a href="../05-metering-import/#timestamp-handling">Metering Imports</a>.</p>
+Offset used to interpret a timestamp. Readings are stored as exact moments in
+time; days, billing periods, tariff hours and charts use Swiss time
+(CET/CEST). Timestamps without an offset in an import file are read as Swiss
+time unless the import says <em>UTC</em>. See <a href="../05-metering-import/#timestamp-handling">Metering Imports</a>.</p>
 <h2 id="v">V<a class="headerlink" href="#v" title="Permanent link">&para;</a></h2>
 <p><strong>VAT</strong>
 Value Added Tax. In Switzerland, 8.1% (standard rate since 2024). How OpenZEV applies it depends on the ZEV's VAT treatment. See <a href="../02-zev-setup/#vat-configuration">ZEV Setup → VAT Configuration</a>.</p>

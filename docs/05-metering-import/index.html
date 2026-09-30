@@ -839,6 +839,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Timestamp Handling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#imports-from-before-october-2026" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Imports from before October 2026
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1741,6 +1758,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Timestamp Handling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#imports-from-before-october-2026" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Imports from before October 2026
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2104,10 +2138,12 @@ alike. Delimiter may be any single character (for example <code>,</code>, <code>
 </ul>
 </li>
 <li>Set <strong>Date/time format</strong> as a Python <code>strptime</code> pattern (e.g. <code>%d.%m.%Y</code>, <code>%Y-%m-%dT%H:%M:%S%z</code>), or leave empty for auto-detect. The format must capture the full calendar date (year + month + day); <code>%d.%m</code> is rejected. Day-of-year (<code>%Y-%j</code>) is accepted.</li>
+<li>Set <strong>Timestamps without an offset are</strong> to <em>Swiss time (CET/CEST)</em> (the
+   default) or <em>UTC</em> — see <a href="#timestamp-handling">Timestamp Handling</a>.</li>
 <li>For daily profiles set <strong>Intervals per row</strong> and <strong>Minutes per interval</strong>.</li>
 </ul>
 <p>Native Excel datetime cells ignore <strong>Date/time format</strong> — they are read
- as-is (assumed UTC). The format only applies to text cells.</p>
+ as-is, in the zone chosen above. The format only applies to text cells.</p>
 </li>
 <li>
 <p><strong>Preview (required for CSV)</strong></p>
@@ -2170,29 +2206,60 @@ ones; fully duplicate rows are skipped with a <code>Duplicate reading</code> err
 <p><strong>Note:</strong> SDAT-CH metadata (meter type, interval) is extracted; timestamp resolution is auto-detected.</p>
 </blockquote>
 <h2 id="timestamp-handling">Timestamp Handling<a class="headerlink" href="#timestamp-handling" title="Permanent link">&para;</a></h2>
-<p>OpenZEV stores all readings on the UTC timeline, and there is <strong>no timezone
-selector</strong> in the import UI:</p>
+<p>OpenZEV stores every reading as an exact moment in time and does all
+calendar work — days, billing periods, tariff hours, charts — in <strong>Swiss
+time</strong>. What matters on import is how a timestamp in your file is read:</p>
 <ul>
 <li>A timestamp <strong>with</strong> an offset (<code>2026-01-15T14:00:00+01:00</code>, as in SDAT-CH
-  files) is converted to UTC correctly.</li>
-<li>A timestamp <strong>without</strong> an offset (<code>2026-01-15 14:00:00</code>) is read as
-  <strong>UTC</strong>, not Swiss time.</li>
-<li>A daily-profile row's first interval starts at <strong>00:00 UTC</strong> of its date.</li>
-<li>Billing periods also run from 00:00 UTC to 00:00 UTC.</li>
+  files, or <code>…Z</code> for UTC) is read exactly as written.</li>
+<li>A timestamp <strong>without</strong> an offset (<code>2026-01-15 14:00:00</code>) is read in the zone
+  you choose under <strong>Timestamps without an offset are</strong>: <em>Swiss time
+  (CET/CEST)</em> by default, which is what Swiss meter and grid-operator exports
+  use. Choose <em>UTC</em> only for a source that really exports UTC without saying so.</li>
+<li>A daily-profile row covers its Swiss calendar day: its first interval starts
+  at 00:00 Swiss time.</li>
 </ul>
-<p>So a file of Swiss local times without offsets lands one hour (winter) or two
-hours (summer) late. Within a period that changes nothing, but readings near
-a period boundary can fall into the neighbouring period. If your files carry
-local time, prefer an export with offsets and a format such as
-<code>%Y-%m-%dT%H:%M:%S%z</code>.
- The <strong>Date/time format</strong> field is a Python
+<p><strong>Daylight saving time</strong> is handled for Swiss-time files:</p>
+<ul>
+<li>On the last Sunday of <strong>October</strong>, 02:00–02:59 happens twice. When a file
+  lists that hour twice for a meter, the first occurrence is read as summer
+  time and the second as winter time — both are imported.</li>
+<li>On the last Sunday of <strong>March</strong>, 02:00–02:59 does not exist. Rows at those
+  times with energy 0 are skipped with a warning in the import protocol; a row
+  with energy there is reported as an error.</li>
+<li>A daily-profile row has 92 quarter-hours on the March day, 96 on ordinary
+  days and 100 on the October day. On the March day, a 96-column row may leave
+  the missing 02:00 hour empty (or 0), or leave the last four columns empty. On
+  the October day the row needs all 100 values: set <strong>Intervals per row</strong> to
+  100 for such files (the extra columns stay empty on ordinary days).</li>
+</ul>
+<p>The import protocol shows which zone each CSV import used.</p>
+<p>The <strong>Date/time format</strong> field is a Python
 <code>strptime</code> pattern controlling how text timestamps are parsed; empty means
 auto-detect (ISO first, then day-first European fallback for dates like
 <code>07.01.2026</code>). The pattern must include the full date — <code>%d.%m.%Y</code>,
 <code>%Y-%m-%dT%H:%M:%S%z</code>, <code>%Y-%j</code> — while <code>%d.%m</code> or <code>%H:%M</code> are rejected.</p>
-<p>Whatever you choose, use one consistent timestamp interpretation across all
-your import files: mixing local-time and UTC files for the same meter creates
-overlaps and gaps an hour wide.</p>
+<p>Pick the zone per file to match what the file contains: a UTC file imported as
+Swiss time lands one or two hours early, and a Swiss-time file imported as UTC
+one or two hours late.</p>
+<h3 id="imports-from-before-october-2026">Imports from before October 2026<a class="headerlink" href="#imports-from-before-october-2026" title="Permanent link">&para;</a></h3>
+<p>Earlier versions read timestamps without an offset as UTC. If your files were
+in Swiss time, those readings sit one hour (winter) or two hours (summer) late:
+the first hours of a month show up on the last day of the previous month, and
+tariff hours and period boundaries are off by the same amount. The protocol of
+such an import shows <em>UTC (imported before October 2026)</em>.</p>
+<p>Your server operator can move these imports to the right time with a
+management command. It lists the affected imports, shows what would change
+without writing anything, and only applies when asked:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>manage.py<span class="w"> </span>reanchor_readings<span class="w"> </span>--list
+python<span class="w"> </span>manage.py<span class="w"> </span>reanchor_readings<span class="w"> </span>--batch<span class="w"> </span>&lt;batch-id&gt;<span class="w"> </span>--batch<span class="w"> </span>&lt;batch-id&gt;
+python<span class="w"> </span>manage.py<span class="w"> </span>reanchor_readings<span class="w"> </span>--batch<span class="w"> </span>&lt;batch-id&gt;<span class="w"> </span>--batch<span class="w"> </span>&lt;batch-id&gt;<span class="w"> </span>--apply
+</code></pre></div>
+<p>Select all months of a meter together — a month's first hours move onto the
+previous month's last hours. Each import can be moved only once. If invoices
+that are already approved, sent or paid cover the moved readings, the command
+asks for <code>--allow-invoiced</code>; those invoices themselves never change. Regenerate
+draft invoices afterwards.</p>
 <h2 id="common-import-scenarios">Common Import Scenarios<a class="headerlink" href="#common-import-scenarios" title="Permanent link">&para;</a></h2>
 <h3 id="scenario-1-hourly-solar--consumption">Scenario 1: Hourly Solar + Consumption<a class="headerlink" href="#scenario-1-hourly-solar--consumption" title="Permanent link">&para;</a></h3>
 <p><strong>File:</strong> <code>readings_2026-01.csv</code></p>
@@ -2270,9 +2337,8 @@ slot — preview and import both reject the empty row.</p>
 <blockquote>
 <p><strong>Best practice:</strong> Leave overwrite off unless you mean to change history.
 To remove bad imports entirely, delete the import log (single or period
-bulk-delete) — period deletion uses <strong>UTC days</strong> on import creation time,
-while history timestamps render locally, so check the UTC note in the
-delete dialog.</p>
+bulk-delete) — period deletion uses the <strong>Swiss calendar days</strong> on which
+the imports were created, the same days the history shows.</p>
 </blockquote>
 <h2 id="deleting-imports">Deleting imports<a class="headerlink" href="#deleting-imports" title="Permanent link">&para;</a></h2>
 <p>Single and bulk deletion remove eligible import logs plus all readings still
@@ -2283,9 +2349,9 @@ If a bulk selection includes a protected import, the entire deletion is rejected
 and nothing is removed. The bulk dialog lists the blocking protected imports
 (filename and creation time) and disables confirmation while any is included.
 To correct an overwrite import, upload corrected values
-with overwrite enabled. Period bulk-delete matches
-<code>created_at</code> in the half-open UTC range <code>[date_from 00:00Z, date_to+1d 00:00Z)</code> —
-the visible-count preview uses the same UTC math as the backend.</p>
+with overwrite enabled. Period bulk-delete matches imports created from
+00:00 Swiss time on the first day up to midnight after the last day — the
+visible-count preview counts exactly the same imports.</p>
 <h2 id="data-quality-checks">Data Quality Checks<a class="headerlink" href="#data-quality-checks" title="Permanent link">&para;</a></h2>
 <p>After import, review <strong>Metering → Data Quality</strong> (<code>/metering/quality</code>) to see:</p>
 <ul>

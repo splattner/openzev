@@ -1909,8 +1909,10 @@ out without reading every value. Long periods are paginated a month
 15-minute grid of the exact values, so you can spot an individual anomalous
 reading the aggregated chart may hide. The expanded detail also flags
 negative individual readings and duplicate (timestamp, direction) readings,
-if any. Readings are grouped by their UTC calendar day, matching how imported
-timestamps are stored.</p>
+if any. Readings are grouped by their Swiss calendar day, the same day used
+for billing periods and tariffs. The day on which clocks go forward has 92
+quarter-hours and the day they go back has 100; in the grid, that day's two
+02:00 hours add up in one cell.</p>
 <h2 id="data-quality-view">Data Quality View<a class="headerlink" href="#data-quality-view" title="Permanent link">&para;</a></h2>
 <p>Use the <strong>Data Quality</strong> tab to assess completeness and health of metering
 data. Unlike the Chart tab, selecting a metering point here is optional —
