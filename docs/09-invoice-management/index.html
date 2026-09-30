@@ -952,10 +952,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#billing-hub-invoices--emails--statements" class="md-nav__link">
+  <a href="#billing-hub-invoices--emails" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Billing Hub (Invoices · Emails · Statements)
+        Billing Hub (Invoices · Emails)
       
     </span>
   </a>
@@ -1180,10 +1180,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#annual-statements-and-tax-overviews-billing--reports" class="md-nav__link">
+  <a href="#reports-annual-report-statements-and-tax-overviews" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Annual Statements and Tax Overviews (Billing + Reports)
+        Reports: Annual Report, Statements and Tax Overviews
       
     </span>
   </a>
@@ -1739,10 +1739,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#billing-hub-invoices--emails--statements" class="md-nav__link">
+  <a href="#billing-hub-invoices--emails" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Billing Hub (Invoices · Emails · Statements)
+        Billing Hub (Invoices · Emails)
       
     </span>
   </a>
@@ -1967,10 +1967,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#annual-statements-and-tax-overviews-billing--reports" class="md-nav__link">
+  <a href="#reports-annual-report-statements-and-tax-overviews" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Annual Statements and Tax Overviews (Billing + Reports)
+        Reports: Annual Report, Statements and Tax Overviews
       
     </span>
   </a>
@@ -2147,7 +2147,7 @@ link leads back to <strong>My invoices</strong>.</p>
   through the API only — there is no cancel button in the UI.</li>
 </ul>
 <p>Only admins can delete an invoice that is approved, sent or paid.</p>
-<h2 id="billing-hub-invoices--emails--statements">Billing Hub (Invoices · Emails · Statements)<a class="headerlink" href="#billing-hub-invoices--emails--statements" title="Permanent link">&para;</a></h2>
+<h2 id="billing-hub-invoices--emails">Billing Hub (Invoices · Emails)<a class="headerlink" href="#billing-hub-invoices--emails" title="Permanent link">&para;</a></h2>
 <p>The sidebar entry <strong>Billing</strong> (<code>/billing/invoices</code>) opens the invoice-first
 billing hub. Its tabs are routes — each is directly linkable:</p>
 <ul>
@@ -2156,10 +2156,10 @@ billing hub. Its tabs are routes — each is directly linkable:</p>
   invoices: the latest email status per invoice, a filter by status, a
   failed-email banner, <strong>View history</strong> for the actual attempt log, and an
   inline <strong>Retry</strong> per failed latest attempt.</li>
-<li><strong>Statements</strong> (<code>/billing/statements</code>) — the yearly whole-ZEV annual-statement
-  ZIP downloads (see
-  <a href="#annual-statements-and-tax-overviews-billing--reports">Annual Statements and Tax Overviews</a>).</li>
 </ul>
+<p>The yearly whole-ZEV annual-statement ZIP is on <strong>Reports</strong> (see
+<a href="#reports-annual-report-statements-and-tax-overviews">Reports: Annual Report, Statements and Tax Overviews</a>).
+The former <code>/billing/statements</code> address redirects there.</p>
 <p>The per-period work cards live on <strong>Overview</strong>. The running period is separated
 as <strong>Collecting data</strong> and never exposes readiness actions. Ended periods with
 open work remain visible as cards; fully completed ended periods are collapsed.
@@ -2177,7 +2177,6 @@ quality or tariffs. <strong>Open invoices</strong> opens that period's invoices.
 starts. It updates automatically when the next delivery attempt is recorded.
 Invoice rows themselves keep only the latest delivery-state badge; detailed
 attempts and errors are kept in the Emails tab's history panel.</p>
-<p><img alt="Annual statement downloads" src="../screenshots/08f-billing-statements.png" /></p>
 <h2 id="period-based-invoice-view">Period-Based Invoice View<a class="headerlink" href="#period-based-invoice-view" title="Permanent link">&para;</a></h2>
 <p>The <strong>Invoices</strong> tab shows one billing period at a time. There are no status filters — you navigate between periods instead.</p>
 <h3 id="period-navigation">Period Navigation<a class="headerlink" href="#period-navigation" title="Permanent link">&para;</a></h3>
@@ -2427,13 +2426,37 @@ history</strong>, where a failed latest attempt also has a <strong>Retry</strong
 <li><strong>Any status</strong> — admins can always delete.</li>
 </ul>
 <p>Deletion is permanent; the invoice is removed from the database.</p>
-<h2 id="annual-statements-and-tax-overviews-billing--reports">Annual Statements and Tax Overviews (Billing + Reports)<a class="headerlink" href="#annual-statements-and-tax-overviews-billing--reports" title="Permanent link">&para;</a></h2>
-<p>Select a year at the top of the page. The default is the last completed year.</p>
-<p><strong>Admins and ZEV owners:</strong> Open <strong>Billing → Statements</strong> (<code>/billing/statements</code>)
-to prepare a ZIP of the selected ZEV's annual statements. Download it when
-ready. You can return after reloading; links expire after 24 hours. Partial
-exports include an <code>omitted.txt</code> listing statements that could not be generated.
-The ZEV tax overview is also available under <strong>Reports</strong> (<code>/reports</code>).</p>
+<h2 id="reports-annual-report-statements-and-tax-overviews">Reports: Annual Report, Statements and Tax Overviews<a class="headerlink" href="#reports-annual-report-statements-and-tax-overviews" title="Permanent link">&para;</a></h2>
+<p>Open <strong>Reports</strong> (<code>/reports</code>) and select a year at the top of the page. The
+default is the last completed year.</p>
+<p><strong>Admins and ZEV owners</strong> see the selected ZEV's annual report first:</p>
+<ul>
+<li><strong>Key figures</strong> — the year's <strong>self-consumption rate</strong> (share of the ZEV's
+  production used inside the ZEV), <strong>self-sufficiency rate</strong> (share of the
+  ZEV's consumption covered by its own production), total production and
+  consumption, and the participants' total savings. When the previous year has
+  metering data, its rates are shown below this year's for comparison.</li>
+<li><strong>Over the year</strong> — both rates month by month. The previous year is drawn
+  as dashed lines; months without data are left empty.</li>
+<li><strong>Benefit per participant</strong> — each participant's consumption, how much of it
+  came from the ZEV, their self-sufficiency rate, and their savings: what their
+  ZEV electricity was billed at, what the same kWh would have cost at the
+  average grid rate on their invoices, and the difference. These are the same
+  savings figures as on each participant's annual statement. Cancelled
+  invoices do not count, and a participant without invoices for the year shows
+  no savings.</li>
+</ul>
+<p>The rates use the same definitions as <strong>Energy balance</strong>, so the figures
+match. A year without metering data shows a short notice instead.</p>
+<p>Below the report, under <strong>Annual documents</strong>:</p>
+<ul>
+<li><strong>Tax Overview</strong> — download the ZEV's yearly tax overview for producers as a
+  PDF.</li>
+<li><strong>Annual Statement</strong> — prepare a ZIP of the selected ZEV's annual statements
+  for all participants. Download it when ready. You can return after
+  reloading; links expire after 24 hours. Partial exports include an
+  <code>omitted.txt</code> listing statements that could not be generated.</li>
+</ul>
 <p><img alt="Reports page" src="../screenshots/23-reports.png" /></p>
 <p><strong>Participants:</strong> Open <strong>Annual statement</strong> (<code>/me/statement</code>) to read your own
 statement or select the <strong>Tax Overview</strong> tab. Use <strong>Download PDF</strong> to save the
