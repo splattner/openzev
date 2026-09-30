@@ -231,14 +231,8 @@ export function AppRoutes() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="billing/statements"
-            element={
-              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
-                <BillingHubPage tab="statements" />
-              </ProtectedRoute>
-            }
-          />
+          {/* Annual statements moved to Reports with the other yearly documents. */}
+          <Route path="billing/statements" element={<AliasNavigate to="/reports" />} />
           <Route path="billing/invoices/:invoiceId" element={<InvoiceDetailPage />} />
           <Route path="billing" element={<AliasNavigate to="/billing/invoices" />} />
           <Route path="invoices" element={<AliasNavigate to="/billing/invoices" />} />

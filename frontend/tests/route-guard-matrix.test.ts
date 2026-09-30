@@ -132,7 +132,7 @@ const MATRIX: Array<{ path: string; marker: string; allow: Record<UserRole, bool
     { path: '/billing/periods', marker: 'home', allow: { admin: true, zev_owner: true, participant: true } },
     { path: '/billing/invoices', marker: 'billing-hub', allow: { admin: true, zev_owner: true, participant: false } },
     { path: '/billing/emails', marker: 'billing-hub', allow: { admin: true, zev_owner: true, participant: false } },
-    { path: '/billing/statements', marker: 'billing-hub', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/billing/statements', marker: 'reports', allow: { admin: true, zev_owner: true, participant: true } },
     { path: '/billing/invoices/42', marker: 'invoice-detail', allow: { admin: true, zev_owner: true, participant: true } },
     { path: '/me/statement', marker: 'reports', allow: { admin: false, zev_owner: false, participant: true } },
     { path: '/me/invoices', marker: 'my-invoices', allow: { admin: false, zev_owner: false, participant: true } },

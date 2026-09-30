@@ -152,6 +152,16 @@ label > small.muted {
   cursor: pointer;
 }
 
+/* Read-only variant (annual report): rows are not a selection. */
+.participant-table--static tbody tr {
+  cursor: default;
+}
+
+.participant-table tfoot td {
+  font-weight: 600;
+  border-top: 1px solid var(--border-default);
+}
+
 .participant-table thead tr th {
   position: sticky;
   top: 0;

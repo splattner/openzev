@@ -30,6 +30,7 @@ from accounts.models import UserRole
 from accounts.permissions import IsZevOwnerOrAdmin
 from zev.models import Participant, Zev
 
+from .annual_report import build_annual_report
 from .annual_statement import generate_annual_statement_pdf
 from .financial_summary import generate_financial_summary_pdf
 from .tariff_overview import generate_tariff_overview_pdf
@@ -215,6 +216,38 @@ class FinancialSummaryView(APIView):
             f"financial-summary-{year}-{participant.last_name}.pdf",
             disposition="attachment",
         )
+
+
+class AnnualReportView(APIView):
+    """A ZEV's year in figures: energy balance, monthly trend, participant savings.
+
+    Owner/admin only, JSON (it is drawn on the Reports page, not printed) —
+    see docs/specs/2026-09-annual-zev-report.md §5. Both parameters are
+    required: the report is about exactly one ZEV and one civil year.
+    """
+
+    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
+
+    def get(self, request, *args, **kwargs):
+        year, error = _parse_year(request.query_params.get("year"))
+        if error:
+            return error
+        # year - 1 is read for the comparison line.
+        if year == MINYEAR:
+            return Response(
+                {"error": f"year must be between {MINYEAR + 1} and {MAXYEAR - 1}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        zev_id = request.query_params.get("zev_id")
+        if not zev_id:
+            return Response({"error": "zev_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        zev, error = _get_authorised_zev(request, zev_id)
+        if error:
+            return error
+
+        return Response(build_annual_report(zev, year))
 
 
 class TariffOverviewView(APIView):

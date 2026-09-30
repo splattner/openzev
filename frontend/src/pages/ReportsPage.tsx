@@ -7,6 +7,8 @@ import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { ReportsEmptyState } from '../features/reports/ReportsEmptyState'
 import { YearDownloadCard } from '../features/reports/YearDownloadCard'
+import { AnnualReportSection } from '../features/reports/AnnualReportSection'
+import { AnnualStatementsExportCard } from '../features/reports/AnnualStatementsExportCard'
 import { ParticipantYearDocuments } from '../features/reports/ParticipantYearDocuments'
 import { PageSkeleton } from '../components/PageSkeleton'
 
@@ -27,6 +29,8 @@ export function ReportsPage() {
     const years = Array.from({ length: YEAR_COUNT }, (_, i) => new Date().getFullYear() - i)
     const [year, setYear] = useState(() => new Date().getFullYear() - 1)
     const selectedYear = years.includes(year) ? year : years[1]
+    // Disable the shared year selector while the ZIP export is preparing.
+    const [zipBusy, setZipBusy] = useState(false)
 
     const financialSummaryMutation = useMutation({
         mutationFn: () => downloadFinancialSummary({
@@ -58,7 +62,7 @@ export function ReportsPage() {
                                 aria-label={t('pages.reports.year')}
                                 value={selectedYear}
                                 onChange={(e) => setYear(Number(e.target.value))}
-                                disabled={financialSummaryMutation.isPending}
+                                disabled={financialSummaryMutation.isPending || zipBusy}
                             >
                                 {years.map((y) => (
                                     <option key={y} value={y}>{y}</option>
@@ -67,20 +71,24 @@ export function ReportsPage() {
                         </label>
                     </div>
 
-                    <YearDownloadCard
-                        titleKey="pages.reports.financialSummary.title"
-                        descriptionKey="pages.reports.financialSummary.ownerDescription"
-                        busy={financialSummaryMutation.isPending}
-                        error={financialSummaryMutation.isError ? t('pages.reports.financialSummary.error') : null}
-                        onDownload={() => financialSummaryMutation.mutate()}
-                        actionLabelKey="pages.reports.financialSummary.download"
-                    />
+                    <AnnualReportSection zevId={selectedZevId} year={selectedYear} />
 
-                    <div className="card page-stack">
-                        <h3 style={{ marginTop: 0 }}>{t('pages.reports.ownerComing.title')}</h3>
-                        <p className="muted" style={{ margin: 0 }}>
-                            {t('pages.reports.ownerComing.description')}
-                        </p>
+                    <h3 style={{ margin: '0.5rem 0 0' }}>{t('pages.reports.documentsTitle')}</h3>
+                    <div className="grid grid-2">
+                        <YearDownloadCard
+                            titleKey="pages.reports.financialSummary.title"
+                            descriptionKey="pages.reports.financialSummary.ownerDescription"
+                            busy={financialSummaryMutation.isPending}
+                            error={financialSummaryMutation.isError ? t('pages.reports.financialSummary.error') : null}
+                            onDownload={() => financialSummaryMutation.mutate()}
+                            actionLabelKey="pages.reports.financialSummary.download"
+                        />
+                        <AnnualStatementsExportCard
+                            zevId={selectedZevId}
+                            year={selectedYear}
+                            enabled={!!selectedZevId}
+                            onBusyChange={setZipBusy}
+                        />
                     </div>
                 </>
             )}

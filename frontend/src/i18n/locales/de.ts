@@ -2568,9 +2568,44 @@ export const de = {
                 expired: 'Dieser Download-Link ist abgelaufen. Bereiten Sie einen neuen Export vor, um aktuelle Daten herunterzuladen.',
                 error: 'Jahresabrechnung konnte nicht erstellt werden. Bitte versuchen Sie es erneut.',
             },
-            ownerComing: {
-                title: 'Berichte folgen in Kürze',
-                description: 'Hier entstehen Auswertungen zu Eigenverbrauch im Zeitverlauf, Energiebilanz und Teilnehmernutzen.',
+            documentsTitle: 'Jahresdokumente',
+            annualReport: {
+                title: 'Jahresbericht {{year}}',
+                error: 'Der Jahresbericht konnte nicht geladen werden.',
+                noData: 'Für {{year}} liegen keine Messdaten vor.',
+                stats: {
+                    selfConsumptionRate: 'Eigenverbrauchsquote',
+                    selfSufficiencyRate: 'Autarkiegrad',
+                    produced: 'Produktion',
+                    consumed: 'Verbrauch',
+                    savings: 'Ersparnis Teilnehmende',
+                },
+                hints: {
+                    previousYear: '{{year}}: {{rate}}',
+                    savings: 'Gemäss Rechnungen des Jahres',
+                },
+                trend: {
+                    title: 'Verlauf über das Jahr',
+                    description: 'Eigenverbrauchsquote: Anteil der Produktion, der im ZEV verbraucht wurde. Autarkiegrad: Anteil des Verbrauchs, der aus dem ZEV gedeckt wurde. Gestrichelt: Vorjahr.',
+                    selfConsumption: 'Eigenverbrauchsquote {{year}}',
+                    selfSufficiency: 'Autarkiegrad {{year}}',
+                },
+                participants: {
+                    title: 'Nutzen pro Teilnehmende',
+                    description: 'Verbrauch, Deckung aus dem ZEV und Ersparnis gegenüber dem Netzstrompreis.',
+                    empty: 'Keine Teilnehmenden mit Daten in diesem Jahr.',
+                    total: 'Total',
+                    note: 'Die Ersparnis vergleicht die verrechneten Kosten für ZEV-Strom mit dem, was dieselben kWh zum durchschnittlichen Netztarif der Rechnungen gekostet hätten, wie in der Jahresabrechnung. Stornierte Rechnungen zählen nicht; ohne Rechnungen bleibt die Zeile leer.',
+                },
+                col: {
+                    participant: 'Teilnehmende',
+                    consumption: 'Verbrauch',
+                    fromZev: 'Aus ZEV',
+                    selfSufficiency: 'Autarkiegrad',
+                    localCost: 'Kosten ZEV-Strom',
+                    gridCost: 'Kosten ab Netz',
+                    savings: 'Ersparnis',
+                },
             },
             financialSummary: {
                 title: 'Steuerübersicht',
@@ -2581,11 +2616,10 @@ export const de = {
             },
         },
         billingHub: {
-            description: 'Rechnungen, Zustellung und Jahresabrechnungen für den ausgewählten (v)ZEV.',
+            description: 'Rechnungen und E-Mail-Zustellung für den ausgewählten (v)ZEV.',
             tabs: {
                 invoices: 'Rechnungen',
                 emails: 'E-Mails',
-                statements: 'Jahresabrechnungen',
             },
         },
         billingPeriods: {

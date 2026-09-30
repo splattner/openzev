@@ -215,7 +215,6 @@ test.describe('User Guide Screenshots', () => {
   for (const [name, route] of [
     ['06b-zev-billing-settings', '/zev-settings/billing'],
     ['08e-billing-emails', '/billing/emails'],
-    ['08f-billing-statements', '/billing/statements'],
     ['10b-admin-health', '/admin/health'],
   ]) {
     test(name, async ({ page }) => {
@@ -446,7 +445,8 @@ test.describe('User Guide Screenshots', () => {
   // 23 — Reports (owner view on the demo ZEV)
   test('23-reports', async ({ page }) => {
     await navigateTo(page, '/reports')
-    await page.waitForSelector('.card', { timeout: 10_000 })
+    // The annual report aggregates a year of readings; wait for its figures.
+    await page.waitForSelector('.kpi-row', { timeout: 30_000 })
     await screenshotFull(page, '23-reports')
   })
 

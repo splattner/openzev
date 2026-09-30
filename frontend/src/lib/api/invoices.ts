@@ -1,4 +1,5 @@
 import type {
+  AnnualReport,
   DashboardStats,
   EmailLog,
   EmailTemplateResponse,
@@ -100,6 +101,11 @@ export async function downloadAnnualStatement(params: {
     signal,
   })
   return data as Blob
+}
+
+export async function fetchAnnualReport(params: { zev_id: string; year: number }): Promise<AnnualReport> {
+  const { data } = await api.get<AnnualReport>('/invoices/invoices/annual-report/', { params })
+  return data
 }
 
 export async function downloadFinancialSummary(params: {

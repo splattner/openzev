@@ -2568,9 +2568,44 @@ export const it = {
                 expired: 'Questo link di download è scaduto. Prepara un nuovo export per scaricare i dati aggiornati.',
                 error: 'Il rendiconto annuale non è stato generato. Riprova.',
             },
-            ownerComing: {
-                title: 'I rapporti arriveranno presto',
-                description: 'Questa sezione offrirà l\'autoconsumo nel tempo, il bilancio energetico e i vantaggi dei partecipanti.',
+            documentsTitle: 'Documenti annuali',
+            annualReport: {
+                title: 'Rapporto annuale {{year}}',
+                error: 'Impossibile caricare il rapporto annuale.',
+                noData: 'Nessun dato di misura per il {{year}}.',
+                stats: {
+                    selfConsumptionRate: 'Tasso di autoconsumo',
+                    selfSufficiencyRate: 'Grado di autarchia',
+                    produced: 'Produzione',
+                    consumed: 'Consumo',
+                    savings: 'Risparmi dei partecipanti',
+                },
+                hints: {
+                    previousYear: '{{year}}: {{rate}}',
+                    savings: 'Secondo le fatture dell\'anno',
+                },
+                trend: {
+                    title: 'Andamento nell\'anno',
+                    description: 'Tasso di autoconsumo: quota della produzione consumata nella RCP. Grado di autarchia: quota del consumo coperta dalla RCP. Tratteggiato: anno precedente.',
+                    selfConsumption: 'Tasso di autoconsumo {{year}}',
+                    selfSufficiency: 'Grado di autarchia {{year}}',
+                },
+                participants: {
+                    title: 'Vantaggio per partecipante',
+                    description: 'Consumo, copertura dalla RCP e risparmio rispetto al prezzo dell\'elettricità di rete.',
+                    empty: 'Nessun partecipante con dati in quest\'anno.',
+                    total: 'Totale',
+                    note: 'Il risparmio confronta il costo fatturato dell\'elettricità della RCP con quanto sarebbero costati gli stessi kWh alla tariffa di rete media delle fatture, come nel rendiconto annuale. Le fatture annullate non contano; senza fatture la riga resta vuota.',
+                },
+                col: {
+                    participant: 'Partecipante',
+                    consumption: 'Consumo',
+                    fromZev: 'Dalla RCP',
+                    selfSufficiency: 'Grado di autarchia',
+                    localCost: 'Costo elettricità RCP',
+                    gridCost: 'Costo alla tariffa di rete',
+                    savings: 'Risparmio',
+                },
             },
             financialSummary: {
                 title: 'Panoramica fiscale',
@@ -2581,11 +2616,10 @@ export const it = {
             },
         },
         billingHub: {
-            description: 'Fatture, invio e rendiconti annuali per il RCP selezionato.',
+            description: 'Fatture e invio e-mail per la RCP selezionata.',
             tabs: {
                 invoices: 'Fatture',
                 emails: 'E-mail',
-                statements: 'Rendiconti annuali',
             },
         },
         billingPeriods: {

@@ -381,7 +381,7 @@ def _compute_monthly_data(
     return months_data, totals
 
 
-def _compute_savings(invoices) -> dict | None:
+def compute_savings(invoices) -> dict | None:
     """Compute annual savings from local energy vs grid rates for the
     selected participant/year's non-cancelled invoices."""
     from .models import InvoiceItem
@@ -564,7 +564,7 @@ def generate_annual_statement_pdf(
         "total_chf": f"{sum_total:.2f}",
     }
 
-    savings = _compute_savings(year_invoices)
+    savings = compute_savings(year_invoices)
 
     owner_participant = zev.participants.filter(user=zev.owner).first()
 

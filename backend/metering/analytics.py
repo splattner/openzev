@@ -111,22 +111,17 @@ def _participant_names(participant_ids) -> dict[str, str]:
 # Owner / admin dashboard
 # ---------------------------------------------------------------------------
 
-def owner_dashboard_summary(qs, trunc_fn, selected_participant_id):
+def _zev_balance(base):
+    """ZEV-wide energy balance of a bucket-annotated readings queryset.
+
+    Import and export are netted per timestamp — what the ZEV could not cover
+    locally in that quarter hour — before being summed into buckets, so a
+    sunny noon cannot offset a dark evening.
+
+    Returns ``(ts_pivot, timeline, totals)``: the per-timestamp
+    consumed/produced pivot (the per-participant split needs it), the bucket
+    timeline as floats, and the period totals as Decimals.
     """
-    Compute ZEV-owner/admin dashboard summary.
-
-    qs              – MeterReading queryset already filtered to the desired ZEV
-                      and date range.
-    trunc_fn        – Django ORM truncation class (TruncDay / TruncHour / …).
-    selected_participant_id – optional UUID str to scope totals & timeline.
-
-    Returns a dict matching the existing API response shape.  The caller
-    should add the ``"bucket"`` key before returning to the client.
-    """
-    today = date_type.today()
-    base = qs.annotate(bucket=trunc_fn("timestamp"))
-
-    # --- ZEV-wide pivot by timestamp ---
     zev_ts_rows = (
         base.values("bucket", "timestamp", "direction")
         .annotate(total_kwh=Sum("energy_kwh"))
@@ -189,6 +184,36 @@ def owner_dashboard_summary(qs, trunc_fn, selected_participant_id):
         }
         for _, item in sorted(bucket_pivot.items(), key=lambda entry: entry[0])
     ]
+    return ts_pivot, timeline, totals
+
+
+def zev_balance_timeline(qs, trunc_fn):
+    """``(timeline, totals)`` of the ZEV-wide balance, without the per-participant split.
+
+    The cheap half of :func:`owner_dashboard_summary`, for callers that only
+    need the community's figures (the annual report's previous-year line).
+    Totals are floats, like the timeline.
+    """
+    _, timeline, totals = _zev_balance(qs.annotate(bucket=trunc_fn("timestamp")))
+    return timeline, {k: float(v) for k, v in totals.items()}
+
+
+def owner_dashboard_summary(qs, trunc_fn, selected_participant_id):
+    """
+    Compute ZEV-owner/admin dashboard summary.
+
+    qs              – MeterReading queryset already filtered to the desired ZEV
+                      and date range.
+    trunc_fn        – Django ORM truncation class (TruncDay / TruncHour / …).
+    selected_participant_id – optional UUID str to scope totals & timeline.
+
+    Returns a dict matching the existing API response shape.  The caller
+    should add the ``"bucket"`` key before returning to the client.
+    """
+    today = date_type.today()
+    base = qs.annotate(bucket=trunc_fn("timestamp"))
+
+    ts_pivot, timeline, totals = _zev_balance(base)
 
     # --- Per-participant breakdown ---
     # Readings are attributed to the participant whose assignment is active at

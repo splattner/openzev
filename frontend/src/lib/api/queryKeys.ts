@@ -52,6 +52,7 @@ export const queryKeys = {
     readiness: (zevId?: string) => ['invoices', 'readiness', zevId ?? 'all'] as const,
     readinessList: (zevId?: string) => ['invoices', 'readiness-list', zevId ?? 'all'] as const,
     attention: (zevId?: string) => ['invoices', 'attention', zevId ?? 'all'] as const,
+    annualReport: (zevId: string, year: number) => ['invoices', 'annual-report', zevId, year] as const,
   },
   admin: {
     emailTemplate: (templateKey: string) => ['admin', 'email-template', templateKey] as const,

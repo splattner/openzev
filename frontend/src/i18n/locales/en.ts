@@ -2579,9 +2579,44 @@ export const en = {
                 expired: 'This download link has expired. Prepare a new export to download current data.',
                 error: 'Failed to generate annual statement. Please try again.',
             },
-            ownerComing: {
-                title: 'Reports are coming soon',
-                description: 'This area will provide self-consumption over time, energy balance, and participant benefit reports.',
+            documentsTitle: 'Annual documents',
+            annualReport: {
+                title: 'Annual report {{year}}',
+                error: 'The annual report could not be loaded.',
+                noData: 'There is no metering data for {{year}}.',
+                stats: {
+                    selfConsumptionRate: 'Self-consumption rate',
+                    selfSufficiencyRate: 'Self-sufficiency rate',
+                    produced: 'Production',
+                    consumed: 'Consumption',
+                    savings: 'Participant savings',
+                },
+                hints: {
+                    previousYear: '{{year}}: {{rate}}',
+                    savings: 'Based on the year\'s invoices',
+                },
+                trend: {
+                    title: 'Over the year',
+                    description: 'Self-consumption rate: share of production used inside the ZEV. Self-sufficiency rate: share of consumption covered by the ZEV. Dashed: previous year.',
+                    selfConsumption: 'Self-consumption rate {{year}}',
+                    selfSufficiency: 'Self-sufficiency rate {{year}}',
+                },
+                participants: {
+                    title: 'Benefit per participant',
+                    description: 'Consumption, coverage from the ZEV, and savings compared with the grid electricity price.',
+                    empty: 'No participants with data in this year.',
+                    total: 'Total',
+                    note: 'Savings compare what ZEV electricity was billed at with what the same kWh would have cost at the invoices\' average grid rate, as on the annual statement. Cancelled invoices do not count; without invoices the row stays empty.',
+                },
+                col: {
+                    participant: 'Participant',
+                    consumption: 'Consumption',
+                    fromZev: 'From ZEV',
+                    selfSufficiency: 'Self-sufficiency',
+                    localCost: 'ZEV electricity cost',
+                    gridCost: 'Cost at grid rate',
+                    savings: 'Savings',
+                },
             },
             financialSummary: {
                 title: 'Tax Overview',
@@ -2592,11 +2627,10 @@ export const en = {
             },
         },
         billingHub: {
-            description: 'Invoices, delivery, and statements for the selected (v)ZEV.',
+            description: 'Invoices and email delivery for the selected (v)ZEV.',
             tabs: {
                 invoices: 'Invoices',
                 emails: 'Emails',
-                statements: 'Annual statements',
             },
         },
         billingPeriods: {

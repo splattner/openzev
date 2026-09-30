@@ -2568,9 +2568,44 @@ export const fr = {
                 expired: 'Ce lien de téléchargement a expiré. Préparez un nouvel export pour télécharger les données actuelles.',
                 error: 'Le décompte annuel n\'a pas pu être généré. Veuillez réessayer.',
             },
-            ownerComing: {
-                title: 'Les rapports arrivent bientôt',
-                description: 'Cette section proposera l\'autoconsommation dans le temps, le bilan énergétique et les avantages des participants.',
+            documentsTitle: 'Documents annuels',
+            annualReport: {
+                title: 'Rapport annuel {{year}}',
+                error: 'Le rapport annuel n\'a pas pu être chargé.',
+                noData: 'Aucune donnée de mesure pour {{year}}.',
+                stats: {
+                    selfConsumptionRate: 'Taux d\'autoconsommation',
+                    selfSufficiencyRate: 'Taux d\'autarcie',
+                    produced: 'Production',
+                    consumed: 'Consommation',
+                    savings: 'Économies des participants',
+                },
+                hints: {
+                    previousYear: '{{year}} : {{rate}}',
+                    savings: 'Selon les factures de l\'année',
+                },
+                trend: {
+                    title: 'Évolution sur l\'année',
+                    description: 'Taux d\'autoconsommation : part de la production consommée dans le RCP. Taux d\'autarcie : part de la consommation couverte par le RCP. En pointillé : année précédente.',
+                    selfConsumption: 'Taux d\'autoconsommation {{year}}',
+                    selfSufficiency: 'Taux d\'autarcie {{year}}',
+                },
+                participants: {
+                    title: 'Avantage par participant',
+                    description: 'Consommation, couverture par le RCP et économies par rapport au prix de l\'électricité du réseau.',
+                    empty: 'Aucun participant avec des données cette année.',
+                    total: 'Total',
+                    note: 'Les économies comparent le coût facturé de l\'électricité du RCP à ce que les mêmes kWh auraient coûté au tarif réseau moyen des factures, comme dans le relevé annuel. Les factures annulées ne comptent pas ; sans factures, la ligne reste vide.',
+                },
+                col: {
+                    participant: 'Participant',
+                    consumption: 'Consommation',
+                    fromZev: 'Du RCP',
+                    selfSufficiency: 'Taux d\'autarcie',
+                    localCost: 'Coût électricité RCP',
+                    gridCost: 'Coût au tarif réseau',
+                    savings: 'Économies',
+                },
             },
             financialSummary: {
                 title: 'Aperçu fiscal',
@@ -2581,11 +2616,10 @@ export const fr = {
             },
         },
         billingHub: {
-            description: 'Factures, envoi et relevés annuels pour le RCP sélectionné.',
+            description: 'Factures et envoi des e-mails pour le RCP sélectionné.',
             tabs: {
                 invoices: 'Factures',
                 emails: 'E-mails',
-                statements: 'Relevés annuels',
             },
         },
         billingPeriods: {

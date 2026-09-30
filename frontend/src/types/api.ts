@@ -1426,6 +1426,57 @@ export interface ParticipantDashboardSummary {
 
 export type MeteringDashboardSummary = ZevOwnerDashboardSummary | ParticipantDashboardSummary
 
+/** A ZEV's energy balance over a period, with the two rates derived from it. Rates are percentages (one decimal), null when undefined. */
+export interface AnnualReportBalance {
+    produced_kwh: number
+    consumed_kwh: number
+    imported_kwh: number
+    exported_kwh: number
+    self_consumed_kwh: number
+    self_consumption_rate: number | null
+    self_sufficiency_rate: number | null
+}
+
+export interface AnnualReportMonth extends AnnualReportBalance {
+    /** Calendar month, 1–12. */
+    month: number
+    previous_self_consumption_rate: number | null
+    previous_self_sufficiency_rate: number | null
+}
+
+/** Same shape and strings as the annual statement's savings box. */
+export interface AnnualReportSavings {
+    local_kwh: string
+    local_chf: string
+    local_rp: string
+    grid_rp: string
+    hypothetical_chf: string
+    saved_chf: string
+}
+
+export interface AnnualReportParticipant {
+    participant_id: string
+    participant_name: string
+    consumed_kwh: number
+    produced_kwh: number
+    from_zev_kwh: number
+    from_grid_kwh: number
+    self_sufficiency_rate: number | null
+    savings: AnnualReportSavings | null
+}
+
+export interface AnnualReport {
+    zev_id: string
+    year: number
+    has_data: boolean
+    totals: AnnualReportBalance
+    previous_totals: AnnualReportBalance | null
+    /** Always twelve entries, January first. */
+    months: AnnualReportMonth[]
+    participants: AnnualReportParticipant[]
+    savings_total_chf: string | null
+}
+
 export interface HourlyProfileEntry {
     hour: number
     from_zev_kwh: number

@@ -24,6 +24,7 @@ vi.mock('../src/lib/managedZev', () => ({
 vi.mock('../src/lib/api/invoices', () => ({
     downloadAnnualStatement: vi.fn(() => Promise.resolve(new Blob())),
     downloadFinancialSummary: vi.fn(() => Promise.resolve(new Blob())),
+    fetchAnnualReport: vi.fn(() => Promise.resolve({ has_data: false })),
 }))
 
 vi.mock('../src/lib/api/exports', () => ({
@@ -37,7 +38,7 @@ vi.mock('../src/lib/downloadBlob', () => ({
     downloadBlob: vi.fn(),
 }))
 
-import { BillingStatementsPage } from '../src/pages/BillingStatementsPage'
+import { ReportsPage } from '../src/pages/ReportsPage'
 import { AnnualStatementsExportCard } from '../src/features/reports/AnnualStatementsExportCard'
 import * as exportsApi from '../src/lib/api/exports'
 import * as invoicesApi from '../src/lib/api/invoices'
@@ -67,7 +68,7 @@ function makeCompletedJob(overrides: Record<string, unknown> = {}) {
     }
 }
 
-function renderReportsPage(component = BillingStatementsPage) {
+function renderReportsPage(component = ReportsPage) {
     const container = document.createElement('div')
     document.body.appendChild(container)
     const client = new QueryClient()
@@ -124,7 +125,7 @@ function findButton(container: HTMLElement, text: string): HTMLButtonElement | u
     )
 }
 
-describe('BillingStatementsPage restored export', () => {
+describe('ReportsPage restored annual-statements export', () => {
     beforeEach(() => {
         document.body.innerHTML = ''
         vi.clearAllMocks()
@@ -140,7 +141,7 @@ describe('BillingStatementsPage restored export', () => {
         const job = makeCompletedJob({ id: 'job-42', params: { year } })
         vi.mocked(exportsApi.fetchAnnualStatementExports).mockResolvedValue([job])
 
-        const { container, unmount } = renderReportsPage(BillingStatementsPage)
+        const { container, unmount } = renderReportsPage(ReportsPage)
         await flush()
         await flush()
 
@@ -153,7 +154,7 @@ describe('BillingStatementsPage restored export', () => {
     })
 })
 
-describe('BillingStatementsPage', () => {
+describe('ReportsPage annual-statements export', () => {
     beforeEach(() => {
         document.body.innerHTML = ''
         vi.clearAllMocks()
@@ -170,7 +171,7 @@ describe('BillingStatementsPage', () => {
         vi.mocked(exportsApi.createAnnualStatementsExport).mockResolvedValue(
             makeCompletedJob({ id: 'job-new', params: { year: targetYear } }),
         )
-        const { container, unmount } = renderReportsPage(BillingStatementsPage)
+        const { container, unmount } = renderReportsPage(ReportsPage)
         await flush()
         const select = container.querySelector('select') as HTMLSelectElement
         await changeYear(select, String(targetYear))
@@ -189,7 +190,7 @@ describe('BillingStatementsPage', () => {
 
     it('cannot prepare for a stale ZEV selection', async () => {
         mockOwner({ selectedZevId: 'stale', selectedZev: null, managedZevs: [{ id: 'zev-1' }] })
-        const { container, unmount } = renderReportsPage(BillingStatementsPage)
+        const { container, unmount } = renderReportsPage(ReportsPage)
         await flush()
         expect(container.textContent).toContain('pages.reports.selectZevTitle')
         expect(container.querySelector('button')).toBeNull()
@@ -198,7 +199,7 @@ describe('BillingStatementsPage', () => {
 
     it('shows the empty state without a ZEV', async () => {
         mockOwner({ selectedZevId: null, selectedZev: null, managedZevs: [] })
-        const { container, unmount } = renderReportsPage(BillingStatementsPage)
+        const { container, unmount } = renderReportsPage(ReportsPage)
         await flush()
         expect(container.textContent).toContain('pages.reports.noZevTitle')
         expect(container.textContent).not.toContain('pages.reports.annualStatement.prepare')

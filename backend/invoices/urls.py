@@ -8,6 +8,7 @@ from .pdf import TEMPLATE_NAME
 from .views import InvoiceViewSet
 from .views_dashboard import InvoiceDashboardView
 from .views_reports import (
+    AnnualReportView,
     AnnualStatementView,
     FinancialSummaryView,
     TariffOverviewView,
@@ -31,6 +32,7 @@ extracted_urlpatterns = [
     path("invoices/readiness/", ReadinessView.as_view(), name="invoice-readiness"),
     path("invoices/attention/", AttentionView.as_view(), name="invoice-attention"),
     path("invoices/dashboard/", InvoiceDashboardView.as_view(), name="invoice-dashboard"),
+    path("invoices/annual-report/", AnnualReportView.as_view(), name="invoice-annual-report"),
     path("invoices/annual-statement/", AnnualStatementView.as_view(), name="invoice-annual-statement"),
     path("invoices/financial-summary/", FinancialSummaryView.as_view(), name="invoice-financial-summary"),
     path("invoices/tariff-overview/", TariffOverviewView.as_view(), name="invoice-tariff-overview"),

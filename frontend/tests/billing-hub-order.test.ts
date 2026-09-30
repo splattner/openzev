@@ -10,7 +10,6 @@ vi.mock('../src/lib/managedZev', () => ({
 }))
 vi.mock('../src/pages/InvoicesPage', () => ({ InvoicesPage: () => createElement('div') }))
 vi.mock('../src/pages/BillingEmailsPage', () => ({ BillingEmailsPage: () => createElement('div') }))
-vi.mock('../src/pages/BillingStatementsPage', () => ({ BillingStatementsPage: () => createElement('div') }))
 
 import { BillingHubPage } from '../src/pages/BillingHubPage'
 
@@ -36,7 +35,6 @@ describe('billing hub information architecture', () => {
         expect(tabs).toEqual([
             'pages.billingHub.tabs.invoices',
             'pages.billingHub.tabs.emails',
-            'pages.billingHub.tabs.statements',
         ])
         expect(container.textContent).not.toContain('pages.billingHub.tabs.periods')
     })

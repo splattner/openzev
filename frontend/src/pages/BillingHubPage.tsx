@@ -4,17 +4,17 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { InvoicesPage } from './InvoicesPage'
 import { BillingEmailsPage } from './BillingEmailsPage'
-import { BillingStatementsPage } from './BillingStatementsPage'
 
 /**
- * Billing hub: tabs are routes — Invoices · Email delivery · Annual
- * statements — each with its own guard. Period work lives on Overview.
+ * Billing hub: tabs are routes — Invoices · Email delivery — each with its
+ * own guard. Period work lives on Overview; the whole-ZEV annual-statement
+ * ZIP moved to Reports with the other yearly documents.
  * The shell renders the hub header and the shared tab strip; tab bodies are
  * the existing components (InvoicesPage) or new tab pages riding the
  * phase-2 readiness/email-status payloads.
  */
 
-export type BillingTab = 'invoices' | 'emails' | 'statements'
+export type BillingTab = 'invoices' | 'emails'
 
 export function BillingHubPage({ tab }: { tab: BillingTab }) {
     const { t } = useTranslation()
@@ -47,7 +47,6 @@ export function BillingHubPage({ tab }: { tab: BillingTab }) {
                 <Tabs.List aria-label={t('nav.billing')}>
                     <Tabs.Tab value="invoices">{t('pages.billingHub.tabs.invoices')}</Tabs.Tab>
                     <Tabs.Tab value="emails">{t('pages.billingHub.tabs.emails')}</Tabs.Tab>
-                    <Tabs.Tab value="statements">{t('pages.billingHub.tabs.statements')}</Tabs.Tab>
                 </Tabs.List>
 
                 <Tabs.Panel value="invoices">
@@ -55,9 +54,6 @@ export function BillingHubPage({ tab }: { tab: BillingTab }) {
                 </Tabs.Panel>
                 <Tabs.Panel value="emails">
                     <BillingEmailsPage />
-                </Tabs.Panel>
-                <Tabs.Panel value="statements">
-                    <BillingStatementsPage />
                 </Tabs.Panel>
             </Tabs>
         </div>
