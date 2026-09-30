@@ -694,6 +694,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#generation-behind-the-meter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generation behind the meter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#assignment-validity-periods" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1589,6 +1600,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#generation-behind-the-meter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generation behind the meter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#assignment-validity-periods" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1825,6 +1847,9 @@
 <li><strong>Meter type</strong> — <code>Consumption</code>, <code>Production</code>, or <code>Bidirectional</code></li>
 <li><strong>Active</strong> — inventory status (defaults to on)</li>
 <li><strong>Location</strong> (optional, e.g., "Roof solar panel")</li>
+<li><strong>Generation behind the meter</strong> — only shown for <code>Bidirectional</code> or
+   <code>Production</code> meters; see
+   <a href="#generation-behind-the-meter">Generation behind the meter</a> below</li>
 </ul>
 </li>
 <li>
@@ -1840,6 +1865,39 @@
 it does not affect billing. To <em>stop billing</em> a meter, end its assignment
 instead — see <a href="#decommissioning-a-meter">Decommissioning a Meter</a>.</p>
 </blockquote>
+<h2 id="generation-behind-the-meter">Generation behind the meter<a class="headerlink" href="#generation-behind-the-meter" title="Permanent link">&para;</a></h2>
+<p>In a vZEV, a producer's PV system usually sits <strong>behind</strong> their own grid
+connection meter, which is bidirectional. That meter only records what
+crosses the connection point — the <strong>surplus</strong> fed in once the household's
+own use is covered, and the residual <strong>grid draw</strong> for the times there is no
+surplus. This is called <strong>net (surplus) metering</strong> (<em>Überschussmessung</em>), and
+it is different from <strong>gross production metering</strong>, which needs its own,
+separate production meter and measures everything the PV system generates.</p>
+<p>Everything the household consumes directly from its own PV never reaches a
+net meter, so it never shows up as "production" or "self-consumption" in
+OpenZEV's statistics. Billing is unaffected — a vZEV can only share energy
+that actually crosses the connection point — but a producer's own
+self-sufficiency rate looks misleadingly low, because the numerator (what
+they draw from the shared pool) barely counts their own solar use at all.</p>
+<p>Tick <strong>Generation behind the meter (surplus metering)</strong> on a <code>Bidirectional</code>
+or <code>Production</code> metering point when this is the case (the checkbox is hidden
+for <code>Consumption</code> meters, since a consumption-only meter cannot have
+generation behind it). Once ticked:</p>
+<ul>
+<li>The participant who personally holds that meter no longer sees a
+  self-sufficiency rate anywhere — <strong>Energy balance</strong>, their own dashboard,
+  the <strong>annual report</strong>, and their <strong>annual statement</strong> PDF all show <strong>—</strong>
+  with a short explanation instead.</li>
+<li>The ZEV's own kWh totals and rates are <strong>not</strong> changed or excluded — the
+  energy is real, and billing depends on it. Instead, wherever the ZEV has a
+  flagged meter, an explanatory note appears next to the ZEV-wide figures.</li>
+<li>Metering-point lists and tables show a <strong>Surplus metering</strong> badge next to
+  the meter type.</li>
+</ul>
+<p>If you later add a true production meter (measuring everything the PV system
+generates, not just the surplus), leave this box unticked on that separate
+meter and consult the OpenZEV team about importing gross production data —
+that is a planned follow-up, not yet supported.</p>
 <h2 id="assignment-validity-periods">Assignment Validity Periods<a class="headerlink" href="#assignment-validity-periods" title="Permanent link">&para;</a></h2>
 <p>Metering points themselves do not have <code>valid_from</code>/<code>valid_to</code> fields.
 Date validity is defined on the <strong>metering point assignment</strong> to a participant:</p>
@@ -1945,7 +2003,9 @@ historical readings still count towards the community energy pool.</p>
 <p>Each card on the <strong>Metering Points</strong> page shows, at a glance:</p>
 <ul>
 <li>The <strong>meter ID</strong> and its <strong>location</strong> (or "No location set")</li>
-<li><strong>Active</strong>/<strong>Inactive</strong> and meter-<strong>type</strong> badges</li>
+<li><strong>Active</strong>/<strong>Inactive</strong> and meter-<strong>type</strong> badges, plus a <strong>Surplus
+  metering</strong> badge when <a href="#generation-behind-the-meter">Generation behind the meter</a>
+  is ticked</li>
 <li>A <strong>data-health badge</strong> — <code>Healthy</code>, <code>Data gaps</code>, <code>Data at risk</code>, or <code>No
   data yet</code>, based on the last 30 days of readings; click it to open the
   metering point's data-quality view</li>
@@ -1961,7 +2021,8 @@ historical readings still count towards the community energy pool.</p>
 <ol>
 <li>Go to <strong>Metering Points</strong></li>
 <li>Open the meter's <strong>⋯ More</strong> menu and click <strong>Edit</strong></li>
-<li>Update its ID, type, active status, or location</li>
+<li>Update its ID, type, active status, location, or
+   <a href="#generation-behind-the-meter">Generation behind the meter</a> flag</li>
 <li>Click <strong>Save Changes</strong></li>
 </ol>
 <blockquote>

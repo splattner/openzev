@@ -2024,7 +2024,9 @@ Aggregation level of a metering chart: hourly, daily, or monthly. Readings thems
 <p><strong>SDAT-CH</strong>
 Swiss standard for metering data exchange. OpenZEV supports SDAT-CH uploads. See <a href="../05-metering-import/">Metering Imports</a>.</p>
 <p><strong>Self-Consumption / Self-Sufficiency</strong>
-The fraction of local energy vs. total consumption. Example: 60 kWh local ÷ 100 kWh total = 60% self-consumption.</p>
+The fraction of local energy vs. total consumption. Example: 60 kWh local ÷ 100 kWh total = 60% self-consumption. Not shown for a participant who personally holds a metering point with <strong>Generation Behind the Meter</strong> — see below.</p>
+<p><strong>Surplus Metering / Net Metering</strong> (<em>Überschussmessung</em>)
+What a bidirectional meter records when generation (e.g. PV) sits behind it, rather than in front of it: only the <strong>surplus</strong> fed in once the household's own use is covered, and the residual <strong>grid draw</strong>. The household's own direct use of its own generation never reaches the meter, which is why a producer's raw self-sufficiency figure looks misleadingly low. Different from <strong>gross production metering</strong>, which needs a separate production meter. See <a href="../04-metering-points/#generation-behind-the-meter">Metering Points → Generation behind the meter</a>.</p>
 <p><strong>Sent Invoice</strong>
 Invoice delivered to participant (email sent). Status: <code>Sent</code>. See <a href="../09-invoice-management/">Invoice Management</a>.</p>
 <p><strong>Shared Fee</strong>
