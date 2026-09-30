@@ -376,6 +376,13 @@ class MeteringPoint(models.Model):
     )
     is_active = models.BooleanField(default=True)
     location_description = models.CharField(max_length=200, blank=True)
+    has_behind_meter_generation = models.BooleanField(
+        default=False,
+        help_text=(
+            "Generation (e.g. PV) sits behind this meter, so it records only the "
+            "surplus fed in and the residual grid draw (net / surplus metering)."
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -384,6 +391,20 @@ class MeteringPoint(models.Model):
 
     def __str__(self):
         return self.meter_id
+
+    def clean(self):
+        if self.has_behind_meter_generation and self.meter_type not in (
+            MeteringPointType.BIDIRECTIONAL,
+            MeteringPointType.PRODUCTION,
+        ):
+            raise ValidationError(
+                {
+                    "has_behind_meter_generation": (
+                        "Only bidirectional or production metering points can have "
+                        "generation behind the meter."
+                    )
+                }
+            )
 
 
 class AllocationMode(models.TextChoices):

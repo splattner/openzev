@@ -348,6 +348,7 @@ export const en = {
             languageCode: 'Language code (de/fr/it/en)',
             annualStatementData: 'Annual Statement',
             annualYear: 'Year of the statement',
+            annualHasBehindMeterGeneration: 'Net-metering detected (true/false)',
             annualTotals: 'Annual Totals',
             annualTotalConsumed: 'Total consumption (kWh)',
             annualFromZev: 'Energy from ZEV (kWh)',
@@ -1822,6 +1823,8 @@ export const en = {
                 active: 'Active',
                 activeHint: 'Inventory status only — it does not affect billing. To stop billing a meter, set an end date on its assignment.',
                 location: 'Location',
+                behindMeterGeneration: 'Generation behind the meter (surplus metering)',
+                behindMeterGenerationHelp: 'Tick this when a PV system sits behind this meter, so the meter only records the surplus fed in and the grid draw.',
             },
             meterTypes: {
                 consumption: 'Consumption',
@@ -3017,6 +3020,12 @@ export const en = {
         noneMatchFilter: 'No metering points match this filter.',
         unassignedWarning: '{{readings}} readings over {{days}} days with no assignment holder — not billed',
         assignmentOverlapWarning: 'Overlapping assignment windows — reassign the affected meter',
+    },
+    behindMeter: {
+        badge: 'Surplus metering',
+        participantHint: "This participant's PV system sits behind their meter; their own use of it is not measured, so no rate is shown.",
+        ownHint: 'Your PV system sits behind your meter; your own use of it is not measured, so no rate is shown.',
+        zevNote: "Some metering points have a PV system behind them. For those, production means the surplus fed in, and the rates describe energy exchanged at the connection points, not the plant's own self-consumption.",
     },
     features: {
         title: 'Feature Flags',

@@ -60,6 +60,7 @@ Defined in `zev.models`.
 | `meter_type` | `MeteringPointType` | `consumption`, `production`, or `bidirectional` |
 | `is_active` | `BooleanField` (default `True`) | Soft-deactivation flag; inactive meters are not deleted |
 | `location_description` | `CharField(200)` | Free-text location hint (blank allowed) |
+| `has_behind_meter_generation` | `BooleanField` (default `False`) | Generation (e.g. PV) sits behind this meter, so it records only the surplus fed in and the residual grid draw (net / surplus metering). Only allowed when `meter_type` is `bidirectional` or `production` — see below. See `SPEC-2026-behind-the-meter-generation`. |
 | `created_at` | `DateTimeField` (auto) | Creation timestamp |
 | `updated_at` | `DateTimeField` (auto) | Last modification timestamp |
 
@@ -70,6 +71,15 @@ Ordering: `["meter_id"]`.
   Temporal ownership is modeled exclusively on `MeteringPointAssignment`.
 - The formerly deprecated `MeteringPoint.participant` FK has been removed
   (ADR 0009).  Assignments are the single source of truth for ownership.
+
+**`has_behind_meter_generation` validation:** enforced in both
+`MeteringPoint.clean()` and `MeteringPointSerializer.validate()`, using the
+effective `meter_type` (the incoming value, or the instance's on a partial
+update). Setting it `True` while `meter_type` is `consumption` is rejected:
+`400 {"has_behind_meter_generation": ["Only bidirectional or production
+metering points can have generation behind the meter."]}`. A PATCH that
+changes `meter_type` to `consumption` while the flag is still `True` on the
+instance is rejected the same way.
 
 ### 3.2 MeteringPointType
 

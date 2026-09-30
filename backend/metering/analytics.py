@@ -99,6 +99,47 @@ def _distribute_reading(windows, mp_to_zev, shares_by_zev, metering_point_id, ts
     return [(resolution.holder_id, Decimal("1"))]
 
 
+def _flagged_metering_point_ids(readings_qs) -> set:
+    """Metering point ids among ``readings_qs`` that have generation behind the meter."""
+    return set(
+        MeteringPoint.objects.filter(
+            id__in=readings_qs.values_list("metering_point_id", flat=True).distinct(),
+            has_behind_meter_generation=True,
+        ).values_list("id", flat=True)
+    )
+
+
+def net_metered_participant_ids(windows, readings_qs, flagged_mp_ids=None) -> set[str]:
+    """Participants who personally held a meter with generation behind it
+    for at least one reading in ``readings_qs``.
+
+    A participant is net-metered if, for at least one reading of a flagged
+    metering point in ``readings_qs``, ``windows.assignment_at`` attributes
+    that reading to them through a personal assignment. Community-mode
+    assignments on a flagged meter never make anyone net-metered — their
+    readings are split by weight, so no single participant's rate is
+    distorted. Short-circuits with no window resolution at all when the ZEV
+    has no flagged meter, which is the common case. Callers that already
+    looked up ``flagged_mp_ids`` pass them to save the query.
+    """
+    if flagged_mp_ids is None:
+        flagged_mp_ids = _flagged_metering_point_ids(readings_qs)
+    if not flagged_mp_ids:
+        return set()
+
+    participant_ids: set[str] = set()
+    distinct_ts = (
+        readings_qs.filter(metering_point_id__in=flagged_mp_ids)
+        .values_list("metering_point_id", "timestamp")
+        .distinct()
+    )
+    for mp_id, ts in distinct_ts:
+        resolution = windows.assignment_at(mp_id, ts)
+        if resolution is not None and resolution.allocation_mode == AllocationMode.PERSONAL:
+            participant_ids.add(str(resolution.holder_id))
+    return participant_ids
+
+
 def _participant_names(participant_ids) -> dict[str, str]:
     """``{participant_id: "First Last"}`` for the given participant ids."""
     names = {}
@@ -224,6 +265,9 @@ def owner_dashboard_summary(qs, trunc_fn, selected_participant_id):
     mp_to_zev, shares_by_zev = _community_shares_by_zev(
         qs.values_list("metering_point_id", flat=True).distinct(), window_start, window_end,
     )
+    flagged_mp_ids = _flagged_metering_point_ids(qs)
+    zev_has_behind_meter_generation = bool(flagged_mp_ids)
+    net_metered_ids = net_metered_participant_ids(windows, qs, flagged_mp_ids)
 
     participant_rows = (
         base.filter(direction="in")
@@ -341,6 +385,7 @@ def owner_dashboard_summary(qs, trunc_fn, selected_participant_id):
                 "total_produced_kwh": float(item["total_produced_kwh"]),
                 "from_zev_kwh": float(item["from_zev_kwh"]),
                 "from_grid_kwh": float(item["from_grid_kwh"]),
+                "has_behind_meter_generation": item["participant_id"] in net_metered_ids,
             }
             for item in participant_map.values()
         ],
@@ -381,6 +426,7 @@ def owner_dashboard_summary(qs, trunc_fn, selected_participant_id):
         "participant_stats": participant_stats,
         "selected_participant_id": selected_participant_id,
         "selected_participant_name": selected_participant_name,
+        "zev_has_behind_meter_generation": zev_has_behind_meter_generation,
     }
 
 
@@ -517,6 +563,12 @@ def participant_dashboard_summary(participant_qs, zev_qs, trunc_fn, user, zev_id
     zev_mp_to_zev, zev_shares_by_zev = _community_shares_by_zev(
         zev_qs.values_list("metering_point_id", flat=True).distinct(), zev_window_start, zev_window_end,
     )
+    zev_flagged_mp_ids = _flagged_metering_point_ids(zev_qs)
+    zev_has_behind_meter_generation = bool(zev_flagged_mp_ids)
+    zev_net_metered_ids = net_metered_participant_ids(zev_windows, zev_qs, zev_flagged_mp_ids)
+    has_behind_meter_generation = bool(
+        {str(pid) for pid in current_participant_ids} & zev_net_metered_ids
+    )
 
     all_consumption_rows = (
         zev_qs.annotate(bucket=trunc_fn("timestamp"))
@@ -591,6 +643,7 @@ def participant_dashboard_summary(participant_qs, zev_qs, trunc_fn, user, zev_id
                 "total_produced_kwh": float(item["total_produced_kwh"]),
                 "from_zev_kwh": float(item["from_zev_kwh"]),
                 "from_grid_kwh": float(item["from_grid_kwh"]),
+                "has_behind_meter_generation": item["participant_id"] in zev_net_metered_ids,
             }
             for item in all_p_map.values()
         ],
@@ -607,6 +660,8 @@ def participant_dashboard_summary(participant_qs, zev_qs, trunc_fn, user, zev_id
         "current_participant_id": (
             str(next(iter(current_participant_ids))) if current_participant_ids else None
         ),
+        "has_behind_meter_generation": has_behind_meter_generation,
+        "zev_has_behind_meter_generation": zev_has_behind_meter_generation,
     }
 
 
@@ -665,11 +720,11 @@ def compute_hourly_profile(selected_zev_id, participant_ids, start_dt, end_dt, p
     participant_readings = list(participant_readings_qs.order_by("timestamp"))
 
     if not participant_readings:
-        return {"hourly_profile": None}
+        return {"hourly_profile": None, "has_behind_meter_generation": False}
 
     resolutions = {r.resolution for r in participant_readings}
     if resolutions == {"daily"}:
-        return {"hourly_profile": None}
+        return {"hourly_profile": None, "has_behind_meter_generation": False}
 
     # Per-timestamp attribution: a reading only counts while one of the
     # selected participants held the metering point at its timestamp (ADR 0013)
@@ -681,6 +736,8 @@ def compute_hourly_profile(selected_zev_id, participant_ids, start_dt, end_dt, p
     mp_to_zev, shares_by_zev = _community_shares_by_zev(
         participant_readings_qs.values_list("metering_point_id", flat=True).distinct(), ps, pe,
     )
+    net_metered_ids = net_metered_participant_ids(windows, participant_readings_qs)
+    has_behind_meter_generation = bool(participant_ids_set & net_metered_ids)
 
     # The pool covers every metering point of the ZEV regardless of assignment
     # (ADR 0013), matching the engine and the PDFs. Shared read-model helper:
@@ -728,7 +785,7 @@ def compute_hourly_profile(selected_zev_id, participant_ids, start_dt, end_dt, p
         }
         for h in range(24)
     ]
-    return {"hourly_profile": profile}
+    return {"hourly_profile": profile, "has_behind_meter_generation": has_behind_meter_generation}
 
 
 # ---------------------------------------------------------------------------

@@ -468,6 +468,17 @@ The invoice, contract, and annual-statement PDF templates are editable via the a
 
 Request body: `{ "content": "<html>...", "template_type": "invoice" | "contract" | "annual_statement" }` (defaults to `invoice`) plus `"output": "html" | "pdf"` (defaults to `html`). The sample context comes from `build_sample_invoice_context()`, `build_sample_contract_context()`, or `build_sample_annual_statement_context()` in `invoices/template_context.py`. With `output: "html"` the response is `{ "html": "<rendered html>" }`; with `output: "pdf"` the same content runs through the WeasyPrint pipeline (`render_pdf()`) and the response is raw `application/pdf` bytes rendered from sample data. Template rendering errors return `400` with `{ "error": "Template rendering error: ..." }`; missing/blank content returns `400`; unknown `template_type`/`output` values return `400`; content above `MAX_TEMPLATE_CHARS` (500,000) returns `400`; a PDF-stage failure returns a generic `500` (details logged server-side).
 
+`build_sample_annual_statement_context()` gains `has_behind_meter_generation:
+False` (SPEC-2026-behind-the-meter-generation §5.5): the real
+`generate_annual_statement_pdf()` sets it `True`, and every
+`monthly_data[].self_sufficiency_pct`/`totals.self_sufficiency_pct` to `None`,
+when the statement's participant personally held a metering point with
+generation behind it for a reading that year. The template renders `—` for a
+`None` rate and, when the flag is set, a note below the monthly table using
+the new `ANNUAL_TRANSLATIONS` key `behind_meter_note` (all four languages).
+The field catalog (`field_catalog_data.py`) documents both the
+`{{ has_behind_meter_generation }}` variable and the `{{ tr.behind_meter_note }}` key.
+
 **Response shape (example GET; PATCH/DELETE return the same template metadata without `fields`):**
 
 ```json

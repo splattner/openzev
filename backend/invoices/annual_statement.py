@@ -23,6 +23,7 @@ from allocation.split import split_consumption
 from allocation.windows import AssignmentWindows
 from .pdf_render import render_pdf
 
+from metering.analytics import net_metered_participant_ids
 from metering.models import MeterReading, ReadingDirection
 from zev.models import AllocationMode, MeteringPointAssignment
 from .generated_chart_tokens import (
@@ -50,6 +51,7 @@ ANNUAL_TRANSLATIONS: dict[str, dict[str, str]] = {
         "from_grid": "Aus dem Netz",
         "self_sufficiency": "Eigenversorgung",
         "autarky": "Autarkiegrad",
+        "behind_meter_note": "Ihre Photovoltaikanlage liegt hinter dem Zähler. Erfasst werden nur der eingespeiste Überschuss und der Netzbezug; Ihr Eigenverbrauch direkt ab Anlage ist nicht enthalten. Deshalb wird keine Autarkie ausgewiesen.",
         "monthly_breakdown": "Monatliche Übersicht",
         "monthly_chart_description": "Monatlicher Energieverbrauch — aufgeteilt in lokale ZEV-Energie und Netzbezug.",
         "month_col": "Monat",
@@ -86,6 +88,7 @@ ANNUAL_TRANSLATIONS: dict[str, dict[str, str]] = {
         "from_grid": "Depuis le réseau",
         "self_sufficiency": "Autosuffisance",
         "autarky": "Taux d'autarcie",
+        "behind_meter_note": "Votre installation photovoltaïque se trouve derrière votre compteur. Seuls le surplus injecté et le soutirage du réseau sont enregistrés ; votre autoconsommation directe depuis l'installation n'est pas comprise. Aucun taux d'autarcie n'est donc indiqué.",
         "monthly_breakdown": "Aperçu mensuel",
         "monthly_chart_description": "Consommation énergétique mensuelle — répartie en énergie locale CEL et importation réseau.",
         "month_col": "Mois",
@@ -122,6 +125,7 @@ ANNUAL_TRANSLATIONS: dict[str, dict[str, str]] = {
         "from_grid": "Dalla rete",
         "self_sufficiency": "Autosufficienza",
         "autarky": "Grado di autarchia",
+        "behind_meter_note": "Il vostro impianto fotovoltaico si trova dietro il vostro contatore. Vengono registrati solo il surplus immesso e il prelievo dalla rete; il vostro autoconsumo diretto dall'impianto non è incluso. Per questo motivo non viene indicato alcun grado di autarchia.",
         "monthly_breakdown": "Panoramica mensile",
         "monthly_chart_description": "Consumo energetico mensile — suddiviso in energia locale CEL e importazione dalla rete.",
         "month_col": "Mese",
@@ -158,6 +162,7 @@ ANNUAL_TRANSLATIONS: dict[str, dict[str, str]] = {
         "from_grid": "From Grid",
         "self_sufficiency": "Self-Sufficiency",
         "autarky": "Autarky Rate",
+        "behind_meter_note": "Your PV system sits behind your meter. Only the surplus fed in and the energy drawn from the grid are recorded; what you use directly from your system is not included. No self-sufficiency rate is therefore shown.",
         "monthly_breakdown": "Monthly Overview",
         "monthly_chart_description": "Monthly energy consumption — split between local ZEV energy and grid import.",
         "month_col": "Month",
@@ -287,6 +292,21 @@ def _compute_monthly_data(
     if shares_by_date is None:
         shares_by_date = eligible_participant_shares(zev, year_start, year_end)
 
+    # Net-metered: this participant personally held a metering point with
+    # generation behind it (PV behind a bidirectional/production meter) for
+    # at least one reading this year. ``windows`` only carries this
+    # participant's own assignments plus community ones, so any personally
+    # held id it resolves is this participant's. Short-circuits with no
+    # extra queries when the ZEV has no flagged meter.
+    net_metered_readings_qs = MeterReading.objects.filter(
+        metering_point_id__in=set(cons_mp_ids) | set(prod_mp_ids),
+        timestamp__gte=year_start_dt,
+        timestamp__lt=year_end_dt,
+    )
+    has_behind_meter_generation = str(participant.id) in net_metered_participant_ids(
+        windows, net_metered_readings_qs
+    )
+
     def _participant_share(metering_point_id, ts) -> Decimal:
         """This participant's share of a reading at (mp, ts): 1 for a
         personal assignment they hold, their normalized weight share for a
@@ -348,7 +368,9 @@ def _compute_monthly_data(
         from_grid_f = float(m["from_grid"].quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
         produced_f = float(m["produced"].quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
-        self_suf = round(from_zev_f / consumed_f * 100) if consumed_f > 0 else 0
+        self_suf = None
+        if not has_behind_meter_generation:
+            self_suf = round(from_zev_f / consumed_f * 100) if consumed_f > 0 else 0
 
         months_data.append({
             "month_label": tr["months"][month_idx],
@@ -368,7 +390,9 @@ def _compute_monthly_data(
     total_from_zev = float(acc_from_zev.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
     total_from_grid = float(acc_from_grid.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
     total_produced = float(acc_produced.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
-    total_self_suf = round(total_from_zev / total_consumed * 100) if total_consumed > 0 else 0
+    total_self_suf = None
+    if not has_behind_meter_generation:
+        total_self_suf = round(total_from_zev / total_consumed * 100) if total_consumed > 0 else 0
 
     totals = {
         "total_consumed_kwh": f"{total_consumed:.2f}",
@@ -376,6 +400,7 @@ def _compute_monthly_data(
         "from_grid_kwh": f"{total_from_grid:.2f}",
         "total_produced_kwh": f"{total_produced:.2f}",
         "self_sufficiency_pct": total_self_suf,
+        "has_behind_meter_generation": has_behind_meter_generation,
     }
 
     return months_data, totals
@@ -579,6 +604,7 @@ def generate_annual_statement_pdf(
         "owner_participant": owner_participant,
         "monthly_data": monthly_data,
         "totals": totals,
+        "has_behind_meter_generation": totals["has_behind_meter_generation"],
         "monthly_chart_svg": monthly_chart_svg,
         "invoices": invoice_rows,
         "invoice_totals": invoice_totals,

@@ -178,6 +178,14 @@ record (see below). `READING_CSV_COLUMNS = ("meter_id", "timestamp",
 normal CSV metering import reads, plus `resolution`/`import_source` so nothing is
 lost in a round trip.
 
+`METERING_POINT_FIELDS` includes `has_behind_meter_generation`
+(SPEC-2026-behind-the-meter-generation §5.7), an additive boolean field with
+a model default of `False`: `_pick` (`importer.py`) omits a key whose raw
+value is absent or JSON `null`, so `MeteringPoint(...)` falls back to the
+model default and an archive written before this field existed still imports
+every point as `False`. No format-version bump — the same "additive field
+with a default" treatment as every other schema addition documented here.
+
 **Invoice PDFs (`invoice_pdfs`, format version 3+).** Opt-in and dependent on
 `invoices`: without a rendered document an invoice contributes no member (the
 same "absence means absence" rule readings expresses with a header-only CSV —
@@ -387,7 +395,9 @@ ids; no account reference travels; one-section exports leave the others out; a
 meter id with a path separator cannot escape `readings/`
 (`test_a_meter_id_with_a_path_separator_cannot_escape_the_readings_folder`);
 collision-safe member names (`test_two_meter_ids_that_sanitise_to_one_name_
-still_get_separate_members`).
+still_get_separate_members`); `metering_points.json` carries
+`has_behind_meter_generation` per point
+(`test_export_contains_the_behind_meter_generation_field`).
 
 **`RoundTripTests`**: every section arrives; assignments follow the right
 participant; participants arrive unlinked; readings keep resolution and values;
@@ -395,7 +405,11 @@ tariff periods round-trip; invoice items travel (PDFs only when `invoice_pdfs`
 is explicitly selected — see `test_transfer_invoice_pdfs.py`); the counter is
 pushed past imported numbering; readings are recorded as an import log;
 importing twice collides on meter ids; a structure-only archive can be imported
-twice; a subset can be imported from a full archive; a name override renames the
+twice; a subset can be imported from a full archive;
+`has_behind_meter_generation` round-trips true/false per point
+(`test_behind_meter_generation_round_trips_and_defaults_false_when_absent`)
+and imports `False` when the archive predates the field
+(`test_metering_points_json_without_the_field_imports_as_false`); a name override renames the
 imported ZEV; a structure-only archive still names the ZEV.
 
 **Dynamic source compatibility**: current version-2 exports retain the

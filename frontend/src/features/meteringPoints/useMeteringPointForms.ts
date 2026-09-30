@@ -13,6 +13,7 @@ export const defaultMeteringPointForm = (): MeteringPointInput => ({
   meter_type: 'consumption',
   is_active: true,
   location_description: '',
+  has_behind_meter_generation: false,
 })
 
 export const defaultAssignmentForm = (meteringPointId = ''): MeteringPointAssignmentInput => ({

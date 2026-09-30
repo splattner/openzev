@@ -167,6 +167,51 @@ class AnnualReportContentTests(AnnualReportTestCase):
         self.assertEqual(producer["produced_kwh"], 10.0)
         self.assertIsNone(producer["self_sufficiency_rate"])
 
+    def test_net_metered_participant_has_null_rate_and_flag(self):
+        """SPEC-2026-behind-the-meter-generation §5.4: a participant who
+        personally holds a flagged (net/surplus-metered) meter loses their
+        self-sufficiency rate, but their kWh and savings are unaffected, and
+        the top-level flag reflects the flagged meter having readings."""
+        flagged_mp = MeteringPoint.objects.create(
+            zev=self.zev, meter_id="CH-AR-BIDI", meter_type=MeteringPointType.BIDIRECTIONAL,
+            has_behind_meter_generation=True,
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=flagged_mp, participant=self.producer, valid_from=date(2025, 1, 1),
+        )
+        self._reading(flagged_mp, datetime(2026, 6, 15, 22, 0, tzinfo=ZURICH), "2", ReadingDirection.IN)
+
+        report = self._report()
+        self.assertTrue(report["has_behind_meter_generation"])
+
+        rows = {row["participant_id"]: row for row in report["participants"]}
+        producer = rows[str(self.producer.pk)]
+        self.assertTrue(producer["has_behind_meter_generation"])
+        self.assertIsNone(producer["self_sufficiency_rate"])
+        self.assertEqual(producer["consumed_kwh"], 2.0)
+        self.assertEqual(producer["produced_kwh"], 10.0)
+
+        consumer = rows[str(self.consumer.pk)]
+        self.assertFalse(consumer["has_behind_meter_generation"])
+        self.assertEqual(consumer["self_sufficiency_rate"], 40.0)
+
+    def test_totals_are_unchanged_by_the_flag(self):
+        flagged_mp = MeteringPoint.objects.create(
+            zev=self.zev, meter_id="CH-AR-BIDI2", meter_type=MeteringPointType.BIDIRECTIONAL,
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=flagged_mp, participant=self.producer, valid_from=date(2025, 1, 1),
+        )
+        self._reading(flagged_mp, datetime(2026, 6, 15, 22, 0, tzinfo=ZURICH), "2", ReadingDirection.IN)
+
+        without_flag = self._report()["totals"]
+
+        flagged_mp.has_behind_meter_generation = True
+        flagged_mp.save(update_fields=["has_behind_meter_generation"])
+
+        with_flag = self._report()["totals"]
+        self.assertEqual(with_flag, without_flag)
+
     def test_participants_are_sorted_by_name(self):
         names = [row["participant_name"] for row in self._report()["participants"]]
 

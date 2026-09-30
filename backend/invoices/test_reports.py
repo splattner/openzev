@@ -383,3 +383,79 @@ class AnnualStatementMonthlyDataTests(TestCase):
 
         # Weight 3 of 4 total: the holder's own share is 8 * 3/4 = 6, not 8.
         self.assertEqual(monthly[0]["consumed_kwh"], "6.00")
+
+
+class AnnualStatementBehindMeterGenerationTests(TestCase):
+    """SPEC-2026-behind-the-meter-generation §5.5: a net-metered participant's
+    self-sufficiency rate is suppressed in both the monthly data and the
+    rendered PDF's context, and a non-flagged participant is unaffected."""
+
+    def setUp(self):
+        self.owner = make_user("asbm_owner", UserRole.ZEV_OWNER)
+        self.zev = make_zev(self.owner, "Behind Meter Statement ZEV")
+        self.participant = make_participant(self.zev, first="Pia", last="Muster")
+        from invoices.annual_statement import ANNUAL_TRANSLATIONS
+        self.tr = ANNUAL_TRANSLATIONS["de"]
+
+    def _flagged_meter(self, meter_type):
+        from zev.models import MeteringPoint, MeteringPointAssignment
+
+        mp = MeteringPoint.objects.create(
+            zev=self.zev, meter_id="CH00000000000000000000000000REPBM",
+            meter_type=meter_type, has_behind_meter_generation=True,
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=mp, participant=self.participant,
+            valid_from=date(2026, 1, 1), valid_to=None,
+        )
+        return mp
+
+    def test_net_metered_participant_has_null_rates_and_flag(self):
+        from invoices.annual_statement import _compute_monthly_data, generate_annual_statement_pdf
+        from metering.models import MeterReading, ReadingDirection, ReadingResolution
+        from zev.models import MeteringPointType
+
+        mp = self._flagged_meter(MeteringPointType.BIDIRECTIONAL)
+        MeterReading.objects.create(
+            metering_point=mp,
+            timestamp=datetime(2026, 1, 15, 12, 0, tzinfo=dt_timezone.utc),
+            energy_kwh=Decimal("4"), direction=ReadingDirection.IN,
+            resolution=ReadingResolution.DAILY,
+        )
+
+        monthly, totals = _compute_monthly_data(self.participant, self.zev, 2026, self.tr)
+
+        self.assertTrue(totals["has_behind_meter_generation"])
+        self.assertIsNone(totals["self_sufficiency_pct"])
+        self.assertIsNone(monthly[0]["self_sufficiency_pct"])
+        self.assertEqual(monthly[0]["consumed_kwh"], "4.00")
+
+        # The PDF must still render for a net-metered participant.
+        pdf_bytes = generate_annual_statement_pdf(self.participant, self.zev, 2026)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+
+    def test_non_flagged_participant_is_unchanged(self):
+        from invoices.annual_statement import _compute_monthly_data
+        from metering.models import MeterReading, ReadingDirection, ReadingResolution
+        from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType
+
+        mp = MeteringPoint.objects.create(
+            zev=self.zev, meter_id="CH00000000000000000000000000REPBM2",
+            meter_type=MeteringPointType.CONSUMPTION,
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=mp, participant=self.participant,
+            valid_from=date(2026, 1, 1), valid_to=None,
+        )
+        MeterReading.objects.create(
+            metering_point=mp,
+            timestamp=datetime(2026, 1, 15, 12, 0, tzinfo=dt_timezone.utc),
+            energy_kwh=Decimal("4"), direction=ReadingDirection.IN,
+            resolution=ReadingResolution.DAILY,
+        )
+
+        monthly, totals = _compute_monthly_data(self.participant, self.zev, 2026, self.tr)
+
+        self.assertFalse(totals["has_behind_meter_generation"])
+        self.assertIsNotNone(totals["self_sufficiency_pct"])
+        self.assertIsNotNone(monthly[0]["self_sufficiency_pct"])

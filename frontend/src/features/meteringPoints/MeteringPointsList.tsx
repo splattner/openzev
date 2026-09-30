@@ -11,6 +11,7 @@ import {
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
+import { BehindMeterBadge } from '../../components/BehindMeterBadge'
 import { formatDateTime, formatShortDate } from '../../lib/appSettings'
 import { todayBusinessIso } from '../../lib/dates'
 import type { AppSettings, MeteringPoint, MeteringPointAssignment } from '../../types/api'
@@ -170,6 +171,7 @@ export function MeteringPointsList({
                     {point.is_active ? t('pages.meteringPoints.active') : t('pages.meteringPoints.inactive')}
                   </span>
                   <span className="badge badge-neutral">{t(`pages.meteringPoints.meterTypes.${point.meter_type}`)}</span>
+                  {point.has_behind_meter_generation && <BehindMeterBadge />}
                   <Link
                     className={meteringPointHealthBadgeClass(health)}
                     style={{ textDecoration: 'none' }}

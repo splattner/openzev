@@ -383,6 +383,7 @@ export function useMeteringPointActions({
             meter_type: point.meter_type,
             is_active: point.is_active,
             location_description: point.location_description ?? '',
+            has_behind_meter_generation: point.has_behind_meter_generation,
         })
         setShowMpModal(true)
     }

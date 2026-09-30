@@ -123,6 +123,7 @@ def build_annual_report(zev, year: int) -> dict:
     participants = {}
     for stat in summary["participant_stats"]:
         pid = stat["participant_id"]
+        has_behind_meter_generation = stat["has_behind_meter_generation"]
         participants[pid] = {
             "participant_id": pid,
             "participant_name": stat["participant_name"] or names.get(pid, ""),
@@ -130,7 +131,12 @@ def build_annual_report(zev, year: int) -> dict:
             "produced_kwh": stat["total_produced_kwh"],
             "from_zev_kwh": stat["from_zev_kwh"],
             "from_grid_kwh": stat["from_grid_kwh"],
-            "self_sufficiency_rate": _rate(stat["from_zev_kwh"], stat["total_consumed_kwh"]),
+            "self_sufficiency_rate": (
+                None
+                if has_behind_meter_generation
+                else _rate(stat["from_zev_kwh"], stat["total_consumed_kwh"])
+            ),
+            "has_behind_meter_generation": has_behind_meter_generation,
             "savings": savings.get(pid),
         }
     # Invoiced but without readings in the year (e.g. a data gap): the savings
@@ -145,6 +151,7 @@ def build_annual_report(zev, year: int) -> dict:
                 "from_zev_kwh": 0.0,
                 "from_grid_kwh": 0.0,
                 "self_sufficiency_rate": None,
+                "has_behind_meter_generation": False,
                 "savings": row_savings,
             }
 
@@ -154,6 +161,7 @@ def build_annual_report(zev, year: int) -> dict:
         "zev_id": str(zev.id),
         "year": year,
         "has_data": has_data,
+        "has_behind_meter_generation": summary["zev_has_behind_meter_generation"],
         "totals": _balance(summary["zev_totals"]),
         "previous_totals": _balance(previous_totals) if previous_totals else None,
         "months": months,

@@ -339,6 +339,7 @@ export const de = {
             languageCode: 'Sprachcode (de/fr/it/en)',
             annualStatementData: 'Jahresabrechnung',
             annualYear: 'Jahr der Abrechnung',
+            annualHasBehindMeterGeneration: 'Netzmessung erkannt (true/false)',
             annualTotals: 'Jahrestotale',
             annualTotalConsumed: 'Gesamtverbrauch (kWh)',
             annualFromZev: 'Energie aus ZEV (kWh)',
@@ -1811,6 +1812,8 @@ export const de = {
                 active: 'Aktiv',
                 activeHint: 'Nur Bestandsstatus — ohne Einfluss auf die Abrechnung. Um einen Zähler nicht mehr abzurechnen, setzen Sie ein Enddatum bei seiner Zuordnung.',
                 location: 'Standort',
+                behindMeterGeneration: 'Erzeugung hinter dem Zähler (Überschussmessung)',
+                behindMeterGenerationHelp: 'Aktivieren, wenn hinter diesem Zähler eine PV-Anlage liegt, sodass der Zähler nur den eingespeisten Überschuss und den Netzbezug erfasst.',
             },
             meterTypes: {
                 consumption: 'Verbrauch',
@@ -3006,6 +3009,12 @@ export const de = {
         noneMatchFilter: 'Keine Messstellen entsprechen diesem Filter.',
         unassignedWarning: '{{readings}} Messwerte an {{days}} Tagen ohne Zuordnung — nicht verrechnet',
         assignmentOverlapWarning: 'Überlappende Zuordnungsfenster — betroffenen Zähler neu zuweisen',
+    },
+    behindMeter: {
+        badge: 'Überschussmessung',
+        participantHint: 'Die Photovoltaikanlage dieser Person liegt hinter ihrem Zähler; ihr eigener Verbrauch ab Anlage wird nicht erfasst, daher wird keine Quote ausgewiesen.',
+        ownHint: 'Ihre Photovoltaikanlage liegt hinter Ihrem Zähler; Ihr eigener Verbrauch ab Anlage wird nicht erfasst, daher wird keine Quote ausgewiesen.',
+        zevNote: 'Einige Messpunkte haben eine Photovoltaikanlage hinter dem Zähler. Für diese bedeutet Produktion den eingespeisten Überschuss, und die Quoten beschreiben die an den Anschlusspunkten ausgetauschte Energie, nicht den Eigenverbrauch der Anlage selbst.',
     },
     features: {
         title: 'Feature-Flags',

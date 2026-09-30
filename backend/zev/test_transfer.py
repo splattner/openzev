@@ -219,6 +219,17 @@ class ArchiveShapeTests(TestCase):
         self.assertNotIn("owner", zev_payload)
         self.assertNotIn(self.owner.username.encode(), raw)
 
+    def test_export_contains_the_behind_meter_generation_field(self):
+        production = self.zev.metering_points.get(meter_id="SHAPE-PROD-1")
+        production.has_behind_meter_generation = True
+        production.save(update_fields=["has_behind_meter_generation"])
+
+        with zipfile.ZipFile(io.BytesIO(export_to_bytes(self.zev))) as archive:
+            points = json.loads(archive.read("metering_points.json"))
+        by_meter_id = {p["meter_id"]: p for p in points}
+        self.assertTrue(by_meter_id["SHAPE-PROD-1"]["has_behind_meter_generation"])
+        self.assertFalse(by_meter_id["SHAPE-CONS-1"]["has_behind_meter_generation"])
+
     def test_selecting_one_section_leaves_the_others_out(self):
         with zipfile.ZipFile(io.BytesIO(export_to_bytes(self.zev, ["tariffs"]))) as archive:
             names = set(archive.namelist())
@@ -317,6 +328,36 @@ class RoundTripTests(TestCase):
             )
         }
         self.assertEqual(holders, {"RT-CONS-1": "Bob", "RT-PROD-1": "Alice"})
+
+    def test_behind_meter_generation_round_trips_and_defaults_false_when_absent(self):
+        """The flagged production meter keeps its flag; the unflagged one imports False."""
+        self.source.metering_points.filter(meter_id="RT-PROD-1").update(
+            has_behind_meter_generation=True
+        )
+        result = self._import()
+        imported_points = {
+            mp.meter_id: mp.has_behind_meter_generation
+            for mp in MeteringPoint.objects.filter(zev_id=result["zev_id"])
+        }
+        self.assertEqual(
+            imported_points, {"RT-CONS-1": False, "RT-PROD-1": True}
+        )
+
+    def test_metering_points_json_without_the_field_imports_as_false(self):
+        """An archive written before this field existed must still import cleanly."""
+        raw = export_and_clear(self.source)
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            points = json.loads(archive.read("metering_points.json"))
+        for point in points:
+            point.pop("has_behind_meter_generation", None)
+
+        rewritten = rewrite_archive(raw, replace={"metering_points.json": points})
+        result = import_archive(io.BytesIO(rewritten), owner=self.importer)
+        self.assertTrue(
+            MeteringPoint.objects.filter(
+                zev_id=result["zev_id"], has_behind_meter_generation=False
+            ).exists()
+        )
 
     def test_participants_arrive_unlinked_even_when_an_account_shares_the_email(self):
         """Re-linking by email would let an edited archive hand over an account."""

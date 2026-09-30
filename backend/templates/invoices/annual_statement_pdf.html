@@ -302,10 +302,14 @@
             </div>
             <div class="summary-card highlight">
                 <div class="card-label">{{ tr.self_sufficiency }}</div>
-                <div class="card-value">{{ totals.self_sufficiency_pct }}%</div>
+                <div class="card-value">{% if totals.self_sufficiency_pct is None %}—{% else %}{{ totals.self_sufficiency_pct }}%{% endif %}</div>
                 <div class="card-unit">{{ tr.autarky }}</div>
             </div>
         </div>
+
+        {% if has_behind_meter_generation %}
+        <p style="color: var(--muted); font-size: 8pt; margin-bottom: 4mm;">{{ tr.behind_meter_note }}</p>
+        {% endif %}
 
         <!-- Monthly Breakdown -->
         <h2 class="section-title">{{ tr.monthly_breakdown }}</h2>
@@ -336,7 +340,7 @@
                     <td class="number">{{ row.from_zev_kwh }}</td>
                     <td class="number">{{ row.from_grid_kwh }}</td>
                     <td class="number">{{ row.produced_kwh }}</td>
-                    <td class="number">{{ row.self_sufficiency_pct }}%</td>
+                    <td class="number">{% if row.self_sufficiency_pct is None %}—{% else %}{{ row.self_sufficiency_pct }}%{% endif %}</td>
                 </tr>
                 {% endfor %}
                 <tr class="total-row">
@@ -345,7 +349,7 @@
                     <td class="number">{{ totals.from_zev_kwh }}</td>
                     <td class="number">{{ totals.from_grid_kwh }}</td>
                     <td class="number">{{ totals.total_produced_kwh }}</td>
-                    <td class="number">{{ totals.self_sufficiency_pct }}%</td>
+                    <td class="number">{% if totals.self_sufficiency_pct is None %}—{% else %}{{ totals.self_sufficiency_pct }}%{% endif %}</td>
                 </tr>
             </tbody>
         </table>

@@ -339,6 +339,7 @@ export const fr = {
             languageCode: 'Code langue (de/fr/it/en)',
             annualStatementData: 'Décompte annuel',
             annualYear: 'Année du décompte',
+            annualHasBehindMeterGeneration: 'Comptage net détecté (true/false)',
             annualTotals: 'Totaux annuels',
             annualTotalConsumed: 'Consommation totale (kWh)',
             annualFromZev: 'Énergie depuis CEL (kWh)',
@@ -1811,6 +1812,8 @@ export const fr = {
                 active: 'Actif',
                 activeHint: 'Statut d’inventaire uniquement — sans effet sur la facturation. Pour cesser de facturer un compteur, définissez une date de fin sur son affectation.',
                 location: 'Emplacement',
+                behindMeterGeneration: 'Production derrière le compteur (comptage du surplus)',
+                behindMeterGenerationHelp: 'Cochez cette case lorsqu’une installation photovoltaïque se trouve derrière ce compteur, qui n’enregistre alors que le surplus injecté et le soutirage du réseau.',
             },
             meterTypes: {
                 consumption: 'Consommation',
@@ -3006,6 +3009,12 @@ export const fr = {
         noneMatchFilter: 'Aucun point de mesure ne correspond à ce filtre.',
         unassignedWarning: '{{readings}} relevés sur {{days}} jours sans attribution — non facturés',
         assignmentOverlapWarning: 'Fenêtres d\'attribution qui se chevauchent — réaffecter le compteur concerné',
+    },
+    behindMeter: {
+        badge: 'Comptage du surplus',
+        participantHint: 'L\'installation photovoltaïque de cette personne se trouve derrière son compteur ; sa propre consommation depuis l\'installation n\'est pas mesurée, aucun taux n\'est donc indiqué.',
+        ownHint: 'Votre installation photovoltaïque se trouve derrière votre compteur ; votre propre consommation depuis l\'installation n\'est pas mesurée, aucun taux n\'est donc indiqué.',
+        zevNote: 'Certains points de mesure ont une installation photovoltaïque derrière le compteur. Pour ceux-ci, la production correspond au surplus injecté, et les taux décrivent l\'énergie échangée aux points de raccordement, pas l\'autoconsommation propre de l\'installation.',
     },
     features: {
         title: 'Fonctionnalités',

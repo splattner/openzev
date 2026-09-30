@@ -111,6 +111,7 @@ function makeReport(overrides: Partial<AnnualReport> = {}): AnnualReport {
         zev_id: 'zev-1',
         year: new Date().getFullYear() - 1,
         has_data: true,
+        has_behind_meter_generation: false,
         totals: BALANCE,
         previous_totals: { ...BALANCE, self_consumption_rate: 50, self_sufficiency_rate: 100 },
         months: Array.from({ length: 12 }, (_, i) => ({
@@ -128,6 +129,7 @@ function makeReport(overrides: Partial<AnnualReport> = {}): AnnualReport {
                 from_zev_kwh: 4,
                 from_grid_kwh: 6,
                 self_sufficiency_rate: 40,
+                has_behind_meter_generation: false,
                 savings: {
                     local_kwh: '4.00',
                     local_chf: '0.80',
@@ -145,6 +147,7 @@ function makeReport(overrides: Partial<AnnualReport> = {}): AnnualReport {
                 from_zev_kwh: 0,
                 from_grid_kwh: 0,
                 self_sufficiency_rate: null,
+                has_behind_meter_generation: false,
                 savings: null,
             },
         ],
@@ -288,6 +291,38 @@ describe('ReportsPage annual report', () => {
         expect(rows[1].textContent).toContain('—')
         expect(rows[1].textContent).not.toContain('CHF')
         expect(container.querySelector('.participant-table tfoot')?.textContent).toContain('CHF 0.40')
+        unmount()
+    })
+
+    it('renders — and a badge for a net-metered participant, plus the ZEV-wide note', async () => {
+        vi.mocked(invoicesApi.fetchAnnualReport).mockResolvedValue(
+            makeReport({
+                has_behind_meter_generation: true,
+                participants: [
+                    {
+                        participant_id: 'p-2',
+                        participant_name: 'Paul Produzent',
+                        consumed_kwh: 2,
+                        produced_kwh: 10,
+                        from_zev_kwh: 0,
+                        from_grid_kwh: 2,
+                        self_sufficiency_rate: null,
+                        has_behind_meter_generation: true,
+                        savings: null,
+                    },
+                ],
+            }),
+        )
+
+        const { container, unmount } = renderReportsPage()
+        await flush()
+        await flush()
+
+        expect(container.textContent).toContain('behindMeter.zevNote')
+        const row = container.querySelector('.participant-table tbody tr')!
+        expect(row.textContent).toContain('Paul Produzent')
+        expect(row.textContent).toContain('behindMeter.badge')
+        expect(row.textContent).toContain('—')
         unmount()
     })
 

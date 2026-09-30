@@ -377,11 +377,35 @@ class TestConsumptionSummary:
         top = result["participants"][0]
         assert set(top) == {
             "participant_id", "participant_name", "consumed_kwh", "from_zev_kwh",
-            "from_grid_kwh", "produced_kwh", "local_share_pct",
+            "from_grid_kwh", "produced_kwh", "local_share_pct", "has_behind_meter_generation",
         }
         assert top["consumed_kwh"] == 8.0
         assert top["local_share_pct"] == 0.0
+        assert top["has_behind_meter_generation"] is False
         assert result["totals"]["consumed_kwh"] == 10.0
+        assert result["totals"]["has_behind_meter_generation"] is False
+
+    def test_net_metered_participant_has_null_local_share(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        producer = ParticipantFactory(zev=zev, first_name="Producer", last_name="Test", valid_from=date(2026, 1, 1))
+        meter = MeteringPointFactory(
+            zev=zev, meter_type="bidirectional", has_behind_meter_generation=True,
+        )
+        MeteringPointAssignmentFactory(metering_point=meter, participant=producer, valid_from=date(2026, 1, 1))
+        MeterReading.objects.create(
+            metering_point=meter, timestamp=datetime(2026, 1, 10, 18, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("3.0000"), direction=ReadingDirection.IN,
+            resolution=ReadingResolution.FIFTEEN_MIN,
+        )
+
+        result = _structured(call_tool(owner_mcp_client, "consumption_summary", {
+            "zev_id": str(zev.id), "date_from": "2026-01-01", "date_to": "2026-01-31",
+        }))
+
+        row = next(p for p in result["participants"] if p["participant_id"] == str(producer.id))
+        assert row["has_behind_meter_generation"] is True
+        assert row["local_share_pct"] is None
+        assert result["totals"]["has_behind_meter_generation"] is True
 
     def test_participant_call_is_scoped_and_has_no_breakdown(self, owner_mcp_client, owner_user):
         zev = ZevFactory(owner=owner_user)
@@ -460,6 +484,23 @@ class TestConsumptionProfile:
         assert result["profile"][18]["total_kwh"] == 1.0
         assert result["average_daily_kwh"] == 1.0
         assert result["local_share_pct"] == 0.0
+
+    def test_net_metered_participant_has_null_local_share(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        participant = ParticipantFactory(zev=zev, valid_from=date(2026, 1, 1))
+        meter = MeteringPointFactory(
+            zev=zev, meter_type="bidirectional", has_behind_meter_generation=True,
+        )
+        MeteringPointAssignmentFactory(metering_point=meter, participant=participant, valid_from=date(2026, 1, 1))
+        MeterReading.objects.create(
+            metering_point=meter, timestamp=datetime(2026, 1, 10, 18, 0, tzinfo=ZoneInfo("Europe/Zurich")),
+            energy_kwh=Decimal("10.0000"), direction=ReadingDirection.IN, resolution=ReadingResolution.FIFTEEN_MIN,
+        )
+
+        result = _structured(call_tool(owner_mcp_client, "consumption_profile", self._args(zev, participant)))
+
+        assert result["has_behind_meter_generation"] is True
+        assert result["local_share_pct"] is None
 
     def test_no_readings_returns_null_profile_with_note(self, owner_mcp_client, owner_user):
         zev = ZevFactory(owner=owner_user)

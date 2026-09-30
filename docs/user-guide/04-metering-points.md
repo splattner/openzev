@@ -34,6 +34,9 @@ OpenZEV supports three metering point types:
    - **Meter type** — `Consumption`, `Production`, or `Bidirectional`
    - **Active** — inventory status (defaults to on)
    - **Location** (optional, e.g., "Roof solar panel")
+   - **Generation behind the meter** — only shown for `Bidirectional` or
+     `Production` meters; see
+     [Generation behind the meter](#generation-behind-the-meter) below
 
 3. Click **Create Metering Point**
 
@@ -43,6 +46,43 @@ OpenZEV supports three metering point types:
 > **Tip:** **Active** only tracks whether a meter is in inventory; on its own
 > it does not affect billing. To *stop billing* a meter, end its assignment
 > instead — see [Decommissioning a Meter](#decommissioning-a-meter).
+
+## Generation behind the meter
+
+In a vZEV, a producer's PV system usually sits **behind** their own grid
+connection meter, which is bidirectional. That meter only records what
+crosses the connection point — the **surplus** fed in once the household's
+own use is covered, and the residual **grid draw** for the times there is no
+surplus. This is called **net (surplus) metering** (*Überschussmessung*), and
+it is different from **gross production metering**, which needs its own,
+separate production meter and measures everything the PV system generates.
+
+Everything the household consumes directly from its own PV never reaches a
+net meter, so it never shows up as "production" or "self-consumption" in
+OpenZEV's statistics. Billing is unaffected — a vZEV can only share energy
+that actually crosses the connection point — but a producer's own
+self-sufficiency rate looks misleadingly low, because the numerator (what
+they draw from the shared pool) barely counts their own solar use at all.
+
+Tick **Generation behind the meter (surplus metering)** on a `Bidirectional`
+or `Production` metering point when this is the case (the checkbox is hidden
+for `Consumption` meters, since a consumption-only meter cannot have
+generation behind it). Once ticked:
+
+- The participant who personally holds that meter no longer sees a
+  self-sufficiency rate anywhere — **Energy balance**, their own dashboard,
+  the **annual report**, and their **annual statement** PDF all show **—**
+  with a short explanation instead.
+- The ZEV's own kWh totals and rates are **not** changed or excluded — the
+  energy is real, and billing depends on it. Instead, wherever the ZEV has a
+  flagged meter, an explanatory note appears next to the ZEV-wide figures.
+- Metering-point lists and tables show a **Surplus metering** badge next to
+  the meter type.
+
+If you later add a true production meter (measuring everything the PV system
+generates, not just the surplus), leave this box unticked on that separate
+meter and consult the OpenZEV team about importing gross production data —
+that is a planned follow-up, not yet supported.
 
 ## Assignment Validity Periods
 
@@ -145,7 +185,9 @@ join date, and a leaver's share stops on their leave date.
 Each card on the **Metering Points** page shows, at a glance:
 
 - The **meter ID** and its **location** (or "No location set")
-- **Active**/**Inactive** and meter-**type** badges
+- **Active**/**Inactive** and meter-**type** badges, plus a **Surplus
+  metering** badge when [Generation behind the meter](#generation-behind-the-meter)
+  is ticked
 - A **data-health badge** — `Healthy`, `Data gaps`, `Data at risk`, or `No
   data yet`, based on the last 30 days of readings; click it to open the
   metering point's data-quality view
@@ -163,7 +205,8 @@ Click **Chart** on a card for the metering point's full reading history.
 
 1. Go to **Metering Points**
 2. Open the meter's **⋯ More** menu and click **Edit**
-3. Update its ID, type, active status, or location
+3. Update its ID, type, active status, location, or
+   [Generation behind the meter](#generation-behind-the-meter) flag
 4. Click **Save Changes**
 
 > **Warning:** Changing a meter ID retroactively can break billing audit trails. Prefer creating a new meter and adjusting assignment windows.

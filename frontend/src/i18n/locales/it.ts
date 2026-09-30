@@ -339,6 +339,7 @@ export const it = {
             languageCode: 'Codice lingua (de/fr/it/en)',
             annualStatementData: 'Rendiconto annuale',
             annualYear: 'Anno del rendiconto',
+            annualHasBehindMeterGeneration: 'Misurazione netta rilevata (true/false)',
             annualTotals: 'Totali annuali',
             annualTotalConsumed: 'Consumo totale (kWh)',
             annualFromZev: 'Energia da CEL (kWh)',
@@ -1811,6 +1812,8 @@ export const it = {
                 active: 'Attivo',
                 activeHint: 'Solo stato di inventario — non influisce sulla fatturazione. Per smettere di fatturare un contatore, imposta una data di fine sulla sua assegnazione.',
                 location: 'Posizione',
+                behindMeterGeneration: 'Produzione dietro il contatore (misurazione del surplus)',
+                behindMeterGenerationHelp: 'Attivare quando dietro questo contatore si trova un impianto fotovoltaico, così il contatore registra solo il surplus immesso e il prelievo dalla rete.',
             },
             meterTypes: {
                 consumption: 'Consumo',
@@ -3006,6 +3009,12 @@ export const it = {
         noneMatchFilter: 'Nessun punto di misurazione corrisponde a questo filtro.',
         unassignedWarning: '{{readings}} letture su {{days}} giorni senza assegnazione — non fatturate',
         assignmentOverlapWarning: 'Finestre di assegnazione sovrapposte — riassegnare il contatore interessato',
+    },
+    behindMeter: {
+        badge: 'Misurazione del surplus',
+        participantHint: 'L\'impianto fotovoltaico di questa persona si trova dietro il proprio contatore; il proprio consumo diretto dall\'impianto non viene misurato, quindi non viene indicato alcun tasso.',
+        ownHint: 'Il vostro impianto fotovoltaico si trova dietro il vostro contatore; il vostro consumo diretto dall\'impianto non viene misurato, quindi non viene indicato alcun tasso.',
+        zevNote: 'Alcuni punti di misura hanno un impianto fotovoltaico dietro il contatore. Per questi, la produzione significa il surplus immesso, e i tassi descrivono l\'energia scambiata ai punti di connessione, non l\'autoconsumo dell\'impianto stesso.',
     },
     features: {
         title: 'Feature Flag',

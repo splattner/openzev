@@ -9,6 +9,7 @@ import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { formatChf, formatKwh, formatPercent } from '../../lib/numbers'
 import { StatCard } from '../../components/StatCard'
 import { PageSkeleton } from '../../components/PageSkeleton'
+import { BehindMeterBadge } from '../../components/BehindMeterBadge'
 import type { AnnualReport, AnnualReportBalance } from '../../types/api'
 
 const percentOrDash = (value: number | null | undefined) => (value == null ? '—' : formatPercent(value))
@@ -75,26 +76,29 @@ function AnnualReportKpis({ report }: { report: AnnualReport }) {
     const { t } = useTranslation()
     const { totals, previous_totals: previous, year } = report
     return (
-        <section className="kpi-row" aria-label={t('pages.reports.annualReport.title', { year })}>
-            <StatCard
-                accent
-                label={t('pages.reports.annualReport.stats.selfConsumptionRate')}
-                value={percentOrDash(totals.self_consumption_rate)}
-                hint={previousHint(t, previous, 'self_consumption_rate', year)}
-            />
-            <StatCard
-                label={t('pages.reports.annualReport.stats.selfSufficiencyRate')}
-                value={percentOrDash(totals.self_sufficiency_rate)}
-                hint={previousHint(t, previous, 'self_sufficiency_rate', year)}
-            />
-            <StatCard label={t('pages.reports.annualReport.stats.produced')} value={yearKwh(totals.produced_kwh)} />
-            <StatCard label={t('pages.reports.annualReport.stats.consumed')} value={yearKwh(totals.consumed_kwh)} />
-            <StatCard
-                label={t('pages.reports.annualReport.stats.savings')}
-                value={chfOrDash(report.savings_total_chf)}
-                hint={t('pages.reports.annualReport.hints.savings')}
-            />
-        </section>
+        <>
+            <section className="kpi-row" aria-label={t('pages.reports.annualReport.title', { year })}>
+                <StatCard
+                    accent
+                    label={t('pages.reports.annualReport.stats.selfConsumptionRate')}
+                    value={percentOrDash(totals.self_consumption_rate)}
+                    hint={previousHint(t, previous, 'self_consumption_rate', year)}
+                />
+                <StatCard
+                    label={t('pages.reports.annualReport.stats.selfSufficiencyRate')}
+                    value={percentOrDash(totals.self_sufficiency_rate)}
+                    hint={previousHint(t, previous, 'self_sufficiency_rate', year)}
+                />
+                <StatCard label={t('pages.reports.annualReport.stats.produced')} value={yearKwh(totals.produced_kwh)} />
+                <StatCard label={t('pages.reports.annualReport.stats.consumed')} value={yearKwh(totals.consumed_kwh)} />
+                <StatCard
+                    label={t('pages.reports.annualReport.stats.savings')}
+                    value={chfOrDash(report.savings_total_chf)}
+                    hint={t('pages.reports.annualReport.hints.savings')}
+                />
+            </section>
+            {report.has_behind_meter_generation && <p className="muted">{t('behindMeter.zevNote')}</p>}
+        </>
     )
 }
 
@@ -189,7 +193,12 @@ function ParticipantSavingsCard({ report }: { report: AnnualReport }) {
                         <tbody>
                             {report.participants.map((row) => (
                                 <tr key={row.participant_id}>
-                                    <td>{row.participant_name || '-'}</td>
+                                    <td>
+                                        {row.participant_name || '-'}
+                                        {row.has_behind_meter_generation && (
+                                            <BehindMeterBadge hintKey="behindMeter.participantHint" />
+                                        )}
+                                    </td>
                                     <td className="numeric">{yearKwh(row.consumed_kwh)}</td>
                                     <td className="numeric">{yearKwh(row.from_zev_kwh)}</td>
                                     <td className="numeric">{percentOrDash(row.self_sufficiency_rate)}</td>

@@ -226,6 +226,11 @@ _ANNUAL_STATEMENT_FIELDS = [
         "fields": [
             {"variable": "{{ year }}", "description_key": "admin.fields.annualYear", "sample_path": "year"},
             {"variable": "{{ lang }}", "description_key": "admin.fields.languageCode", "sample_path": "lang"},
+            {
+                "variable": "{{ has_behind_meter_generation }}",
+                "description_key": "admin.fields.annualHasBehindMeterGeneration",
+                "sample_path": "has_behind_meter_generation",
+            },
         ],
     },
     {
@@ -484,6 +489,7 @@ _CONTRACT_TRANSLATION_KEYS = (
 
 _ANNUAL_STATEMENT_TRANSLATION_KEYS = (
     "autarky",
+    "behind_meter_note",
     "consumption_col",
     "from_grid",
     "from_grid_col",

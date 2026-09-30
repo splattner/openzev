@@ -86,6 +86,19 @@ export function DashboardPage() {
     const participantScopeName = user?.zev_count === 1 ? user?.zev_name : undefined
     const selectedParticipantName = summary?.role === 'zev_owner' ? summary.selected_participant_name : undefined
     const ownerTimeline = useMemo(() => (summary?.role === 'zev_owner' ? summary.timeline : []), [summary])
+    // The selected participant personally holds a metering point with
+    // generation behind it: their own from-ZEV rate below would be
+    // misleading (spec §7.2), so it is suppressed on the frontend — the
+    // backend keeps sending kWh, not a rate, on this payload.
+    const selectedParticipantFlagged = useMemo(
+        () =>
+            summary?.role === 'zev_owner' && !!selectedParticipantId
+                ? summary.participant_stats.some(
+                      (participant) => participant.participant_id === selectedParticipantId && participant.has_behind_meter_generation,
+                  )
+                : false,
+        [summary, selectedParticipantId],
+    )
     const ownerChartData = useMemo(
         () =>
             ownerTimeline.map((entry) => {
@@ -93,23 +106,25 @@ export function DashboardPage() {
                 const locally_produced = Math.max(0, entry.produced_kwh - entry.exported_kwh)
                 const self_consumption_rate =
                     entry.produced_kwh > 0 ? Math.round((locally_produced / entry.produced_kwh) * 1000) / 10 : null
-                const from_zev_rate = fromZevRate(locally_consumed, entry.consumed_kwh)
+                const from_zev_rate = selectedParticipantFlagged ? null : fromZevRate(locally_consumed, entry.consumed_kwh)
                 return { ...entry, locally_consumed, locally_produced, self_consumption_rate, from_zev_rate }
             }),
-        [ownerTimeline],
+        [ownerTimeline, selectedParticipantFlagged],
     )
     const participantTimeline = useMemo(
         () =>
             summary?.role === 'participant'
                 ? summary.timeline.map((entry) => ({
                       ...entry,
-                      from_zev_rate: fromZevRate(entry.consumed_from_zev_kwh, entry.total_consumed_kwh),
+                      from_zev_rate: summary.has_behind_meter_generation
+                          ? null
+                          : fromZevRate(entry.consumed_from_zev_kwh, entry.total_consumed_kwh),
                   }))
                 : [],
         [summary],
     )
     const participantFromZev = useMemo(() => {
-        if (summary?.role !== 'participant') return null
+        if (summary?.role !== 'participant' || summary.has_behind_meter_generation) return null
         const { consumed_from_zev_kwh, total_consumed_kwh } = summary.totals
         const pct = fromZevRate(consumed_from_zev_kwh, total_consumed_kwh)
         return pct === null ? null : { pct, zevKwh: consumed_from_zev_kwh, totalKwh: total_consumed_kwh }
@@ -221,6 +236,7 @@ export function DashboardPage() {
                         <StatCard label={t('pages.dashboard.stats.importedFromGrid')} value={dashboardKwhStat(summary.zev_totals.imported_kwh)} />
                         <StatCard label={t('pages.dashboard.stats.exportedToGrid')} value={dashboardKwhStat(summary.zev_totals.exported_kwh)} />
                     </section>
+                    {summary.zev_has_behind_meter_generation && <p className="muted">{t('behindMeter.zevNote')}</p>}
                     {summary.participant_stats.length > 0 && (
                         <EnergyFlowCard
                             totals={summary.zev_totals}
@@ -258,20 +274,27 @@ export function DashboardPage() {
                     <section style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
                         <StatCard label={t('pages.dashboard.participantStats.consumedFromZev')} value={dashboardKwhStat(summary.totals.consumed_from_zev_kwh)} />
                         <StatCard label={t('pages.dashboard.participantStats.importedFromGrid')} value={dashboardKwhStat(summary.totals.imported_from_grid_kwh)} />
-                        <StatCard label={t('pages.dashboard.participantStats.totalConsumption')} value={dashboardKwhStat(summary.totals.total_consumed_kwh)} />
+                        <StatCard
+                            label={t('pages.dashboard.participantStats.totalConsumption')}
+                            value={dashboardKwhStat(summary.totals.total_consumed_kwh)}
+                            hint={summary.has_behind_meter_generation ? t('behindMeter.ownHint') : undefined}
+                        />
                         <StatCard
                             label={t('pages.dashboard.participantStats.fromZevShare')}
                             value={participantFromZev ? formatPercent(participantFromZev.pct) : '—'}
                             hint={
-                                participantFromZev
-                                    ? t('pages.dashboard.hints.fromZevShare', {
-                                          zev: formatKwh(participantFromZev.zevKwh, { maxDecimals: 0 }),
-                                          total: formatKwh(participantFromZev.totalKwh, { maxDecimals: 0 }),
-                                      })
-                                    : undefined
+                                summary.has_behind_meter_generation
+                                    ? t('behindMeter.ownHint')
+                                    : participantFromZev
+                                      ? t('pages.dashboard.hints.fromZevShare', {
+                                            zev: formatKwh(participantFromZev.zevKwh, { maxDecimals: 0 }),
+                                            total: formatKwh(participantFromZev.totalKwh, { maxDecimals: 0 }),
+                                        })
+                                      : undefined
                             }
                         />
                     </section>
+                    {summary.zev_has_behind_meter_generation && <p className="muted">{t('behindMeter.zevNote')}</p>}
                     {summary.zev_participant_stats.length > 0 && summary.current_participant_id && (
                         <EnergyFlowCard
                             totals={summary.zev_totals}

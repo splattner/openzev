@@ -50,7 +50,12 @@ export function MeteringPointFormModal({
             value={form.meter_type}
             onChange={(event) => {
               const value = event.target.value as MeteringPointInput['meter_type']
-              setForm((previous) => ({ ...previous, meter_type: value }))
+              setForm((previous) => ({
+                ...previous,
+                meter_type: value,
+                // A consumption-only meter cannot have surplus behind it.
+                has_behind_meter_generation: value === 'consumption' ? false : previous.has_behind_meter_generation,
+              }))
             }}
           >
             {METER_TYPE_OPTIONS.map((option) => (
@@ -72,6 +77,20 @@ export function MeteringPointFormModal({
             description={t('pages.meteringPoints.form.activeHint')}
           />
         </div>
+
+        {(form.meter_type === 'bidirectional' || form.meter_type === 'production') && (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <Switch
+              checked={form.has_behind_meter_generation ?? false}
+              onChange={(event) => {
+                const checked = event.currentTarget.checked
+                setForm((previous) => ({ ...previous, has_behind_meter_generation: checked }))
+              }}
+              label={t('pages.meteringPoints.form.behindMeterGeneration')}
+              description={t('pages.meteringPoints.form.behindMeterGenerationHelp')}
+            />
+          </div>
+        )}
 
         <label style={{ gridColumn: '1 / -1' }}>
           <span>{t('pages.meteringPoints.form.location')}</span>

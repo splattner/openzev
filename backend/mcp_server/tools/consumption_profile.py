@@ -16,7 +16,8 @@ class ConsumptionProfileTool(Tool):
         "split per hour into energy from the ZEV (local solar) and from the grid. "
         "Use it for questions like 'when is consumption highest' or 'how much of "
         "the evening load is covered by solar'. Needs a participant_id from "
-        "list_participants."
+        "list_participants. Meters with generation behind them record only "
+        "surplus and residual grid draw; the holder's local share is null."
     )
     input_schema = {
         "type": "object",
@@ -57,6 +58,8 @@ class ConsumptionProfileTool(Tool):
             "date_to": arguments["date_to"],
         }
 
+        has_behind_meter_generation = bool(data.get("has_behind_meter_generation"))
+
         # ``hourly_profile: None`` means the participant holds no metering
         # point with readings in the range — say so rather than returning
         # 24 zero rows that read as "consumes nothing".
@@ -88,7 +91,14 @@ class ConsumptionProfileTool(Tool):
                 "profile": rows,
                 "average_daily_kwh": kwh(daily_total),
                 "average_daily_from_zev_kwh": kwh(daily_zev),
-                "local_share_pct": round(100 * daily_zev / daily_total, 1) if daily_total else None,
+                # A meter with generation behind it records only surplus and
+                # residual grid draw, so this participant's own local share
+                # would be misleading; it is null instead.
+                "local_share_pct": (
+                    None if has_behind_meter_generation
+                    else (round(100 * daily_zev / daily_total, 1) if daily_total else None)
+                ),
+                "has_behind_meter_generation": has_behind_meter_generation,
                 "peak_hour": peak["hour"] if daily_total else None,
             }
         )

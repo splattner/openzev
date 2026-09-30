@@ -86,7 +86,9 @@ agrees with both.
 
 ## 4. Data model
 
-No model or migration changes.
+No model or migration changes here directly; the report reads
+`MeteringPoint.has_behind_meter_generation` added by
+`SPEC-2026-behind-the-meter-generation`.
 
 ## 5. API contracts
 
@@ -113,6 +115,7 @@ Validation order: year, then zev_id, then ZEV lookup and authorisation.
   "zev_id": "uuid",
   "year": 2025,
   "has_data": true,
+  "has_behind_meter_generation": false,
   "totals": { /* Balance */ },
   "previous_totals": { /* Balance */ } | null,
   "months": [ /* 12 × Month, January first */ ],
@@ -133,7 +136,20 @@ that month). A month without readings has zero kWh and `null` rates.
 `Participant`: `participant_id`, `participant_name`, `consumed_kwh`,
 `produced_kwh`, `from_zev_kwh`, `from_grid_kwh` (floats),
 `self_sufficiency_rate` (`from_zev_kwh / consumed_kwh`, percent, or `null`),
-`savings` (object or `null`, see below).
+`has_behind_meter_generation` (boolean, see below), `savings` (object or
+`null`, see below).
+
+**Behind-the-meter generation** (`SPEC-2026-behind-the-meter-generation`): a
+participant who personally held a metering point with
+`has_behind_meter_generation=True` for at least one reading in the year gets
+`has_behind_meter_generation: true` and `self_sufficiency_rate: null` — their
+`consumed_kwh`/`produced_kwh`/`from_zev_kwh`/`from_grid_kwh` and `savings` are
+unaffected. A participant added only because they have savings but no
+readings that year always gets `has_behind_meter_generation: false`. Top-level
+`has_behind_meter_generation` is true when any metering point with generation
+behind it had readings in the year (`owner_dashboard_summary`'s
+`zev_has_behind_meter_generation`, computed over the year's readings). ZEV-wide
+`totals`, `previous_totals`, and `months` are never affected by the flag.
 
 ### Definitions
 
@@ -212,7 +228,8 @@ The `pages.reports.ownerComing` placeholder card and its keys are gone.
   self-consumption rate, then self-sufficiency rate, production, consumption,
   and savings (`formatChf`, hint `hints.savings`). The two rate cards take
   `hints.previousYear` (`{{year}}: {{rate}}`) when `previous_totals` has that
-  rate.
+  rate. When `report.has_behind_meter_generation` is true, a muted note
+  (`behindMeter.zevNote`) renders below the KPI row.
 - `AnnualTrendCard`: Recharts `LineChart`, x = month short name
   (`Intl.DateTimeFormat(i18n.language, {month: 'short'})`), y = 0–100 %.
   Current-year lines are `CHART_LOCAL` (self-consumption) and
@@ -223,8 +240,11 @@ The `pages.reports.ownerComing` placeholder card and its keys are gone.
   inside `.table-scroll`, with columns participant, consumption, from ZEV,
   self-sufficiency, ZEV electricity cost (`savings.local_chf`), cost at grid
   rate (`savings.hypothetical_chf`), savings (`savings.saved_chf`). Missing
-  values show `—`. A `tfoot` total row appears when `savings_total_chf` is
-  set, followed by an explanatory note (`participants.note`).
+  values show `—` — `self_sufficiency_rate` is already `null` for a
+  net-metered participant, so it renders `—` here too; that row's name cell
+  also gets a `BehindMeterBadge` (`behindMeter.participantHint`). A `tfoot`
+  total row appears when `savings_total_chf` is set, followed by an
+  explanatory note (`participants.note`).
 - kWh is shown whole (`formatKwh(v, {maxDecimals: 0})` + ` kWh`), percentages
   with `formatPercent`, money with `formatChf`.
 
@@ -275,6 +295,8 @@ export interface AnnualReportParticipant {
     from_zev_kwh: number
     from_grid_kwh: number
     self_sufficiency_rate: number | null
+    /** Personally holds a metering point with generation behind it for at least one reading in the year: `self_sufficiency_rate` is null. */
+    has_behind_meter_generation: boolean
     savings: AnnualReportSavings | null
 }
 
@@ -282,6 +304,8 @@ export interface AnnualReport {
     zev_id: string
     year: number
     has_data: boolean
+    /** Any metering point with generation behind it had readings in the year. */
+    has_behind_meter_generation: boolean
     totals: AnnualReportBalance
     previous_totals: AnnualReportBalance | null
     months: AnnualReportMonth[]
@@ -310,6 +334,8 @@ All four locales, under `pages.reports`: `documentsTitle`, and
 `annualReport.trend.{title, description, selfConsumption, selfSufficiency}`,
 `annualReport.participants.{title, description, empty, total, note}`,
 `annualReport.col.{participant, consumption, fromZev, selfSufficiency, localCost, gridCost, savings}`.
+Behind-the-meter generation reuses the shared top-level namespace
+`behindMeter.{badge, participantHint, zevNote}` (`SPEC-2026-behind-the-meter-generation` §7.5), not a `pages.reports`-scoped key.
 
 ## 8. Risks and mitigations
 
@@ -325,7 +351,7 @@ All four locales, under `pages.reports`: `documentsTitle`, and
 
 ### Backend — `backend/invoices/test_annual_report.py`
 
-**`AnnualReportContentTests`** (11 tests):
+**`AnnualReportContentTests`** (13 tests):
 
 | Test | Asserts |
 |---|---|
@@ -335,6 +361,8 @@ All four locales, under `pages.reports`: `documentsTitle`, and
 | `test_previous_totals_are_null_without_previous_year_readings` | `previous_totals` null, all previous month rates null |
 | `test_year_follows_swiss_civil_time` | local-midnight reading in January of the new year; 23:45 on 31 Dec in the previous year |
 | `test_participants_carry_their_split_and_rate` | consumer split and rate; producer rate `null` |
+| `test_net_metered_participant_has_null_rate_and_flag` | flagged holder's `self_sufficiency_rate` null and `has_behind_meter_generation` true; kWh/savings unchanged; top-level flag true (SPEC-2026-behind-the-meter-generation) |
+| `test_totals_are_unchanged_by_the_flag` | `totals` identical with the flag toggled on an otherwise-unchanged reading set |
 | `test_participants_are_sorted_by_name` | name order |
 | `test_savings_match_the_annual_statement` | `savings == compute_savings([invoice])`, `saved_chf`, total |
 | `test_cancelled_invoices_and_other_years_do_not_count` | no savings, total `null` |
@@ -353,11 +381,13 @@ unchanged.
 ### Frontend
 
 - `tests/reports-page.test.ts`: the owner test now asserts the report, the
-  documents heading, and both document cards. The new `ReportsPage annual
-  report` block (4 tests) covers the request parameters; rates, previous-year
+  documents heading, and both document cards. The `ReportsPage annual
+  report` block covers the request parameters; rates, previous-year
   hint, savings, table rows, `—` for rows without savings, and the footer
-  total; the no-data notice with documents still available; and the error
-  alert.
+  total; the no-data notice with documents still available; the error
+  alert; and (SPEC-2026-behind-the-meter-generation) a net-metered
+  participant's row rendering `—` plus the `behindMeter.badge`, and the
+  `behindMeter.zevNote` note under the KPI row when the top-level flag is set.
 - `tests/annual-statements-export.test.ts`: the page-level export tests render
   `ReportsPage` instead of the deleted `BillingStatementsPage`.
 - `tests/billing-hub-order.test.ts`: two tabs.

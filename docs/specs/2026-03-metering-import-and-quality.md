@@ -560,13 +560,25 @@ Returns role-differentiated response shapes:
       "total_consumed_kwh": 200.0,
       "total_produced_kwh": 0.0,
       "from_zev_kwh": 150.0,
-      "from_grid_kwh": 50.0
+      "from_grid_kwh": 50.0,
+      "has_behind_meter_generation": false
     }
   ],
   "selected_participant_id": null,
-  "selected_participant_name": null
+  "selected_participant_name": null,
+  "zev_has_behind_meter_generation": false
 }
 ```
+
+`has_behind_meter_generation` per participant and the top-level
+`zev_has_behind_meter_generation` are from `SPEC-2026-behind-the-meter-generation`
+§4.2/§5.2: a participant who personally held a metering point with
+generation behind it (PV behind a bidirectional/production meter) for at
+least one reading in the window is net-metered — consumers of this payload
+(dashboard, annual report, MCP) suppress that participant's self-sufficiency
+/ local-share rate rather than the backend, which keeps sending kWh, not a
+rate. The top-level flag is true when any metering point with readings in the
+queryset is flagged, regardless of allocation mode.
 
 When `participant_id` is provided, `totals` and `timeline` are narrowed to that
 participant's readings and the response includes `selected_participant_name`.
@@ -587,9 +599,16 @@ routing, ADR 0013.)
     "imported_from_grid_kwh": 50.0,
     "total_consumed_kwh": 200.0
   },
-  "timeline": [{"bucket": "...", "consumed_from_zev_kwh": ..., "imported_from_grid_kwh": ..., "total_consumed_kwh": ...}]
+  "timeline": [{"bucket": "...", "consumed_from_zev_kwh": ..., "imported_from_grid_kwh": ..., "total_consumed_kwh": ...}],
+  "has_behind_meter_generation": false,
+  "zev_has_behind_meter_generation": false
 }
 ```
+
+`has_behind_meter_generation` here is whether the *current* participant is
+net-metered in the window (personally holds a flagged meter); each entry of
+`zev_participant_stats` (the Sankey/ZEV-wide breakdown) also carries its own
+`has_behind_meter_generation`, same semantics as the owner response above.
 
 **Local/grid energy split algorithm (timestamp-level):**
 

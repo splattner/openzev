@@ -252,6 +252,7 @@ def build_sample_annual_statement_context() -> dict:
             "total_produced_kwh": f"{total_produced:.2f}",
             "self_sufficiency_pct": round(total_from_zev / total_consumed * 100) if total_consumed > 0 else 0,
         },
+        "has_behind_meter_generation": False,
         "monthly_chart_svg": _build_monthly_chart_svg(monthly_data, tr),
         "invoices": [
             {

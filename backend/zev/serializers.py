@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .geocoding import get_cached_building_footprint
 from .grid_operators import grid_operator_ids
-from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment, VatMode
+from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode
 from accounts.models import UserRole
 from .services import create_zev_with_owner_setup, ensure_participant_account
 from .tasks import trigger_geocode_if_address_present
@@ -71,6 +71,30 @@ class MeteringPointSerializer(serializers.ModelSerializer):
         if hasattr(obj, "last_reading_at"):
             return obj.last_reading_at
         return obj.readings.order_by("-timestamp").values_list("timestamp", flat=True).first()
+
+    def validate(self, attrs):
+        def resolved(field):
+            if field in attrs:
+                return attrs[field]
+            if self.instance is not None:
+                return getattr(self.instance, field)
+            return MeteringPoint._meta.get_field(field).get_default()
+
+        has_behind_meter_generation = resolved("has_behind_meter_generation")
+        meter_type = resolved("meter_type")
+        if has_behind_meter_generation and meter_type not in (
+            MeteringPointType.BIDIRECTIONAL,
+            MeteringPointType.PRODUCTION,
+        ):
+            raise serializers.ValidationError(
+                {
+                    "has_behind_meter_generation": (
+                        "Only bidirectional or production metering points can have "
+                        "generation behind the meter."
+                    )
+                }
+            )
+        return attrs
 
 
 class MeteringPointReadingsDeleteSerializer(serializers.Serializer):

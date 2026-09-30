@@ -29,6 +29,7 @@ def _series_entry(item: dict) -> dict:
 def _participant_entry(item: dict) -> dict:
     consumed = float(item.get("total_consumed_kwh") or 0)
     from_zev = float(item.get("from_zev_kwh") or 0)
+    has_behind_meter_generation = bool(item.get("has_behind_meter_generation"))
     return {
         # FK-free: the analytics layer already builds these as strings.
         "participant_id": str(item.get("participant_id")),
@@ -37,7 +38,15 @@ def _participant_entry(item: dict) -> dict:
         "from_zev_kwh": kwh(from_zev),
         "from_grid_kwh": kwh(item.get("from_grid_kwh")),
         "produced_kwh": kwh(item.get("total_produced_kwh")),
-        "local_share_pct": round(100 * from_zev / consumed, 1) if consumed else None,
+        # A meter with generation behind it (PV behind a bidirectional/
+        # production meter) records only the surplus fed in and the
+        # residual grid draw, so a personal holder's local share here would
+        # be misleadingly low; it is null instead.
+        "local_share_pct": (
+            None if has_behind_meter_generation
+            else (round(100 * from_zev / consumed, 1) if consumed else None)
+        ),
+        "has_behind_meter_generation": has_behind_meter_generation,
     }
 
 
@@ -68,7 +77,9 @@ class ConsumptionSummaryTool(Tool):
         "of up to 7 days). Without participant_id the result also breaks the "
         "ZEV down per participant (consumption, from ZEV, from grid, local "
         "share), largest consumer first; with participant_id the totals and "
-        "series are that participant's."
+        "series are that participant's. Meters with generation behind them "
+        "record only surplus and residual grid draw; the holder's local "
+        "share is null."
     )
     input_schema = {
         "type": "object",
@@ -120,6 +131,12 @@ class ConsumptionSummaryTool(Tool):
             "totals": _totals(data.get("totals", {})),
             "series": series,
         }
+        # ZEV-wide kWh and rates are unaffected by behind-the-meter
+        # generation; the flag only drives an explanatory note, added here so
+        # callers know when to show it.
+        result["totals"]["has_behind_meter_generation"] = bool(
+            data.get("zev_has_behind_meter_generation")
+        )
         if data.get("selected_participant_id"):
             result["participant_id"] = str(data["selected_participant_id"])
             result["participant_name"] = data.get("selected_participant_name")
@@ -130,9 +147,21 @@ class ConsumptionSummaryTool(Tool):
                 # place. Passing those on under this participant's id would
                 # attribute the whole ZEV's consumption to them.
                 result["totals"] = _totals({})
+                result["totals"]["has_behind_meter_generation"] = False
                 result["series"] = []
                 result["note"] = "No readings attributed to this participant in the date range."
                 return result
+            stats_by_id = {
+                str(item.get("participant_id")): item for item in data.get("participant_stats") or []
+            }
+            stat = stats_by_id.get(result["participant_id"])
+            participant_flagged = bool(stat.get("has_behind_meter_generation")) if stat else False
+            result["totals"]["has_behind_meter_generation"] = participant_flagged
+            if participant_flagged:
+                # This participant personally holds a meter with generation
+                # behind it: their own self-sufficiency rate is misleading,
+                # so it is suppressed rather than the ZEV-wide totals below.
+                result["totals"]["self_sufficiency_pct"] = None
         else:
             stats = data.get("participant_stats") or []
             result["participants"] = [_participant_entry(item) for item in stats[:_MAX_PARTICIPANTS]]

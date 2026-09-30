@@ -505,6 +505,9 @@ export interface MeteringPoint {
     meter_type: 'consumption' | 'production' | 'bidirectional'
     is_active: boolean
     location_description?: string
+    /** PV (or other generation) sits behind this meter: it records only the
+     * surplus fed in and the residual grid draw (net / surplus metering). */
+    has_behind_meter_generation: boolean
     /** Readings that a delete of this metering point would cascade-delete. */
     reading_count: number
     /** Assignment windows (any state) that a delete of this metering point would cascade-delete. */
@@ -519,6 +522,7 @@ export interface MeteringPointInput {
     meter_type: 'consumption' | 'production' | 'bidirectional'
     is_active: boolean
     location_description?: string
+    has_behind_meter_generation?: boolean
 }
 
 export interface MeteringPointAssignment {
@@ -1390,7 +1394,11 @@ export interface ZevOwnerDashboardSummary {
         total_produced_kwh: number
         from_zev_kwh: number
         from_grid_kwh: number
+        /** Personally holds a metering point with generation behind it for at least one reading in the window: no self-sufficiency rate is shown for this participant. */
+        has_behind_meter_generation: boolean
     }>
+    /** Any metering point with readings in this window is flagged (has generation behind it). */
+    zev_has_behind_meter_generation: boolean
 }
 
 export interface ParticipantDashboardSummary {
@@ -1420,8 +1428,13 @@ export interface ParticipantDashboardSummary {
         total_produced_kwh: number
         from_zev_kwh: number
         from_grid_kwh: number
+        has_behind_meter_generation: boolean
     }>
     current_participant_id: string | null
+    /** The current participant is net-metered (personally holds a flagged meter) in this window. */
+    has_behind_meter_generation: boolean
+    /** Any metering point with readings in this window is flagged. */
+    zev_has_behind_meter_generation: boolean
 }
 
 export type MeteringDashboardSummary = ZevOwnerDashboardSummary | ParticipantDashboardSummary
@@ -1462,6 +1475,8 @@ export interface AnnualReportParticipant {
     from_zev_kwh: number
     from_grid_kwh: number
     self_sufficiency_rate: number | null
+    /** Personally holds a metering point with generation behind it for at least one reading in the year: `self_sufficiency_rate` is null. */
+    has_behind_meter_generation: boolean
     savings: AnnualReportSavings | null
 }
 
@@ -1469,6 +1484,8 @@ export interface AnnualReport {
     zev_id: string
     year: number
     has_data: boolean
+    /** Any metering point with generation behind it had readings in the year. */
+    has_behind_meter_generation: boolean
     totals: AnnualReportBalance
     previous_totals: AnnualReportBalance | null
     /** Always twelve entries, January first. */

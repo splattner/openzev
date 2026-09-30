@@ -362,6 +362,16 @@ default is the last completed year.
 The rates use the same definitions as **Energy balance**, so the figures
 match. A year without metering data shows a short notice instead.
 
+If a metering point is marked **Generation behind the meter** (see
+[Metering points](04-metering-points.md#generation-behind-the-meter)), the
+participant who holds it shows **—** instead of a self-sufficiency rate, with
+a badge explaining why. Their consumption and production kWh are unaffected.
+A note under the key figures explains that, for those meters, "production"
+means only the surplus fed into the community and the rates describe energy
+exchanged at the connection point — not the plant's own self-consumption. The
+same **—** and note appear on that participant's annual statement PDF, on
+**Energy balance**, and on the participant's own dashboard.
+
 Below the report, under **Annual documents**:
 
 - **Tax Overview** — download the ZEV's yearly tax overview for producers as a

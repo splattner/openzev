@@ -2051,6 +2051,75 @@ class MeteringPointCascadeInfoTests(TestCase):
 		self.assertEqual(resp.data["assignment_count"], 0)
 
 
+class MeteringPointBehindMeterGenerationTests(TestCase):
+	"""SPEC-2026-behind-the-meter-generation §4.1: the flag is only allowed on
+	a bidirectional or production metering point, checked against the
+	effective ``meter_type`` (incoming value or the instance's, on a partial
+	update)."""
+
+	def setUp(self):
+		self.admin_client = APIClient()
+		self.admin = make_user("admin_behind_meter", UserRole.ADMIN)
+		self.zev = Zev.objects.create(
+			name="Behind Meter ZEV",
+			owner=make_user("owner_behind_meter", UserRole.ZEV_OWNER),
+			zev_type="vzev",
+			invoice_prefix="BM",
+		)
+		auth(self.admin_client, self.admin)
+
+	def test_behind_meter_generation_defaults_false(self):
+		mp = MeteringPoint.objects.create(
+			zev=self.zev, meter_id="BM-1", meter_type=MeteringPointType.CONSUMPTION,
+		)
+		self.assertFalse(mp.has_behind_meter_generation)
+
+	def test_behind_meter_generation_allowed_for_bidirectional_and_production(self):
+		for meter_id, meter_type in (
+			("BM-BIDI-1", MeteringPointType.BIDIRECTIONAL),
+			("BM-PROD-1", MeteringPointType.PRODUCTION),
+		):
+			resp = self.admin_client.post(
+				"/api/v1/zev/metering-points/",
+				{
+					"zev": str(self.zev.id),
+					"meter_id": meter_id,
+					"meter_type": meter_type,
+					"has_behind_meter_generation": True,
+				},
+				format="json",
+			)
+			self.assertEqual(resp.status_code, 201, resp.data)
+			self.assertTrue(resp.data["has_behind_meter_generation"])
+
+	def test_behind_meter_generation_rejected_for_consumption(self):
+		resp = self.admin_client.post(
+			"/api/v1/zev/metering-points/",
+			{
+				"zev": str(self.zev.id),
+				"meter_id": "BM-CONS-1",
+				"meter_type": MeteringPointType.CONSUMPTION,
+				"has_behind_meter_generation": True,
+			},
+			format="json",
+		)
+		self.assertEqual(resp.status_code, 400)
+		self.assertIn("has_behind_meter_generation", resp.data)
+
+	def test_partial_update_to_consumption_with_flag_set_is_rejected(self):
+		mp = MeteringPoint.objects.create(
+			zev=self.zev, meter_id="BM-BIDI-2", meter_type=MeteringPointType.BIDIRECTIONAL,
+			has_behind_meter_generation=True,
+		)
+		resp = self.admin_client.patch(
+			f"/api/v1/zev/metering-points/{mp.id}/",
+			{"meter_type": MeteringPointType.CONSUMPTION},
+			format="json",
+		)
+		self.assertEqual(resp.status_code, 400)
+		self.assertIn("has_behind_meter_generation", resp.data)
+
+
 class NextInvoiceNumberTests(TestCase):
 	"""Guards the F()-expression counter increment used during invoice generation."""
 

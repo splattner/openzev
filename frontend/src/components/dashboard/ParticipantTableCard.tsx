@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { BehindMeterBadge } from '../BehindMeterBadge'
 import { dashboardKwhStat } from '../../lib/dashboardFormatting'
 import { formatPercent } from '../../lib/numbers'
 import type { ZevOwnerDashboardSummary } from '../../types/api'
@@ -54,12 +55,22 @@ export function ParticipantTableCard({ participantStats, selectedParticipantId, 
                                             >
                                                 {participant.participant_name || '-'}
                                             </button>
+                                            {participant.has_behind_meter_generation && (
+                                                <BehindMeterBadge hintKey="behindMeter.participantHint" />
+                                            )}
                                         </td>
-                                        <td className="numeric">{dashboardKwhStat(participant.total_consumed_kwh)}</td>
+                                        <td
+                                            className="numeric"
+                                            title={participant.has_behind_meter_generation ? t('behindMeter.participantHint') : undefined}
+                                        >
+                                            {dashboardKwhStat(participant.total_consumed_kwh)}
+                                        </td>
                                         <td className="numeric">{dashboardKwhStat(participant.total_produced_kwh)}</td>
                                         <td className="numeric">{dashboardKwhStat(participant.from_zev_kwh)}</td>
                                         <td className="numeric">{dashboardKwhStat(participant.from_grid_kwh)}</td>
-                                        <td className="numeric">{formatPercent(zevSharePercent(participant))}</td>
+                                        <td className="numeric">
+                                            {participant.has_behind_meter_generation ? '—' : formatPercent(zevSharePercent(participant))}
+                                        </td>
                                     </tr>
                                 )
                             })}

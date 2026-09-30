@@ -1368,3 +1368,108 @@ class SharedMeteringDashboardTests(TestCase):
 		# so the whole community pool draws from the grid... but the pool total
 		# equals the meter's own consumption here, making it fully local).
 		self.assertAlmostEqual(hour_12["from_zev_kwh"] + hour_12["from_grid_kwh"], 2.0)
+
+
+class BehindMeterGenerationDashboardTests(TestCase):
+	"""SPEC-2026-behind-the-meter-generation §4.2/§5.2/§5.3: a participant who
+	personally holds a flagged (net/surplus-metered) metering point for at
+	least one reading in the window is marked, and their per-participant
+	self-sufficiency rate is meant to be suppressed by callers of the flag."""
+
+	def setUp(self):
+		self.client = APIClient()
+		self.owner = make_user("bm_dash_owner", UserRole.ZEV_OWNER)
+		self.zev = Zev.objects.create(name="Behind Meter Dash ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="BMD")
+
+		self.producer_user = make_user("bm_dash_producer", UserRole.PARTICIPANT)
+		self.producer = Participant.objects.create(
+			zev=self.zev, user=self.producer_user, first_name="Producer", last_name="Example",
+			email="bm.producer@example.com", valid_from=date(2026, 1, 1),
+		)
+		self.consumer = Participant.objects.create(
+			zev=self.zev, first_name="Consumer", last_name="Example",
+			email="bm.consumer@example.com", valid_from=date(2026, 1, 1),
+		)
+
+		self.flagged_mp = MeteringPoint.objects.create(
+			zev=self.zev, meter_id="BMD-BIDI-1", meter_type=MeteringPointType.BIDIRECTIONAL,
+			has_behind_meter_generation=True,
+		)
+		self.consumption_mp = MeteringPoint.objects.create(
+			zev=self.zev, meter_id="BMD-CONS-1", meter_type=MeteringPointType.CONSUMPTION,
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.flagged_mp, participant=self.producer, valid_from=date(2026, 1, 1),
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.consumption_mp, participant=self.consumer, valid_from=date(2026, 1, 1),
+		)
+		MeterReading.objects.create(
+			metering_point=self.flagged_mp,
+			timestamp=datetime(2026, 1, 1, 6, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("3.0000"), direction=ReadingDirection.IN,
+			resolution=ReadingResolution.FIFTEEN_MIN,
+		)
+		MeterReading.objects.create(
+			metering_point=self.consumption_mp,
+			timestamp=datetime(2026, 1, 1, 6, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("5.0000"), direction=ReadingDirection.IN,
+			resolution=ReadingResolution.FIFTEEN_MIN,
+		)
+
+	def test_owner_dashboard_marks_net_metered_participant(self):
+		auth(self.client, self.owner)
+		resp = self.client.get(
+			"/api/v1/metering/readings/dashboard-summary/",
+			{"zev_id": str(self.zev.id), "date_from": "2026-01-01", "date_to": "2026-01-01", "bucket": "day"},
+		)
+		self.assertEqual(resp.status_code, 200)
+		self.assertTrue(resp.data["zev_has_behind_meter_generation"])
+		by_id = {s["participant_id"]: s for s in resp.data["participant_stats"]}
+		self.assertTrue(by_id[str(self.producer.id)]["has_behind_meter_generation"])
+		self.assertFalse(by_id[str(self.consumer.id)]["has_behind_meter_generation"])
+
+	def test_owner_dashboard_without_flag_is_unchanged(self):
+		self.flagged_mp.has_behind_meter_generation = False
+		self.flagged_mp.save(update_fields=["has_behind_meter_generation"])
+
+		auth(self.client, self.owner)
+		resp = self.client.get(
+			"/api/v1/metering/readings/dashboard-summary/",
+			{"zev_id": str(self.zev.id), "date_from": "2026-01-01", "date_to": "2026-01-01", "bucket": "day"},
+		)
+		self.assertEqual(resp.status_code, 200)
+		self.assertFalse(resp.data["zev_has_behind_meter_generation"])
+		for stat in resp.data["participant_stats"]:
+			self.assertFalse(stat["has_behind_meter_generation"])
+		self.assertAlmostEqual(float(resp.data["zev_totals"]["consumed_kwh"]), 8.0, places=6)
+
+	def test_community_assignment_on_flagged_meter_marks_nobody(self):
+		self.flagged_mp.assignments.all().delete()
+		MeteringPointAssignment.objects.create(
+			metering_point=self.flagged_mp, participant=self.producer, valid_from=date(2026, 1, 1),
+			allocation_mode=AllocationMode.COMMUNITY,
+		)
+
+		auth(self.client, self.owner)
+		resp = self.client.get(
+			"/api/v1/metering/readings/dashboard-summary/",
+			{"zev_id": str(self.zev.id), "date_from": "2026-01-01", "date_to": "2026-01-01", "bucket": "day"},
+		)
+		self.assertEqual(resp.status_code, 200)
+		self.assertTrue(resp.data["zev_has_behind_meter_generation"])
+		for stat in resp.data["participant_stats"]:
+			self.assertFalse(stat["has_behind_meter_generation"])
+
+	def test_participant_dashboard_marks_own_net_metering(self):
+		auth(self.client, self.producer_user)
+		resp = self.client.get(
+			"/api/v1/metering/readings/dashboard-summary/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-01", "bucket": "day"},
+		)
+		self.assertEqual(resp.status_code, 200)
+		self.assertTrue(resp.data["has_behind_meter_generation"])
+		self.assertTrue(resp.data["zev_has_behind_meter_generation"])
+		by_id = {s["participant_id"]: s for s in resp.data["zev_participant_stats"]}
+		self.assertTrue(by_id[str(self.producer.id)]["has_behind_meter_generation"])
+		self.assertFalse(by_id[str(self.consumer.id)]["has_behind_meter_generation"])

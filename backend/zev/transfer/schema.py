@@ -148,6 +148,7 @@ METERING_POINT_FIELDS = (
     "meter_type",
     "is_active",
     "location_description",
+    "has_behind_meter_generation",
 )
 
 ASSIGNMENT_FIELDS = (

@@ -278,8 +278,12 @@ class AllocationQueryCountTests(_ReconciliationBase):
         )
 
     def test_annual_statement_monthly_data_query_count(self):
+        # 6 -> 7: net_metered_participant_ids (behind-the-meter generation)
+        # adds one query to check whether any of this participant's metering
+        # points are flagged; it short-circuits before any window resolution
+        # when none are (as here).
         self._call_at_most(
-            6, _compute_monthly_data, self.alice, self.zev, 2026,
+            7, _compute_monthly_data, self.alice, self.zev, 2026,
             ANNUAL_TRANSLATIONS["de"],
         )
 
@@ -288,4 +292,7 @@ class AllocationQueryCountTests(_ReconciliationBase):
         # two queries — a metering-point-to-ZEV mapping, then one
         # eligible_participant_shares fetch per distinct ZEV touched (this
         # fixture has one) — both still single fetches, not per-reading.
-        self._call_at_most(8, self._analytics)
+        # 8 -> 9: net_metered_participant_ids (behind-the-meter generation)
+        # adds one query to check for a flagged metering point; it
+        # short-circuits before any window resolution when none is flagged.
+        self._call_at_most(9, self._analytics)

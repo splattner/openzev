@@ -182,6 +182,36 @@ describe('dashboard behavior preservation', () => {
         expect(rows[1].textContent).toContain('66.7 %')
     })
 
+    it('flagged participant row shows — for the from-ZEV share and the ZEV-wide note appears', async () => {
+        mockState.role = 'zev_owner'
+        const base = managerSummary()
+        mockState.summary = {
+            ...base,
+            zev_has_behind_meter_generation: true,
+            participant_stats: base.participant_stats.map((participant) => ({
+                ...participant,
+                has_behind_meter_generation: participant.participant_id === 'p1',
+            })),
+        }
+        mockState.summaryCalls = []
+        mockState.invoiceCalls = []
+        mockState.hourlyProfile = null
+        mockState.hourlyCalls = []
+        mockState.invoices = []
+        const container = await renderDashboard()
+
+        const rows = container.querySelectorAll('.participant-table tbody tr')
+        expect(rows.length).toBe(2)
+        // Alice (p1) is flagged: her from-ZEV share is suppressed, and the badge appears.
+        expect(rows[0].textContent).toContain('—')
+        expect(rows[0].textContent).toContain('behindMeter.badge')
+        // Bob (p2) is unaffected: his real 66.7 % share still shows, no badge.
+        expect(rows[1].textContent).toContain('66.7 %')
+        expect(rows[1].textContent).not.toContain('behindMeter.badge')
+
+        expect(container.textContent).toContain('behindMeter.zevNote')
+    })
+
     it('manager row click selects the participant and loads the hourly profile', async () => {
         mockState.role = 'zev_owner'
         mockState.summaryCalls = []
