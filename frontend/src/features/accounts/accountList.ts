@@ -48,13 +48,12 @@ export function filterAccounts(accounts: AdminUser[], filters: AccountFilters): 
 
 /**
  * Accounts an admin may attach to a participant. Mirrors the server's link
- * rule: only participant or guest roles, and only while not already tied to a
- * participant (an account holds at most one participant record).
+ * rule: any non-admin account, however many participant rows or grants it
+ * already holds (#761 — one account per person).
  */
 export function linkableAccounts(accounts: AdminUser[]): AdminUser[] {
     return accounts
-        .filter((account) => account.role === 'participant' || account.role === 'guest')
-        .filter((account) => account.memberships.every((m) => m.participant === null))
+        .filter((account) => account.role !== 'admin')
         .sort((left, right) => left.username.localeCompare(right.username))
 }
 
@@ -63,9 +62,9 @@ export function canDeleteAccount(account: Pick<AdminUser, 'memberships'>): boole
     return account.memberships.length === 0
 }
 
-/** Only participant and owner accounts may be impersonated (never admins). */
-export function canImpersonateAccount(account: Pick<AdminUser, 'role'>): boolean {
-    return account.role === 'participant' || account.role === 'zev_owner'
+/** Any active non-admin account may be impersonated (#761); never an admin. */
+export function canImpersonateAccount(account: Pick<AdminUser, 'role' | 'is_active'>): boolean {
+    return account.role !== 'admin' && account.is_active
 }
 
 export function accountStats(accounts: AdminUser[]) {

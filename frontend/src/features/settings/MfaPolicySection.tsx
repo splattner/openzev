@@ -6,13 +6,11 @@ import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { useAppSettings } from '../../lib/appSettings'
 import { useToast } from '../../lib/toast'
-import type { UserRole } from '../../types/api'
-
-const ROLES: UserRole[] = ['admin', 'zev_owner', 'participant', 'guest']
 
 /**
- * Which roles must hold a second factor, and for how long they may put it
- * off. Spec 2026-09-two-factor-authentication.md §7.4.
+ * Whether every account must hold a second factor, and for how long it may be
+ * put off. One switch since #761 (roles became per ZEV). Spec
+ * 2026-09-two-factor-authentication.md §7.4.
  *
  * Disabled — with the reason stated — while the instance has no
  * `MFA_ENCRYPTION_KEYS`: a requirement the server cannot honour must not be
@@ -29,13 +27,13 @@ export function MfaPolicySection() {
     // a failed probe the API's own validation remains the backstop.
     const keyMissing = healthQuery.data ? !healthQuery.data.mfa.encryption_key_configured : false
 
-    const [roles, setRoles] = useState<UserRole[]>(settings.mfa_required_roles)
+    const [required, setRequired] = useState(settings.mfa_required)
     const [graceDays, setGraceDays] = useState(String(settings.mfa_grace_period_days))
 
     useEffect(() => {
-        setRoles(settings.mfa_required_roles)
+        setRequired(settings.mfa_required)
         setGraceDays(String(settings.mfa_grace_period_days))
-    }, [settings.mfa_required_roles, settings.mfa_grace_period_days])
+    }, [settings.mfa_required, settings.mfa_grace_period_days])
 
     const saveMutation = useMutation({
         mutationFn: updateAppSettings,
@@ -47,14 +45,10 @@ export function MfaPolicySection() {
         onError: (error) => pushToast(formatApiError(error, t('adminSystemSettings.mfaPolicy.saveFailed')), 'error'),
     })
 
-    function toggleRole(role: UserRole, checked: boolean) {
-        setRoles((previous) => (checked ? [...previous, role] : previous.filter((value) => value !== role)))
-    }
-
     function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
         saveMutation.mutate({
-            mfa_required_roles: ROLES.filter((role) => roles.includes(role)),
+            mfa_required: required,
             mfa_grace_period_days: Math.max(0, Math.floor(Number(graceDays) || 0)),
         })
     }
@@ -70,18 +64,15 @@ export function MfaPolicySection() {
 
             <form className="form-grid" onSubmit={handleSubmit}>
                 <fieldset disabled={keyMissing} style={{ border: 0, padding: 0, margin: 0 }}>
-                    <legend>{t('adminSystemSettings.mfaPolicy.rolesLabel')}</legend>
-                    {ROLES.map((role) => (
-                        <label key={role} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                            <input
-                                type="checkbox"
-                                checked={roles.includes(role)}
-                                onChange={(event) => toggleRole(role, event.target.checked)}
-                            />
-                            <span>{t(`pages.accounts.roles.${role}`)}</span>
-                        </label>
-                    ))}
-                    <p className="muted">{t('adminSystemSettings.mfaPolicy.rolesHint')}</p>
+                    <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <input
+                            type="checkbox"
+                            checked={required}
+                            onChange={(event) => setRequired(event.target.checked)}
+                        />
+                        <span>{t('adminSystemSettings.mfaPolicy.requiredLabel')}</span>
+                    </label>
+                    <p className="muted">{t('adminSystemSettings.mfaPolicy.requiredHint')}</p>
                 </fieldset>
 
                 <label>

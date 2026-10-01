@@ -145,12 +145,14 @@ A ZEV owner or admin can revoke any printed link; see
 A **Guest** is a log-in account that is not currently linked to a participant. It
 has no access to a ZEV's data until an admin links it to a participant.
 
-- **How a Guest is created:** when an admin **unlinks** an account from a
-  participant, that account's role becomes `guest`.
+- **Where Guests come from:** accounts created before unlinking stopped
+  changing roles. Unlinking an account from a participant no longer changes its
+  role; it simply has one participant record less.
 - **Re-linking:** a guest account can be linked to a participant again by an
-  admin (same as a participant account).
-- **Restrictions:** guests cannot manage communities or settings, and cannot be
-  impersonated or impersonate others.
+  admin (same as any other account).
+- **Restrictions:** guests cannot manage communities or settings and cannot
+  impersonate others. An admin can impersonate a guest, as any other account
+  that is not an admin.
 
 ## Access Control Matrix
 
@@ -186,7 +188,7 @@ each:
   page.
 - **Security** — which second factors the account has (authenticator app,
   passkey), or *No two-factor*; whether it is still within its grace period or
-  overdue, for an account the two-factor policy names (see below); and when it
+  overdue, while two-factor authentication is required (see below); and when it
   last signed in, or *Never signed in*.
 
 Use **Search**, **Platform role**, **Community** and **Two-factor** to narrow
@@ -233,16 +235,17 @@ belongs to:
 2. On the participant's card, open **More**
 3. Choose **Send onboarding link** or **Copy onboarding link** (creates the
    account and gives the participant a sign-in link), or — as an admin —
-   **Link existing** to attach a guest or participant account that is not yet
-   linked
-4. To detach an account again, choose **Unlink** (it becomes a Guest account)
+   **Link existing** to attach an existing account — any account except an
+   admin's, also one that is already a participant in another community, so a
+   person who rents in two communities keeps one login
+4. To detach an account again, choose **Unlink** (the account itself stays as it is)
 
 ### Other Account Actions
 
 Open **More** on an account row for:
 
-- **Impersonate** — view the platform as a participant or owner (never an
-  admin).
+- **Impersonate** — view the platform as that account sees it, in every
+  community it belongs to (any active account except an admin).
 - **Reset two-factor** — removes the account's passkeys, authenticator app and
   recovery codes, so someone locked out can sign in with their password again.
 - **View activity** — opens the platform audit log filtered to this account's
@@ -346,13 +349,13 @@ is unaffected unless the administrator requires the provider to assert a second 
 > instead** at that point. Keep your recovery codes somewhere safe — they are what gets you in with a
 > password if you can't use your passkey.
 
-### Requiring it for a role (administrators)
+### Requiring it for everyone (administrators)
 
-Under **Platform → System Settings → Security**, choose which roles must use
-two-factor authentication and set a grace period in days. Users of those roles see a reminder on their
+Under **Platform → System Settings → Security**, tick **Require two-factor
+authentication for every account** and set a grace period in days. Users see a reminder on their
 account page and a set-up screen they can postpone until the grace period ends. The period counts from
 the later of the account's creation and the day you last changed the policy, so switching it on never
-locks anyone out immediately. A user whose role requires it cannot remove their last factor.
+locks anyone out immediately. While it is required, nobody can remove their last factor.
 
 To see who has not enrolled yet, go to **Platform → Accounts → Users**: an account the policy names
 gets a badge in the Security column — "2FA required · due `<date>`" during the grace period, "2FA

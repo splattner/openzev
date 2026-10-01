@@ -265,8 +265,12 @@ export async function register(payload: RegisterInput): Promise<{ detail: string
   return data
 }
 
-export async function verifyEmail(token: string): Promise<void> {
-  await api.post('/auth/verify-email/', { token })
+/** Which kind of link was used: a self-registration or a ZEV-access invitation (#761). */
+export type VerificationPurpose = 'signup' | 'invitation'
+
+export async function verifyEmail(token: string): Promise<VerificationPurpose> {
+  const { data } = await api.post<{ purpose?: VerificationPurpose }>('/auth/verify-email/', { token })
+  return data.purpose ?? 'signup'
 }
 
 export async function setInitialPassword(newPassword: string): Promise<void> {

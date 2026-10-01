@@ -409,9 +409,12 @@ PR 7, where it is renamed `summary_kind` with values `"zev"` / `"participant"`.
 
 ## 7. API contracts
 
-### 7.1 Grants — `ZevAccessGrantViewSet`
+### 7.1 Grants — `zev/views_access.py`
 
-Routes (registered in `zev/urls.py` with explicit `path()`s under the ZEV):
+Three `APIView`s (`ZevAccessListView`, `ZevAccessDetailView`,
+`ZevAccessResendInvitationView`, `permission_classes = [IsAuthenticated]`),
+registered in `zev/urls.py` as `zev-access-list`, `zev-access-detail` and
+`zev-access-resend-invitation` with `<uuid:zev_id>` / `<uuid:pk>` paths:
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
@@ -419,9 +422,14 @@ Routes (registered in `zev/urls.py` with explicit `path()`s under the ZEV):
 | `/api/v1/zev/zevs/{zev_id}/access/` | POST | `can_manage(zev)`, ZEV not disabled (admin exempt) | Body `{email, role, valid_to?}`. See below. 201 with the grant |
 | `/api/v1/zev/zevs/{zev_id}/access/{id}/` | PATCH | `can_manage(zev)`, not disabled | Body `{role?, valid_to?}`. Role change per §4.2; `valid_to` sets a planned end (≥ `valid_from`). 200 |
 | `/api/v1/zev/zevs/{zev_id}/access/{id}/` | DELETE | `can_manage(zev)`, not disabled | Revoke per §4.2. 204 |
-| `/api/v1/zev/zevs/{zev_id}/access/{id}/resend-invitation/` | POST | `can_manage(zev)` | Only while the grantee's account is pending (`is_active=False` with an unconsumed `invitation` token); issues a new token and email. 202; 400 otherwise |
+| `/api/v1/zev/zevs/{zev_id}/access/{id}/resend-invitation/` | POST | `can_manage(zev)`, not disabled | Only while the grantee's account has never been activated (`is_active=False`); earlier unused invitation links stop working (marked consumed), a new token and email are issued. 202 `{"email_sent": bool}`; 400 `"This account has already accepted its invitation."` otherwise |
 
-A ZEV the caller cannot view answers 404 on every route.
+A ZEV the caller cannot view answers 404 on every route. A caller who can view
+but not manage it gets 403 on writes (`"Only a manager of this ZEV can change
+who has access."`, audited as `DENIED`); on a disabled ZEV a non-admin manager
+gets 400 (`"This ZEV is disabled. Ask an admin to re-enable it first."`).
+PATCH, DELETE and resend only find grants of that ZEV that are in effect or yet
+to start (an ended grant is history, 404).
 
 **Create.** `email` is normalised (strip, case-insensitive match on
 `User.email`):
@@ -431,9 +439,14 @@ A ZEV the caller cannot view answers 404 on every route.
 - matches another account → grant created (`valid_from = today`, `granted_by = request.user`), notification email `zev_access_granted`;
 - matches no account → invitation (§8): account created, grant created, `invitation` email.
 
+`valid_to` in the past → 400. The response is the grant plus
+`"email_sent": bool`; a failed send leaves the grant in place.
+
 **Refusals on PATCH/DELETE:** downgrading or revoking the last active manager → 400
 `{"detail": "A ZEV needs at least one manager."}` (also when a manager revokes
-themself). A planned `valid_to` on the last manager is refused the same way.
+themself). A planned `valid_to` on the last manager is refused the same way. A
+`valid_to` before the start that applies (today when the role also changes) →
+400, checked before anything is written.
 
 **Serializer `ZevAccessGrantSerializer`** — fields: `id`, `zev`, `role`,
 `valid_from`, `valid_to`, `is_active`, `granted_by` (`{id, full_name}` or null),
@@ -443,63 +456,84 @@ inactive with an unconsumed `invitation` token. Write-only on create: `email`.
 
 **Audit** (`audit.services.record_audit_event`, category `governance`,
 `target_type="zev.ZevAccessGrant"`, `zev` set): `zev_access.grant`,
-`zev_access.invite`, `zev_access.change_role`, `zev_access.set_end`,
-`zev_access.revoke`, `zev_access.resend_invitation`; refusals recorded as
-`DENIED` like other governance denials. Metadata: `user_id`, `role`, and
-`before`/`after` for changes.
+`zev_access.invite` (both `FAILED` when the email could not be sent),
+`zev_access.change` (`changes` holds `role`/`valid_to` before/after),
+`zev_access.revoke` (metadata `removed_unaccepted_account`),
+`zev_access.resend_invitation`; a non-manager's write is recorded as `DENIED`
+under the action it attempted. Metadata always carries `user_id`.
 
 ### 7.2 Participant account link / unlink (`ParticipantViewSet`)
 
 - `link-account` (admin only, unchanged): the role gate
-  (`participant`/`guest` only) and `already_linked_elsewhere` are removed.
-  Refused: target is an admin (400 `"Admin accounts cannot be linked to a participant."`),
-  participant already linked to another account (400, unchanged).
+  (`participant`/`guest` only) and `already_linked_elsewhere` are removed, so
+  one account may hold any number of participant rows. Refused: target is an
+  admin (400 `"Admin accounts cannot be linked to a participant."`). Linking a
+  row that already has an account replaces the link, as before.
 - `unlink-account` (admin only): no longer touches `User.role`. The
   "cannot unlink the owner account from the owner participant" rule stays until phase 2.
 
 ### 7.3 `zev.services`
 
-- `sync_participant_user_fields`: no longer writes `role`.
-- `ensure_participant_account`: the password carve-out ("never touch the
-  password of an owner or admin") becomes "of an admin, or an account with any
-  grant"; it no longer reads or writes `role`. Newly created participant
-  accounts get `role=user` (before PR 7: `participant`).
-- `own_participant_for_user(user, zev=None)`: with `zev`, the live participant
-  row in that ZEV; without, unchanged (first by ordering).
+- `sync_participant_user_fields`: no longer writes `role` (it still copies the
+  participant's email and names onto the account).
+- `has_its_own_login(user)`: admin, an old `zev_owner`-role account, or an
+  account that holds or has held any grant.
+- `ensure_participant_account`: never neutralises the password of an account
+  with its own login (was: owners and admins); it no longer writes `role`.
+  Newly created participant accounts keep `role=participant` until step 7.
+- `own_participant_for_user(user, zev_id=None)`: the account's first current
+  row, in `zev_id` when given.
+- `ParticipantSerializer.validate`: a non-admin may not edit a participant row
+  whose account has its own login (400 on `user`, `"This participant is linked
+  to an account with its own login; only an admin can edit it."`). Saving a row
+  copies its email onto the account, so this stops one manager from rewriting
+  another's login email (and taking the account over through a password
+  reset). It generalises the old "linked account must have participant role"
+  check.
 
 ### 7.4 Impersonation (`accounts/views_impersonation.py`)
 
 `IMPERSONATABLE_ROLES` is removed. `ImpersonateParticipantView` (name kept)
-refuses only admins and inactive accounts (400). Audit metadata records
-`is_admin=False` and the target's grant count and participant count instead of
-`role`.
+refuses only admins and inactive accounts (400 `"Admin and inactive accounts
+cannot be impersonated."`, audited `DENIED` with metadata `is_admin`,
+`is_active`). The session sees everything the account holds. The frontend's
+`canImpersonateAccount` mirrors this (`role !== 'admin' && is_active`).
 
 ### 7.5 Two-factor policy
 
 - `accounts.mfa.policy_applies(user)` → `app_settings.mfa_required`.
 - `accounts.mfa.grace_deadline(user)` → `None` unless `mfa_required`.
 - `accounts.authentication.enforce_mfa_enrolment` → returns early unless `mfa_required`.
+- `AppSettings.validate_mfa_required` replaces `validate_mfa_required_roles`
+  (refuses `True` without `MFA_ENCRYPTION_KEYS`).
 - `AppSettingsSerializer`: `mfa_required` (bool) replaces `mfa_required_roles`.
+- Migration `accounts.0020_access_grants_accounts` adds `mfa_required`,
+  `EmailVerificationToken.purpose` and `User.may_create_zev`, then
+  `carry_over`: a non-empty role list → `mfa_required=True` and
+  `mfa_policy_changed_at=now()`; every `zev_owner`-role account →
+  `may_create_zev=True`; then drops `mfa_required_roles`. Reverse
+  (`carry_back`): `mfa_required=True` → all four roles.
   `PATCH /api/v1/auth/app-settings/` with `mfa_required` is admin-only as before;
   changing it or `mfa_grace_period_days` stamps `mfa_policy_changed_at` (unchanged).
 - `AdminUserSerializer.mfa_compliance`: `null` when the policy is off.
 
 ### 7.6 Self-registration and self-setup
 
-- `register` creates the pending account with `role=user` (before PR 7:
-  `zev_owner`, so existing behaviour holds until the collapse),
+- `register` creates the pending account with `role=zev_owner` (until step 7),
   `may_create_zev=True`, and a `signup`-purpose token.
-- `ZevViewSet.self_setup`: allowed when `user.may_create_zev` and the account
-  has no active manager grant on a non-disabled ZEV (the same condition as
-  today's "you already have a ZEV" guard, which counted only active owned ZEVs).
-  403 `"This account cannot create a ZEV."` otherwise.
-- OAuth auto-provisioning (`views_oauth.py`) creates `role=user`, `may_create_zev=False`.
-- `create_zev_with_owner_setup` (admin wizard) creates the owner with `role=user`
-  (`zev_owner` before PR 7) and `may_create_zev=False`; the grant comes from §4.7.
+- `ZevViewSet.self_setup`: allowed for an admin or when `user.may_create_zev`,
+  and only while the account has no active manager grant on a non-disabled ZEV
+  (the old "you already have a ZEV" guard). 403 `"This account cannot create a
+  ZEV."` otherwise.
+- OAuth auto-provisioning and the admin wizard (`create_zev_with_owner_setup`)
+  leave `may_create_zev=False`; the wizard's owner gets its grant from §4.7.
+- Test helpers mirror the migration: `testing.helpers.make_user` and
+  `OwnerFactory` set `may_create_zev=True` for the `zev_owner` role.
 
 ### 7.7 `/api/v1/auth/me/` and the admin accounts list
 
-`_serialize_me` adds:
+`_serialize_me` adds `may_create_zev` and (built by
+`zev.access.memberships_for(user)`, two queries):
 
 ```json
 "memberships": [
@@ -519,12 +553,15 @@ their invoices); sorted by `zev_name` (case-insensitive), then `zev`. Admins get
 the entries for their own participant rows only (normally `[]`).
 `zev_name`/`zev_count` stay until PR 7, then are removed.
 
-`AdminUserSerializer.get_memberships` returns the same shape built from stored
-grants and participant rows, replacing the per-ZEV merge of `owned_zevs` and
-`participations`. `AccountMembership` in the frontend changes accordingly (§9.6).
+`AdminUserSerializer.get_memberships` returns the same shape through
+`zev.access.build_memberships`, from rows `UserListCreateView.get_queryset`
+prefetches (`zev.access.active_grants_prefetch()` into `active_zev_grants`, and
+`participations` with `zev`), so the list stays a fixed number of queries. It
+replaces the per-ZEV merge of `owned_zevs` and `participations`; the frontend
+`AccountMembership` type is replaced by `Membership`.
 
-The admin accounts list `?role=` filter accepts `admin` and `user`
-(`zev_owner`/`participant`/`guest` are rejected with 400 after PR 7).
+The admin accounts list `?role=` filter is unchanged until step 7, when it
+accepts `admin` and `user` only.
 
 ### 7.8 Reports self-service (`invoices/views_reports.py`)
 
@@ -555,34 +592,46 @@ tokens; it reads `/auth/me`.
 
 Triggered by a grant create whose email matches no account (§7.1):
 
-1. Create `User(username=<from email, unique>, email=email, role=user,
-   is_active=False, may_create_zev=False)` with `set_unusable_password()`.
+1. Create `User(username=build_unique_username(email=…), email=email,
+   role=participant (until step 7), is_active=False, may_create_zev=False)`
+   with `set_unusable_password()`.
 2. Create the grant (`granted_by = request.user`).
 3. Create `EmailVerificationToken(user, purpose="invitation", token=token_urlsafe(48))`.
-4. Send email template `zev_access_invitation` (new `EMAIL_TEMPLATE_DEFAULTS`
-   key, overridable like the others, in `de`/`fr`/`it`/`en`, language from the
-   ZEV's `invoice_language`). Context: `zev_name`, `role_display`,
-   `inviter_name`, `accept_url = {FRONTEND_URL}/verify-email?token=…`,
-   `expires_days = 7`.
+4. Send the `zev_access_invitation` email (`zev.views_access.send_invitation`).
 
 Accepting reuses `POST /api/v1/auth/verify-email/` (activates the account,
 mints a session, MFA rules unchanged). Its response gains
-`"purpose": "signup" | "invitation"`. The frontend `VerifyEmailPage` then asks
-for a password (step `set-password`, existing) and, for `invitation`, skips the
-`create-zev` step and lands on `/`.
+`"purpose": "signup" | "invitation"` (also in the MFA-challenge response). The
+frontend `verifyEmail()` returns it, and `VerifyEmailPage` asks for a password
+(step `set-password`, existing) and, for `invitation`, skips the `create-zev`
+step and lands on `/`.
 
 An expired invitation leaves an inactive account holding a grant; it grants
 nothing (inactive accounts cannot authenticate). `resend-invitation` issues a
 fresh token. Revoking the grant of a never-activated invited account also
-deletes the account when it has no other grant and no participant link.
+deletes the account when it has no other current grant and no participant row.
 
-Granting to an existing account sends `zev_access_granted` (same languages):
-`zev_name`, `role_display`, `inviter_name`, `login_url`.
+Granting to an existing account sends the `zev_access_granted` email
+(`send_granted_notice`).
 
-Both are sent synchronously the same way `register` sends
-`email_verification` today (subject/body from `EMAIL_TEMPLATE_DEFAULTS`,
-overridden by an `EmailTemplate` row with the same `template_key`); a send failure leaves the grant in place, returns 201
-with `"email_sent": false`, and is audited as `FAILED` on
+**Templates.** Two new `EmailTemplate` keys, `zev_access_invitation` and
+`zev_access_granted`, follow the magic-link contract: shipped defaults per
+language in `invoices.models.ZEV_ACCESS_INVITATION_EMAIL_DEFAULTS_BY_LANGUAGE`
+and `ZEV_ACCESS_GRANTED_EMAIL_DEFAULTS_BY_LANGUAGE` (`en`/`de`/`fr`/`it`; the
+English ones are the `EMAIL_TEMPLATE_DEFAULTS` entries), sent in the ZEV's
+`invoice_language`; an operator's saved template for the key replaces them for
+every language; a saved template with an unusable placeholder falls back to the
+shipped default. Context (`invoices.email_context.build_zev_access_email_context`):
+`zev_name`, `role_name` (from `ZEV_ACCESS_ROLE_NAMES_BY_LANGUAGE`, e.g.
+"Verwaltung" / "Einsicht (nur lesen)"), `inviter_name` (`granted_by`'s full
+name or email), `link_url` (invitation: `{FRONTEND_URL}/verify-email?token=…`;
+notice: `{FRONTEND_URL}/login`) and, for the invitation only, `valid_days` (7).
+Both keys have field catalogues (`invoices/field_catalog_data.py`) and sample
+contexts (`invoices/field_catalog.py EMAIL_SAMPLE_CONTEXTS`), and appear as two
+more tabs on the admin email-templates page.
+
+Both are sent synchronously; a send failure leaves the grant in place, returns
+201 with `"email_sent": false`, and is audited as `FAILED` on
 `zev_access.invite`/`zev_access.grant`.
 
 ## 9. Frontend
@@ -717,16 +766,26 @@ Tab `access` on `/zev-settings/:tab`. Query
 - On mutation success: invalidate `queryKeys.zev.access(zevId)` and, when the
   change affects the current user, `queryKeys.auth.me()`.
 
-`features/accounts/AccountMemberships.tsx` / `AdminAccountsPage.tsx`: render
-`Membership[]` (relation badge + participant rows); the role filter becomes
-admin / non-admin.
+Shipped in PR 5, because the API shapes they read changed there:
 
-`features/settings/MfaPolicySection.tsx`: one switch "Require two-factor
-authentication for every account" plus the grace period.
-
-`ParticipantsPage` link dialog: candidate accounts are all non-admin accounts.
-
-`VerifyEmailPage`: §8.
+- `features/accounts/AccountMemberships.tsx`: renders `Membership[]`, one chip
+  per community labelled `pages.accounts.membership.{manager,viewer,participant,former}`
+  (grant first; otherwise participant while a row is current, else former);
+  clicking opens the Participants page focused on the current (or first)
+  participant row. The admin list's role filter becomes admin / non-admin in
+  step 7.
+- `features/settings/MfaPolicySection.tsx`: one checkbox
+  (`adminSystemSettings.mfaPolicy.requiredLabel`, hint `requiredHint`) plus the
+  grace period; it sends `mfa_required`.
+- `features/accounts/accountList.ts`: `linkableAccounts` = every non-admin
+  account (the Participants page link dialog); `canImpersonateAccount` =
+  `role !== 'admin' && is_active`.
+- `VerifyEmailPage`: §8.
+- Admin email templates: `EMAIL_TEMPLATE_KEYS` gains `zev_access_invitation`
+  and `zev_access_granted`, labelled `admin.emailTemplates.zevAccessInvitationEmail`
+  / `zevAccessGrantedEmail` (hub: `pages.adminTemplates.items.*`), with the
+  "sent in each ZEV's invoice language" note; field labels
+  `admin.emailTemplates.fields.{roleName,invitationLinkUrl,validDays,loginUrl}`.
 
 ### 9.7 API client (`frontend/src/lib/api/zev.ts`)
 
@@ -767,7 +826,7 @@ Each PR is green on its own; numbering follows the implementation plan.
 | 2 | Regression suite pinning today's behaviour (`zev/test_access_regression.py`), tests only |
 | 3 | `ZevAccessGrant`, migration, `zev/access.py`, owner invariant, backups registry/restore — no behaviour change |
 | 4 | Scoping/permissions/hand checks on grants; viewer; union; former participants; dashboard/reports `zev_id`; remove `is_zev_owner` |
-| 5 | Grant API, invitations, link/unlink, impersonation, MFA switch, self-setup gate, `/auth/me` memberships |
+| 5 | Grant API, invitations, link/unlink, impersonation, MFA switch, self-setup gate, `/auth/me` memberships — plus the frontend consumers of the changed shapes: `Membership` type and account chips, link/impersonation rules in `accountList.ts`, the single 2FA switch, `VerifyEmailPage` invitation path, the two new email-template tabs |
 | 6 | Frontend (§9) |
 | 7 | Collapse `User.role` to `admin`/`user`; remove `zev_name`/`zev_count`, `ManagedZevProvider` alias, `summary.role`; test-suite role churn; `seed_demo` personas |
 
@@ -905,17 +964,56 @@ manage its ZEV); `exports/tests.py` "lost ownership" changes `owner` through
 (`invoices/test_dynamic_tariff_pricing.py`, `tariffs/test_dynamic_source_link_api.py`)
 backdate the owner grant before patching "today" into the past.
 
-### Backend — PR 5
+### Backend — PR 5 (shipped)
 
-`zev/test_access_api.py` — **`ZevAccessGrantApiTests`** (list/create/patch/delete,
-permissions per relation, last-manager refusals, admin email refused, duplicate
-refused, disabled ZEV refused, audit events), **`ZevAccessInvitationTests`**
-(account created inactive, token purpose and 7-day lifetime, verify returns
-`purpose`, resend, revoke deletes never-activated account, email failure →
-`email_sent: false`). `zev/tests.py` — link/unlink without role gate, admin
-refused. `accounts/test_impersonation.py` — any non-admin. `accounts/test_mfa.py` —
-`mfa_required` switch, migration mapping and grace restart.
-`accounts/tests.py` — `/auth/me` memberships, self-setup gate.
+`zev/test_access_api.py` (25 tests):
+
+**`ZevAccessGrantApiTests`** (12): managers, viewers and admins list the
+grants, a stranger gets 404; ended grants only with `include_ended`; a manager
+gives an existing account access (case-insensitive email, notice in the ZEV's
+language, audited); the grantee sees the ZEV at once; viewers get 403 (audited
+`DENIED`) and strangers 404 on create; refusals (an admin, an account that
+already has access, a past end date, an unknown role); a disabled ZEV refuses
+changes except by an admin; a role change keeps the history (two rows); the
+last manager cannot be downgraded, given an end date or revoked; with a second
+manager the first may leave; revoking a viewer ends its access; a planned end
+date keeps access until then.
+
+**`ZevAccessInvitationTests`** (8): an unknown email gets an inactive account
+without password or `may_create_zev`, a grant and an `invitation` token, and
+the email carries the link and the 7 days; accepting signs in, reports
+`purpose: "invitation"` and reaches the ZEV (a signup token still reports
+`"signup"`); the link is valid at 6 days and not at 8; resending replaces the
+link and is refused once the account is active; revoking an unaccepted
+invitation removes the account, an accepted one keeps it; a failed send keeps
+the grant, answers `email_sent: false` and is audited `FAILED`; a custom
+template is used and a broken one falls back to the default.
+
+**`AccountsAroundGrantsTests`** (5): `/auth/me` lists every ZEV the account
+relates to with access and participant rows, plus `may_create_zev`; self-setup
+needs `may_create_zev`; self-registration sets it; a grant holder's password
+survives `ensure_participant_account`; a manager cannot edit a participant row
+of an account with its own login (its email stays).
+
+`accounts/test_access_migration.py` — **`AccessGrantsAccountsMigrationTests`**
+(3, `TransactionTestCase`): a role list turns the switch on and restarts the
+grace period; an empty list leaves it off; existing owner accounts keep
+`may_create_zev`.
+
+Existing tests changed with the behaviour: the 2FA tests
+(`accounts/test_mfa_enforcement.py`, `test_passkeys.py`,
+`test_admin_users_list.py`) set `mfa_required`, and per-role cases became
+"covers every account" / "off blocks nobody"; `zev/tests.py` (an account may
+hold several participant rows, admins cannot be linked, unlink leaves the role,
+onboarding leaves roles alone); `accounts/test_impersonation.py` (any active
+non-admin; admins and inactive accounts refused); `accounts/test_api_keys.py`
+(`/auth/me` costs two more queries); `invoices/test_field_catalog.py` covers
+the new keys; `zev/test_access_regression.py` `test_impersonation` (a guest is
+now 200, commented as intended).
+
+Frontend in PR 5 (the parts the changed API shapes require):
+`tests/account-list.test.ts` (new `Membership` shape, link and impersonation
+rules) and `tests/templates-hub.test.ts` (9 template tabs).
 
 ### Frontend (PR 6)
 

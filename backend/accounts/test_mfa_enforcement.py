@@ -34,9 +34,9 @@ def _unsafe_write(client):
     return client.post(API_KEYS, {"name": "probe"}, format="json")
 
 
-def _set_policy(*, roles, grace_days=1, changed_days_ago=None):
+def _set_policy(*, required=True, grace_days=1, changed_days_ago=None):
     AppSettings.load()  # the row must exist before .update() can touch it
-    AppSettings.objects.update(mfa_required_roles=roles, mfa_grace_period_days=grace_days)
+    AppSettings.objects.update(mfa_required=required, mfa_grace_period_days=grace_days)
     if changed_days_ago is not None:
         AppSettings.objects.update(mfa_policy_changed_at=timezone.now() - timedelta(days=changed_days_ago))
 
@@ -55,7 +55,7 @@ class MfaEnrolmentEnforcementTests(TestCase):
 
     def test_a_write_is_refused_once_overdue_with_no_factor(self):
         user = _overdue_user("mee_overdue")
-        _set_policy(roles=["participant"], grace_days=1, changed_days_ago=30)
+        _set_policy(required=True, grace_days=1, changed_days_ago=30)
         client = APIClient()
         auth(client, user)
 
@@ -69,7 +69,7 @@ class MfaEnrolmentEnforcementTests(TestCase):
 
     def test_reads_are_never_blocked(self):
         user = _overdue_user("mee_read")
-        _set_policy(roles=["participant"], grace_days=1, changed_days_ago=30)
+        _set_policy(required=True, grace_days=1, changed_days_ago=30)
         client = APIClient()
         auth(client, user)
 
@@ -77,7 +77,7 @@ class MfaEnrolmentEnforcementTests(TestCase):
 
     def test_within_the_grace_period_writes_still_work(self):
         user = make_user("mee_grace", UserRole.PARTICIPANT)  # joined "now"
-        _set_policy(roles=["participant"], grace_days=30)
+        _set_policy(required=True, grace_days=30)
         client = APIClient()
         auth(client, user)
 
@@ -87,7 +87,7 @@ class MfaEnrolmentEnforcementTests(TestCase):
         from .models import TotpDevice
 
         user = _overdue_user("mee_enrolled")
-        _set_policy(roles=["participant"], grace_days=1, changed_days_ago=30)
+        _set_policy(required=True, grace_days=1, changed_days_ago=30)
         device = TotpDevice(user=user, confirmed_at=timezone.now())
         with self.settings(MFA_ENCRYPTION_KEYS=[TOTP_KEY]):
             device.set_secret("JBSWY3DPEHPK3PXP")
@@ -98,9 +98,19 @@ class MfaEnrolmentEnforcementTests(TestCase):
         response = _unsafe_write(client)
         self.assertEqual(response.status_code, 201, response.content)
 
-    def test_a_role_the_policy_does_not_name_is_never_blocked(self):
+    def test_the_requirement_covers_every_account(self):
+        # One switch for every account since #761: there is no role the policy
+        # leaves out any more.
         user = _overdue_user("mee_other_role", UserRole.ZEV_OWNER)
-        _set_policy(roles=["participant"], grace_days=1, changed_days_ago=30)
+        _set_policy(required=True, grace_days=1, changed_days_ago=30)
+        client = APIClient()
+        auth(client, user)
+
+        self.assertEqual(_unsafe_write(client).status_code, 403)
+
+    def test_switching_the_requirement_off_blocks_nobody(self):
+        user = _overdue_user("mee_switched_off")
+        _set_policy(required=False, grace_days=1, changed_days_ago=30)
         client = APIClient()
         auth(client, user)
 
@@ -120,7 +130,7 @@ class ExemptSelfServiceRoutesTests(TestCase):
 
     def setUp(self):
         self.user = _overdue_user("mee_exempt")
-        _set_policy(roles=["participant"], grace_days=1, changed_days_ago=30)
+        _set_policy(required=True, grace_days=1, changed_days_ago=30)
         self.client = APIClient()
         auth(self.client, self.user)
 
@@ -156,9 +166,9 @@ class ExemptSelfServiceRoutesTests(TestCase):
 
     def test_editing_the_policy_itself_is_blocked(self):
         # No escaping the block by turning the policy off.
-        response = self.client.patch("/api/v1/auth/app-settings/", {"mfa_required_roles": []}, format="json")
+        response = self.client.patch("/api/v1/auth/app-settings/", {"mfa_required": False}, format="json")
         self.assertEqual(response.status_code, 403)
-        self.assertEqual(AppSettings.load().mfa_required_roles, ["participant"])
+        self.assertIs(AppSettings.load().mfa_required, True)
 
 
 class AdminActionsOnOthersAreBlockedTests(TestCase):
@@ -167,7 +177,7 @@ class AdminActionsOnOthersAreBlockedTests(TestCase):
 
     def setUp(self):
         self.admin = _overdue_user("mee_admin", UserRole.ADMIN)
-        _set_policy(roles=["admin"], grace_days=1, changed_days_ago=30)
+        _set_policy(required=True, grace_days=1, changed_days_ago=30)
         self.client = APIClient()
         auth(self.client, self.admin)
         self.other = make_user("mee_other", UserRole.PARTICIPANT)
@@ -202,7 +212,7 @@ class ImpersonationIsExemptTests(TestCase):
     def test_an_active_impersonation_session_is_not_gated_by_the_targets_compliance(self):
         admin = make_user("mee_imp_admin", UserRole.ADMIN)
         target = _overdue_user("mee_imp_target", UserRole.PARTICIPANT)
-        _set_policy(roles=["participant"], grace_days=1, changed_days_ago=30)
+        _set_policy(required=True, grace_days=1, changed_days_ago=30)
 
         admin_client = APIClient()
         auth(admin_client, admin)
@@ -220,7 +230,7 @@ class ImpersonationIsExemptTests(TestCase):
 class ApiKeysAreExemptTests(TestCase):
     def test_an_overdue_accounts_api_key_keeps_working(self):
         user = _overdue_user("mee_key_user", UserRole.ZEV_OWNER)
-        _set_policy(roles=["zev_owner"], grace_days=1, changed_days_ago=30)
+        _set_policy(required=True, grace_days=1, changed_days_ago=30)
         _, plaintext = create_api_key(user)
 
         client = APIClient()
@@ -237,7 +247,7 @@ class CookieAndRefreshPathTests(TestCase):
 
     def setUp(self):
         self.user = _overdue_user("mee_cookie")
-        _set_policy(roles=["participant"], grace_days=1, changed_days_ago=30)
+        _set_policy(required=True, grace_days=1, changed_days_ago=30)
 
     def test_a_write_via_the_cookie_is_refused_too(self):
         tokens = make_jwt_for_user(self.user)

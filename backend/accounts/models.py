@@ -40,6 +40,10 @@ class User(AbstractUser):
         default=UserRole.PARTICIPANT,
     )
     must_change_password = models.BooleanField(default=False)
+    # May set up a ZEV of its own through self-setup (#761). Set by
+    # self-registration; not a role — what the account may do in a ZEV comes
+    # from its grants (zev.access).
+    may_create_zev = models.BooleanField(default=False)
     # The community opened by default for this user. Owners and admins who
     # manage several communities can switch between them; this records the one
     # to land on, so the default does not depend on the order the list happens
@@ -126,13 +130,26 @@ class ApiKey(models.Model):
 
 
 class EmailVerificationToken(models.Model):
-    """One-time email verification token for self-registered accounts."""
+    """One-time email link that activates an account and signs it in.
+
+    ``signup``: a self-registered owner confirming their address (24 hours).
+    ``invitation``: someone given access to a ZEV before they had an account
+    (#761); it lives longer because nobody is waiting for it.
+    """
+
+    class Purpose(models.TextChoices):
+        SIGNUP = "signup", "Signup"
+        INVITATION = "invitation", "Invitation"
+
+    LIFETIMES = {Purpose.SIGNUP: timedelta(hours=24), Purpose.INVITATION: timedelta(days=7)}
+
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name='email_verification_tokens',
     )
     token = models.CharField(max_length=64, unique=True, db_index=True)
+    purpose = models.CharField(max_length=20, choices=Purpose.choices, default=Purpose.SIGNUP)
     created_at = models.DateTimeField(auto_now_add=True)
     consumed_at = models.DateTimeField(null=True, blank=True)
 
@@ -142,7 +159,7 @@ class EmailVerificationToken(models.Model):
     def is_valid(self) -> bool:
         if self.consumed_at:
             return False
-        return timezone.now() < self.created_at + timedelta(hours=24)
+        return timezone.now() < self.created_at + self.LIFETIMES[self.purpose]
 
 
 MAGIC_LINK_LIFETIME = timedelta(minutes=15)
@@ -385,43 +402,39 @@ class AppSettings(models.Model):
         choices=DATETIME_FORMAT_CHOICES,
         default=DATETIME_DD_MM_YYYY_HH_MM,
     )
-    # Roles that must hold a second factor (spec 2026-09-two-factor-authentication
-    # §4.4). A passkey or TOTP satisfies it. Enforcement is by the frontend's
-    # enrolment gate after ``mfa_grace_period_days``, not by the API.
-    mfa_required_roles = models.JSONField(default=list, blank=True)
+    # Whether every account must hold a second factor (spec
+    # 2026-09-two-factor-authentication §4.4; one switch since #761, when roles
+    # became per ZEV and a per-role policy had nothing left to key on). A
+    # passkey or TOTP satisfies it. Enforced after ``mfa_grace_period_days`` by
+    # the frontend's enrolment gate and ``authentication.enforce_mfa_enrolment``.
+    mfa_required = models.BooleanField(default=False)
     mfa_grace_period_days = models.PositiveIntegerField(default=14)
     # When the policy last changed. The grace period runs from the later of
     # this and the account's creation, so an admin switching the requirement
-    # on gives every existing account of that role a full grace period
+    # on gives every existing account a full grace period
     # instead of locking out anyone whose account is older than the policy.
     mfa_policy_changed_at = models.DateTimeField(null=True, blank=True, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
 
-    MFA_POLICY_FIELDS = ("mfa_required_roles", "mfa_grace_period_days")
+    MFA_POLICY_FIELDS = ("mfa_required", "mfa_grace_period_days")
 
     @staticmethod
-    def validate_mfa_required_roles(roles):
-        """Return ``roles`` de-duplicated, or raise ``ValidationError``.
+    def validate_mfa_required(required):
+        """Return ``required``, or raise ``ValidationError``.
 
-        A policy that cannot be honoured must not be saveable: unknown roles
-        are typos, and a requirement with no ``MFA_ENCRYPTION_KEYS`` would
-        demand a TOTP fallback the instance cannot provide (ADR 0021).
+        A policy that cannot be honoured must not be saveable: a requirement
+        with no ``MFA_ENCRYPTION_KEYS`` would demand a TOTP fallback the
+        instance cannot provide (ADR 0021).
         """
-        if not isinstance(roles, list):
-            raise ValidationError("mfa_required_roles must be a list of role names.")
-        valid = set(UserRole.values)
-        unknown = [role for role in roles if role not in valid]
-        if unknown:
-            raise ValidationError(f"Unknown role(s): {', '.join(str(r) for r in unknown)}.")
-        if roles and not settings.MFA_ENCRYPTION_KEYS:
+        if required and not settings.MFA_ENCRYPTION_KEYS:
             raise ValidationError(
                 "Two-factor authentication cannot be required: MFA_ENCRYPTION_KEYS is not configured."
             )
-        return list(dict.fromkeys(roles))
+        return bool(required)
 
     def clean(self):
         super().clean()
-        self.mfa_required_roles = self.validate_mfa_required_roles(self.mfa_required_roles)
+        self.mfa_required = self.validate_mfa_required(self.mfa_required)
 
     def save(self, *args, **kwargs):
         self.pk = 1

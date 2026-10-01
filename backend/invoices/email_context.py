@@ -62,3 +62,25 @@ def build_magic_link_email_context(
         "link_url": link_url,
         "valid_minutes": valid_minutes,
     }
+
+
+def build_zev_access_email_context(
+    *,
+    zev_name: object,
+    role_name: object,
+    inviter_name: object,
+    link_url: object,
+    valid_days: object = None,
+) -> dict[str, object]:
+    """Return the variables available to the ZEV-access invitation and notice
+    emails (#761). Only the invitation has a link that expires, so only it
+    carries ``valid_days``."""
+    context = {
+        "zev_name": zev_name,
+        "role_name": role_name,
+        "inviter_name": inviter_name,
+        "link_url": link_url,
+    }
+    if valid_days is not None:
+        context["valid_days"] = valid_days
+    return context

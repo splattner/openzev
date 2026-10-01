@@ -4,7 +4,7 @@ from .geocoding import get_cached_building_footprint
 from .grid_operators import grid_operator_ids
 from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode
 from accounts.models import UserRole
-from .services import create_zev_with_owner_setup, ensure_participant_account
+from .services import create_zev_with_owner_setup, ensure_participant_account, has_its_own_login
 from .tasks import trigger_geocode_if_address_present
 from .iban import (
     IBAN_ADDRESS_REQUIRED_MESSAGE,
@@ -203,12 +203,19 @@ class ParticipantSerializer(serializers.ModelSerializer):
         if not email:
             raise serializers.ValidationError({"email": "Participant email is required."})
 
+        # Saving a participant copies its email and name onto the linked
+        # account (ensure_participant_account). For an account with its own
+        # login — an owner, or anyone holding a manager or viewer grant — that
+        # would let a non-admin rewrite someone else's login email and take the
+        # account over through a password reset, so only an admin may edit such
+        # a row (#761; before grants this was the "participant role" check).
         request = self.context.get("request")
         is_admin = bool(request and request.user.is_admin)
         user = getattr(self.instance, "user", None)
-        if user is not None and user.role != UserRole.PARTICIPANT and not is_admin:
-            raise serializers.ValidationError({"user": "Linked account must have participant role."})
-
+        if user is not None and not is_admin and has_its_own_login(user):
+            raise serializers.ValidationError(
+                {"user": "This participant is linked to an account with its own login; only an admin can edit it."}
+            )
         return attrs
 
     def create(self, validated_data):

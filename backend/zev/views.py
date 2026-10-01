@@ -12,9 +12,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
-from accounts.permissions import IsAdmin, may_hold_management_access
+from accounts.permissions import IsAdmin
 from accounts.throttling import ApiKeyRateThrottle, TransferArchiveThrottle
-from accounts.models import FeatureFlag, User, UserRole
+from accounts.models import FeatureFlag, User
 from allocation.validity import period_window
 from metering.models import MeterReading
 from . import access, onboarding
@@ -139,10 +139,9 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     def self_setup(self, request):
         """Create a ZEV for the authenticated self-registered zev_owner."""
         user = request.user
-        # Transitional (#761): the old owner role still marks an account that
-        # may set up its own ZEV, until User.may_create_zev replaces it.
-        if not (user.is_admin or may_hold_management_access(user)):
-            return Response({"detail": "Only ZEV owners can use this endpoint."}, status=status.HTTP_403_FORBIDDEN)
+        # Self-registration grants this; it is not a role (#761).
+        if not (user.is_admin or user.may_create_zev):
+            return Response({"detail": "This account cannot create a ZEV."}, status=status.HTTP_403_FORBIDDEN)
         # Excludes disabled ZEVs: without this, an owner who disables their
         # only community would be permanently locked out of ever creating a
         # replacement through this endpoint — the guard exists to stop a
@@ -662,12 +661,12 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         except User.DoesNotExist:
             return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if account.role not in (UserRole.PARTICIPANT, UserRole.GUEST):
-            return Response({"detail": "Only participant or guest accounts can be linked."}, status=status.HTTP_400_BAD_REQUEST)
-
-        already_linked_elsewhere = Participant.objects.filter(user=account).exclude(pk=participant.pk).exists()
-        if already_linked_elsewhere:
-            return Response({"detail": "This account is already linked to another participant."}, status=status.HTTP_400_BAD_REQUEST)
+        # One account may hold any number of participant rows, in this ZEV or
+        # others, whatever else it does (#761). Only admins are kept apart: they
+        # need no relationship to any ZEV, and a participant row would make one
+        # appear in a community it does not belong to.
+        if account.is_admin:
+            return Response({"detail": "Admin accounts cannot be linked to a participant."}, status=status.HTTP_400_BAD_REQUEST)
 
         participant.user = account
         participant.save(update_fields=["user", "updated_at"])
@@ -702,10 +701,9 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         if participant.zev.owner_id == participant.user_id:
             return Response({"detail": "Cannot unlink the owner account from the owner participant."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # The account itself is left as it is: what it may do elsewhere comes
+        # from its other rows and grants, not from a role (#761).
         unlinked_account = participant.user
-        unlinked_account.role = UserRole.GUEST
-        unlinked_account.save(update_fields=["role"])
-
         participant.user = None
         participant.save(update_fields=["user", "updated_at"])
         # Detaching the account must also kill any outstanding onboarding

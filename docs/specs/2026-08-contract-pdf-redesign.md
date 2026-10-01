@@ -277,7 +277,8 @@ The reference is now catalog-driven and shared across all template surfaces:
 - **Backend source of truth.** `invoices/field_catalog_data.py` holds the
   curated static catalog definitions per PDF type (`invoice`, `contract`,
   `annual_statement`) and per email key (`invoice_email`,
-  `participant_onboarding`, `email_verification`, `participant_magic_link`).
+  `participant_onboarding`, `email_verification`, `participant_magic_link`,
+  `zev_access_invitation`, `zev_access_granted`).
   `invoices/field_catalog.py` resolves those definitions into API payloads.
   Each entry carries the token to paste (`variable`), a React i18n key
   (`description_key`) and an internal `sample_path` into the matching sample

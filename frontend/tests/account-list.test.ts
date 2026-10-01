@@ -9,13 +9,15 @@ import {
     linkableAccounts,
     needsTwoFactor,
 } from '../src/features/accounts/accountList'
-import type { AccountMembership, AdminUser, MfaCompliance } from '../src/types/api'
+import type { AdminUser, Membership, MfaCompliance } from '../src/types/api'
 
-const member = (zev: string, over: Partial<AccountMembership> = {}): AccountMembership => ({
+const row = (zev: string) => ({ id: `p-${zev}`, valid_from: '2026-01-01', valid_to: null, live: true })
+const member = (zev: string, over: Partial<Membership> = {}): Membership => ({
     zev,
     zev_name: zev.toUpperCase(),
-    is_owner: false,
-    participant: `p-${zev}`,
+    zev_disabled: false,
+    access: null,
+    participants: [row(zev)],
     ...over,
 })
 
@@ -41,11 +43,11 @@ describe('filterAccounts', () => {
     const tenantInA = account({ username: 'tina', first_name: 'Tina', last_name: 'Tenant', memberships: [member('a')] })
     const ownerOfB = account({
         username: 'olga', first_name: 'Olga', last_name: 'Owner', role: 'zev_owner',
-        memberships: [member('b', { is_owner: true })],
+        memberships: [member('b', { access: 'manager' })],
     })
     const both = account({
         username: 'ben', first_name: 'Ben', last_name: 'Both', role: 'zev_owner',
-        memberships: [member('a', { is_owner: true }), member('b', { participant: null, is_owner: true })],
+        memberships: [member('a', { access: 'manager' }), member('b', { participants: [], access: 'manager' })],
     })
     const all = [tenantInA, ownerOfB, both]
 
@@ -94,21 +96,16 @@ describe('hasActiveFilters', () => {
 })
 
 describe('linkableAccounts', () => {
-    it('offers participant and guest accounts that hold no participant record', () => {
+    it('offers every non-admin account, also one that already holds participant rows (#761)', () => {
         const free = account({ username: 'free' })
         const guest = account({ username: 'guest', role: 'guest' })
         const taken = account({ username: 'taken', memberships: [member('a')] })
         const owner = account({ username: 'owner', role: 'zev_owner' })
         const admin = account({ username: 'admin', role: 'admin' })
 
-        expect(linkableAccounts([taken, owner, admin, guest, free]).map((a) => a.username)).toEqual(['free', 'guest'])
-    })
-
-    it('does not treat an owner-only membership as a participant link', () => {
-        // Cannot occur for participant/guest roles today, but the rule is
-        // "holds a participant record", not "has any membership".
-        const odd = account({ username: 'odd', role: 'guest', memberships: [member('a', { participant: null, is_owner: true })] })
-        expect(linkableAccounts([odd])).toEqual([odd])
+        expect(linkableAccounts([taken, owner, admin, guest, free]).map((a) => a.username)).toEqual(
+            ['free', 'guest', 'owner', 'taken'],
+        )
     })
 })
 
@@ -118,11 +115,12 @@ describe('account action guards', () => {
         expect(canDeleteAccount(account({ memberships: [member('a')] }))).toBe(false)
     })
 
-    it('impersonates participants and owners, never admins or guests', () => {
-        expect(canImpersonateAccount({ role: 'participant' })).toBe(true)
-        expect(canImpersonateAccount({ role: 'zev_owner' })).toBe(true)
-        expect(canImpersonateAccount({ role: 'admin' })).toBe(false)
-        expect(canImpersonateAccount({ role: 'guest' })).toBe(false)
+    it('impersonates any active non-admin account (#761), never an admin or an inactive one', () => {
+        expect(canImpersonateAccount({ role: 'participant', is_active: true })).toBe(true)
+        expect(canImpersonateAccount({ role: 'zev_owner', is_active: true })).toBe(true)
+        expect(canImpersonateAccount({ role: 'guest', is_active: true })).toBe(true)
+        expect(canImpersonateAccount({ role: 'admin', is_active: true })).toBe(false)
+        expect(canImpersonateAccount({ role: 'participant', is_active: false })).toBe(false)
     })
 })
 

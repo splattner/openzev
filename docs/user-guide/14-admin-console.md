@@ -150,9 +150,9 @@ Configure external OAuth login providers in **Platform → System Settings → O
 
 ### Security
 
-Choose which roles must use two-factor authentication, and the grace period
-they get, in **Platform → System Settings → Security**. See
-[Roles and Permissions → Requiring it for a role](11-roles-and-permissions.md#requiring-it-for-a-role-administrators).
+Choose whether every account must use two-factor authentication, and the grace
+period they get, in **Platform → System Settings → Security**. See
+[Roles and Permissions → Requiring it for everyone](11-roles-and-permissions.md#requiring-it-for-everyone-administrators).
 
 ### VAT
 
@@ -264,7 +264,7 @@ Admins manage system-wide default email templates in **Platform → Templates �
 
 ### Overview
 
-OpenZEV uses four email templates:
+OpenZEV uses six email templates:
 
 | Template | Purpose |
 | --- | --- |
@@ -272,6 +272,11 @@ OpenZEV uses four email templates:
 | **Onboarding Email** | Sent when an owner chooses **Send onboarding link** on a participant, with a reusable onboarding link |
 | **Verification Email** | Sent for email address verification |
 | **Sign-in Link Email** | Sent when a participant asks for a sign-in link from the QR code on their invoice (see [Participant Access from the Invoice](02-zev-setup.md#participant-access-from-the-invoice)) |
+| **ZEV Access Invitation Email** | Sent when someone is given access to a community (as manager or viewer) and has no account yet; its link, valid for 7 days, activates the account and asks for a password |
+| **ZEV Access Notice Email** | Sent when an existing account is given access to a community |
+
+The sign-in link and the two access emails are sent in each community's invoice
+language until you save your own text, which then replaces all four languages.
 
 The **Sign-in Link Email** is the one template whose recipient never sees a copy
 of anything else you send — it exists only to carry `{link_url}`. If your edit
@@ -283,7 +288,7 @@ Administrators can edit the default subject and body for each template. ZEV owne
 ### Accessing Email Templates
 
 1. Navigate to **Platform → Templates → Email templates**
-2. The page displays four tabs — one per template type
+2. The page displays six tabs — one per template type
 
 ![Admin Email Templates](screenshots/14b-admin-email-templates.png)
 

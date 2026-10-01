@@ -3,6 +3,7 @@
 from .email_context import (
     build_invoice_email_context,
     build_magic_link_email_context,
+    build_zev_access_email_context,
     build_onboarding_email_context,
     build_verification_email_context,
 )
@@ -66,11 +67,32 @@ def build_sample_magic_link_email_context() -> dict:
     )
 
 
+def build_sample_zev_access_invitation_email_context() -> dict:
+    return build_zev_access_email_context(
+        zev_name="Solar Community Example",
+        role_name="manager",
+        inviter_name="Anna Beispiel",
+        link_url="https://app.example.com/verify-email?token=7c1a9e4f2b6d8a3c5e0f1b2a3c4d5e6f",
+        valid_days=7,
+    )
+
+
+def build_sample_zev_access_granted_email_context() -> dict:
+    return build_zev_access_email_context(
+        zev_name="Solar Community Example",
+        role_name="viewer (read only)",
+        inviter_name="Anna Beispiel",
+        link_url="https://app.example.com/login",
+    )
+
+
 EMAIL_SAMPLE_CONTEXTS = {
     "invoice_email": build_sample_invoice_email_context,
     "participant_onboarding": build_sample_onboarding_email_context,
     "email_verification": build_sample_verification_email_context,
     "participant_magic_link": build_sample_magic_link_email_context,
+    "zev_access_invitation": build_sample_zev_access_invitation_email_context,
+    "zev_access_granted": build_sample_zev_access_granted_email_context,
 }
 
 

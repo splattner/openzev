@@ -215,3 +215,55 @@ def ensure_a_manager(zev) -> None:
     managers = ZevAccessGrant.objects.filter(zev_id=zev.pk, role=ZevAccessRole.MANAGER)
     if not active_on(managers, _today()).exists():
         sync_owner_grant(zev)
+
+
+def build_memberships(grants, participants, *, today: date | None = None) -> list[dict]:
+    """One entry per ZEV the account relates to, for ``/auth/me`` and the admin
+    accounts list (spec §7.7).
+
+    ``grants`` are the account's active grants and ``participants`` all its
+    participant rows (current and ended, so a former participant can still
+    reach its invoices), each with ``zev`` loaded — passed in rather than
+    queried so a list of accounts can build this from prefetched rows.
+    """
+    today = today or _today()
+    by_zev: dict = {}
+
+    def entry(zev):
+        return by_zev.setdefault(zev.pk, {
+            "zev": str(zev.pk),
+            "zev_name": zev.name,
+            "zev_disabled": zev.disabled_at is not None,
+            "access": None,
+            "participants": [],
+        })
+
+    for grant in grants:
+        entry(grant.zev)["access"] = grant.role
+    for participant in participants:
+        entry(participant.zev)["participants"].append({
+            "id": str(participant.pk),
+            "valid_from": participant.valid_from.isoformat(),
+            "valid_to": participant.valid_to.isoformat() if participant.valid_to else None,
+            "live": participant.valid_to is None or participant.valid_to >= today,
+        })
+    return sorted(by_zev.values(), key=lambda item: (item["zev_name"].lower(), item["zev"]))
+
+
+def memberships_for(user) -> list[dict]:
+    """``build_memberships`` for one account, with its own queries."""
+    return build_memberships(
+        active_grants(user),
+        Participant.objects.filter(user=user).select_related("zev").order_by("valid_from", "id"),
+    )
+
+
+def active_grants_prefetch():
+    """``Prefetch`` of each account's active grants into ``active_zev_grants``."""
+    from django.db.models import Prefetch
+
+    return Prefetch(
+        "zev_grants",
+        queryset=active_on(ZevAccessGrant.objects.select_related("zev"), _today()),
+        to_attr="active_zev_grants",
+    )

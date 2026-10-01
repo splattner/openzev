@@ -667,7 +667,7 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 				auth(self.client, self.owner)
 				self.assertEqual(self.client.get(f"/api/v1/zev/zevs/{self.zev.id}/").status_code, 200)
 
-	def test_onboarding_link_preserves_privileged_roles_and_promotes_guests(self):
+	def test_onboarding_link_leaves_roles_alone_and_keeps_privileged_logins(self):
 		admin = make_user("admin_invite_privileged", UserRole.ADMIN)
 		auth(self.client, admin)
 		for role in (UserRole.ZEV_OWNER, UserRole.ADMIN, UserRole.PARTICIPANT, UserRole.GUEST):
@@ -680,12 +680,13 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 				resp = self.client.post(f"/api/v1/zev/participants/{participant.id}/send-onboarding-link/")
 				self.assertEqual(resp.status_code, 200)
 				account.refresh_from_db()
-				expected_role = UserRole.PARTICIPANT if role == UserRole.GUEST else role
-				self.assertEqual(account.role, expected_role)
+				# The role is no longer rewritten (#761): what an account may
+				# do comes from its grants and participant rows.
+				self.assertEqual(account.role, role)
 				# An owner or admin's own login must survive being invited as
-				# a participant of one of their own ZEVs — only a genuine
-				# participant account is neutralized.
-				if expected_role == UserRole.PARTICIPANT:
+				# a participant of one of their own ZEVs — only an account with
+				# no login of its own is neutralized.
+				if role in (UserRole.PARTICIPANT, UserRole.GUEST):
 					self.assertFalse(account.has_usable_password())
 				else:
 					self.assertTrue(account.has_usable_password())
@@ -749,10 +750,21 @@ class ParticipantAccountLinkingTests(TestCase):
 		self.participant_no_account.refresh_from_db()
 		self.assertEqual(self.participant_no_account.user_id, self.linkable_account.id)
 
-	def test_linking_rejects_already_linked_account(self):
+	def test_an_account_may_hold_several_participant_rows(self):
+		# One account per person, however many rows it holds (#761).
 		resp = self.client.post(
 			f"/api/v1/zev/participants/{self.participant_no_account.id}/link-account/",
 			{"user_id": self.linked_account.id},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(Participant.objects.filter(user=self.linked_account).count(), 2)
+
+	def test_linking_refuses_an_admin_account(self):
+		resp = self.client.post(
+			f"/api/v1/zev/participants/{self.participant_no_account.id}/link-account/",
+			{"user_id": self.admin.id},
 			format="json",
 		)
 
@@ -768,7 +780,8 @@ class ParticipantAccountLinkingTests(TestCase):
 		self.participant_with_account.refresh_from_db()
 		self.linked_account.refresh_from_db()
 		self.assertIsNone(self.participant_with_account.user_id)
-		self.assertEqual(self.linked_account.role, UserRole.GUEST)
+		# The account is left as it is; it is no longer demoted to guest (#761).
+		self.assertEqual(self.linked_account.role, UserRole.PARTICIPANT)
 
 	def test_admin_can_create_and_link_a_passwordless_account_via_onboarding_link(self):
 		resp = self.client.post(

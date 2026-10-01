@@ -15,7 +15,7 @@ from django.test import override_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.jwt_utils import SESSION_CLAIM
-from accounts.models import User, VatRate
+from accounts.models import User, UserRole, VatRate
 from zev.models import Participant
 
 
@@ -28,8 +28,11 @@ def make_user(username: str, role: str, password: str = "pass1234") -> User:
     fuller object graph (a Zev, a Participant, ...); reach for this when a
     test genuinely only needs a user.
     """
+    # A zev_owner-role account may set up a ZEV of its own, as migration
+    # accounts.0020 grants every existing owner account (#761).
     return User.objects.create_user(
-        username=username, email=f"{username}@example.com", password=password, role=role
+        username=username, email=f"{username}@example.com", password=password, role=role,
+        may_create_zev=role == UserRole.ZEV_OWNER,
     )
 
 

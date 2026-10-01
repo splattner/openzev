@@ -579,4 +579,29 @@ _EMAIL_FIELDS = {
             ],
         },
     ],
+    "zev_access_invitation": [
+        {
+            "group_key": "zevAccessInvitation",
+            "group_title_key": None,
+            "fields": [
+                {"variable": "{zev_name}", "description_key": "admin.emailTemplates.fields.zevName", "sample_path": "zev_name"},
+                {"variable": "{role_name}", "description_key": "admin.emailTemplates.fields.roleName", "sample_path": "role_name"},
+                {"variable": "{inviter_name}", "description_key": "admin.emailTemplates.fields.inviterName", "sample_path": "inviter_name"},
+                {"variable": "{link_url}", "description_key": "admin.emailTemplates.fields.invitationLinkUrl", "sample_path": "link_url"},
+                {"variable": "{valid_days}", "description_key": "admin.emailTemplates.fields.validDays", "sample_path": "valid_days"},
+            ],
+        },
+    ],
+    "zev_access_granted": [
+        {
+            "group_key": "zevAccessGranted",
+            "group_title_key": None,
+            "fields": [
+                {"variable": "{zev_name}", "description_key": "admin.emailTemplates.fields.zevName", "sample_path": "zev_name"},
+                {"variable": "{role_name}", "description_key": "admin.emailTemplates.fields.roleName", "sample_path": "role_name"},
+                {"variable": "{inviter_name}", "description_key": "admin.emailTemplates.fields.inviterName", "sample_path": "inviter_name"},
+                {"variable": "{link_url}", "description_key": "admin.emailTemplates.fields.loginUrl", "sample_path": "link_url"},
+            ],
+        },
+    ],
 }

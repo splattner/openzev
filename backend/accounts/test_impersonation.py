@@ -51,15 +51,26 @@ class ImpersonationPermissionTests(TestCase):
 
         self.assertEqual(self.client.post(impersonate_url(owner.pk)).status_code, 200)
 
-    def test_admins_and_guests_may_not_be_impersonated(self):
-        """The role guard is what stops an admin minting a token for another
-        admin, which would transfer privilege with no record of the human."""
+    def test_admins_and_inactive_accounts_may_not_be_impersonated(self):
+        """The guard is what stops an admin minting a token for another admin,
+        which would transfer privilege with no record of the human. An inactive
+        account cannot sign in, so it cannot be stepped into either."""
         auth(self.client, self.admin)
-        for role in (UserRole.ADMIN, UserRole.GUEST):
-            with self.subTest(role=role):
-                victim = make_user(f"imp_victim_{role}", role)
+        inactive = make_user("imp_victim_inactive", UserRole.PARTICIPANT)
+        inactive.is_active = False
+        inactive.save(update_fields=["is_active"])
+        for victim in (make_user("imp_victim_admin", UserRole.ADMIN), inactive):
+            with self.subTest(victim=victim.username):
                 resp = self.client.post(impersonate_url(victim.pk))
                 self.assertEqual(resp.status_code, 400)
+
+    def test_any_active_non_admin_account_may_be_impersonated(self):
+        # Impersonation is on the account (#761), whatever relationships it has.
+        auth(self.client, self.admin)
+        for role in (UserRole.ZEV_OWNER, UserRole.PARTICIPANT, UserRole.GUEST):
+            with self.subTest(role=role):
+                victim = make_user(f"imp_any_{role}", role)
+                self.assertEqual(self.client.post(impersonate_url(victim.pk)).status_code, 200)
 
     def test_non_admins_are_refused(self):
         for role in (UserRole.ZEV_OWNER, UserRole.PARTICIPANT, UserRole.GUEST):
@@ -125,8 +136,8 @@ class ImpersonationAuditTests(TestCase):
 
         event = self._event()
         self.assertEqual(event.status, AuditEventStatus.DENIED)
-        self.assertIn("due to role guard", event.summary)
-        self.assertEqual(event.metadata_json["role"], UserRole.ADMIN)
+        self.assertIn("admin or inactive account", event.summary)
+        self.assertIs(event.metadata_json["is_admin"], True)
 
     def test_unknown_target_is_recorded_as_failed(self):
         auth(self.client, self.admin)

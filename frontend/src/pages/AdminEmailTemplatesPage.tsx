@@ -22,7 +22,12 @@ const EMAIL_TEMPLATE_LABEL_KEYS: Record<EmailTemplateKey, string> = {
     participant_onboarding: 'admin.emailTemplates.onboardingEmail',
     email_verification: 'admin.emailTemplates.verificationEmail',
     participant_magic_link: 'admin.emailTemplates.magicLinkEmail',
+    zev_access_invitation: 'admin.emailTemplates.zevAccessInvitationEmail',
+    zev_access_granted: 'admin.emailTemplates.zevAccessGrantedEmail',
 }
+
+/** Templates shipped in the ZEV's invoice language until an operator overrides them. */
+const TRANSLATED_TEMPLATE_KEYS = new Set<EmailTemplateKey>(['participant_magic_link', 'zev_access_invitation', 'zev_access_granted'])
 
 type EmailDraft = Pick<EmailTemplateResponse, 'subject' | 'body'>
 const selectEmailDraft = ({ subject, body }: EmailDraft): EmailDraft => ({ subject, body })
@@ -114,8 +119,8 @@ function EmailTemplateEditor({ templateKey }: { templateKey: EmailTemplateKey })
         <>
         <div className="content-with-aside">
             <section className="card page-stack">
-                {/* One sign-in override replaces all four translated defaults. */}
-                {templateKey === 'participant_magic_link' && (
+                {/* One override replaces all four translated defaults. */}
+                {TRANSLATED_TEMPLATE_KEYS.has(templateKey) && (
                     <p className="muted">{t('admin.emailTemplates.magicLinkLanguageNote')}</p>
                 )}
                 {query.isLoading && <PageSkeleton variant="card" />}
@@ -208,6 +213,8 @@ export function AdminEmailTemplatesPage({ embedded = false, template }: {
         { key: 'participant_onboarding', label: t(EMAIL_TEMPLATE_LABEL_KEYS.participant_onboarding) },
         { key: 'email_verification', label: t(EMAIL_TEMPLATE_LABEL_KEYS.email_verification) },
         { key: 'participant_magic_link', label: t(EMAIL_TEMPLATE_LABEL_KEYS.participant_magic_link) },
+        { key: 'zev_access_invitation', label: t(EMAIL_TEMPLATE_LABEL_KEYS.zev_access_invitation) },
+        { key: 'zev_access_granted', label: t(EMAIL_TEMPLATE_LABEL_KEYS.zev_access_granted) },
     ]
 
     return (

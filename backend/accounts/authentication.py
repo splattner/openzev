@@ -70,7 +70,7 @@ class CookieJWTAuthentication(JWTAuthentication):
 
 # ── MFA policy enforcement ────────────────────────────────────────────────────
 #
-# ``AppSettings.mfa_required_roles`` (spec 2026-09-two-factor-authentication.md
+# ``AppSettings.mfa_required`` (spec 2026-09-two-factor-authentication.md
 # §7.3) is otherwise a UI-only nag: ``MfaEnrolmentGate`` withholds the app shell
 # in the browser once an account's grace period ends, but nothing stops a
 # script from carrying on regardless, past its own grace period, forever. This
@@ -157,7 +157,7 @@ def enforce_mfa_enrolment(request, user, token) -> None:
     from .models import AppSettings
 
     app_settings = AppSettings.load()
-    if user.role not in app_settings.mfa_required_roles:
+    if not app_settings.mfa_required:
         return
 
     from . import mfa

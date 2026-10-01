@@ -74,20 +74,33 @@ def own_participant_for_user(user, zev_id=None):
 
 
 def sync_participant_user_fields(participant, user) -> None:
-    # Owners and admins can also have participant records. Updating their
-    # profile or sending an invitation must not remove management access.
-    if user.role not in (UserRole.ZEV_OWNER, UserRole.ADMIN):
-        user.role = UserRole.PARTICIPANT
+    # The role is left alone: what an account may do comes from its grants and
+    # participant rows, not from the role (#761).
     user.email = participant.email
     user.first_name = participant.first_name
     user.last_name = participant.last_name
+
+
+def has_its_own_login(user) -> bool:
+    """Whether ``user`` signs in with a password it uses for more than being a
+    participant: an admin, an old ``zev_owner``-role account, or an account
+    holding (or having held) a manager or viewer grant (#761). Such a password
+    is never neutralized because one of its participant rows was touched.
+    """
+    from .models import ZevAccessGrant
+
+    return (
+        user.is_admin
+        or user.role == UserRole.ZEV_OWNER
+        or ZevAccessGrant.objects.filter(user=user).exists()
+    )
 
 
 @transaction.atomic
 def ensure_participant_account(participant):
     """The user account linked to ``participant``, creating one if needed.
 
-    Never mints a usable password for a **participant-role** account. A
+    Never mints a usable password for a **participant-only** account. A
     freshly created account gets ``set_unusable_password()``: nothing is
     transmitted, so there is nothing to rotate, and ``must_change_password``
     would strand the participant in a form asking them to change a password
@@ -102,18 +115,18 @@ def ensure_participant_account(participant):
     participant chooses themselves through ``set_initial_password`` once they
     are in.
 
-    **Deliberately does not touch the password of an owner or admin account**
-    that also happens to be linked as a participant (``sync_participant_user_fields``
-    already carves this case out for role, for the same reason). That is their
-    real login, used for everything else they manage — nuking it because one
-    of their own participant rows was saved or invited would lock them out of
-    their own instance.
+    **Deliberately does not touch the password of an account with its own
+    login** (``has_its_own_login``: admins, owners, anyone holding a grant)
+    that also happens to be linked as a participant. That is their real login,
+    used for everything else they manage — nuking it because one of their own
+    participant rows was saved or invited would lock them out of their own
+    instance.
     """
     if participant.user_id:
         user = participant.user
         sync_participant_user_fields(participant, user)
-        update_fields = ['role', 'email', 'first_name', 'last_name']
-        if user.role == UserRole.PARTICIPANT:
+        update_fields = ['email', 'first_name', 'last_name']
+        if not has_its_own_login(user):
             if user.has_usable_password():
                 user.set_unusable_password()
                 update_fields.append('password')

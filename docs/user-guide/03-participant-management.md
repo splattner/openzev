@@ -63,8 +63,8 @@ link died without resending it. Open **More** on a card to send or copy the part
 reused within that time — copying or resending it hands out the same link,
 unless it has expired, in which case a fresh one is issued automatically. Once
 the participant sets their own password, the link is revoked. Administrators can also **Link existing** — attach
-a guest or participant account that is not yet linked to anyone — or **Unlink**
-the current one. Platform → Accounts lists every account and which communities
+any existing account other than an admin's, including one that is already a
+participant elsewhere, so one person keeps one login — or **Unlink** the current one. Platform → Accounts lists every account and which communities
 it belongs to; see [Roles and Permissions](11-roles-and-permissions.md).
 
 ### A Participant Forgot Their Password

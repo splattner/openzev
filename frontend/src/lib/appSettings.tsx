@@ -10,7 +10,7 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
     date_format_short: 'dd.MM.yyyy',
     date_format_long: 'd MMMM yyyy',
     date_time_format: 'dd.MM.yyyy HH:mm',
-    mfa_required_roles: [],
+    mfa_required: false,
     mfa_grace_period_days: 14,
     updated_at: '',
 }

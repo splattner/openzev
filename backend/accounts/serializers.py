@@ -135,23 +135,12 @@ class AdminUserSerializer(UserSerializer):
     mfa_compliance = serializers.SerializerMethodField()
 
     def get_memberships(self, user):
-        """One entry per community the account is tied to.
+        """One entry per community the account relates to — its grant there and
+        its participant rows — built from the stored relationships (#761), the
+        same shape ``/auth/me`` returns (``zev.access.build_memberships``)."""
+        from zev.access import build_memberships
 
-        ``Zev.owner`` and ``Participant.user`` are separate relations, but an
-        owner is normally also their own community's owner-participant, so the
-        two are merged per ZEV: showing "Owner · Sonnenberg" and
-        "Participant · Sonnenberg" for one person would read as two roles.
-        """
-        by_zev: dict = {}
-        for zev in user.owned_zevs.all():
-            by_zev[zev.pk] = {"zev": str(zev.pk), "zev_name": zev.name, "is_owner": True, "participant": None}
-        for participant in user.participations.all():
-            entry = by_zev.setdefault(
-                participant.zev_id,
-                {"zev": str(participant.zev_id), "zev_name": participant.zev.name, "is_owner": False, "participant": None},
-            )
-            entry["participant"] = str(participant.pk)
-        return sorted(by_zev.values(), key=lambda entry: entry["zev_name"].lower())
+        return build_memberships(user.active_zev_grants, user.participations.all())
 
     def get_mfa_methods(self, user):
         methods = []
@@ -166,8 +155,8 @@ class AdminUserSerializer(UserSerializer):
         return methods
 
     def get_mfa_compliance(self, user):
-        """Where this account stands against ``AppSettings.mfa_required_roles``,
-        or ``None`` when the policy does not name its role.
+        """Where this account stands against ``AppSettings.mfa_required``,
+        or ``None`` when the policy is off.
 
         ``AppSettings`` is loaded once per request (cached on ``self``, the one
         child serializer instance a ``many=True`` list reuses for every row —
@@ -299,17 +288,17 @@ class AppSettingsSerializer(serializers.ModelSerializer):
             "date_format_short",
             "date_format_long",
             "date_time_format",
-            "mfa_required_roles",
+            "mfa_required",
             "mfa_grace_period_days",
             "updated_at",
         ]
         read_only_fields = ["updated_at"]
 
-    def validate_mfa_required_roles(self, value):
+    def validate_mfa_required(self, value):
         # The model's clean() is not run by a DRF serializer; share its rules
         # so an API write cannot save a policy the instance cannot honour.
         try:
-            return AppSettings.validate_mfa_required_roles(value)
+            return AppSettings.validate_mfa_required(value)
         except DjangoValidationError as exc:
             raise serializers.ValidationError(exc.messages) from exc
 

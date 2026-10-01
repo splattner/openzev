@@ -352,6 +352,127 @@ MAGIC_LINK_EMAIL_DEFAULTS_BY_LANGUAGE = {
     },
 }
 
+
+# Access to a ZEV given to someone by email (#761). Two mails: an invitation
+# for an address with no account yet (the link activates the account and lets
+# the invitee set a password), and a notice for an existing account. Sent in
+# the ZEV's invoice language unless an operator saved a custom template for the
+# key, which then applies to every language (same contract as the magic link).
+ZEV_ACCESS_ROLE_NAMES_BY_LANGUAGE = {
+    "en": {"manager": "manager", "viewer": "viewer (read only)"},
+    "de": {"manager": "Verwaltung", "viewer": "Einsicht (nur lesen)"},
+    "fr": {"manager": "gestion", "viewer": "consultation (lecture seule)"},
+    "it": {"manager": "gestione", "viewer": "consultazione (sola lettura)"},
+}
+
+ZEV_ACCESS_INVITATION_EMAIL_DEFAULTS_BY_LANGUAGE = {
+    "en": {
+        "subject": "You have been given access to {zev_name} on OpenZEV",
+        "body": (
+            "Hello,\n\n"
+            "{inviter_name} has given you access to {zev_name} on OpenZEV, "
+            "as {role_name}.\n\n"
+            "Open this link to set up your account and choose a password:\n\n"
+            "{link_url}\n\n"
+            "The link is valid for {valid_days} days and can be used once.\n\n"
+            "If you were not expecting this, you can ignore this email.\n\n"
+            "Kind regards\nOpenZEV"
+        ),
+    },
+    "de": {
+        "subject": "Zugang zu {zev_name} auf OpenZEV",
+        "body": (
+            "Guten Tag\n\n"
+            "{inviter_name} hat Ihnen Zugang zu {zev_name} auf OpenZEV "
+            "gegeben, mit der Rolle {role_name}.\n\n"
+            "Öffnen Sie diesen Link, um Ihr Konto einzurichten und ein "
+            "Passwort zu wählen:\n\n"
+            "{link_url}\n\n"
+            "Der Link ist {valid_days} Tage gültig und kann einmal verwendet "
+            "werden.\n\n"
+            "Falls Sie diese E-Mail nicht erwartet haben, können Sie sie "
+            "ignorieren.\n\n"
+            "Freundliche Grüsse\nOpenZEV"
+        ),
+    },
+    "fr": {
+        "subject": "Accès à {zev_name} sur OpenZEV",
+        "body": (
+            "Bonjour,\n\n"
+            "{inviter_name} vous a donné accès à {zev_name} sur OpenZEV, "
+            "avec le rôle {role_name}.\n\n"
+            "Ouvrez ce lien pour créer votre compte et choisir un mot de "
+            "passe :\n\n"
+            "{link_url}\n\n"
+            "Le lien est valable {valid_days} jours et ne peut être utilisé "
+            "qu'une seule fois.\n\n"
+            "Si vous ne vous attendiez pas à cet e-mail, vous pouvez "
+            "l'ignorer.\n\n"
+            "Cordialement,\nOpenZEV"
+        ),
+    },
+    "it": {
+        "subject": "Accesso a {zev_name} su OpenZEV",
+        "body": (
+            "Buongiorno,\n\n"
+            "{inviter_name} le ha dato accesso a {zev_name} su OpenZEV, con "
+            "il ruolo {role_name}.\n\n"
+            "Apra questo link per creare il suo account e scegliere una "
+            "password:\n\n"
+            "{link_url}\n\n"
+            "Il link è valido {valid_days} giorni e può essere usato una sola "
+            "volta.\n\n"
+            "Se non si aspettava questa e-mail, può ignorarla.\n\n"
+            "Cordiali saluti\nOpenZEV"
+        ),
+    },
+}
+
+ZEV_ACCESS_GRANTED_EMAIL_DEFAULTS_BY_LANGUAGE = {
+    "en": {
+        "subject": "You now have access to {zev_name} on OpenZEV",
+        "body": (
+            "Hello,\n\n"
+            "{inviter_name} has given you access to {zev_name} on OpenZEV, "
+            "as {role_name}. Sign in with your existing account:\n\n"
+            "{link_url}\n\n"
+            "Kind regards\nOpenZEV"
+        ),
+    },
+    "de": {
+        "subject": "Sie haben jetzt Zugang zu {zev_name} auf OpenZEV",
+        "body": (
+            "Guten Tag\n\n"
+            "{inviter_name} hat Ihnen Zugang zu {zev_name} auf OpenZEV "
+            "gegeben, mit der Rolle {role_name}. Melden Sie sich mit Ihrem "
+            "bestehenden Konto an:\n\n"
+            "{link_url}\n\n"
+            "Freundliche Grüsse\nOpenZEV"
+        ),
+    },
+    "fr": {
+        "subject": "Vous avez désormais accès à {zev_name} sur OpenZEV",
+        "body": (
+            "Bonjour,\n\n"
+            "{inviter_name} vous a donné accès à {zev_name} sur OpenZEV, "
+            "avec le rôle {role_name}. Connectez-vous avec votre compte "
+            "existant :\n\n"
+            "{link_url}\n\n"
+            "Cordialement,\nOpenZEV"
+        ),
+    },
+    "it": {
+        "subject": "Ora ha accesso a {zev_name} su OpenZEV",
+        "body": (
+            "Buongiorno,\n\n"
+            "{inviter_name} le ha dato accesso a {zev_name} su OpenZEV, con "
+            "il ruolo {role_name}. Acceda con il suo account esistente:\n\n"
+            "{link_url}\n\n"
+            "Cordiali saluti\nOpenZEV"
+        ),
+    },
+}
+
 EMAIL_TEMPLATE_DEFAULTS = {
     "invoice_email": {
         "subject": DEFAULT_INVOICE_EMAIL_SUBJECT,
@@ -369,6 +490,8 @@ EMAIL_TEMPLATE_DEFAULTS = {
         "subject": DEFAULT_MAGIC_LINK_EMAIL_SUBJECT,
         "body": DEFAULT_MAGIC_LINK_EMAIL_BODY,
     },
+    "zev_access_invitation": ZEV_ACCESS_INVITATION_EMAIL_DEFAULTS_BY_LANGUAGE["en"],
+    "zev_access_granted": ZEV_ACCESS_GRANTED_EMAIL_DEFAULTS_BY_LANGUAGE["en"],
 }
 
 
@@ -377,7 +500,8 @@ class EmailTemplate(models.Model):
     Admin-customizable email template stored in the database.
 
     Each template_key maps to a specific email type (invoice_email,
-    participant_onboarding, email_verification, participant_magic_link).
+    participant_onboarding, email_verification, participant_magic_link,
+    zev_access_invitation, zev_access_granted).
     Hardcoded defaults
     are defined in EMAIL_TEMPLATE_DEFAULTS.  Deleting the DB row
     reverts to the hardcoded default.

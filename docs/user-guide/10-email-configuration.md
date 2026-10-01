@@ -63,10 +63,11 @@ docker compose restart backend worker
 **ZEV Owners** customize email templates in **ZEV Settings → Documents & emails**.
 
 The sections below describe the **invoice** email, which is the one ZEV owners
-customize per ZEV. Three further templates are system-wide and edited by admins
-in **Platform → Templates → Email templates**: onboarding, address verification, and
+customize per ZEV. Five further templates are system-wide and edited by admins
+in **Platform → Templates → Email templates**: onboarding, address verification,
 the **sign-in link** email sent when a participant requests
-one from the QR code on their invoice. See
+one from the QR code on their invoice, and the two **community access** emails
+(an invitation for someone without an account, a notice for an existing one). See
 [Platform Administration → Email Templates](14-admin-console.md#email-templates) for those,
 including their placeholders.
 

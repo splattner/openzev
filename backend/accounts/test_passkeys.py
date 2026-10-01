@@ -541,45 +541,45 @@ class MfaPolicyTests(TestCase):
         return self.admin_client.patch(APP_SETTINGS_URL, payload, format="json")
 
     def test_admin_can_set_the_policy_and_it_is_audited(self):
-        resp = self._set_policy(mfa_required_roles=["admin", "zev_owner"], mfa_grace_period_days=7)
+        resp = self._set_policy(mfa_required=True, mfa_grace_period_days=7)
 
         self.assertEqual(resp.status_code, 200)
         settings_row = AppSettings.load()
-        self.assertEqual(settings_row.mfa_required_roles, ["admin", "zev_owner"])
+        self.assertIs(settings_row.mfa_required, True)
         self.assertEqual(settings_row.mfa_grace_period_days, 7)
         event = AuditEvent.objects.get(action_type="app_settings.update")
-        self.assertIn("mfa_required_roles", event.changes_json)
-        self.assertEqual(event.changes_json["mfa_required_roles"]["after"], ["admin", "zev_owner"])
+        self.assertIn("mfa_required", event.changes_json)
+        self.assertIs(event.changes_json["mfa_required"]["after"], True)
 
     def test_non_admin_cannot_set_the_policy(self):
         client = APIClient()
         auth(client, make_user("policy_owner", UserRole.ZEV_OWNER))
 
-        resp = client.patch(APP_SETTINGS_URL, {"mfa_required_roles": ["admin"]}, format="json")
+        resp = client.patch(APP_SETTINGS_URL, {"mfa_required": True}, format="json")
 
         self.assertEqual(resp.status_code, 403)
-        self.assertEqual(AppSettings.load().mfa_required_roles, [])
+        self.assertIs(AppSettings.load().mfa_required, False)
 
-    def test_unknown_roles_are_rejected(self):
-        resp = self._set_policy(mfa_required_roles=["admin", "wizard"])
+    def test_a_non_boolean_is_rejected(self):
+        resp = self._set_policy(mfa_required="sometimes")
 
         self.assertEqual(resp.status_code, 400)
-        self.assertEqual(AppSettings.load().mfa_required_roles, [])
+        self.assertIs(AppSettings.load().mfa_required, False)
 
     def test_policy_cannot_be_enabled_without_an_encryption_key(self):
         with override_settings(MFA_ENCRYPTION_KEYS=[]):
-            resp = self._set_policy(mfa_required_roles=["admin"])
+            resp = self._set_policy(mfa_required=True)
             with self.assertRaises(ValidationError):
-                AppSettings(mfa_required_roles=["admin"]).clean()
+                AppSettings(mfa_required=True).clean()
 
         self.assertEqual(resp.status_code, 400)
         self.assertIn("MFA_ENCRYPTION_KEYS", json.dumps(resp.data))
 
     def test_clearing_the_policy_never_needs_a_key(self):
-        self._set_policy(mfa_required_roles=["admin"])
+        self._set_policy(mfa_required=True)
 
         with override_settings(MFA_ENCRYPTION_KEYS=[]):
-            resp = self._set_policy(mfa_required_roles=[])
+            resp = self._set_policy(mfa_required=False)
 
         self.assertEqual(resp.status_code, 200)
 
@@ -595,7 +595,7 @@ class MfaPolicyTests(TestCase):
         make_old = timezone.now() - timedelta(days=900)
         type(self.admin).objects.filter(pk=self.admin.pk).update(date_joined=make_old)
 
-        self._set_policy(mfa_required_roles=["admin"], mfa_grace_period_days=14)
+        self._set_policy(mfa_required=True, mfa_grace_period_days=14)
         data = self.admin_client.get(MFA_STATUS_URL).data
 
         self.assertTrue(data["required"])
@@ -604,7 +604,7 @@ class MfaPolicyTests(TestCase):
         self.assertLess(deadline, timezone.now() + timedelta(days=15))
 
     def test_a_newly_created_account_gets_its_own_grace_period(self):
-        self._set_policy(mfa_required_roles=["participant"], mfa_grace_period_days=10)
+        self._set_policy(mfa_required=True, mfa_grace_period_days=10)
         AppSettings.objects.update(mfa_policy_changed_at=timezone.now() - timedelta(days=400))
         newcomer = make_user("policy_newcomer", UserRole.PARTICIPANT)
         client = APIClient()
@@ -614,15 +614,16 @@ class MfaPolicyTests(TestCase):
 
         self.assertGreater(deadline, timezone.now() + timedelta(days=9))
 
-    def test_role_outside_the_policy_is_not_required(self):
-        self._set_policy(mfa_required_roles=["admin"])
+    def test_the_requirement_covers_every_account(self):
+        # One switch for every account since #761.
+        self._set_policy(mfa_required=True)
         client = APIClient()
         auth(client, make_user("policy_participant", UserRole.PARTICIPANT))
 
-        self.assertFalse(client.get(MFA_STATUS_URL).data["required"])
+        self.assertTrue(client.get(MFA_STATUS_URL).data["required"])
 
     def test_enrolled_user_has_no_grace_deadline(self):
-        self._set_policy(mfa_required_roles=["admin"])
+        self._set_policy(mfa_required=True)
         with override_settings(WEBAUTHN_RP_ID=RP_ID, WEBAUTHN_ORIGIN=ORIGIN):
             register_passkey(self.admin_client, SoftAuthenticator())
 
@@ -651,7 +652,7 @@ class MfaRemovalGuardTests(TestCase):
         self.client = APIClient()
         auth(self.client, self.user)
         AppSettings.load()
-        AppSettings.objects.update(mfa_required_roles=["zev_owner"])
+        AppSettings.objects.update(mfa_required=True)
 
     def _totp(self):
         device = TotpDevice(user=self.user, confirmed_at=timezone.now())
@@ -682,8 +683,8 @@ class MfaRemovalGuardTests(TestCase):
         self.assertEqual(resp.status_code, 409)
         self.assertEqual(WebAuthnCredential.objects.count(), 1)
 
-    def test_removal_is_free_when_the_policy_does_not_name_the_role(self):
-        AppSettings.objects.update(mfa_required_roles=["admin"])
+    def test_removal_is_free_when_the_policy_is_off(self):
+        AppSettings.objects.update(mfa_required=False)
         self._totp()
 
         resp = self.client.delete("/api/v1/auth/me/mfa/totp/")

@@ -58,8 +58,9 @@ from .throttling import AuthLoginThrottle, AuthMfaThrottle, AuthRefreshThrottle,
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.mixins import AuditedUpdateMixin
 from audit.services import build_diff, record_audit_event
+from zev import access as zev_access
 from zev import onboarding as zev_onboarding
-from zev.models import Participant, Zev
+from zev.models import Participant
 from invoices.email_context import build_verification_email_context
 
 logger = logging.getLogger(__name__)
@@ -329,8 +330,13 @@ class UserListCreateView(generics.ListCreateAPIView):
             User.objects.all()
             .select_related("totp_device")
             .prefetch_related(
-                Prefetch("owned_zevs", queryset=Zev.objects.only("id", "name", "owner_id")),
-                Prefetch("participations", queryset=Participant.objects.select_related("zev").only("id", "user_id", "zev_id", "zev__name")),
+                zev_access.active_grants_prefetch(),
+                Prefetch(
+                    "participations",
+                    queryset=Participant.objects.select_related("zev")
+                    .only("id", "user_id", "zev_id", "valid_from", "valid_to", "zev__name", "zev__disabled_at")
+                    .order_by("valid_from", "id"),
+                ),
                 "webauthn_credentials",
             )
             .order_by("username")
@@ -519,6 +525,10 @@ def _serialize_me(user):
     # Whether this account can re-authenticate with a password, which is what
     # the email-change form needs. Participants and OAuth-only accounts cannot.
     data["has_usable_password"] = user.has_usable_password()
+    # Every ZEV the account relates to, with its grant and participant rows
+    # there — what the frontend's community switcher lists (#761).
+    data["memberships"] = zev_access.memberships_for(user)
+    data["may_create_zev"] = user.may_create_zev
     if user.role == UserRole.PARTICIPANT:
         from zev.services import own_participant_for_user
 
@@ -614,7 +624,7 @@ def app_settings(request):
         "date_format_short",
         "date_format_long",
         "date_time_format",
-        "mfa_required_roles",
+        "mfa_required",
         "mfa_grace_period_days",
     ]
     before = {field: getattr(settings_instance, field) for field in settings_fields}
@@ -738,6 +748,7 @@ def register(request):
         username=username,
         email=email,
         role=UserRole.ZEV_OWNER,
+        may_create_zev=True,
         is_active=False,
         must_change_password=True,
     )
@@ -782,7 +793,12 @@ def register(request):
 @permission_classes([AllowAny])
 @throttle_classes([AuthVerifyThrottle])
 def verify_email(request):
-    """Consume a one-time verification token and return JWT tokens to auto-login the user."""
+    """Consume a one-time verification token and return JWT tokens to auto-login the user.
+
+    Serves both self-registration and ZEV-access invitations (#761); the
+    response's ``purpose`` tells the frontend which, so an invitee is not
+    walked into setting up a ZEV of their own.
+    """
     token_value = request.data.get("token", "").strip()
     if not token_value:
         return Response({"detail": "Token is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -827,10 +843,11 @@ def verify_email(request):
             "mfa_required": True,
             "mfa_token": mfa.issue_challenge(user),
             "methods": mfa.challenge_methods(user),
+            "purpose": token.purpose,
         })
 
     tokens = make_jwt_for_user(user)
-    response = Response({"detail": "Email verified."})
+    response = Response({"detail": "Email verified.", "purpose": token.purpose})
     set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
     record_login(user)
     return response

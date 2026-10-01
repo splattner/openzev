@@ -125,12 +125,12 @@ Since the redesign (see `2026-08-contract-pdf-redesign.md` §12) `PATCH` validat
 | Field | Type | Description |
 |---|---|-|
 | `id` | `BigAutoField` (PK) | Auto-generated |
-| `template_key` | `CharField(100)`, unique | Application/API key. Recognized values are `invoice_email`, `participant_onboarding`, `email_verification`, and `participant_magic_link`; the database field itself is free-form rather than a choices enum. |
+| `template_key` | `CharField(100)`, unique | Application/API key. Recognized values are `invoice_email`, `participant_onboarding`, `email_verification`, `participant_magic_link`, `zev_access_invitation`, and `zev_access_granted`; the database field itself is free-form rather than a choices enum. |
 | `subject` | `CharField(500)` | Customized subject template |
 | `body` | `TextField` | Customized body template |
 | `updated_at` | `DateTimeField` (auto) | Last modification timestamp |
 
-A row exists only when an admin has customized the template via the admin API (§7.4). `EMAIL_TEMPLATE_DEFAULTS` (`invoices/models.py`) defines the four recognized application keys. Deleting a row normally restores that key's hardcoded subject/body. `participant_magic_link` is the exception at delivery time: when no override exists, `send_magic_link_email` chooses the shipped default for the ZEV's invoice language; a saved override still replaces all four language defaults. `participant_invitation` was replaced by `participant_onboarding`, and migration `0017_drop_participant_invitation_template` deletes any legacy row.
+A row exists only when an admin has customized the template via the admin API (§7.4). `EMAIL_TEMPLATE_DEFAULTS` (`invoices/models.py`) defines the six recognized application keys. Deleting a row normally restores that key's hardcoded subject/body. `participant_magic_link`, `zev_access_invitation` and `zev_access_granted` are the exception at delivery time: when no override exists, the sender chooses the shipped default for the ZEV's invoice language; a saved override still replaces all four language defaults. `participant_invitation` was replaced by `participant_onboarding`, and migration `0017_drop_participant_invitation_template` deletes any legacy row.
 
 ---
 
@@ -632,16 +632,16 @@ rejected (HTTP `400`). The retried send creates a **new** `EmailLog` entry.
 
 ### 7.4 System email template management
 
-The global `EmailTemplate` overrides (§3.5) use the four keys defined in `EMAIL_TEMPLATE_DEFAULTS`: `invoice_email`, `participant_onboarding`, `email_verification`, and `participant_magic_link`. `participant_onboarding` replaced `participant_invitation`; its catalog exposes `{participant_name}`, `{inviter_name}`, `{zev_name}`, `{link_url}`, and `{expiry_date}`. The magic-link catalog exposes `{participant_name}`, `{zev_name}`, `{link_url}`, and `{valid_minutes}`. Admins may read all four global templates; ZEV owners may read only `invoice_email` and its field catalog so the per-ZEV editor can show the effective fallback. Listing and mutations remain admin-only. Denied mutations are audit-logged as `DENIED`; denied reads are not governance mutation events.
+The global `EmailTemplate` overrides (§3.5) use the six keys defined in `EMAIL_TEMPLATE_DEFAULTS`: `invoice_email`, `participant_onboarding`, `email_verification`, `participant_magic_link`, `zev_access_invitation`, and `zev_access_granted`. `participant_onboarding` replaced `participant_invitation`; its catalog exposes `{participant_name}`, `{inviter_name}`, `{zev_name}`, `{link_url}`, and `{expiry_date}`. The magic-link catalog exposes `{participant_name}`, `{zev_name}`, `{link_url}`, and `{valid_minutes}`. The ZEV-access invitation catalog exposes `{zev_name}`, `{role_name}`, `{inviter_name}`, `{link_url}`, and `{valid_days}`; the access notice the same without `{valid_days}` (#761). Admins may read all six global templates; ZEV owners may read only `invoice_email` and its field catalog so the per-ZEV editor can show the effective fallback. Listing and mutations remain admin-only. Denied mutations are audit-logged as `DENIED`; denied reads are not governance mutation events.
 
 | Method | URL | Permission | Response / behavior |
 |---|---|---|---|
-| `GET` | `/invoices/invoices/email-templates/` | `IsAdmin` | Bare array of `{template_key, subject, body, is_customized}` for all four keys; no `fields` |
+| `GET` | `/invoices/invoices/email-templates/` | `IsAdmin` | Bare array of `{template_key, subject, body, is_customized}` for all six keys; no `fields` |
 | `GET` | `/invoices/invoices/email-template/{key}/` | `HasZevAccess` for `invoice_email`; otherwise `IsAdmin` | `{template_key, subject, body, is_customized, fields}`; participant → `403`, unauthenticated → `401`; an unknown key returns `404` only after authorization succeeds |
 | `PATCH` | `/invoices/invoices/email-template/{key}/` | `IsAdmin` | Save `subject`/`body` (`template.email.update`); return template metadata with `is_customized: true` plus `detail`; blank/non-string values → `400` |
 | `DELETE` | `/invoices/invoices/email-template/{key}/` | `IsAdmin` | Remove the DB override (`template.email.reset`); return the shipped subject/body, `is_customized: false`, and `detail` |
 
-The `participant_magic_link` shipped body/subject is selected by the ZEV invoice language when no override exists. Saving one override deliberately replaces that language-specific default for every language, as the admin editor explains.
+The `participant_magic_link`, `zev_access_invitation` and `zev_access_granted` shipped bodies/subjects are selected by the ZEV invoice language when no override exists. Saving one override deliberately replaces that language-specific default for every language, as the admin editor explains.
 
 ---
 

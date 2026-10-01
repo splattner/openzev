@@ -205,16 +205,15 @@ printout stops working.
 
 | Field | Type | Default | Constraints / Notes |
 |---|---|---|---|
-| `mfa_required_roles` | `JSONField` | `list` | Roles that must enrol, e.g. `["admin", "zev_owner"]`. Validated against `UserRole` values in `clean()` |
+| `mfa_required` | `BooleanField` | `False` | Every account must enrol. Replaced the per-role `mfa_required_roles` list in #761 (migration `accounts.0020`: a non-empty list became `True` and restarted the grace period), when roles became per ZEV and a per-role policy had nothing left to key on |
 | `mfa_grace_period_days` | `PositiveIntegerField` | `14` | Days after the requirement is set, or after account creation, before enrolment is enforced |
 
-`clean()` rejects any value in `mfa_required_roles` that is not a `UserRole` member, and rejects
-a non-empty list when `MFA_ENCRYPTION_KEYS` is unset (§4.5) — a policy that cannot be honoured
-must not be saveable.
+`clean()` rejects `mfa_required=True` when `MFA_ENCRYPTION_KEYS` is unset (§4.5) — a policy that
+cannot be honoured must not be saveable.
 
 **Serializer:** `AppSettingsSerializer` gains both fields, writable by `admin` only. Validation lives
-in `AppSettings.validate_mfa_required_roles`, shared by `clean()` and the serializer (DRF does not run
-`clean()`), and clearing the list never needs a key. Policy changes are audited through the existing
+in `AppSettings.validate_mfa_required`, shared by `clean()` and the serializer (DRF does not run
+`clean()`), and switching the requirement off never needs a key. Policy changes are audited through the existing
 `app_settings.update` diff.
 
 **Addition beyond the table above: `mfa_policy_changed_at`** (`DateTimeField`, null, non-editable),
@@ -320,7 +319,7 @@ server-side nonce would buy nothing and add state.
 | `me/passkeys/register/complete/` | POST | `IsAuthenticated` | `{credential, name}` → verifies attestation (user verification required), stores the credential, returns `{passkey, recovery_codes}`. `409` if the credential ID is already registered anywhere |
 | `me/passkeys/<uuid:pk>/` | PATCH, DELETE | `IsAuthenticated` | Rename or remove own credential. Same `409` guard as TOTP removal |
 
-**As shipped.** `me/mfa/` returns `required` (the policy names this user's role) and
+**As shipped.** `me/mfa/` returns `required` (the policy is on — for every account since #761) and
 `grace_until` as an ISO **datetime** (a moment the gate compares with now, not a bare date), which is
 `null` once the user has any factor or when no policy applies. `me/mfa/totp/` POST returns `409`
 while an *active* device exists (remove it first) and `503` naming `MFA_ENCRYPTION_KEYS` when the
@@ -369,7 +368,7 @@ the already-installed `qrcode` dependency, so the secret never reaches a third-p
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
 | `users/<int:pk>/mfa/` | DELETE | `IsAdmin` | Removes **all** factors and recovery codes for that user. Audited as `auth.mfa.reset` (D3) |
-| `app-settings/` | PATCH | `IsAdmin` | Now also accepts `mfa_required_roles`, `mfa_grace_period_days` |
+| `app-settings/` | PATCH | `IsAdmin` | Now also accepts `mfa_required`, `mfa_grace_period_days` |
 
 An admin **cannot** enrol a factor *for* another user, and cannot read any secret — the reset is
 a removal, mirroring the API-key rule that an admin may revoke but not create on someone's
@@ -543,11 +542,11 @@ the caller *is* authenticated, just not allowed to do this yet — and records
    `set-initial-password`, `email-change-request`, `email-change-confirm`, `sessions-revoke-own`,
    `token_refresh`, `token-mfa`, and `api-key-detail` for `DELETE` only — revoking a key removes
    capability, renaming or minting one does not).
-4. Otherwise: `user.role not in AppSettings.load().mfa_required_roles`, or
+4. Otherwise: `not AppSettings.load().mfa_required`, or
    `mfa.compliance_status(...)` is not `"overdue"` (grace period still running, or the account
    already holds a factor). `AppSettings.load()` runs once regardless — a single indexed lookup on
    every unsafe request is the cost of the feature being usable at all; `mfa.has_any_factor` (two
-   more queries) only runs once the role actually matches the policy, so an instance that has never
+   more queries) only runs once the policy is on, so an instance that has never
    turned the policy on pays exactly one query for this on every write and nothing more.
 
 **Deliberately absent from the exemption list**, and so blocked once overdue like anything else:
@@ -594,7 +593,8 @@ refresh is never caught by it.
 **File:** `frontend/src/pages/AdminSystemSettingsPage.tsx` · Route `/admin/system-settings`
 
 The existing **Security** area (or a new tab alongside `regional`, `features`, `oauth`, `vat`)
-gains a multi-select for `mfa_required_roles` and a number input for `mfa_grace_period_days`.
+gains a checkbox for `mfa_required` ("Require two-factor authentication for every account"; a
+multi-select of roles until #761) and a number input for `mfa_grace_period_days`.
 Both are disabled, with an explanatory hint, when `/auth/system-health/` reports the encryption
 key as unconfigured — mirroring the pattern PR #732 used for the dynamic-source picker.
 

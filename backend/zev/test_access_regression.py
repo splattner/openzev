@@ -333,7 +333,9 @@ class SingleRelationshipWriteMatrixTests(AccessWorldMixin, TestCase):
         )
 
     def test_impersonation(self):
-        for target, admin_status in ((self.tenant, 200), (self.owner_b, 200), (self.guest, 400), (self.admin, 400)):
+        # Changed on purpose in #761 step 5: any non-admin account may be
+        # impersonated (impersonation is on the account), so a guest is 200 now.
+        for target, admin_status in ((self.tenant, 200), (self.owner_b, 200), (self.guest, 200), (self.admin, 400)):
             with self.subTest(target=target.username):
                 url = f"/api/v1/auth/users/{target.pk}/impersonate/"
                 self.assertEqual(self.attempt("admin", "post", url), admin_status)

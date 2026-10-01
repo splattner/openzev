@@ -30,14 +30,16 @@ from .cookies import (
     set_auth_cookies,
 )
 from .jwt_utils import IMPERSONATOR_CLAIM, add_custom_claims
-from .models import User, UserRole
+from .models import User
 from .permissions import IsAdmin
 from .serializers import UserSerializer
 
-#: Only these roles may be impersonated. Admins are excluded on purpose — an
-#: admin minting a token for another admin would be a privilege transfer with
-#: no trace of which human was behind it.
-IMPERSONATABLE_ROLES = (UserRole.PARTICIPANT, UserRole.ZEV_OWNER)
+# Any non-admin account may be impersonated, and the session sees everything
+# that account holds — every grant and participant row (#761: impersonation is
+# on the account, not on one relationship). Admins are excluded on purpose: an
+# admin minting a token for another admin would be a privilege transfer with no
+# trace of which human was behind it. Inactive accounts cannot sign in, so they
+# cannot be stepped into either.
 
 ACTION_TYPE = "impersonation.issue_token"
 
@@ -93,18 +95,18 @@ class ImpersonateParticipantView(APIView):
 
         display = target_user.email or target_user.username
 
-        if target_user.role not in IMPERSONATABLE_ROLES:
+        if target_user.is_admin or not target_user.is_active:
             _record(
                 request,
-                summary=f"Denied impersonation for {display} due to role guard.",
+                summary=f"Denied impersonation for {display}: admin or inactive account.",
                 event_status=AuditEventStatus.DENIED,
                 target=target_user,
                 target_id=str(target_user.pk),
                 target_display=display,
-                metadata={"role": target_user.role},
+                metadata={"is_admin": target_user.is_admin, "is_active": target_user.is_active},
             )
             return Response(
-                {"detail": "Only participant or ZEV owner users can be impersonated."},
+                {"detail": "Admin and inactive accounts cannot be impersonated."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

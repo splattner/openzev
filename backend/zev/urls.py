@@ -1,5 +1,6 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
+from .views_access import ZevAccessDetailView, ZevAccessListView, ZevAccessResendInvitationView
 from .views import (
     GridOperatorListView,
     GridOperatorSuggestionView,
@@ -19,6 +20,13 @@ router.register("metering-point-assignments", MeteringPointAssignmentViewSet, ba
 urlpatterns = [
     path("grid-operators/", GridOperatorListView.as_view(), name="grid-operator-list"),
     path("grid-operators/suggest/", GridOperatorSuggestionView.as_view(), name="grid-operator-suggest"),
+    path("zevs/<uuid:zev_id>/access/", ZevAccessListView.as_view(), name="zev-access-list"),
+    path("zevs/<uuid:zev_id>/access/<uuid:pk>/", ZevAccessDetailView.as_view(), name="zev-access-detail"),
+    path(
+        "zevs/<uuid:zev_id>/access/<uuid:pk>/resend-invitation/",
+        ZevAccessResendInvitationView.as_view(),
+        name="zev-access-resend-invitation",
+    ),
     path(
         "participants/geocoding-enabled/",
         ParticipantGeocodingEnabledView.as_view(),

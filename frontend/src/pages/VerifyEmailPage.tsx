@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
-import { verifyEmail, setInitialPassword } from '../lib/api/auth'
+import { verifyEmail, setInitialPassword, type VerificationPurpose } from '../lib/api/auth'
 import { createSelfSetupZev } from '../lib/api/zev'
 import { formatApiError } from '../lib/api/errors'
 import { todayBusinessIso } from '../lib/dates'
@@ -20,6 +20,7 @@ export function VerifyEmailPage() {
     const { refreshUser } = useAuth()
 
     const [step, setStep] = useState<Step>('verifying')
+    const [purpose, setPurpose] = useState<VerificationPurpose>('signup')
     const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
     // Set-password step state
@@ -55,7 +56,8 @@ export function VerifyEmailPage() {
         }
 
         verifyEmail(token)
-            .then(() => {
+            .then((verifiedPurpose) => {
+                setPurpose(verifiedPurpose)
                 return refreshUser()
             })
             .then(() => {
@@ -81,6 +83,11 @@ export function VerifyEmailPage() {
         try {
             await setInitialPassword(password)
             await refreshUser()
+            // Someone invited to an existing ZEV has nothing to set up (#761).
+            if (purpose === 'invitation') {
+                navigate('/', { replace: true })
+                return
+            }
             setStep('create-zev')
         } catch (err) {
             setPwError(formatApiError(err))

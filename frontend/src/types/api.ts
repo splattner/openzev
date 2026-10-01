@@ -23,19 +23,34 @@ export interface User {
     has_usable_password?: boolean
     /** Present when this session is an impersonation session. */
     impersonated_by?: User
+    /** From /auth/me: every community the account relates to (#761). */
+    memberships?: Membership[]
+    /** From /auth/me: whether the account may set up a ZEV of its own. */
+    may_create_zev?: boolean
 }
 
-/** One community an account belongs to (admin accounts list). */
-export interface AccountMembership {
+/** Per-ZEV access an account holds through a grant (#761). */
+export type ZevAccessRole = 'manager' | 'viewer'
+
+/** One participant row an account is linked to in a community. */
+export interface MembershipParticipant {
+    id: string
+    valid_from: string
+    valid_to: string | null
+    /** The row is current: no end date, or it has not passed. */
+    live: boolean
+}
+
+/** One community an account relates to: its grant there and its participant rows (/auth/me and the admin accounts list). */
+export interface Membership {
     zev: string
     zev_name: string
-    /** The account is this community's owner. */
-    is_owner: boolean
-    /** The participant record linked to the account here, if any. */
-    participant: string | null
+    zev_disabled: boolean
+    access: ZevAccessRole | null
+    participants: MembershipParticipant[]
 }
 
-/** Where an account stands against `AppSettings.mfa_required_roles`; `null` when the policy does not name its role. */
+/** Where an account stands against `AppSettings.mfa_required`; `null` when the policy is off. */
 export interface MfaCompliance {
     status: 'compliant' | 'grace' | 'overdue'
     /** ISO datetime: when enrolment stops being optional. */
@@ -45,7 +60,7 @@ export interface MfaCompliance {
 /** A user as the admin accounts list returns it: the account plus where it belongs and its second factors. */
 export interface AdminUser extends User {
     is_active: boolean
-    memberships: AccountMembership[]
+    memberships: Membership[]
     mfa_methods: Array<'totp' | 'passkey'>
     mfa_compliance: MfaCompliance | null
     /** ISO datetime of the account's last completed sign-in (any door), or null if it has never signed in. */
@@ -84,8 +99,8 @@ export interface AppSettings {
     date_format_short: ShortDateFormat
     date_format_long: LongDateFormat
     date_time_format: DateTimeFormat
-    /** Roles that must hold a second factor (a passkey or TOTP). */
-    mfa_required_roles: UserRole[]
+    /** Every account must hold a second factor (a passkey or TOTP). */
+    mfa_required: boolean
     mfa_grace_period_days: number
     updated_at: string
 }
@@ -94,7 +109,7 @@ export interface AppSettingsInput {
     date_format_short?: ShortDateFormat
     date_format_long?: LongDateFormat
     date_time_format?: DateTimeFormat
-    mfa_required_roles?: UserRole[]
+    mfa_required?: boolean
     mfa_grace_period_days?: number
 }
 
@@ -283,7 +298,7 @@ export interface MfaStatus {
     totp: TotpDevice | null
     passkeys: Passkey[]
     recovery_codes_remaining: number
-    /** Whether AppSettings.mfa_required_roles names this user's role. */
+    /** Whether AppSettings.mfa_required is on. */
     required: boolean
     /** ISO datetime after which enrolment is no longer optional; null when
      * no policy applies or the user already has a factor. */

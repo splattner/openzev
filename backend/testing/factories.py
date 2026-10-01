@@ -70,6 +70,8 @@ class AdminFactory(UserFactory):
 class OwnerFactory(UserFactory):
     username = factory.Sequence(lambda n: f"owner{n}")
     role = UserRole.ZEV_OWNER
+    # As migration accounts.0020 grants every existing owner account (#761).
+    may_create_zev = True
 
 
 class ParticipantUserFactory(UserFactory):
