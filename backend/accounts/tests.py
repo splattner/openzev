@@ -35,7 +35,9 @@ class UserModelTests(TestCase):
 		)
 
 		self.assertTrue(admin.is_admin)
-		self.assertTrue(owner.is_zev_owner)
+		# Managing a ZEV is a per-ZEV grant now, not a property of the role (#761).
+		self.assertFalse(owner.is_admin)
+		self.assertFalse(hasattr(owner, "is_zev_owner"))
 		self.assertFalse(participant.is_admin)
 
 	def test_create_superuser_sets_admin_role(self):

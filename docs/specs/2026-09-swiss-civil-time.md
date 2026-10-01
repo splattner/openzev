@@ -143,7 +143,7 @@ changed as stated; no other behaviour changes.
 | `tariffs/dynamic/pricing.py` | `_last_fully_covered_day` | `(covers_to - 1 µs).date()` | `civil_date(covers_to - 1 µs)`; the docstring's "22:00 or 23:00 UTC" case disappears, since a local month boundary is now a civil-day boundary |
 | `tariffs/dynamic/services.py`, `tariffs/views.py` | `local_civil_day_window` (removed) and its caller, the price-history action | local window | `period_window`, which now computes the same window |
 | `metering/importers/sdatch_importer.py` | `_parse_ts` | bare `astimezone` | §6.2 |
-| `metering/views.py` | `chart_data`, `raw_data`, `dashboard_summary`, `_scope_by_role`, `bulk_delete` | UTC truncation and UTC days | §5.1–5.2; `_bucket_trunc(bucket)` picks the truncation |
+| `metering/views.py` | `chart_data`, `raw_data`, `dashboard_summary`, `_scope_by_role` (since #761 `_scope_by_relation`), `bulk_delete` | UTC truncation and UTC days | §5.1–5.2; `_bucket_trunc(bucket)` picks the truncation |
 
 The rule from ADR 0007 still applies: no `timestamp__date` lookups. Any
 remaining `.date()` on a reading timestamp outside `allocation.validity` is a
@@ -174,7 +174,7 @@ included and read-only by virtue of never being writable through the log API.
 | `GET /api/v1/metering/readings/raw-data/` (`raw_data`) | Day grouping `TruncDay(..., tzinfo=business_tz())`; the row key is the Zurich civil date. Detail mode (`?date=`) returns the readings in `period_window(day, day)`, i.e. the local day, 92–100 rows |
 | `GET /api/v1/metering/readings/dashboard-summary/` (`dashboard_summary`) | Same bucket rule as `chart_data` |
 | `GET /api/v1/metering/readings/hourly-profile/` (`hourly_profile`) | Hours are Zurich wall-clock hours (§4.3) |
-| Participant scoping (`_scope_by_role`) | `TruncDate("timestamp", tzinfo=business_tz())` for the per-day assignment correlation |
+| Participant scoping (`_scope_by_role`, since #761 `_scope_by_relation`) | `TruncDate("timestamp", tzinfo=business_tz())` for the per-day assignment correlation |
 
 Response shapes are unchanged. Bucket values are ISO-8601 datetimes carrying
 the offset of the zone they were truncated in: a day bucket serializes as

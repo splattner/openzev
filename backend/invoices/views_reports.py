@@ -27,7 +27,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import UserRole
-from accounts.permissions import IsZevOwnerOrAdmin
+from accounts.permissions import HasZevAccess, may_hold_management_access
+from zev import access
 from zev.models import Participant, Zev
 
 from .annual_report import build_annual_report
@@ -89,7 +90,7 @@ def _get_authorised_zev(request, zev_id) -> tuple[Zev | None, Response | None]:
         # not exist, so report it the same way rather than crashing.
         return None, Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
 
-    if not request.user.is_admin and zev.owner != request.user:
+    if not access.can_view(request.user, zev):
         return None, Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
     return zev, None
@@ -108,15 +109,32 @@ def _get_participant_in_zev(participant_id, zev) -> tuple[Participant | None, Re
         return None, Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
 
 
-def _is_self_service(request) -> bool:
-    """True when the caller is a plain participant fetching their own report."""
-    return request.user.role == UserRole.PARTICIPANT and not request.user.is_admin
+def _self_service(request) -> tuple[bool, Participant | None]:
+    """Whether this is a self-service download, and the caller's own row for it.
 
-
-def _own_participant(request) -> Participant | None:
+    A caller who can view the ZEV it names is served as a manager. An account
+    that manages or views anything is self-service only for a ZEV it names and
+    holds a current participant row in; otherwise it is served as a manager
+    (naming another ZEV is refused there). An account that only participates is
+    always self-service: it gets its row in the named ZEV, or — as before
+    per-ZEV grants, when a participant's ids were simply ignored — its first
+    current one. With no current row, a plain participant account still gets a
+    404 while a guest is served as a manager; that distinction rests on the old
+    role until it collapses (#761).
+    """
     from zev.services import own_participant_for_user
 
-    return own_participant_for_user(request.user)
+    user = request.user
+    zev_id = request.query_params.get("zev_id")
+    if zev_id and access.can_view(user, zev_id):
+        return False, None
+    if user.is_admin or access.viewable_zev_ids(user) or may_hold_management_access(user):
+        participant = own_participant_for_user(user, zev_id=zev_id) if zev_id else None
+        return participant is not None, participant
+    participant = (zev_id and own_participant_for_user(user, zev_id=zev_id)) or own_participant_for_user(user)
+    if participant is not None:
+        return True, participant
+    return user.role == UserRole.PARTICIPANT, None
 
 
 def _pdf_response(pdf_bytes: bytes, filename: str, *, disposition: str) -> HttpResponse:
@@ -139,9 +157,9 @@ class AnnualStatementView(APIView):
         if error:
             return error
 
-        if _is_self_service(request):
-            participant = _own_participant(request)
-            if not participant:
+        self_service, participant = _self_service(request)
+        if self_service:
+            if participant is None:
                 return Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
             zev = participant.zev
             sent_only = True
@@ -183,9 +201,9 @@ class FinancialSummaryView(APIView):
         if error:
             return error
 
-        if _is_self_service(request):
-            participant = _own_participant(request)
-            if not participant:
+        self_service, participant = _self_service(request)
+        if self_service:
+            if participant is None:
                 return Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
             zev = participant.zev
         else:
@@ -228,7 +246,7 @@ class AnnualReportView(APIView):
     required: the report is about exactly one ZEV and one civil year.
     """
 
-    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, HasZevAccess]
 
     def get(self, request, *args, **kwargs):
         year, error = _parse_year(request.query_params.get("year"))
@@ -261,7 +279,7 @@ class TariffOverviewView(APIView):
     downloaded from is itself owner/admin only.
     """
 
-    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, HasZevAccess]
 
     def get(self, request, *args, **kwargs):
         zev_id = request.query_params.get("zev_id")

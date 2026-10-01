@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import FeatureFlag
-from accounts.permissions import IsZevOwnerOrAdmin
+from accounts.permissions import HasZevAccess
 from zev.models import Zev
 
 from .calculator import FeasibilityInput, ParticipantInput, compute_feasibility
@@ -82,7 +82,7 @@ class FeasibilityPrefillView(APIView):
     and tariff figures.
     """
 
-    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, HasZevAccess]
 
     def get(self, request, zev_id, *args, **kwargs):
         if not FeatureFlag.is_enabled(FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED):
@@ -96,7 +96,7 @@ class FeasibilityPrefillView(APIView):
         return Response(FeasibilityPrefillSerializer(prefill).data)
 
     def _get_accessible_zev(self, zev_id):
-        user = self.request.user
-        if user.is_admin:
-            return Zev.objects.filter(id=zev_id).first()
-        return Zev.objects.filter(id=zev_id, owner=user).first()
+        from zev.access import can_view
+
+        zev = Zev.objects.filter(id=zev_id).first()
+        return zev if zev is not None and can_view(self.request.user, zev) else None

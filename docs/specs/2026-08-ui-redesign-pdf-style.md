@@ -60,7 +60,7 @@ No new roles. The redesign is visual and does not change authorization.
 | Actor | Preview (HTML or PDF) | Template write/reset | Invoice/contract PDF embed |
 |---|---|---|---|
 | `admin` | `POST /invoices/invoices/preview-pdf-template/` (sample data, no tenant scope) | `GET/PATCH/DELETE /invoices/invoices/{pdf,contract-pdf,annual-statement-pdf}-template/` — `IsAdmin` (`views_templates.py:_AdminTemplateView`) | Can open any invoice/contract PDF (`pdf_url` / `contract-pdf/` stream) across all ZEVs |
-| `zev_owner` | No | No (403) | Own ZEV invoices/contracts only (existing `IsZevOwnerOrAdmin` + object checks) |
+| `zev_owner` | No | No (403) | Own ZEV invoices/contracts only (existing `HasZevAccess` + object checks) |
 | `participant` | No | No | Own invoices/contracts only |
 | `guest` | No | No | No |
 
@@ -263,7 +263,7 @@ No new backend endpoint required, but the frontend behaviour is specified here b
 - `frontend/src/pages/InvoiceDetailPage.tsx` — after loading `GET /api/v1/invoices/invoices/{id}/`, read `invoice.pdf_url` (from `InvoiceSerializer.pdf_url` / `Invoice.pdf_file` `FileField` `invoices/pdf/invoice_{number}.pdf`). If `pdf_url` is present, render:
   - operational chrome **above** a paper-style frame: page header (invoice number title, participant/period subtitle, back link), a `grid-4` card row (status pill from the `invoice.status.*` i18n namespace — there is no `status_display` field on `InvoiceSerializer` or the `Invoice` TS type — plus total/subtotal/VAT CHF cards), and an energy-totals card (local/grid/feed-in kWh), then
   - the blob-fetched artifact in an `<iframe src={objectUrl}>` inside `class="pdf-frame"` (`border: 1px solid var(--line)`, `border-radius: 8px`, `background: var(--surface)`), with `PdfPreview`'s open-in-new-tab fallback. The invoice and participant annual-statement embeds both fetch authenticated blobs and render object URLs, so they work with cookie- and token-based auth and across `Content-Disposition` values; an iframe `src` cannot attach an `Authorization` header, and the iframe never navigates to an API URL directly, so CSP `frame-src` stays closed. `usePdfObjectUrl` associates state with the active request identity, removes a superseded document immediately, ignores out-of-order completions, and revokes object URLs on replacement, disable, and unmount.
-- If `pdf_url` is null (rare — invoice created but `generate_pdf` not yet run), show a "Generate PDF" affordance that calls the existing `POST /api/v1/invoices/invoices/{id}/generate-pdf/` (`IsZevOwnerOrAdmin`, returns `{ pdf_url }`) and then embeds the result. No new generate-if-missing endpoint — reuse the existing action.
+- If `pdf_url` is null (rare — invoice created but `generate_pdf` not yet run), show a "Generate PDF" affordance that calls the existing `POST /api/v1/invoices/invoices/{id}/generate-pdf/` (`HasZevAccess`, returns `{ pdf_url }`) and then embeds the result. No new generate-if-missing endpoint — reuse the existing action.
 - This is a restructure, not a facsimile: no second HTML rendering of line items in the detail page that would drift from the PDF (rejected alternative §11).
 
 `ReportsPage` mounts `ParticipantYearDocuments` for participants. Annual Statement

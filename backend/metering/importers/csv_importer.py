@@ -576,13 +576,10 @@ def _infer_direction_and_energy(meter_type, energy, explicit_direction=None):
 
 def _meter_queryset_for_user(user, zev):
     qs = MeteringPoint.objects.select_related("zev").filter(zev=zev)
-    if user.is_admin:
-        return qs
-    if user.is_zev_owner:
-        return qs.filter(zev__owner=user)
-    if zev.owner_id is not None and zev.owner_id == user.id:
-        return qs
-    return qs.none()
+    # Importing writes readings, so it takes a manager of the ZEV (#761).
+    from zev.access import can_manage
+
+    return qs if can_manage(user, zev) else qs.none()
 
 
 def _resolve_columns(table, col, required_keys):

@@ -68,11 +68,11 @@ agrees with both.
 | Actor | Capability |
 |---|---|
 | `admin` | Any ZEV |
-| `zev_owner` | ZEVs they own (`zev.owner == request.user`) |
+| manager / viewer | ZEVs they hold a grant for (`zev.access.can_view`, #761) |
 | `participant` | None (`403`). Their `/reports` branch is unchanged |
 | anonymous | `401` |
 
-- Backend: `permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]`, then
+- Backend: `permission_classes = [IsAuthenticated, HasZevAccess]`, then
   `_get_authorised_zev(request, zev_id)` (shared with the other report views):
   unknown or malformed id → `404 {"error": "ZEV not found."}`, a ZEV owned by
   someone else → `403 {"error": "Permission denied."}`.
@@ -94,7 +94,7 @@ No model or migration changes here directly; the report reads
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
-| `/api/v1/invoices/invoices/annual-report/` | GET | `IsAuthenticated`, `IsZevOwnerOrAdmin` + `_get_authorised_zev` | JSON annual report for `zev_id` and `year` |
+| `/api/v1/invoices/invoices/annual-report/` | GET | `IsAuthenticated`, `HasZevAccess` + `_get_authorised_zev` | JSON annual report for `zev_id` and `year` |
 
 URL name `invoice-annual-report`. It is registered in `invoices/urls.py`'s
 `extracted_urlpatterns` ahead of the router, like the other report endpoints.

@@ -62,10 +62,6 @@ class User(AbstractUser):
     def is_admin(self):
         return self.role == UserRole.ADMIN or self.is_superuser
 
-    @property
-    def is_zev_owner(self):
-        return self.role in (UserRole.ADMIN, UserRole.ZEV_OWNER) or self.is_superuser
-
     def save(self, *args, **kwargs):
         # A plain ``save()`` writes every column, including ``session_version``
         # as this instance last saw it. A request that loaded the user before a

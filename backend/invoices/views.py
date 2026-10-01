@@ -10,9 +10,10 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.http import FileResponse, HttpResponse
-from accounts.permissions import IsZevOwnerOrAdmin
+from accounts.permissions import HasZevAccess
 from allocation.errors import AllocationError
 from zev.models import Zev, Participant
+from zev import access
 from zev.scoping import ZevScopedQuerySetMixin
 from .models import Invoice, InvoicePdfStatus, InvoiceStatus, EmailLog, sent_to_participant
 from .serializers import (
@@ -69,7 +70,7 @@ def _deny_if_zev_disabled(request, invoice: Invoice, *, action_type: str, denied
 
     Invoice's write actions are all custom (``generate``/``generate-all`` got
     their own check in ZEV lifecycle phase 2's invoice-generation follow-up;
-    ``IsZevOwnerOrAdmin`` has no ``has_object_permission`` the way
+    ``HasZevAccess`` has no ``has_object_permission`` the way
     ``BaseZevScopedPermission`` gives ``Participant``/``MeteringPoint`` — see
     ``2026-03-community-and-access.md`` §4.3), so unlike those two models this
     needs its own check at every remaining write site rather than one
@@ -110,11 +111,15 @@ class InvoiceViewSet(
 
     serializer_class = InvoiceSerializer
     permission_classes = [IsAuthenticated]
-    zev_owner_filter = "zev__owner"
-    participant_filter = "participant__user"
+    zev_lookup = "zev"
+    participant_path = "participant"
     # A participant sees an invoice only once it has been sent to them (#861):
     # list, detail and every detail action (``/pdf`` included) go through this.
     participant_visible = sent_to_participant()
+    # ...and keeps seeing the ones they were sent after leaving the ZEV (#761).
+    participant_access_survives_end = True
+    # A ZIP of the period's PDFs is a POST that only reads.
+    viewer_allowed_actions = frozenset({"download_pdfs"})
 
     def get_serializer_class(self):
         # The list is the one unbounded read here — the admin invoice view has
@@ -230,17 +235,10 @@ class InvoiceViewSet(
             raise ValidationError({field_name: ["Must be YYYY-MM-DD."]})
 
     def destroy(self, request, *args, **kwargs):
+        # get_object() already 404s for anyone who does not manage the ZEV (the
+        # write-scoped queryset); this stays as the audited, explicit refusal.
         invoice = self.get_object()
-        if not request.user.is_zev_owner:
-            _record_invoice_event(
-                request=request,
-                action_type="invoice.delete",
-                summary=f"Denied invoice deletion for {_invoice_target_display(invoice)}.",
-                status=AuditEventStatus.DENIED,
-                invoice=invoice,
-            )
-            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
-        if not request.user.is_admin and invoice.zev.owner != request.user:
+        if not access.can_manage(request.user, invoice.zev):
             _record_invoice_event(
                 request=request,
                 action_type="invoice.delete",
@@ -279,7 +277,7 @@ class InvoiceViewSet(
         return response
 
     @action(detail=False, methods=["post"], url_path="generate",
-            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+            permission_classes=[IsAuthenticated, HasZevAccess])
     def generate(self, request):
         """Generate a single invoice for a participant."""
         s = GenerateInvoiceSerializer(data=request.data)
@@ -289,7 +287,7 @@ class InvoiceViewSet(
         except Participant.DoesNotExist:
             return Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if not request.user.is_admin and participant.zev.owner != request.user:
+        if not access.can_manage(request.user, participant.zev):
             return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
         # A new invoice is a create, the same class of write assert_within_scope
@@ -378,7 +376,7 @@ class InvoiceViewSet(
                         status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["post"], url_path="generate-all",
-            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+            permission_classes=[IsAuthenticated, HasZevAccess])
     def generate_all(self, request):
         """Queue background generation of invoices for all participants of a ZEV."""
         s = GenerateZevInvoicesSerializer(data=request.data)
@@ -388,7 +386,7 @@ class InvoiceViewSet(
         except Zev.DoesNotExist:
             return Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if not request.user.is_admin and zev.owner != request.user:
+        if not access.can_manage(request.user, zev):
             return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
         # Same create-time rule as generate() above — batch invoice creation
@@ -432,7 +430,7 @@ class InvoiceViewSet(
             status=status.HTTP_202_ACCEPTED,
         )
 
-    @action(detail=False, methods=["get"], url_path="period-overview", permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+    @action(detail=False, methods=["get"], url_path="period-overview", permission_classes=[IsAuthenticated, HasZevAccess])
     def period_overview(self, request):
         """Return one row per participant for a ZEV/period with invoice + metering data readiness."""
         zev_id = request.query_params.get("zev_id")
@@ -459,7 +457,7 @@ class InvoiceViewSet(
         except Zev.DoesNotExist:
             return Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if not request.user.is_admin and zev.owner_id != request.user.id:
+        if not access.can_view(request.user, zev):
             return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
         rows = compute_period_overview(zev=zev, period_start=period_start, period_end=period_end, request=request)
@@ -495,7 +493,7 @@ class InvoiceViewSet(
         )
 
     @action(detail=True, methods=["post"], url_path="generate-pdf",
-            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+            permission_classes=[IsAuthenticated, HasZevAccess])
     def generate_pdf(self, request, pk=None):
         """Generate / regenerate the PDF for an invoice.
 
@@ -534,7 +532,7 @@ class InvoiceViewSet(
         return Response({"pdf_url": request.build_absolute_uri(f"/api/v1/invoices/invoices/{invoice.pk}/pdf/")})
 
     @action(detail=True, methods=["post"], url_path="send-email",
-            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+            permission_classes=[IsAuthenticated, HasZevAccess])
     def send_email(self, request, pk=None):
         """Queue an invoice PDF email to the participant."""
         invoice = self.get_object()
@@ -563,7 +561,7 @@ class InvoiceViewSet(
         return Response({"detail": f"Email queued for {recipient}."})
 
     @action(detail=True, methods=["post"], url_path="revoke-access",
-            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+            permission_classes=[IsAuthenticated, HasZevAccess])
     def revoke_access(self, request, pk=None):
         """Kill the access link printed on this invoice.
 
@@ -635,7 +633,7 @@ class InvoiceViewSet(
         return Response(InvoiceSerializer(invoice, context={"request": request}).data)
 
     @action(detail=True, methods=["post"], url_path="approve",
-            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+            permission_classes=[IsAuthenticated, HasZevAccess])
     def approve(self, request, pk=None):
         """Transition a draft invoice to approved."""
         return self._perform_status_transition(
@@ -647,7 +645,7 @@ class InvoiceViewSet(
         )
 
     @action(detail=True, methods=["post"], url_path="mark-sent",
-            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+            permission_classes=[IsAuthenticated, HasZevAccess])
     def mark_sent(self, request, pk=None):
         """Transition an approved invoice to sent/locked state."""
         return self._perform_status_transition(
@@ -659,7 +657,7 @@ class InvoiceViewSet(
         )
 
     @action(detail=True, methods=["post"], url_path="mark-paid",
-            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+            permission_classes=[IsAuthenticated, HasZevAccess])
     def mark_paid(self, request, pk=None):
         """Record that a sent invoice has been paid."""
         return self._perform_status_transition(
@@ -671,7 +669,7 @@ class InvoiceViewSet(
         )
 
     @action(detail=True, methods=["post"], url_path="cancel",
-            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+            permission_classes=[IsAuthenticated, HasZevAccess])
     def cancel(self, request, pk=None):
         """Cancel an invoice that has not yet been paid."""
         return self._perform_status_transition(
@@ -683,7 +681,7 @@ class InvoiceViewSet(
         )
 
     @action(detail=True, methods=["post"], url_path=r"retry-email/(?P<email_log_id>[^/.]+)",
-            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+            permission_classes=[IsAuthenticated, HasZevAccess])
     def retry_email(self, request, pk=None, email_log_id=None):
         """Retry sending a failed invoice email."""
         invoice = self.get_object()
@@ -744,7 +742,10 @@ class InvoiceViewSet(
         except Zev.DoesNotExist:
             return None, None, Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if not request.user.is_admin and zev.owner != request.user:
+        # The write actions need a manager; the one read (download-pdfs, which
+        # passes require_active=False) is open to viewers too.
+        allowed = access.can_manage if require_active else access.can_view
+        if not allowed(request.user, zev):
             return None, None, Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
         if require_active and not request.user.is_admin and zev.disabled_at is not None:
@@ -761,7 +762,7 @@ class InvoiceViewSet(
         return zev, invoices, None
 
     @action(detail=False, methods=["post"], url_path="approve-all",
-            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+            permission_classes=[IsAuthenticated, HasZevAccess])
     def approve_all(self, request):
         """Approve all draft invoices for a ZEV period."""
         _zev, invoices, error = self._get_period_invoices(request)
@@ -782,7 +783,7 @@ class InvoiceViewSet(
         return Response({"approved": count})
 
     @action(detail=False, methods=["post"], url_path="send-all",
-            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+            permission_classes=[IsAuthenticated, HasZevAccess])
     def send_all(self, request):
         """Queue emails for all approved invoices in a ZEV period."""
         _zev, invoices, error = self._get_period_invoices(request)
@@ -812,7 +813,7 @@ class InvoiceViewSet(
         return Response({"queued": queued, "skipped": skipped})
 
     @action(detail=False, methods=["post"], url_path="generate-pdfs-all",
-            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+            permission_classes=[IsAuthenticated, HasZevAccess])
     def generate_pdfs_all(self, request):
         """Queue background PDF generation for all invoices in a ZEV period."""
         _zev, invoices, error = self._get_period_invoices(request)
@@ -850,7 +851,7 @@ class InvoiceViewSet(
         )
 
     @action(detail=False, methods=["post"], url_path="download-pdfs",
-            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+            permission_classes=[IsAuthenticated, HasZevAccess])
     def download_pdfs(self, request):
         """Download all period PDFs as a single ZIP file."""
         _zev, invoices, error = self._get_period_invoices(request, require_active=False)

@@ -337,9 +337,9 @@ Proposed classes:
 ### 5.6 Queryset rules
 
 1. Admin: unrestricted queryset.
-2. ZEV owner: only events where `zev.owner == request.user`.
+2. Managers and viewers: only events of ZEVs they hold an active grant for (`zev_id__in=zev.access.viewable_zev_ids(user)`, #761).
 3. Events with `zev = null` are admin-only in v1.
-4. Participant and guest users receive HTTP `403`.
+4. Accounts without a grant receive HTTP `403` (`CanViewAuditEvents`), except accounts still carrying the old `zev_owner` role, which see an empty list until they hold a grant.
 
 ---
 

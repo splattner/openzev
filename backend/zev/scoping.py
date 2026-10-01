@@ -1,46 +1,63 @@
 """
-Shared role-based scoping for ZEV-related viewsets.
+Shared scoping for ZEV-related viewsets: what an account may see and change.
 
-Every ZEV-scoped viewset applies the same three-tier visibility rule:
+Access is per ZEV (ADR 0027, SPEC-2026-10-zev-access-grants §6.1), and an
+account gets the union of everything it holds:
 
-- **admin** — sees everything
-- **zev_owner** — sees objects belonging to ZEVs they own
-- **participant** — sees only objects linked to their own participant record
-  (or nothing, for owner-only resources such as tariffs)
+- **admin** — sees and may change everything;
+- **manager / viewer grant** — sees every row of that ZEV; only a manager may
+  change them;
+- **participant link** — sees the rows reached through their own participant
+  record (nothing, for resources such as tariffs), while that record is current;
+  invoices once sent stay visible after it ends.
 
-Centralizing the rule makes the tenant-isolation logic auditable in one
-place instead of being re-implemented per viewset.
+An account with one relationship sees exactly what the old role-based rule gave
+it (``zev/test_access_regression.py`` pins that). Centralizing the rule keeps
+the tenant-isolation logic auditable in one place, and every decision about a
+grant is made by ``zev.access``.
 
 Reads and writes are scoped here together on purpose. Scoping only the
 queryset protects what a caller can *see* while leaving what they can *write*
 open: DRF consults ``has_object_permission`` for detail routes but never on
 create, so a payload naming another community's ZEV was accepted (#424). The
 write rule is the mirror of the read rule — you may only create or move an
-object into a ZEV you would be allowed to see.
+object into a ZEV you manage — and for unsafe methods the queryset itself
+narrows to managed ZEVs, so a write a viewer or participant reaches through any
+detail route, custom actions included, resolves to 404 before view code runs.
 """
 
 import uuid
 
 from django.db.models import Q
 from rest_framework import serializers
+from rest_framework.permissions import SAFE_METHODS
+
+from . import access
 
 
 class ZevScopedQuerySetMixin:
-    """Mixin for DRF viewsets that scopes reads and writes by user role.
+    """Mixin for DRF viewsets that scopes reads and writes by ZEV relationship.
 
     Class attributes:
 
-    - ``zev_owner_filter``: ORM lookup path from the model to the owning
-      user, e.g. ``"zev__owner"``.
-    - ``participant_filter``: ORM lookup path from the model to the
-      participant's user, e.g. ``"participant__user"``. ``None`` means
-      participants get an empty queryset (owner-only resource).
-    - ``participant_distinct``: set to ``True`` when the participant filter
+    - ``zev_lookup``: ORM path from the model to its ``Zev``, e.g.
+      ``"metering_point__zev"``; ``""`` for the ZEV viewset, whose model *is*
+      the ZEV.
+    - ``participant_path``: ORM path from the model to the ``Participant`` it
+      belongs to, e.g. ``"participant"`` or ``"assignments__participant"``;
+      ``""`` when the model is ``Participant``. ``None`` means a participant
+      link reveals nothing (manager-only resource).
+    - ``participant_distinct``: set to ``True`` when the participant path
       traverses a to-many relation and may produce duplicate rows.
     - ``participant_visible``: an optional ``Q`` a row must also match to be
-      visible to a participant, for rows a participant may only see once they
-      reach a given state (an invoice once it is sent). Owners and admins are
-      not narrowed by it.
+      visible through a participant link, for rows a participant may only see
+      once they reach a given state (an invoice once it is sent). Grants and
+      admins are not narrowed by it.
+    - ``participant_access_survives_end``: ``True`` when a participant keeps
+      seeing these rows after their participant record has ended (sent
+      invoices). Otherwise only current records count.
+    - ``viewer_allowed_actions``: action names that use an unsafe method but
+      only read (a ZIP of PDFs), so a viewer may call them.
     - ``scope_parent_path``: attribute chain from a write payload to the ZEV
       the object would belong to. The first element is the key in
       ``validated_data``; any further elements walk from that object to its
@@ -49,10 +66,12 @@ class ZevScopedQuerySetMixin:
       ``.zev`` is the one that matters. ``None`` disables the write check.
     """
 
-    zev_owner_filter: str
-    participant_filter: str | None = None
+    zev_lookup: str
+    participant_path: str | None = None
     participant_distinct: bool = False
     participant_visible: Q | None = None
+    participant_access_survives_end: bool = False
+    viewer_allowed_actions: frozenset[str] = frozenset()
     scope_parent_path: tuple[str, ...] | None = None
 
     def scope_queryset(self, qs):
@@ -64,57 +83,67 @@ class ZevScopedQuerySetMixin:
         them (#411).
 
         The filter cannot widen what a caller sees: it only ever adds a
-        conjunctive ``filter()`` to the role-scoped queryset, so naming
+        conjunctive ``filter()`` to the relation-scoped queryset, so naming
         somebody else's ZEV yields an empty list rather than their data.
         """
-        return self._narrow_by_zev_id(self._scope_by_role(qs))
+        return self._narrow_by_zev_id(self._scope_by_relation(qs))
 
-    def _scope_by_role(self, qs):
+    def is_write_request(self) -> bool:
+        """An unsafe method that is not one of the read-only exceptions."""
+        if self.request.method in SAFE_METHODS:
+            return False
+        return getattr(self, "action", None) not in self.viewer_allowed_actions
+
+    def _scope_by_relation(self, qs):
         user = self.request.user
         if user.is_admin:
             return qs
-        if user.is_zev_owner:
-            # Deliberately not excluding a disabled ZEV here: its owner keeps
-            # read-only visibility of it (has_object_permission blocks their
-            # writes; assert_within_scope blocks their creates). Only the
-            # participant branch below makes a disabled ZEV disappear
-            # entirely — see _exclude_disabled_zev.
-            return qs.filter(**{self.zev_owner_filter: user})
-        if self.participant_filter is None:
-            return qs.none()
-        qs = self._exclude_disabled_zev(qs.filter(**{self.participant_filter: user}))
+        if self.is_write_request():
+            # Only a manager writes. A disabled ZEV stays in this set on
+            # purpose: has_object_permission and assert_target_not_disabled
+            # refuse the write with their own message.
+            return self._filter_distinct(qs, self._zev_in(access.managed_zev_ids(user)))
+        # Deliberately not excluding a disabled ZEV from the grant branch: its
+        # managers and viewers keep read-only visibility of it. Only the
+        # participant branch makes a disabled ZEV disappear entirely — see
+        # _not_disabled_q.
+        condition = self._zev_in(access.viewable_zev_ids(user))
+        participant = self._participant_q(user)
+        if participant is not None:
+            condition |= participant
+        return self._filter_distinct(qs, condition)
+
+    def _filter_distinct(self, qs, condition):
+        qs = qs.filter(condition)
+        return qs.distinct() if self.participant_distinct else qs
+
+    def _zev_in(self, zev_ids) -> Q:
+        return Q(**{f"{self.zev_lookup}__in" if self.zev_lookup else "pk__in": zev_ids})
+
+    def _participant_prefix(self) -> str:
+        return f"{self.participant_path}__" if self.participant_path else ""
+
+    def _participant_q(self, user):
+        """Rows reached through the caller's own participant records, or ``None``."""
+        if self.participant_path is None:
+            return None
+        prefix = self._participant_prefix()
+        condition = Q(**{f"{prefix}user": user}) & self._not_disabled_q()
+        if not self.participant_access_survives_end:
+            condition &= access.live_participant_q(prefix)
         if self.participant_visible is not None:
-            qs = qs.filter(self.participant_visible)
-        if self.participant_distinct:
-            qs = qs.distinct()
-        return qs
+            condition &= self.participant_visible
+        return condition
 
-    def _exclude_disabled_zev(self, qs):
-        """Narrow ``qs`` to rows whose ZEV is not disabled.
+    def _not_disabled_q(self) -> Q:
+        """Rows whose ZEV is not disabled.
 
-        Only ever applied to the participant branch of ``_scope_by_role``: a
-        disabled ZEV is not merely read-only to a participant the way it is
-        to its owner, it is invisible — the same as a ZEV they were never
-        part of. A viewset whose participant scoping fully overrides
-        ``_scope_by_role`` (``MeterReadingViewSet``, for its assignment-window
-        query) calls this directly instead.
+        Only ever part of the participant branch: a disabled ZEV is not merely
+        read-only to a participant the way it is to its managers, it is
+        invisible — the same as a ZEV they were never part of.
         """
         lookup = f"{self.zev_lookup}__disabled_at" if self.zev_lookup else "disabled_at"
-        return qs.filter(**{f"{lookup}__isnull": True})
-
-    @property
-    def zev_lookup(self) -> str:
-        """ORM path from this model to its ``Zev``, derived from the role filter.
-
-        ``zev_owner_filter`` is by definition the path to that ZEV's ``owner``,
-        so dropping the final segment yields the path to the ZEV itself:
-        ``"metering_point__zev__owner"`` -> ``"metering_point__zev"``. Deriving
-        it keeps the two in step — a viewset that changes its relation path
-        cannot end up filtering on a stale one — and ``""`` correctly denotes
-        the ZEV viewset, whose model *is* the ZEV.
-        """
-        head, _, _ = self.zev_owner_filter.rpartition("__")
-        return head
+        return Q(**{f"{lookup}__isnull": True})
 
     def _narrow_by_zev_id(self, qs):
         raw = self.request.query_params.get("zev_id")
@@ -171,7 +200,7 @@ class ZevScopedQuerySetMixin:
         if user.is_admin:
             return
         field = self.scope_parent_path[0]
-        if target_zev.owner_id != user.pk:
+        if not access.can_manage(user, target_zev):
             raise serializers.ValidationError(
                 {field: ["You do not have access to the ZEV this would belong to."]}
             )

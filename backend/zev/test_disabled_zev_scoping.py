@@ -10,12 +10,12 @@ Three layers, each covered by its own class:
 - Writing to an existing row under a disabled ZEV (``has_object_permission``
   on ``BaseZevScopedPermission``): read-only for the owner, blocked entirely
   for a participant, open for an admin.
-- Reading rows under a disabled ZEV as a participant (``_scope_by_role`` /
-  ``_exclude_disabled_zev``): invisible, not merely read-only — the same as a
+- Reading rows under a disabled ZEV as a participant (``_scope_by_relation`` /
+  ``_not_disabled_q``): invisible, not merely read-only — the same as a
   ZEV the participant was never part of.
 
 A fourth class covers the follow-up that closed the remaining gap:
-``Tariff``/``TariffPeriod``/``MeterReading`` use ``IsZevOwnerOrAdmin``, which
+``Tariff``/``TariffPeriod``/``MeterReading`` use ``HasZevAccess``, which
 has no ``has_object_permission``, so they don't get existing-row protection
 the way ``Participant``/``MeteringPoint``/``MeteringPointAssignment`` do.
 Instead, ``ZevScopedQuerySetMixin.assert_target_not_disabled`` — called from
@@ -302,7 +302,7 @@ class ParticipantReadCutoffTests(_OwnerAndParticipant):
 
     def test_participant_no_longer_sees_their_reading(self):
         """Readings reach a participant through raw-data, not the plain CRUD
-        list (IsZevOwnerOrAdmin keeps that 403 for a participant in every ZEV
+        list (HasZevAccess keeps that 403 for a participant in every ZEV
         state) — raw-data overrides to IsAuthenticated and reads through the
         same get_queryset() this class's other cases exercise."""
         response = self.participant_client.get(

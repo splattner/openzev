@@ -19,7 +19,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import FeatureFlag
-from accounts.permissions import IsZevOwnerOrAdmin
+from accounts.permissions import HasZevReadAccess
 from accounts.throttling import ApiKeyRateThrottle
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import record_audit_event
@@ -76,7 +76,7 @@ class McpView(APIView):
 
     http_method_names = ["post"]
     authentication_classes = [McpApiKeyAuthentication]
-    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, HasZevReadAccess]
     throttle_classes = [ApiKeyRateThrottle]
 
     # ── request gate (SPEC-2026-mcp-server §5.1) ──────────────────────────
@@ -311,5 +311,7 @@ class McpView(APIView):
             return None
         from zev.models import Zev
 
-        qs = Zev.objects.all() if user.is_admin else Zev.objects.filter(owner=user)
-        return qs.filter(pk=zev_id).first()
+        from zev.access import can_view
+
+        zev = Zev.objects.filter(pk=zev_id).first()
+        return zev if zev is not None and can_view(user, zev) else None

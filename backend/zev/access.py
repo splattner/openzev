@@ -9,9 +9,12 @@ the account holds itself, so a caller that filters by them checks
 ``user.is_admin`` first (as every scoping branch already does).
 
 "Today" is the Swiss civil date (``timezone.localdate()``, ADR 0026). Grant
-lookups are memoised on the user instance per day, so a request costs one grant
-query and one participant query however often it asks; ``invalidate`` drops the
-memo after a write that changes the answer.
+lookups are memoised on the user instance, so a request costs one grant query
+and one participant query however often it asks. The memo also carries the day
+and a generation that every save or delete of a grant or participant row bumps
+(``bump_generation``, wired in ``ZevConfig.ready``), so a user object that lives
+longer than one request — a test client's forced user, a task — never answers
+from stale rows; ``invalidate`` drops it outright.
 """
 
 from __future__ import annotations
@@ -28,6 +31,13 @@ from allocation.validity import active_on
 from .models import Participant, ZevAccessGrant, ZevAccessRole
 
 _CACHE_ATTR = "_zev_access_cache"
+_generation = 0
+
+
+def bump_generation(**_kwargs) -> None:
+    """Invalidate every memo: a grant or participant row changed."""
+    global _generation
+    _generation += 1
 
 
 def _today() -> date:
@@ -37,8 +47,8 @@ def _today() -> date:
 def _memo(user) -> dict:
     today = _today()
     memo = getattr(user, _CACHE_ATTR, None)
-    if memo is None or memo["day"] != today:
-        memo = {"day": today}
+    if memo is None or memo["day"] != today or memo["generation"] != _generation:
+        memo = {"day": today, "generation": _generation}
         setattr(user, _CACHE_ATTR, memo)
     return memo
 

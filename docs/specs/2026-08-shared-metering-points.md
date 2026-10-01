@@ -290,7 +290,7 @@ No new endpoints; two response/request shapes gain fields. Base prefix
 | `/api/v1/zev/metering-point-assignments/{id}/` | GET/PATCH/PUT/DELETE | same | same |
 | `/api/v1/zev/participants/` | GET/POST | `IsAuthenticated, BaseZevScopedPermission` | Body/response gain `allocation_weight: string` (decimal, default `"1.0000"`) |
 | `/api/v1/zev/participants/{id}/` | GET/PATCH/PUT/DELETE | same | same |
-| `/api/v1/tariffs/tariffs/` | GET/POST | `IsAuthenticated, IsZevOwnerOrAdmin` | Body/response gain `split_key: "equal" \| "weight"` (default `equal`) |
+| `/api/v1/tariffs/tariffs/` | GET/POST | `IsAuthenticated, HasZevAccess` | Body/response gain `split_key: "equal" \| "weight"` (default `equal`) |
 | `/api/v1/tariffs/tariffs/{id}/` | GET/PATCH/PUT/DELETE | same | same |
 
 Error behaviour: unchanged — serializer `validate()` surfaces model

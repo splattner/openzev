@@ -70,7 +70,7 @@ name it, and the ZEV's VAT treatment stated on the face of the document.
 | `participant` | None (403) |
 | `guest` | None (401) |
 
-**Backend:** `permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]`, plus
+**Backend:** `permission_classes = [IsAuthenticated, HasZevAccess]`, plus
 `_get_authorised_zev()` from `views_reports.py`, which already returns 403 for
 another owner's ZEV and 404 for an unknown or malformed id.
 
@@ -326,7 +326,7 @@ content over two pages became 263 mm on one.
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
-| `/api/v1/invoices/invoices/tariff-overview/` | GET | `IsAuthenticated`, `IsZevOwnerOrAdmin` | Returns `application/pdf` |
+| `/api/v1/invoices/invoices/tariff-overview/` | GET | `IsAuthenticated`, `HasZevAccess` | Returns `application/pdf` |
 
 **View:** `TariffOverviewView(APIView)` in
 `invoices/views_reports.py`, routed

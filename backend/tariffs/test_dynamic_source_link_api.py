@@ -18,6 +18,7 @@ from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory, TariffPeriod
 from testing import factories
 from testing.helpers import authenticate, make_user
+from zev.models import ZevAccessGrant
 
 pytestmark = pytest.mark.django_db
 
@@ -34,6 +35,9 @@ class TestPickingASourceThroughTheTariffApi:
     def test_series_and_detail_return_the_same_historical_percentage_base(self, api_client):
         owner = make_user("percentage_owner", UserRole.ZEV_OWNER)
         zev = factories.ZevFactory(owner=owner)
+        # The requests run on a patched "today" in the past; start the owner's
+        # manager grant (created on the real today) before it (#761).
+        ZevAccessGrant.objects.filter(zev=zev).update(valid_from=date(2026, 1, 1))
         source = make_source()
         factories.TariffFactory(zev=zev, dynamic_source=source, energy_type="grid", valid_from=date(2026, 1, 1))
         percentage = factories.TariffFactory(

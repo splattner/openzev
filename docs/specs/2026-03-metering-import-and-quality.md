@@ -310,7 +310,7 @@ Parses the Swiss SDAT-CH MeteringData XML format delivered by VNBs.
 8. Timestamps: each observation offset = `start + resolution × observation_index`.
 9. Write via `get_or_create` (skip existing; no overwrite mode).
 
-**Permission:** ZEV owner must match `zev.owner == request.user` for non-admin.
+**Permission:** non-admins must manage the ZEV (`zev.access.can_manage`, an active manager grant; #761).
 
 ### 4.3 Preview workflow
 
@@ -393,7 +393,7 @@ duplicate rows in the import protocol; the preview notice is advisory.
 
 ### 4.3.1 Settings detection
 
-**Endpoint:** `POST /api/v1/metering/import/detect-csv/` (multipart, `file` only) — `IsAuthenticated, IsZevOwnerOrAdmin`, `ImportThrottle` (each call counts against the shared per-user `import` budget). Advisory: it reads a bounded sample of the file (`SAMPLE_ROWS = 60` data rows, via the `limit` argument of `_read_table`), never touches the database, is not audited, and never gates an import — the preview stays the gate. Implemented in `backend/metering/importers/csv_detect.py:detect_csv_settings`; an unreadable file (`.xls`, bad encoding) is a 400 `{"error": ...}` like the other import endpoints, a missing `file` a 400 `No file provided.`.
+**Endpoint:** `POST /api/v1/metering/import/detect-csv/` (multipart, `file` only) — `IsAuthenticated, HasZevAccess`, `ImportThrottle` (each call counts against the shared per-user `import` budget). Advisory: it reads a bounded sample of the file (`SAMPLE_ROWS = 60` data rows, via the `limit` argument of `_read_table`), never touches the database, is not audited, and never gates an import — the preview stays the gate. Implemented in `backend/metering/importers/csv_detect.py:detect_csv_settings`; an unreadable file (`.xls`, bad encoding) is a 400 `{"error": ...}` like the other import endpoints, a missing `file` a 400 `No file provided.`.
 
 Response:
 
@@ -467,11 +467,11 @@ All metering endpoints are routed under `/api/v1/metering/` via DRF routers.
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `GET` | `/readings/` | `IsAuthenticated`, `IsZevOwnerOrAdmin` | List readings (role-scoped) |
-| `POST` | `/readings/` | `IsZevOwnerOrAdmin` | Create single reading |
-| `GET` | `/readings/{id}/` | `IsZevOwnerOrAdmin` | Retrieve single reading |
-| `PUT/PATCH` | `/readings/{id}/` | `IsZevOwnerOrAdmin` | Update reading |
-| `DELETE` | `/readings/{id}/` | `IsZevOwnerOrAdmin` | Delete reading |
+| `GET` | `/readings/` | `IsAuthenticated`, `HasZevAccess` | List readings (role-scoped) |
+| `POST` | `/readings/` | `HasZevAccess` | Create single reading |
+| `GET` | `/readings/{id}/` | `HasZevAccess` | Retrieve single reading |
+| `PUT/PATCH` | `/readings/{id}/` | `HasZevAccess` | Update reading |
+| `DELETE` | `/readings/{id}/` | `HasZevAccess` | Delete reading |
 
 ### 5.2 Chart data
 
@@ -767,10 +767,10 @@ legacy `/imports` alias still redirects with its query preserved.
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `POST` | `/import/csv/` | `IsAuthenticated, IsZevOwnerOrAdmin` | CSV/Excel import (multipart form data) |
-| `POST` | `/import/sdatch/` | `IsAuthenticated, IsZevOwnerOrAdmin` | SDAT-CH XML import (multipart, requires `zev_id`) |
-| `POST` | `/import/preview-csv/` | `IsAuthenticated, IsZevOwnerOrAdmin` | CSV preview (no data write) |
-| `POST` | `/import/detect-csv/` | `IsAuthenticated, IsZevOwnerOrAdmin` | Suggest wizard settings from the file content (§4.3.1) |
+| `POST` | `/import/csv/` | `IsAuthenticated, HasZevAccess` | CSV/Excel import (multipart form data) |
+| `POST` | `/import/sdatch/` | `IsAuthenticated, HasZevAccess` | SDAT-CH XML import (multipart, requires `zev_id`) |
+| `POST` | `/import/preview-csv/` | `IsAuthenticated, HasZevAccess` | CSV preview (no data write) |
+| `POST` | `/import/detect-csv/` | `IsAuthenticated, HasZevAccess` | Suggest wizard settings from the file content (§4.3.1) |
 
 All import endpoints use `MultiPartParser` and `FormParser`.
 
@@ -812,14 +812,14 @@ and missing meters still block the wizard.
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `GET` | `/import-logs/` | `IsAuthenticated, IsZevOwnerOrAdmin` | List import logs |
-| `GET` | `/import-logs/{id}/` | `IsAuthenticated, IsZevOwnerOrAdmin` | Retrieve single import log |
-| `DELETE` | `/import-logs/{id}/` | `IsAuthenticated, IsZevOwnerOrAdmin` | Delete a single import log and all readings in its `batch_id` |
-| `POST` | `/import-logs/bulk-delete/` | `IsAuthenticated, IsZevOwnerOrAdmin` | Delete all visible import logs in a selected created-at period or delete all visible logs |
+| `GET` | `/import-logs/` | `IsAuthenticated, HasZevAccess` | List import logs |
+| `GET` | `/import-logs/{id}/` | `IsAuthenticated, HasZevAccess` | Retrieve single import log |
+| `DELETE` | `/import-logs/{id}/` | `IsAuthenticated, HasZevAccess` | Delete a single import log and all readings in its `batch_id` |
+| `POST` | `/import-logs/bulk-delete/` | `IsAuthenticated, HasZevAccess` | Delete all visible import logs in a selected created-at period or delete all visible logs |
 
 **Queryset scoping:**
 - `admin` → all import logs.
-- `zev_owner` → logs where `zev.owner == user` OR `imported_by == user`.
+- otherwise, reads → logs of ZEVs the caller holds a manager or viewer grant for, OR `imported_by == user`; deletes (single and bulk) → logs of ZEVs the caller manages, OR logs it imported that belong to no ZEV (#761).
 
 **Deletion semantics:**
 - Imports with `rows_overwritten > 0` cannot be deleted. Both endpoints return **400** with `{code: "overwrite_import_protected", error: "Imports that overwrote readings cannot be deleted. No imports were deleted."}` when any selected log is protected. The entire bulk operation is rejected without deleting any log or reading; this is not a rollback API and previous values are not restored.
@@ -845,13 +845,14 @@ and missing meters still block the wizard.
 | Role | Visible readings |
 |---|---|
 | `admin` | All readings |
-| `zev_owner` | Readings for meters in `zev__owner = user` |
-| `participant` | Readings with an assignment for the same meter whose `participant.user = user` and whose validity window contains the reading's civil date |
+| manager / viewer grant | Readings for meters of ZEVs the caller holds a grant for (writes: managed ZEVs only) |
+| participant link | Readings with an assignment for the same meter whose `participant.user = user`, on a current participant row (`valid_to` null or ≥ today), and whose validity window contains the reading's civil date |
 
-`MeterReadingViewSet._scope_by_role()` delegates admin/owner scoping to
-`ZevScopedQuerySetMixin`. For non-manager callers, it aliases `reading_day`
-with `TruncDate("timestamp", tzinfo=business_tz())` and filters using a correlated
-`Exists` over `MeteringPointAssignment`: `metering_point_id` equals the outer
+`MeterReadingViewSet` aliases `reading_day` with
+`TruncDate("timestamp", tzinfo=business_tz())` (`_scope_by_relation`) and
+leaves the grant branch to `ZevScopedQuerySetMixin`; its participant branch
+(`_participant_q`, unioned with the grant branch) is a correlated `Exists`
+over `MeteringPointAssignment`: `metering_point_id` equals the outer
 reading's meter, `participant__user` equals the caller, `valid_from <=
 reading_day`, and `valid_to IS NULL OR valid_to >= reading_day`. All conditions
 must match the same assignment. This avoids implicit Zurich date conversion
@@ -1026,7 +1027,7 @@ type MeteringDashboardSummary =
 - **Batch grouping:** `import_batch` UUID on each reading links it back to its
   import log for traceability.
 - **Scope enforcement:** reading visibility is enforced via queryset scoping;
-  import endpoints require `IsZevOwnerOrAdmin`.
+  import endpoints require `HasZevAccess`.
 - **Non-destructive defaults:** imports skip duplicates by default; overwrite
   must be explicitly opted into.
 - **Error isolation:** malformed rows in CSV generate per-row errors without

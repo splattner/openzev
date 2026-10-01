@@ -363,7 +363,7 @@ without a session.
 
 ### 5.6 Revoking a printed link
 
-`POST /api/v1/invoices/invoices/<id>/revoke-access/` — `IsZevOwnerOrAdmin`,
+`POST /api/v1/invoices/invoices/<id>/revoke-access/` — `HasZevAccess`,
 object scope inherited from `InvoiceViewSet.get_queryset`.
 
 The token has no expiry (§4.1), so this is the **only** way a printed link

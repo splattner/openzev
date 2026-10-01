@@ -26,9 +26,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils import timezone
 
-from accounts.permissions import IsZevOwnerOrAdmin
+from accounts.permissions import HasZevAccess
 from audit.models import AuditActionCategory
 from audit.services import record_audit_event
+from zev import access
 from zev.models import Zev
 
 from .importers.planner import PlannedCandidate, Selection, apply_import, plan_import
@@ -64,14 +65,14 @@ def _fetch_failed(exc, zev) -> Response:
 def _resolve_zev(request, zev_id) -> Zev:
     """The ZEV being imported into, or a 404/403.
 
-    ``IsZevOwnerOrAdmin`` only checks the role, so ownership is checked here —
+    ``HasZevAccess`` only checks the role, so ownership is checked here —
     otherwise any ZEV owner could write tariffs into any other ZEV.
     """
     zev = Zev.objects.filter(pk=zev_id).first()
     if zev is None:
         raise NotFound("ZEV not found.")
-    if not request.user.is_admin and zev.owner_id != request.user.id:
-        raise PermissionDenied("You do not own this ZEV.")
+    if not access.can_manage(request.user, zev):
+        raise PermissionDenied("You do not manage this ZEV.")
     return zev
 
 
@@ -138,7 +139,7 @@ def _candidate_payload(planned: PlannedCandidate) -> dict:
 class VseTariffImportPreviewView(APIView):
     """Fetch the operator's document and report what importing it would do."""
 
-    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, HasZevAccess]
 
     @extend_schema(
         request=VseTariffImportPreviewRequestSerializer,
@@ -170,7 +171,7 @@ class VseTariffImportPreviewView(APIView):
 class VseTariffImportApplyView(APIView):
     """Create the tariffs the user selected in the preview."""
 
-    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, HasZevAccess]
 
     @extend_schema(
         request=VseTariffImportApplyRequestSerializer,

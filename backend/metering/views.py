@@ -11,12 +11,13 @@ from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import SAFE_METHODS, IsAuthenticated
 from rest_framework.response import Response
-from accounts.permissions import IsZevOwnerOrAdmin
+from accounts.permissions import HasZevAccess, may_hold_management_access
 from accounts.throttling import ApiKeyRateThrottle, ImportThrottle
 from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from .models import MeterReading, ImportLog
+from zev import access
 from zev.scoping import ZevScopedQuerySetMixin
 from .serializers import MeterReadingSerializer, ImportLogSerializer
 from .importers.csv_detect import detect_csv_settings
@@ -82,7 +83,7 @@ def _resolve_import_target_zev(request, *, for_write):
         zev = Zev.objects.get(pk=raw)
     except Zev.DoesNotExist:
         return None, "not_found", Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
-    if not request.user.is_admin and zev.owner != request.user:
+    if not access.can_manage(request.user, zev):
         return zev, "forbidden", Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
     if for_write and not request.user.is_admin and zev.disabled_at is not None:
         return (
@@ -126,30 +127,64 @@ def _bucket_trunc(bucket):
     return partial(trunc_cls, tzinfo=business_tz())
 
 
+def _resolve_dashboard_scope(user, zev_id):
+    """Whose dashboard to show: ``("zev", zev_id, None)``, ``("participant", zev_ids, None)``
+    or ``(None, None, error_response)``.
+
+    A ZEV the caller can view gets the community view. A ZEV the caller is a
+    current participant of gets their participant view of that ZEV. Otherwise
+    an account that manages or views something must name a ZEV it can see
+    (403 for another one; 400 when it can see several and named none), and an
+    account that only participates gets its participant view across all its
+    current memberships, ``zev_id`` notwithstanding — what each kind of account
+    got before per-ZEV grants (#761, pinned in zev/test_access_regression.py).
+    """
+    viewable = access.viewable_zev_ids(user)
+    manages = user.is_admin or bool(viewable) or may_hold_management_access(user)
+    own = access.participant_zev_ids(user)
+    if zev_id:
+        if access.can_view(user, zev_id):
+            return "zev", str(zev_id), None
+        if str(zev_id) in {str(pk) for pk in own}:
+            return "participant", [zev_id], None
+        if manages:
+            return None, None, Response({"error": "Permission denied for selected ZEV."}, status=403)
+        return "participant", list(own), None
+    if manages:
+        candidates = Zev.objects.all() if user.is_admin else Zev.objects.filter(pk__in=viewable)
+        if candidates.count() == 1:
+            return "zev", str(candidates.first().pk), None
+        return None, None, Response({"error": "zev_id query parameter is required."}, status=400)
+    return "participant", list(own), None
+
+
 class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     serializer_class = MeterReadingSerializer
-    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
-    zev_owner_filter = "metering_point__zev__owner"
+    permission_classes = [IsAuthenticated, HasZevAccess]
+    zev_lookup = "metering_point__zev"
+    # Not a plain path: a participant sees a reading only inside the window of
+    # an assignment they hold (see _participant_q), so this marks the resource
+    # as reachable by participants and _participant_q builds the condition.
+    participant_path = "metering_point__assignments__participant"
     scope_parent_path = ("metering_point", "zev")
 
-    def _scope_by_role(self, qs):
-        user = self.request.user
-        if user.is_admin or user.is_zev_owner:
-            return super()._scope_by_role(qs)
+    def _scope_by_relation(self, qs):
+        # The civil day of each reading, for matching assignment windows.
+        return super()._scope_by_relation(qs.alias(reading_day=TruncDate("timestamp", tzinfo=business_tz())))
 
-        # Match ownership and both bounds on the same assignment. EXISTS
+    def _participant_q(self, user):
+        # Match the holder and both bounds on the same assignment. EXISTS
         # avoids multiplying aggregate sums when a holder returns to a meter.
-        qs = qs.alias(reading_day=TruncDate("timestamp", tzinfo=business_tz()))
         reading_day = OuterRef("reading_day")
         assignments = MeteringPointAssignment.objects.filter(
             metering_point_id=OuterRef("metering_point_id"),
             participant__user=user,
             valid_from__lte=reading_day,
         ).filter(Q(valid_to__isnull=True) | Q(valid_to__gte=reading_day))
-        # This branch fully replaces the base implementation rather than
-        # extending it, so the disabled-ZEV exclusion it would otherwise give
-        # participants for free has to be applied here explicitly too.
-        return self._exclude_disabled_zev(qs.filter(Exists(assignments)))
+        # Only while the participant record is current (#761), like every
+        # other participant-reachable resource.
+        assignments = assignments.filter(access.live_participant_q("participant__"))
+        return Q(Exists(assignments)) & self._not_disabled_q()
 
     def get_queryset(self):
         return self.scope_queryset(MeterReading.objects.select_related("metering_point__zev"))
@@ -303,22 +338,12 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         if date_to:
             qs = qs.filter(timestamp__lt=period_end_exclusive_dt(date_type.fromisoformat(date_to)))
 
-        if user.is_admin or user.role == "zev_owner":
-            selected_zev_id = None
-            if zev_id:
-                if not user.is_admin and not Zev.objects.filter(id=zev_id, owner=user).exists():
-                    return Response({"error": "Permission denied for selected ZEV."}, status=403)
-                qs = qs.filter(metering_point__zev_id=zev_id)
-                selected_zev_id = zev_id
-            else:
-                owner_zevs = Zev.objects.all() if user.is_admin else Zev.objects.filter(owner=user)
-                if owner_zevs.count() == 1:
-                    selected_zev = owner_zevs.first()
-                    qs = qs.filter(metering_point__zev=selected_zev)
-                    selected_zev_id = str(selected_zev.id)
-                else:
-                    return Response({"error": "zev_id query parameter is required."}, status=400)
-
+        kind, scope, error = _resolve_dashboard_scope(user, zev_id)
+        if error is not None:
+            return error
+        if kind == "zev":
+            selected_zev_id = scope
+            qs = qs.filter(metering_point__zev_id=selected_zev_id)
             if selected_participant_id and selected_zev_id and not Participant.objects.filter(
                 id=selected_participant_id,
                 zev_id=selected_zev_id,
@@ -336,7 +361,7 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         # would otherwise make the whole ZEV invisible to them here — the
         # zev-wide section below is unscoped by literal holdership on
         # purpose (shared metering points, #387).
-        zev_ids = Participant.objects.filter(user=user).values_list("zev_id", flat=True).distinct()
+        zev_ids = scope
         zev_qs = MeterReading.objects.filter(metering_point__zev_id__in=zev_ids)
         if date_from:
             zev_qs = zev_qs.filter(timestamp__gte=period_start_dt(date_type.fromisoformat(date_from)))
@@ -372,36 +397,26 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         zev_id = request.query_params.get("zev_id")
         participant_id = request.query_params.get("participant_id")
 
-        if user.role == "participant":
-            zev_ids = list(
-                Participant.objects.filter(user=user).values_list("zev_id", flat=True).distinct()
-            )
+        kind, scope, error = _resolve_dashboard_scope(user, zev_id)
+        if error is not None:
+            return error
+        if kind == "participant":
+            zev_ids = list(scope)
             if not zev_ids:
                 return Response({"hourly_profile": None})
             participant_ids = list(
-                Participant.objects.filter(user=user, zev_id__in=zev_ids).values_list("id", flat=True)
+                Participant.objects.filter(access.live_participant_q(), user=user, zev_id__in=zev_ids)
+                .values_list("id", flat=True)
             )
             selected_zev_id = zev_ids[0]
-        elif user.is_admin or user.role == "zev_owner":
-            if not zev_id:
-                owner_zevs = Zev.objects.all() if user.is_admin else Zev.objects.filter(owner=user)
-                if owner_zevs.count() == 1:
-                    selected_zev_id = str(owner_zevs.first().id)
-                else:
-                    return Response({"error": "zev_id query parameter is required."}, status=400)
-            else:
-                if not user.is_admin and not Zev.objects.filter(id=zev_id, owner=user).exists():
-                    return Response({"error": "Permission denied for selected ZEV."}, status=403)
-                selected_zev_id = zev_id
-
+        else:
+            selected_zev_id = scope
             if participant_id:
                 if not Participant.objects.filter(id=participant_id, zev_id=selected_zev_id).exists():
                     return Response({"error": "Participant not found for selected ZEV."}, status=404)
                 participant_ids = [participant_id]
             else:
                 return Response({"hourly_profile": None})
-        else:
-            return Response({"hourly_profile": None})
 
         return Response(compute_hourly_profile(selected_zev_id, participant_ids, start_dt, end_dt, ps, pe))
 
@@ -430,11 +445,10 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         user = request.user
         if user.is_admin:
             metering_points = MeteringPoint.objects.all()
-        elif user.is_zev_owner:
-            metering_points = MeteringPoint.objects.filter(zev__owner=user)
         else:
             metering_points = MeteringPoint.objects.filter(
-                assignments__participant__user=user
+                Q(zev_id__in=access.viewable_zev_ids(user))
+                | (Q(assignments__participant__user=user) & access.live_participant_q("assignments__participant__"))
             ).distinct()
 
         zev_id = _validated_uuid(request.query_params.get("zev_id"), "zev_id")
@@ -455,14 +469,20 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
 
 class ImportLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
     serializer_class = ImportLogSerializer
-    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, HasZevAccess]
 
     def get_queryset(self):
         user = self.request.user
         base = ImportLog.objects.select_related("zev", "imported_by")
         if user.is_admin:
             return base.all()
-        return base.filter(Q(zev__owner=user) | Q(imported_by=user)).distinct()
+        if self.request.method in SAFE_METHODS:
+            return base.filter(Q(zev_id__in=access.viewable_zev_ids(user)) | Q(imported_by=user)).distinct()
+        # Deleting a log takes a manager of its ZEV (or the importer of a log
+        # that belongs to no ZEV).
+        return base.filter(
+            Q(zev_id__in=access.managed_zev_ids(user)) | Q(imported_by=user, zev__isnull=True)
+        ).distinct()
 
     def _delete_import_logs(self, queryset):
         """Delete the selected logs and their readings.
@@ -578,7 +598,7 @@ class ImportLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
 
 class ImportView(viewsets.ViewSet):
     """Handles CSV and SDAT-CH file uploads for metering data."""
-    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, HasZevAccess]
     parser_classes = [MultiPartParser, FormParser]
     # ImportThrottle bounds bulk uploads per user; ApiKeyRateThrottle stays so
     # view-level lists (which replace DEFAULT_THROTTLE_CLASSES) keep counting

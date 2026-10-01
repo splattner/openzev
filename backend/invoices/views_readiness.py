@@ -9,7 +9,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsZevOwnerOrAdmin
+from accounts.permissions import HasZevAccess
+from zev import access
 from zev.models import Zev
 
 from .readiness import (
@@ -49,7 +50,7 @@ def _resolve_zev(request) -> tuple[Zev | None, Response | None]:
         zev = Zev.objects.get(pk=zev_id)
     except Zev.DoesNotExist:
         return None, Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
-    if not request.user.is_admin and zev.owner_id != request.user.id:
+    if not access.can_view(request.user, zev):
         return None, Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
     return zev, None
 
@@ -167,7 +168,7 @@ class ReadinessView(APIView):
     ``total_periods`` / ``truncated`` instead of silently capping it.
     """
 
-    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, HasZevAccess]
 
     def get(self, request):
         zev, error = _resolve_zev(request)
@@ -210,7 +211,7 @@ class ReadinessView(APIView):
 class AttentionView(APIView):
     """GET /api/v1/invoices/invoices/attention/ — ZEV-level cross-period items."""
 
-    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, HasZevAccess]
 
     def get(self, request):
         zev, error = _resolve_zev(request)

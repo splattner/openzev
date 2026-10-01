@@ -17,6 +17,7 @@ from rest_framework.views import APIView
 
 from audit.models import AuditEventStatus
 from audit.services import record_audit_event
+from zev import access
 from zev.models import Zev
 
 from .exporters import (
@@ -49,7 +50,8 @@ def _zev_or_error(request, zev_id) -> tuple[Zev | None, Response | None]:
         # ValidationError is what the UUID primary key raises for a malformed
         # id; to the caller it is indistinguishable from a missing one.
         return None, Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
-    if not request.user.is_admin and zev.owner != request.user:
+    # Exports are reads, so a viewer may start one too.
+    if not access.can_view(request.user, zev):
         return None, Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
     return zev, None
 
@@ -62,7 +64,7 @@ def _get_owned_job_or_error(request, job_id) -> tuple[ExportJob | None, Response
         return None, Response({"error": "Export job not found."}, status=status.HTTP_404_NOT_FOUND)
     if job.requester_id != request.user.id:
         return None, Response({"error": "Export job not found."}, status=status.HTTP_404_NOT_FOUND)
-    if not request.user.is_admin and job.zev.owner != request.user:
+    if not access.can_view(request.user, job.zev):
         return None, Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
     return job, None
 
@@ -84,7 +86,7 @@ class ExportJobView(APIView):
         if not request.user.is_admin:
             # Same rule as status/download: losing ZEV read access hides the
             # job's metadata too.
-            queryset = queryset.filter(zev__owner=request.user)
+            queryset = queryset.filter(zev_id__in=access.viewable_zev_ids(request.user))
         export_type = request.query_params.get("export_type")
         zev_id = request.query_params.get("zev_id")
         if export_type:

@@ -56,24 +56,23 @@ class UserSerializer(serializers.ModelSerializer):
         return value
 
     def validate_preferred_zev(self, value):
-        """A default community must be one the user manages.
+        """A default community must be one the account relates to.
 
-        The preference is meaningless for roles without a community switcher
-        (participant, guest), and an owner must not point their default at a
-        community they do not own. Admins may set any community.
+        Managed, viewed or participated (current or past) — every community the
+        switcher can list. Admins may set any community.
         """
         user = self.instance
         if value is None or user is None:
             return value
-        if not user.is_zev_owner:
-            raise serializers.ValidationError(
-                "Only ZEV owners and admins can set a default community."
-            )
-        if not user.is_admin and value.owner_id != user.pk:
-            raise serializers.ValidationError(
-                "You can only set one of your own communities as the default."
-            )
-        return value
+        from zev import access
+
+        # Any community the account relates to may be its default (#761): the
+        # community switcher lists managed, viewed and participated ones alike.
+        if access.can_view(user, value) or value.pk in access.participant_zev_ids(user, include_ended=True):
+            return value
+        raise serializers.ValidationError(
+            "You can only set a community you belong to as the default."
+        )
 
     class Meta:
         model = User

@@ -14,7 +14,8 @@ from django.db.models.deletion import ProtectedError
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.dateparse import parse_date
-from accounts.permissions import IsZevOwnerOrAdmin
+from accounts.permissions import HasZevAccess
+from zev import access
 from allocation.validity import period_window
 from .dynamic.fetch import coverage_gaps
 from .dynamic.storage import PriceSeriesConflict
@@ -129,9 +130,9 @@ def _copy_or_replace_periods(source, target, periods_data) -> None:
 
 class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     serializer_class = TariffSerializer
-    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
-    zev_owner_filter = "zev__owner"
-    participant_filter = None
+    permission_classes = [IsAuthenticated, HasZevAccess]
+    zev_lookup = "zev"
+    participant_path = None
     scope_parent_path = ("zev",)
 
     audit_action_category = AuditActionCategory.TARIFF
@@ -440,9 +441,9 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
 
 class TariffPeriodViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     serializer_class = TariffPeriodSerializer
-    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
-    zev_owner_filter = "tariff__zev__owner"
-    participant_filter = None
+    permission_classes = [IsAuthenticated, HasZevAccess]
+    zev_lookup = "tariff__zev"
+    participant_path = None
     scope_parent_path = ("tariff", "zev")
 
     audit_action_category = AuditActionCategory.TARIFF
@@ -494,7 +495,7 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
     """Manage global shared sources and inspect the prices they materialize."""
 
     serializer_class = DynamicTariffSourceSerializer
-    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, HasZevAccess]
 
     def get_queryset(self):
         point_counts = (
@@ -535,7 +536,7 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
     def _require_source_reader(self, request, source):
         if request.user.is_admin:
             return
-        if not source.tariffs.filter(zev__owner=request.user).exists():
+        if not source.tariffs.filter(zev_id__in=access.viewable_zev_ids(request.user)).exists():
             raise PermissionDenied(
                 "This price history is only available through a tariff in your ZEV."
             )

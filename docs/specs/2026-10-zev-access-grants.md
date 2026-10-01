@@ -233,11 +233,18 @@ with `Zev.owner`.
 
 ## 5. Access helpers (`backend/zev/access.py`)
 
-All functions treat an admin as allowed everywhere and an anonymous user as
-allowed nowhere. Results per `(user, today)` are memoised on the user instance
-(`user._zev_access_cache`), so one request performs at most one grant query and
-one participant query; the cache is cleared by `invalidate(user)`, which the
-grant API calls after writing.
+`can_manage`/`can_view` treat an admin as allowed everywhere; the id-set
+helpers return only what the account itself holds, so callers filtering by
+them check `user.is_admin` first. An anonymous user is allowed nowhere.
+Results are memoised on the user instance (`user._zev_access_cache`), so one
+request performs at most one grant query and one participant query. The memo
+is keyed by the civil day and by a module generation counter that
+`bump_generation` increments on every `post_save`/`post_delete` of a
+`ZevAccessGrant` or `Participant` (connected in `zev.apps.ZevConfig.ready`), so
+a user object that outlives one request (a test client's forced user, a task)
+never answers from stale rows; `invalidate(user)` drops it outright. Bulk
+`QuerySet.update`/`delete` on those models bypass the signals — call
+`bump_generation()` after them.
 
 | Function | Returns |
 |---|---|
@@ -270,7 +277,7 @@ Class attributes after the change:
 | Attribute | Meaning |
 |---|---|
 | `zev_lookup: str` | ORM path from the model to its `Zev` (`""` for `ZevViewSet`). Declared directly; replaces `zev_owner_filter`, from which it used to be derived |
-| `participant_path: str \| None` | ORM path from the model to `Participant` (e.g. `"participant"`, `"participants"`, `"assignments__participant"`, `""` for `ParticipantViewSet`). `None` = participants see nothing (owner-only resource). Replaces `participant_filter` (a path to the user) |
+| `participant_path: str \| None` | ORM path from the model to `Participant` (e.g. `"participant"`, `"assignments__participant"`, `""` for `ParticipantViewSet`). `None` = a participant link reveals nothing (manager-only resource). Replaces `participant_filter` (a path to the user). `ZevViewSet` sets `None`: a ZEV record (settings, bank details, templates) is readable only through a grant — participants were always refused there, and an account that manages one ZEV and rents in another must not read the other's record through its link |
 | `participant_distinct: bool` | unchanged |
 | `participant_visible: Q \| None` | unchanged (#861); `InvoiceViewSet` sets `sent_to_participant()` |
 | `participant_access_survives_end: bool = False` | when `True`, ended participant rows still grant access (subject to `participant_visible`). Only `InvoiceViewSet` sets it |
@@ -281,18 +288,22 @@ Class attributes after the change:
 
 ```
 if user.is_admin: return qs
-zev_ids = viewable_zev_ids(user)   # or managed_zev_ids(user) for writes, below
-q = Q(**{f"{zev_lookup}__in" if zev_lookup else "pk__in": zev_ids})
-if participant_path is not None:
+if is_write_request():            # unsafe method, action not in viewer_allowed_actions
+    return filter(_zev_in(managed_zev_ids(user)))
+condition = _zev_in(viewable_zev_ids(user))
+participant = _participant_q(user)  # None when participant_path is None
+if participant is not None:
+    condition |= participant
+return filter(condition)            # .distinct() when participant_distinct
+
+_participant_q(user):
     p = f"{participant_path}__" if participant_path else ""
-    part = Q(**{f"{p}user": user}) & Q(**{f"{zev_lookup}__disabled_at__isnull" ...: True})
+    q = Q(**{f"{p}user": user}) & _not_disabled_q()
     if not participant_access_survives_end:
-        part &= Q(**{f"{p}valid_to__isnull": True}) | Q(**{f"{p}valid_to__gte": today})
+        q &= live_participant_q(p)
     if participant_visible is not None:
-        part &= participant_visible
-    q |= part
-qs = qs.filter(q)
-if participant_distinct: qs = qs.distinct()
+        q &= participant_visible
+    return q
 ```
 
 The grant branch keeps today's owner behaviour for disabled ZEVs (visible,
@@ -310,17 +321,23 @@ forgot an explicit check.
 `assert_within_scope`: `target_zev.owner_id != user.pk` → `not can_manage(user, target_zev)`.
 `assert_target_not_disabled`: unchanged.
 
-`MeterReadingViewSet` keeps overriding the participant branch (assignment-window
-matching) and adopts the same union: grant branch via `viewable_zev_ids`, its
-existing participant query unchanged, ended participants excluded.
+`MeterReadingViewSet` overrides `_scope_by_relation` only to alias
+`reading_day` (`TruncDate("timestamp", tzinfo=business_tz())`) and
+`_participant_q` to return its assignment-window `Exists` (holder, both window
+bounds on the same assignment, current participant row) and the disabled-ZEV
+exclusion; the grant branch and the union come from the mixin. Its
+`participant_path` (`"metering_point__assignments__participant"`) only marks
+the resource as reachable by participants.
 
 ### 6.2 Permission classes
 
 `zev.permissions.BaseZevScopedPermission`:
 
-- `has_permission`: authenticated and (admin, or safe method and (viewable or
-  participant ZEVs non-empty, when `allow_participant_safe_methods`), or unsafe
-  method and `managed_zev_ids` non-empty).
+- `has_permission`: authenticated and (admin, or `may_hold_management_access`,
+  or safe method and (`allow_participant_safe_methods` or viewable ZEVs
+  non-empty), or unsafe method and `managed_zev_ids` non-empty). As before,
+  `allow_participant_safe_methods` admits safe methods without a participant row
+  (an account with nothing gets an empty list from `MeteringPointViewSet`).
 - `has_object_permission`: admin → allow. Resolve the ZEV (`_get_zev`, unchanged).
   Disabled ZEV and unsafe method → admin only (unchanged). Unsafe → `can_manage`.
   Safe → `can_view`, or (`allow_participant_safe_methods` and a live participant
@@ -329,38 +346,63 @@ existing participant query unchanged, ended participants excluded.
 - `ZevDisablePermission`: `can_manage(user, zev)` (was `zev.owner == user`).
 
 `accounts.permissions.IsZevOwnerOrAdmin` is renamed `HasZevAccess` (§3); every
-use is replaced.
+use is replaced. `HasZevReadAccess` (a `HasZevAccess` that treats every request
+as a read) guards the MCP endpoint, which is POST-only but read-only (ADR 0025),
+so a viewer may use it.
+
+**Transitional role gate.** `accounts.permissions.may_hold_management_access(user)`
+is `role == "zev_owner"`. It lets such an account pass the coarse gates
+(`HasZevAccess`, `BaseZevScopedPermission.has_permission`, `CanViewAuditEvents`,
+the dashboard resolver, the reports self-service rule, `self_setup`) before it
+holds a grant — a self-registered owner who has not finished setup gets empty
+lists, not 403s, exactly as before. It never widens which rows are visible
+(those are scoped by grants) and disappears with the role collapse (step 7).
 
 ### 6.3 Hand-written checks replaced
 
 | Site | Old | New |
 |---|---|---|
 | `invoices/views.py` `destroy`, `generate`, `generate_all` | `is_zev_owner`, `zev.owner != request.user` | `can_manage` |
-| `invoices/views.py` `_get_period_invoices` (shared by `approve_all`, `send_all`, `generate_pdfs_all`, `download_pdfs`) | `zev.owner != request.user` | new keyword `for_write=True`: `can_manage`; `download_pdfs` passes `for_write=False`: `can_view` |
+| `invoices/views.py` `_get_period_invoices` (shared by `approve_all`, `send_all`, `generate_pdfs_all`, `download_pdfs`) | `zev.owner != request.user` | its existing `require_active` flag already separates the batch writes (`True`) from the one read, `download_pdfs` (`False`): `can_manage` for the former, `can_view` for the latter |
 | `invoices/views.py` `period_overview` | `zev.owner_id != request.user.id` | `can_view` |
 | `invoices/views_readiness.py` `_resolve_zev` | `zev.owner_id != user.id` | `can_view` |
 | `invoices/views_reports.py` `_get_authorised_zev` | `zev.owner != user` | `can_view` |
-| `invoices/views_reports.py` `_is_self_service` | `role == PARTICIPANT` | caller has no `can_view` on the requested ZEV and has a live participant link (§7.8) |
+| `invoices/views_reports.py` `_is_self_service` / `_own_participant` | `role == PARTICIPANT` | `_self_service(request) -> (bool, participant)`, §7.8 |
 | `exports/views.py` create, status, download, list | `zev.owner != user`, `zev__owner=user` | `can_view` / `zev_id__in=viewable_zev_ids` (exports are reads) |
 | `tariffs/views_import.py` | `zev.owner_id != user.id` | `can_manage` |
-| `tariffs/views.py` dynamic source `recheck`/`fetch` | `tariffs.filter(zev__owner=user)` | `tariffs.filter(zev_id__in=managed_zev_ids)` |
-| `metering/views.py` imports, chart, raw, dashboard, hourly, quality, bulk-delete, `ImportLogViewSet` | `role == "zev_owner"`, `owner=user` | `viewable_zev_ids` for reads, `managed_zev_ids` for imports/bulk-delete |
+| `tariffs/views.py` `DynamicTariffSourceViewSet._require_source_reader` (price history) | `tariffs.filter(zev__owner=user)` | `tariffs.filter(zev_id__in=viewable_zev_ids)` (a read; source writes stay admin-only) |
+| `metering/views.py` `_resolve_import_target_zev` (import, preview) | `zev.owner != user` | `can_manage` |
+| `metering/views.py` `dashboard_summary`, `hourly_profile` | `role == "zev_owner"`, `owner=user` | `_resolve_dashboard_scope`, §6.4 |
+| `metering/views.py` `data_quality_status` | `is_zev_owner`, `zev__owner=user` | meters of viewable ZEVs ∪ meters assigned to a current own participant row |
+| `metering/views.py` `ImportLogViewSet.get_queryset` | `zev__owner=user` OR `imported_by=user` | reads: viewable ZEVs OR `imported_by=user`; deletes (incl. bulk): managed ZEVs OR own logs without a ZEV |
 | `metering/importers/csv_importer.py` `_meter_queryset_for_user` | `is_zev_owner`, `zev.owner_id == user.id` | `can_manage` |
 | `feasibility/views.py` | `Zev.objects.filter(id=…, owner=user)` | `can_view` |
-| `mcp_server/views.py` `_resolve_zev_for_audit` | `Zev.objects.filter(owner=user)` | `viewable_zev_ids` |
-| `audit/views.py` `CanViewAuditEvents`, `_base_queryset` | `role == ZEV_OWNER`, `zev__owner=user` | viewable ZEVs non-empty; `zev_id__in=viewable_zev_ids` |
+| `mcp_server/views.py` `_resolve_zev_for_audit` | `Zev.objects.filter(owner=user)` | `can_view` |
+| `mcp_server/views.py` `McpView.permission_classes` | `IsZevOwnerOrAdmin` | `HasZevReadAccess` |
+| `audit/views.py` `CanViewAuditEvents`, `_base_queryset` | `role == ZEV_OWNER`, `zev__owner=user` | admin, `may_hold_management_access`, or viewable ZEVs non-empty; `zev_id__in=viewable_zev_ids` |
 | `zev/views.py` `ParticipantViewSet._contract_pdf_access_denied` | `is_zev_owner` | GET: `can_view` or own participant; POST (issue): `can_manage` |
-| `zev/views.py` `self_setup` | `is_zev_owner` | §7.6 |
-| `zev/serializers.py` `ParticipantSerializer.validate` | `user.role != PARTICIPANT` | removed |
-| `accounts/serializers.py` `SelfUserSerializer.validate_preferred_zev` | `value.owner_id != user.pk` | `can_view(user, value)` or a participant link in it |
+| `zev/views.py` `self_setup` | `is_zev_owner`; `Zev.objects.filter(owner=user, disabled_at__isnull=True)` | until step 5: admin or `may_hold_management_access`; "already have a ZEV" = an active manager grant on a non-disabled ZEV. §7.6 from step 5 |
+| `zev/services.py` `own_participant_for_user(user, zev_id=None)` | first participant row | first **current** row, in `zev_id` when given |
+| `zev/serializers.py` `ParticipantSerializer.validate` | `user.role != PARTICIPANT` | unchanged in step 4; removed in step 5 with the link/unlink rework |
+| `accounts/serializers.py` `SelfUserSerializer.validate_preferred_zev` | `is_zev_owner`, `value.owner_id != user.pk` | `can_view(user, value)` or any participant row (current or past) in it; message "You can only set a community you belong to as the default." |
+| `accounts/models.py` `User.is_zev_owner` | property | removed |
 
 ### 6.4 Dashboard summary (`metering/views.py` `dashboard_summary`)
 
-- `?zev_id=` given: `can_view` → owner summary for that ZEV; else live
-  participant link in that ZEV → participant summary for that ZEV only; else 403.
-- No `zev_id`: exactly one viewable ZEV → owner summary for it; none viewable and
-  live participant links → participant summary across them (today's
-  behaviour); otherwise 400 `zev_id query parameter is required.`
+Both `dashboard_summary` and `hourly_profile` decide through
+`_resolve_dashboard_scope(user, zev_id)` (`metering/views.py`), where "manages"
+means admin, a manager or viewer grant anywhere, or `may_hold_management_access`:
+
+- `?zev_id=` given: `can_view` → community (owner) summary for that ZEV; else a
+  current participant row in that ZEV → participant summary for that ZEV only;
+  else, for an account that manages anything → 403 `Permission denied for
+  selected ZEV.`; for an account that only participates → its participant
+  summary across all its current rows, `zev_id` notwithstanding (as before —
+  pinned by the regression suite, and it never reveals another ZEV's totals).
+- No `zev_id`: an account that manages anything gets the community summary
+  when it can see exactly one ZEV (admin: when exactly one exists), else 400
+  `zev_id query parameter is required.`; any other account gets its
+  participant summary across all its current rows.
 
 The response key `role` keeps its values `"zev_owner"` / `"participant"` until
 PR 7, where it is renamed `summary_kind` with values `"zev"` / `"participant"`.
@@ -486,11 +528,23 @@ The admin accounts list `?role=` filter accepts `admin` and `user`
 
 ### 7.8 Reports self-service (`invoices/views_reports.py`)
 
-`AnnualStatementView` and `FinancialSummaryView`: when the caller can view the
-requested `zev_id`, the manager branch (`participant_id` required for the
-statement) applies. Otherwise the self-service branch picks the caller's live
-participant row **in `zev_id`** when given, else the first live one
-(`own_participant_for_user`). The statement keeps `sent_only=True` (#861).
+`AnnualStatementView` and `FinancialSummaryView` decide through
+`_self_service(request) -> (is_self_service, participant)`:
+
+1. The caller can view the requested `zev_id` → manager branch
+   (`participant_id` required for the statement).
+2. The caller manages or views anything (admin, a grant, or
+   `may_hold_management_access`) → self-service only when it names a `zev_id`
+   in which it holds a current participant row (that row); otherwise the
+   manager branch, where naming a ZEV it cannot view is a 403.
+3. Any other account is self-service: its current row in the named `zev_id`,
+   else — as before per-ZEV grants, when a participant's ids were simply
+   ignored — its first current row (`own_participant_for_user`). With no
+   current row, a `participant`-role account gets 404 and any other account is
+   served by the manager branch (400 without ids); that distinction rests on
+   the old role until step 7.
+
+Self-service statements keep `sent_only=True` (#861).
 
 ### 7.9 JWT claims
 
@@ -807,17 +861,49 @@ transfer import makes the importer manager.
 `0030` grants every owner, from the creation date even when `start_date` is in
 the future.
 
-### Backend — `zev/test_access_scoping.py` (PR 4)
+### Backend — `zev/test_access_scoping.py` (PR 4; 14 tests, shipped)
 
-**`MultiRelationshipScopingTests`**: tenant in two ZEVs; owner of A renting in
-B (sees A wholly, own rows in B); manager of two ZEVs; manager + participant in
-the same ZEV sees unsent invoices via the grant. **`ViewerTests`**: reads equal a
-manager's; writes 403/404; `download_pdfs` and export creation allowed.
-**`ViewerWriteRouterWalkTests`**: enumerates `router.registry` and custom
-actions, asserts a viewer's unsafe requests fail except the allow-list.
-**`FormerParticipantTests`**: sent invoices visible, everything else gone, ended
-row + live row in another ZEV. **`DisabledZevTests`**: viewer/manager read-only,
-participant invisible.
+World: the regression world (`AccessWorldMixin`) plus `acc_viewer` (viewer of
+Alpha) and `acc_viewer_manager` (viewer of Alpha, manager of Beta).
+
+**`ViewerTests`** (6): a viewer's lists equal the manager's for every list in
+the regression suite; readiness/period overview of its ZEV only, and the
+community dashboard; it cannot file a row under Alpha (403 at the gate for a
+pure viewer, 400 on the payload for one that manages Beta); `download-pdfs`
+(200) and export creation (202) are open to it; it may use the MCP server
+(`list_zevs` = Alpha); a disabled Alpha stays readable, refuses writes (viewer
+and manager 403) and disappears for its participants.
+
+**`ViewerWriteRouterWalkTests`** (1): walks the URL configuration (every
+`api/v1/` route except `auth/`, `public/`, `backups/`, and the declared
+read-only POSTs `invoice-download-pdfs`, `export-job-create`,
+`feasibility-calculate`, `mcp`) and tries every unsafe method with an empty
+body, in a rolled-back savepoint, as both accounts. Alpha's rows (ZEV,
+participants, meters, assignments, tariffs, periods, invoices, readings, import
+logs, grants) must be unchanged after every attempt, and the pure viewer must
+never get a 2xx. More than 100 attempts. With the write rule disabled it fails
+on tariff edits/deletes, reading deletes and invoice approve/cancel/PDF/send.
+
+**`MultiRelationshipScopingTests`** (4): a tenant in two ZEVs sees both
+ZEVs' sent invoices and meters; an owner of Alpha who rents in Beta sees all of
+Alpha plus its own Beta invoice (not Beta's draft), only Alpha's ZEV record, no
+Beta tariffs, cannot write its Beta participant row (404), gets the participant
+dashboard for `zev_id=Beta` and its own Beta statement (`sent_only=True`); a
+manager of two ZEVs sees and edits both and must name one on the dashboard
+(400); a manager who is also a participant of the same ZEV sees its unsent
+invoices through the grant.
+
+**`FormerParticipantTests`** (3): with the row ended yesterday the tenant keeps
+its sent invoice (list and detail) and loses meters, community dashboard totals
+and the self-service statement (404); a current row elsewhere keeps that ZEV.
+
+Existing tests adjusted in PR 4: `zev/test_scoping.py` (new attribute names,
+fake request carries a method); `accounts/tests.py` `test_user_role_helpers`
+and `testing/test_factories_smoke.py` (no `is_zev_owner`; the factory owner can
+manage its ZEV); `exports/tests.py` "lost ownership" changes `owner` through
+`save()` so the grant moves; two time-travel tests
+(`invoices/test_dynamic_tariff_pricing.py`, `tariffs/test_dynamic_source_link_api.py`)
+backdate the owner grant before patching "today" into the past.
 
 ### Backend — PR 5
 

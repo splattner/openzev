@@ -1,6 +1,6 @@
 """ZEV lifecycle phase 2 follow-up, part 2: every action on an *existing*
 invoice under a disabled ZEV (as opposed to creating a new one — see
-test_disabled_zev_invoice_generation.py). ``IsZevOwnerOrAdmin`` has no
+test_disabled_zev_invoice_generation.py). ``HasZevAccess`` has no
 ``has_object_permission`` the way ``BaseZevScopedPermission`` gives
 ``Participant``/``MeteringPoint``, so each of these needed its own check
 (``invoices.views._deny_if_zev_disabled``) rather than inheriting one.

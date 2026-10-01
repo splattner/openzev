@@ -60,7 +60,7 @@ The current `InvoiceViewSet` / `engine.py` billing pipeline always charges both 
 
 ## 3. Actors, permissions, and ZEV scope
 
-All existing permission rules apply unchanged. No new roles are introduced in v1. LEG is a configuration of `ZevType` on an existing `Zev`; all ZEV-scoped permission classes (e.g. `IsZevOwnerOrAdmin`) continue to apply.
+All existing permission rules apply unchanged. No new roles are introduced in v1. LEG is a configuration of `ZevType` on an existing `Zev`; all ZEV-scoped permission classes (e.g. `HasZevAccess`) continue to apply.
 
 | Actor | Capability |
 |---|---|

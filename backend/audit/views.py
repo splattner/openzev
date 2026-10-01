@@ -5,7 +5,8 @@ from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 
-from accounts.models import UserRole
+from accounts.permissions import may_hold_management_access
+from zev import access
 
 from .models import AuditEvent
 from .serializers import (
@@ -19,7 +20,12 @@ class CanViewAuditEvents(BasePermission):
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
-        return request.user.is_admin or request.user.role == UserRole.ZEV_OWNER
+        # Managers and viewers see the trail of the ZEVs they hold (#761).
+        return (
+            request.user.is_admin
+            or may_hold_management_access(request.user)
+            or bool(access.viewable_zev_ids(request.user))
+        )
 
 
 class BaseAuditEventView:
@@ -30,7 +36,7 @@ class BaseAuditEventView:
         queryset = AuditEvent.objects.select_related("actor_user", "zev")
         if self.request.user.is_admin:
             return queryset
-        return queryset.filter(zev__owner=self.request.user)
+        return queryset.filter(zev_id__in=access.viewable_zev_ids(self.request.user))
 
 
 class AuditEventListView(BaseAuditEventView, ListAPIView):

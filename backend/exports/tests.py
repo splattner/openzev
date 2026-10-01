@@ -291,7 +291,10 @@ class ExportJobListTests(ExportJobApiTestCase):
 
     def test_requester_who_lost_ownership_no_longer_sees_the_jobs(self):
         job = ExportJob.objects.get(pk=self._create_job().data["job"]["id"])
-        self.zev.__class__.objects.filter(pk=self.zev.pk).update(owner=self.other_owner)
+        # Through save(), so the owner's manager grant moves with ownership
+        # (#761); losing access means losing the grant.
+        self.zev.owner = self.other_owner
+        self.zev.save()
 
         auth(self.client, self.owner)
         resp = self.client.get(EXPORTS + "jobs/")

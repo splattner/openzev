@@ -94,7 +94,7 @@ MFA belongs to the **account**, not to a community. A user with memberships in t
 one set of factors, and the audit events carry `zev = None` — so, exactly as with `auth.login`
 today, they are visible only in the platform-wide log at **Platform administration → Overview →
 Audit Logs**, never in a ZEV owner's community-scoped tab (`_base_queryset` filters non-admins
-by `zev__owner=request.user`, [audit/views.py:33](../../backend/audit/views.py#L33)).
+to the ZEVs they hold a grant for, [audit/views.py](../../backend/audit/views.py)).
 
 | Actor | Capability |
 |---|---|

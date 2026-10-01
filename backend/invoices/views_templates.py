@@ -16,7 +16,7 @@ from rest_framework import exceptions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsAdmin, IsZevOwnerOrAdmin
+from accounts.permissions import IsAdmin, HasZevAccess
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import record_audit_event
 
@@ -336,7 +336,7 @@ class EmailTemplateView(_AdminTemplateView):
 
     def get_permissions(self):
         if self.request.method == "GET" and self.kwargs.get("template_key") == "invoice_email":
-            return [IsZevOwnerOrAdmin()]
+            return [HasZevAccess()]
         return super().get_permissions()
 
     def denial_audit(self, request) -> dict | None:

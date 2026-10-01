@@ -64,7 +64,7 @@ more — and every tool call is traceable in the audit log.
 Rules:
 
 1. The MCP view's `authentication_classes = [McpApiKeyAuthentication]` — **no** cookie/JWT
-   authentication. `permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]`.
+   authentication. `permission_classes = [IsAuthenticated, HasZevAccess]`.
 2. Inactive users, expired or revoked keys: `401` exactly as `ApiKeyAuthentication`.
 3. A `read_only` key is accepted: every iteration-1 tool is read-only. The MCP `POST` itself
    is not treated as a write (the read-only check in `ApiKeyAuthentication._enforce_scope` is

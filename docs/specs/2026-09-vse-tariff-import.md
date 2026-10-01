@@ -67,8 +67,8 @@ the same series.
 | `participant` | None — 403 |
 | `guest` | None — 401 |
 
-Both endpoints use `permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]`.
-`IsZevOwnerOrAdmin` checks the *role* only, so ownership is checked explicitly
+Both endpoints use `permission_classes = [IsAuthenticated, HasZevAccess]`.
+`HasZevAccess` checks the *role* only, so ownership is checked explicitly
 in `tariffs.views_import._resolve_zev`: a non-admin whose `id` is not the ZEV's
 `owner_id` gets `PermissionDenied`. Without that check any ZEV owner could
 write tariffs into any other ZEV.
@@ -404,7 +404,7 @@ and `Source: <url> (imported <date>)`.
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
-| `/api/v1/tariffs/imports/vse/preview/` | POST | `IsAuthenticated, IsZevOwnerOrAdmin` + ownership | Fetch, parse, plan. Writes nothing. |
+| `/api/v1/tariffs/imports/vse/preview/` | POST | `IsAuthenticated, HasZevAccess` + ownership | Fetch, parse, plan. Writes nothing. |
 | `/api/v1/tariffs/imports/vse/apply/` | POST | same | Re-fetch, verify digest, create the selected candidates |
 
 Both are declared in `tariffs/urls.py` **before** `router.urls` so the viewset

@@ -333,6 +333,11 @@ def test_plain_list_batches_percentage_bases_including_grids_outside_the_page(
     from tariffs.views import TariffViewSet
 
     zev = factories.ZevFactory(owner=owner_user)
+    # The request runs on a patched "today" in the past; start the owner's
+    # manager grant (created on the real today) before it (#761).
+    from zev.models import ZevAccessGrant
+
+    ZevAccessGrant.objects.filter(zev=zev).update(valid_from=date(2026, 1, 1))
     source = make_source()
     dynamic_tariff(zev, source, name="Z grid")
     for name in ["A local", "B local", "C local"]:

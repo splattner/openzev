@@ -269,10 +269,10 @@ the ZEV from the object (via `_get_zev()`) and enforces owner matching.
 
 ### 5.2 Queryset scoping
 
-| ViewSet | `admin` | `zev_owner` | `participant` |
+| ViewSet | `admin` | manager / viewer grant (#761) | participant link |
 |---|---|---|---|
-| `MeteringPointViewSet` | All metering points | `zev__owner = user` | Meters linked via `assignments__participant__user = user` (read-only) |
-| `MeteringPointAssignmentViewSet` | All assignments | `metering_point__zev__owner = user` | `participant__user = user` (read-only, but blocked at view-level permission) |
+| `MeteringPointViewSet` | All metering points | Meters of the ZEVs held (writes: managed ZEVs only) | Meters linked via `assignments__participant__user = user` on a current participant row (read-only) |
+| `MeteringPointAssignmentViewSet` | All assignments | Assignments of the ZEVs held (writes: managed ZEVs only) | `participant__user = user` on a current row (read-only, but blocked at view-level permission) |
 
 The `MeteringPointAssignmentViewSet` queryset uses `select_related("metering_point", "metering_point__zev", "participant")` to minimize N+1 queries.
 

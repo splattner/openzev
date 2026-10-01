@@ -613,7 +613,7 @@ the two never disagree. It does not create price bands for a dynamic candidate.
 - **`GET /tariffs/dynamic-sources/`** (`DynamicTariffSourceViewSet`, paginated):
   every configured source, for the tariff form and admin console. It includes
   fetch state/coverage plus annotated `point_count`, `linked_tariff_count`,
-  `linked_zev_count`, and `supports_backfill`. `IsZevOwnerOrAdmin`, **not
+  `linked_zev_count`, and `supports_backfill`. `HasZevAccess`, **not
   ZEV-scoped** — a source is global (ADR 0018).
 - **`POST /tariffs/dynamic-sources/discover/`**: owner/admin wizard endpoint.
   It fetches through the SSRF-safe client, auto-detects v1.0.5/v2.0.0 unless a

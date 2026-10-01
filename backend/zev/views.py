@@ -12,12 +12,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
-from accounts.permissions import IsAdmin
+from accounts.permissions import IsAdmin, may_hold_management_access
 from accounts.throttling import ApiKeyRateThrottle, TransferArchiveThrottle
 from accounts.models import FeatureFlag, User, UserRole
 from allocation.validity import period_window
 from metering.models import MeterReading
-from . import onboarding
+from . import access, onboarding
 from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from .purge import ZevPurgeError, purge_zev
 from .scoping import ZevScopedQuerySetMixin
@@ -66,9 +66,13 @@ logger = logging.getLogger(__name__)
 
 class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, ZevManagementPermission]
-    zev_owner_filter = "owner"
-    participant_filter = "participants__user"
-    participant_distinct = True
+    zev_lookup = ""
+    # No participant path: a ZEV record (settings, bank details, templates) is
+    # only ever readable through a grant. Participants were always refused here
+    # (ZevManagementPermission), and an account that manages one ZEV and rents
+    # in another must not read the other's record through its participant link
+    # (#761). Its name reaches the frontend through /auth/me instead.
+    participant_path = None
     # No DELETE: a bare instance.delete() collides with Invoice.zev's
     # on_delete=PROTECT the moment a ZEV has any invoice (see zev/purge.py's
     # docstring), and it also skips the disable-first safety step the
@@ -102,11 +106,11 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         # No disabled-state filtering needed here: ZevManagementPermission
-        # already blocks participants from every method on this viewset
-        # regardless of a ZEV's state, and the owner-scoped queryset
-        # (ZevScopedQuerySetMixin, ``zev_owner_filter = "owner"``) already
-        # includes a disabled ZEV for its own owner — which is what gives the
-        # owner read-only visibility of it (see has_object_permission).
+        # already blocks accounts without a grant from every method on this
+        # viewset regardless of a ZEV's state, and the grant branch of the
+        # scoped queryset already includes a disabled ZEV for its managers and
+        # viewers — which is what gives them read-only visibility of it (see
+        # has_object_permission).
         return self.scope_queryset(Zev.objects.all())
 
     def get_serializer_class(self):
@@ -135,13 +139,15 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     def self_setup(self, request):
         """Create a ZEV for the authenticated self-registered zev_owner."""
         user = request.user
-        if not user.is_zev_owner:
+        # Transitional (#761): the old owner role still marks an account that
+        # may set up its own ZEV, until User.may_create_zev replaces it.
+        if not (user.is_admin or may_hold_management_access(user)):
             return Response({"detail": "Only ZEV owners can use this endpoint."}, status=status.HTTP_403_FORBIDDEN)
         # Excludes disabled ZEVs: without this, an owner who disables their
         # only community would be permanently locked out of ever creating a
         # replacement through this endpoint — the guard exists to stop a
         # second *active* community, not to freeze the owner out forever.
-        if Zev.objects.filter(owner=user, disabled_at__isnull=True).exists():
+        if Zev.objects.filter(pk__in=access.managed_zev_ids(user), disabled_at__isnull=True).exists():
             return Response({"detail": "You already have a ZEV."}, status=status.HTTP_400_BAD_REQUEST)
 
         address_fields = (
@@ -497,8 +503,8 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
 class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     serializer_class = ParticipantSerializer
     permission_classes = [IsAuthenticated, BaseZevScopedPermission]
-    zev_owner_filter = "zev__owner"
-    participant_filter = "user"
+    zev_lookup = "zev"
+    participant_path = ""
     scope_parent_path = ("zev",)
 
     audit_action_category = AuditActionCategory.PARTICIPANT
@@ -527,10 +533,14 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         return {"zev_id": str(instance.zev_id)}
 
     def _contract_pdf_access_denied(self, request, participant):
-        """True when the caller may not reach this participant's contract."""
-        if request.user.is_admin or request.user.is_zev_owner:
-            return False
-        return participant.user != request.user
+        """True when the caller may not reach this participant's contract.
+
+        Reading the issued contract is open to whoever can view the ZEV and to
+        the participant themselves; issuing a version takes a manager (#761).
+        """
+        if request.method == "GET":
+            return not (access.can_view(request.user, participant.zev) or participant.user_id == request.user.id)
+        return not access.can_manage(request.user, participant.zev)
 
     @staticmethod
     def _stream_contract_issue(participant, issue):
@@ -810,8 +820,8 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
 class MeteringPointViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     serializer_class = MeteringPointSerializer
     permission_classes = [IsAuthenticated, MeteringPointPermission]
-    zev_owner_filter = "zev__owner"
-    participant_filter = "assignments__participant__user"
+    zev_lookup = "zev"
+    participant_path = "assignments__participant"
     participant_distinct = True
     scope_parent_path = ("zev",)
 
@@ -897,8 +907,8 @@ class MeteringPointViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevSco
 class MeteringPointAssignmentViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     serializer_class = MeteringPointAssignmentSerializer
     permission_classes = [IsAuthenticated, MeteringPointAssignmentPermission]
-    zev_owner_filter = "metering_point__zev__owner"
-    participant_filter = "participant__user"
+    zev_lookup = "metering_point__zev"
+    participant_path = "participant"
     scope_parent_path = ("metering_point", "zev")
 
     audit_action_category = AuditActionCategory.METERING

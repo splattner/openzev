@@ -88,8 +88,10 @@ Unchanged from the invoice lifecycle spec (§5.7 of
 
 Endpoint: `/api/v1/zev/participants/{pk}/contract-pdf/` — DRF action
 `ParticipantViewSet.contract_pdf` (`zev/views.py`), `IsAuthenticated` plus a
-manual check: `is_admin` or `is_zev_owner` may fetch any participant;
-otherwise `participant.user == request.user` is required (403 otherwise).
+manual check (`_contract_pdf_access_denied`): a GET is allowed for whoever can
+view the ZEV (`zev.access.can_view`) and for the participant themselves
+(`participant.user == request.user`); a POST (issuing a version) requires
+`zev.access.can_manage` (403 otherwise; #761).
 Response is a streamed `application/pdf` attachment named
 `contract_{last_name}_{first_name}_v{version}.pdf` (versioned snapshot, see
 §13).

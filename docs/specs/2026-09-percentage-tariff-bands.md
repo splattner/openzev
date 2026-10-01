@@ -64,7 +64,7 @@ tariffs bill exactly as before.
 ## 3. Actors, permissions, and ZEV scope
 
 Unchanged. Tariffs and bands are edited through `TariffViewSet` /
-`TariffPeriodViewSet` with `IsAuthenticated, IsZevOwnerOrAdmin` and ZEV-scoped
+`TariffPeriodViewSet` with `IsAuthenticated, HasZevAccess` and ZEV-scoped
 querysets, and in the frontend on the tariffs page (roles `admin`, `zev_owner`).
 Participants see only what documents and invoices print.
 

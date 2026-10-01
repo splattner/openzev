@@ -19,7 +19,10 @@ pytestmark = pytest.mark.django_db
 def test_zev_factory_creates_owner():
     zev = factories.ZevFactory()
     assert zev.owner_id is not None
-    assert zev.owner.is_zev_owner
+    # Owning a ZEV makes its owner a manager through the owner grant (#761).
+    from zev import access
+
+    assert access.can_manage(zev.owner, zev)
 
 
 def test_participant_factory_shares_zev():

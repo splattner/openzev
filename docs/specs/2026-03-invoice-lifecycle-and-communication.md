@@ -216,9 +216,9 @@ All invoice endpoints are routed under `/api/v1/invoices/invoices/` via a DRF `G
 
 | Method | URL | Permission | Payload | Response |
 |---|---|---|---|---|
-| `POST` | `/invoices/generate/` | `IsZevOwnerOrAdmin` | `{participant_id, period_start, period_end}` | `201` with invoice JSON; `400` with the underlying error if allocation fails (`AllocationError`, e.g. overlapping assignment windows), or if the participant's ZEV is disabled — non-admin only, ZEV lifecycle phase 2 (§4.5 of `2026-03-community-and-access.md`; this view resolves the participant directly rather than through `ZevScopedQuerySetMixin`, so it carries its own copy of that rule); `409` if locked, or a structured `{code: "dynamic_price_gap", tariff_id, tariff_name, source_id, missing_at, error}` when a fetched series does not cover a reading; invalid source configurations return `409` with `code: "invalid_dynamic_tariff"`, tariff/source ids, tariff name and error |
-| `POST` | `/invoices/generate-all/` | `IsZevOwnerOrAdmin` | `{zev_id, period_start, period_end}` | Same disabled-ZEV `400` as `generate/` above, non-admin only; `409` with the same structured dynamic gap/configuration error as single generation when the synchronous coverage/configuration preflight fails; otherwise `202` with `{detail, queued: true, participant_count}` — generation runs asynchronously via Celery (`generate_zev_invoices_task`); per-participant failures (e.g. locked invoices) are isolated — the batch continues, and the audit event (`source = celery`) reports generated/failed counts plus per-participant errors |
-| `POST` | `/invoices/generate-pdfs-all/` | `IsZevOwnerOrAdmin` | `{zev_id, period_start, period_end}` | Same disabled-ZEV `400` as the others (via `_get_period_invoices(require_active=True)`, non-admin only); `202` with `{detail, queued: true, invoice_count}` — PDF rendering runs asynchronously via Celery (`generate_zev_pdfs_task`) |
+| `POST` | `/invoices/generate/` | `HasZevAccess` | `{participant_id, period_start, period_end}` | `201` with invoice JSON; `400` with the underlying error if allocation fails (`AllocationError`, e.g. overlapping assignment windows), or if the participant's ZEV is disabled — non-admin only, ZEV lifecycle phase 2 (§4.5 of `2026-03-community-and-access.md`; this view resolves the participant directly rather than through `ZevScopedQuerySetMixin`, so it carries its own copy of that rule); `409` if locked, or a structured `{code: "dynamic_price_gap", tariff_id, tariff_name, source_id, missing_at, error}` when a fetched series does not cover a reading; invalid source configurations return `409` with `code: "invalid_dynamic_tariff"`, tariff/source ids, tariff name and error |
+| `POST` | `/invoices/generate-all/` | `HasZevAccess` | `{zev_id, period_start, period_end}` | Same disabled-ZEV `400` as `generate/` above, non-admin only; `409` with the same structured dynamic gap/configuration error as single generation when the synchronous coverage/configuration preflight fails; otherwise `202` with `{detail, queued: true, participant_count}` — generation runs asynchronously via Celery (`generate_zev_invoices_task`); per-participant failures (e.g. locked invoices) are isolated — the batch continues, and the audit event (`source = celery`) reports generated/failed counts plus per-participant errors |
+| `POST` | `/invoices/generate-pdfs-all/` | `HasZevAccess` | `{zev_id, period_start, period_end}` | Same disabled-ZEV `400` as the others (via `_get_period_invoices(require_active=True)`, non-admin only); `202` with `{detail, queued: true, invoice_count}` — PDF rendering runs asynchronously via Celery (`generate_zev_pdfs_task`) |
 
 **Disabled-ZEV coverage on the remaining actions** (ZEV lifecycle phase 2
 follow-up — `invoices.views._deny_if_zev_disabled`, an audited `400` for the
@@ -229,7 +229,7 @@ exempt: `revoke-access` (revoking reduces exposure, so a disabled ZEV should
 not stand in the way of it) and both PDF reads — `GET /invoices/{id}/pdf/`
 and `download-pdfs` (`_get_period_invoices(require_active=False)`) — since the
 owner keeps read access everywhere, same as every other disabled-ZEV rule.
-`IsZevOwnerOrAdmin` has no `has_object_permission` the way
+`HasZevAccess` has no `has_object_permission` the way
 `BaseZevScopedPermission` gives `Participant`/`MeteringPoint`
 (`2026-03-community-and-access.md` §4.3), so each of these carries its own
 check rather than inheriting one — unlike `Tariff`/`TariffPeriod`/
@@ -256,10 +256,10 @@ Validation: `period_start` must be before `period_end`. On creation the engine a
 
 | Method | URL | Permission | Pre-condition | Side effects |
 |---|---|---|---|---|
-| `POST` | `/invoices/{id}/approve/` | `IsZevOwnerOrAdmin` | `status == draft` | → `approved` |
-| `POST` | `/invoices/{id}/mark-sent/` | `IsZevOwnerOrAdmin` | `status == approved` | → `sent`, `sent_at = now()` |
-| `POST` | `/invoices/{id}/mark-paid/` | `IsZevOwnerOrAdmin` | `status == sent` | → `paid` |
-| `POST` | `/invoices/{id}/cancel/` | `IsZevOwnerOrAdmin` | `status ∉ {paid, cancelled}` | → `cancelled` |
+| `POST` | `/invoices/{id}/approve/` | `HasZevAccess` | `status == draft` | → `approved` |
+| `POST` | `/invoices/{id}/mark-sent/` | `HasZevAccess` | `status == approved` | → `sent`, `sent_at = now()` |
+| `POST` | `/invoices/{id}/mark-paid/` | `HasZevAccess` | `status == sent` | → `paid` |
+| `POST` | `/invoices/{id}/cancel/` | `HasZevAccess` | `status ∉ {paid, cancelled}` | → `cancelled` |
 
 Transition rules are implemented centrally in `invoices/workflow.py`
 (`approve_invoice`, `mark_invoice_sent`, `mark_invoice_paid`, `cancel_invoice`).
@@ -290,12 +290,12 @@ coverage runs against PostgreSQL only (§13, `test_workflow.py`).
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `POST` | `/invoices/{id}/generate-pdf/` | `IsZevOwnerOrAdmin` | Generate/regenerate PDF; returns `{pdf_url}` |
-| `POST` | `/invoices/{id}/send-email/` | `IsZevOwnerOrAdmin` | Queue email to participant (optional `email` override); returns `{detail}` |
-| `POST` | `/invoices/{id}/retry-email/{email_log_id}/` | `IsZevOwnerOrAdmin` | Re-queue a failed email; `400` if already sent |
-| `POST` | `/invoices/approve-all/` | `IsZevOwnerOrAdmin` | Approve all draft invoices for a ZEV period (`zev_id`, `period_start`, `period_end`); returns `{approved}`; audit-logged (`invoice.approve_all`) |
-| `POST` | `/invoices/send-all/` | `IsZevOwnerOrAdmin` | Queue emails for all approved invoices in a ZEV period; returns `{queued, skipped}`; audit-logged (`invoice.send_all`, status `queued`) |
-| `POST` | `/invoices/download-pdfs/` | `IsZevOwnerOrAdmin` | Download all period invoice PDFs as a single ZIP (`{invoice_number}.pdf` entries); `404` when the period has no PDFs |
+| `POST` | `/invoices/{id}/generate-pdf/` | `HasZevAccess` | Generate/regenerate PDF; returns `{pdf_url}` |
+| `POST` | `/invoices/{id}/send-email/` | `HasZevAccess` | Queue email to participant (optional `email` override); returns `{detail}` |
+| `POST` | `/invoices/{id}/retry-email/{email_log_id}/` | `HasZevAccess` | Re-queue a failed email; `400` if already sent |
+| `POST` | `/invoices/approve-all/` | `HasZevAccess` | Approve all draft invoices for a ZEV period (`zev_id`, `period_start`, `period_end`); returns `{approved}`; audit-logged (`invoice.approve_all`) |
+| `POST` | `/invoices/send-all/` | `HasZevAccess` | Queue emails for all approved invoices in a ZEV period; returns `{queued, skipped}`; audit-logged (`invoice.send_all`, status `queued`) |
+| `POST` | `/invoices/download-pdfs/` | `HasZevAccess` | Download all period invoice PDFs as a single ZIP (`{invoice_number}.pdf` entries); `404` when the period has no PDFs |
 
 #### Annual statement / financial summary downloads (frontend location)
 
@@ -335,7 +335,7 @@ always agree, including for multi-membership users.
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `POST` | `/exports/jobs/` | `IsZevOwnerOrAdmin` on the named ZEV | Create a job: body `{export_type: "annual_statements", zev_id, params: {year}}`. Validates the year range and that the ZEV has participants active that year (`400`); an identical in-flight job is returned instead of duplicated; the job is persisted as `queued` and enqueued after the row is committed — an enqueue failure marks the job `failed` and returns `503`. Success returns `202 {detail, job}` and is audit-logged (`annual_statement_export.created`, status `queued`) |
+| `POST` | `/exports/jobs/` | `HasZevAccess` on the named ZEV | Create a job: body `{export_type: "annual_statements", zev_id, params: {year}}`. Validates the year range and that the ZEV has participants active that year (`400`); an identical in-flight job is returned instead of duplicated; the job is persisted as `queued` and enqueued after the row is committed — an enqueue failure marks the job `failed` and returns `503`. Success returns `202 {detail, job}` and is audit-logged (`annual_statement_export.created`, status `queued`) |
 | `GET` | `/exports/jobs/` | Requester only + ZEV readable | The caller's own jobs for ZEVs they may still read, newest first (optional `export_type` / `zev_id` filters, `limit` ≤ 100). The frontend restores an in-flight or completed export after a reload by reading the newest matching job |
 | `GET` | `/exports/jobs/{id}/` | Requester only + ZEV readable | Job status payload: `status`, `params`, counts, `file_expires_at`, computed `expired`, safe `error_message`. `404` for others' jobs, `403` once the ZEV is no longer readable |
 | `GET` | `/exports/jobs/{id}/download/` | Requester only + ZEV readable | Streams the completed ZIP (`Content-Disposition: attachment; filename="annual-statements-{year}.zip"`); `404` when not `completed`, `410` when expired |
@@ -344,7 +344,7 @@ always agree, including for multi-membership users.
 
 | Method | URL | Permission | Query params |
 |---|---|---|---|
-| `GET` | `/invoices/period-overview/` | `IsZevOwnerOrAdmin` | `zev_id`, `period_start`, `period_end` |
+| `GET` | `/invoices/period-overview/` | `HasZevAccess` | `zev_id`, `period_start`, `period_end` |
 
 **Response shape:**
 
@@ -390,13 +390,13 @@ always agree, including for multi-membership users.
 
 Pure computation lives in `invoices/readiness.py`; the endpoints in
 `views_readiness.py` mirror the period-overview RBAC pattern (`zev_id`
-required → 400, unknown ZEV → 404, non-owner → 403 via `IsZevOwnerOrAdmin`).
+required → 400, unknown ZEV → 404, non-owner → 403 via `HasZevAccess`).
 
 | Method | URL | Permission | Query params | Description |
 |---|---|---|---|---|
-| `GET` | `/invoices/invoices/readiness/` | `IsZevOwnerOrAdmin` | `zev_id`; or `zev_id` + `period_start` + `period_end`; or `zev_id` + `periods=all` | Period readiness for the billing cockpit. Parameterless form resolves the **cockpit period** server-side: the most recent ENDED period with open work — a draft/approved invoice, or a billable participant (active with an assignment) who has no invoice (partial batch generation); sent/paid/cancelled are trailing/withdrawn states; an invoice covers only its exact `(start, end)`, and aligned periods begin on/after the community start (a mid-period start has no partial first period; a period whose every day is covered by sent/paid invoices from an earlier interval counts as settled — paid monthly periods do not reopen as regeneration work, while partly locked-covered periods are an explicit `generation_conflicts` warn step (`next_action: review_generation_conflicts`) instead of ordinary generation). No work at all → one of three flagged states: `setup` (readiness-state block — `complete`/`reason`/`assignment_link` plus advisory `billing_settings_complete`/`billing_settings_link`; `period: null` only when master data is empty), `awaiting_first_period` (nothing has ended yet; `period: null`, but the
+| `GET` | `/invoices/invoices/readiness/` | `HasZevAccess` | `zev_id`; or `zev_id` + `period_start` + `period_end`; or `zev_id` + `periods=all` | Period readiness for the billing cockpit. Parameterless form resolves the **cockpit period** server-side: the most recent ENDED period with open work — a draft/approved invoice, or a billable participant (active with an assignment) who has no invoice (partial batch generation); sent/paid/cancelled are trailing/withdrawn states; an invoice covers only its exact `(start, end)`, and aligned periods begin on/after the community start (a mid-period start has no partial first period; a period whose every day is covered by sent/paid invoices from an earlier interval counts as settled — paid monthly periods do not reopen as regeneration work, while partly locked-covered periods are an explicit `generation_conflicts` warn step (`next_action: review_generation_conflicts`) instead of ordinary generation). No work at all → one of three flagged states: `setup` (readiness-state block — `complete`/`reason`/`assignment_link` plus advisory `billing_settings_complete`/`billing_settings_link`; `period: null` only when master data is empty), `awaiting_first_period` (nothing has ended yet; `period: null`, but the
 `setup` block is still present), or `caught_up` (the most recent ended period is returned with `caught_up: true` plus a completed `setup` block — only setup/awaiting are `period: null`, and the caught-up steps may still show trailing items such as unpaid invoices; parameterless cockpit responses always carry `setup`, explicit-period ones never do). A pending invoice from an earlier billing interval stays visible even when its period no longer aligns with the current interval; duplicate invoices for one participant/period resolve to the newest one everywhere, and attention/readiness links land on the period overview, whose rows persist for participants holding an invoice even after their assignment ends (so retry/mark-paid actions stay reachable). `periods=all` returns the union of current-calendar and exact invoice periods (deduplicated by both dates, newest-first by end/start, with `source` ∈ calendar | invoice, `ended: boolean`, and a configured `interval` only when the exact dates align) with `history_from`/`total_periods`/`truncated` metadata, computed from one shared dataset (constant query count, not a per-period walk); `ended` is true only when `period.end < today`, so the running period can be displayed as data collection rather than actionable readiness; explicit ranges are bounded to five years. |
-| `GET` | `/invoices/invoices/attention/` | `IsZevOwnerOrAdmin` | `zev_id` | Cross-period attention items only (the types the readiness cockpit cannot show as steps): `email_failed`, `invoice_overdue`, `participant_validity` — tariff coverage, cockpit data gaps and setup state are readiness-step concerns and are not repeated here. Each item carries a `link`, its own period ref where item-scoped, structured fields for frontend localization, and a stable type-prefixed `id` (record identity, never list position). Failed-email items appear only while the **newest** attempt failed (a later success clears them); one per invoice. On Overview, grouped into the matching period card or a community notice when not period-scoped. |
+| `GET` | `/invoices/invoices/attention/` | `HasZevAccess` | `zev_id` | Cross-period attention items only (the types the readiness cockpit cannot show as steps): `email_failed`, `invoice_overdue`, `participant_validity` — tariff coverage, cockpit data gaps and setup state are readiness-step concerns and are not repeated here. Each item carries a `link`, its own period ref where item-scoped, structured fields for frontend localization, and a stable type-prefixed `id` (record identity, never list position). Failed-email items appear only while the **newest** attempt failed (a later success clears them); one per invoice. On Overview, grouped into the matching period card or a community notice when not period-scoped. |
 
 `Readiness` payload: `{period: {start, end, interval} | null, steps: [{key,
 status, count, [total], [failed], [detail], [link], [detail_data]}],
@@ -524,25 +524,31 @@ The field catalog (`field_catalog_data.py`) documents both the
 | Role | Visible invoices |
 |---|---|
 | `admin` | All invoices across all ZEVs |
-| `zev_owner` | Invoices in ZEVs they own (`zev.owner == user`) |
-| `participant` | Only invoices where `participant.user == user` **and** the invoice has been sent to them: `sent_at` is set, or `status` is `sent`/`paid` (`invoices.models.sent_to_participant()`, #861). Drafts, approved-but-unsent invoices and cancelled drafts are invisible — list, detail and every detail action (`/pdf` included) answer as for an out-of-scope invoice (404). A sent invoice that was later cancelled stays visible, shown as cancelled. Applied through `InvoiceViewSet.participant_visible`, so only the participant branch of the scoping is narrowed |
+| manager / viewer grant | Every invoice of the ZEVs they hold an active grant for (`zev.access.viewable_zev_ids`, #761). A participant link adds the caller's own sent invoices of other ZEVs (union) |
+| participant link | Only invoices where `participant.user == user` **and** the invoice has been sent to them: `sent_at` is set, or `status` is `sent`/`paid` (`invoices.models.sent_to_participant()`, #861). Drafts, approved-but-unsent invoices and cancelled drafts are invisible — list, detail and every detail action (`/pdf` included) answer as for an out-of-scope invoice (404). A sent invoice that was later cancelled stays visible, shown as cancelled. Applied through `InvoiceViewSet.participant_visible`, so only the participant branch of the scoping is narrowed. `participant_access_survives_end = True`: a former participant (row `valid_to` in the past) keeps exactly these invoices (#761) |
 
 ### 6.2 Action permissions
 
-| Action | `admin` | `zev_owner` (own ZEV) | `participant` |
-|---|---|---|---|
-| List / read | Yes | Yes (own ZEV) | Yes (own invoices, once sent — §6.1) |
-| Generate | Yes | Yes | No |
-| Approve / mark-sent / mark-paid / cancel | Yes | Yes | No (HTTP 403) |
-| Generate PDF / send email / retry email | Yes | Yes | No |
-| Delete | Any status | Draft/cancelled only | No |
-| PDF template read/write | Yes | No (HTTP 403) | No |
-| Contract PDF template read/write | Yes | No (HTTP 403) | No |
-| Dashboard | Yes | No (HTTP 403) | No |
+| Action | `admin` | manager | viewer | `participant` |
+|---|---|---|---|---|
+| List / read | Yes | Yes (the ZEV) | Yes (the ZEV) | Yes (own invoices, once sent — §6.1) |
+| Period overview, readiness, download PDFs (ZIP) | Yes | Yes | Yes | No |
+| Generate | Yes | Yes | No | No |
+| Approve / mark-sent / mark-paid / cancel | Yes | Yes | No (HTTP 403/404) | No (HTTP 403) |
+| Generate PDF / send email / retry email | Yes | Yes | No | No |
+| Delete | Any status | Draft/cancelled only | No | No |
+| PDF template read/write | Yes | No (HTTP 403) | No | No |
+| Contract PDF template read/write | Yes | No (HTTP 403) | No | No |
+| Dashboard | Yes | No (HTTP 403) | No | No |
 
-Permission enforcement uses `IsZevOwnerOrAdmin` for action endpoints, with
-additional ownership checks (`zev.owner == request.user`) for non-admin users
-in generate, generate-all, and period-overview.
+Permission enforcement uses `HasZevAccess` for action endpoints, plus the
+write-scoped queryset (§ community-and-access 4.4: any unsafe request resolves
+only rows of ZEVs the caller manages, so a viewer's detail write is a 404), and
+explicit per-ZEV checks: `zev.access.can_manage` in destroy, generate,
+generate-all and the batch writes (`_get_period_invoices` with
+`require_active=True`), `zev.access.can_view` in period-overview and
+`download-pdfs` (the one read-only POST, listed in
+`InvoiceViewSet.viewer_allowed_actions`).
 
 ---
 
@@ -631,7 +637,7 @@ The global `EmailTemplate` overrides (§3.5) use the four keys defined in `EMAIL
 | Method | URL | Permission | Response / behavior |
 |---|---|---|---|
 | `GET` | `/invoices/invoices/email-templates/` | `IsAdmin` | Bare array of `{template_key, subject, body, is_customized}` for all four keys; no `fields` |
-| `GET` | `/invoices/invoices/email-template/{key}/` | `IsZevOwnerOrAdmin` for `invoice_email`; otherwise `IsAdmin` | `{template_key, subject, body, is_customized, fields}`; participant → `403`, unauthenticated → `401`; an unknown key returns `404` only after authorization succeeds |
+| `GET` | `/invoices/invoices/email-template/{key}/` | `HasZevAccess` for `invoice_email`; otherwise `IsAdmin` | `{template_key, subject, body, is_customized, fields}`; participant → `403`, unauthenticated → `401`; an unknown key returns `404` only after authorization succeeds |
 | `PATCH` | `/invoices/invoices/email-template/{key}/` | `IsAdmin` | Save `subject`/`body` (`template.email.update`); return template metadata with `is_customized: true` plus `detail`; blank/non-string values → `400` |
 | `DELETE` | `/invoices/invoices/email-template/{key}/` | `IsAdmin` | Remove the DB override (`template.email.reset`); return the shipped subject/body, `is_customized: false`, and `detail` |
 

@@ -54,7 +54,7 @@ Global settings (date formats, VAT rates) and ZEV-level configuration (billing i
 
 "Read only" for AppSettings means GET `/api/v1/auth/app-settings/` is allowed for any authenticated user; the frontend `AppSettingsProvider` loads it at boot for date formatting everywhere.
 
-Admin-only frontend routes are wrapped in `<ProtectedRoute allowedRoles={['admin']}>`. On the backend, VAT rates, the invoice dashboard, PDF templates, the email-template list, and email-template mutations use `IsAdmin`. The invoice-email detail `GET` is the one exception: `EmailTemplateView.get_permissions()` returns `IsZevOwnerOrAdmin` for `invoice_email` GET, allowing ZEV owners to read their effective global fallback and catalog; other global email-template details remain admin-only. This intentional read exception exposes only global template text and static catalog metadata needed for the per-ZEV editor, not per-ZEV overrides, recipient data, credentials, or other communities' data. Participants receive `403` and unauthenticated callers `401`. The `app_settings` endpoint uses `IsAuthenticated` with a manual `request.user.is_admin` check in the view body.
+Admin-only frontend routes are wrapped in `<ProtectedRoute allowedRoles={['admin']}>`. On the backend, VAT rates, the invoice dashboard, PDF templates, the email-template list, and email-template mutations use `IsAdmin`. The invoice-email detail `GET` is the one exception: `EmailTemplateView.get_permissions()` returns `HasZevAccess` for `invoice_email` GET, allowing ZEV owners to read their effective global fallback and catalog; other global email-template details remain admin-only. This intentional read exception exposes only global template text and static catalog metadata needed for the per-ZEV editor, not per-ZEV overrides, recipient data, credentials, or other communities' data. Participants receive `403` and unauthenticated callers `401`. The `app_settings` endpoint uses `IsAuthenticated` with a manual `request.user.is_admin` check in the view body.
 
 ---
 
@@ -278,7 +278,7 @@ on-disk default. See `2026-08-contract-pdf-redesign.md` §5.2.
 `EmailTemplateListView` and `EmailTemplateView` are served from
 `views_templates.py`. The list remains `IsAdmin` and returns a bare array of
 `{template_key, subject, body, is_customized}` without `fields`. Single-template
-`GET` uses `IsZevOwnerOrAdmin` for `invoice_email` and `IsAdmin` for other keys, and returns
+`GET` uses `HasZevAccess` for `invoice_email` and `IsAdmin` for other keys, and returns
 `{template_key, subject, body, is_customized, fields}`. `PATCH` and `DELETE`
 use `IsAdmin`, return `detail` without recomputing the catalog (the client
 refetches the detail after either mutation), and reject unknown keys with
@@ -591,7 +591,7 @@ keep edit rights.
 **Email template fields** (via `ZevEmailTemplateFields`):
 - **Draft:** Subject and body change independently. An inherited field shows the platform text read-only (DB override when present, otherwise the hardcoded default); `Customize` seeds its editor with that text. `Use platform default` stages `''`; Save persists it and Discard restores the saved value. Clearing an editor while typing keeps it mounted and focused, even when the saved field inherits the default. `ZevSettingsPage` increments `emailEditorRevision` on a successful save or Discard and passes it as `resetRevision`; only that explicit reset clears both fields’ local editing modes. Community changes remount the fields using the ZEV id and selection epoch.
 - **Source:** Each field's badge reports its saved source (`Using platform default` / `Customized for this ZEV`) via the shared `TemplateSourceStatus` labels (`templates.source.*`), decoupled from the ZEV settings copy so rewording one surface cannot silently change the other. Draft changes show a separate `Unsaved changes` cue; a cleared unsaved field says inheritance starts after Save. Text matching today's platform default still counts as a saved override. Notes fields have no source badges.
-- **Validation:** Inline subject/body errors stay beside their fields, including inherited fields. Owner reads of the fallback are authorized (`IsZevOwnerOrAdmin` on the `invoice_email` detail GET); a failed fetch shows one error and permits customization from a blank editor.
+- **Validation:** Inline subject/body errors stay beside their fields, including inherited fields. Owner reads of the fallback are authorized (`HasZevAccess` on the `invoice_email` detail GET); a failed fetch shows one error and permits customization from a blank editor.
 - **Field insertion:** The shared `FieldReference` hides behind an `Insert field` toggle (default closed; with no editor focused and the body on default, a token click starts the body from the default text on a new line). Open, it renders from the owner-readable global response's `fields` catalog with search, examples, occurrence badges, and caret insertion for `{invoice_number}`, `{zev_name}`, `{participant_name}`, `{period_start}`, `{period_end}`, `{due_date}` (empty when absent), and `{total_chf}`. The same component is used by both admin email and PDF editors.
 
 ### 9.8 TypeScript types
@@ -717,7 +717,7 @@ Changing date formats does NOT retroactively modify already-generated PDF files 
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Wrong VAT rate selected for invoice period | High | Non-overlapping validation in `clean()`. `active_for_day()` returns deterministic result. Test coverage for boundary dates. |
-| Unauthorized settings changes | High | Admin routes use frontend role guards; backend settings, dashboard, PDF templates, email list, and email mutations use `IsAdmin`. Only invoice-email detail GET uses `IsZevOwnerOrAdmin`; participants and guests remain denied. |
+| Unauthorized settings changes | High | Admin routes use frontend role guards; backend settings, dashboard, PDF templates, email list, and email mutations use `IsAdmin`. Only invoice-email detail GET uses `HasZevAccess`; participants and guests remain denied. |
 | Template regressions in generated PDFs | Medium | Admin can edit and preview HTML template. Template is a Django template file readable in plain text. |
 | Email template rendering failure | Medium | On `KeyError`/`ValueError`, the invoice-email task falls back to the shipped defaults and logs a warning; other uncaught formatting errors are not guaranteed to degrade gracefully. |
 | VAT overlap allowing double taxation | High | `clean()` checks all existing ranges. `full_clean()` called in `save()`. API wraps validation errors for clear feedback. |

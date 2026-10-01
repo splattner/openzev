@@ -51,11 +51,26 @@ def build_unique_username(*, first_name: str, last_name: str, email: str | None 
     return username
 
 
-def own_participant_for_user(user):
-    """Self-service membership shared by ``/auth/me`` and report downloads."""
+def own_participant_for_user(user, zev_id=None):
+    """Self-service membership shared by ``/auth/me`` and report downloads.
+
+    The account's current participant row — in ``zev_id`` when given, else the
+    first by ordering. An ended row is not a membership any more (#761); an
+    unusable ``zev_id`` finds nothing rather than raising.
+    """
+    from django.core.exceptions import ValidationError
+
+    from .access import live_participant_q
     from .models import Participant
 
-    return Participant.objects.filter(user=user).select_related("zev").first()
+    rows = Participant.objects.filter(live_participant_q(), user=user).select_related("zev")
+    if zev_id:
+        try:
+            rows = rows.filter(zev_id=zev_id)
+            return rows.first()
+        except (ValidationError, ValueError):
+            return None
+    return rows.first()
 
 
 def sync_participant_user_fields(participant, user) -> None:
