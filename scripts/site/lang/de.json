@@ -11,6 +11,8 @@
   "hero_lede": "Lastgänge importieren, den Solarstrom pro 15-Minuten-Intervall auf die Teilnehmenden aufteilen, mit Ihren Tarifen bewerten und eine QR-Rechnung versenden. Ich habe es geschrieben, um meinen eigenen ZEV abzurechnen, und stelle es zur Verfügung, falls es für Ihren nützlich ist.",
   "cta_start": "Mit einem Befehl starten",
   "cta_source": "Quellcode auf GitHub",
+  "selfhost_b": "Kein Cloud-Dienst.",
+  "selfhost_t": "Gebaut für den Eigengebrauch und für Selbst-Hoster, die gerne ihren eigenen Stack betreiben. Es gibt keine Anmeldung und kein Abo: Sie betreiben OpenZEV auf Ihrem eigenen Server, und Ihre Daten bleiben dort.",
 
   "flow_eyebrow": "Energiebilanz · Demo-Gemeinschaft · Q3 2026",
   "flow_aria": "Energiefluss eines Quartals. Von 1’888.85 kWh Produktion vor Ort werden 625.8 kWh lokal verbraucht und 1’263.05 kWh ins Netz eingespeist. Weitere 738.9 kWh werden aus dem Netz bezogen. Der lokale Verbrauch beträgt damit 1’364.7 kWh, die Eigenverbrauchsquote 33.1 Prozent.",

@@ -11,6 +11,8 @@
   "hero_lede": "Importez les courbes de charge, répartissez le solaire entre les participant·e·s par intervalle de 15 minutes, valorisez-le selon vos tarifs et envoyez une QR-facture. Je l’ai écrit pour facturer mon propre RCP, et je le publie au cas où il serait utile pour le vôtre.",
   "cta_start": "Démarrer en une commande",
   "cta_source": "Code source sur GitHub",
+  "selfhost_b": "Pas un service hébergé.",
+  "selfhost_t": "Conçu pour un usage personnel et pour les adeptes de l’auto-hébergement qui aiment exploiter leur propre pile. Ni inscription ni abonnement : vous faites tourner OpenZEV sur votre propre serveur, et vos données y restent.",
 
   "flow_eyebrow": "Bilan énergétique · communauté de démo · T3 2026",
   "flow_aria": "Flux d’énergie sur un trimestre. Sur 1 888,85 kWh produits sur place, 625,8 kWh sont consommés localement et 1 263,05 kWh sont injectés dans le réseau. 738,9 kWh supplémentaires sont soutirés du réseau, ce qui porte la consommation locale à 1 364,7 kWh et le taux d’autoconsommation à 33,1 pour cent.",

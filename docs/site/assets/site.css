@@ -165,6 +165,18 @@ p { margin: 0; }
 .btn-primary:hover { background: #379059; }
 .btn-ghost { border-color: rgba(158,195,172,.34); color: #dcebe1; }
 .btn-ghost:hover { border-color: var(--ozv-sage); background: rgba(158,195,172,.09); }
+.selfhost {
+  margin-top: 28px;
+  max-width: 52ch;
+  padding: 14px 18px;
+  border-left: 3px solid var(--ozv-sun);
+  border-radius: 0 10px 10px 0;
+  background: rgba(246,194,19,.07);
+  color: #c6dacd;
+  font-size: var(--step--1);
+  line-height: 1.55;
+}
+.selfhost b { color: var(--ozv-sun); font-weight: 600; }
 
 /* Energy-flow ribbon */
 .flow-card {

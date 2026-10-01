@@ -11,6 +11,8 @@
   "hero_lede": "Import the load curves, split the solar between participants per 15-minute interval, price it against your tariffs, send a QR-bill invoice. I wrote it to bill my own ZEV, and put it out in case it is useful for yours.",
   "cta_start": "Start in one command",
   "cta_source": "View source on GitHub",
+  "selfhost_b": "Not a hosted service.",
+  "selfhost_t": "Built for personal use and self-hosting tinkerers who enjoy running their own stack. There is no sign-up and no subscription: you run OpenZEV on your own server, and your data stays there.",
 
   "flow_eyebrow": "Energy balance · demo community · Q3 2026",
   "flow_aria": "Energy flow for one quarter. Of 1888.85 kWh produced on site, 625.8 kWh is used locally and 1263.05 kWh is exported to the grid. A further 738.9 kWh is imported from the grid, bringing local consumption to 1364.7 kWh and the self-consumption rate to 33.1 percent.",
