@@ -6,7 +6,7 @@ This directory captures key architectural decisions for OpenZEV.
 
 - [0001: Assignment-only validity model](0001-assignment-only-validity.md)
 - [0002: Timestamp-level billing allocation model](0002-invoice-allocation-model.md)
-- [0003: Role and ZEV-scope enforcement model](0003-role-and-zev-scope-enforcement.md)
+- [0003: Role and ZEV-scope enforcement model](0003-role-and-zev-scope-enforcement.md) (superseded by 0027)
 - [0004: Asynchronous invoice email delivery with audit logs](0004-async-invoice-email-delivery.md)
 - [0005: Metering import with preview-first validation and safe write modes](0005-metering-import-preview-and-safe-write.md)
 - [0006: Invoice lifecycle state machine and regeneration locking](0006-invoice-lifecycle-and-locking.md)
@@ -28,7 +28,9 @@ This directory captures key architectural decisions for OpenZEV.
 - [0022: Sessions are revoked with a per-account version counter, not a token blacklist](0022-session-revocation-by-version-counter.md)
 - [0023: Backup archives preserve primary keys and restore in place, unlike transfer archives](0023-backup-archives-preserve-keys.md)
 - [0024: Backup artifacts are encrypted under a dedicated, optional key](0024-backup-encryption-key.md)
+- [0025: The MCP server runs inside Django and answers through the REST views](0025-mcp-server-in-process-over-rest.md)
 - [0026: Readings are UTC instants; every calendar question is answered in Swiss civil time](0026-swiss-civil-time-for-billing.md) (supersedes 0007)
+- [0027: Access is granted per ZEV; the platform role only says "admin or not"](0027-per-zev-access-grants.md) (supersedes 0003)
 
 ## Conventions
 

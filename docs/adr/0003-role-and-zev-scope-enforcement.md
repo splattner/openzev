@@ -1,7 +1,8 @@
 # ADR 0003: Role and ZEV-scope enforcement model
 
-- Status: Accepted
+- Status: Superseded
 - Date: 2026-03-24
+- Superseded by: [ADR 0027](0027-per-zev-access-grants.md)
 
 ## Context
 

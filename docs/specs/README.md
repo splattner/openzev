@@ -122,6 +122,8 @@ when the capability changes; do not treat them as baselines:
 - `2026-09-backup-and-restore.md` (Implemented — backups, restore of an instance and of one community, schedule, retention, verification)
 - `2026-09-two-factor-authentication.md` (Draft) — TOTP and passkeys; extends the `auth.*` audit
   namespace shipped in 1.15.0. See [#740](https://github.com/splattner/openzev/issues/740).
+- `2026-10-zev-access-grants.md` (Approved, in progress) — per-ZEV manager/viewer grants replace the
+  platform role; phase 1 of [#761](https://github.com/splattner/openzev/issues/761). ADR 0027.
 
 ## Archived
 
