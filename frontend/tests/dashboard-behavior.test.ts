@@ -340,7 +340,7 @@ describe('dashboard behavior preservation', () => {
         expect(withId.textContent).toContain('70\u00a0%')
     })
 
-    it('participant invoices keep the approved/sent/paid pdf filter with details actions', async () => {
+    it('participant invoices keep the sent/paid pdf filter with details actions', async () => {
         mockState.role = 'participant'
         mockState.hourlyProfile = null
         mockState.hourlyCalls = []
@@ -366,12 +366,12 @@ describe('dashboard behavior preservation', () => {
         for (let i = 0; i < 15 && !container.textContent?.includes('INV-5'); i++) {
             await flush()
         }
-        expect(container.textContent).toContain('INV-1')
+        expect(container.textContent).not.toContain('INV-1')
         expect(container.textContent).toContain('INV-3')
         expect(container.textContent).toContain('INV-5')
         expect(container.textContent).not.toContain('INV-2')
         expect(container.textContent).not.toContain('INV-4')
-        expect(container.querySelector('a[href="/billing/invoices/1"]')).not.toBeNull()
+        expect(container.querySelector('a[href="/billing/invoices/3"]')).not.toBeNull()
         expect(container.querySelector('a[href="/billing/invoices/5"]')).not.toBeNull()
 
         const paidRow = Array.from(container.querySelectorAll('tbody tr')).find((row) =>

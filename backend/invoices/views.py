@@ -14,7 +14,7 @@ from accounts.permissions import IsZevOwnerOrAdmin
 from allocation.errors import AllocationError
 from zev.models import Zev, Participant
 from zev.scoping import ZevScopedQuerySetMixin
-from .models import Invoice, InvoicePdfStatus, InvoiceStatus, EmailLog
+from .models import Invoice, InvoicePdfStatus, InvoiceStatus, EmailLog, sent_to_participant
 from .serializers import (
     InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
     GenerateZevInvoicesSerializer
@@ -112,6 +112,9 @@ class InvoiceViewSet(
     permission_classes = [IsAuthenticated]
     zev_owner_filter = "zev__owner"
     participant_filter = "participant__user"
+    # A participant sees an invoice only once it has been sent to them (#861):
+    # list, detail and every detail action (``/pdf`` included) go through this.
+    participant_visible = sent_to_participant()
 
     def get_serializer_class(self):
         # The list is the one unbounded read here — the admin invoice view has
@@ -123,7 +126,7 @@ class InvoiceViewSet(
         return super().get_serializer_class()
 
     def get_queryset(self):
-        # Participants see only their own invoices.
+        # Participants see only their own invoices, and only once sent.
         queryset = Invoice.objects.select_related("participant", "zev")
         # Prefetching what the list serializer does not render would keep the
         # database cost the payload change just removed. getattr because schema

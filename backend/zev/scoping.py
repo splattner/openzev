@@ -21,6 +21,7 @@ object into a ZEV you would be allowed to see.
 
 import uuid
 
+from django.db.models import Q
 from rest_framework import serializers
 
 
@@ -36,6 +37,10 @@ class ZevScopedQuerySetMixin:
       participants get an empty queryset (owner-only resource).
     - ``participant_distinct``: set to ``True`` when the participant filter
       traverses a to-many relation and may produce duplicate rows.
+    - ``participant_visible``: an optional ``Q`` a row must also match to be
+      visible to a participant, for rows a participant may only see once they
+      reach a given state (an invoice once it is sent). Owners and admins are
+      not narrowed by it.
     - ``scope_parent_path``: attribute chain from a write payload to the ZEV
       the object would belong to. The first element is the key in
       ``validated_data``; any further elements walk from that object to its
@@ -47,6 +52,7 @@ class ZevScopedQuerySetMixin:
     zev_owner_filter: str
     participant_filter: str | None = None
     participant_distinct: bool = False
+    participant_visible: Q | None = None
     scope_parent_path: tuple[str, ...] | None = None
 
     def scope_queryset(self, qs):
@@ -77,6 +83,8 @@ class ZevScopedQuerySetMixin:
         if self.participant_filter is None:
             return qs.none()
         qs = self._exclude_disabled_zev(qs.filter(**{self.participant_filter: user}))
+        if self.participant_visible is not None:
+            qs = qs.filter(self.participant_visible)
         if self.participant_distinct:
             qs = qs.distinct()
         return qs

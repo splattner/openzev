@@ -63,6 +63,9 @@ class InvoiceRBACTests(TestCase):
         self.assertNotIn(str(self.inv2.pk), ids)
 
     def test_participant_sees_only_own_invoices(self):
+        self.inv1.status = InvoiceStatus.SENT
+        self.inv1.sent_at = datetime.now(timezone.utc)
+        self.inv1.save(update_fields=["status", "sent_at"])
         auth(self.client, self.puser)
         status_code, ids = self._list()
         self.assertEqual(status_code, 200)

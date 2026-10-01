@@ -551,12 +551,13 @@ Existing suites stay green (contract: 58 tests in `test_contract_context.py`; te
 
 **`PdfRenderFetchPolicyTests`** (same module) — pins the `render_pdf` protocol boundary at the fetcher itself: `file:`/`http:`/`https:`/`ftp:` URLs raise, `data:` URIs fetch. Non-admin denial on the preview is additionally covered by the `ALL_ENDPOINTS` permission loops at the top of the module.
 
-**`InvoicePdfDownloadTests`** (same module, 5 tests) — authenticated `GET /invoices/{id}/pdf/` endpoint:
+**`InvoicePdfDownloadTests`** (same module, 6 tests) — authenticated `GET /invoices/{id}/pdf/` endpoint:
 
 | Test | Asserts |
 |---|---|
 | `test_pdf_returns_200_pdf_for_owner` | ZEV owner → 200 `application/pdf`, streaming body starts `%PDF-` |
-| `test_pdf_returns_200_for_own_participant` | participant assigned to that invoice → 200 |
+| `test_pdf_returns_200_for_own_participant` | participant assigned to that invoice, once sent → 200 |
+| `test_pdf_returns_404_for_own_participant_before_sending` | participant assigned to a draft invoice with a stored PDF → 404 (#861) |
 | `test_pdf_returns_404_when_no_pdf_file` | invoice with no stored `pdf_file` → 404 |
 | `test_pdf_returns_404_for_out_of_scope` | user not in the invoice's ZEV scope → 404 (not 403) |
 | `test_pdf_returns_401_for_anonymous` | unauthenticated → 401 |

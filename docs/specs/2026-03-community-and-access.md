@@ -317,6 +317,12 @@ writes to them are what `has_object_permission` (§4.3) and
 matching, not a plain filter) and calls `_exclude_disabled_zev` directly on
 its result.
 
+**Participant-only narrowing (`participant_visible`):** a viewset may set
+`participant_visible` to a `Q` that a row must also match to be visible in the
+participant branch; the owner and admin branches are not narrowed by it.
+`InvoiceViewSet` sets it to `invoices.models.sent_to_participant()`, so a
+participant sees an invoice only once it has been sent to them (#861).
+
 ### 4.5 Write scoping (`ZevScopedQuerySetMixin`)
 
 `has_object_permission` runs on detail routes only — DRF has no object to
@@ -1470,7 +1476,7 @@ backend's primary access control mechanism.
 | User (list) | all (`IsAdmin`) | PermissionDenied | PermissionDenied | PermissionDenied |
 | ImportLog | all | `zev.owner == user` OR `imported_by == user` | PermissionDenied | PermissionDenied |
 | MeterReading | all | ZEV-scoped meters | raw/chart readings only within own assignment dates (UTC); CRUD routes denied | PermissionDenied |
-| Invoice | all | `zev.owner == user` | `participant.user == user` | — |
+| Invoice | all | `zev.owner == user` | `participant.user == user`, once sent (`sent_at` set or status `sent`/`paid`; #861) | — |
 
 For participant raw/chart metering access, the assignment's meter and linked
 user must match the reading and caller, and its inclusive validity window

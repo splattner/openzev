@@ -764,7 +764,7 @@ Tests cover dashboard access (`test_invoice_dashboard_is_admin_only`) confirming
 
 ### 13.1a Template administration backend coverage
 
-- `backend/invoices/test_template_admin.py`: 49 methods across 8 classes cover
+- `backend/invoices/test_template_admin.py`: 50 methods across 8 classes cover
   declarative permissions, DENIED mutation audits, admin/ZEV-owner email reads,
   participant `403` and unauthenticated `401` read denials, CRUD validation, and
   catalog responses for every PDF/email detail GET endpoint. PATCH/DELETE tests

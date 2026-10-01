@@ -33,7 +33,7 @@ from .generated_chart_tokens import (
     _CHART_LOCAL,
     _CHART_MUTED,
 )
-from .models import Invoice, InvoiceStatus
+from .models import Invoice, InvoiceStatus, sent_to_participant
 from .pdf import _format_date_value, _render_template
 
 ANNUAL_STATEMENT_TEMPLATE = "invoices/annual_statement_pdf.html"
@@ -536,8 +536,14 @@ def generate_annual_statement_pdf(
     *,
     shares_by_date: ParticipantSharesByDate | None = None,
     zev_totals_by_ts: tuple[dict, dict] | None = None,
+    sent_only: bool = False,
 ) -> bytes:
-    """Generate an annual statement, reusing optional ZEV-wide batch data."""
+    """Generate an annual statement, reusing optional ZEV-wide batch data.
+
+    ``sent_only`` limits the invoice figures to invoices already sent to the
+    participant — set for the participant's own download, which must not add
+    in drafts or approved-but-undelivered amounts (#861).
+    """
     lang = zev.invoice_language or "de"
     tr = ANNUAL_TRANSLATIONS.get(lang, ANNUAL_TRANSLATIONS["de"])
     app_settings = AppSettings.load()
@@ -555,14 +561,15 @@ def generate_annual_statement_pdf(
     year_start = date(year, 1, 1)
     year_end = date(year, 12, 31)
 
-    year_invoices = list(
-        Invoice.objects.filter(
-            participant=participant,
-            zev=zev,
-            period_start__gte=year_start,
-            period_end__lte=year_end,
-        ).exclude(status=InvoiceStatus.CANCELLED).prefetch_related("items").order_by("period_start")
-    )
+    year_invoices_qs = Invoice.objects.filter(
+        participant=participant,
+        zev=zev,
+        period_start__gte=year_start,
+        period_end__lte=year_end,
+    ).exclude(status=InvoiceStatus.CANCELLED)
+    if sent_only:
+        year_invoices_qs = year_invoices_qs.filter(sent_to_participant())
+    year_invoices = list(year_invoices_qs.prefetch_related("items").order_by("period_start"))
 
     date_pattern = app_settings.date_format_short
     invoice_rows = []

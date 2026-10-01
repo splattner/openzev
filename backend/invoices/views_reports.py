@@ -144,7 +144,9 @@ class AnnualStatementView(APIView):
             if not participant:
                 return Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
             zev = participant.zev
+            sent_only = True
         else:
+            sent_only = False
             participant_id = request.query_params.get("participant_id")
             zev_id = request.query_params.get("zev_id")
             if not participant_id or not zev_id:
@@ -160,7 +162,7 @@ class AnnualStatementView(APIView):
                 return error
 
         return _pdf_response(
-            generate_annual_statement_pdf(participant, zev, year),
+            generate_annual_statement_pdf(participant, zev, year, sent_only=sent_only),
             f"annual-statement-{year}-{participant.last_name}.pdf",
             disposition="inline",
         )

@@ -15,6 +15,21 @@ class InvoiceStatus(models.TextChoices):
     CANCELLED = "cancelled", "Cancelled"
 
 
+def sent_to_participant() -> models.Q:
+    """Invoices that have reached their participant (#861).
+
+    A draft is the operator's working state and an approved invoice is final
+    but not yet delivered; neither is the participant's to see. ``sent_at`` is
+    the delivery fact (``mark_invoice_sent`` and ``record_email_delivery`` stamp
+    it), and a sent invoice that was cancelled afterwards stays visible as
+    cancelled. The status clause covers a ``sent``/``paid`` row whose
+    ``sent_at`` was never stamped, so no data migration is needed to rely on it.
+    """
+    return models.Q(sent_at__isnull=False) | models.Q(
+        status__in=(InvoiceStatus.SENT, InvoiceStatus.PAID)
+    )
+
+
 class InvoicePdfStatus(models.TextChoices):
     """Where the invoice's document is, as distinct from the invoice's own status.
 

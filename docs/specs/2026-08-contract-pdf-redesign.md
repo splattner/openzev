@@ -623,7 +623,7 @@ Total: 58 test methods across 9 classes in `test_contract_context.py`.
 **`PdfTemplatePreviewTests`** (11), **`PdfTemplateAdminTests`** (3),
 **`TemplateFieldCatalogEndpointTests`** (5),
 **`PdfTemplateOverrideIntegrityTests`** (9), **`PdfRenderFetchPolicyTests`** (2),
-and **`InvoicePdfDownloadTests`** (5) — 49 test methods across 8 classes.
+and **`InvoicePdfDownloadTests`** (6) — 50 test methods across 8 classes.
 
 **`PdfTemplateOverrideIntegrityTests`** (9 tests):
 

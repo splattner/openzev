@@ -1,6 +1,7 @@
 """Test template endpoint permissions, denial audits, and owner read access."""
 
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 from weasyprint.urls import URLFetcher
 
@@ -669,10 +670,22 @@ class InvoicePdfDownloadTests(TestCase):
         self.assertTrue(b"".join(resp.streaming_content).startswith(b"%PDF"))
 
     def test_pdf_returns_200_for_own_participant(self):
+        from invoices.models import InvoiceStatus
+
+        self.invoice.status = InvoiceStatus.SENT
+        self.invoice.sent_at = timezone.now()
+        self.invoice.save(update_fields=["status", "sent_at"])
         self._attach_pdf(self.invoice)
         auth(self.client, self.participant_user)
         resp = self.client.get(self._url(self.invoice))
         self.assertEqual(resp.status_code, 200)
+
+    def test_pdf_returns_404_for_own_participant_before_sending(self):
+        # A draft's PDF exists for the operator's review only (#861).
+        self._attach_pdf(self.invoice)
+        auth(self.client, self.participant_user)
+        resp = self.client.get(self._url(self.invoice))
+        self.assertEqual(resp.status_code, 404)
 
     def test_pdf_returns_404_when_no_pdf_file(self):
         auth(self.client, self.owner)

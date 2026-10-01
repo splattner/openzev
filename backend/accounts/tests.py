@@ -1166,7 +1166,9 @@ class RbacEndpointMatrixTests(TestCase):
 
 	def test_action_and_delete_role_matrix(self):
 		action_expected = {"admin": 200, "owner": 200, "participant": 403, "guest": 403}
-		delete_expected = {"admin": 204, "owner": 204, "participant": 403, "guest": 404}
+		# The invoice is a draft, which its participant cannot see (#861), so the
+		# delete 404s for them exactly as it does for an unrelated guest.
+		delete_expected = {"admin": 204, "owner": 204, "participant": 404, "guest": 404}
 
 		for role, client in self.clients.items():
 			with self.subTest(role=role, operation="approve"):

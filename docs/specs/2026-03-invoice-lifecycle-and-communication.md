@@ -312,7 +312,7 @@ export job, polls its status, and downloads the artifact when it completes
 
 | Method | URL | Permission | Frontend usage |
 |---|---|---|---|
-| `GET` | `/invoices/invoices/annual-statement/` | Authenticated (participant sees own, admin/owner ZEV-scoped) | `downloadAnnualStatement({year}, signal?)` (no `zev_id`, backend scopes by participant) behind the participant Annual Statement tab; owners/admins supply `participant_id` + `zev_id`, which this page does not do |
+| `GET` | `/invoices/invoices/annual-statement/` | Authenticated (participant sees own, admin/owner ZEV-scoped) | `downloadAnnualStatement({year}, signal?)` (no `zev_id`, backend scopes by participant) behind the participant Annual Statement tab; owners/admins supply `participant_id` + `zev_id`, which this page does not do. The participant's own download calls `generate_annual_statement_pdf(..., sent_only=True)`, so its invoice table and totals count only invoices already sent to them (§6.1); an owner/admin-requested statement and the whole-ZEV export keep every non-cancelled invoice |
 | `GET` | `/invoices/invoices/financial-summary/` | Authenticated (optional `zev_id` / `participant_id`) | `downloadFinancialSummary({year}, signal?)` behind the participant Tax Overview tab; manager card passes `zev_id` |
 
 `ParticipantYearDocuments` shows Annual Statement (generated on entry) and Tax
@@ -457,7 +457,7 @@ The invoice, contract, and annual-statement PDF templates are editable via the a
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `GET` | `/invoices/invoices/{id}/pdf/` | `IsAuthenticated` + queryset ZEV scoping (owner/participant see own invoices, admin all) | Serve stored PDF artifact via `FileResponse` (`application/pdf`); 404 when no `pdf_file` or out of scope |
+| `GET` | `/invoices/invoices/{id}/pdf/` | `IsAuthenticated` + queryset ZEV scoping (owner sees own ZEV's invoices, participant own sent invoices — §6.1, admin all) | Serve stored PDF artifact via `FileResponse` (`application/pdf`); 404 when no `pdf_file` or out of scope |
 
 
 #### Template preview
@@ -525,13 +525,13 @@ The field catalog (`field_catalog_data.py`) documents both the
 |---|---|
 | `admin` | All invoices across all ZEVs |
 | `zev_owner` | Invoices in ZEVs they own (`zev.owner == user`) |
-| `participant` | Only invoices where `participant.user == user` |
+| `participant` | Only invoices where `participant.user == user` **and** the invoice has been sent to them: `sent_at` is set, or `status` is `sent`/`paid` (`invoices.models.sent_to_participant()`, #861). Drafts, approved-but-unsent invoices and cancelled drafts are invisible — list, detail and every detail action (`/pdf` included) answer as for an out-of-scope invoice (404). A sent invoice that was later cancelled stays visible, shown as cancelled. Applied through `InvoiceViewSet.participant_visible`, so only the participant branch of the scoping is narrowed |
 
 ### 6.2 Action permissions
 
 | Action | `admin` | `zev_owner` (own ZEV) | `participant` |
 |---|---|---|---|
-| List / read | Yes | Yes (own ZEV) | Yes (own invoices) |
+| List / read | Yes | Yes (own ZEV) | Yes (own invoices, once sent — §6.1) |
 | Generate | Yes | Yes | No |
 | Approve / mark-sent / mark-paid / cancel | Yes | Yes | No (HTTP 403) |
 | Generate PDF / send email / retry email | Yes | Yes | No |
@@ -1008,7 +1008,8 @@ the cockpit readiness and attention caches.
 |---|---|---|
 | `test_invoice_list_filter.py` | `InvoiceStatusFilterTests`, `InvoiceStatusFilterScopingTests` | §5.1: comma-separated `?status=` (single/repeated values, whitespace tolerance, empty = absent, all unknown values → 400, list-only so detail routes are unaffected), status × `zev_id` + role scoping (participant cannot enumerate another ZEV's open invoices), composes with pagination |
 | `test_invoice_list_filter.py` | `InvoiceParticipantAndPeriodFilterTests` | §5.1: `?participant_id=` narrows to that participant and composes with `?status=`, cannot widen an owner's scope, malformed UUID → 400; `?period_from=`/`?period_to=` narrow by period overlap (either alone, both together), malformed date → 400 |
-| `tests.py` | `InvoiceRBACTests` | §6: admin sees all, owner sees own ZEV, participant sees own invoices; participant cannot approve/cancel; PDF template access restricted to admin; deletion rules by role and status; generic POST create returns 405 (creation only via generate); serializer ignores forged billing/workflow fields |
+| `test_participant_invoice_visibility.py` | `ParticipantInvoiceVisibilityTests`, `ParticipantAnnualStatementSentOnlyTests` | §6.1 (#861): participant list shows only sent/paid/cancelled-after-sending invoices, owner list unnarrowed, unsent invoices 404 on detail and `/pdf`, a `sent`/`paid` row without `sent_at` stays visible; `sent_only=True` leaves unsent invoices out of the annual statement, default keeps them, participant download passes `sent_only=True` and owner download `False` |
+| `tests.py` | `InvoiceRBACTests` | §6: admin sees all, owner sees own ZEV, participant sees own sent invoices; participant cannot approve/cancel; PDF template access restricted to admin; deletion rules by role and status; generic POST create returns 405 (creation only via generate); serializer ignores forged billing/workflow fields |
 | `tests.py` | `InvoiceBillingIntegrationTests` | §5.2: end-to-end generation via API with metering data; allocation failures reported as 400, not the 409 duplicate-invoice message |
 | `test_workflow.py` | `InvoiceWorkflowTests` | §4.2: approve draft ✓, approve non-draft ✗, mark-sent from approved ✓, mark-sent from draft ✗, mark-paid from sent ✓, mark-paid from draft ✗, cancel from draft/approved/sent ✓, cancel from paid ✗, cancel already-cancelled ✗ |
 | `test_workflow.py` | `InvoiceEngineGuardTests` | §4.4: regenerate approved/paid → 409, regenerate draft/cancelled → success |

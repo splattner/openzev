@@ -57,8 +57,11 @@ covered by readiness steps or setup guidance.
 
 Participants open **My invoices** (`/me/invoices`) in the sidebar to see the
 invoices issued to them — invoice number, period, total, status, and a link to
-the details. Every issued invoice is listed, whether or not its PDF has been
-generated yet; the PDF button appears only on rows that have a document.
+the details. An invoice appears here once it has been sent: drafts and
+approved invoices that haven't gone out yet stay with the operator, and the
+participant's annual statement counts only sent invoices too. A sent invoice
+that is cancelled later stays listed, marked as cancelled. The PDF button
+appears only on rows that have a document.
 Participants with several communities see which community issued each invoice.
 The list is read-only; the deep link `/billing/invoices/{id}` shows a
 participant only their own invoice (enforced by the backend), and its return

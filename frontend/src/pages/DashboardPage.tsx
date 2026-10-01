@@ -137,7 +137,7 @@ export function DashboardPage() {
     const participantInvoicesWithPdf = useMemo(
         () =>
             (invoicesQuery.data ?? []).filter(
-                (invoice) => ['approved', 'sent', 'paid'].includes(invoice.status) && !!invoice.pdf_url,
+                (invoice) => ['sent', 'paid'].includes(invoice.status) && !!invoice.pdf_url,
             ),
         [invoicesQuery.data],
     )
