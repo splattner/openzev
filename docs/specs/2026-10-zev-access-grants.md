@@ -721,15 +721,46 @@ Baseline specs updated in the PR that changes their behaviour:
 
 ## 13. Test plan
 
-### Backend — `zev/test_access_regression.py` (PR 2, extended in PR 4)
+### Backend — `zev/test_access_regression.py` (PR 2; 17 tests, shipped)
 
-**`SingleRelationshipVisibilityMatrixTests`** — for `admin`, `owner` (also own
-participant), `participant`, `guest`, the exact id sets visible on: zevs,
-participants, metering points, assignments, readings (raw/chart), tariffs,
-tariff periods, invoices, audit events, import logs, exports, readiness,
-period overview, reports (statement/financial summary), dashboard summary, MCP
-`list_zevs`. **`SingleRelationshipWriteMatrixTests`** — allowed/denied status for
-create/update/delete and every custom unsafe action per role.
+World (`AccessWorldMixin.setUpTestData`): two communities built with
+`zev.test_transfer.build_populated_zev` — Alpha (owner `acc_owner_a`, who is
+also Alpha's participant "Olivia Owner") and Beta (owner `acc_owner_b`); a
+tenant linked to Alpha's Bob (holder of `ALPHA-CONS-1`) with one sent and one
+draft invoice; a draft invoice in Beta; an extra 100 kWh Beta production
+reading so a leak of Beta's totals is visible; one import log and one audit
+event per community; plus an admin and a guest. Expected sets are computed from
+the database. Every write attempt runs in a rolled-back savepoint.
+
+**`SingleRelationshipVisibilityMatrixTests`** (7):
+
+| Test | Asserts |
+|---|---|
+| `test_list_matrix` | For admin/owner/tenant/guest on zevs, participants, metering points, assignments, tariffs, tariff periods, invoices, readings, import logs, audit events: admin = all rows, owner = Alpha's rows, tenant = their meter and their sent invoice (other lists 403), guest = empty meter/invoice lists (other lists 403) |
+| `test_owner_cannot_open_another_communitys_rows` | Owner gets 404 on Beta's ZEV, participant, metering point, tariff and invoice detail |
+| `test_tenant_opens_only_their_own_sent_invoice` | Own sent invoice 200; own draft and Alice's invoice 404 |
+| `test_zev_scoped_reports_matrix` | Readiness and period overview: admin 200/200, owner 200 (Alpha) / 403 (Beta), tenant and guest 403 |
+| `test_dashboard_summary_matrix` | Admin needs `zev_id` (400 without); owner gets the owner summary for Alpha, 403 for Beta; tenant/guest always get the participant summary and never Beta's totals |
+| `test_self_service_statement_matrix` | Tenant self-service 200; guest 400 (not self-service, so `zev_id`/`participant_id` required); owner 200 for Alpha's participant, 403 for Beta's |
+| `test_mcp_list_zevs_matrix` | Admin lists both ZEVs, owner only Alpha; tenant and guest are refused by the endpoint (403) |
+
+**`SingleRelationshipWriteMatrixTests`** (10) — status per (admin, owner, tenant, guest):
+
+| Test | Asserts |
+|---|---|
+| `test_zev_settings` | PATCH Alpha 200/200/403/403; PATCH Beta 200/404/403/403 |
+| `test_participant_edit` | PATCH Alpha participant 200/200/403/403; Beta participant 200/404/403/403 |
+| `test_create_metering_point` | POST under Alpha 201/201/403/403; under Beta 201/400/403/403 (field error) |
+| `test_create_tariff` | Same shape as metering points |
+| `test_invoice_workflow` | Approve Alpha draft 200/200/403/403, Beta draft 200/404/403/403; delete Alpha draft 204/204/404/404, Beta draft 204/404/404/404 |
+| `test_export_job_creation` | Alpha 202/202/403/403; Beta 202/403/403/403 |
+| `test_disable_zev` | Alpha 200/200/403/403; Beta 200/404/403/403 |
+| `test_account_linking_is_admin_only` | 200/403/403/403 |
+| `test_impersonation` | Admin may impersonate tenant and another owner (200), not a guest or an admin (400); owner always 403 |
+| `test_self_setup_needs_an_owner_account` | Tenant and guest 403; owner with an active community 400 |
+
+A deliberate mutation (owner branch of `_scope_by_role` returning every row)
+fails the list, detail and MCP checks, so the suite discriminates.
 
 ### Backend — `zev/test_access.py` (PR 3)
 
