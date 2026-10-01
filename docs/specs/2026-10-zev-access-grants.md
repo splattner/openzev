@@ -142,7 +142,7 @@ records when the role changed.
 
 **`__str__`:** `f"{user} {role} {zev.name}"`.
 
-**Admin (`zev/admin.py`):** registered read-mostly (`list_display = zev, user, role, valid_from, valid_to`, `list_filter = role`), for support.
+**Admin (`zev/admin.py`):** `ZevAccessGrantAdmin` — `list_display = (zev, user, role, valid_from, valid_to, granted_by)`, `list_filter = (role,)`, `search_fields = (zev__name, user__email, user__username)`, `raw_id_fields = (user, granted_by)`; for support.
 
 ### 4.3 `User` changes (`accounts.models`)
 
@@ -183,10 +183,13 @@ drop `mfa_required_roles`. Release notes must say this.
 
 ### 4.6 Data migration for grants
 
-`zev/migrations/00xx_zev_access_grant.py`: create the model, then for every
-`Zev`: `ZevAccessGrant(zev=zev, user_id=zev.owner_id, role="manager",
-valid_from=zev.start_date)`. Reverse: delete all grants. Lossless — the input is
-exactly `Zev.owner`.
+`zev/migrations/0031_zev_access_grant.py`: create the model, then
+`RunPython(grant_owners, drop_grants)` — for every `Zev`:
+`ZevAccessGrant(zev=zev, user_id=zev.owner_id, role="manager",
+valid_from=<local date of zev.created_at>)`. The creation date, not
+`start_date`: a ZEV planned to start in the future would otherwise lock its owner
+out until then. Reverse: delete all grants. Lossless — the input is exactly
+`Zev.owner`.
 
 ### 4.7 Transitional invariant: the owner holds a manager grant
 
@@ -198,7 +201,8 @@ previous owner's open manager grant is revoked — this preserves today's
 behaviour where reassigning `Zev.owner` removed the old owner's access.
 
 It is called from `Zev.save()` when the instance is being added or `owner_id`
-changed (tracked with `__init__`-time `_loaded_owner_id`). That one hook covers
+changed (tracked as `_loaded_owner_id`, set in `Zev.from_db`; an instance loaded
+with `owner` deferred triggers a harmless no-op sync). That one hook covers
 `create_zev_with_owner_setup`, `create_zev_for_existing_owner`,
 `zev.transfer.importer`, `seed_demo`, `ZevSerializer.update` and every test
 fixture that does `Zev.objects.create(owner=...)`. Bulk `QuerySet.update(owner=…)`
@@ -210,11 +214,19 @@ with `Zev.owner`.
 
 ### 4.8 Backups and transfer archive
 
-- `backups/registry.py`: `zev.ZevAccessGrant` joins the per-ZEV section after
-  `zev.Zev` (the coverage test requires it).
-- `backups/restore_zev.py`: grants are restored through the account transform
-  (`_account_transform`) for `user_id` and `granted_by_id`; a grant whose user
-  does not map is dropped, `granted_by` that does not map becomes null.
+- `backups/registry.py`: new per-ZEV section `access_grants`
+  (`ZevPart("zev.ZevAccessGrant", "zev")`) right after `zev` (the coverage test
+  requires every model to be listed). An instance restore loads it like any
+  other section.
+- `backups/restore_zev.py`: `access_grants` is a **kept** section
+  (`_KEPT_SECTIONS = {"audit_events", "access_grants"}`): a per-ZEV restore rolls
+  data back, not who may act on the community today, just as it never writes
+  accounts. After loading, `zev.access.ensure_a_manager(zev)` gives the owner a
+  manager grant when the community has no active manager at all — the case of a
+  deleted community being recreated, whose grants were deleted with it.
+  Restoring an archive from before grants existed needs the database migrated
+  back first (`check_migrations`); migrating forward again runs §4.6.
+  Recorded in `2026-09-backup-and-restore.md` (decision 18a).
 - ZEV transfer archive: grants are **not** exported (accounts never are). On
   import, the importing account becomes `Zev.owner`, and §4.7 gives it a manager
   grant. Recorded in `2026-08-zev-transfer-archive.md`.
@@ -235,9 +247,15 @@ grant API calls after writing.
 | `can_manage(user, zev) -> bool` | admin, or `zev.pk in managed_zev_ids(user)` |
 | `can_view(user, zev) -> bool` | admin, or `zev.pk in viewable_zev_ids(user)` |
 | `active_grants(user)` | queryset of active grants (for `/auth/me`) |
+| `live_participant_q(prefix="") -> Q` | participant rows that are still current (see below) |
 | `sync_owner_grant(zev, previous_owner_id=None)` | §4.7 |
-| `revoke(grant, *, today=None)` / `change_role(grant, role, *, by)` | §4.2 |
-| `is_last_manager(grant) -> bool` | the grant is `manager`, active, and no other active manager grant exists on its ZEV |
+| `ensure_a_manager(zev)` | `sync_owner_grant(zev)` only when the ZEV has no active manager grant at all (§4.8) |
+| `revoke(grant, *, today=None)` / `change_role(grant, role, *, by=None)` | §4.2; `revoke` leaves an already-ended grant alone |
+| `is_last_manager(grant) -> bool` | the grant is `manager` and no other active manager grant exists on its ZEV |
+| `invalidate(user)` | drop the per-request memo after a write |
+
+`zev` arguments accept a `Zev`, a `UUID` or an id string (as query parameters
+carry it); anything that is not a UUID is treated as no access.
 
 A participant row is **live** when `valid_to is null or valid_to >= today`.
 Future-dated rows count as live (unchanged from today, so onboarding before the
@@ -764,13 +782,30 @@ fails the list, detail and MCP checks, so the suite discriminates.
 
 ### Backend — `zev/test_access.py` (PR 3)
 
-**`ZevAccessGrantModelTests`**: constraints (one open grant, window check),
-active-on-day, revoke sets `valid_to = yesterday`, revoke of a same-day grant
-deletes it, role change creates a new row. **`AccessHelperTests`**: each helper
-for admin/manager/viewer/participant/former/none, memoisation (query count),
-future-dated grant inactive. **`OwnerGrantInvariantTests`**: create ZEV → grant;
-owner change → old revoked, new granted; transfer import → importer granted;
-migration creates one grant per ZEV.
+Shipped with 25 tests (plus 2 in `backups/test_restore_zev.py`,
+`AccessGrantRestoreTests`).
+
+**`ZevAccessGrantModelTests`** (7): one open grant per account and ZEV; a closed
+and an open grant may coexist; the window may not end before it starts; revoke
+ends the window yesterday; revoking a grant that never took effect deletes it;
+revoking an ended grant changes nothing; a role change ends one row and opens
+another.
+
+**`AccessHelperTests`** (10): manager/viewer/stranger answers; ids given as
+strings work and garbage is refused; an admin may do everything with no grant;
+anonymous may do nothing; the id sets; inclusive window bounds and inactive
+future grants; `participant_zev_ids` skips ended rows unless asked; future
+participant rows count as current; one query per memoised user; `is_last_manager`.
+
+**`OwnerGrantInvariantTests`** (7): creating a ZEV makes its owner manager;
+saving without an owner change adds nothing; moving ownership moves the
+manager grant; a new owner who was a viewer is promoted; the owner's grant can be
+revoked afterwards; `ensure_a_manager` acts only when nobody manages; a
+transfer import makes the importer manager.
+
+**`GrantMigrationTests`** (1, `TransactionTestCase`): migrating forward from
+`0030` grants every owner, from the creation date even when `start_date` is in
+the future.
 
 ### Backend — `zev/test_access_scoping.py` (PR 4)
 

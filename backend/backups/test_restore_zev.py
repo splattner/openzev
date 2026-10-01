@@ -30,10 +30,11 @@ from zev.models import MeteringPoint, Participant, Zev
 
 
 def zev_rows(zev_id) -> dict[str, list[dict]]:
-    """The community's restorable rows, field for field (the audit trail is not restored)."""
+    """The community's restorable rows, field for field (kept sections — the audit
+    trail and access grants — are not restored)."""
     result = {}
     for name, parts in ZEV_SECTIONS:
-        if name == "audit_events":
+        if name in restore_zev._KEPT_SECTIONS:
             continue
         for part in parts:
             model = apps.get_model(part.label)
@@ -501,3 +502,27 @@ class MetadataTests(ZevRestoreTestCase):
         self.assertEqual(plan["backup"]["created_at"], self.manifest["created_at"])
         self.assertEqual(plan["media"]["files"], 1)
         self.assertTrue(json.dumps(plan))  # the plan is stored as JSON
+
+
+class AccessGrantRestoreTests(ZevRestoreTestCase):
+    """Grants are a kept section: rolling a community back leaves today's access alone (#761)."""
+
+    def test_existing_grants_are_left_exactly_as_they_are(self):
+        from zev.models import ZevAccessGrant, ZevAccessRole
+
+        viewer = make_user("restore_viewer", UserRole.PARTICIPANT)
+        ZevAccessGrant.objects.create(zev_id=self.alpha_id, user=viewer, role=ZevAccessRole.VIEWER)
+        before = list(ZevAccessGrant.objects.filter(zev_id=self.alpha_id).order_by("pk").values())
+        self.damage_alpha()
+        result = restore_from(self.raw, self.alpha_id)
+        self.assertTrue(result.plan["sections"]["access_grants"]["kept"])
+        self.assertEqual(list(ZevAccessGrant.objects.filter(zev_id=self.alpha_id).order_by("pk").values()), before)
+
+    def test_a_recreated_community_gets_its_owner_as_manager(self):
+        from zev import access
+
+        Invoice.objects.filter(zev_id=self.alpha_id).delete()
+        Zev.objects.filter(pk=self.alpha_id).delete()
+        restore_from(self.raw, self.alpha_id)
+        owner = Zev.objects.get(pk=self.alpha_id).owner
+        self.assertTrue(access.can_manage(owner, self.alpha_id))

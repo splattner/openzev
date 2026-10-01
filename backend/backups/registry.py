@@ -76,6 +76,7 @@ class ZevPart:
 # sections written before it (or at instance-scope rows).
 ZEV_SECTIONS: tuple[tuple[str, tuple[ZevPart, ...]], ...] = (
     ("zev", (ZevPart("zev.Zev", "pk"),)),
+    ("access_grants", (ZevPart("zev.ZevAccessGrant", "zev"),)),
     (
         "participants",
         (

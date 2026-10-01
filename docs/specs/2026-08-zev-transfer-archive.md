@@ -37,7 +37,8 @@ copy, not an in-place restore (see `docs/user-guide/17-zev-transfer.md`).
 - SHA-256 per-member checksums in the manifest (decided: not needed — CRC32 is
   validated by the ZIP container itself).
 - In-place restore; audit events / import logs do not travel.
-- Account references (`owner`, participant `user` link) — never exported.
+- Account references (`owner`, participant `user` link) and access grants
+  (`ZevAccessGrant`, #761) — never exported.
 - Email/PDF templates from the admin console (instance-wide, not ZEV data).
 
 ## 3. Actors, permissions, and ZEV scope
@@ -334,7 +335,9 @@ way readings require.
   absent from this query entirely, so it is silently skipped here rather than
   double-reported. `_verify_manifest_counts` still catches a member the
   manifest declared but the archive does not actually contain (§6).
-- The importing admin becomes `owner` of the new ZEV; `name_override` renames it.
+- The importing admin becomes `owner` of the new ZEV, and through `Zev.save()`'s
+  owner hook also its manager (an active `manager` grant, SPEC-2026-10-zev-access-grants
+  §4.7); `name_override` renames it.
 
 ## 9. Frontend
 

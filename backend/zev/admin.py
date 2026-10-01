@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment
+from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment, ZevAccessGrant
 
 
 class ParticipantInline(admin.TabularInline):
@@ -37,3 +37,11 @@ class MeteringPointAdmin(admin.ModelAdmin):
     list_display = ("meter_id", "zev", "meter_type", "is_active")
     list_filter = ("meter_type", "is_active")
     search_fields = ("meter_id",)
+
+
+@admin.register(ZevAccessGrant)
+class ZevAccessGrantAdmin(admin.ModelAdmin):
+    list_display = ("zev", "user", "role", "valid_from", "valid_to", "granted_by")
+    list_filter = ("role",)
+    search_fields = ("zev__name", "user__email", "user__username")
+    raw_id_fields = ("user", "granted_by")

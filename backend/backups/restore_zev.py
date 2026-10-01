@@ -13,6 +13,10 @@ accounts that must not notice it. The rules that follow from that:
   *now*, and left unlinked when nobody does.
 * **The audit trail is not restored at all.** It is append-only and already
   contains everything the backup's copy does; the restore adds one entry.
+* **Access grants are not restored either.** Who may manage or view a
+  community today is not part of rolling its data back, any more than accounts
+  are. When a restore recreates a deleted community, which then has no grants,
+  its owner is made its manager (``zev.access.ensure_a_manager``).
 * **Every check runs twice**: once to tell the operator (a dry run is the plan),
   and again under the row lock immediately before the first write, because
   minutes can pass between them.
@@ -37,6 +41,8 @@ from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.db import DatabaseError, IntegrityError, connection, transaction
 
+from zev.access import ensure_a_manager
+
 from . import archive
 from .registry import ZEV_SECTIONS
 from .restore import (
@@ -52,8 +58,9 @@ from .restore import (
 
 logger = logging.getLogger(__name__)
 
-# The trail is never restored (see the module docstring); its section is skipped.
-_KEPT_SECTIONS = frozenset({"audit_events"})
+# The trail and the access grants are never restored (see the module
+# docstring); their sections are skipped.
+_KEPT_SECTIONS = frozenset({"audit_events", "access_grants"})
 _LOCKED_STATUSES = ("sent", "paid")
 _MAX_LISTED = 20
 
@@ -466,6 +473,7 @@ def restore_zev(
                 _clear_zev(zev_id, facts.contract_issue_ids)
                 _apply(zf, manifest, facts, report, referenced, write=True)
                 _verify_counts(zev_id, report)
+                ensure_a_manager(zev_model.objects.get(pk=zev_id))
                 connection.check_constraints()
                 progress("Restoring invoice PDFs…")
                 _restore_media(zf, manifest, referenced, report, undo, only_zev=zev_id)

@@ -206,6 +206,34 @@ class Zev(models.Model):
     def __str__(self):
         return f"{self.name} ({self.get_zev_type_display()})"
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        # Remembered so ``save`` can tell an ownership change from any other
+        # save (deferred loads leave it unknown, which only costs a no-op sync).
+        instance._loaded_owner_id = instance.__dict__.get("owner_id")
+        return instance
+
+    def save(self, *args, **kwargs):
+        """Keep the owner's manager grant in step with ``owner`` (#761).
+
+        Until the party layer replaces ``owner`` (phase 2), creating a ZEV or
+        moving its ownership must leave the owner holding an active manager
+        grant, and moving ownership revokes the previous owner's — the access
+        the old ``owner == user`` checks used to give and take away. One hook
+        here covers every path that creates or reassigns a ZEV (admin wizard,
+        self-setup, transfer import, demo seed, fixtures). See
+        ``zev.access.sync_owner_grant`` and SPEC-2026-10-zev-access-grants §4.7.
+        """
+        adding = self._state.adding
+        previous_owner_id = getattr(self, "_loaded_owner_id", None)
+        super().save(*args, **kwargs)
+        if adding or self.owner_id != previous_owner_id:
+            from .access import sync_owner_grant
+
+            sync_owner_grant(self, previous_owner_id=None if adding else previous_owner_id)
+            self._loaded_owner_id = self.owner_id
+
     @property
     def is_disabled(self) -> bool:
         return self.disabled_at is not None
@@ -517,3 +545,57 @@ class MeteringPointAssignment(models.Model):
     def __str__(self):
         valid_to = self.valid_to.isoformat() if self.valid_to else "open"
         return f"{self.metering_point.meter_id} → {self.participant.full_name} ({self.valid_from} - {valid_to})"
+
+
+class ZevAccessRole(models.TextChoices):
+    MANAGER = "manager", "Manager"
+    VIEWER = "viewer", "Viewer"
+
+
+class ZevAccessGrant(models.Model):
+    """An account's right to manage or view one ZEV, for a dated window (#761).
+
+    Replaces the platform-wide ``zev_owner`` role and ``Zev.owner`` as the
+    answer to "may this account act on this ZEV" (ADR 0027). A ``manager`` has
+    today's owner rights; a ``viewer`` sees everything a manager sees and
+    changes nothing. The window is inclusive at both ends, like
+    ``MeteringPointAssignment`` (ADR 0001); ``valid_to`` null is open-ended.
+    Revoking ends the window yesterday (or deletes a grant that never took
+    effect), and a role change ends one grant and opens another, so the rows
+    are the history of who could act on the ZEV and when. Read through
+    ``zev.access``, never directly by views.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    zev = models.ForeignKey(Zev, on_delete=models.CASCADE, related_name="access_grants")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="zev_grants")
+    role = models.CharField(max_length=10, choices=ZevAccessRole.choices)
+    valid_from = models.DateField(default=timezone.localdate)
+    valid_to = models.DateField(null=True, blank=True)
+    granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="+",
+        help_text="Who granted it; empty for grants created by migration or by owning the ZEV.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["zev_id", "role", "user_id", "valid_from", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["zev", "user"],
+                condition=models.Q(valid_to__isnull=True),
+                name="one_open_zev_grant_per_user",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=models.F("valid_from")),
+                name="zev_grant_valid_window",
+            ),
+        ]
+        indexes = [models.Index(fields=["user", "valid_to"], name="zev_grant_user_valid_to")]
+
+    def __str__(self):
+        return f"{self.user} {self.role} {self.zev.name}"

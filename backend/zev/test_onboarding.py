@@ -564,9 +564,11 @@ class OnboardingConstraintUpgradeTests(TransactionTestCase):
         call_command("migrate", "zev", "0028", verbosity=0, interactive=False)
         try:
             owner = make_user("owner_mig_0029", UserRole.ZEV_OWNER)
-            zev = Zev.objects.create(
-                name="Mig ZEV", owner=owner, zev_type="vzev", invoice_prefix="M",
-            )
+            # bulk_create, not create: Zev.save() also writes the owner's
+            # access grant, whose table does not exist at 0028.
+            zev = Zev.objects.bulk_create([
+                Zev(name="Mig ZEV", owner=owner, zev_type="vzev", invoice_prefix="M"),
+            ])[0]
             participant = Participant.objects.create(
                 zev=zev, first_name="Mig", last_name="Rate",
                 email="mig@example.com", valid_from=date(2026, 1, 1),
