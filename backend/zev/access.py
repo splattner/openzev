@@ -3,15 +3,20 @@
 Access is per ZEV (ADR 0027, SPEC-2026-10-zev-access-grants §5): an account
 manages a ZEV through an active ``manager`` grant, views it through an active
 ``manager`` or ``viewer`` grant, and reaches its own rows as a participant
-through ``Participant.user``. An admin may do everything and needs no grant;
+through ``Participant.user``. An account also manages a ZEV while a party it
+belongs to — through ``Party.user`` or one of the party's participations —
+holds the issuer or representative role there (``MANAGING_ROLES``, ADR 0028
+amended, SPEC-2026-10-zev-parties §5.5). That access is derived from the dated
+role, never stored as a grant, so it starts and ends with the role. An admin may do everything and needs no grant;
 ``can_manage``/``can_view`` say so, while the id-set helpers return only what
 the account holds itself, so a caller that filters by them checks
 ``user.is_admin`` first (as every scoping branch already does).
 
 "Today" is the Swiss civil date (``timezone.localdate()``, ADR 0026). Grant
-lookups are memoised on the user instance, so a request costs one grant query
-and one participant query however often it asks. The memo also carries the day
-and a generation that every save or delete of a grant or participant row bumps
+lookups are memoised on the user instance, so a request costs one grant query,
+one role query and one participant query however often it asks. The memo also
+carries the day and a generation that every save or delete of a grant,
+participant, party or party role bumps
 (``bump_generation``, wired in ``ZevConfig.ready``), so a user object that lives
 longer than one request — a test client's forced user, a task — never answers
 from stale rows; ``invalidate`` drops it outright.
@@ -28,7 +33,7 @@ from django.utils import timezone
 
 from allocation.validity import active_on
 
-from .models import Participant, ZevAccessGrant, ZevAccessRole
+from .models import MANAGING_ROLES, Participant, ZevAccessGrant, ZevAccessRole, ZevPartyRole
 
 _CACHE_ATTR = "_zev_access_cache"
 _generation = 0
@@ -72,17 +77,74 @@ def _grant_sets(user) -> tuple[frozenset, frozenset]:
             viewable.add(zev_id)
             if role == ZevAccessRole.MANAGER:
                 managed.add(zev_id)
-        memo["grants"] = (frozenset(managed), frozenset(viewable))
+        role_zevs = frozenset(role_holdings(user, memo["day"]).values_list("zev_id", flat=True))
+        memo["grants"] = (frozenset(managed) | role_zevs, frozenset(viewable) | role_zevs)
     return memo["grants"]
 
 
+def _party_of_account_q(user, prefix: str = "") -> Q:
+    """Parties the account belongs to: its own (``Party.user``) or through a participation."""
+    return Q(**{f"{prefix}user": user}) | Q(**{f"{prefix}participations__user": user})
+
+
+def role_holdings(user, day: date | None = None):
+    """The account's managing role rows in effect on ``day`` (issuer, representative)."""
+    rows = ZevPartyRole.objects.filter(role__in=MANAGING_ROLES).filter(_party_of_account_q(user, "party__"))
+    return active_on(rows, day or _today()).distinct()
+
+
+def holds_managing_role_ever(user) -> bool:
+    """Whether the account has ever been issuer or representative of any ZEV."""
+    return ZevPartyRole.objects.filter(role__in=MANAGING_ROLES).filter(_party_of_account_q(user, "party__")).exists()
+
+
+def party_accounts(party) -> list:
+    """The accounts that belong to ``party``: its own, then its participations'."""
+    accounts = []
+    if party.user_id is not None:
+        accounts.append(party.user)
+    for participation in party.participations.select_related("user").exclude(user=None).order_by("-valid_from", "id"):
+        if participation.user not in accounts:
+            accounts.append(participation.user)
+    return accounts
+
+
+def role_managers(zev, day: date | None = None) -> list[tuple]:
+    """``(account, role_row)`` for every account managing ``zev`` through its party's role on ``day``."""
+    rows = active_on(
+        ZevPartyRole.objects.filter(zev_id=_zev_id(zev), role__in=MANAGING_ROLES).select_related("party__user"),
+        day or _today(),
+    )
+    return [(account, row) for row in rows for account in party_accounts(row.party)]
+
+
+def role_holdings_by_account(day: date | None = None) -> dict:
+    """Every managing role row in effect on ``day``, by account id — for a list
+    of accounts, in a fixed number of queries (``build_memberships(roles=…)``)."""
+    rows = active_on(ZevPartyRole.objects.filter(role__in=MANAGING_ROLES), day or _today())
+    by_account: dict = {}
+    for row in rows.select_related("zev", "party").prefetch_related("party__participations"):
+        accounts = {row.party.user_id} | {participation.user_id for participation in row.party.participations.all()}
+        for account_id in accounts - {None}:
+            by_account.setdefault(account_id, []).append(row)
+    return by_account
+
+
+def has_manager(zev, *, exclude_grant=None, day: date | None = None) -> bool:
+    """Whether ``zev`` has an account that manages it on ``day``, by grant or role."""
+    grants = active_on(ZevAccessGrant.objects.filter(zev_id=_zev_id(zev), role=ZevAccessRole.MANAGER), day or _today())
+    if exclude_grant is not None:
+        grants = grants.exclude(pk=exclude_grant.pk)
+    return grants.exists() or bool(role_managers(zev, day))
+
+
 def managed_zev_ids(user) -> frozenset:
-    """ZEVs the account holds an active ``manager`` grant for."""
+    """ZEVs the account manages: an active ``manager`` grant, or a managing role."""
     return _grant_sets(user)[0] if _is_account(user) else frozenset()
 
 
 def viewable_zev_ids(user) -> frozenset:
-    """ZEVs the account holds an active ``manager`` or ``viewer`` grant for."""
+    """ZEVs the account may view: any active grant, or a managing role."""
     return _grant_sets(user)[1] if _is_account(user) else frozenset()
 
 
@@ -138,11 +200,11 @@ def active_grants(user):
 
 
 def is_last_manager(grant: ZevAccessGrant) -> bool:
-    """Whether ``grant`` is the only active manager grant of its ZEV."""
+    """Whether ending ``grant`` would leave its ZEV without a manager — no other
+    manager grant and nobody managing through the issuer or representative role."""
     if grant.role != ZevAccessRole.MANAGER:
         return False
-    managers = active_on(ZevAccessGrant.objects.filter(zev_id=grant.zev_id, role=ZevAccessRole.MANAGER), _today())
-    return not managers.exclude(pk=grant.pk).exists()
+    return not has_manager(grant.zev_id, exclude_grant=grant)
 
 
 def revoke(grant: ZevAccessGrant, *, today: date | None = None) -> ZevAccessGrant | None:
@@ -197,7 +259,7 @@ def grant_manager(zev, user, *, by=None) -> ZevAccessGrant:
     )
 
 
-def build_memberships(grants, participants, *, today: date | None = None) -> list[dict]:
+def build_memberships(grants, participants, *, roles=(), today: date | None = None) -> list[dict]:
     """One entry per ZEV the account relates to, for ``/auth/me`` and the admin
     accounts list (spec §7.7).
 
@@ -205,6 +267,9 @@ def build_memberships(grants, participants, *, today: date | None = None) -> lis
     participant rows (current and ended, so a former participant can still
     reach its invoices), each with ``zev`` loaded — passed in rather than
     queried so a list of accounts can build this from prefetched rows.
+    ``roles`` are its managing role rows in effect today (``role_holdings``,
+    with ``zev``): each makes the entry's access ``manager`` and is listed
+    under ``roles``.
     """
     today = today or _today()
     by_zev: dict = {}
@@ -215,11 +280,17 @@ def build_memberships(grants, participants, *, today: date | None = None) -> lis
             "zev_name": zev.name,
             "zev_disabled": zev.disabled_at is not None,
             "access": None,
+            "roles": [],
             "participants": [],
         })
 
     for grant in grants:
         entry(grant.zev)["access"] = grant.role
+    for row in roles:
+        item = entry(row.zev)
+        item["access"] = ZevAccessRole.MANAGER
+        if row.role not in item["roles"]:
+            item["roles"].append(row.role)
     for participant in participants:
         entry(participant.zev)["participants"].append({
             "id": str(participant.pk),
@@ -235,6 +306,7 @@ def memberships_for(user) -> list[dict]:
     return build_memberships(
         active_grants(user),
         Participant.objects.filter(user=user).select_related("zev").order_by("valid_from", "id"),
+        roles=role_holdings(user).select_related("zev").order_by("role"),
     )
 
 

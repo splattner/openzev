@@ -164,7 +164,8 @@ class AccessHelperTests(GrantTestCase):
                 access.can_manage(user, self.zev)
                 access.can_view(user, self.zev)
                 access.viewable_zev_ids(user)
-        self.assertEqual(len(queries), 1)
+        # One for the grants, one for the issuer/representative roles.
+        self.assertEqual(len(queries), 2)
 
     def test_is_last_manager(self):
         owner_grant = ZevAccessGrant.objects.get(zev=self.zev, user=self.owner)

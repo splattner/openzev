@@ -85,15 +85,18 @@ def has_its_own_login(user) -> bool:
     """Whether ``user`` signs in with a password it uses for more than being a
     participant: an admin, an account that may set up a ZEV of its own
     (self-registered), or an account holding (or having held) a manager or
-    viewer grant (#761). Such a password
+    viewer grant, or the issuer or representative role through its party
+    (#761). Such a password
     is never neutralized because one of its participant rows was touched.
     """
+    from .access import holds_managing_role_ever
     from .models import ZevAccessGrant
 
     return (
         user.is_admin
         or user.may_create_zev
         or ZevAccessGrant.objects.filter(user=user).exists()
+        or holds_managing_role_ever(user)
     )
 
 

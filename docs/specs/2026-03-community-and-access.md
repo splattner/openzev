@@ -222,8 +222,10 @@ base manager) always `select_related("party")`.
 
 **`zev.ZevPartyRole`** — a party's dated role in the ZEV (`issuer`,
 `representative`, `landowner`; at most one issuer and one representative on
-any day). Grants nothing in OpenZEV. Model, constraints and the
-`zev/parties.py` service: SPEC-2026-10-zev-parties §4.4–4.5.
+any day). The issuer and the representative make the party's accounts
+managers of the ZEV while the role lasts (§4.1); a landowner gets nothing.
+Model, constraints and the `zev/parties.py` service: SPEC-2026-10-zev-parties
+§4.4–4.5, access §5.5.
 
 ### 3.6 MeteringPoint and MeteringPointAssignment
 
@@ -280,6 +282,8 @@ holds there, and an account gets the union of everything it holds. Every
 admin                 →  global access, all CRUD, configuration, impersonation (User.role)
 manager grant         →  that ZEV: everything today's owner may do (ZevAccessGrant, role "manager")
 viewer grant          →  that ZEV: read everything a manager reads, change nothing (role "viewer")
+issuer/representative →  that ZEV as a manager, while a party the account belongs to (Party.user
+                         or one of its participations) holds the role — derived, not a grant
 participant link      →  own rows through Participant.user while the row is current
                          (valid_to null or ≥ today); sent invoices stay visible afterwards
 no relationship       →  authenticated, no domain access
@@ -299,7 +303,11 @@ creates a ZEV through the wizard, self-setup or a transfer import gets a
 manager grant from `zev.access.grant_manager(zev, user)` (an existing open
 grant is promoted, an active manager grant kept); a ZEV an admin creates
 through `POST /zevs/` gets no grant. Whom its documents are from is the dated
-issuer role (SPEC-2026-10-zev-parties §4.4).
+issuer role (SPEC-2026-10-zev-parties §4.4), and the accounts of the issuer
+and the representative manage the ZEV through that role
+(`zev.access.role_holdings`, SPEC-2026-10-zev-parties §5.5): `managed_zev_ids`
+and `viewable_zev_ids` include those ZEVs, memberships carry `roles`, and the
+last-manager rule counts them.
 
 ### 4.2 Backend permission classes
 

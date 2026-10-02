@@ -134,14 +134,24 @@ held a role on their own date:
 
 | Role | What it does | Which date counts |
 |---|---|---|
-| **Issuer** | Invoices, contracts and annual statements are from this party: its name and address head the document, and it is the creditor on the QR bill | An invoice: the last day of its period. A contract: the day it is issued. An annual statement: 31 December |
-| **Representative toward the grid operator** | Who acts for the community toward the grid operator (VNB) | — |
+| **Issuer** | Invoices, contracts and annual statements are from this party: its name and address head the document, and it is the creditor on the QR bill. Its login manages the community | An invoice: the last day of its period. A contract: the day it is issued. An annual statement: 31 December |
+| **Representative toward the grid operator** | Who acts for the community toward the grid operator (VNB). Its login manages the community | — |
 | **Landowners** | The owners of the plots or buildings in the community — several when it spans several plots, as a vZEV usually does | — |
 
 - **Change from…** on the issuer or the representative picks a party and a
   date. The current holder ends the day before. Invoices for earlier periods
   keep naming the earlier issuer, and an invoice that is already approved never
   changes.
+- **The issuer and the representative manage the community.** While a party
+  holds one of these roles, its login — its own, or the one of its participant
+  entry — has manager access, exactly as if it had been given under
+  [Access](#access-tab), and loses it when the role ends. Before a change
+  takes effect, a confirmation names the login that gets access, or says that
+  nobody does because the party has no login. A change that would leave the
+  community without any manager is refused: give someone manager access first.
+- **Landowners and contacts get no access** through the tab. A landowner does
+  not see other participants' data; a contact that should work in OpenZEV gets
+  access under [Access](#access-tab), where you can pick it directly.
 - Without an issuer, documents carry only the community's name. The tab says so
   until one is set.
 - **Add landowner** adds a party from a date; **End** sets a landowner's last
@@ -328,17 +338,25 @@ Tick **Show ended access** to see access that has ended.
 
 Managers and admins can:
 
-- **Give access** — enter an email address, choose **Manager** or **Viewer**
-  and, if the access should end, a last day. Someone with an OpenZEV account
-  gets access straight away and a notice by email; anyone else gets an
-  invitation email to set up their account.
+- **Give access** — pick a **party of the community** (a participant or a
+  contact from the [Parties tab](#parties-tab)) or enter an **email address**,
+  choose **Manager** or **Viewer** and, if the access should end, a last day.
+  Someone with an OpenZEV login gets access straight away and a notice by
+  email; anyone else gets an invitation email to set up their account — a
+  party at its own email address, after which the new login belongs to that
+  party. A party without an email address cannot be invited; add one in the
+  Parties tab first.
 - **Make manager** / **Make viewer** — change someone's role. Making a manager
   a viewer asks for confirmation.
 - **Resend invitation** — for an invitation that has not been accepted.
 - **Remove access** — ends the access immediately, after a confirmation.
 
-A ZEV always keeps at least one manager: removing the last one, or making them
-a viewer, is refused. Viewers see the list but cannot change it. Every change
+The list also shows who manages the community **as issuer** or **as
+representative**. That access comes from the role and is changed in the
+[Parties tab](#parties-tab), not here.
+
+A ZEV always keeps at least one manager — by access or through a role:
+removing the last one, or making them a viewer, is refused. Viewers see the list but cannot change it. Every change
 is recorded in the ZEV's audit log.
 
 Admins manage user accounts in **Platform → Accounts**.

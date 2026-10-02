@@ -63,6 +63,7 @@ first and is a prerequisite.
 |---|---|
 | admin | Read and write in every ZEV |
 | manager (grant) | Read and write in its ZEVs |
+| account of the issuer or representative (§5.5) | Manager of that ZEV while the role lasts — the same as a manager grant |
 | viewer (grant) | Read in its ZEVs |
 | participant | Its own participant rows' party fields through the existing participant endpoints (read); no party/role endpoints |
 | no relation | Nothing |
@@ -96,6 +97,7 @@ is read-only for non-admins (unchanged rule). Frontend: the Parties tab sits in 
 | `postal_code` | `CharField(10)` | `""` | blank |
 | `city` | `CharField(100)` | `""` | blank |
 | `notes` | `TextField` | `""` | blank |
+| `user` | FK → `User`, null | `null` | `SET_NULL`, `related_name="parties"`; the party's own login when it is not a participant (migration `zev.0038_party_user`). A participant's login stays on `Participant.user` |
 | `sort_name` | `CharField(200)`, indexed, not editable | `""` | `organisation_name` (organisation) or `last_name` (person), set by `save()` |
 | `created_at`, `updated_at` | `DateTimeField` | auto | |
 
@@ -293,6 +295,70 @@ gains read-only `issuer` (`{party, display_name}` of today's issuer or `null`) f
 switcher and the ZEV list, read from the `issuer_roles` prefetch that `ZevViewSet.get_queryset`
 adds (one query for the list). Self-setup grants the caller a manager role explicitly (§6);
 `ZevViewSet.create` (admin) grants nobody. The admin "change owner" (`PATCH zev.owner`) is gone.
+
+### 5.5 Access through the issuer and representative roles (ADR 0028 decision 8)
+
+**Rule.** An account manages a ZEV on a day when a party it belongs to holds a role in
+`MANAGING_ROLES = (issuer, representative)` there on that day. A party's accounts
+(`zev.access.party_accounts(party)`): `party.user`, then the users of its participations (latest
+`valid_from` first), without duplicates. The `landowner` role and plain contacts give nothing.
+Access is derived from the role rows, never stored as `ZevAccessGrant`s.
+
+**`zev/access.py`.**
+
+| Function | Behaviour |
+|---|---|
+| `role_holdings(user, day=None)` | The account's managing role rows active on `day` (party via `Party.user` or `participations__user`), distinct |
+| `_grant_sets(user)` | Managed and viewable ZEV ids from grants, each joined with the ZEV ids of `role_holdings` (memoised; one grant query + one role query per request) |
+| `holds_managing_role_ever(user)` | Any managing role row, at any time — `services.has_its_own_login` counts it, so a non-admin cannot rewrite the login of an issuer's participant row |
+| `party_accounts(party)` | As above |
+| `role_managers(zev, day=None)` | `[(account, role_row)]` managing `zev` through a role on `day` |
+| `has_manager(zev, *, exclude_grant=None, day=None)` | An active manager grant (other than `exclude_grant`) or any `role_managers` |
+| `is_last_manager(grant)` | A manager grant whose ZEV has no other manager — grant or role (`has_manager(..., exclude_grant=grant)`) |
+| `role_holdings_by_account(day=None)` | `{account_id: [role rows]}` for the admin accounts list, in a fixed number of queries |
+| `build_memberships(grants, participants, *, roles=())` | Each entry gains `roles` (managing role names held today); a role sets `access` to `manager` |
+
+`bump_generation` is also connected to `Party` and `ZevPartyRole` saves and deletes, so the memo
+never answers from a stale role or account link.
+
+**Guards (`zev/parties.py`).** `assign_role` and `end_role` of a managing role check
+`has_manager` before and after the change, inside its transaction: a ZEV that had a manager and
+would have none today → `ValidationError({"party": [NO_MANAGER_LEFT]})` with `NO_MANAGER_LEFT =
+"This would leave the ZEV without a manager. Give someone manager access first."`; the API
+(`create`, `end`) returns it as a 400. `end_role` is atomic.
+
+**API.**
+
+- `PartySerializer` gains read-only `accounts: [{id, email, full_name, is_active}]` (from the
+  `select_related("user")` / prefetched `participations__user`).
+- Role audit events (`party_role.assign` / `.end`) carry `metadata.manager_accounts`: the logins
+  the role makes managers (empty for a landowner).
+- Zugang `GET /zev/zevs/{id}/access/` appends, after the grants, one read-only entry per
+  `role_managers(zev)`: `{id: "role-<role id>-<user id>", zev, role: "manager", valid_from,
+  valid_to, is_active, granted_by: null, created_at, user, source: "role", party_role: {role,
+  party, party_display_name}}`; grant entries carry `source: "grant"`. PATCH/DELETE address grant
+  ids only.
+- Zugang `POST` takes `email` **or** `party` (`{"email": ["Give either an email address or a
+  party."]}` otherwise). For a party of the ZEV (else 400 on `party`): its first account gets the
+  grant; without one, its `email` is used like an address (an existing account with that email,
+  else an invitation); a party without either → 400 `{"party": ["This party has no email address
+  to send an invitation to. Add one first."]}`. A party without an account is linked to the
+  account the grant went to (`Party.user`). Errors about the account (an admin, already has
+  access) are keyed by the field used. The audit event's metadata names the `party`.
+- `/auth/me` and the admin accounts list: memberships carry `roles`.
+
+**Frontend.**
+
+- Types: `ZevAccessGrant.source`, `.party_role`; `ZevAccessGrantInput` with optional `email` /
+  `party`; `Membership.roles`; `Party.accounts`.
+- Zugang (`ZevAccessSection`): "Give access to" a party (default; picker of the ZEV's parties
+  with their login, "invite <email>" or "no email address" — the last disabled) or an email
+  address. Role entries show an "As <role>" badge and "Through the role of <party>; changes in
+  the Parties tab", without actions. The end date uses `CivilDateInput` (`minDate` today).
+- Parties tab: assigning the issuer or representative opens a `ConfirmDialog` naming the logins
+  that get manager access (`grantsAccess`) or saying nobody does (`noLogin`); contacts show
+  their login. Issuer, representative and contacts hints say what the role or contact means for
+  access.
 
 ## 6. Creation flows
 
@@ -493,6 +559,7 @@ through the participant endpoints keep the existing participant audit events.
 | 5 | Drop `Zev.owner` (`zev.0037`): creation flows with explicit grants, `ZevSerializer.issuer`, admin owner dialog removed, `zev.owner.*` template alias, backups, frontend owner reads replaced, role badges on participants |
 | 5b | Transfer archive format 5 (`parties.json`, `party_roles.json` in the participants section) |
 | 6 | Party and role write endpoints, Parties tab, participant form and badges, user guide |
+| 7 | The issuer and representative manage the ZEV (§5.5): `Party.user`, derived access, guards, Zugang by party, role entries in Zugang, confirmation in the Parties tab (ADR 0028 decision 8) |
 
 ## 12. Risks and mitigations
 
@@ -562,6 +629,18 @@ through the participant endpoints keep the existing participant audit events.
   date; end a landowner), `tests/participant-form-mapping.test.ts` (+2: organisation payload and
   validation, a second participation sends only the participation). User guide: ZEV setup →
   Parties tab, participant management (type, second name line, same party).
+- **PR 7** (shipped): `zev/test_role_access.py` (15): `RoleAccessTests` (the issuer's
+  participant account manages exactly while the role lasts; a representative with its own
+  account manages, a landowner neither manages nor views; memberships name the role; holding the
+  role protects the login), `LastManagerTests` (ending the only managing role or handing it to a
+  party without a login is refused; with a manager grant the role can go; a manager grant can go
+  while the issuer manages; the API reports the reason), `ZugangTests` (the list shows role
+  managers; access for a party with a login goes to that login; a party without one is invited
+  and linked; no email → 400; email or party, not both; a role assignment's audit names the
+  logins and the party lists its accounts). `PartyRoleApiTests`: a former issuer's participant
+  gets no parties, today's issuer's does. Query budgets: `/auth/me` 3 → 4, the access memo 1 → 2
+  queries. Frontend: `zev-access-section.test.ts` +2 (access to a party; role entries without
+  actions), `zev-parties-section.test.ts` (setting a representative confirms the login first).
 
 ## 14. Acceptance criteria
 

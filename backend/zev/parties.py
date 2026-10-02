@@ -17,7 +17,9 @@ from django.db import transaction
 
 from allocation.validity import active_on
 
-from .models import SINGLE_HOLDER_ROLES, Party, PartyRole, ZevPartyRole
+from .models import MANAGING_ROLES, SINGLE_HOLDER_ROLES, Party, PartyRole, ZevPartyRole
+
+NO_MANAGER_LEFT = "This would leave the ZEV without a manager. Give someone manager access first."
 
 
 def holders_on(zev, role: str, day: date):
@@ -53,6 +55,20 @@ def _create(zev, party, role, valid_from, valid_to) -> ZevPartyRole:
     return row
 
 
+def _keeps_a_manager(zev, had_manager: bool) -> None:
+    """Refuse a role change that leaves a managed ZEV without any manager today.
+
+    The issuer and the representative manage the ZEV through their role (ADR
+    0028, amended); handing a role to a party without an account, or ending it,
+    can take the last manager away. Called inside the change's transaction, so
+    raising rolls it back.
+    """
+    from .access import has_manager
+
+    if had_manager and not has_manager(zev):
+        raise ValidationError({"party": NO_MANAGER_LEFT})
+
+
 @transaction.atomic
 def assign_role(zev, party, role: str, valid_from: date, *, valid_to: date | None = None) -> ZevPartyRole:
     """Give ``party`` ``role`` from ``valid_from``.
@@ -68,6 +84,11 @@ def assign_role(zev, party, role: str, valid_from: date, *, valid_to: date | Non
         raise ValidationError({"valid_to": "The role cannot end before it starts."})
     rows = list(ZevPartyRole.objects.select_for_update().filter(zev=zev, role=role).order_by("valid_from"))
 
+    if role in MANAGING_ROLES:
+        from .access import has_manager
+
+        had_manager = has_manager(zev)
+
     if role not in SINGLE_HOLDER_ROLES:
         if any(row.party_id == party.pk and row.valid_to is None for row in rows):
             raise ValidationError({"party": "The party already holds this role."})
@@ -80,18 +101,37 @@ def assign_role(zev, party, role: str, valid_from: date, *, valid_to: date | Non
             continue
         if row.party_id == party.pk and row.valid_to is None and valid_to is None:
             return row
-        end_role(row, valid_from - timedelta(days=1))
-    return _create(zev, party, role, valid_from, valid_to)
+        _end(row, valid_from - timedelta(days=1))
+    created = _create(zev, party, role, valid_from, valid_to)
+    if role in MANAGING_ROLES:
+        _keeps_a_manager(zev, had_manager)
+    return created
 
 
-def end_role(row: ZevPartyRole, last_day: date) -> ZevPartyRole | None:
-    """End ``row`` on ``last_day``; a row that would end before it starts is deleted."""
+def _end(row: ZevPartyRole, last_day: date) -> ZevPartyRole | None:
     if last_day < row.valid_from:
         row.delete()
         return None
     row.valid_to = last_day
     row.save(update_fields=["valid_to", "updated_at"])
     return row
+
+
+@transaction.atomic
+def end_role(row: ZevPartyRole, last_day: date) -> ZevPartyRole | None:
+    """End ``row`` on ``last_day``; a row that would end before it starts is deleted.
+
+    Ending the issuer or representative role must not leave the ZEV without a
+    manager (``ValidationError``)."""
+    managing = row.role in MANAGING_ROLES
+    if managing:
+        from .access import has_manager
+
+        had_manager = has_manager(row.zev_id)
+    ended = _end(row, last_day)
+    if managing:
+        _keeps_a_manager(row.zev_id, had_manager)
+    return ended
 
 
 def ensure_initial_roles(zev, party, valid_from: date) -> None:

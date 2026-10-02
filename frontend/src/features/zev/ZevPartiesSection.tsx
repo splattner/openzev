@@ -112,6 +112,28 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
         onError: (error) => pushToast(formatApiError(error, t('pages.zevSettings.parties.saveFailed')), 'error'),
     })
 
+    /**
+     * The issuer and the representative manage the ZEV through their role
+     * (ADR 0028, amended), so handing one over is an access change too: say
+     * who gets manager access — or that nobody does — before applying it.
+     */
+    function assignManagingRole(role: 'issuer' | 'representative', partyId: string, validFrom: string): Promise<unknown> {
+        const party = (partiesQuery.data ?? []).find((candidate) => candidate.id === partyId)
+        const name = party?.display_name ?? ''
+        const logins = (party?.accounts ?? []).map((account) => account.email).join(', ')
+        return new Promise((resolve, reject) => {
+            confirm({
+                title: t(`pages.zevSettings.parties.${role}Title`),
+                message: logins
+                    ? t('pages.zevSettings.parties.grantsAccess', { name, accounts: logins })
+                    : t('pages.zevSettings.parties.noLogin', { name }),
+                confirmText: t('pages.zevSettings.parties.apply'),
+                // The mutation shows its own error; the dialog closes either way.
+                onConfirm: () => assign.mutateAsync({ party: partyId, role, valid_from: validFrom }).then(resolve, reject),
+            })
+        })
+    }
+
     function openNewContact(onCreated?: (id: string) => void) {
         setEditingParty(null)
         setPickAfterCreate(() => onCreated ?? null)
@@ -153,7 +175,7 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
                             parties={parties}
                             canManage={canManage}
                             busy={busy}
-                            onAssign={(party, validFrom) => assign.mutateAsync({ party, role, valid_from: validFrom })}
+                            onAssign={(party, validFrom) => assignManagingRole(role, party, validFrom)}
                             onNewContact={openNewContact}
                         />
                     ))}
@@ -197,6 +219,9 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
                                         </div>
                                         <div className="zev-access-meta muted">
                                             {party.email && <span>{party.email}</span>}
+                                            {party.accounts.length > 0 && (
+                                                <span>{t('pages.zevSettings.parties.login', { email: party.accounts[0].email })}</span>
+                                            )}
                                             {(party.address_line1 || party.city) && (
                                                 <span>{[party.address_line1, [party.postal_code, party.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')}</span>
                                             )}

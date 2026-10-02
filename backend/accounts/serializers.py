@@ -138,9 +138,13 @@ class AdminUserSerializer(UserSerializer):
         """One entry per community the account relates to — its grant there and
         its participant rows — built from the stored relationships (#761), the
         same shape ``/auth/me`` returns (``zev.access.build_memberships``)."""
-        from zev.access import build_memberships
+        from zev.access import build_memberships, role_holdings_by_account
 
-        return build_memberships(user.active_zev_grants, user.participations.all())
+        # Computed once for the whole list: who manages a ZEV through its party's role.
+        roles = self.context.get("_role_holdings")
+        if roles is None:
+            roles = self.context["_role_holdings"] = role_holdings_by_account()
+        return build_memberships(user.active_zev_grants, user.participations.all(), roles=roles.get(user.pk, ()))
 
     def get_mfa_methods(self, user):
         methods = []

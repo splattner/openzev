@@ -1176,7 +1176,8 @@ class SchemaParityTests(TestCase):
         },
         # ``sort_name`` is derived on save; a party, a role and a participant
         # point at each other through archive ids (``id``, ``party_id``).
-        "PARTY_FIELDS": {"id", "zev", "sort_name", "created_at", "updated_at"},
+        # ``user`` is an account reference: accounts never travel.
+        "PARTY_FIELDS": {"id", "zev", "user", "sort_name", "created_at", "updated_at"},
         "PARTY_ROLE_FIELDS": {"id", "zev", "party", "created_at", "updated_at"},
         "PARTICIPANT_FIELDS": {"id", "zev", "user", "party", "created_at", "updated_at"},
         "METERING_POINT_FIELDS": {"id", "zev", "created_at", "updated_at"},

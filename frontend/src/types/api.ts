@@ -29,7 +29,9 @@ export interface User {
 /** Per-ZEV access an account holds through a grant (#761). */
 export type ZevAccessRole = 'manager' | 'viewer'
 
-/** One manager or viewer grant on a ZEV, as the access API returns it (#761). */
+/** One manager or viewer grant on a ZEV, as the access API returns it (#761).
+ * Entries with `source: 'role'` are not grants: the account manages the ZEV
+ * because its party is issuer or representative (read-only, ends with the role). */
 export interface ZevAccessGrant {
     id: string
     zev: string
@@ -40,6 +42,9 @@ export interface ZevAccessGrant {
     granted_by: { id: number; full_name: string } | null
     created_at: string
     user: { id: number; email: string; first_name: string; last_name: string; pending_invitation: boolean }
+    source?: 'grant' | 'role'
+    /** For `source: 'role'`: the role that gives the access, and whose it is. */
+    party_role?: { role: 'issuer' | 'representative'; party: string; party_display_name: string }
 }
 
 /** POST /zev/zevs/{id}/access/ answers with the grant and whether its email went out. */
@@ -47,8 +52,11 @@ export interface ZevAccessGrantCreated extends ZevAccessGrant {
     email_sent: boolean
 }
 
+/** Give access to an email address or to a party of the ZEV (one of the two). */
 export interface ZevAccessGrantInput {
-    email: string
+    email?: string
+    /** A party without a login is invited at its own email address and linked to the new account. */
+    party?: string
     role: ZevAccessRole
     valid_to?: string | null
 }
@@ -68,6 +76,8 @@ export interface Membership {
     zev_name: string
     zev_disabled: boolean
     access: ZevAccessRole | null
+    /** Roles that make the account a manager here today (issuer, representative). */
+    roles?: Array<'issuer' | 'representative'>
     participants: MembershipParticipant[]
 }
 
@@ -511,6 +521,8 @@ export interface Party {
     display_name: string
     participations: { id: string; valid_from: string; valid_to: string | null }[]
     roles: PartyRoleWindow[]
+    /** The party's logins (its own, then its participations'); as issuer or representative each manages the ZEV. */
+    accounts: { id: number; email: string; full_name: string; is_active: boolean }[]
     created_at: string
     updated_at: string
 }

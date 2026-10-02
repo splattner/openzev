@@ -233,9 +233,17 @@ class PartyRoleApiTests(TestCase):
         self.assertEqual(self.client.delete(f"/api/v1/zev/party-roles/{row.pk}/").status_code, 405)
 
     def test_a_participant_reaches_no_parties(self):
-        authenticate(self.client, self.member.user)
+        # Ann was issuer until 2020: her participation's account gets nothing from that.
+        former = Participant.objects.create(
+            zev=self.zev, party=self.ann, valid_from=date(2021, 1, 1), user=make_user("party_former", UserRole.USER),
+        )
+        authenticate(self.client, former.user)
         self.assertEqual(self.client.get("/api/v1/zev/parties/").status_code, 403)
         self.assertEqual(self.client.get("/api/v1/zev/party-roles/").status_code, 403)
+
+    def test_the_issuers_participant_account_manages_the_zev(self):
+        authenticate(self.client, self.member.user)
+        self.assertEqual(self.client.get("/api/v1/zev/parties/").status_code, 200)
 
     def test_a_participant_row_lists_its_party_roles(self):
         self.as_viewer()

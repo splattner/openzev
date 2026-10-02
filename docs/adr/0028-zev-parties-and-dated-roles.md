@@ -1,6 +1,6 @@
 # ADR 0028: Every person or organisation of a ZEV is a party; issuer, representative and landowner are dated roles
 
-- Status: Accepted
+- Status: Accepted (amended 2026-10-02: decision 8 — the issuer and the representative manage the ZEV)
 - Date: 2026-10-02
 - Related: ADR 0027 (accounts layer), ADR 0001 (dated validity windows)
 
@@ -60,8 +60,9 @@ not the model: new code reads `participant.party`.
 - `landowner` — a member of the community in the EnG sense. Any number.
 
 A change of issuer ends the previous role the day before the new one starts, so history is
-kept. Holding a role grants nothing in OpenZEV: access stays on grants (ADR 0027), and a party
-without a login is the normal case.
+kept. ~~Holding a role grants nothing in OpenZEV: access stays on grants (ADR 0027)~~ —
+superseded by decision 8 for the issuer and the representative. A party without a login is
+still the normal case.
 
 **5. Which issuer a document names is fixed by a date in the document.** An invoice names the
 issuer on its `period_end`; a contract the issuer on its `rendered_on`; an annual statement the
@@ -76,6 +77,33 @@ Billing & payment settings. Invoices copy them, so the change never alters an is
 role (decision 4), and "whoever owns the ZEV can manage it" by an explicit manager grant made
 where a ZEV is created (wizard, self-setup, admin create, transfer import). Template variables
 `owner_participant.*` and `zev.owner.*` stay as deprecated aliases of the new `issuer.*`.
+
+**8. The issuer and the representative manage the ZEV (amendment).** Whoever issues a ZEV's
+documents or represents it toward the grid operator is, in practice, who runs it — the owner of
+a simple ZEV, or the property manager of a larger one — and keeping that in step by hand (a
+role change in the Parties tab *and* a grant change in Zugang) was the friction the first
+version of this ADR left. So:
+
+- An account manages a ZEV while a party it belongs to holds the `issuer` or `representative`
+  role there (`MANAGING_ROLES`). A party's accounts are its own (`Party.user`, new, for a party
+  that is not a participant) and those of its participations (`Participant.user`).
+- The access is **derived from the role row**, not copied into a grant: it starts and ends on
+  the role's dates with no job and no second list to keep in step, and a grant given by hand is
+  never touched by a role change. `zev.access` adds the role-holding ZEVs to an account's managed
+  and viewable sets (one more query per request, memoised like the grants).
+- A `landowner` gets nothing by its role (a landowner seeing every participant's consumption is a
+  data-protection question, not a default). A contact gets nothing either; Zugang can give any
+  party access, and invites a party without a login at its own email address.
+- A role change that would leave a managed ZEV without any manager is refused, as revoking the
+  last manager grant already is; the last-manager check counts role managers too.
+- Zugang lists the role-derived managers read-only ("as issuer"), and the Parties tab says which
+  login gets manager access before applying an issuer or representative change. The audit event
+  of a role assignment names those logins.
+
+Considered and rejected for this amendment: copying the role into grant rows (needs a daily job
+for future-dated roles and must tell its own grants from hand-made ones) and giving the
+representative viewer rights only (it is usually the operator; a party that only deals with the
+grid operator can be entered as a contact with a viewer grant instead).
 
 ## Consequences
 

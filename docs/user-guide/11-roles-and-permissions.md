@@ -26,14 +26,18 @@ rent a flat in another, or be a tenant in two communities.
 | Relation | What it allows in that community |
 | --- | --- |
 | **Manager** | Everything a ZEV owner can do: participants, metering, tariffs, invoices, settings, and giving others access |
+| **Issuer** or **representative** | The same as a manager, while the role lasts |
 | **Viewer** | Sees everything a manager sees and may download and export, but changes nothing |
 | **Participant** | Own consumption, own invoices and annual statement |
 | **Former participant** | Own invoices that were sent, after leaving the community |
 
 Managers and viewers get their access from the community's managers (or an
 admin) under **ZEV settings → Access** — see
-[Access tab](02-zev-setup.md#access-tab). The ZEV's owner is a manager
-automatically. Participants get theirs by being linked to a participant entry.
+[Access tab](02-zev-setup.md#access-tab). Whoever creates a ZEV is its manager.
+The login of the community's **issuer** and of its **representative toward the
+grid operator** manages it for as long as the role lasts — see
+[Parties tab](02-zev-setup.md#parties-tab); a landowner gets no access by that
+role. Participants get theirs by being linked to a participant entry.
 
 ## Admin Role
 

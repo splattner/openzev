@@ -36,7 +36,7 @@ import { ZevPartiesSection } from '../src/features/zev/ZevPartiesSection'
 const party = (id: string, name: string, over: Partial<Party> = {}): Party => ({
     id, zev: 'z1', kind: 'person', title: '', first_name: '', last_name: name, organisation_name: '', name_addition: '',
     email: '', phone: '', address_line1: '', address_line2: '', postal_code: '', city: '', notes: '',
-    display_name: name, participations: [{ id: `p-${id}`, valid_from: '2026-01-01', valid_to: null }], roles: [],
+    display_name: name, participations: [{ id: `p-${id}`, valid_from: '2026-01-01', valid_to: null }], roles: [], accounts: [],
     created_at: '', updated_at: '', ...over,
 })
 const role = (id: string, partyId: string, name: string, kind: ZevPartyRole['role'], validFrom: string, validTo: string | null = null): ZevPartyRole => ({
@@ -51,7 +51,10 @@ beforeEach(() => {
     vi.mocked(fetchParties).mockResolvedValue([
         party('a', 'Alt'),
         party('n', 'Neu'),
-        party('v', 'Verwaltung Nord', { kind: 'organisation', organisation_name: 'Verwaltung Nord', participations: [] }),
+        party('v', 'Verwaltung Nord', {
+            kind: 'organisation', organisation_name: 'Verwaltung Nord', participations: [],
+            accounts: [{ id: 5, email: 'nord@example.com', full_name: '', is_active: true }],
+        }),
     ])
     vi.mocked(fetchPartyRoles).mockResolvedValue([
         role('r1', 'a', 'Alt', 'issuer', '2025-01-01', '2026-03-31'),
@@ -111,6 +114,13 @@ describe('ZevPartiesSection', () => {
             select.dispatchEvent(new Event('change', { bubbles: true }))
         })
         await click(buttons(container, 'pages.zevSettings.parties.apply')[0])
+        // A managing role is an access change: the dialog names the login first.
+        expect(assignPartyRole).not.toHaveBeenCalled()
+        expect(container.ownerDocument.body.textContent).toContain('pages.zevSettings.parties.grantsAccess:Verwaltung Nord')
+        const confirmButton = Array.from(container.ownerDocument.querySelectorAll('button'))
+            .filter((button) => button.textContent?.includes('pages.zevSettings.parties.apply'))
+            .at(-1)!
+        await click(confirmButton)
         expect(assignPartyRole).toHaveBeenCalledWith({ zev: 'z1', party: 'v', role: 'representative', valid_from: '2026-06-15' })
     })
 

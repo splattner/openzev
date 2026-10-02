@@ -322,6 +322,20 @@ class Party(models.Model):
     postal_code = models.CharField(max_length=10, blank=True)
     city = models.CharField(max_length=100, blank=True)
     notes = models.TextField(blank=True)
+    # The party's own login, for a party that is not a participant (a property
+    # manager, an outside representative). A participant's account stays on its
+    # participation (``Participant.user``); ``zev.access.party_accounts`` reads
+    # both. An account linked here gets no rights by itself: the issuer and
+    # representative roles make it a manager (ADR 0028, amended), a grant gives
+    # anything else.
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="parties",
+        help_text="The party's own account, when it is not a participant",
+    )
     # What lists sort by: the organisation's name or the person's last name.
     sort_name = models.CharField(max_length=200, blank=True, editable=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -798,6 +812,11 @@ class PartyRole(models.TextChoices):
 
 # Roles held by at most one party on any day.
 SINGLE_HOLDER_ROLES = (PartyRole.ISSUER, PartyRole.REPRESENTATIVE)
+
+# Roles whose holder manages the ZEV in OpenZEV while it holds them (ADR 0028,
+# amended): the party's accounts get manager rights, derived in ``zev.access``
+# rather than stored as grants. A landowner gets nothing by its role.
+MANAGING_ROLES = (PartyRole.ISSUER, PartyRole.REPRESENTATIVE)
 
 
 class ZevPartyRole(models.Model):

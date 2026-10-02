@@ -223,9 +223,9 @@ class ApiKeyLastUsedTests(TestCase):
         self.api_key.refresh_from_db()
         first_write = self.api_key.last_used_at
 
-        # The key joined to its user, then the account's grants and participant
-        # rows for /auth/me's memberships (#761) — and no UPDATE.
-        with self.assertNumQueries(3):
+        # The key joined to its user, then the account's grants, managing roles
+        # and participant rows for /auth/me's memberships (#761) — and no UPDATE.
+        with self.assertNumQueries(4):
             self.client.get("/api/v1/auth/me/")
 
         self.api_key.refresh_from_db()

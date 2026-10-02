@@ -16,7 +16,7 @@ vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast }) }))
 vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ user: { id: 1 }, refreshUser: vi.fn() }) }))
 vi.mock('../src/lib/appSettings', async (importOriginal) => ({
     ...(await importOriginal<typeof import('../src/lib/appSettings')>()),
-    useAppSettings: () => ({ settings: undefined }),
+    useAppSettings: () => ({ settings: { date_format_short: 'dd.MM.yyyy' } }),
 }))
 vi.mock('../src/lib/api/zev', () => ({
     fetchZevAccess: vi.fn(),
@@ -24,9 +24,10 @@ vi.mock('../src/lib/api/zev', () => ({
     updateZevAccess: vi.fn(),
     revokeZevAccess: vi.fn(),
     resendZevInvitation: vi.fn(),
+    fetchParties: vi.fn(),
 }))
 
-import { createZevAccess, fetchZevAccess, revokeZevAccess, updateZevAccess } from '../src/lib/api/zev'
+import { createZevAccess, fetchParties, fetchZevAccess, revokeZevAccess, updateZevAccess } from '../src/lib/api/zev'
 import { ZevAccessSection } from '../src/features/zev/ZevAccessSection'
 
 const grant = (over: Partial<ZevAccessGrant> & { email?: string; pending?: boolean } = {}): ZevAccessGrant => ({
@@ -62,6 +63,13 @@ async function render(canManage: boolean) {
     return container
 }
 
+async function chooseOption(select: HTMLSelectElement, value: string) {
+    await act(async () => {
+        select.value = value
+        select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+}
+
 const buttons = (container: Element, label: string) =>
     Array.from(container.querySelectorAll('button')).filter((button) => button.textContent?.includes(label))
 
@@ -85,6 +93,7 @@ describe('ZevAccessSection', () => {
         vi.mocked(createZevAccess).mockResolvedValue({ ...grant({ id: 'g3', role: 'viewer', pending: true }), email_sent: true })
         const container = await render(true)
         await act(async () => buttons(container, 'pages.zevSettings.access.add')[0].click())
+        await chooseOption(container.querySelector<HTMLSelectElement>('.zev-access-form select')!, 'email')
         const input = container.querySelector<HTMLInputElement>('input[type="email"]')!
         await act(async () => {
             const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
@@ -94,6 +103,32 @@ describe('ZevAccessSection', () => {
         await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })))
         expect(createZevAccess).toHaveBeenCalledWith('z1', { email: 'new@example.com', role: 'viewer', valid_to: null })
         expect(pushToast).toHaveBeenCalledWith('pages.zevSettings.access.invited', 'success')
+    })
+
+    it('gives access to a party of the community', async () => {
+        vi.mocked(fetchParties).mockResolvedValue([
+            { id: 'p1', display_name: 'Verwaltung Nord', email: 'nord@example.com', accounts: [] },
+        ] as never)
+        vi.mocked(createZevAccess).mockResolvedValue({ ...grant({ id: 'g3', pending: true }), email_sent: true })
+        const container = await render(true)
+        await act(async () => buttons(container, 'pages.zevSettings.access.add')[0].click())
+        await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+        const selects = container.querySelectorAll<HTMLSelectElement>('.zev-access-form select')
+        await chooseOption(selects[1], 'p1')
+        await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })))
+        expect(createZevAccess).toHaveBeenCalledWith('z1', { party: 'p1', role: 'viewer', valid_to: null })
+    })
+
+    it('lists who manages through a role without actions', async () => {
+        vi.mocked(fetchZevAccess).mockResolvedValue([{
+            ...grant({ id: 'role-r1-5', email: 'issuer@example.com' }),
+            source: 'role',
+            party_role: { role: 'issuer', party: 'p9', party_display_name: 'Ida Issuer' },
+        }])
+        const container = await render(true)
+        expect(container.textContent).toContain('issuer@example.com')
+        expect(container.textContent).toContain('pages.zevSettings.access.byRole')
+        expect(buttons(container, 'pages.zevSettings.access.revoke')).toHaveLength(0)
     })
 
     it('makes a viewer a manager straight away and asks before making a manager a viewer', async () => {

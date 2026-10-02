@@ -13,6 +13,12 @@
 
 ---
 
+
+> **Amended by ADR 0028 decision 8 (#761 phase 2).** Besides grants, an account manages a ZEV
+> while a party it belongs to is the ZEV's issuer or representative — access derived from the
+> dated role, listed read-only in Zugang (SPEC-2026-10-zev-parties §5.5). Zugang can also give
+> access to a party of the ZEV. Everything below about grants is unchanged.
+
 ## 1. Problem and outcome
 
 OpenZEV decides what an account may do from one platform-wide `User.role`

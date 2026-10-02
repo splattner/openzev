@@ -340,6 +340,22 @@ class PartySerializer(serializers.ModelSerializer):
     display_name = serializers.ReadOnlyField()
     participations = serializers.SerializerMethodField()
     roles = serializers.SerializerMethodField()
+    accounts = serializers.SerializerMethodField()
+
+    def get_accounts(self, obj):
+        """The logins that belong to the party: its own, then its participations'.
+        The issuer and representative roles make each of them a manager (ADR
+        0028, amended). Read from the prefetched participations."""
+        accounts = []
+        if obj.user_id is not None:
+            accounts.append(obj.user)
+        for participation in obj.participations.all():
+            if participation.user_id is not None and participation.user not in accounts:
+                accounts.append(participation.user)
+        return [
+            {"id": account.pk, "email": account.email, "full_name": account.get_full_name(), "is_active": account.is_active}
+            for account in accounts
+        ]
 
     def get_participations(self, obj):
         return [
@@ -371,9 +387,9 @@ class PartySerializer(serializers.ModelSerializer):
         fields = [
             "id", "zev", "kind", "title", "first_name", "last_name", "organisation_name", "name_addition",
             "email", "phone", "address_line1", "address_line2", "postal_code", "city", "notes",
-            "display_name", "participations", "roles", "created_at", "updated_at",
+            "display_name", "participations", "roles", "accounts", "created_at", "updated_at",
         ]
-        read_only_fields = ["id", "display_name", "participations", "roles", "created_at", "updated_at"]
+        read_only_fields = ["id", "display_name", "participations", "roles", "accounts", "created_at", "updated_at"]
 
 
 class ZevPartyRoleAssignSerializer(serializers.Serializer):

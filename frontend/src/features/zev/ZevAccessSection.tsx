@@ -3,8 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faEnvelope, faPlus, faUserMinus } from '@fortawesome/free-solid-svg-icons'
+import { CivilDateInput } from '../../components/CivilDateInput'
 import { ConfirmDialog, useConfirmDialog } from '../../components/ConfirmDialog'
-import { createZevAccess, fetchZevAccess, resendZevInvitation, revokeZevAccess, updateZevAccess } from '../../lib/api/zev'
+import { createZevAccess, fetchParties, fetchZevAccess, resendZevInvitation, revokeZevAccess, updateZevAccess } from '../../lib/api/zev'
 import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
@@ -28,10 +29,13 @@ function displayName(grant: ZevAccessGrant): string {
 
 /**
  * Who may manage or view this ZEV (#761, SPEC-2026-10-zev-access-grants §9.6).
- * Managers and admins give access by email — an address without an account
- * gets an invitation — change a manager into a viewer or back, resend an
- * invitation nobody has accepted yet, and take access away. The last manager
- * cannot be removed; the server says so and the message is shown as is.
+ * Managers and admins give access to a party of the ZEV or to an email address
+ * — a party or address without an account gets an invitation — change a
+ * manager into a viewer or back, resend an invitation nobody has accepted yet,
+ * and take access away. The last manager cannot be removed; the server says so
+ * and the message is shown as is. Accounts that manage the ZEV because their
+ * party is issuer or representative are listed too, read-only: that access
+ * changes with the role in the Parties tab (ADR 0028, amended).
  */
 export function ZevAccessSection({ zevId, canManage }: Props) {
     const { t } = useTranslation()
@@ -43,9 +47,17 @@ export function ZevAccessSection({ zevId, canManage }: Props) {
 
     const [includeEnded, setIncludeEnded] = useState(false)
     const [isAdding, setIsAdding] = useState(false)
+    const [target, setTarget] = useState<'party' | 'email'>('party')
+    const [partyId, setPartyId] = useState('')
     const [email, setEmail] = useState('')
     const [role, setRole] = useState<ZevAccessRole>('viewer')
     const [validTo, setValidTo] = useState('')
+
+    const partiesQuery = useQuery({
+        queryKey: queryKeys.zev.parties(zevId),
+        queryFn: () => fetchParties(zevId),
+        enabled: Boolean(zevId) && canManage && isAdding,
+    })
 
     const accessQuery = useQuery({
         queryKey: queryKeys.zev.access(zevId, includeEnded),
@@ -60,10 +72,16 @@ export function ZevAccessSection({ zevId, canManage }: Props) {
     }
 
     const createMutation = useMutation({
-        mutationFn: () => createZevAccess(zevId, { email: email.trim(), role, valid_to: validTo || null }),
+        mutationFn: () => createZevAccess(zevId, {
+            ...(target === 'party' ? { party: partyId } : { email: email.trim() }),
+            role,
+            valid_to: validTo || null,
+        }),
         onSuccess: (created) => {
             setIsAdding(false)
             setEmail('')
+            setPartyId('')
+            void queryClient.invalidateQueries({ queryKey: ['zev', 'parties', zevId] })
             setRole('viewer')
             setValidTo('')
             afterChange(created)
@@ -110,8 +128,12 @@ export function ZevAccessSection({ zevId, canManage }: Props) {
 
     function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
-        if (!email.trim()) {
+        if (target === 'email' && !email.trim()) {
             pushToast(t('pages.zevSettings.access.emailRequired'), 'error')
+            return
+        }
+        if (target === 'party' && !partyId) {
+            pushToast(t('pages.zevSettings.access.partyRequired'), 'error')
             return
         }
         createMutation.mutate()
@@ -155,9 +177,35 @@ export function ZevAccessSection({ zevId, canManage }: Props) {
             {canManage && (isAdding ? (
                 <form className="form-grid zev-access-form" onSubmit={submit}>
                     <label>
-                        <span>{t('pages.zevSettings.access.emailLabel')}</span>
-                        <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="off" />
+                        <span>{t('pages.zevSettings.access.targetLabel')}</span>
+                        <select value={target} onChange={(event) => setTarget(event.target.value as 'party' | 'email')}>
+                            <option value="party">{t('pages.zevSettings.access.targetParty')}</option>
+                            <option value="email">{t('pages.zevSettings.access.targetEmail')}</option>
+                        </select>
                     </label>
+                    {target === 'party' ? (
+                        <label>
+                            <span>{t('pages.zevSettings.access.partyLabel')}</span>
+                            <select value={partyId} onChange={(event) => setPartyId(event.target.value)}>
+                                <option value="">{t('pages.zevSettings.parties.selectParty')}</option>
+                                {(partiesQuery.data ?? []).map((party) => (
+                                    <option key={party.id} value={party.id} disabled={party.accounts.length === 0 && !party.email}>
+                                        {party.display_name}
+                                        {' — '}
+                                        {party.accounts[0]?.email
+                                            ?? (party.email
+                                                ? t('pages.zevSettings.access.partyInvite', { email: party.email })
+                                                : t('pages.zevSettings.access.partyNoEmail'))}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    ) : (
+                        <label>
+                            <span>{t('pages.zevSettings.access.emailLabel')}</span>
+                            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="off" />
+                        </label>
+                    )}
                     <label>
                         <span>{t('pages.zevSettings.access.roleLabel')}</span>
                         <select value={role} onChange={(event) => setRole(event.target.value as ZevAccessRole)}>
@@ -168,7 +216,7 @@ export function ZevAccessSection({ zevId, canManage }: Props) {
                     </label>
                     <label>
                         <span>{t('pages.zevSettings.access.validToLabel')}</span>
-                        <input type="date" value={validTo} onChange={(event) => setValidTo(event.target.value)} />
+                        <CivilDateInput value={validTo || null} onChange={(iso) => setValidTo(iso ?? '')} minDate={todayBusinessIso()} />
                         <small className="muted">{t('pages.zevSettings.access.validToHint')}</small>
                     </label>
                     <p className="muted zev-access-form-hint">{t('pages.zevSettings.access.inviteHint')}</p>
@@ -202,7 +250,8 @@ export function ZevAccessSection({ zevId, canManage }: Props) {
                 <ul className="zev-access-list" aria-label={t('pages.zevSettings.access.title')}>
                     {grants.map((grant) => {
                         const ended = grant.valid_to !== null && grant.valid_to < today
-                        const actionable = canManage && !ended
+                        const byRole = grant.source === 'role'
+                        const actionable = canManage && !ended && !byRole
                         return (
                             <li key={grant.id} className="zev-access-row">
                                 <div className="zev-access-who">
@@ -212,6 +261,11 @@ export function ZevAccessSection({ zevId, canManage }: Props) {
                                         <span className={`badge ${grant.role === 'manager' ? 'badge-info' : 'badge-neutral'}`}>
                                             {t(`nav.relation.${grant.role}`)}
                                         </span>
+                                        {byRole && grant.party_role && (
+                                            <span className="badge badge-neutral">
+                                                {t('pages.zevSettings.access.byRole', { role: t(`pages.participants.roles.${grant.party_role.role}`) })}
+                                            </span>
+                                        )}
                                         {grant.user.pending_invitation && (
                                             <span className="badge badge-warning">{t('pages.zevSettings.access.pending')}</span>
                                         )}
@@ -225,6 +279,9 @@ export function ZevAccessSection({ zevId, canManage }: Props) {
                                     </span>
                                     {grant.granted_by && (
                                         <span>{t('pages.zevSettings.access.grantedBy', { name: grant.granted_by.full_name })}</span>
+                                    )}
+                                    {byRole && grant.party_role && (
+                                        <span>{t('pages.zevSettings.access.byRoleHint', { name: grant.party_role.party_display_name })}</span>
                                     )}
                                 </div>
                                 {actionable && (
