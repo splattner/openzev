@@ -33,7 +33,7 @@ more — and every tool call is traceable in the audit log.
 |---|---|
 | Transport | `POST /api/v1/mcp/` — MCP Streamable HTTP, stateless, JSON responses only (ADR 0025) |
 | Protocol | JSON-RPC 2.0: `initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call`; batches |
-| Auth | Existing API keys via `Authorization: Api-Key ozv_…` or `Authorization: Bearer ozv_…`; roles `admin`, `zev_owner` |
+| Auth | Existing API keys via `Authorization: Api-Key ozv_…` or `Authorization: Bearer ozv_…`; an admin, or an account with a manager or viewer grant (`HasZevReadAccess`, #761) |
 | Feature flag | `mcp_server_enabled`, default off; `404` while off |
 | Tools | 10 read-only tools (§6) built on in-process sub-requests to existing REST GET endpoints |
 | Audit | `AuditEventSource.MCP`; one `mcp.tool.call` event per `tools/call` |
@@ -57,9 +57,9 @@ more — and every tool call is traceable in the audit log.
 | Actor | Capability |
 |---|---|
 | `admin` | All tools, all ZEVs (whatever the REST endpoints return for an admin) |
-| `zev_owner` | All tools, own ZEVs only (enforced by the underlying REST views) |
-| `participant` | `403` on every MCP request (JSON-RPC error, see §5.4) |
-| `guest` / anonymous | `401` with `WWW-Authenticate: Bearer` |
+| manager / viewer | All tools, the ZEVs it holds a grant for only (enforced by the underlying REST views) |
+| participant, or an account with no relation | `403` on every MCP request (JSON-RPC error, see §5.4) |
+| anonymous | `401` with `WWW-Authenticate: Bearer` |
 
 Rules:
 

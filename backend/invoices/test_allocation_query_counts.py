@@ -61,7 +61,7 @@ class AllocationQueryCountTests(_ReconciliationBase):
         # meters plus an unassigned one, two producers (one bidirectional), and
         # multiple mid-period transfers.
         self.owner = User.objects.create_user(
-            username="recon_multi", password="pass1234", role=UserRole.ZEV_OWNER
+            username="recon_multi", password="pass1234", role=UserRole.USER
         )
         self.zev = Zev.objects.create(
             name="Multi ZEV",

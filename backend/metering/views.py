@@ -13,7 +13,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import SAFE_METHODS, IsAuthenticated
 from rest_framework.response import Response
-from accounts.permissions import HasZevAccess, may_hold_management_access
+from accounts.permissions import HasZevAccess
 from accounts.throttling import ApiKeyRateThrottle, ImportThrottle
 from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from .models import MeterReading, ImportLog
@@ -140,7 +140,7 @@ def _resolve_dashboard_scope(user, zev_id):
     got before per-ZEV grants (#761, pinned in zev/test_access_regression.py).
     """
     viewable = access.viewable_zev_ids(user)
-    manages = user.is_admin or bool(viewable) or may_hold_management_access(user)
+    manages = user.is_admin or bool(viewable)
     own = access.participant_zev_ids(user)
     if zev_id:
         if access.can_view(user, zev_id):

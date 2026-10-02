@@ -34,7 +34,7 @@ from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory
 class InvoiceWorkflowTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("wf_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("wf_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "WF ZEV")
         self.participant = make_participant(self.zev)
         auth(self.client, self.owner)
@@ -123,7 +123,7 @@ class StaleInstanceConcurrencyTests(TestCase):
     """
 
     def setUp(self):
-        self.owner = make_user("stale_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("stale_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Stale ZEV")
         self.participant = make_participant(self.zev)
 
@@ -227,7 +227,7 @@ class StaleInstanceConcurrencyTests(TestCase):
 class InvoiceEngineGuardTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("guard_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("guard_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "GuardZEV")
         self.participant = make_participant(self.zev)
         auth(self.client, self.owner)

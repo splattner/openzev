@@ -32,7 +32,7 @@ def _cookie_client(user, csrf_token=None):
 
 class CookieCsrfTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="csrf_user", password="pass1234", role=UserRole.PARTICIPANT)
+        self.user = User.objects.create_user(username="csrf_user", password="pass1234", role=UserRole.USER)
         self.token = "a" * 32
 
     def test_safe_method_no_csrf_needed(self):
@@ -107,14 +107,14 @@ class CookieCsrfTests(TestCase):
         self.assertEqual(resp.status_code, 201)
 
     def test_login_sets_csrf_cookie(self):
-        User.objects.create_user(username="login_csrf", password="pass1234", role=UserRole.PARTICIPANT, email="login_csrf@example.com")
+        User.objects.create_user(username="login_csrf", password="pass1234", role=UserRole.USER, email="login_csrf@example.com")
         resp = APIClient().post("/api/v1/auth/token/", {"username": "login_csrf", "password": "pass1234"}, format="json")
         self.assertEqual(resp.status_code, 200)
         self.assertIn(settings.CSRF_COOKIE_NAME, resp.cookies)
 
     def test_refresh_needs_csrf_and_reissues_cookie(self):
         client = APIClient()
-        User.objects.create_user(username="refresh_csrf", password="pass1234", role=UserRole.PARTICIPANT, email="refresh_csrf@example.com")
+        User.objects.create_user(username="refresh_csrf", password="pass1234", role=UserRole.USER, email="refresh_csrf@example.com")
         login = client.post("/api/v1/auth/token/", {"username": "refresh_csrf", "password": "pass1234"}, format="json")
         csrf_token = login.cookies[settings.CSRF_COOKIE_NAME].value
 

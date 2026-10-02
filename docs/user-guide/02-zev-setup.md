@@ -65,7 +65,7 @@ it off under **Platform → System Settings → Functions**).
 2. Click **Create ZEV & finish**
 3. You are redirected to the dashboard as the owner of your new ZEV
 
-> **Note:** Self-registration creates the account with the `zev_owner` role. Each self-registered owner can create exactly one ZEV via this flow.
+> **Note:** A self-registered account may set up a ZEV of its own, and becomes its manager. It can create one ZEV this way; to run more, an admin creates them or another manager gives access.
 >
 > The IBAN belongs to the account that receives participant payments. If you enter one, provide the payment recipient's address as well so QR-Rechnungen can be generated. Skipping it leaves invoices without payment details until you add it under **Billing & payment** in ZEV Settings.
 

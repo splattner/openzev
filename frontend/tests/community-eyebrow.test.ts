@@ -49,7 +49,7 @@ vi.mock('../src/lib/api/metering', () => ({
     fetchChartData: () => Promise.resolve([]),
     fetchMeteringDataQualityStatus: () => Promise.resolve({ metering_points: [] }),
     fetchMeteringDashboardSummary: () => Promise.resolve({
-        role: 'participant',
+        summary_kind: 'participant',
         bucket: 'day',
         totals: { consumed_from_zev_kwh: 0, imported_from_grid_kwh: 0, total_consumed_kwh: 0 },
         timeline: [],
@@ -113,13 +113,15 @@ function mockOwner() {
             email: 'owner@example.com',
             first_name: '',
             last_name: '',
-            role: 'zev_owner',
+            role: 'user',
             must_change_password: false,
             preferred_zev: null,
         },
     })
     mockManagedZev.mockReturnValue({
         managedZevs: [{ id: 'z1', name: 'Selected ZEV' }],
+        entries: [{ id: 'z1', name: 'Selected ZEV', relation: 'manager' }],
+        relation: 'manager',
         selectedZevId: 'z1',
         selectedZev: { id: 'z1', name: 'Selected ZEV', billing_interval: 'monthly' },
         isSelectable: false,
@@ -155,7 +157,13 @@ function mockAdmin() {
     })
 }
 
+/** A participant of `zevCount` communities, "Member ZEV" first and selected. */
 function mockParticipant(zevCount = 1) {
+    const names = ['Member ZEV', 'Other ZEV'].slice(0, zevCount)
+    const memberships = names.map((name, index) => ({
+        zev: `m${index + 1}`, zev_name: name, zev_disabled: false, access: null,
+        participants: [{ id: `p${index + 1}`, valid_from: '2026-01-01', valid_to: null, live: true }],
+    }))
     mockAuth.mockReturnValue({
         isAuthenticated: true,
         isLoading: false,
@@ -167,16 +175,17 @@ function mockParticipant(zevCount = 1) {
             email: 'member@example.com',
             first_name: 'Anna',
             last_name: 'Aar',
-            role: 'participant',
-            zev_name: 'Member ZEV',
-            zev_count: zevCount,
+            role: 'user',
+            memberships,
             must_change_password: false,
             preferred_zev: null,
         },
     })
     mockManagedZev.mockReturnValue({
         managedZevs: [],
-        selectedZevId: null,
+        entries: memberships.map((m) => ({ id: m.zev, name: m.zev_name, relation: 'participant' })),
+        relation: 'participant',
+        selectedZevId: 'm1',
         selectedZev: null,
         isSelectable: false,
         isLoading: false,
@@ -274,10 +283,11 @@ describe('community eyebrow', { timeout: 30000 }, () => {
         unmount()
     })
 
-    it('dashboard shows no community with several memberships', async () => {
+    it('dashboard shows the selected community with several memberships', async () => {
+        // The participant dashboard asks about the selected community (#761).
         mockParticipant(2)
         const { container, unmount } = await renderAt('/')
-        expect(container.querySelector('.page-stack .eyebrow')).toBeNull()
+        expect(container.querySelector('.page-stack .eyebrow')?.textContent).toBe('Member ZEV')
         unmount()
     })
 
@@ -321,8 +331,7 @@ describe('community eyebrow', { timeout: 30000 }, () => {
     })
 
     it('statement keeps the membership label with several memberships', async () => {
-        // Recorded exception (spec §6): both statement downloads serve the
-        // backend-resolved membership, so the label stays.
+        // Both statement downloads ask about the selected community (#761).
         mockParticipant(2)
         const { container, unmount } = await renderAt('/me/statement')
         const eyebrow = container.querySelector('.page-stack .eyebrow')

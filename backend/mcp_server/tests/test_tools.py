@@ -119,7 +119,7 @@ class TestListParticipants:
         assert result["truncated"] is True
         assert result["total"] == 3
 
-    def test_owner_cannot_list_another_owners_participants(self, owner_mcp_client):
+    def test_owner_cannot_list_another_owners_participants(self, zev, owner_mcp_client):
         other_zev = ZevFactory()
         ParticipantFactory(zev=other_zev, first_name="Secret", last_name="Person", valid_from=date(2025, 1, 1))
 
@@ -129,11 +129,11 @@ class TestListParticipants:
 
 
 class TestPeriodReadiness:
-    def test_invalid_arguments_missing_zev_id(self, owner_mcp_client):
+    def test_invalid_arguments_missing_zev_id(self, zev, owner_mcp_client):
         response = call_tool(owner_mcp_client, "period_readiness", {})
         assert response.json()["error"]["code"] == -32602
 
-    def test_owner_cannot_see_another_owners_zev(self, owner_mcp_client):
+    def test_owner_cannot_see_another_owners_zev(self, zev, owner_mcp_client):
         other_zev = ZevFactory()
         response = call_tool(owner_mcp_client, "period_readiness", {"zev_id": str(other_zev.id)})
         result = _tool_result(response)
@@ -280,7 +280,7 @@ class TestExplainInvoice:
         )
         assert result["previous"] is None
 
-    def test_owner_cannot_read_another_owners_invoice(self, owner_mcp_client):
+    def test_owner_cannot_read_another_owners_invoice(self, zev, owner_mcp_client):
         other_zev = ZevFactory()
         other_participant = ParticipantFactory(zev=other_zev)
         other_invoice = InvoiceFactory(zev=other_zev, participant=other_participant)
@@ -524,7 +524,7 @@ class TestConsumptionProfile:
         response = call_tool(owner_mcp_client, "consumption_profile", self._args(zev, other_participant))
         assert _is_error(response) is True
 
-    def test_owner_cannot_read_another_owners_zev(self, owner_mcp_client):
+    def test_owner_cannot_read_another_owners_zev(self, zev, owner_mcp_client):
         zev = ZevFactory()
         participant = self._participant_with_reading(zev)
 

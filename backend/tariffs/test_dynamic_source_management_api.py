@@ -45,7 +45,7 @@ def add_point(source, price="0.10000"):
 
 
 class TestCreationAndEditing:
-    def test_owner_can_discover_version_and_components(self, owner_client):
+    def test_owner_can_discover_version_and_components(self, zev, owner_client):
         discovery = EndpointDiscovery(
             api_version="v2_0_0",
             components=[DiscoveredComponent("grid", "standard")],
@@ -68,7 +68,7 @@ class TestCreationAndEditing:
             }],
         }
 
-    def test_source_payload_serves_the_versioned_component_expansion(self, owner_client):
+    def test_source_payload_serves_the_versioned_component_expansion(self, zev, owner_client):
         make_source(api_version="v2_0_0", tariff_type="dso", tariff_name="standard")
         response = owner_client.get("/api/v1/tariffs/dynamic-sources/")
 
@@ -76,7 +76,7 @@ class TestCreationAndEditing:
         row = response.json()["results"][0]
         assert row["aggregated_tariff_types"] == ["grid", "metering", "national_fees"]
 
-    def test_owner_can_probe_and_create_a_source(self, owner_client):
+    def test_owner_can_probe_and_create_a_source(self, zev, owner_client):
         point = PricePoint(
             valid_from=datetime(2026, 9, 11, tzinfo=UTC),
             valid_to=datetime(2026, 9, 11, 0, 15, tzinfo=UTC),
@@ -106,7 +106,7 @@ class TestCreationAndEditing:
             action_type="tariff.dynamic_source_create", target_id=str(source.pk)
         ).exists()
 
-    def test_creation_reports_units_the_source_publishes_but_cannot_bill(self, owner_client):
+    def test_creation_reports_units_the_source_publishes_but_cannot_bill(self, zev, owner_client):
         # A dropped demand or fixed-fee unit must reach the caller, not just
         # the audit trail — the point in time it is most useful is right when
         # the source is being configured.
@@ -140,7 +140,7 @@ class TestCreationAndEditing:
         )
         assert event.metadata_json["warnings"] == [warning]
 
-    def test_reusing_an_existing_source_reports_no_warnings(self, owner_client):
+    def test_reusing_an_existing_source_reports_no_warnings(self, zev, owner_client):
         # Nothing was probed, so there is nothing new to warn about.
         source = make_source()
 
@@ -155,7 +155,7 @@ class TestCreationAndEditing:
         assert response.status_code == 200
         assert response.json()["warnings"] == []
 
-    def test_creation_reuses_the_natural_key_without_refetching(self, owner_client):
+    def test_creation_reuses_the_natural_key_without_refetching(self, zev, owner_client):
         source = make_source()
         with mock.patch("tariffs.dynamic.services.probe_source_configuration") as probe:
             response = owner_client.post("/api/v1/tariffs/dynamic-sources/", {
@@ -170,7 +170,7 @@ class TestCreationAndEditing:
         assert response.json()["id"] == str(source.pk)
         probe.assert_not_called()
 
-    def test_provider_adapter_names_are_not_accepted_as_versions(self, owner_client):
+    def test_provider_adapter_names_are_not_accepted_as_versions(self, zev, owner_client):
         response = owner_client.post("/api/v1/tariffs/dynamic-sources/", {
             "label": "Example", "url": "https://prices.example.test/tariffs",
             "api_version": "provider_name", "tariff_type": "grid",
@@ -625,7 +625,7 @@ class TestDeletingASource:
         assert DynamicTariffSource.objects.filter(pk=source.pk).exists()
 
 
-def test_empty_v2_creation_refuses_blank_but_persists_a_discovered_product(owner_client):
+def test_empty_v2_creation_refuses_blank_but_persists_a_discovered_product(zev, owner_client):
     payload = {
         "label": "V2",
         "url": "https://example.test/prices",
@@ -655,7 +655,7 @@ def test_empty_v2_creation_refuses_blank_but_persists_a_discovered_product(owner
     assert DynamicTariffSource.objects.get().tariff_name == "standard"
 
 
-def test_disabled_source_creation_does_not_schedule_backfill(
+def test_disabled_source_creation_does_not_schedule_backfill(zev, 
     owner_client, django_capture_on_commit_callbacks
 ):
     capabilities = SourceCapabilities(

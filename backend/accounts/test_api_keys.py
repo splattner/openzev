@@ -91,7 +91,7 @@ class ApiKeyGenerationTests(TestCase):
 
 class ApiKeyModelTests(TestCase):
     def setUp(self):
-        self.user = make_user("keyowner", UserRole.PARTICIPANT)
+        self.user = make_user("keyowner", UserRole.USER)
 
     def test_a_fresh_key_is_active(self):
         api_key, _ = create_api_key(self.user)
@@ -112,7 +112,7 @@ class ApiKeyAuthenticationTests(TestCase):
     """Authenticating a request with ``Authorization: Api-Key``."""
 
     def setUp(self):
-        self.user = make_user("scripter", UserRole.ZEV_OWNER)
+        self.user = make_user("scripter", UserRole.USER)
         self.api_key, self.raw_key = create_api_key(self.user, name="reporting")
         self.client = APIClient()
 
@@ -201,7 +201,7 @@ class ApiKeyAuthenticationTests(TestCase):
 
 class ApiKeyLastUsedTests(TestCase):
     def setUp(self):
-        self.user = make_user("toucher", UserRole.ZEV_OWNER)
+        self.user = make_user("toucher", UserRole.USER)
         self.api_key, self.raw_key = create_api_key(self.user)
         self.client = APIClient()
         self.client.credentials(HTTP_AUTHORIZATION=f"Api-Key {self.raw_key}")
@@ -302,7 +302,7 @@ class ApiKeyScopeTests(TestCase):
 
     def setUp(self):
         self.admin = make_user("scoped-admin", UserRole.ADMIN)
-        self.victim = make_user("victim", UserRole.PARTICIPANT)
+        self.victim = make_user("victim", UserRole.USER)
         self.api_key, self.raw_key = create_api_key(self.admin)
         self.client = APIClient()
         self.client.credentials(HTTP_AUTHORIZATION=f"Api-Key {self.raw_key}")
@@ -464,7 +464,7 @@ class ApiKeyThrottleTests(TestCase):
 
     def setUp(self):
         cache.clear()
-        self.user = make_user("busy", UserRole.ZEV_OWNER)
+        self.user = make_user("busy", UserRole.USER)
         self.api_key, self.raw_key = create_api_key(self.user)
         self.client = APIClient()
         self.client.credentials(HTTP_AUTHORIZATION=f"Api-Key {self.raw_key}")
@@ -505,7 +505,7 @@ class ApiKeyCrudTests(TestCase):
     LIST_URL = "/api/v1/auth/me/api-keys/"
 
     def setUp(self):
-        self.user = make_user("owner", UserRole.PARTICIPANT)
+        self.user = make_user("owner", UserRole.USER)
         self.client = APIClient()
         authenticate(self.client, self.user)
 
@@ -620,7 +620,7 @@ class ApiKeyCrudTests(TestCase):
         self.assertTrue(ApiKey.objects.filter(pk=key_id).exists())
 
     def test_a_user_cannot_revoke_somebody_elses_key(self):
-        other = make_user("target", UserRole.PARTICIPANT)
+        other = make_user("target", UserRole.USER)
         victim_key, _ = create_api_key(other)
 
         response = self.client.delete(f"{self.LIST_URL}{victim_key.pk}/")
@@ -673,8 +673,8 @@ class AdminApiKeyManagementTests(TestCase):
 
     def setUp(self):
         self.admin = make_user("console-admin", UserRole.ADMIN)
-        self.owner = make_user("key-owner", UserRole.ZEV_OWNER)
-        self.participant = make_user("key-participant", UserRole.PARTICIPANT)
+        self.owner = make_user("key-owner", UserRole.USER)
+        self.participant = make_user("key-participant", UserRole.USER)
 
         self.owner_key, self.owner_raw = create_api_key(self.owner, name="owner nightly")
         self.participant_key, _ = create_api_key(self.participant, name="participant export")
@@ -698,7 +698,7 @@ class AdminApiKeyManagementTests(TestCase):
         row = next(r for r in response.data["results"] if r["name"] == "owner nightly")
         self.assertEqual(row["username"], "key-owner")
         self.assertEqual(row["user_email"], "key-owner@example.com")
-        self.assertEqual(row["user_role"], UserRole.ZEV_OWNER)
+        self.assertEqual(row["user_role"], UserRole.USER)
 
     def test_the_list_never_exposes_the_hash(self):
         """There is no admin path to a secret — none exists to expose."""

@@ -34,9 +34,12 @@ class DashboardPermissionTests(TestCase):
     def test_non_admins_are_refused(self):
         """This endpoint aggregates across all tenants, so the permission check
         is the only thing keeping one owner out of another owner's figures."""
-        for role in (UserRole.ZEV_OWNER, UserRole.PARTICIPANT):
-            with self.subTest(role=role):
-                auth(self.client, make_user(f"dash_{role}", role))
+        for kind in ("plain", "manager"):
+            with self.subTest(kind=kind):
+                account = make_user(f"dash_{kind}", UserRole.USER)
+                if kind == "manager":
+                    make_zev(account, name="Dashboard ZEV")
+                auth(self.client, account)
                 self.assertEqual(self.client.get(URL).status_code, 403)
 
     def test_anonymous_is_refused(self):
@@ -48,7 +51,7 @@ class DashboardPermissionTests(TestCase):
 class DashboardStatisticsTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("dash_stats_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("dash_stats_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Dash ZEV")
         self.participant = make_participant(self.zev, first="Dana")
         auth(self.client, make_user("dash_stats_admin", UserRole.ADMIN))
@@ -127,7 +130,7 @@ class DashboardStatisticsTests(TestCase):
         self.assertEqual(Decimal(str(row["total_chf"])), invoice.total_chf)
 
     def test_statistics_span_every_tenant(self):
-        other_zev = make_zev(make_user("dash_other_owner", UserRole.ZEV_OWNER), "Other ZEV")
+        other_zev = make_zev(make_user("dash_other_owner", UserRole.USER), "Other ZEV")
         make_invoice(other_zev, make_participant(other_zev, first="Otto"), InvoiceStatus.DRAFT)
         make_invoice(self.zev, self.participant, InvoiceStatus.DRAFT)
 

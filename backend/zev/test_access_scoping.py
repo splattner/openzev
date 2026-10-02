@@ -36,9 +36,9 @@ class GrantWorldMixin(AccessWorldMixin):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.viewer = make_user("acc_viewer", UserRole.PARTICIPANT)
+        cls.viewer = make_user("acc_viewer", UserRole.USER)
         ZevAccessGrant.objects.create(zev=cls.alpha, user=cls.viewer, role=ZevAccessRole.VIEWER)
-        cls.viewer_manager = make_user("acc_viewer_manager", UserRole.PARTICIPANT)
+        cls.viewer_manager = make_user("acc_viewer_manager", UserRole.USER)
         ZevAccessGrant.objects.create(zev=cls.alpha, user=cls.viewer_manager, role=ZevAccessRole.VIEWER)
         ZevAccessGrant.objects.create(zev=cls.beta, user=cls.viewer_manager, role=ZevAccessRole.MANAGER)
 
@@ -65,7 +65,7 @@ class ViewerTests(GrantWorldMixin, TestCase):
             client.get("/api/v1/invoices/invoices/period-overview/", {"zev_id": self.alpha.pk, **period}).status_code, 200,
         )
         summary = client.get("/api/v1/metering/readings/dashboard-summary/")
-        self.assertEqual((summary.status_code, summary.json()["role"]), (200, "zev_owner"))
+        self.assertEqual((summary.status_code, summary.json()["summary_kind"]), (200, "zev"))
 
     def test_a_viewer_cannot_file_rows_under_its_zev(self):
         body = {"zev": str(self.alpha.pk), "meter_id": "ALPHA-VIEWER-1"}
@@ -264,7 +264,7 @@ class MultiRelationshipScopingTests(GrantWorldMixin, TestCase):
         )
 
         dashboard = client.get("/api/v1/metering/readings/dashboard-summary/", {"zev_id": self.beta.pk})
-        self.assertEqual((dashboard.status_code, dashboard.json()["role"]), (200, "participant"))
+        self.assertEqual((dashboard.status_code, dashboard.json()["summary_kind"]), (200, "participant"))
         with mock.patch("invoices.views_reports.generate_annual_statement_pdf", return_value=b"%PDF") as generate:
             statement = client.get("/api/v1/invoices/invoices/annual-statement/", {"year": 2026, "zev_id": self.beta.pk})
         self.assertEqual(statement.status_code, 200)

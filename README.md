@@ -406,6 +406,8 @@ Seeded demo users:
 - Participant (ZEV 1): `anna@openzev.local` / `anna1234`
 - Participant (ZEV 1): `ben@openzev.local` / `ben1234`
 - Participant (ZEV 2): `clara@openzev.local` / `clara1234`
+- Viewer (ZEV 1, read-only): `viewer@openzev.local` / `viewer1234`
+- Property manager (both ZEVs): `manager@openzev.local` / `manager1234`
 
 The seed command creates two communities owned by the same demo owner, so the community switcher can be exercised:
 

@@ -8,6 +8,7 @@ import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { formatChf } from '../lib/numbers'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useAuth } from '../lib/auth'
+import { soleCommunityName } from '../lib/membership'
 
 /**
  * Participant's own invoices (`/me/invoices`, nav-regroup phase 2): a
@@ -28,14 +29,15 @@ export function MyInvoicesPage() {
     const invoices = invoicesQuery.data ?? []
     // A multi-membership participant needs to know which community issued each
     // invoice; with a single membership the page header already names it.
-    const showCommunity = (user?.zev_count ?? 0) > 1
+    const showCommunity = (user?.memberships?.length ?? 0) > 1
+    const communityName = soleCommunityName(user)
 
     return (
         <div className="page-stack">
             <header>
                 {/* Single membership: the community name is page context, like
                     every other participant page (spec §6). */}
-                {user?.zev_count === 1 && user?.zev_name ? <p className="eyebrow">{user.zev_name}</p> : null}
+                {communityName ? <p className="eyebrow">{communityName}</p> : null}
                 <h2>{t('pages.myInvoices.title')}</h2>
                 <p className="muted">{t('pages.myInvoices.description')}</p>
             </header>

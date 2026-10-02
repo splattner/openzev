@@ -11,6 +11,8 @@ import { usePdfObjectUrl } from '../../lib/usePdfObjectUrl'
 
 type ParticipantYearDocumentsProps = {
   userId: number
+  /** The community to ask about; omitted, the server picks the account's first current membership. */
+  zevId?: string
   year: number
   years: number[]
   onYearChange: (year: number) => void
@@ -26,7 +28,7 @@ type DocumentDescriptor = {
     | 'pages.reports.financialSummary.description'
   errorKey: 'pages.reports.annualStatement.error' | 'pages.reports.financialSummary.error'
   filenamePrefix: string
-  load: (year: number, signal: AbortSignal) => Promise<Blob>
+  load: (year: number, signal: AbortSignal, zevId?: string) => Promise<Blob>
 }
 
 const DESCRIPTORS: DocumentDescriptor[] = [
@@ -36,7 +38,7 @@ const DESCRIPTORS: DocumentDescriptor[] = [
     descriptionKey: 'pages.reports.annualStatement.description',
     errorKey: 'pages.reports.annualStatement.error',
     filenamePrefix: 'annual-statement',
-    load: (year, signal) => downloadAnnualStatement({ year }, signal),
+    load: (year, signal, zevId) => downloadAnnualStatement({ year, ...(zevId ? { zev_id: zevId } : {}) }, signal),
   },
   {
     kind: 'tax-overview',
@@ -44,17 +46,19 @@ const DESCRIPTORS: DocumentDescriptor[] = [
     descriptionKey: 'pages.reports.financialSummary.description',
     errorKey: 'pages.reports.financialSummary.error',
     filenamePrefix: 'financial-summary',
-    load: (year, signal) => downloadFinancialSummary({ year }, signal),
+    load: (year, signal, zevId) => downloadFinancialSummary({ year, ...(zevId ? { zev_id: zevId } : {}) }, signal),
   },
 ]
 
 function AnnualDocumentPanel({
   descriptor,
   year,
+  zevId,
   active,
 }: {
   descriptor: DocumentDescriptor
   year: number
+  zevId?: string
   active: boolean
 }) {
   const { t } = useTranslation()
@@ -68,10 +72,10 @@ function AnnualDocumentPanel({
   }, [active])
 
   const fetcher = useMemo(() => {
-    return (signal: AbortSignal) => descriptor.load(year, signal)
+    return (signal: AbortSignal) => descriptor.load(year, signal, zevId)
     // Retry changes the fetcher identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, descriptor, retryAttempt])
+  }, [year, zevId, descriptor, retryAttempt])
 
   const { url, blob, loading, error } = usePdfObjectUrl(fetcher, requested)
 
@@ -158,7 +162,7 @@ function AnnualDocumentPanel({
   )
 }
 
-export function ParticipantYearDocuments({ userId, year, years, onYearChange }: ParticipantYearDocumentsProps) {
+export function ParticipantYearDocuments({ userId, zevId, year, years, onYearChange }: ParticipantYearDocumentsProps) {
   const { t } = useTranslation()
   const [active, setActive] = useState<DocumentKind>('annual-statement')
 
@@ -198,9 +202,10 @@ export function ParticipantYearDocuments({ userId, year, years, onYearChange }: 
           </Tabs.List>
           {DESCRIPTORS.map((descriptor) => (
             <AnnualDocumentPanel
-              key={`${descriptor.kind}-${userId}-${year}`}
+              key={`${descriptor.kind}-${userId}-${zevId ?? ''}-${year}`}
               descriptor={descriptor}
               year={year}
+              zevId={zevId}
               active={active === descriptor.kind}
             />
           ))}

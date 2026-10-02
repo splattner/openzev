@@ -11,18 +11,13 @@ import type { User } from '../types/api'
 export type ShellRole = CommunityRelation | 'none'
 
 /**
- * The account's shell role. An admin is always `admin`. Otherwise the relation
- * to the selected community; when none is known (no memberships on the user
- * yet), the old platform role decides, so sessions and tests that predate
- * per-ZEV access keep their meaning until the role collapses (#761 step 7).
+ * The account's shell role. An admin is always `admin`; anyone else has the
+ * relation to the selected community, or `none` without one.
  */
 export function shellRoleFor(user: Pick<User, 'role'> | null | undefined, relation?: CommunityRelation): ShellRole {
     if (!user) return 'none'
     if (user.role === 'admin') return 'admin'
-    if (relation) return relation
-    if (user.role === 'zev_owner') return 'manager'
-    if (user.role === 'participant') return 'participant'
-    return 'none'
+    return relation ?? 'none'
 }
 
 export interface CommunityAccess {
@@ -89,7 +84,7 @@ export function relationToZev(user: User | null | undefined, zevId: string | nul
     return membership ? relationOf(membership) : undefined
 }
 
-/** The account's shell role for a given community, with the same role fallback as `shellRoleFor`. */
+/** The account's shell role for a given community. */
 export function shellRoleForZev(user: User | null | undefined, zevId: string | null | undefined): ShellRole {
     return shellRoleFor(user, relationToZev(user, zevId))
 }

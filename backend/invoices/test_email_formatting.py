@@ -15,7 +15,7 @@ from invoices.test_helpers import make_invoice, make_participant, make_user, mak
 )
 class InvoiceEmailFormattingTests(TestCase):
     def test_email_uses_configured_short_date_format(self):
-        owner = make_user("email_owner", UserRole.ZEV_OWNER)
+        owner = make_user("email_owner", UserRole.USER)
         zev = make_zev(owner, "Email ZEV")
         participant = make_participant(zev, first="Ema", last="Il")
         invoice = make_invoice(zev, participant, InvoiceStatus.APPROVED)
@@ -34,7 +34,7 @@ class InvoiceEmailFormattingTests(TestCase):
         self.assertIsNotNone(invoice.sent_at)
 
     def test_email_uses_zev_custom_templates(self):
-        owner = make_user("email_tpl_owner", UserRole.ZEV_OWNER)
+        owner = make_user("email_tpl_owner", UserRole.USER)
         zev = make_zev(owner, "Template ZEV")
         zev.email_subject_template = "{invoice_number}|{zev_name}|{participant_name}|{period_start}|{period_end}|{due_date}|{total_chf}"
         zev.email_body_template = "{invoice_number}|{zev_name}|{participant_name}|{period_start}|{period_end}|{due_date}|{total_chf}"
@@ -62,7 +62,7 @@ class InvoiceEmailFormattingTests(TestCase):
         self.assertEqual(mail.outbox[0].body, expected)
 
     def test_email_includes_due_date_variable(self):
-        owner = make_user("email_due_owner", UserRole.ZEV_OWNER)
+        owner = make_user("email_due_owner", UserRole.USER)
         zev = make_zev(owner, "Due Date ZEV")
         zev.email_body_template = "Due: {due_date}"
         zev.save(update_fields=["email_body_template"])
@@ -79,7 +79,7 @@ class InvoiceEmailFormattingTests(TestCase):
         self.assertIn("Due: 15.02.2026", mail.outbox[0].body)
 
     def test_email_due_date_empty_when_not_set(self):
-        owner = make_user("email_due_none_owner", UserRole.ZEV_OWNER)
+        owner = make_user("email_due_none_owner", UserRole.USER)
         zev = make_zev(owner, "No Due ZEV")
         zev.email_body_template = "Due: [{due_date}]"
         zev.save(update_fields=["email_body_template"])

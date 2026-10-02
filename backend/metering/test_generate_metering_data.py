@@ -19,7 +19,7 @@ class GenerateMeteringDataResolutionTests(TestCase):
     """
 
     def setUp(self):
-        self.owner = make_user("gen_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("gen_owner", UserRole.USER)
         self.zev = Zev.objects.create(
             name="Gen ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="G"
         )

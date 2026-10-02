@@ -74,7 +74,7 @@ class PermissionTests(ApiTestCase):
     def test_an_owner_cannot_read_the_destination_list_to_learn_where_backups_go(self):
         self.local_destination()
         client = APIClient()
-        authenticate(client, make_user("other_owner", UserRole.ZEV_OWNER))
+        authenticate(client, make_user("other_owner", UserRole.USER))
         self.assertEqual(client.get(f"{BASE}/destinations/").status_code, 403)
 
 

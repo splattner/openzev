@@ -37,13 +37,13 @@ class TestFeasibilityPrefillAuth:
         response = participant_client.get(_url(zev.id))
         assert response.status_code == 403
 
-    def test_owner_of_a_different_zev_gets_not_found(self, owner_client):
+    def test_owner_of_a_different_zev_gets_not_found(self, zev, owner_client):
         other_owner = factories.OwnerFactory()
         other_zev = factories.ZevFactory(owner=other_owner)
         response = owner_client.get(_url(other_zev.id))
         assert response.status_code == 404
 
-    def test_unknown_zev_returns_not_found(self, owner_client):
+    def test_unknown_zev_returns_not_found(self, zev, owner_client):
         response = owner_client.get(_url("00000000-0000-0000-0000-000000000000"))
         assert response.status_code == 404
 

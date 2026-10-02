@@ -27,8 +27,8 @@ ANNUAL_STATEMENT = "/api/v1/invoices/invoices/annual-statement/"
 class ParticipantInvoiceVisibilityTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("vis_owner", UserRole.ZEV_OWNER)
-        self.tenant = make_user("vis_tenant", UserRole.PARTICIPANT)
+        self.owner = make_user("vis_owner", UserRole.USER)
+        self.tenant = make_user("vis_tenant", UserRole.USER)
         self.zev = make_zev(self.owner)
         self.participant = make_participant(self.zev, user=self.tenant)
         self.draft = self._invoice(InvoiceStatus.DRAFT, month=1)
@@ -95,8 +95,8 @@ class ParticipantInvoiceVisibilityTests(TestCase):
 
 class ParticipantAnnualStatementSentOnlyTests(TestCase):
     def setUp(self):
-        self.owner = make_user("stmt_owner", UserRole.ZEV_OWNER)
-        self.tenant = make_user("stmt_tenant", UserRole.PARTICIPANT)
+        self.owner = make_user("stmt_owner", UserRole.USER)
+        self.tenant = make_user("stmt_tenant", UserRole.USER)
         self.zev = make_zev(self.owner)
         self.participant = make_participant(self.zev, user=self.tenant)
         self.draft = make_invoice(

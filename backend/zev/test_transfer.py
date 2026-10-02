@@ -171,14 +171,14 @@ class SectionDependencyTests(TestCase):
         self.assertEqual(missing_dependencies(SECTIONS), {})
 
     def test_export_refuses_an_incomplete_selection(self):
-        owner = make_user("dep_owner", UserRole.ZEV_OWNER)
+        owner = make_user("dep_owner", UserRole.USER)
         zev = Zev.objects.create(name="Deps", owner=owner)
         with self.assertRaises(ValueError) as ctx:
             export_to_bytes(zev, ["readings"])
         self.assertIn("metering_points", str(ctx.exception))
 
     def test_export_refuses_to_run_inside_an_outer_transaction(self):
-        owner = make_user("dep_owner2", UserRole.ZEV_OWNER)
+        owner = make_user("dep_owner2", UserRole.USER)
         zev = Zev.objects.create(name="Deps", owner=owner)
         buffer = io.BytesIO()
         with self.assertRaises(RuntimeError):
@@ -189,7 +189,7 @@ class SectionDependencyTests(TestCase):
 class ArchiveShapeTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.owner = make_user("shape_owner", UserRole.ZEV_OWNER)
+        cls.owner = make_user("shape_owner", UserRole.USER)
         cls.zev = build_populated_zev(cls.owner, meter_prefix="SHAPE")
 
     def test_archive_contains_a_manifest_and_one_csv_per_meter(self):
@@ -277,7 +277,7 @@ class ArchiveShapeTests(TestCase):
 class RoundTripTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.owner = make_user("rt_owner", UserRole.ZEV_OWNER)
+        cls.owner = make_user("rt_owner", UserRole.USER)
         cls.importer = make_user("rt_importer", UserRole.ADMIN)
         cls.source = build_populated_zev(cls.owner, meter_prefix="RT")
 
@@ -361,7 +361,7 @@ class RoundTripTests(TestCase):
 
     def test_participants_arrive_unlinked_even_when_an_account_shares_the_email(self):
         """Re-linking by email would let an edited archive hand over an account."""
-        existing = make_user("alice_account", UserRole.PARTICIPANT)
+        existing = make_user("alice_account", UserRole.USER)
         self.source.participants.filter(first_name="Alice").update(email=existing.email)
         result = self._import()
         imported = Zev.objects.get(pk=result["zev_id"])
@@ -439,7 +439,7 @@ class RoundTripTests(TestCase):
 class RejectedArchiveTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.owner = make_user("rej_owner", UserRole.ZEV_OWNER)
+        cls.owner = make_user("rej_owner", UserRole.USER)
         cls.importer = make_user("rej_importer", UserRole.ADMIN)
         cls.source = build_populated_zev(cls.owner, meter_prefix="REJ")
 
@@ -836,7 +836,7 @@ class PercentageBandArchiveTests(TestCase):
     it on the tariff itself."""
 
     def setUp(self):
-        self.owner = make_user("pct_archive_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("pct_archive_owner", UserRole.USER)
 
     def _zev_with_percentage_bands(self):
         zev = Zev.objects.create(name="Percentage Archive ZEV", owner=self.owner)
@@ -924,7 +924,7 @@ class DynamicTariffTransferTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = make_user("dyn_owner", UserRole.ZEV_OWNER)
+        cls.owner = make_user("dyn_owner", UserRole.USER)
         cls.importer = make_user("dyn_importer", UserRole.ADMIN)
 
     def _zev_with_dynamic_tariff(self):
@@ -1011,7 +1011,7 @@ class DynamicTariffTransferTests(TestCase):
 class DynamicSourceImportTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.owner = make_user("dynval_owner", UserRole.ZEV_OWNER)
+        cls.owner = make_user("dynval_owner", UserRole.USER)
 
     def test_an_invalid_dynamic_source_is_rejected(self):
         from zev.transfer.importer import _Collector, _dynamic_source_for
@@ -1198,8 +1198,9 @@ class TransferEndpointTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.admin = make_user("tx_admin", UserRole.ADMIN)
-        cls.owner = make_user("tx_owner", UserRole.ZEV_OWNER)
-        cls.other_owner = make_user("tx_other", UserRole.ZEV_OWNER)
+        cls.owner = make_user("tx_owner", UserRole.USER)
+        cls.other_owner = make_user("tx_other", UserRole.USER)
+        Zev.objects.create(name="Somebody else's ZEV", owner=cls.other_owner)
         cls.zev = build_populated_zev(cls.owner, meter_prefix="TX")
 
     def setUp(self):

@@ -25,7 +25,7 @@ from testing.helpers import authenticate as auth
 
 class GenerateSingleInvoiceTests(TestCase):
     def setUp(self):
-        self.owner = make_user("dzg_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("dzg_owner", UserRole.USER)
         self.admin = make_user("dzg_admin", UserRole.ADMIN)
         self.zev = make_zev(self.owner, "Disabled-gen ZEV")
         self.participant = make_participant(self.zev)
@@ -64,7 +64,7 @@ class GenerateSingleInvoiceTests(TestCase):
 
 class GenerateAllInvoicesTests(TestCase):
     def setUp(self):
-        self.owner = make_user("dzga_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("dzga_owner", UserRole.USER)
         self.admin = make_user("dzga_admin", UserRole.ADMIN)
         self.zev = make_zev(self.owner, "Disabled-gen-all ZEV")
         make_participant(self.zev)

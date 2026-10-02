@@ -38,7 +38,7 @@ def _fill_readings(mp, start: date, end: date):
 
 class ComputePeriodOverviewTests(TestCase):
     def setUp(self):
-        self.owner = make_user("po_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("po_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Unit ZEV")
         self.period_start = date(2026, 3, 1)
         self.period_end = date(2026, 3, 31)

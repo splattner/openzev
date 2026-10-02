@@ -29,7 +29,7 @@ const baseUser = (preferredZev: string | null): User => ({
     email: 'owner1@example.com',
     first_name: 'Owner',
     last_name: 'One',
-    role: 'zev_owner',
+    role: 'user',
     must_change_password: false,
     preferred_zev: preferredZev,
 })

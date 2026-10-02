@@ -28,7 +28,7 @@ def make_source(**overrides) -> DynamicTariffSource:
 
 
 class TestAccess:
-    def test_an_owner_can_list_sources(self, owner_client):
+    def test_an_owner_can_list_sources(self, zev, owner_client):
         make_source()
 
         response = owner_client.get("/api/v1/tariffs/dynamic-sources/")
@@ -55,7 +55,7 @@ class TestAccess:
 
 
 class TestListing:
-    def test_sources_are_not_scoped_to_any_zev(self, owner_client, owner_user):
+    def test_sources_are_not_scoped_to_any_zev(self, zev, owner_client, owner_user):
         # There is no ZEV in this request at all — the point of the test.
         make_source()
 
@@ -64,7 +64,7 @@ class TestListing:
         assert response.status_code == 200
         assert response.json()["count"] == 1
 
-    def test_the_payload_carries_what_a_picker_needs(self, owner_client):
+    def test_the_payload_carries_what_a_picker_needs(self, zev, owner_client):
         make_source(
             last_fetch_status="ok",
             last_fetch_at=datetime(2026, 9, 11, 12, tzinfo=UTC),

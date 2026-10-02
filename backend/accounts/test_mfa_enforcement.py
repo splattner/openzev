@@ -41,7 +41,7 @@ def _set_policy(*, required=True, grace_days=1, changed_days_ago=None):
         AppSettings.objects.update(mfa_policy_changed_at=timezone.now() - timedelta(days=changed_days_ago))
 
 
-def _overdue_user(username, role=UserRole.PARTICIPANT):
+def _overdue_user(username, role=UserRole.USER):
     """A freshly created account, backdated so a 1-day grace period from
     policy-change time has already passed."""
     user = make_user(username, role)
@@ -76,7 +76,7 @@ class MfaEnrolmentEnforcementTests(TestCase):
         self.assertEqual(client.get(ME).status_code, 200)
 
     def test_within_the_grace_period_writes_still_work(self):
-        user = make_user("mee_grace", UserRole.PARTICIPANT)  # joined "now"
+        user = make_user("mee_grace", UserRole.USER)  # joined "now"
         _set_policy(required=True, grace_days=30)
         client = APIClient()
         auth(client, user)
@@ -101,7 +101,7 @@ class MfaEnrolmentEnforcementTests(TestCase):
     def test_the_requirement_covers_every_account(self):
         # One switch for every account since #761: there is no role the policy
         # leaves out any more.
-        user = _overdue_user("mee_other_role", UserRole.ZEV_OWNER)
+        user = _overdue_user("mee_other_role", UserRole.USER)
         _set_policy(required=True, grace_days=1, changed_days_ago=30)
         client = APIClient()
         auth(client, user)
@@ -180,7 +180,7 @@ class AdminActionsOnOthersAreBlockedTests(TestCase):
         _set_policy(required=True, grace_days=1, changed_days_ago=30)
         self.client = APIClient()
         auth(self.client, self.admin)
-        self.other = make_user("mee_other", UserRole.PARTICIPANT)
+        self.other = make_user("mee_other", UserRole.USER)
 
     def test_editing_someone_elses_account_is_blocked(self):
         response = self.client.patch(f"/api/v1/auth/users/{self.other.pk}/", {"first_name": "X"}, format="json")
@@ -199,7 +199,7 @@ class AdminActionsOnOthersAreBlockedTests(TestCase):
     def test_creating_a_new_account_is_blocked(self):
         response = self.client.post(
             "/api/v1/auth/users/",
-            {"username": "mee_new", "email": "mee_new@example.com", "first_name": "N", "last_name": "N", "role": "participant"},
+            {"username": "mee_new", "email": "mee_new@example.com", "first_name": "N", "last_name": "N", "role": "user"},
             format="json",
         )
         self.assertEqual(response.status_code, 403)
@@ -211,7 +211,7 @@ class AdminActionsOnOthersAreBlockedTests(TestCase):
 class ImpersonationIsExemptTests(TestCase):
     def test_an_active_impersonation_session_is_not_gated_by_the_targets_compliance(self):
         admin = make_user("mee_imp_admin", UserRole.ADMIN)
-        target = _overdue_user("mee_imp_target", UserRole.PARTICIPANT)
+        target = _overdue_user("mee_imp_target", UserRole.USER)
         _set_policy(required=True, grace_days=1, changed_days_ago=30)
 
         admin_client = APIClient()
@@ -229,7 +229,7 @@ class ImpersonationIsExemptTests(TestCase):
 
 class ApiKeysAreExemptTests(TestCase):
     def test_an_overdue_accounts_api_key_keeps_working(self):
-        user = _overdue_user("mee_key_user", UserRole.ZEV_OWNER)
+        user = _overdue_user("mee_key_user", UserRole.USER)
         _set_policy(required=True, grace_days=1, changed_days_ago=30)
         _, plaintext = create_api_key(user)
 

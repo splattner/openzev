@@ -21,7 +21,7 @@ const user = (over: Partial<User> = {}): User => ({
     email: 'u@example.com',
     first_name: 'U',
     last_name: 'Ser',
-    role: 'participant',
+    role: 'user',
     must_change_password: false,
     preferred_zev: null,
     ...over,
@@ -41,14 +41,12 @@ describe('shellRoleFor', () => {
     })
 
     it('follows the relation to the selected community', () => {
-        expect(shellRoleFor(user({ role: 'participant' }), 'manager')).toBe('manager')
-        expect(shellRoleFor(user({ role: 'zev_owner' }), 'participant')).toBe('participant')
+        expect(shellRoleFor(user(), 'manager')).toBe('manager')
+        expect(shellRoleFor(user(), 'participant')).toBe('participant')
     })
 
-    it('falls back to the old role when no relation is known', () => {
-        expect(shellRoleFor(user({ role: 'zev_owner' }))).toBe('manager')
-        expect(shellRoleFor(user({ role: 'participant' }))).toBe('participant')
-        expect(shellRoleFor(user({ role: 'guest' }))).toBe('none')
+    it('is none without a relation', () => {
+        expect(shellRoleFor(user())).toBe('none')
         expect(shellRoleFor(null)).toBe('none')
     })
 })
@@ -97,9 +95,8 @@ describe('communityEntries', () => {
         ])
     })
 
-    it('falls back to an owner’s own ZEVs before memberships are known', () => {
-        expect(communityEntries(user({ role: 'zev_owner' }), zevs).map((entry) => entry.id)).toEqual(['a'])
-        expect(communityEntries(user({ role: 'participant' }), zevs)).toEqual([])
+    it('lists nothing for an account without memberships', () => {
+        expect(communityEntries(user(), zevs)).toEqual([])
     })
 })
 

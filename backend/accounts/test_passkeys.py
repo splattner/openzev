@@ -147,7 +147,7 @@ class PasskeyRegistrationTests(TestCase):
     def setUp(self):
         cache.clear()
         self.client = APIClient()
-        self.user = make_user("passkey_reg_user", UserRole.PARTICIPANT)
+        self.user = make_user("passkey_reg_user", UserRole.USER)
         auth(self.client, self.user)
         self.authenticator = SoftAuthenticator()
 
@@ -226,7 +226,7 @@ class PasskeyRegistrationTests(TestCase):
 
     def test_credential_id_is_globally_unique(self):
         register_passkey(self.client, self.authenticator)
-        other = make_user("passkey_other_user", UserRole.PARTICIPANT)
+        other = make_user("passkey_other_user", UserRole.USER)
         other_client = APIClient()
         auth(other_client, other)
 
@@ -281,7 +281,7 @@ class PasskeyRegistrationTests(TestCase):
 class PasskeyLoginTests(TestCase):
     def setUp(self):
         cache.clear()
-        self.user = make_user("passkey_login_user", UserRole.ZEV_OWNER)
+        self.user = make_user("passkey_login_user", UserRole.USER)
         self.authenticator = SoftAuthenticator()
         owner = APIClient()
         auth(owner, self.user)
@@ -438,7 +438,7 @@ class PasskeyGatesThePasswordRouteTests(TestCase):
 
     def setUp(self):
         cache.clear()
-        self.user = make_user("passkey_gate_user", UserRole.ZEV_OWNER)
+        self.user = make_user("passkey_gate_user", UserRole.USER)
         owner = APIClient()
         auth(owner, self.user)
         self.authenticator = SoftAuthenticator()
@@ -553,7 +553,7 @@ class MfaPolicyTests(TestCase):
 
     def test_non_admin_cannot_set_the_policy(self):
         client = APIClient()
-        auth(client, make_user("policy_owner", UserRole.ZEV_OWNER))
+        auth(client, make_user("policy_owner", UserRole.USER))
 
         resp = client.patch(APP_SETTINGS_URL, {"mfa_required": True}, format="json")
 
@@ -606,7 +606,7 @@ class MfaPolicyTests(TestCase):
     def test_a_newly_created_account_gets_its_own_grace_period(self):
         self._set_policy(mfa_required=True, mfa_grace_period_days=10)
         AppSettings.objects.update(mfa_policy_changed_at=timezone.now() - timedelta(days=400))
-        newcomer = make_user("policy_newcomer", UserRole.PARTICIPANT)
+        newcomer = make_user("policy_newcomer", UserRole.USER)
         client = APIClient()
         auth(client, newcomer)
 
@@ -618,7 +618,7 @@ class MfaPolicyTests(TestCase):
         # One switch for every account since #761.
         self._set_policy(mfa_required=True)
         client = APIClient()
-        auth(client, make_user("policy_participant", UserRole.PARTICIPANT))
+        auth(client, make_user("policy_participant", UserRole.USER))
 
         self.assertTrue(client.get(MFA_STATUS_URL).data["required"])
 
@@ -648,7 +648,7 @@ class MfaPolicyTests(TestCase):
 class MfaRemovalGuardTests(TestCase):
     def setUp(self):
         cache.clear()
-        self.user = make_user("guard_user", UserRole.ZEV_OWNER)
+        self.user = make_user("guard_user", UserRole.USER)
         self.client = APIClient()
         auth(self.client, self.user)
         AppSettings.load()
@@ -722,7 +722,7 @@ class MfaAdminResetTests(TestCase):
         self.admin = make_user("reset_admin", UserRole.ADMIN)
         self.admin_client = APIClient()
         auth(self.admin_client, self.admin)
-        self.target = make_user("reset_target", UserRole.ZEV_OWNER)
+        self.target = make_user("reset_target", UserRole.USER)
         target_client = APIClient()
         auth(target_client, self.target)
         register_passkey(target_client, SoftAuthenticator())
@@ -758,7 +758,7 @@ class MfaAdminResetTests(TestCase):
 
     def test_non_admin_cannot_reset_another_user(self):
         client = APIClient()
-        auth(client, make_user("reset_owner", UserRole.ZEV_OWNER))
+        auth(client, make_user("reset_owner", UserRole.USER))
 
         resp = client.delete(self._url())
 

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchZevs } from './api/zev'
 import { queryKeys } from './api/queryKeys'
 import { useAuth } from './auth'
-import type { User, UserRole, Zev } from '../types/api'
+import type { User, Zev } from '../types/api'
 import { relationOf, type CommunityRelation } from './membership'
 
 export type { CommunityRelation } from './membership'
@@ -30,15 +30,6 @@ interface ManagedZevContextValue {
     setSelectedZevId: (zevId: string) => void
 }
 
-interface ManagedSelectionInput {
-    role?: UserRole
-    managedZevs: ReadonlyArray<Pick<Zev, 'id'>>
-    /** Explicit in-session pick ('' while the user has not switched yet). */
-    currentId: string
-    /** Account-level default community (``User.preferred_zev``), if any. */
-    preferredZevId?: string | null
-}
-
 interface ManagedSelection {
     /** User may switch between managed ZEVs. */
     isSelectable: boolean
@@ -46,28 +37,6 @@ interface ManagedSelection {
     selection: string
     /** Whether a user-initiated selection request targets a managed ZEV. */
     isAllowedId: (zevId: string) => boolean
-}
-
-/**
- * Admin: always switch. Owner: switch only with 2+ ZEVs. Else: no selection.
- * The role-only rule for accounts whose memberships are not known (sessions
- * from before /auth/me listed them). (No hooks, unit-testable.)
- */
-export function resolveManagedSelection({
-    role,
-    managedZevs,
-    currentId,
-    preferredZevId = '',
-}: ManagedSelectionInput): ManagedSelection {
-    const isAdmin = role === 'admin'
-    const isOwner = role === 'zev_owner'
-    const canManage = isAdmin || isOwner
-    return resolveCommunitySelection({
-        isAdmin,
-        entryIds: canManage ? managedZevs.map((zev) => zev.id) : [],
-        currentId,
-        preferredZevId,
-    })
 }
 
 interface CommunitySelectionInput {
@@ -103,29 +72,17 @@ export function resolveCommunitySelection({
     }
 }
 
-/**
- * The communities an account can switch between. Admins: every ZEV. Accounts
- * with known memberships: those. Otherwise (a session from before /auth/me
- * carried memberships) the old role rule: an owner's own ZEVs.
- */
+/** The communities an account can switch between. Admins: every ZEV; anyone else: its memberships. */
 export function communityEntries(user: User | null | undefined, zevs: ReadonlyArray<Zev>): CommunityEntry[] {
     if (!user) return []
     if (user.role === 'admin') {
         return zevs.map((zev) => ({ id: zev.id, name: zev.name, relation: 'admin' as const }))
     }
-    if (user.memberships) {
-        return user.memberships.map((membership) => ({
-            id: membership.zev,
-            name: membership.zev_name,
-            relation: relationOf(membership),
-        }))
-    }
-    if (user.role === 'zev_owner') {
-        return zevs
-            .filter((zev) => zev.owner === user.id)
-            .map((zev) => ({ id: zev.id, name: zev.name, relation: 'manager' as const }))
-    }
-    return []
+    return (user.memberships ?? []).map((membership) => ({
+        id: membership.zev,
+        name: membership.zev_name,
+        relation: relationOf(membership),
+    }))
 }
 
 const ManagedZevContext = createContext<ManagedZevContextValue | undefined>(undefined)
@@ -134,9 +91,8 @@ export function ManagedZevProvider({ children }: { children: ReactNode }) {
     const { user, updatePreferredZev } = useAuth()
     const isAdmin = user?.role === 'admin'
     const holdsAGrant = (user?.memberships ?? []).some((membership) => membership.access !== null)
-    // ZEV records are readable through a grant (or as an admin); the old owner
-    // role still reads its own before memberships are known.
-    const mayReadZevs = isAdmin || holdsAGrant || (!user?.memberships && user?.role === 'zev_owner')
+    // ZEV records are readable through a grant, or as an admin.
+    const mayReadZevs = isAdmin || holdsAGrant
 
     const zevsQuery = useQuery({
         queryKey: queryKeys.zev.list(),

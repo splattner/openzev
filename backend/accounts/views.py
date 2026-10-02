@@ -515,12 +515,8 @@ class VatRateDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 def _serialize_me(user):
-    """Serialize the current user, adding the participant's community name.
-
-    Participants have no managed-ZEV selection, so their community comes from
-    their membership here (``zev.services.own_participant_for_user``, shared
-    with the statement downloads).
-    """
+    """Serialize the current user with what the shell needs: every community
+    it relates to (``memberships``) and whether it may set up a ZEV."""
     data = UserSerializer(user).data
     # Whether this account can re-authenticate with a password, which is what
     # the email-change form needs. Participants and OAuth-only accounts cannot.
@@ -529,13 +525,6 @@ def _serialize_me(user):
     # there — what the frontend's community switcher lists (#761).
     data["memberships"] = zev_access.memberships_for(user)
     data["may_create_zev"] = user.may_create_zev
-    if user.role == UserRole.PARTICIPANT:
-        from zev.services import own_participant_for_user
-
-        participant = own_participant_for_user(user)
-        if participant is not None:
-            data["zev_name"] = participant.zev.name
-        data["zev_count"] = user.participations.count()
     return data
 
 
@@ -718,7 +707,7 @@ def feature_flag_update(request, pk: int):
 @permission_classes([AllowAny])
 @throttle_classes([AuthRegisterThrottle])
 def register(request):
-    """Self-registration: create a pending zev_owner account and send a verification email."""
+    """Self-registration: create a pending account that may set up a ZEV, and send a verification email."""
     if not FeatureFlag.is_enabled(FeatureFlag.ZEV_SELF_REGISTRATION_ENABLED):
         return Response(
             {"detail": "Self-registration is currently disabled."},
@@ -747,7 +736,7 @@ def register(request):
     user = User.objects.create_user(
         username=username,
         email=email,
-        role=UserRole.ZEV_OWNER,
+        role=UserRole.USER,
         may_create_zev=True,
         is_active=False,
         must_change_password=True,

@@ -47,3 +47,42 @@ class AccessGrantsAccountsMigrationTests(TransactionTestCase):
         User = new.get_model("accounts", "User")
         self.assertIs(User.objects.get(username="mig_owner").may_create_zev, True)
         self.assertIs(User.objects.get(username="mig_tenant").may_create_zev, False)
+
+
+class CollapseUserRoleMigrationTests(TransactionTestCase):
+    """accounts.0021 (#761): the platform role becomes admin or user."""
+
+    BEFORE = [("accounts", "0020_access_grants_accounts"), ("zev", "0031_zev_access_grant")]
+    AFTER = [("accounts", "0021_collapse_user_role")]
+
+    migrate = AccessGrantsAccountsMigrationTests.migrate
+    tearDown = AccessGrantsAccountsMigrationTests.tearDown
+
+    def test_every_role_but_admin_becomes_user_and_back(self):
+        old = self.migrate(self.BEFORE)
+        User = old.get_model("accounts", "User")
+        for role in ("admin", "zev_owner", "participant", "guest"):
+            User.objects.create(username=f"mig_{role}", email=f"{role}@example.com", role=role)
+        owner = User.objects.get(username="mig_zev_owner")
+        zev = old.get_model("zev", "Zev").objects.create(name="Mig ZEV", owner_id=owner.pk)
+        old.get_model("zev", "ZevAccessGrant").objects.create(
+            zev=zev, user_id=owner.pk, role="manager", valid_from="2026-01-01",
+        )
+        old.get_model("zev", "Participant").objects.create(
+            zev=zev, user_id=User.objects.get(username="mig_participant").pk,
+            first_name="P", last_name="Q", email="p@example.com", valid_from="2026-01-01",
+        )
+
+        new = self.migrate(self.AFTER)
+        roles = dict(new.get_model("accounts", "User").objects.values_list("username", "role"))
+        self.assertEqual(
+            {name: roles[name] for name in ("mig_admin", "mig_zev_owner", "mig_participant", "mig_guest")},
+            {"mig_admin": "admin", "mig_zev_owner": "user", "mig_participant": "user", "mig_guest": "user"},
+        )
+
+        back = self.migrate(self.BEFORE)
+        roles = dict(back.get_model("accounts", "User").objects.values_list("username", "role"))
+        self.assertEqual(
+            {name: roles[name] for name in ("mig_admin", "mig_zev_owner", "mig_participant", "mig_guest")},
+            {"mig_admin": "admin", "mig_zev_owner": "zev_owner", "mig_participant": "participant", "mig_guest": "guest"},
+        )

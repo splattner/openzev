@@ -55,12 +55,12 @@ class TariffOverviewTestCase(TestCase):
         self.client = APIClient()
         self.admin = make_user("tov_admin", UserRole.ADMIN)
 
-        self.owner = make_user("tov_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("tov_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Overview ZEV")
-        self.puser = make_user("tov_participant", UserRole.PARTICIPANT)
+        self.puser = make_user("tov_participant", UserRole.USER)
         self.participant = make_participant(self.zev, user=self.puser, first="Pia", last="Muster")
 
-        self.other_owner = make_user("tov_other_owner", UserRole.ZEV_OWNER)
+        self.other_owner = make_user("tov_other_owner", UserRole.USER)
         self.other_zev = make_zev(self.other_owner, "Other Overview ZEV")
 
     def _get(self, user, **params):

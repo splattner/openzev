@@ -148,7 +148,7 @@ records when the role changed.
 
 | Field | Change |
 |---|---|
-| `role` | Choices become `UserRole.ADMIN = "admin"` and `UserRole.USER = "user"`; default `user`. Data migration maps `zev_owner`/`participant`/`guest` → `user` (lands in PR 7, §11) |
+| `role` | Choices are `UserRole.ADMIN = "admin"` and `UserRole.USER = "user"`; default `user`. Migration `accounts.0021_collapse_user_role` (PR 7) maps `zev_owner`/`participant`/`guest` → `user`; its best-effort reverse maps an open manager grant → `zev_owner`, a participant link → `participant`, anything else → `guest` |
 | `may_create_zev` | New `BooleanField(default=False)`. Set to `True` by self-registration (`register`). Gates `ZevViewSet.self_setup` (§7.6). Data migration: `True` for every account whose role was `zev_owner` |
 
 Properties: `is_admin` unchanged (`role == ADMIN or is_superuser`).
@@ -333,8 +333,7 @@ the resource as reachable by participants.
 
 `zev.permissions.BaseZevScopedPermission`:
 
-- `has_permission`: authenticated and (admin, or `may_hold_management_access`,
-  or safe method and (`allow_participant_safe_methods` or viewable ZEVs
+- `has_permission`: authenticated and (admin, or safe method and (`allow_participant_safe_methods` or viewable ZEVs
   non-empty), or unsafe method and `managed_zev_ids` non-empty). As before,
   `allow_participant_safe_methods` admits safe methods without a participant row
   (an account with nothing gets an empty list from `MeteringPointViewSet`).
@@ -350,13 +349,11 @@ use is replaced. `HasZevReadAccess` (a `HasZevAccess` that treats every request
 as a read) guards the MCP endpoint, which is POST-only but read-only (ADR 0025),
 so a viewer may use it.
 
-**Transitional role gate.** `accounts.permissions.may_hold_management_access(user)`
-is `role == "zev_owner"`. It lets such an account pass the coarse gates
-(`HasZevAccess`, `BaseZevScopedPermission.has_permission`, `CanViewAuditEvents`,
-the dashboard resolver, the reports self-service rule, `self_setup`) before it
-holds a grant — a self-registered owner who has not finished setup gets empty
-lists, not 403s, exactly as before. It never widens which rows are visible
-(those are scoped by grants) and disappears with the role collapse (step 7).
+**No role gate.** Until PR 7 a transitional `may_hold_management_access(user)`
+(`role == "zev_owner"`) let an account without a grant pass the coarse gates
+and get empty lists. It is removed with the role collapse: an account with no
+grant (for example a self-registered one that never finished setup) gets 403
+from the management endpoints, and its shell shows nothing to manage.
 
 ### 6.3 Hand-written checks replaced
 
@@ -379,9 +376,9 @@ lists, not 403s, exactly as before. It never widens which rows are visible
 | `feasibility/views.py` | `Zev.objects.filter(id=…, owner=user)` | `can_view` |
 | `mcp_server/views.py` `_resolve_zev_for_audit` | `Zev.objects.filter(owner=user)` | `can_view` |
 | `mcp_server/views.py` `McpView.permission_classes` | `IsZevOwnerOrAdmin` | `HasZevReadAccess` |
-| `audit/views.py` `CanViewAuditEvents`, `_base_queryset` | `role == ZEV_OWNER`, `zev__owner=user` | admin, `may_hold_management_access`, or viewable ZEVs non-empty; `zev_id__in=viewable_zev_ids` |
+| `audit/views.py` `CanViewAuditEvents`, `_base_queryset` | `role == ZEV_OWNER`, `zev__owner=user` | admin, or viewable ZEVs non-empty; `zev_id__in=viewable_zev_ids` |
 | `zev/views.py` `ParticipantViewSet._contract_pdf_access_denied` | `is_zev_owner` | GET: `can_view` or own participant; POST (issue): `can_manage` |
-| `zev/views.py` `self_setup` | `is_zev_owner`; `Zev.objects.filter(owner=user, disabled_at__isnull=True)` | until step 5: admin or `may_hold_management_access`; "already have a ZEV" = an active manager grant on a non-disabled ZEV. §7.6 from step 5 |
+| `zev/views.py` `self_setup` | `is_zev_owner`; `Zev.objects.filter(owner=user, disabled_at__isnull=True)` | admin or `may_create_zev`; "already have a ZEV" = an active manager grant on a non-disabled ZEV (§7.6) |
 | `zev/services.py` `own_participant_for_user(user, zev_id=None)` | first participant row | first **current** row, in `zev_id` when given |
 | `zev/serializers.py` `ParticipantSerializer.validate` | `user.role != PARTICIPANT` | unchanged in step 4; removed in step 5 with the link/unlink rework |
 | `accounts/serializers.py` `SelfUserSerializer.validate_preferred_zev` | `is_zev_owner`, `value.owner_id != user.pk` | `can_view(user, value)` or any participant row (current or past) in it; message "You can only set a community you belong to as the default." |
@@ -391,7 +388,7 @@ lists, not 403s, exactly as before. It never widens which rows are visible
 
 Both `dashboard_summary` and `hourly_profile` decide through
 `_resolve_dashboard_scope(user, zev_id)` (`metering/views.py`), where "manages"
-means admin, a manager or viewer grant anywhere, or `may_hold_management_access`:
+means admin, or a manager or viewer grant anywhere:
 
 - `?zev_id=` given: `can_view` → community (owner) summary for that ZEV; else a
   current participant row in that ZEV → participant summary for that ZEV only;
@@ -404,8 +401,9 @@ means admin, a manager or viewer grant anywhere, or `may_hold_management_access`
   `zev_id query parameter is required.`; any other account gets its
   participant summary across all its current rows.
 
-The response key `role` keeps its values `"zev_owner"` / `"participant"` until
-PR 7, where it is renamed `summary_kind` with values `"zev"` / `"participant"`.
+The response says which summary it is in `summary_kind`: `"zev"` (the
+community summary) or `"participant"`. (Until PR 7 the key was `role`, with
+`"zev_owner"` / `"participant"`.)
 
 ## 7. API contracts
 
@@ -476,11 +474,12 @@ under the action it attempted. Metadata always carries `user_id`.
 
 - `sync_participant_user_fields`: no longer writes `role` (it still copies the
   participant's email and names onto the account).
-- `has_its_own_login(user)`: admin, an old `zev_owner`-role account, or an
+- `has_its_own_login(user)`: admin, an account with `may_create_zev`
+  (self-registered), or an
   account that holds or has held any grant.
 - `ensure_participant_account`: never neutralises the password of an account
   with its own login (was: owners and admins); it no longer writes `role`.
-  Newly created participant accounts keep `role=participant` until step 7.
+  New participant accounts get `role=user`.
 - `own_participant_for_user(user, zev_id=None)`: the account's first current
   row, in `zev_id` when given.
 - `ParticipantSerializer.validate`: a non-admin may not edit a participant row
@@ -519,7 +518,7 @@ cannot be impersonated."`, audited `DENIED` with metadata `is_admin`,
 
 ### 7.6 Self-registration and self-setup
 
-- `register` creates the pending account with `role=zev_owner` (until step 7),
+- `register` creates the pending account with `role=user`,
   `may_create_zev=True`, and a `signup`-purpose token.
 - `ZevViewSet.self_setup`: allowed for an admin or when `user.may_create_zev`,
   and only while the account has no active manager grant on a non-disabled ZEV
@@ -527,8 +526,9 @@ cannot be impersonated."`, audited `DENIED` with metadata `is_admin`,
   ZEV."` otherwise.
 - OAuth auto-provisioning and the admin wizard (`create_zev_with_owner_setup`)
   leave `may_create_zev=False`; the wizard's owner gets its grant from §4.7.
-- Test helpers mirror the migration: `testing.helpers.make_user` and
-  `OwnerFactory` set `may_create_zev=True` for the `zev_owner` role.
+- Test helpers: `testing.helpers.make_user(username, role=USER, password, *,
+  may_create_zev=False)`; `OwnerFactory` sets `may_create_zev=True` (a
+  self-registered owner; owning a ZEV makes it manager).
 
 ### 7.7 `/api/v1/auth/me/` and the admin accounts list
 
@@ -551,7 +551,8 @@ One entry per ZEV the account relates to through an active grant or any
 participant row (ended rows included, so a former participant can still reach
 their invoices); sorted by `zev_name` (case-insensitive), then `zev`. Admins get
 the entries for their own participant rows only (normally `[]`).
-`zev_name`/`zev_count` stay until PR 7, then are removed.
+The former participant-only `zev_name` / `zev_count` keys are removed (PR 7);
+the frontend labels from `memberships`.
 
 `AdminUserSerializer.get_memberships` returns the same shape through
 `zev.access.build_memberships`, from rows `UserListCreateView.get_queryset`
@@ -560,8 +561,8 @@ prefetches (`zev.access.active_grants_prefetch()` into `active_zev_grants`, and
 replaces the per-ZEV merge of `owned_zevs` and `participations`; the frontend
 `AccountMembership` type is replaced by `Membership`.
 
-The admin accounts list `?role=` filter is unchanged until step 7, when it
-accepts `admin` and `user` only.
+The admin accounts list filters by role on the client; the choices are
+`admin` and `user` (PR 7).
 
 ### 7.8 Reports self-service (`invoices/views_reports.py`)
 
@@ -570,22 +571,25 @@ accepts `admin` and `user` only.
 
 1. The caller can view the requested `zev_id` → manager branch
    (`participant_id` required for the statement).
-2. The caller manages or views anything (admin, a grant, or
-   `may_hold_management_access`) → self-service only when it names a `zev_id`
+2. The caller manages or views anything (admin, or a grant) → self-service only when it names a `zev_id`
    in which it holds a current participant row (that row); otherwise the
    manager branch, where naming a ZEV it cannot view is a 403.
 3. Any other account is self-service: its current row in the named `zev_id`,
    else — as before per-ZEV grants, when a participant's ids were simply
    ignored — its first current row (`own_participant_for_user`). With no
-   current row, a `participant`-role account gets 404 and any other account is
-   served by the manager branch (400 without ids); that distinction rests on
-   the old role until step 7.
+   current row, an account that has any (ended) participant row gets 404; an
+   account that never took part is served by the manager branch (400 without
+   ids).
+
+The participant Reports page names the selected community (`zev_id`) when the
+account has more than one (§9.4), so a participant of two ZEVs gets the
+statement of the one it is looking at.
 
 Self-service statements keep `sent_only=True` (#861).
 
 ### 7.9 JWT claims
 
-`role` stays a claim (`admin`/`user` after PR 7). The frontend never decodes
+`role` stays a claim (`admin` or `user`). The frontend never decodes
 tokens; it reads `/auth/me`.
 
 ## 8. Invitations
@@ -593,7 +597,7 @@ tokens; it reads `/auth/me`.
 Triggered by a grant create whose email matches no account (§7.1):
 
 1. Create `User(username=build_unique_username(email=…), email=email,
-   role=participant (until step 7), is_active=False, may_create_zev=False)`
+   role=user, is_active=False, may_create_zev=False)`
    with `set_unusable_password()`.
 2. Create the grant (`granted_by = request.user`).
 3. Create `EmailVerificationToken(user, purpose="invitation", token=token_urlsafe(48))`.
@@ -639,7 +643,7 @@ Both are sent synchronously; a send failure leaves the grant in place, returns
 ### 9.1 Types (`frontend/src/types/api.ts`)
 
 ```typescript
-export type UserRole = 'admin' | 'user'            // PR 7; until then the old union plus 'user'
+export type UserRole = 'admin' | 'user'
 export type ZevAccessRole = 'manager' | 'viewer'
 
 export interface MembershipParticipant {
@@ -659,7 +663,7 @@ export interface Membership {
 
 export interface User {
     // …existing fields…
-    memberships?: Membership[]   // from /auth/me; absent in older sessions
+    memberships?: Membership[]   // from /auth/me
     may_create_zev?: boolean
 }
 
@@ -691,22 +695,21 @@ export interface ZevAccessGrantInput { email: string; role: ZevAccessRole; valid
   account relates to, built by `communityEntries(user, zevs)`: admin → every ZEV
   (`fetchZevs`), relation `admin`; an account with `user.memberships` → one entry
   per membership with `relationOf(membership)` (`lib/membership.ts`: the grant's
-  `manager` / `viewer`, else `participant` while a row is live, else `former`);
-  a session without memberships (from before /auth/me listed them) → the old
-  rule, an owner's own ZEVs as `manager`.
+  `manager` / `viewer`, else `participant` while a row is live, else `former`).
 - **`relation?: CommunityRelation`** — the selected entry's relation.
 
 `managedZevs` (ZEV records) is now every ZEV for an admin and the ZEVs the
-account holds a grant for otherwise; `fetchZevs` runs for admins, grant
-holders, and (transitional) `zev_owner`-role accounts without memberships.
+account holds a grant for otherwise; `fetchZevs` runs for admins and grant
+holders. Entries come from `/auth/me`, so a non-admin's selection resolves
+before the ZEV list arrives.
 `selectedZev` is `null` for a participant-only entry (its record is not
 readable).
 
 **Selection** — `resolveCommunitySelection({ isAdmin, entryIds, currentId,
 preferredZevId })`, pure: explicit in-session pick if still listed →
 `user.preferred_zev` if listed → first entry. An admin may always switch;
-anyone else once there is more than one entry. `resolveManagedSelection` stays
-as the role-only wrapper for old callers. Reset on account change (unchanged).
+anyone else once there is more than one entry. Reset on account change
+(unchanged). (The role-only `resolveManagedSelection` was removed in PR 7.)
 
 **`useCommunityAccess()`** (`lib/communityAccess.ts`) →
 `{ shellRole, isZevScope, canManage, isParticipantScope, isAdmin }`:
@@ -714,15 +717,14 @@ as the role-only wrapper for old callers. Reset on account change (unchanged).
 | `shellRole` | from | `isZevScope` (read the management view) | `canManage` (write) | `isParticipantScope` |
 |---|---|---|---|---|
 | `admin` | `user.role === 'admin'` | yes | yes | no |
-| `manager` | selected relation (or, without one, `role === 'zev_owner'`) | yes | yes | no |
+| `manager` | selected relation | yes | yes | no |
 | `viewer` | selected relation | yes | no | no |
-| `participant` | selected relation (or, without one, `role === 'participant'`) | no | no | yes |
+| `participant` | selected relation | no | no | yes |
 | `former` | selected relation | no | no | yes (invoices only) |
 | `none` | anything else | no | no | no |
 
-`shellRoleFor(user, relation)` holds the fallback, so sessions and tests from
-before per-ZEV access keep their meaning until the role collapses (step 7).
-Outside the auth provider (an isolated page test) the hook answers as for a
+`shellRoleFor(user, relation)`: `admin` for an admin, else the relation, else
+`none` (the old-role fallback was removed in PR 7). Outside the auth provider (an isolated page test) the hook answers as for a
 manager — those pages' old behaviour; the backend enforces access regardless.
 `relationToZev(user, zevId)` / `shellRoleForZev` answer for a given community,
 for pages about one record that may belong to another community than the
@@ -761,9 +763,17 @@ admin, or the owner itself), else the account's relation. A context without
 `DashboardPage`: `isZevScope` → the community dashboard for the selected ZEV
 (as before); `isParticipantScope` → the participant dashboard, asking about the
 selected ZEV (`zev_id`) only when the account has more than one entry, so a
-single membership sends exactly the old request. `summary.role` is read as
-before (`summary_kind` after step 7). `HomePage`: `isZevScope` → Overview, else
+single membership sends exactly the old request. The page branches on
+`summary.summary_kind` (`zev` / `participant`). `HomePage`: `isZevScope` → Overview, else
 the dashboard.
+
+**Community labels (PR 7).** Pages that list across every membership (My
+invoices, metering points, the chart) name the community only when the account
+has exactly one membership (`soleCommunityName(user)` in `lib/membership.ts`);
+My invoices adds a community column with more than one. The participant
+dashboard and Reports name the selected entry, because they ask about it:
+`ReportsPage` passes `zevId` to `ParticipantYearDocuments` (statement and tax
+overview downloads) when the account has more than one entry.
 
 ### 9.5 Viewer read-only
 
@@ -818,8 +828,9 @@ Shipped in PR 5, because the API shapes they read changed there:
   per community labelled `pages.accounts.membership.{manager,viewer,participant,former}`
   (grant first; otherwise participant while a row is current, else former);
   clicking opens the Participants page focused on the current (or first)
-  participant row. The admin list's role filter becomes admin / non-admin in
-  step 7.
+  participant row. The admin list's role filter, create and edit forms offer
+  `admin` and `user` (PR 7); the "accounts without a community" stat counts
+  non-admin accounts with no membership.
 - `features/settings/MfaPolicySection.tsx`: one checkbox
   (`adminSystemSettings.mfaPolicy.requiredLabel`, hint `requiredHint`) plus the
   grace period; it sends `mfa_required`.
@@ -876,7 +887,7 @@ Each PR is green on its own; numbering follows the implementation plan.
 | 4 | Scoping/permissions/hand checks on grants; viewer; union; former participants; dashboard/reports `zev_id`; remove `is_zev_owner` |
 | 5 | Grant API, invitations, link/unlink, impersonation, MFA switch, self-setup gate, `/auth/me` memberships — plus the frontend consumers of the changed shapes: `Membership` type and account chips, link/impersonation rules in `accountList.ts`, the single 2FA switch, `VerifyEmailPage` invitation path, the two new email-template tabs |
 | 6 | Frontend (§9): community switcher with relations, shell roles in routes and navigation, viewer read-only pages, ZEV settings → Access |
-| 7 | Collapse `User.role` to `admin`/`user`; remove `zev_name`/`zev_count`, `ManagedZevProvider` alias, `summary.role`; test-suite role churn; `seed_demo` personas |
+| 7 | Collapse `User.role` to `admin`/`user` (`accounts.0021`); remove `may_hold_management_access`, the frontend's old-role fallbacks, `zev_name`/`zev_count`; `summary.role` → `summary_kind`; participant statements ask about the selected community; test-suite role churn; `seed_demo` viewer and property-manager personas. `ManagedZevProvider` / `useManagedZev` keep their names |
 
 Baseline specs updated in the PR that changes their behaviour:
 `2026-03-community-and-access.md`, `2026-03-admin-governance-and-settings.md`,
@@ -1089,6 +1100,29 @@ rules) and `tests/templates-hub.test.ts` (9 template tabs).
 
 Plus `npm run lint`, `lint:style`, hex check, `test:unit`, `build`.
 
+### PR 7 (shipped)
+
+Backend: `accounts/test_access_migration.py`
+`CollapseUserRoleMigrationTests.test_every_role_but_admin_becomes_user_and_back`
+(forward to `user`, reverse by grant / participant link); the suite's old
+roles became `UserRole.USER`, with `may_create_zev=True` where a test
+self-sets up a ZEV and an owned ZEV where a test needs an account that
+manages something (no role gate any more). Changed expectations:
+`accounts/tests.py` `MeEndpointParticipantContextTests` (memberships instead
+of `zev_name` / `zev_count`); `invoices/test_reports.py`
+`test_account_that_never_took_part_is_served_as_a_manager` (400, was a 404
+for the participant role); role loops in `test_impersonation.py`,
+`test_dashboard.py`, `test_oauth.py` and `zev/tests.py` iterate account kinds
+(plain, manager, participant, self-registered) instead of roles.
+
+Frontend: tests build accounts as `role: 'user'` plus `memberships` or a
+mocked `relation`; `managed-zev-selection.test.ts` tests
+`resolveCommunitySelection` and the provider on memberships (the selection
+resolves before the ZEV list loads); `community-eyebrow.test.ts` covers the
+labels above, including the dashboard naming the selected community with two
+memberships; `account-list.test.ts` the admin/user filter and the
+"without a community" stat.
+
 ### Acceptance criteria
 
 - [ ] Every account with one relationship sees and can do exactly what it could before (PR 2 suite green from PR 3 on).
@@ -1099,4 +1133,4 @@ Plus `npm run lint`, `lint:style`, hex check, `test:unit`, `build`.
 - [ ] A former participant sees their sent invoices and nothing else of that ZEV.
 - [ ] Admins can impersonate any non-admin account and see its full union.
 - [ ] 2FA is one switch; turning it on gives every account the grace period.
-- [ ] `User.role` holds only `admin`/`user` after PR 7, and nothing reads `is_zev_owner`.
+- [x] `User.role` holds only `admin`/`user` after PR 7, and nothing reads `is_zev_owner`.

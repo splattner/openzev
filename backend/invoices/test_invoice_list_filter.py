@@ -31,8 +31,8 @@ class _TwoPopulatedCommunitiesMixin:
     def setUp(self):
         super().setUp()
         self.admin = make_user("isf_admin", UserRole.ADMIN)
-        self.owner_a = make_user("isf_owner_a", UserRole.ZEV_OWNER)
-        self.owner_b = make_user("isf_owner_b", UserRole.ZEV_OWNER)
+        self.owner_a = make_user("isf_owner_a", UserRole.USER)
+        self.owner_b = make_user("isf_owner_b", UserRole.USER)
         self.zev_a = Zev.objects.create(name="Community A", owner=self.owner_a, invoice_prefix="AAA")
         self.zev_b = Zev.objects.create(name="Community B", owner=self.owner_b, invoice_prefix="BBB")
 
@@ -184,7 +184,7 @@ class InvoiceStatusFilterScopingTests(_TwoPopulatedCommunitiesMixin, TestCase):
         self.assertEqual(response.status_code, 404, response.content)
 
     def _as_participant_a(self):
-        member = make_user("isf_member", UserRole.PARTICIPANT)
+        member = make_user("isf_member", UserRole.USER)
         self.participant_a.user = member
         self.participant_a.save(update_fields=["user"])
         return self._as(member)

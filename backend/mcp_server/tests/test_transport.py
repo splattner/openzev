@@ -109,7 +109,7 @@ class TestRole:
     def test_admin_is_allowed(self, admin_mcp_client):
         assert rpc(admin_mcp_client, "ping").status_code == 200
 
-    def test_owner_is_allowed(self, owner_mcp_client):
+    def test_owner_is_allowed(self, zev, owner_mcp_client):
         assert rpc(owner_mcp_client, "ping").status_code == 200
 
 

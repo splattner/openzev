@@ -46,7 +46,7 @@ def _render_contract_markup(participant) -> str:
 
 class ContractPdfContextTests(TestCase):
     def setUp(self):
-        self.owner = make_user("contract_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("contract_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Contract ZEV")
         self.participant = make_participant(self.zev, first="Future", last="Participant")
 
@@ -129,7 +129,7 @@ class ContractPdfPaymentTermsTests(TestCase):
     independently of the invoice PDF's own copy of the same bug (#365 follow-up)."""
 
     def setUp(self):
-        self.owner = make_user("contract_terms_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("contract_terms_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Contract Terms ZEV")
         self.participant = make_participant(self.zev, first="Terms", last="Participant")
 
@@ -174,7 +174,7 @@ class ContractPdfPaymentTermsTests(TestCase):
         self.zev.save(update_fields=["payment_term_days"])
         _build_contract_context(self.participant)
 
-        other_owner = make_user("contract_terms_owner_other", UserRole.ZEV_OWNER)
+        other_owner = make_user("contract_terms_owner_other", UserRole.USER)
         other_zev = make_zev(other_owner, "Other Contract Terms ZEV")
         other_participant = make_participant(other_zev, first="Other", last="Participant")
 
@@ -190,7 +190,7 @@ class ContractPdfContextFieldsTests(TestCase):
     def setUp(self):
         # These tests arrange their own rates (including the no-active-rate case).
         clear_vat_rates()
-        self.owner = make_user("ctx_fields_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("ctx_fields_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Context Fields ZEV")
         self.participant = make_participant(self.zev, first="Ctx", last="Participant")
 
@@ -249,7 +249,7 @@ class ContractPdfTariffRuleTests(TestCase):
     tariff table documents each tariff's validity period."""
 
     def setUp(self):
-        self.owner = make_user("tariff_rule_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("tariff_rule_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Tariff Rule ZEV")
         self.participant = make_participant(self.zev, first="Rule", last="Participant")
 
@@ -406,7 +406,7 @@ class ContractPdfSeasonalTariffTests(TestCase):
     nothing to say it only applies for half the year."""
 
     def setUp(self):
-        self.owner = make_user("seasonal_contract_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("seasonal_contract_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Seasonal Contract ZEV")
         self.participant = make_participant(self.zev, first="Season", last="Participant")
         self.tariff = TariffFactory(
@@ -509,7 +509,7 @@ class ContractIssuanceTests(TestCase):
     document number is a per-ZEV sequence."""
 
     def setUp(self):
-        self.owner = make_user("issue_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("issue_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Issuance ZEV")
         self.participant = make_participant(self.zev, first="Issue", last="Participant")
         flat_tariff(self.zev, price="0.18000")
@@ -630,7 +630,7 @@ class ContractIssuanceTests(TestCase):
 
     @pytest.mark.slow
     def test_document_number_sequence_is_per_zev(self):
-        other_owner = make_user("issue_owner_other", UserRole.ZEV_OWNER)
+        other_owner = make_user("issue_owner_other", UserRole.USER)
         other_zev = make_zev(other_owner, "Other Issuance ZEV")
         other_participant = make_participant(other_zev, first="Other", last="Participant")
         flat_tariff(other_zev, price="0.20000")
@@ -681,7 +681,7 @@ class ContractIssuanceTests(TestCase):
     def test_issue_zev_is_derived_from_the_participant(self):
         """``ContractIssue.zev`` is a denormalized copy of ``participant.zev``;
         save() derives it so the two can never disagree."""
-        other_owner = make_user("issue_owner_zev_derive", UserRole.ZEV_OWNER)
+        other_owner = make_user("issue_owner_zev_derive", UserRole.USER)
         other_zev = make_zev(other_owner, "Derivation ZEV")
 
         issue = ContractIssue.objects.create(
@@ -788,7 +788,7 @@ class ContractPdfCsrfTests(TestCase):
     """
 
     def setUp(self):
-        self.owner = make_user("csrf_contract_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("csrf_contract_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "CSRF Contract ZEV")
         self.participant = make_participant(self.zev, first="Csrf", last="Participant")
         flat_tariff(self.zev, price="0.18000")
@@ -924,7 +924,7 @@ class ContractPdfRenderingTests(TestCase):
     supported language and carries the invoice-style page furniture."""
 
     def setUp(self):
-        self.owner = make_user("render_contract_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("render_contract_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Render Contract ZEV")
         self.zev.vat_mode = VatMode.REGISTERED
         self.zev.vat_number = "CHE-123.456.789"

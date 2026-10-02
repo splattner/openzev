@@ -57,7 +57,8 @@ const GLOBAL_TEMPLATE = {
 }
 
 const state = vi.hoisted(() => ({
-    role: 'zev_owner',
+    // A non-admin account managing the selected ZEV, or an admin.
+    role: 'user',
     zev: {} as Zev,
     emailError: false,
     updateImpl: null as null | ((id: string, payload: Partial<ZevInput>) => Promise<Zev>),
@@ -78,7 +79,10 @@ vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ isAuthenticated: true, use
 vi.mock('../src/components/Layout', () => ({ Layout: () => createElement(Outlet) }))
 vi.mock('../src/lib/managedZev', () => ({
     ManagedZevProvider: ({ children }: { children: ReactNode }) => children,
-    useManagedZev: () => ({ selectedZevId: state.zev?.id ?? '', selectedZev: state.zev ?? null, isLoading: false }),
+    useManagedZev: () => ({
+        selectedZevId: state.zev?.id ?? '', selectedZev: state.zev ?? null, isLoading: false,
+        relation: state.role === 'admin' ? 'admin' : 'manager',
+    }),
 }))
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: toastSpy }) }))
 vi.mock('../src/lib/appSettings', () => ({
@@ -102,7 +106,7 @@ const cleanups: (() => void)[] = []
 afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
 
 beforeEach(() => {
-    state.role = 'zev_owner'
+    state.role = 'user'
     state.zev = fixtureZev()
     state.emailError = false
     state.updateImpl = async (id: string, payload: Partial<ZevInput>) => ({

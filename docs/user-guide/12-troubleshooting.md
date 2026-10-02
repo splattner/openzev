@@ -52,7 +52,7 @@ Development stack (`docker-compose.dev.yml`) uses port 8001 instead.
 | --- | --- | --- |
 | "Invalid credentials" | Wrong username/password | Sign in with the email address, not the username. Check the [demo accounts](01-getting-started.md#demo-accounts); on a new production instance, [create the first admin account](01-getting-started.md#creating-the-first-admin-account) |
 | Participant never set a password | The onboarding link was not used, or has expired | The community owner sends a new onboarding link from the participant's card |
-| "Permission denied" | User role is too restrictive | Ask admin to update your role |
+| "Permission denied" | Your account has no access to that community, or only view access | Ask a manager of the ZEV (or an admin) for access under **ZEV settings → Access** |
 | Signed out on every device without logging out | Your password or email was changed, your two-factor was reset, or someone chose **Sign out everywhere** for your account | Sign in again; if you did not expect it, change your password and check with your administrator |
 | Email-change link says it "does not work" | The link was already used, is older than 24 hours, or your password or address changed after you asked | Request the change again under **My Account → Profile** |
 | "429 Too many requests" | Login/registration attempts exceeded the per-IP rate limit | Wait a while (check the `Retry-After` header) before trying again |
@@ -72,18 +72,18 @@ There is no "forgot password" link on the login page.
 
 **Problem:** Accessing feature you shouldn't see (permission issue).
 
-**Cause:** Your role or ZEV scope doesn't grant access.
+**Cause:** Your access to this community doesn't allow it (for example, you are a viewer).
 
 **Fix:**
-1. Ask an admin to check your role under **Platform → Accounts → Users**
+1. Ask a manager of the ZEV (or an admin) to check your access under **ZEV settings → Access**
 2. Ask for additional access if you need it
 3. Ensure you're in correct ZEV (use ZEV selector if available)
 
 ### Can't See Other ZEVs
 
-**Expected behavior:** ZEV Owners only see assigned ZEVs.
+**Expected behavior:** you only see the communities you have access to or take part in.
 
-**If you need access:** Ask an admin to assign you to the ZEV.
+**If you need access:** ask a manager of that ZEV (or an admin) to give you access.
 
 ## Data Import & Metering
 

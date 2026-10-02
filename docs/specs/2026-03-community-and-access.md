@@ -29,8 +29,8 @@ with backend-enforced ZEV scoping and frontend UX guardrails.
 
 ### In scope
 
-- User model with role-based access (`admin`, `zev_owner`, `participant`,
-  `guest`)
+- User model with a platform role (`admin` or `user`) plus per-ZEV access
+  from grants and participant links (#761, SPEC-2026-10-zev-access-grants)
 - Authentication (JWT via SimpleJWT), self-registration, email verification,
   password management, impersonation
 - ZEV CRUD and owner lifecycle (creation wizard, self-setup, owner transfer)
@@ -39,7 +39,7 @@ with backend-enforced ZEV scoping and frontend UX guardrails.
 - Metering point and assignment CRUD (covered in depth in
   `2026-03-metering-point-management.md`)
 - Frontend route protection and navigation visibility
-- Global ZEV selector for admin / owner scoping (ManagedZevProvider)
+- Community switcher and per-community shell (ManagedZevProvider)
 
 ### Out of scope
 
@@ -62,10 +62,11 @@ Extends `AbstractUser` (Django `accounts.models`).
 | `email` | `EmailField` | |
 | `first_name` | `CharField(150)` | |
 | `last_name` | `CharField(150)` | |
-| `role` | `CharField(20)` choices `UserRole` | `admin`, `zev_owner`, `participant`, `guest` (default `participant`) |
+| `role` | `CharField(20)` choices `UserRole` | `admin` or `user` (default `user`); migration `accounts.0021` mapped the old `zev_owner` / `participant` / `guest` to `user` |
+| `may_create_zev` | `BooleanField` (default `False`) | May set up a ZEV of its own through self-setup (§7.3); set by self-registration |
 | `must_change_password` | `BooleanField` (default `False`) | Set `True` on admin-created or invitation-created accounts |
 | `is_active` | `BooleanField` | `False` until email verification for self-registered users |
-| `preferred_zev` | `ForeignKey('zev.Zev')`, null, `SET_NULL` | Account-level default community: owners/admins with several communities land here on login. `None` = first managed by name. Set by the frontend via `/auth/me/` |
+| `preferred_zev` | `ForeignKey('zev.Zev')`, null, `SET_NULL` | Account-level default community: an account with several communities lands here on login. `None` = first managed by name. Set by the frontend via `/auth/me/` |
 
 **Computed properties:**
 
@@ -81,9 +82,10 @@ Extends `AbstractUser` (Django `accounts.models`).
 | Value | Label |
 |---|---|
 | `admin` | Admin |
-| `zev_owner` | ZEV Owner |
-| `participant` | Participant |
-| `guest` | Guest |
+| `user` | User |
+
+What a `user` account may do in a ZEV comes from its grants and participant
+links there (§4.1), never from the role.
 
 ### 3.3 EmailVerificationToken
 
@@ -245,17 +247,13 @@ participant link      →  own rows through Participant.user while the row is cu
 no relationship       →  authenticated, no domain access
 ```
 
-`User.role` still carries the old values (`zev_owner`, `participant`,
-`guest`) until it collapses to `admin`/`user` (spec §11, step 7). Until then
-it is read in exactly three transitional places, none of which widens what
-rows anyone sees: `accounts.permissions.may_hold_management_access` (a
-`zev_owner`-role account passes the coarse "manages something" gates before it
-holds a grant, so a self-registered owner who has not finished setup gets
-empty lists rather than 403s), `ZevViewSet.self_setup` (who may create a ZEV)
-and the reports self-service rule (`invoices/views_reports.py
-_self_service`: a participant-role account with no current row gets 404, any
-other account without one is served as a manager). `User.is_zev_owner` no
-longer exists.
+`User.role` is `admin` or `user` (#761 step 7); nothing but `is_admin` reads
+it. An account without a grant passes no management gate (403), whatever it
+did before. `ZevViewSet.self_setup` is gated by `User.may_create_zev`. In the
+reports self-service rule (`invoices/views_reports.py _self_service`) an
+account with no current participant row gets 404 when it has an ended one,
+and is served as a manager (400 without ids) when it never took part.
+`User.is_zev_owner` no longer exists.
 
 The owner of a ZEV holds a manager grant through the transitional invariant
 in `Zev.save()` (SPEC-2026-10-zev-access-grants §4.7): creating a ZEV or
@@ -480,9 +478,9 @@ Helper `accounts.jwt_utils.make_jwt_for_user(user, *, impersonated_by=None) -> d
 
 ### 5.1b API key authentication
 
-`accounts.authentication.ApiKeyAuthentication` (`backend/accounts/authentication.py`) accepts `Authorization: Api-Key ozv_<prefix>_<secret>` on every REST endpoint except the default-deny `accounts` app surface (`ACCOUNTS_API_KEY_ALLOWLIST`; see the module docstring). A key inherits its owner's role permissions, is refused on unsafe methods when `read_only=True`, and marks the request `audit_source = "api_key"`.
+`accounts.authentication.ApiKeyAuthentication` (`backend/accounts/authentication.py`) accepts `Authorization: Api-Key ozv_<prefix>_<secret>` on every REST endpoint except the default-deny `accounts` app surface (`ACCOUNTS_API_KEY_ALLOWLIST`; see the module docstring). A key inherits its owner's access (admin, grants, participant links), is refused on unsafe methods when `read_only=True`, and marks the request `audit_source = "api_key"`.
 
-`mcp_server.authentication.McpApiKeyAuthentication` (`backend/mcp_server/authentication.py`) subclasses it for the MCP endpoint (`POST /api/v1/mcp/` only — SPEC-2026-mcp-server): it also accepts `Authorization: Bearer ozv_…` (many MCP clients cannot send a custom scheme), skips the `accounts` allow-list and the read-only-by-method check (the endpoint is always `POST`; each MCP tool declares its own `read_only`), and marks the request `audit_source = "mcp"` instead of `"api_key"`. Only `admin` and `zev_owner` may authenticate there; cookies/JWT are not accepted on that endpoint at all.
+`mcp_server.authentication.McpApiKeyAuthentication` (`backend/mcp_server/authentication.py`) subclasses it for the MCP endpoint (`POST /api/v1/mcp/` only — SPEC-2026-mcp-server): it also accepts `Authorization: Bearer ozv_…` (many MCP clients cannot send a custom scheme), skips the `accounts` allow-list and the read-only-by-method check (the endpoint is always `POST`; each MCP tool declares its own `read_only`), and marks the request `audit_source = "mcp"` instead of `"api_key"`. Only an admin or an account with a manager or viewer grant passes there (`HasZevReadAccess`); cookies/JWT are not accepted on that endpoint at all.
 
 ### 5.1a Last-login tracking
 
@@ -530,7 +528,7 @@ responses, and the detail view do not carry it.
 
 **Audit:** `CustomTokenObtainPairView.post` records an `AuditActionCategory.AUTH` event on every attempt rather than delegating to `TokenObtainPairView.post` unmodified — a successful login records `auth.login` (`status=success`, the authenticated user as both actor and target); a wrong password, unknown username, or inactive account each record `auth.login_failed` (`status=failed`, no actor — the caller proved nothing) with the attempted `email`/`username` value in `target_display` so a credential-stuffing pattern is visible without correlating requests by IP alone. The failure reason is deliberately not distinguished in the response (`CustomTokenObtainPairSerializer`'s generic "no active account" message) or in the audit event itself, to avoid the audit log becoming an oracle for account enumeration.
 
-### 5.2 Self-registration (zev_owner)
+### 5.2 Self-registration
 
 **Endpoint:** `POST /api/v1/auth/register/` (AllowAny)
 
@@ -539,7 +537,7 @@ responses, and the detail view do not carry it.
 **Flow:**
 1. Validate uniqueness of `email` (case-insensitive).
 2. Generate an internal unique `username` from the email local-part (suffix when needed).
-3. Create `User` with `role=zev_owner`, `may_create_zev=True` (#761: the
+3. Create `User` with `role=user`, `may_create_zev=True` (#761: the
    right to self-setup, not a role), `is_active=False`,
    `must_change_password=True`, unusable password.
 4. Generate `EmailVerificationToken` (48-byte `token_urlsafe`, `purpose="signup"`,
@@ -590,13 +588,8 @@ Validates old password, sets new password, clears `must_change_password`, then *
 
 - GET → returns `UserSerializer` of current user (including `preferred_zev`,
   always present, `null` when unset).
-  For participants the response additionally carries `zev_name: string` — the
-  name of the community of their self-service membership
-  (`zev.services.own_participant_for_user`, the model's default surname
-  ordering; the same record the annual-statement and financial-summary
-  downloads serve) — plus `zev_count: number`, the number of held
-  memberships. `zev_name` is absent when the participant has no membership
-  (`zev_count` is then `0`); admins/owners never get either field.
+  (The participant-only `zev_name` / `zev_count` were removed in #761 step 7;
+  `memberships` carries every community name.)
 - GET additionally carries `memberships` — every community the account relates
   to, in the shape of §6.4's `memberships` — and `may_create_zev: boolean`
   (#761).
@@ -612,11 +605,11 @@ Validates old password, sets new password, clears `must_change_password`, then *
   could change their own email — the sign-in identifier and magic-link target —
   without re-authenticating, clear a forced password change, or deactivate
   themselves.) Admins edit all of these through `PATCH /auth/users/{id}/`. The
-  response is shaped like GET (including `zev_name`/`zev_count` where
-  applicable).
-- `preferred_zev` accepts a ZEV UUID or `null`. Only communities the user
-  manages are accepted: owners may only name their own ZEVs, participants/
-  guests cannot set a preference at all (`400` otherwise).
+  response is shaped like GET.
+- `preferred_zev` accepts a ZEV UUID or `null`. Only a community the account
+  belongs to is accepted — one it can view (admin, grant) or holds a current
+  or past participant row in (`400` "You can only set a community you belong
+  to as the default." otherwise).
 
 ### 5.6a Email change
 
@@ -943,12 +936,13 @@ the account's role everywhere.
   saves the admin's `preferred_zev`, as any switch does) and opens
   `/participants?focus=<participant>` (`/participants` when the account is an
   owner with no participant record). Memberships are edited there, not here.
-- **Stats:** accounts, accounts with two-factor, guest accounts (the ones
-  waiting to be linked), accounts the MFA policy names that have not enrolled
+- **Stats:** accounts, accounts with two-factor, accounts without a community
+  (non-admin accounts with no membership: the ones waiting for access or a
+  participant link), accounts the MFA policy names that have not enrolled
   yet (`accountList.needsTwoFactor`: `"grace"` or `"overdue"`), accounts that
   have never signed in (`last_login === null`).
 - **Filters** (`accountList.filterAccounts`, client-side): search over display
-  name, username and email; platform role; community; two-factor (all accounts,
+  name, username and email; platform role (`admin` / `user`); community; two-factor (all accounts,
   or only those `needsTwoFactor`). The community filter matches *any*
   membership, owner or participant.
 - **New account** (`AccountCreatedNotice` in
@@ -961,7 +955,7 @@ the account's role everywhere.
   with a copy button and is never requested from the server again.
 - **Actions:** *Edit* (username, email, names, **platform role** — labelled as
   such, with a hint that it applies in every community); menu: *Impersonate*
-  (participant and owner accounts only — `canImpersonateAccount`), *Reset
+  (any active non-admin account — `canImpersonateAccount`), *Reset
   two-factor*, **View activity** (navigates to
   `/admin/audit?actor=<id>&actorUsername=<username>` — the platform audit log
   pre-filtered to this account as actor; see
@@ -1005,8 +999,9 @@ participants (`ParticipantCardsSection`, `useParticipantAccountLinking`,
 
 **Queryset scoping:**
 - `admin` → all ZEVs.
-- `zev_owner` → ZEVs where `owner == user`.
-- `participant` → ZEVs where user is linked to any participant in that ZEV.
+- otherwise → the ZEVs the account holds a manager or viewer grant on
+  (`zev.access.viewable_zev_ids`). A participant link alone does not expose
+  the ZEV record.
 
 **Create (POST):** admin only (enforced in `create()` and
 `ZevManagementPermission.has_permission`).
@@ -1037,10 +1032,9 @@ uses `ZevDetailSerializer` which nests `participants` (via
 **Owner assignment on create:** if `owner` not in validated data, defaults to
 `request.user`.
 
-**Owner transfer on update:** `ZevSerializer.update()` syncs roles:
-- If new owner is not already admin or zev_owner → promote to `zev_owner`.
-- If previous owner no longer owns any ZEV and is not superuser → demote to
-  `participant`.
+**Owner transfer on update:** no role changes (#761). `Zev.save()` keeps the
+grant invariant: the new owner holds an active manager grant, the previous
+owner's grant is revoked (`zev.access.sync_owner_grant`).
 
 ### 7.1a Disable and enable (ZEV lifecycle, phases 1–2)
 
@@ -1199,7 +1193,7 @@ invalid IBAN keeps the billing-settings warning until it is corrected.
 
 **Service:** `create_zev_with_owner_setup()` (atomic transaction):
 1. Generate unique username (email-local → full-name → first-name fallback, suffix if taken).
-2. Create `User` with `role=zev_owner`, `must_change_password=True`, temporary password.
+2. Create `User` with `role=user`, `must_change_password=True`, temporary password (the owner's manager grant comes from `Zev.save()`).
 3. Create `Zev` with that user as owner.
 4. Create owner `Participant` with `valid_from = zev.start_date`.
 5. Create each `MeteringPoint` → create `MeteringPointAssignment` to owner participant.
@@ -1226,9 +1220,9 @@ The owner address fields are optional when no IBAN is supplied. A non-empty
 IBAN requires `owner_address_line1`, `owner_postal_code`, and `owner_city`.
 
 **Guards:**
-- User must be `zev_owner`.
-- User must not already own an *active* ZEV (a disabled one does not count —
-  see §7.1a).
+- Admin, or `user.may_create_zev`.
+- The account must not already hold an active manager grant on an *active* ZEV
+  (a disabled one does not count — see §7.1a).
 
 **Service:** `create_zev_for_existing_owner()` → creates Zev + Participant.
 
@@ -1256,20 +1250,19 @@ On create:
    automatically).
 3. Call `ensure_participant_account()`:
    - Generates unique username from participant name/email.
-   - Creates `User` with `role=participant`, `must_change_password=True`,
+   - Creates `User` with `role=user`, `must_change_password=True`,
      temporary 12-char password.
    - Links user to participant.
 4. Return participant data including `account_username` and `initial_password`.
 
 On update:
 1. Sync the linked user's `email`, `first_name`, and `last_name` via
-   `sync_participant_user_fields()`. Preserve existing `zev_owner` and `admin`
-   roles; otherwise set the role to `participant` (including linked guests).
-   Profile synchronization must not remove management access from an owner
-   or admin who also has a participant record.
-2. The existing edit guard remains: only admins may edit participant records
-   linked to a non-participant-role account. Ordinary owners cannot edit their
-   own owner-linked participant record through this endpoint.
+   `sync_participant_user_fields()`. The role is never written (#761).
+2. Edit guard: only admins may edit a participant record linked to an account
+   with its own login (`zev.services.has_its_own_login`: admin,
+   `may_create_zev`, or any grant ever held) — 400 on `user`. Ordinary owners
+   cannot edit their own owner-linked participant record through this
+   endpoint.
 
 When a participant has both `address_line1` and `city`, the geocode cache warm-up
 is dispatched with `transaction.on_commit()` after the participant write has
@@ -1280,7 +1273,7 @@ task that reads uncommitted participant data.
 
 | Action | URL | Method | Permission | Description |
 |---|---|---|---|---|
-| Send invitation | `/{id}/send-invitation/` | POST | admin + zev_owner | Reset password, send invitation email |
+| Send invitation | `/{id}/send-invitation/` | POST | admin or `can_manage` | Reset password, send invitation email |
 | Contract PDF (read) | `/{id}/contract-pdf/` | GET | authenticated (self or admin/owner) | Stream the latest issued contract snapshot; 404 before the first issuance. Never mints a version. |
 | Contract PDF (issue) | `/{id}/contract-pdf/` | POST | authenticated (self or admin/owner) | Issue or reuse the persisted versioned contract snapshot and stream it as PDF (see SPEC-2026-08-contract-pdf-redesign) |
 | Link account | `/{id}/link-account/` | POST | admin only | Link an existing non-admin account; it may already hold participant rows here or elsewhere (#761). An admin account → 400 |
@@ -1291,9 +1284,9 @@ task that reads uncommitted participant data.
 
 `send_participant_invitation()` (atomic):
 1. Ensure account exists via `ensure_participant_account()`. For linked
-   accounts, synchronize profile fields and preserve `zev_owner`/`admin` roles
-   using the same rule as participant updates; linked guests become
-   participants. Newly created accounts have the `participant` role.
+   accounts, synchronize profile fields (never the role); the password of an
+   account with its own login is left alone. Newly created accounts have the
+   `user` role.
 2. Generate new temporary password (12 chars).
 3. Set `must_change_password = True`.
 4. Send email with username + temporary password to participant email.
@@ -1419,13 +1412,12 @@ closes the other. The account disclosure
 in the top bar follows the same focus and dismissal rules while keeping its
 language choices as ordinary buttons; selecting a language leaves it open.
 Every ZEV-scoped page header carries the selected ZEV name as an eyebrow
-above the page title. Participant pages show their community name from
-`zev_name` on `GET /auth/me/` only with a single membership
-(`zev_count == 1`): dashboard and metering data aggregate or list across
-every held membership, so a single name would mislabel the scope. Two pages
-keep an unconditional label because their scope always matches: the
-statement page (both downloads serve the self-service membership) and the
-invoice detail page (the invoice's own `zev_name`; a deep link may land on
+above the page title. Participant pages that list across every membership (metering points, chart,
+My invoices) show the community name only when the account has exactly one
+membership (`soleCommunityName(user)`, from `/auth/me` `memberships`), so a
+single name never mislabels the scope. The participant dashboard and the
+statement page name the selected community, because they ask about it
+(`zev_id` with more than one membership). The invoice detail page shows the invoice's own `zev_name` (a deep link may land on
 an invoice of a different community than the global selection). The owner
 audit-logs page follows the Setup convention (selected ZEV name); every
 `/admin/*` page instead shows the platform label (`nav.platformScope`), so
@@ -1454,23 +1446,21 @@ documented in `2026-03-invoice-lifecycle-and-communication.md` §5.6a.
 ### 9.4 ManagedZevProvider (global community context)
 
 `ManagedZevProvider` / `useManagedZev()` provide the selected community for
-every page (`lib/managedZev.tsx`; the name stays until step 7 of #761).
+every page (`lib/managedZev.tsx`; the names were kept through #761).
 
 **Behaviour:**
 - `entries: CommunityEntry[]` (`{id, name, relation}`) from
   `communityEntries(user, zevs)`: an admin → every ZEV with relation `admin`;
   otherwise one entry per `user.memberships` item (`/auth/me`), its relation
   from `relationOf` in `lib/membership.ts` (the grant's `manager` / `viewer`,
-  else `participant` while a participant row is live, else `former`); a
-  session without memberships → a `zev_owner`'s own ZEVs as `manager`.
+  else `participant` while a participant row is live, else `former`).
 - `managedZevs`: ZEV records — every ZEV for an admin, the ZEVs with a
-  manager or viewer entry otherwise. The ZEV list is fetched for admins,
-  grant holders, and (transitional) `zev_owner` accounts without memberships.
+  manager or viewer entry otherwise. The ZEV list is fetched for admins and
+  grant holders.
 - `selectedZev` is the record for the selection, `null` for a
   participant-only entry; `relation` is the selected entry's relation.
 - `isSelectable`: an admin always; anyone else with more than one entry
-  (`resolveCommunitySelection`). `resolveManagedSelection` remains as the
-  role-only wrapper.
+  (`resolveCommunitySelection`).
 - The selection is server-authoritative: the account's `User.preferred_zev`
   (saved on every switch) follows the user across browsers. No browser
   storage is used, so one account's choice cannot leak into another session.
@@ -1488,9 +1478,8 @@ every page (`lib/managedZev.tsx`; the name stays until step 7 of #761).
 relation into `{shellRole, isZevScope, canManage, isParticipantScope,
 isAdmin}`: `admin` and `manager` may read and write the management view,
 `viewer` only read it (pages hide their write controls), `participant` and
-`former` get the participant view. Without a known relation the old role
-mapping applies (`zev_owner` → manager, `participant` → participant, else
-`none`). `shellRoleForZev(user, zevId)` answers for a record's own community
+`former` get the participant view; without a relation the shell role is
+`none`. `shellRoleForZev(user, zevId)` answers for a record's own community
 (the invoice detail page). Details: SPEC-2026-10-zev-access-grants §9.
 
 ---
@@ -1505,7 +1494,7 @@ mapping applies (`zev_owner` → manager, `participant` → participant, else
 | POST | `/token/mfa/` | AllowAny | Complete a two-factor login: `{mfa_token, code}` (TOTP or recovery code) → sets the same cookies as `/token/` |
 | POST | `/passkeys/authenticate/begin/`, `/passkeys/authenticate/complete/` | AllowAny | Passwordless passkey sign-in (user verification required); sets the same cookies as `/token/` |
 | POST | `/token/refresh/` | AllowAny | JWT refresh (reads `openzev_refresh` cookie; CSRF via `CookieJWTAuthentication` + `CsrfViewMiddleware`) |
-| POST | `/register/` | AllowAny | Self-register a zev_owner account |
+| POST | `/register/` | AllowAny | Self-register an account that may set up a ZEV (`may_create_zev`) |
 | POST | `/verify-email/` | AllowAny | Consume verification token, activate user |
 | GET / PATCH | `/me/` | IsAuthenticated | View/update own profile |
 | POST | `/me/change-password/` | IsAuthenticated | Change password (requires old password) |
@@ -1547,7 +1536,7 @@ mapping applies (`zev_owner` → manager, `participant` → participant, else
 | GET | `/grid-operators/` | IsAuthenticated | The official ElCom grid-operator list for the ZEV form picker — static reference data, **unpaginated** (see §3.4a) |
 | GET / POST | `/participants/` | IsAuthenticated, BaseZevScopedPermission | List/create participants |
 | GET / PATCH / PUT / DELETE | `/participants/{id}/` | IsAuthenticated, BaseZevScopedPermission | Participant detail |
-| POST | `/participants/{id}/send-invitation/` | admin + zev_owner | Send invitation email |
+| POST | `/participants/{id}/send-invitation/` | admin or `can_manage` | Send invitation email |
 | GET | `/participants/{id}/contract-pdf/` | IsAuthenticated | Read the issued participation contract (404 before the first issuance; never mints) |
 | POST | `/participants/{id}/contract-pdf/` | IsAuthenticated | Issue the participation contract (issues or reuses the persisted versioned snapshot) |
 | POST | `/participants/{id}/link-account/` | admin only | Link user account to participant |
@@ -1584,8 +1573,8 @@ a grant and disappear through a participant link.
 | Invoice | all | all of the ZEV's | own invoices once sent (`sent_at` set or status `sent`/`paid`; #861), also after the row has ended | empty list |
 | AuditEvent | all | events of the ZEV | — | PermissionDenied |
 
-Accounts with the old `zev_owner` role and no grant yet pass the coarse gates
-(§4.1) and see empty lists.
+An account with no grant and no participant link passes no management gate
+(403) and sees empty metering-point and invoice lists.
 
 For participant raw/chart metering access, the assignment's meter and linked
 user must match the reading and caller, and its inclusive validity window
@@ -1600,7 +1589,10 @@ and its `metering/test_reading_visibility.py` regression coverage.
 
 ## 12. RBAC endpoint access matrix (tested)
 
-The `RbacEndpointMatrixTests` test class verifies this matrix:
+The `RbacEndpointMatrixTests` test class verifies this matrix. Since #761 the
+columns are relations, not roles: *owner* is a `user` account managing the ZEV
+(it owns it, so it holds a manager grant), *participant* a `user` account
+linked to a participant row, *guest* a `user` account with no relation.
 
 ### 12.1 List endpoints
 
@@ -1654,9 +1646,9 @@ frontend types it as required-nullable).
 - Admin cannot change own role (from admin to anything else).
 - Non-admin cannot change any role at all.
 
-**`preferred_zev` validation:** owners may only set one of their own ZEVs as
-the default; participants and guests cannot set one at all; admins may set
-any ZEV. `null` clears the preference.
+**`preferred_zev` validation:** a community the account belongs to — one it
+can view (admin: any; a grant) or holds a current or past participant row in.
+`null` clears the preference.
 
 ### 13.1a AdminUserSerializer
 
@@ -1716,7 +1708,7 @@ Self-setup goes through `ZevSerializer`
 Key types in `frontend/src/types/api.ts`:
 
 ```typescript
-type UserRole = 'admin' | 'zev_owner' | 'participant' | 'guest'
+type UserRole = 'admin' | 'user'
 
 interface User {
     id: number; username: string; email: string;
@@ -1780,11 +1772,11 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `PasswordChangeFlagTests` | 1 | `must_change_password` cleared on password change |
 | `TokenLoginCredentialTests` | 1 | Email login issues httpOnly cookie JWTs instead of a response body token |
 | `PasswordLoginAuditTests` | 5 | Successful login records `auth.login` with the user as actor and target; wrong password, unknown username, and inactive account each record `auth.login_failed` (status `failed`, no actor) with the attempted identifier in `target_display`; a request with no identifier is still audited |
-| `RegistrationTests` | 4 | Self-registration accepts email only and generates a username; creates an inactive `zev_owner`; verification activates the account; disabled registration is refused |
+| `RegistrationTests` | 4 | Self-registration accepts email only and generates a username; creates an inactive account that may set up a ZEV; verification activates the account; disabled registration is refused |
 | `FeatureFlagsApiTests` | 5 | Anonymous 401 and non-admin 403 on list; admin can list and toggle; defaults sync on read |
 | `ImpersonationTests` | 4 | Admin can impersonate participant/owner; non-admin blocked; admin cannot impersonate admin |
 | `LinkedAccountSafetyTests` | 8 | Admin can edit linked account; cannot delete linked; can delete unlinked; cannot delete last admin (with audit-denied assertion); can delete self when other admin exists (with audit actor SET_NULL assertion); can delete other admin when multiple exist; cannot change own role (via both detail and me endpoints) |
-| `MeEndpointParticipantContextTests` | 4 | Participant `GET /auth/me/` carries `zev_name` + `zev_count`; `zev_name` absent without membership and for admins; count reported with two memberships |
+| `MeEndpointParticipantContextTests` | 4 | `GET /auth/me/` lists a participant's community in `memberships` and carries no `zev_name` / `zev_count`; an admin and an account without a community get `[]`; two memberships are both listed, by name |
 | `AppSettingsTests` | 3 | Authenticated user reads settings; admin updates; non-admin cannot update |
 | `VatRateSettingsTests` | 4 | Admin CRUD; non-admin blocked; overlap rejection; valid_to validation |
 | `OAuthProviderConfigTests` | 5 | Admin creates provider (internal host URLs, scheme-less URLs, default redirect URL); non-admin blocked; login initiate uses provider redirect URL |
@@ -1827,7 +1819,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `ZevCreationWizardTests` | 5 | Non-admin cannot create ZEV; admin wizard creates ZEV + owner + participant + assignments; invalid IBAN and a valid IBAN without the owner address are rejected; wizard payload persists normalized `bank_iban` + `bank_name` |
 | `ZevSelfSetupTests` | 3 | Self-setup persists `bank_iban` + `bank_name` on the created ZEV (owner participant created); an IBAN without the required owner address is rejected without creating the ZEV; falsy-but-valid JSON address values reach serializer validation without being replaced as missing |
 | `ParticipantAccountLifecycleTests` | 3 | Create participant auto-creates account with initial password; update saves contact details; invitation resets password and sends email |
-| `AdminCanEditOwnerParticipantTests` | 4 | `test_admin_can_edit_the_owner_participant_address` preserves the owner role and ZEV API access; `test_profile_sync_preserves_privileged_roles` synchronizes name/email while preserving owner/admin roles and ZEV API access; `test_onboarding_link_leaves_roles_alone_and_keeps_privileged_logins` leaves every role unchanged (#761), keeps the login of owners and admins and neutralises it for participant/guest accounts, and verifies email delivery; `test_zev_owner_cannot_edit_their_own_owner_participant_record` retains the edit restriction (now: a non-admin may not edit a participant row whose account has its own login) |
+| `AdminCanEditOwnerParticipantTests` | 4 | `test_admin_can_edit_the_owner_participant_address` preserves the owner role and ZEV API access; `test_profile_sync_preserves_privileged_roles` synchronizes name/email while preserving owner/admin roles and ZEV API access; `test_onboarding_link_leaves_roles_alone_and_keeps_privileged_logins` leaves every role unchanged (#761), keeps the login of an admin, a self-registered account and a grant holder and neutralises it for a plain account, and verifies email delivery; `test_zev_owner_cannot_edit_their_own_owner_participant_record` retains the edit restriction (now: a non-admin may not edit a participant row whose account has its own login) |
 | `ParticipantAccountLinkingTests` | 8 | Admin can link/unlink accounts (unlink leaves the role); an account may hold several participant rows; an admin account cannot be linked; admin can create-and-link; non-admin cannot link/create |
 | `ZevOwnerRoleSyncTests` | 1 | Owner transfer promotes new owner, demotes previous |
 | `MeteringPointAssignmentValidationTests` | 9 | Unique assignment, no overlaps, historical OK, open-end blocks future, dates within participant window, self-update OK |
@@ -1918,22 +1910,22 @@ lists the test classes per module (test counts are the `test_*` methods).
 
 ## 18. Acceptance criteria
 
-1. User model supports `admin`, `zev_owner`, `participant`, `guest` roles with
+1. User model has the platform role `admin` or `user` with
    a correct `is_admin` computed property; managing a ZEV is a per-ZEV grant
    (`zev.access`, #761).
 2. JWT tokens embed `role`, `email`, `full_name`, `must_change_password`.
-3. Self-registration creates inactive `zev_owner`, sends verification email,
+3. Self-registration creates an inactive `user` with `may_create_zev`, sends verification email,
    and auto-logs in on verification.
 4. `must_change_password` flag redirects to profile; cleared on password change
    or set-initial-password.
-5. Admin can impersonate participants/owners but not other admins.
+5. Admin can impersonate any active non-admin account, never another admin.
 6. All domain viewsets scope querysets by role and ZEV ownership.
 7. `BaseZevScopedPermission` enforces object-level ZEV ownership checks.
 8. Participant creation auto-provisions a linked user account with temporary
    password.
 9. Account linking is admin-only and is done from the community's
-   **Participants** page (link an existing participant/guest account, or
-   unlink — the account becomes `guest`); the admin accounts page only *lists*
+   **Participants** page (link any existing non-admin account, or unlink —
+   the account's role is unchanged); the admin accounts page only *lists*
    memberships and links out to that page. Delete is blocked for accounts that
    belong to a community and for the last admin. `create_superuser` enforces
    `role=ADMIN`, so the `role` column is the canonical admin count.

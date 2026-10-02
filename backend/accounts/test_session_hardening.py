@@ -44,7 +44,7 @@ def _session(user) -> dict:
 
 class SelfServiceProfileTests(TestCase):
     def setUp(self):
-        self.user = make_user("ss_user", UserRole.PARTICIPANT)
+        self.user = make_user("ss_user", UserRole.USER)
         self.user.must_change_password = True
         self.user.save()
         self.client = APIClient()
@@ -66,7 +66,7 @@ class SelfServiceProfileTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.email, "ss_user@example.com")
         self.assertEqual(self.user.username, "ss_user")
-        self.assertEqual(self.user.role, UserRole.PARTICIPANT)
+        self.assertEqual(self.user.role, UserRole.USER)
         self.assertTrue(self.user.must_change_password)
         self.assertTrue(self.user.is_active)
         self.assertEqual(self.user.first_name, "")  # the whole request failed, not just the field
@@ -74,7 +74,7 @@ class SelfServiceProfileTests(TestCase):
     def test_repeating_the_current_values_is_accepted(self):
         response = self.client.patch(
             ME,
-            {"email": "SS_USER@example.com", "username": "ss_user", "role": "participant",
+            {"email": "SS_USER@example.com", "username": "ss_user", "role": "user",
              "must_change_password": True, "is_active": True, "first_name": "Ada"},
             format="json",
         )
@@ -92,7 +92,7 @@ class SelfServiceProfileTests(TestCase):
     def test_owner_can_still_set_a_default_community(self):
         from zev.models import Zev
 
-        owner = make_user("ss_owner", UserRole.ZEV_OWNER)
+        owner = make_user("ss_owner", UserRole.USER)
         zev = Zev.objects.create(name="Mine", owner=owner, zev_type="vzev", invoice_prefix="M")
         client = APIClient()
         authenticate(client, owner)
@@ -121,7 +121,7 @@ class SelfServiceProfileTests(TestCase):
 
 class SessionRevocationTests(TestCase):
     def setUp(self):
-        self.user = make_user("sr_user", UserRole.PARTICIPANT)
+        self.user = make_user("sr_user", UserRole.USER)
 
     def test_a_session_works_until_it_is_revoked(self):
         session = _session(self.user)
@@ -216,7 +216,7 @@ class LogoutRevokesSessionsTests(TestCase):
     LOGOUT = "/api/v1/auth/logout/"
 
     def setUp(self):
-        self.user = make_user("lo_user", UserRole.PARTICIPANT)
+        self.user = make_user("lo_user", UserRole.USER)
 
     def _cookie_client(self, session):
         client = APIClient()
@@ -371,7 +371,7 @@ class LogoutRevokesSessionsTests(TestCase):
 
 class PasswordChangeRevokesSessionsTests(TestCase):
     def setUp(self):
-        self.user = make_user("pc_user", UserRole.ZEV_OWNER)
+        self.user = make_user("pc_user", UserRole.USER)
         self.this_device = _session(self.user)
         self.other_device = _session(self.user)
 
@@ -396,7 +396,7 @@ class PasswordChangeRevokesSessionsTests(TestCase):
 
 class RevokeSessionsEndpointTests(TestCase):
     def setUp(self):
-        self.user = make_user("rv_user", UserRole.PARTICIPANT)
+        self.user = make_user("rv_user", UserRole.USER)
         self.admin = make_user("rv_admin", UserRole.ADMIN)
         self.this_device = _session(self.user)
         self.other_device = _session(self.user)
@@ -434,7 +434,7 @@ class RevokeSessionsEndpointTests(TestCase):
         self.assertEqual(client.post(f"/api/v1/auth/users/{self.admin.pk}/revoke-sessions/").status_code, 400)
 
     def test_non_admins_cannot_use_the_admin_endpoint(self):
-        other = make_user("rv_other", UserRole.ZEV_OWNER)
+        other = make_user("rv_other", UserRole.USER)
         client = APIClient()
         authenticate(client, other)
         self.assertEqual(client.post(f"/api/v1/auth/users/{self.user.pk}/revoke-sessions/").status_code, 403)
@@ -466,7 +466,7 @@ def _confirmation_link() -> str:
 
 class EmailChangeTests(TestCase):
     def setUp(self):
-        self.user = make_user("ec_user", UserRole.ZEV_OWNER)
+        self.user = make_user("ec_user", UserRole.USER)
         self.session = _session(self.user)
         self.client = _bearer(self.session["access"])
 
@@ -520,7 +520,7 @@ class EmailChangeTests(TestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     def test_an_account_without_a_password_cannot_change_its_own_address(self):
-        participant = make_user("ec_participant", UserRole.PARTICIPANT)
+        participant = make_user("ec_participant", UserRole.USER)
         participant.set_unusable_password()
         participant.save()
         response = self._request(client=_bearer(_session(participant)["access"]))
@@ -529,7 +529,7 @@ class EmailChangeTests(TestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     def test_an_address_held_by_another_account_looks_like_success_but_sends_nothing(self):
-        make_user("ec_taken", UserRole.PARTICIPANT)
+        make_user("ec_taken", UserRole.USER)
         taken = self._request(new="EC_TAKEN@example.com")
         free = self._request(new="free@example.org")
         self.assertEqual((taken.status_code, taken.json()), (free.status_code, free.json()))
@@ -561,7 +561,7 @@ class EmailChangeTests(TestCase):
     def test_a_link_is_dead_if_someone_else_took_the_address_meanwhile(self):
         self._request()
         token = _confirmation_link()
-        make_user("ec_sneaky", UserRole.PARTICIPANT).__class__.objects.filter(username="ec_sneaky").update(
+        make_user("ec_sneaky", UserRole.USER).__class__.objects.filter(username="ec_sneaky").update(
             email="new-address@example.org"
         )
         self.assertEqual(APIClient().post(EMAIL_CONFIRM, {"token": token}, format="json").status_code, 400)

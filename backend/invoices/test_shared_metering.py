@@ -42,7 +42,7 @@ class _SharedMeteringBase:
 
     def setUp(self):
         self.owner = User.objects.create_user(
-            username=f"shared_owner_{id(self)}", password="pass1234", role=UserRole.ZEV_OWNER
+            username=f"shared_owner_{id(self)}", password="pass1234", role=UserRole.USER
         )
         self.zev = Zev.objects.create(
             name="Shared Metering ZEV",

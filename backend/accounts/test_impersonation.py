@@ -12,12 +12,15 @@ audit events, which are the part most at risk from moving the admin check from
 a hand-written ``if`` to a permission class.
 """
 
+from datetime import date
+
 from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import AccessToken
 
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
 from testing.helpers import authenticate as auth, make_user
+from zev.models import Participant, Zev
 
 from .cookies import ACCESS_COOKIE, ADMIN_ACCESS_COOKIE, ADMIN_REFRESH_COOKIE, REFRESH_COOKIE
 from .models import UserRole
@@ -30,11 +33,25 @@ def impersonate_url(user_id) -> str:
     return f"/api/v1/auth/users/{user_id}/impersonate/"
 
 
+
+def _account_of_kind(username, kind):
+    """A non-admin account: with no relation, managing a ZEV, or a participant."""
+    account = make_user(username, UserRole.USER)
+    if kind == "manager":
+        Zev.objects.create(name=f"{username} ZEV", owner=account)
+    elif kind == "participant":
+        owner = make_user(f"{username}_owner", UserRole.USER)
+        zev = Zev.objects.create(name=f"{username} ZEV", owner=owner)
+        Participant.objects.create(
+            zev=zev, user=account, first_name="P", last_name="Q", email=account.email, valid_from=date(2026, 1, 1),
+        )
+    return account
+
 class ImpersonationPermissionTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.admin = make_user("imp_admin", UserRole.ADMIN)
-        self.target = make_user("imp_target", UserRole.PARTICIPANT)
+        self.target = make_user("imp_target", UserRole.USER)
 
     def test_admin_may_impersonate_a_participant(self):
         auth(self.client, self.admin)
@@ -47,7 +64,7 @@ class ImpersonationPermissionTests(TestCase):
 
     def test_admin_may_impersonate_a_zev_owner(self):
         auth(self.client, self.admin)
-        owner = make_user("imp_owner_target", UserRole.ZEV_OWNER)
+        owner = make_user("imp_owner_target", UserRole.USER)
 
         self.assertEqual(self.client.post(impersonate_url(owner.pk)).status_code, 200)
 
@@ -56,7 +73,7 @@ class ImpersonationPermissionTests(TestCase):
         which would transfer privilege with no record of the human. An inactive
         account cannot sign in, so it cannot be stepped into either."""
         auth(self.client, self.admin)
-        inactive = make_user("imp_victim_inactive", UserRole.PARTICIPANT)
+        inactive = make_user("imp_victim_inactive", UserRole.USER)
         inactive.is_active = False
         inactive.save(update_fields=["is_active"])
         for victim in (make_user("imp_victim_admin", UserRole.ADMIN), inactive):
@@ -67,15 +84,15 @@ class ImpersonationPermissionTests(TestCase):
     def test_any_active_non_admin_account_may_be_impersonated(self):
         # Impersonation is on the account (#761), whatever relationships it has.
         auth(self.client, self.admin)
-        for role in (UserRole.ZEV_OWNER, UserRole.PARTICIPANT, UserRole.GUEST):
-            with self.subTest(role=role):
-                victim = make_user(f"imp_any_{role}", role)
+        for kind in ("plain", "manager", "participant"):
+            with self.subTest(kind=kind):
+                victim = _account_of_kind(f"imp_any_{kind}", kind)
                 self.assertEqual(self.client.post(impersonate_url(victim.pk)).status_code, 200)
 
     def test_non_admins_are_refused(self):
-        for role in (UserRole.ZEV_OWNER, UserRole.PARTICIPANT, UserRole.GUEST):
-            with self.subTest(role=role):
-                auth(self.client, make_user(f"imp_actor_{role}", role))
+        for kind in ("plain", "manager", "participant"):
+            with self.subTest(kind=kind):
+                auth(self.client, _account_of_kind(f"imp_actor_{kind}", kind))
                 resp = self.client.post(impersonate_url(self.target.pk))
                 self.assertEqual(resp.status_code, 403)
 
@@ -96,7 +113,7 @@ class ImpersonationAuditTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.admin = make_user("aud_admin", UserRole.ADMIN)
-        self.target = make_user("aud_target", UserRole.PARTICIPANT)
+        self.target = make_user("aud_target", UserRole.USER)
 
     def _event(self):
         event = AuditEvent.objects.get()
@@ -119,7 +136,7 @@ class ImpersonationAuditTests(TestCase):
     def test_non_admin_denial_is_recorded(self):
         """Pins the event that used to be written by a hand-rolled admin check
         and is now emitted from permission_denied()."""
-        auth(self.client, make_user("aud_owner", UserRole.ZEV_OWNER))
+        auth(self.client, make_user("aud_owner", UserRole.USER))
 
         self.client.post(impersonate_url(self.target.pk))
 
@@ -167,7 +184,7 @@ class ImpersonationCookieRoundTripTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.admin = make_user("ck_admin", UserRole.ADMIN)
-        self.target = make_user("ck_target", UserRole.PARTICIPANT)
+        self.target = make_user("ck_target", UserRole.USER)
 
     def _login_as_admin(self):
         resp = self.client.post(TOKEN, {"username": self.admin.username, "password": "pass1234"})
@@ -263,7 +280,7 @@ class StopImpersonationAuditTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.admin = make_user("end_admin", UserRole.ADMIN)
-        self.target = make_user("end_target", UserRole.PARTICIPANT)
+        self.target = make_user("end_target", UserRole.USER)
 
     def test_ending_a_session_is_recorded_against_the_impersonated_user(self):
         self.client.post(TOKEN, {"username": self.admin.username, "password": "pass1234"})

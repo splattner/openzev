@@ -24,7 +24,7 @@ from testing.helpers import authenticate as auth
 
 class _DisabledZevWithInvoice(TestCase):
     def setUp(self):
-        self.owner = make_user("dzw_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("dzw_owner", UserRole.USER)
         self.admin = make_user("dzw_admin", UserRole.ADMIN)
         self.zev = make_zev(self.owner, "Disabled-write ZEV")
         self.participant = make_participant(self.zev)

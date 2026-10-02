@@ -276,7 +276,8 @@ with `scripts/start-demo-environment.sh`, or by running `seed_demo` on an
 already-running stack (see below). It contains two communities owned by the
 same owner — the flagship **ZEV STWEG Sonnenhof** and the smaller
 **ZEV Sonnenfirma AG** — so both sides of the community switcher have real
-data to show. Credentials and the full list of what the seed creates are in
+data to show. It also has a viewer of the flagship community and a property
+manager who manages both, to show per-community access. Credentials and the full list of what the seed creates are in
 the root [`README.md`](../../README.md#seed-data--demo-accounts).
 
 ### Resetting Demo Data

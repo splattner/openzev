@@ -27,7 +27,7 @@ class AuditSummaryParityTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.admin = make_user("parity_admin", UserRole.ADMIN)
-        self.owner = make_user("parity_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("parity_owner", UserRole.USER)
         self.zev = Zev.objects.create(name="Parity ZEV", owner=self.owner)
         self.participant = Participant.objects.create(
             zev=self.zev,
@@ -127,7 +127,7 @@ class AuditSummaryParityTests(TestCase):
         self.assertEqual(event.target_display, "flat")
 
     def test_user_update_summary(self):
-        target = make_user("parity_target", UserRole.PARTICIPANT)
+        target = make_user("parity_target", UserRole.USER)
         auth(self.client, self.admin)
         resp = self.client.patch(
             f"/api/v1/auth/users/{target.id}/", {"first_name": "Renamed"}, format="json"

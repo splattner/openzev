@@ -16,7 +16,7 @@ class InvoiceEngineTests(TestCase):
         self.owner = User.objects.create_user(
             username="owner",
             password="secret",
-            role=UserRole.ZEV_OWNER,
+            role=UserRole.USER,
         )
         self.zev = Zev.objects.create(
             name="OpenZEV Demo",

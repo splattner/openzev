@@ -325,7 +325,7 @@ class SeedVatRatesForwardFunctionTests(TestCase):
         from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory, TariffPeriod
         from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType
 
-        owner = make_user("seed_invoice_owner", UserRole.ZEV_OWNER)
+        owner = make_user("seed_invoice_owner", UserRole.USER)
         zev = make_zev(owner, "Seed Invoice ZEV")
         participant = make_participant(zev, first="Seed", last="Invoice")
         metering_point = MeteringPoint.objects.create(
@@ -413,4 +413,4 @@ class SchemaLeftFullyMigratedTests(TransactionTestCase):
         from accounts.models import UserRole
         from testing.helpers import make_user
 
-        make_user("after-the-migration-tests", UserRole.ZEV_OWNER)
+        make_user("after-the-migration-tests", UserRole.USER)

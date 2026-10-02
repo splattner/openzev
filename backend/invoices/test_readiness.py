@@ -118,10 +118,10 @@ class ReadinessTestCase(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("rd_owner", UserRole.ZEV_OWNER)
-        self.other_owner = make_user("rd_other_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("rd_owner", UserRole.USER)
+        self.other_owner = make_user("rd_other_owner", UserRole.USER)
         self.admin = make_user("rd_admin", UserRole.ADMIN)
-        self.participant_user = make_user("rd_participant", UserRole.PARTICIPANT)
+        self.participant_user = make_user("rd_participant", UserRole.USER)
 
         self.zev = make_zev(self.owner, "Readiness ZEV")
         self.zev.start_date = date(2026, 1, 1)

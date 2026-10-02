@@ -48,7 +48,7 @@ class TestGeocodeParticipantsCommand:
 class TestParticipantGeocodingEnabledEndpoint:
     def test_reports_off_by_default(self):
         client = APIClient()
-        client.force_authenticate(make_user("geocoding_flag_reader", UserRole.ZEV_OWNER))
+        client.force_authenticate(make_user("geocoding_flag_reader", UserRole.USER))
 
         response = client.get(GEOCODING_ENABLED_URL)
 
@@ -60,7 +60,7 @@ class TestParticipantGeocodingEnabledEndpoint:
             name=FeatureFlag.PARTICIPANT_GEOCODING_ENABLED, defaults={"enabled": True}
         )
         client = APIClient()
-        client.force_authenticate(make_user("geocoding_flag_reader_on", UserRole.PARTICIPANT))
+        client.force_authenticate(make_user("geocoding_flag_reader_on", UserRole.USER))
 
         response = client.get(GEOCODING_ENABLED_URL)
 

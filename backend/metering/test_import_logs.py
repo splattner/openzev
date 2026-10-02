@@ -28,8 +28,8 @@ from zev.models import MeteringPoint, MeteringPointType, Participant, Zev
 class ImportLogDeletionTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("import_delete_owner", UserRole.ZEV_OWNER)
-        self.other_owner = make_user("import_delete_other", UserRole.ZEV_OWNER)
+        self.owner = make_user("import_delete_owner", UserRole.USER)
+        self.other_owner = make_user("import_delete_other", UserRole.USER)
         auth(self.client, self.owner)
 
         self.zev = Zev.objects.create(name="Delete Imports ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="D")
@@ -459,7 +459,7 @@ class ImportLogCommitVisibilityTests(TransactionTestCase):
     """
 
     def setUp(self):
-        self.owner = make_user("import_visibility_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("import_visibility_owner", UserRole.USER)
         self.zev = Zev.objects.create(
             name="Visibility ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="V"
         )

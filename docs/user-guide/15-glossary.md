@@ -236,4 +236,4 @@ their own communities — to ZEV owners. See [Roles and Permissions](11-roles-an
 
 ## Feature Matrix by Role
 
-See [Roles and Permissions](11-roles-and-permissions.md#access-control-matrix) for the complete access matrix. Note that OpenZEV has four roles — admin, ZEV owner, participant, and guest — where a guest account gains access only once an admin links it to a participant.
+See [Roles and Permissions](11-roles-and-permissions.md#access-control-matrix) for the complete access matrix. Note that an account is either an admin or a user; a user's access comes from each community — as manager, viewer or participant.

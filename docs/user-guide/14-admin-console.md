@@ -45,8 +45,8 @@ Admins can create a ZEV together with a new responsible-person account in one wi
 4. **Step 3** — optionally add initial metering points for the responsible person
 5. **Step 4** — review, then click **Create ZEV**
 
-The system creates the ZEV, the responsible-person account with the **ZEV
-Owner** role and a temporary password, its participant record, and the listed
+The system creates the ZEV, the responsible-person account — the ZEV's owner
+and manager — with a temporary password, its participant record, and the listed
 metering points. The temporary password is shown once at the end — pass it on
 to the responsible person, who sets their own password at first sign-in.
 

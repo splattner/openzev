@@ -209,7 +209,7 @@ describe('MyInvoicesPage (participant own invoices)', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mockAuth.mockReturnValue({
-            user: { id: 5, role: 'participant', username: 'p@example.com' },
+            user: { id: 5, role: 'user', username: 'p@example.com' },
         })
     })
 
@@ -272,7 +272,12 @@ describe('MyInvoicesPage (participant own invoices)', () => {
 
     it('names the issuing community per row for multi-membership participants', async () => {
         mockAuth.mockReturnValue({
-            user: { id: 5, role: 'participant', username: 'p@example.com', zev_count: 2 },
+            user: {
+                id: 5, role: 'user', username: 'p@example.com',
+                memberships: ['First ZEV', 'Second ZEV'].map((name, index) => ({
+                    zev: `z${index}`, zev_name: name, zev_disabled: false, access: null, participants: [],
+                })),
+            },
         })
         mockFetchInvoices.mockResolvedValue([
             {

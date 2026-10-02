@@ -33,7 +33,7 @@ def make_source(**overrides) -> DynamicTariffSource:
 
 class TestPickingASourceThroughTheTariffApi:
     def test_series_and_detail_return_the_same_historical_percentage_base(self, api_client):
-        owner = make_user("percentage_owner", UserRole.ZEV_OWNER)
+        owner = make_user("percentage_owner", UserRole.USER)
         zev = factories.ZevFactory(owner=owner)
         # The requests run on a patched "today" in the past; start the owner's
         # manager grant (created on the real today) before it (#761).
@@ -61,7 +61,7 @@ class TestPickingASourceThroughTheTariffApi:
         }
 
     def test_an_owner_can_create_a_tariff_linked_to_an_existing_source(self, api_client):
-        owner = make_user("dyn_link_owner", UserRole.ZEV_OWNER)
+        owner = make_user("dyn_link_owner", UserRole.USER)
         zev = factories.ZevFactory(owner=owner)
         source = make_source()
         authenticate(api_client, owner)
@@ -80,7 +80,7 @@ class TestPickingASourceThroughTheTariffApi:
         # The model checks this in full_clean(); TariffSerializer.create()
         # already converts that into a DRF ValidationError for every other
         # field, and must for this one too.
-        owner = make_user("dyn_link_owner2", UserRole.ZEV_OWNER)
+        owner = make_user("dyn_link_owner2", UserRole.USER)
         zev = factories.ZevFactory(owner=owner)
         source = make_source()  # tariff_type=grid -> implies energy_type=grid
         authenticate(api_client, owner)
@@ -95,7 +95,7 @@ class TestPickingASourceThroughTheTariffApi:
         assert "energy_type" in response.data
 
     def test_a_fee_tariff_cannot_be_linked_to_a_source(self, api_client):
-        owner = make_user("dyn_link_owner3", UserRole.ZEV_OWNER)
+        owner = make_user("dyn_link_owner3", UserRole.USER)
         zev = factories.ZevFactory(owner=owner)
         source = make_source()
         authenticate(api_client, owner)
@@ -110,7 +110,7 @@ class TestPickingASourceThroughTheTariffApi:
         assert "dynamic_source" in response.data
 
     def test_linking_a_source_to_a_banded_tariff_is_refused(self, api_client):
-        owner = make_user("dyn_link_owner_bands", UserRole.ZEV_OWNER)
+        owner = make_user("dyn_link_owner_bands", UserRole.USER)
         zev = factories.ZevFactory(owner=owner)
         source = make_source()
         tariff = factories.TariffFactory(
@@ -135,7 +135,7 @@ class TestPickingASourceThroughTheTariffApi:
         assert tariff.periods.count() == 1
 
     def test_the_series_endpoint_carries_dynamic_source_on_each_version(self, api_client):
-        owner = make_user("dyn_link_owner4", UserRole.ZEV_OWNER)
+        owner = make_user("dyn_link_owner4", UserRole.USER)
         zev = factories.ZevFactory(owner=owner)
         source = make_source()
         tariff = Tariff.objects.create(
@@ -188,7 +188,7 @@ class TestPreservingTheEvidenceLink:
         return zev, source, tariff
 
     def test_deleting_a_billed_dynamic_tariff_is_refused(self, api_client):
-        owner = make_user("dyn_link_owner5", UserRole.ZEV_OWNER)
+        owner = make_user("dyn_link_owner5", UserRole.USER)
         _zev, _source, tariff = self._billed_dynamic_tariff(owner)
         authenticate(api_client, owner)
 
@@ -198,7 +198,7 @@ class TestPreservingTheEvidenceLink:
         assert Tariff.objects.filter(pk=tariff.pk).exists()
 
     def test_repointing_a_billed_dynamic_tariff_is_refused(self, api_client):
-        owner = make_user("dyn_link_owner6", UserRole.ZEV_OWNER)
+        owner = make_user("dyn_link_owner6", UserRole.USER)
         _zev, _source, tariff = self._billed_dynamic_tariff(owner)
         other_source = make_source(
             url="https://api.tariffs.groupe-e.ch/v2/tariffs", tariff_name="double",
@@ -218,7 +218,7 @@ class TestPreservingTheEvidenceLink:
     def test_clearing_a_billed_dynamic_tariffs_source_is_refused(self, api_client):
         # Unsetting it entirely (e.g. converting to a static tariff) loses
         # the link exactly as much as repointing it does.
-        owner = make_user("dyn_link_owner7", UserRole.ZEV_OWNER)
+        owner = make_user("dyn_link_owner7", UserRole.USER)
         _zev, _source, tariff = self._billed_dynamic_tariff(owner)
         authenticate(api_client, owner)
 
@@ -233,7 +233,7 @@ class TestPreservingTheEvidenceLink:
     def test_an_unbilled_dynamic_tariff_can_still_be_deleted_and_repointed(self, api_client):
         # No invoice overlaps this one — nothing at risk, so both mutations
         # that are refused above must stay ordinary here.
-        owner = make_user("dyn_link_owner8", UserRole.ZEV_OWNER)
+        owner = make_user("dyn_link_owner8", UserRole.USER)
         zev = factories.ZevFactory(owner=owner)
         source = make_source()
         other_source = make_source(
@@ -257,7 +257,7 @@ class TestPreservingTheEvidenceLink:
 
     def test_setting_a_dynamic_source_for_the_first_time_is_unaffected(self, api_client):
         # There is no prior link to lose, billed or not.
-        owner = make_user("dyn_link_owner9", UserRole.ZEV_OWNER)
+        owner = make_user("dyn_link_owner9", UserRole.USER)
         zev = factories.ZevFactory(owner=owner)
         source = make_source()
         tariff = factories.TariffFactory(
@@ -277,7 +277,7 @@ class TestPreservingTheEvidenceLink:
 
 class TestDynamicTariffVersioning:
     def test_duplicate_and_new_version_keep_dynamic_pricing_without_bands(self, api_client):
-        owner = make_user("dyn_version_owner", UserRole.ZEV_OWNER)
+        owner = make_user("dyn_version_owner", UserRole.USER)
         zev = factories.ZevFactory(owner=owner)
         source = make_source()
         tariff = Tariff.objects.create(

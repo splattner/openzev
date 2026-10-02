@@ -59,7 +59,7 @@ class MfaCryptoTests(TestCase):
     def test_rotate_command_re_encrypts_every_device(self):
         old_key = _key()
         new_key = _key()
-        user = make_user("mfa_rotate_user", UserRole.PARTICIPANT)
+        user = make_user("mfa_rotate_user", UserRole.USER)
         with override_settings(MFA_ENCRYPTION_KEYS=[old_key]):
             device = TotpDevice(user=user)
             device.set_secret(SECRET)
@@ -90,7 +90,7 @@ class RotateMfaKeyCommandTests(TestCase):
 
     def test_refuses_when_no_key_is_configured(self):
         key = _key()
-        user = make_user("mfa_rotate_no_key", UserRole.PARTICIPANT)
+        user = make_user("mfa_rotate_no_key", UserRole.USER)
         with override_settings(MFA_ENCRYPTION_KEYS=[key]):
             device = TotpDevice(user=user)
             device.set_secret(SECRET)
@@ -108,7 +108,7 @@ class RotateMfaKeyCommandTests(TestCase):
 
     def test_records_an_audit_event(self):
         key = _key()
-        user = make_user("mfa_rotate_audit", UserRole.PARTICIPANT)
+        user = make_user("mfa_rotate_audit", UserRole.USER)
         with override_settings(MFA_ENCRYPTION_KEYS=[key]):
             device = TotpDevice(user=user)
             device.set_secret(SECRET)

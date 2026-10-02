@@ -14,8 +14,9 @@ const api = vi.hoisted(() => ({
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
 vi.mock('../src/lib/managedZev', () => ({ useManagedZev: () => ({
     selectedZevId: 'z1', selectedZev: { id: 'z1', name: 'ZEV', start_date: '2025-01-01', billing_interval: 'monthly' },
+    relation: 'manager',
 }) }))
-vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ user: { role: 'zev_owner' } }) }))
+vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ user: { role: 'user' } }) }))
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: vi.fn() }) }))
 vi.mock('../src/lib/appSettings', () => ({
     useAppSettings: () => ({ settings: {} }),

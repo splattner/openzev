@@ -1,20 +1,8 @@
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
-from accounts.models import UserRole
-
-
 class IsAdmin(BasePermission):
     def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.is_admin
-
-
-def may_hold_management_access(user) -> bool:
-    """Transitional (#761, until ``User.role`` collapses): an account still
-    carrying the old ``zev_owner`` role passes the coarse "manages something"
-    gates even before it holds a grant, as it did before grants existed — a
-    self-registered owner who has not finished setup sees empty lists rather
-    than 403s. It widens nothing: rows are still scoped by grants."""
-    return getattr(user, "role", None) == UserRole.ZEV_OWNER
 
 
 class HasZevAccess(BasePermission):
@@ -31,7 +19,7 @@ class HasZevAccess(BasePermission):
         user = request.user
         if not user.is_authenticated:
             return False
-        if user.is_admin or may_hold_management_access(user):
+        if user.is_admin:
             return True
         reads = self.only_reads(request, view)
         return bool(access.viewable_zev_ids(user) if reads else access.managed_zev_ids(user))

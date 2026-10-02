@@ -76,7 +76,7 @@ function mockOwner() {
             email: 'owner@example.com',
             first_name: '',
             last_name: '',
-            role: 'zev_owner',
+            role: 'user',
             must_change_password: false,
             preferred_zev: null,
         },

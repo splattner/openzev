@@ -12,13 +12,14 @@ import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { useCommunityAccess } from '../lib/communityAccess'
+import { soleCommunityName } from '../lib/membership'
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function MeteringPointsPage() {
     const { user } = useAuth()
     const { selectedZevId, selectedZev } = useManagedZev()
-    const participantScopeName = user?.zev_count === 1 ? user?.zev_name : undefined
+    const participantScopeName = soleCommunityName(user)
     const { settings } = useAppSettings()
     const { t } = useTranslation()
     // The management view (scope) is open to viewers; writes need a manager (#761).

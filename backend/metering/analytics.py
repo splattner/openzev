@@ -419,7 +419,7 @@ def owner_dashboard_summary(qs, trunc_fn, selected_participant_id):
         ]
 
     return {
-        "role": "zev_owner",
+        "summary_kind": "zev",
         "totals": response_totals,
         "zev_totals": zev_wide_totals,
         "timeline": response_timeline,
@@ -652,7 +652,7 @@ def participant_dashboard_summary(participant_qs, zev_qs, trunc_fn, user, zev_id
     )
 
     return {
-        "role": "participant",
+        "summary_kind": "participant",
         "totals": {k: float(v) for k, v in totals.items()},
         "timeline": timeline,
         "zev_totals": {k: float(v) for k, v in zev_totals.items()},

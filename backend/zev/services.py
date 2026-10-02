@@ -83,15 +83,16 @@ def sync_participant_user_fields(participant, user) -> None:
 
 def has_its_own_login(user) -> bool:
     """Whether ``user`` signs in with a password it uses for more than being a
-    participant: an admin, an old ``zev_owner``-role account, or an account
-    holding (or having held) a manager or viewer grant (#761). Such a password
+    participant: an admin, an account that may set up a ZEV of its own
+    (self-registered), or an account holding (or having held) a manager or
+    viewer grant (#761). Such a password
     is never neutralized because one of its participant rows was touched.
     """
     from .models import ZevAccessGrant
 
     return (
         user.is_admin
-        or user.role == UserRole.ZEV_OWNER
+        or user.may_create_zev
         or ZevAccessGrant.objects.filter(user=user).exists()
     )
 
@@ -143,7 +144,7 @@ def ensure_participant_account(participant):
     )
     user = User.objects.create_user(
         username=username,
-        role=UserRole.PARTICIPANT,
+        role=UserRole.USER,
         email=participant.email,
         first_name=participant.first_name,
         last_name=participant.last_name,
@@ -209,7 +210,7 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
     owner_user = User.objects.create_user(
         username=username,
         password=temporary_password,
-        role=UserRole.ZEV_OWNER,
+        role=UserRole.USER,
         email=email,
         first_name=first_name,
         last_name=last_name,

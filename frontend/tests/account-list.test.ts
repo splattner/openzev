@@ -28,7 +28,7 @@ const account = (over: Partial<AdminUser> = {}): AdminUser => ({
     email: `user${nextId}@example.com`,
     first_name: 'Ada',
     last_name: 'Lovelace',
-    role: 'participant',
+    role: 'user',
     must_change_password: false,
     preferred_zev: null,
     is_active: true,
@@ -42,11 +42,11 @@ const account = (over: Partial<AdminUser> = {}): AdminUser => ({
 describe('filterAccounts', () => {
     const tenantInA = account({ username: 'tina', first_name: 'Tina', last_name: 'Tenant', memberships: [member('a')] })
     const ownerOfB = account({
-        username: 'olga', first_name: 'Olga', last_name: 'Owner', role: 'zev_owner',
+        username: 'olga', first_name: 'Olga', last_name: 'Owner', role: 'user',
         memberships: [member('b', { access: 'manager' })],
     })
     const both = account({
-        username: 'ben', first_name: 'Ben', last_name: 'Both', role: 'zev_owner',
+        username: 'ben', first_name: 'Ben', last_name: 'Both', role: 'user',
         memberships: [member('a', { access: 'manager' }), member('b', { participants: [], access: 'manager' })],
     })
     const all = [tenantInA, ownerOfB, both]
@@ -63,8 +63,9 @@ describe('filterAccounts', () => {
     })
 
     it('filters by platform role', () => {
-        const owners = filterAccounts(all, { ...DEFAULT_ACCOUNT_FILTERS, role: 'zev_owner' })
-        expect(owners.map((a) => a.username)).toEqual(['ben', 'olga'])
+        const admin = account({ username: 'ada', role: 'admin' })
+        expect(filterAccounts([...all, admin], { ...DEFAULT_ACCOUNT_FILTERS, role: 'admin' })).toEqual([admin])
+        expect(filterAccounts([...all, admin], { ...DEFAULT_ACCOUNT_FILTERS, role: 'user' })).toHaveLength(3)
     })
 
     it('searches name, username and email case-insensitively', () => {
@@ -73,7 +74,7 @@ describe('filterAccounts', () => {
     })
 
     it('combines filters conjunctively', () => {
-        expect(filterAccounts(all, { search: 'o', role: 'zev_owner', zevId: 'a', mfaCompliance: 'all' }).map((a) => a.username)).toEqual(['ben'])
+        expect(filterAccounts(all, { search: 'b', role: 'user', zevId: 'a', mfaCompliance: 'all' }).map((a) => a.username)).toEqual(['ben'])
     })
 
     it('falls back to the username when an account has no name', () => {
@@ -90,7 +91,7 @@ describe('hasActiveFilters', () => {
 
     it('is true once any filter narrows the list', () => {
         expect(hasActiveFilters({ ...DEFAULT_ACCOUNT_FILTERS, search: 'x' })).toBe(true)
-        expect(hasActiveFilters({ ...DEFAULT_ACCOUNT_FILTERS, role: 'guest' })).toBe(true)
+        expect(hasActiveFilters({ ...DEFAULT_ACCOUNT_FILTERS, role: 'admin' })).toBe(true)
         expect(hasActiveFilters({ ...DEFAULT_ACCOUNT_FILTERS, zevId: 'a' })).toBe(true)
     })
 })
@@ -98,9 +99,9 @@ describe('hasActiveFilters', () => {
 describe('linkableAccounts', () => {
     it('offers every non-admin account, also one that already holds participant rows (#761)', () => {
         const free = account({ username: 'free' })
-        const guest = account({ username: 'guest', role: 'guest' })
+        const guest = account({ username: 'guest' })
         const taken = account({ username: 'taken', memberships: [member('a')] })
-        const owner = account({ username: 'owner', role: 'zev_owner' })
+        const owner = account({ username: 'owner', memberships: [member('b', { access: 'manager', participants: [] })] })
         const admin = account({ username: 'admin', role: 'admin' })
 
         expect(linkableAccounts([taken, owner, admin, guest, free]).map((a) => a.username)).toEqual(
@@ -116,21 +117,19 @@ describe('account action guards', () => {
     })
 
     it('impersonates any active non-admin account (#761), never an admin or an inactive one', () => {
-        expect(canImpersonateAccount({ role: 'participant', is_active: true })).toBe(true)
-        expect(canImpersonateAccount({ role: 'zev_owner', is_active: true })).toBe(true)
-        expect(canImpersonateAccount({ role: 'guest', is_active: true })).toBe(true)
+        expect(canImpersonateAccount({ role: 'user', is_active: true })).toBe(true)
         expect(canImpersonateAccount({ role: 'admin', is_active: true })).toBe(false)
-        expect(canImpersonateAccount({ role: 'participant', is_active: false })).toBe(false)
+        expect(canImpersonateAccount({ role: 'user', is_active: false })).toBe(false)
     })
 })
 
 describe('accountStats', () => {
-    it('counts accounts, two-factor accounts, guests, accounts needing two-factor, and accounts never signed in', () => {
+    it('counts accounts, two-factor accounts, accounts without a community, accounts needing two-factor, and accounts never signed in', () => {
         const stats = accountStats([
-            account({ mfa_methods: ['totp'] }),
-            account({ mfa_methods: ['passkey', 'totp'], role: 'guest' }),
-            account({ role: 'guest' }),
-            account({ mfa_compliance: grace() }),
+            account({ mfa_methods: ['totp'], memberships: [member('a')] }),
+            account({ mfa_methods: ['passkey', 'totp'] }),
+            account({ role: 'admin' }),
+            account({ mfa_compliance: grace(), memberships: [member('a')] }),
             account({ mfa_compliance: overdue(), last_login: null }),
         ])
         expect(stats).toEqual({ total: 5, withTwoFactor: 2, guests: 2, needsTwoFactor: 2, neverSignedIn: 1 })

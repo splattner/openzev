@@ -47,7 +47,7 @@ def _ts(day: date) -> datetime:
 class ReadModelTests(TestCase):
     def setUp(self):
         self.owner = User.objects.create_user(
-            username="readmodel_owner", password="pass1234", role=UserRole.ZEV_OWNER
+            username="readmodel_owner", password="pass1234", role=UserRole.USER
         )
         self.zev = Zev.objects.create(
             name="ReadModel ZEV",
@@ -272,7 +272,7 @@ class SharedReadModelTests(TestCase):
 
     def setUp(self):
         self.owner = User.objects.create_user(
-            username="shared_readmodel_owner", password="pass1234", role=UserRole.ZEV_OWNER
+            username="shared_readmodel_owner", password="pass1234", role=UserRole.USER
         )
         self.zev = Zev.objects.create(
             name="Shared ReadModel ZEV", owner=self.owner, zev_type="vzev",
@@ -365,7 +365,7 @@ class EligibleParticipantSharesTests(TestCase):
 
     def setUp(self):
         self.owner = User.objects.create_user(
-            username="shares_owner", password="pass1234", role=UserRole.ZEV_OWNER
+            username="shares_owner", password="pass1234", role=UserRole.USER
         )
         self.zev = Zev.objects.create(
             name="Shares ZEV", owner=self.owner, zev_type="vzev",

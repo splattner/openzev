@@ -71,8 +71,8 @@ export function accountStats(accounts: AdminUser[]) {
     return {
         total: accounts.length,
         withTwoFactor: accounts.filter((account) => account.mfa_methods.length > 0).length,
-        // Guests are accounts not yet tied to a participant: the ones waiting to be linked.
-        guests: accounts.filter((account) => account.role === 'guest').length,
+        // Non-admin accounts with no community yet: the ones waiting for access or a participant link.
+        guests: accounts.filter((account) => account.role !== 'admin' && account.memberships.length === 0).length,
         needsTwoFactor: accounts.filter(needsTwoFactor).length,
         neverSignedIn: accounts.filter((account) => account.last_login === null).length,
     }

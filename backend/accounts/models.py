@@ -16,10 +16,14 @@ from . import mfa_crypto
 
 
 class UserRole(models.TextChoices):
+    """Platform role: an administrator, or not (#761, ADR 0027).
+
+    What an account may do in a ZEV comes from its grants and participant
+    links there (``zev.access``), not from this role.
+    """
+
     ADMIN = "admin", "Admin"
-    ZEV_OWNER = "zev_owner", "ZEV Owner"
-    PARTICIPANT = "participant", "Participant"
-    GUEST = "guest", "Guest"
+    USER = "user", "User"
 
 
 class OpenZevUserManager(UserManager):
@@ -32,20 +36,20 @@ class OpenZevUserManager(UserManager):
 
 
 class User(AbstractUser):
-    """Extended user model with role-based access control."""
+    """Extended user model: a platform role (admin or not) plus per-ZEV access."""
 
     role = models.CharField(
         max_length=20,
         choices=UserRole.choices,
-        default=UserRole.PARTICIPANT,
+        default=UserRole.USER,
     )
     must_change_password = models.BooleanField(default=False)
     # May set up a ZEV of its own through self-setup (#761). Set by
     # self-registration; not a role — what the account may do in a ZEV comes
     # from its grants (zev.access).
     may_create_zev = models.BooleanField(default=False)
-    # The community opened by default for this user. Owners and admins who
-    # manage several communities can switch between them; this records the one
+    # The community opened by default for this user. Accounts that relate to
+    # several communities can switch between them; this records the one
     # to land on, so the default does not depend on the order the list happens
     # to be collated in. ``None`` means "first managed community by name".
     preferred_zev = models.ForeignKey(

@@ -397,7 +397,7 @@ def oauth_callback(request, provider_slug: str):
                 last_name=user_info.get("family_name", ""),
                 password=None,
                 is_active=True,
-                role=UserRole.PARTICIPANT,
+                role=UserRole.USER,
             )
             provisioned = True
         else:

@@ -87,7 +87,7 @@ class HtNtAcrossMidnightTests(SimpleTestCase):
 
 class EngineUsesWrappedWindowsTests(TestCase):
     def test_a_stored_night_band_prices_the_night(self):
-        owner = make_user("midnight_owner", UserRole.ZEV_OWNER)
+        owner = make_user("midnight_owner", UserRole.USER)
         zev = Zev.objects.create(name="Midnight ZEV", owner=owner, zev_type="zev")
         tariff = Tariff.objects.create(
             zev=zev, name="Grid", category=TariffCategory.ENERGY,

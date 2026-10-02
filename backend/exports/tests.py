@@ -59,14 +59,14 @@ class ExportJobApiTestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.admin = make_user("exp_admin", UserRole.ADMIN)
-        self.owner = make_user("exp_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("exp_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Export ZEV")
         for index in range(2):
             make_participant(self.zev, first=f"Pia{index}", last="Muster")
-        self.other_owner = make_user("exp_other_owner", UserRole.ZEV_OWNER)
+        self.other_owner = make_user("exp_other_owner", UserRole.USER)
         self.other_zev = make_zev(self.other_owner, "Other ZEV")
         make_participant(self.other_zev, first="Otto", last="Fremd")
-        self.participant_user = make_user("exp_participant", UserRole.PARTICIPANT)
+        self.participant_user = make_user("exp_participant", UserRole.USER)
 
     def _post(self, user, payload=None):
         auth(self.client, user)
@@ -937,7 +937,7 @@ class AnnualStatementExportRealRenderTests(TestCase):
     """
 
     def setUp(self):
-        self.owner = make_user("exp_e2e_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("exp_e2e_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "E2E ZEV")
         for index in range(3):
             make_participant(self.zev, first=f"Extra{index}", last=f"Zed{index}")

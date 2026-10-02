@@ -18,8 +18,8 @@ ZURICH = ZoneInfo("Europe/Zurich")
 class DashboardSummaryAlignmentTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
-		self.owner = make_user("dash_owner", UserRole.ZEV_OWNER)
-		self.participant_user = make_user("dash_participant", UserRole.PARTICIPANT)
+		self.owner = make_user("dash_owner", UserRole.USER)
+		self.participant_user = make_user("dash_participant", UserRole.USER)
 
 		self.zev = Zev.objects.create(name="Dash ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="D")
 		self.participant = Participant.objects.create(
@@ -116,7 +116,7 @@ class DashboardSummaryAlignmentTests(TestCase):
 		self.assertAlmostEqual(float(stats[0]["total_produced_kwh"]), 10.0, places=6)
 
 	def test_owner_participant_filter_excludes_other_participants(self):
-		second_participant_user = make_user("dash_participant_2", UserRole.PARTICIPANT)
+		second_participant_user = make_user("dash_participant_2", UserRole.USER)
 		second_participant = Participant.objects.create(
 			zev=self.zev,
 			user=second_participant_user,
@@ -180,7 +180,7 @@ class DashboardCivilDayBucketingTests(TestCase):
 
 	def setUp(self):
 		self.client = APIClient()
-		self.owner = make_user("bucket_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("bucket_owner", UserRole.USER)
 		self.zev = Zev.objects.create(name="Bucket ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="B")
 		self.mp = MeteringPoint.objects.create(zev=self.zev, meter_id="CH-B-1", meter_type=MeteringPointType.CONSUMPTION)
 		# 23:45 Swiss time is still the last period day; 00:00 is the next one.
@@ -214,9 +214,9 @@ class DashboardCivilDayBucketingTests(TestCase):
 class DashboardMidPeriodTransferTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
-		self.owner = make_user("transfer_owner", UserRole.ZEV_OWNER)
-		self.alice_user = make_user("transfer_alice", UserRole.PARTICIPANT)
-		self.bob_user = make_user("transfer_bob", UserRole.PARTICIPANT)
+		self.owner = make_user("transfer_owner", UserRole.USER)
+		self.alice_user = make_user("transfer_alice", UserRole.USER)
+		self.bob_user = make_user("transfer_bob", UserRole.USER)
 
 		self.zev = Zev.objects.create(name="Transfer ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="T")
 		self.alice = Participant.objects.create(
@@ -364,7 +364,7 @@ class DashboardMidPeriodTransferTests(TestCase):
 class ParticipantImportRestrictionTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
-		self.participant_user = make_user("import_participant", UserRole.PARTICIPANT)
+		self.participant_user = make_user("import_participant", UserRole.USER)
 		auth(self.client, self.participant_user)
 
 	def test_participant_cannot_list_import_logs(self):
@@ -383,8 +383,8 @@ class ParticipantImportRestrictionTests(TestCase):
 class MeteringRawDataEndpointTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
-		self.owner = make_user("rawdata_owner", UserRole.ZEV_OWNER)
-		self.participant_user = make_user("rawdata_participant", UserRole.PARTICIPANT)
+		self.owner = make_user("rawdata_owner", UserRole.USER)
+		self.participant_user = make_user("rawdata_participant", UserRole.USER)
 
 		self.zev = Zev.objects.create(name="RawData ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="R")
 		self.participant = Participant.objects.create(
@@ -514,8 +514,8 @@ class MeteringRawDataEndpointTests(TestCase):
 class DataQualityStatusTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
-		self.owner = make_user("dq_owner", UserRole.ZEV_OWNER)
-		self.participant_user = make_user("dq_participant", UserRole.PARTICIPANT)
+		self.owner = make_user("dq_owner", UserRole.USER)
+		self.participant_user = make_user("dq_participant", UserRole.USER)
 
 		self.zev = Zev.objects.create(name="DQ ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="DQ")
 		self.participant = Participant.objects.create(
@@ -999,7 +999,7 @@ class ChartDataEndpointTests(TestCase):
 
 	def setUp(self):
 		self.client = APIClient()
-		self.owner = make_user("chart_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("chart_owner", UserRole.USER)
 		self.zev = Zev.objects.create(name="Chart ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="C")
 		self.mp = MeteringPoint.objects.create(
 			zev=self.zev,
@@ -1152,7 +1152,7 @@ class ChartDataEndpointTests(TestCase):
 		self.assertAlmostEqual(resp.data[0]["in_kwh"], 7.0)
 
 	def test_chart_data_zev_id_excludes_other_zevs(self):
-		other_owner = make_user("chart_other_owner", UserRole.ZEV_OWNER)
+		other_owner = make_user("chart_other_owner", UserRole.USER)
 		other_zev = Zev.objects.create(name="Other ZEV", owner=other_owner, zev_type="vzev", invoice_prefix="O")
 		other_mp = MeteringPoint.objects.create(
 			zev=other_zev,
@@ -1180,7 +1180,7 @@ class ChartDataEndpointTests(TestCase):
 	def test_chart_data_zev_id_respects_participant_scoping(self):
 		"""A participant querying zev_id still only sees their own assigned
 		meters summed in, not every meter in the ZEV."""
-		participant_user = make_user("chart_participant", UserRole.PARTICIPANT)
+		participant_user = make_user("chart_participant", UserRole.USER)
 		participant = Participant.objects.create(
 			zev=self.zev,
 			user=participant_user,
@@ -1281,10 +1281,10 @@ class SharedMeteringDashboardTests(TestCase):
 
 	def setUp(self):
 		self.client = APIClient()
-		self.owner = make_user("sm_dash_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("sm_dash_owner", UserRole.USER)
 		self.zev = Zev.objects.create(name="Shared Dash ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="SD")
 
-		self.alice_user = make_user("sm_dash_alice", UserRole.PARTICIPANT)
+		self.alice_user = make_user("sm_dash_alice", UserRole.USER)
 		self.alice = Participant.objects.create(
 			zev=self.zev, user=self.alice_user, first_name="Alice", last_name="Muster",
 			email="sm.alice@example.com", valid_from=date(2026, 1, 1), allocation_weight=Decimal("3"),
@@ -1333,7 +1333,7 @@ class SharedMeteringDashboardTests(TestCase):
 		participant's own (holder-scoped) readings queryset, which is empty
 		for a community-only participant — making the whole ZEV invisible to
 		them here, not just their own row."""
-		bob_user = make_user("sm_dash_bob", UserRole.PARTICIPANT)
+		bob_user = make_user("sm_dash_bob", UserRole.USER)
 		self.bob.user = bob_user
 		self.bob.save(update_fields=["user"])
 		auth(self.client, bob_user)
@@ -1378,10 +1378,10 @@ class BehindMeterGenerationDashboardTests(TestCase):
 
 	def setUp(self):
 		self.client = APIClient()
-		self.owner = make_user("bm_dash_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("bm_dash_owner", UserRole.USER)
 		self.zev = Zev.objects.create(name="Behind Meter Dash ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="BMD")
 
-		self.producer_user = make_user("bm_dash_producer", UserRole.PARTICIPANT)
+		self.producer_user = make_user("bm_dash_producer", UserRole.USER)
 		self.producer = Participant.objects.create(
 			zev=self.zev, user=self.producer_user, first_name="Producer", last_name="Example",
 			email="bm.producer@example.com", valid_from=date(2026, 1, 1),

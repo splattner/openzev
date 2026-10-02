@@ -34,7 +34,7 @@ def _daily_row(day, values):
 class ImportTimezoneTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        owner = make_user("tz_import_owner", UserRole.ZEV_OWNER)
+        owner = make_user("tz_import_owner", UserRole.USER)
         auth(self.client, owner)
         self.zev = Zev.objects.create(name="TZ ZEV", owner=owner, zev_type="vzev", invoice_prefix="Z")
         self.meter = MeteringPoint.objects.create(

@@ -36,12 +36,12 @@ class ReportTestCase(TestCase):
         self.client = APIClient()
         self.admin = make_user("rpt_admin", UserRole.ADMIN)
 
-        self.owner = make_user("rpt_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("rpt_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Report ZEV")
-        self.puser = make_user("rpt_participant", UserRole.PARTICIPANT)
+        self.puser = make_user("rpt_participant", UserRole.USER)
         self.participant = make_participant(self.zev, user=self.puser, first="Pia", last="Muster")
 
-        self.other_owner = make_user("rpt_other_owner", UserRole.ZEV_OWNER)
+        self.other_owner = make_user("rpt_other_owner", UserRole.USER)
         self.other_zev = make_zev(self.other_owner, "Other ZEV")
         self.other_participant = make_participant(self.other_zev, first="Otto", last="Fremd")
 
@@ -82,10 +82,14 @@ class AnnualStatementTests(ReportTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn("annual-statement-2026-Muster.pdf", resp["Content-Disposition"])
 
-    def test_participant_without_a_record_is_404(self):
-        resp = self._get(ANNUAL_STATEMENT, make_user("rpt_orphan", UserRole.PARTICIPANT), year=2026)
+    def test_account_that_never_took_part_is_served_as_a_manager(self):
+        """Without any participant row there is nothing to self-serve, so the
+        request needs the ids a manager names (#761; a former participant gets
+        a 404 instead, see ``zev.test_access_scoping``)."""
+        resp = self._get(ANNUAL_STATEMENT, make_user("rpt_orphan", UserRole.USER), year=2026)
 
-        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.data["error"], "participant_id and zev_id are required.")
 
     def test_year_is_required_and_must_be_numeric(self):
         missing = self._get(ANNUAL_STATEMENT, self.admin, zev_id=str(self.zev.pk), participant_id=str(self.participant.pk))
@@ -122,10 +126,10 @@ class AnnualStatementTests(ReportTestCase):
 
         self.assertEqual(self.client.get(ANNUAL_STATEMENT, {"year": 2026}).status_code, 401)
 
-    def test_me_label_agrees_with_statement_for_multiple_memberships(self):
-        """Surname ordering and UUID ordering disagree here; both reads must
-        serve the ``Aar`` membership's community."""
-        puser = make_user("rpt_multi", UserRole.PARTICIPANT)
+    def test_statement_without_zev_id_serves_the_first_membership_by_surname(self):
+        """Surname ordering and UUID ordering disagree here; the statement
+        serves the ``Aar`` membership."""
+        puser = make_user("rpt_multi", UserRole.USER)
         Participant.objects.create(
             id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
             zev=self.other_zev,
@@ -146,10 +150,6 @@ class AnnualStatementTests(ReportTestCase):
         )
 
         auth(self.client, puser)
-        me = self.client.get("/api/v1/auth/me/")
-        self.assertEqual(me.status_code, 200)
-        self.assertEqual(me.data["zev_name"], "Report ZEV")
-
         statement = self.client.get(ANNUAL_STATEMENT, {"year": 2026})
         self.assertEqual(statement.status_code, 200)
         self.assertIn("annual-statement-2026-Aar.pdf", statement["Content-Disposition"])
@@ -257,7 +257,7 @@ class AnnualStatementMonthlyDataTests(TestCase):
     a mid-year assignment transfer must not leak readings across holders."""
 
     def setUp(self):
-        self.owner = make_user("as_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("as_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Annual ZEV")
         self.participant = make_participant(self.zev, first="Pia", last="Muster")
         from invoices.annual_statement import ANNUAL_TRANSLATIONS
@@ -391,7 +391,7 @@ class AnnualStatementBehindMeterGenerationTests(TestCase):
     rendered PDF's context, and a non-flagged participant is unaffected."""
 
     def setUp(self):
-        self.owner = make_user("asbm_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("asbm_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Behind Meter Statement ZEV")
         self.participant = make_participant(self.zev, first="Pia", last="Muster")
         from invoices.annual_statement import ANNUAL_TRANSLATIONS

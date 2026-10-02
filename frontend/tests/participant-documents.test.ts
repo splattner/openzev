@@ -65,10 +65,12 @@ function renderReportsPage(component = ReportsPage) {
 }
 
 function mockParticipant(id = 7) {
-    mockAuth.mockReturnValue({ user: { id, role: 'participant', zev_name: 'Demo' } })
+    mockAuth.mockReturnValue({ user: { id, role: 'user' } })
     mockManagedZev.mockReturnValue({
-        selectedZevId: null,
+        selectedZevId: 'zev-1',
         selectedZev: null,
+        relation: 'participant',
+        entries: [{ id: 'zev-1', name: 'Demo', relation: 'participant' }],
         managedZevs: [],
         isLoading: false,
     })
@@ -102,10 +104,12 @@ describe('ReportsPage participant entry', () => {
     })
 
     it('year selector defaults to last completed year for participants', async () => {
-        mockAuth.mockReturnValue({ user: { id: 7, role: 'participant' } })
+        mockAuth.mockReturnValue({ user: { id: 7, role: 'user' } })
         mockManagedZev.mockReturnValue({
-            selectedZevId: null,
+            selectedZevId: 'zev-1',
             selectedZev: null,
+            relation: 'participant',
+            entries: [{ id: 'zev-1', name: 'Demo', relation: 'participant' }],
             managedZevs: [],
             isLoading: false,
         })
@@ -118,10 +122,12 @@ describe('ReportsPage participant entry', () => {
     })
 
     it('shared year selector drives the participant statement request', async () => {
-        mockAuth.mockReturnValue({ user: { id: 7, role: 'participant' } })
+        mockAuth.mockReturnValue({ user: { id: 7, role: 'user' } })
         mockManagedZev.mockReturnValue({
-            selectedZevId: null,
+            selectedZevId: 'zev-1',
             selectedZev: null,
+            relation: 'participant',
+            entries: [{ id: 'zev-1', name: 'Demo', relation: 'participant' }],
             managedZevs: [],
             isLoading: false,
         })
@@ -142,10 +148,12 @@ describe('ReportsPage participant entry', () => {
     })
 
     it('participant renders document tabs with the statement selected, never the owner ZIP flow', async () => {
-        mockAuth.mockReturnValue({ user: { id: 7, role: 'participant' } })
+        mockAuth.mockReturnValue({ user: { id: 7, role: 'user' } })
         mockManagedZev.mockReturnValue({
-            selectedZevId: null,
+            selectedZevId: 'zev-1',
             selectedZev: null,
+            relation: 'participant',
+            entries: [{ id: 'zev-1', name: 'Demo', relation: 'participant' }],
             managedZevs: [],
             isLoading: false,
         })
@@ -475,7 +483,7 @@ describe('ReportsPage participant annual documents', () => {
         await flush()
         expect(URL.createObjectURL).toHaveBeenCalledTimes(2)
 
-        mockAuth.mockReturnValue({ user: { id: 8, role: 'participant', zev_name: 'Demo' } })
+        mockAuth.mockReturnValue({ user: { id: 8, role: 'user' } })
         rerender()
         await flush()
 
@@ -513,10 +521,11 @@ describe('ReportsPage participant annual documents', () => {
         await flush()
         expect(URL.createObjectURL).toHaveBeenCalledTimes(2)
 
-        mockAuth.mockReturnValue({ user: { id: 7, role: 'zev_owner' } })
+        mockAuth.mockReturnValue({ user: { id: 7, role: 'user' } })
         mockManagedZev.mockReturnValue({
             selectedZevId: 'zev-1',
             selectedZev: { id: 'zev-1', name: 'Demo' },
+            relation: 'manager',
             managedZevs: [{ id: 'zev-1', name: 'Demo' }],
             isLoading: false,
         })
@@ -540,7 +549,7 @@ describe('ReportsPage participant annual documents', () => {
         await selectTab(container, 'pages.reports.financialSummary.title')
         await flush()
 
-        mockAuth.mockReturnValue({ user: { id: 8, role: 'participant', zev_name: 'Demo' } })
+        mockAuth.mockReturnValue({ user: { id: 8, role: 'user' } })
         rerender()
         await flush()
 
@@ -641,10 +650,11 @@ describe('ReportsPage participant annual documents', () => {
     })
 
     it('does not fetch participant documents for a ZEV owner', async () => {
-        mockAuth.mockReturnValue({ user: { id: 3, role: 'zev_owner' } })
+        mockAuth.mockReturnValue({ user: { id: 3, role: 'user' } })
         mockManagedZev.mockReturnValue({
             selectedZevId: 'zev-1',
             selectedZev: { id: 'zev-1', name: 'Demo' },
+            relation: 'manager',
             managedZevs: [{ id: 'zev-1' }],
             isLoading: false,
         })

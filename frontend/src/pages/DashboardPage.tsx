@@ -88,16 +88,17 @@ export function DashboardPage() {
 
     const summary = summaryQuery.data
     const selectedZevName = selectedZev?.name
-    const participantScopeName = user?.zev_count === 1 ? user?.zev_name : undefined
-    const selectedParticipantName = summary?.role === 'zev_owner' ? summary.selected_participant_name : undefined
-    const ownerTimeline = useMemo(() => (summary?.role === 'zev_owner' ? summary.timeline : []), [summary])
+    // A participant's dashboard is about the selected community (or its only one).
+    const participantScopeName = isParticipantScope ? entries?.find((entry) => entry.id === selectedZevId)?.name : undefined
+    const selectedParticipantName = summary?.summary_kind === 'zev' ? summary.selected_participant_name : undefined
+    const ownerTimeline = useMemo(() => (summary?.summary_kind === 'zev' ? summary.timeline : []), [summary])
     // The selected participant personally holds a metering point with
     // generation behind it: their own from-ZEV rate below would be
     // misleading (spec §7.2), so it is suppressed on the frontend — the
     // backend keeps sending kWh, not a rate, on this payload.
     const selectedParticipantFlagged = useMemo(
         () =>
-            summary?.role === 'zev_owner' && !!selectedParticipantId
+            summary?.summary_kind === 'zev' && !!selectedParticipantId
                 ? summary.participant_stats.some(
                       (participant) => participant.participant_id === selectedParticipantId && participant.has_behind_meter_generation,
                   )
@@ -118,7 +119,7 @@ export function DashboardPage() {
     )
     const participantTimeline = useMemo(
         () =>
-            summary?.role === 'participant'
+            summary?.summary_kind === 'participant'
                 ? summary.timeline.map((entry) => ({
                       ...entry,
                       from_zev_rate: summary.has_behind_meter_generation
@@ -129,7 +130,7 @@ export function DashboardPage() {
         [summary],
     )
     const participantFromZev = useMemo(() => {
-        if (summary?.role !== 'participant' || summary.has_behind_meter_generation) return null
+        if (summary?.summary_kind !== 'participant' || summary.has_behind_meter_generation) return null
         const { consumed_from_zev_kwh, total_consumed_kwh } = summary.totals
         const pct = fromZevRate(consumed_from_zev_kwh, total_consumed_kwh)
         return pct === null ? null : { pct, zevKwh: consumed_from_zev_kwh, totalKwh: total_consumed_kwh }
@@ -147,7 +148,7 @@ export function DashboardPage() {
         [invoicesQuery.data],
     )
     const ownerSelfConsumption = useMemo(() => {
-        if (summary?.role !== 'zev_owner') return null
+        if (summary?.summary_kind !== 'zev') return null
         const { produced_kwh, exported_kwh } = summary.zev_totals
         if (produced_kwh <= 0) return null
         const localKwh = Math.max(0, produced_kwh - exported_kwh)
@@ -171,7 +172,7 @@ export function DashboardPage() {
                                 <span>{t('pages.dashboard.participant')}</span>
                                 <select value={selectedParticipantId} onChange={(e) => setSelectedParticipantId(e.target.value)}>
                                     <option value="">{t('pages.dashboard.allParticipants')}</option>
-                                    {summary?.role === 'zev_owner' &&
+                                    {summary?.summary_kind === 'zev' &&
                                         summary.participant_stats.map((participant) => (
                                             <option key={participant.participant_id} value={participant.participant_id}>
                                                 {participant.participant_name || participant.participant_id}
@@ -218,7 +219,7 @@ export function DashboardPage() {
             {summaryQuery.isLoading && <PageSkeleton variant="kpiRow" />}
             {summaryQuery.isError && <div className="card error-banner">{t('pages.dashboard.failedAnalytics')}</div>}
 
-            {summary && summary.role === 'zev_owner' && (
+            {summary && summary.summary_kind === 'zev' && (
                 <>
                     {/* Hero + KPI row (spec §5.1): always ZEV-wide, even when a
                         participant drill-down filters the charts below. */}
@@ -274,7 +275,7 @@ export function DashboardPage() {
                 </>
             )}
 
-            {summary && summary.role === 'participant' && (
+            {summary && summary.summary_kind === 'participant' && (
                 <>
                     <section style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
                         <StatCard label={t('pages.dashboard.participantStats.consumedFromZev')} value={dashboardKwhStat(summary.totals.consumed_from_zev_kwh)} />

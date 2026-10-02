@@ -100,7 +100,7 @@ class ProviderListingTests(OAuthTestCase):
         self.assertEqual([p["name"] for p in resp.data], ["testidp"])
 
     def test_provider_config_is_admin_only(self):
-        for role, expected in ((UserRole.ADMIN, 200), (UserRole.ZEV_OWNER, 403), (UserRole.PARTICIPANT, 403)):
+        for role, expected in ((UserRole.ADMIN, 200), (UserRole.USER, 403)):
             with self.subTest(role=role):
                 auth(self.client, make_user(f"cfg_{role}", role))
                 self.assertEqual(self.client.get(PROVIDERS_CONFIG).status_code, expected)
@@ -122,7 +122,7 @@ class InitiateTests(OAuthTestCase):
         self.assertTrue(resp.data["redirect_url"].startswith(self.provider.authorization_url))
 
     def test_link_initiate_binds_the_state_to_the_caller(self):
-        user = make_user("linker", UserRole.PARTICIPANT)
+        user = make_user("linker", UserRole.USER)
         auth(self.client, user)
 
         resp = self.client.post(f"/api/v1/auth/oauth/link/{self.provider.name}/")
@@ -223,13 +223,13 @@ class CallbackLoginTests(OAuthTestCase):
             resp = self.callback(code="c", state="new")
 
         user = User.objects.get(email="fresh@example.com")
-        self.assertEqual(user.role, UserRole.PARTICIPANT, "auto-provisioned users get the lowest role")
+        self.assertEqual(user.role, UserRole.USER, "auto-provisioned users get the lowest role")
         self.assertEqual(user.first_name, "Fre")
         self.assertFalse(user.has_usable_password())
         self.assertTrue(resp.url.startswith(f"{FRONTEND}/oauth/callback?code="))
 
     def test_a_known_identity_reuses_its_linked_user(self):
-        existing = make_user("known", UserRole.ZEV_OWNER)
+        existing = make_user("known", UserRole.USER)
         SocialAccount.objects.create(provider=self.provider, uid="uid-known", user=existing)
         self.start_state("known-state")
 
@@ -241,7 +241,7 @@ class CallbackLoginTests(OAuthTestCase):
                          "the uid match wins; no second account is created")
 
     def test_an_inactive_user_cannot_log_in(self):
-        user = make_user("dormant", UserRole.PARTICIPANT)
+        user = make_user("dormant", UserRole.USER)
         User.objects.filter(pk=user.pk).update(is_active=False)
         SocialAccount.objects.create(provider=self.provider, uid="uid-dormant", user=user)
         self.start_state("dormant-state")
@@ -271,7 +271,7 @@ class CallbackExistingAccountTests(OAuthTestCase):
             return self.callback(code="c", state=state)
 
     def test_a_verified_email_links_to_the_existing_account(self):
-        user = make_user("verified_owner", UserRole.ZEV_OWNER)
+        user = make_user("verified_owner", UserRole.USER)
 
         resp = self._attempt("verified", user, email_verified=True)
 
@@ -327,7 +327,7 @@ class CallbackExistingAccountTests(OAuthTestCase):
             resp = self.callback(code="c", state="brandnew")
 
         self.assertTrue(resp.url.startswith(f"{FRONTEND}/oauth/callback?code="))
-        self.assertEqual(User.objects.get(email="nobody@example.com").role, UserRole.PARTICIPANT)
+        self.assertEqual(User.objects.get(email="nobody@example.com").role, UserRole.USER)
 
     def test_a_previously_linked_identity_is_unaffected(self):
         """Once the link exists, the uid match short-circuits before any email
@@ -343,7 +343,7 @@ class CallbackExistingAccountTests(OAuthTestCase):
         self.assertEqual(OAuthExchangeCode.objects.get().user, user)
 
     def test_email_matching_is_case_insensitive(self):
-        user = make_user("case_user", UserRole.PARTICIPANT)
+        user = make_user("case_user", UserRole.USER)
         self.start_state("case")
 
         with fake_provider_http(
@@ -357,7 +357,7 @@ class CallbackExistingAccountTests(OAuthTestCase):
 
 class CallbackLinkFlowTests(OAuthTestCase):
     def test_linking_attaches_the_identity_to_the_state_owner(self):
-        user = make_user("owner_link", UserRole.PARTICIPANT)
+        user = make_user("owner_link", UserRole.USER)
         self.start_state("link", user=user)
 
         with fake_provider_http({"access_token": "at"}, {"sub": "uid-link", "email": "anything@example.com"}):
@@ -368,9 +368,9 @@ class CallbackLinkFlowTests(OAuthTestCase):
         self.assertFalse(OAuthExchangeCode.objects.exists(), "linking must not mint a session")
 
     def test_an_identity_already_linked_elsewhere_is_refused(self):
-        holder = make_user("holder", UserRole.PARTICIPANT)
+        holder = make_user("holder", UserRole.USER)
         SocialAccount.objects.create(provider=self.provider, uid="uid-taken", user=holder)
-        other = make_user("other_link", UserRole.PARTICIPANT)
+        other = make_user("other_link", UserRole.USER)
         self.start_state("link-taken", user=other)
 
         with fake_provider_http({"access_token": "at"}, {"sub": "uid-taken", "email": "x@example.com"}):
@@ -380,7 +380,7 @@ class CallbackLinkFlowTests(OAuthTestCase):
         self.assertEqual(SocialAccount.objects.get(uid="uid-taken").user, holder)
 
     def test_relinking_the_same_identity_to_the_same_user_is_idempotent(self):
-        user = make_user("relink", UserRole.PARTICIPANT)
+        user = make_user("relink", UserRole.USER)
         SocialAccount.objects.create(provider=self.provider, uid="uid-same", user=user)
         self.start_state("relink-state", user=user)
 
@@ -394,8 +394,8 @@ class CallbackLinkFlowTests(OAuthTestCase):
 class SocialAccountTests(OAuthTestCase):
     def setUp(self):
         super().setUp()
-        self.user = make_user("sa_user", UserRole.PARTICIPANT)
-        self.other = make_user("sa_other", UserRole.PARTICIPANT)
+        self.user = make_user("sa_user", UserRole.USER)
+        self.other = make_user("sa_other", UserRole.USER)
         self.mine = SocialAccount.objects.create(provider=self.provider, uid="mine", user=self.user)
         self.theirs = SocialAccount.objects.create(provider=self.provider, uid="theirs", user=self.other)
 
@@ -504,7 +504,7 @@ class ProviderConfigAuditTests(OAuthTestCase):
                          .metadata_json["client_secret_rotated"])
 
     def test_deleting_a_provider_records_how_many_links_it_took_with_it(self):
-        user = make_user("linked_to_doomed", UserRole.PARTICIPANT)
+        user = make_user("linked_to_doomed", UserRole.USER)
         SocialAccount.objects.create(provider=self.provider, uid="doomed", user=user)
 
         resp = self.client.delete(f"{PROVIDERS_CONFIG}{self.provider.pk}/")
@@ -521,7 +521,7 @@ class OAuthFlowAuditTests(OAuthTestCase):
         return AuditEvent.objects.get(action_type=action_type)
 
     def test_a_successful_login_is_audited(self):
-        user = make_user("audit_login", UserRole.ZEV_OWNER)
+        user = make_user("audit_login", UserRole.USER)
         SocialAccount.objects.create(provider=self.provider, uid="uid-login", user=user)
         self.start_state("s")
 
@@ -543,12 +543,12 @@ class OAuthFlowAuditTests(OAuthTestCase):
             self.callback(code="c", state="s")
 
         provision = self._event("oauth.provision")
-        self.assertEqual(provision.metadata_json["role"], UserRole.PARTICIPANT)
+        self.assertEqual(provision.metadata_json["role"], UserRole.USER)
         self.assertEqual(provision.target_display, "brand@example.com")
         self.assertTrue(AuditEvent.objects.filter(action_type="oauth.login").exists())
 
     def test_claiming_an_existing_account_with_a_verified_email_is_audited_as_a_link(self):
-        user = make_user("audit_claim", UserRole.ZEV_OWNER)
+        user = make_user("audit_claim", UserRole.USER)
         self.start_state("s")
 
         with fake_provider_http(
@@ -568,7 +568,7 @@ class OAuthFlowAuditTests(OAuthTestCase):
         self.assertEqual(event.metadata_json["reason"], "invalid_state")
 
     def test_an_inactive_account_is_audited_against_that_account(self):
-        user = make_user("audit_inactive", UserRole.PARTICIPANT)
+        user = make_user("audit_inactive", UserRole.USER)
         User.objects.filter(pk=user.pk).update(is_active=False)
         SocialAccount.objects.create(provider=self.provider, uid="uid-inactive", user=user)
         self.start_state("s")
@@ -602,7 +602,7 @@ class OAuthFlowAuditTests(OAuthTestCase):
         self.assertFalse(AuditEvent.objects.exists())
 
     def test_linking_and_unlinking_are_audited(self):
-        user = make_user("audit_link", UserRole.PARTICIPANT)
+        user = make_user("audit_link", UserRole.USER)
         self.start_state("s", user=user)
         with fake_provider_http({"access_token": "at"}, {"sub": "uid-l", "email": user.email}):
             self.callback(code="c", state="s")
@@ -617,9 +617,9 @@ class OAuthFlowAuditTests(OAuthTestCase):
         self.assertEqual(unlink.metadata_json["provider"], "testidp")
 
     def test_linking_an_identity_owned_by_someone_else_is_audited_as_denied(self):
-        holder = make_user("audit_holder", UserRole.PARTICIPANT)
+        holder = make_user("audit_holder", UserRole.USER)
         SocialAccount.objects.create(provider=self.provider, uid="uid-held", user=holder)
-        claimer = make_user("audit_claimer", UserRole.PARTICIPANT)
+        claimer = make_user("audit_claimer", UserRole.USER)
         self.start_state("s", user=claimer)
 
         with fake_provider_http({"access_token": "at"}, {"sub": "uid-held", "email": claimer.email}):
@@ -643,7 +643,7 @@ class OAuthMfaClaimTests(OAuthTestCase):
         self.provider.save(update_fields=["require_mfa_claim"])
 
     def test_login_refused_without_an_mfa_amr_value(self):
-        user = make_user("oauth_mfa_pwd_only", UserRole.PARTICIPANT)
+        user = make_user("oauth_mfa_pwd_only", UserRole.USER)
         SocialAccount.objects.create(provider=self.provider, uid="uid-noamr", user=user)
         self.start_state("s")
 
@@ -657,7 +657,7 @@ class OAuthMfaClaimTests(OAuthTestCase):
         self.assertFalse(OAuthExchangeCode.objects.exists())
 
     def test_missing_amr_claim_entirely_is_refused(self):
-        user = make_user("oauth_mfa_no_claim", UserRole.PARTICIPANT)
+        user = make_user("oauth_mfa_no_claim", UserRole.USER)
         SocialAccount.objects.create(provider=self.provider, uid="uid-none", user=user)
         self.start_state("s")
 
@@ -667,7 +667,7 @@ class OAuthMfaClaimTests(OAuthTestCase):
         self.assertEqual(resp.url, f"{FRONTEND}/login?oauth_error=mfa_claim_missing")
 
     def test_login_succeeds_with_an_mfa_amr_value(self):
-        user = make_user("oauth_mfa_satisfied", UserRole.PARTICIPANT)
+        user = make_user("oauth_mfa_satisfied", UserRole.USER)
         SocialAccount.objects.create(provider=self.provider, uid="uid-amr", user=user)
         self.start_state("s")
 
@@ -681,7 +681,7 @@ class OAuthMfaClaimTests(OAuthTestCase):
         """Some providers send a space-separated string rather than a JSON
         array — tolerate the OIDC-spirit-compliant shape, not just the
         textbook one."""
-        user = make_user("oauth_mfa_string_amr", UserRole.PARTICIPANT)
+        user = make_user("oauth_mfa_string_amr", UserRole.USER)
         SocialAccount.objects.create(provider=self.provider, uid="uid-str", user=user)
         self.start_state("s")
 
@@ -695,7 +695,7 @@ class OAuthMfaClaimTests(OAuthTestCase):
         unchanged, regardless of what amr says or doesn't say."""
         self.provider.require_mfa_claim = False
         self.provider.save(update_fields=["require_mfa_claim"])
-        user = make_user("oauth_mfa_default", UserRole.PARTICIPANT)
+        user = make_user("oauth_mfa_default", UserRole.USER)
         SocialAccount.objects.create(provider=self.provider, uid="uid-default", user=user)
         self.start_state("s")
 

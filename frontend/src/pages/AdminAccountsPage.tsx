@@ -37,7 +37,7 @@ const defaultEditUserForm: UserInput = {
     email: '',
     first_name: '',
     last_name: '',
-    role: 'participant',
+    role: 'user',
     must_change_password: false,
 }
 
@@ -46,10 +46,10 @@ const defaultCreateUserForm: CreateUserInput = {
     email: '',
     first_name: '',
     last_name: '',
-    role: 'participant',
+    role: 'user',
 }
 
-const ROLES: UserRole[] = ['admin', 'zev_owner', 'participant', 'guest']
+const ROLES: UserRole[] = ['admin', 'user']
 
 /**
  * Every account on the platform, one row each, with the communities it belongs
@@ -512,10 +512,9 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                             value={createUserForm.role}
                             onChange={(event) => setCreateUserForm((previous) => ({ ...previous, role: event.target.value as UserRole }))}
                         >
-                            <option value="participant">{t('pages.accounts.roles.participant')}</option>
-                            <option value="guest">{t('pages.accounts.roles.guest')}</option>
-                            <option value="zev_owner">{t('pages.accounts.roles.zev_owner')}</option>
-                            <option value="admin">{t('pages.accounts.roles.admin')}</option>
+                            {ROLES.map((role) => (
+                                <option key={role} value={role}>{roleLabel(role)}</option>
+                            ))}
                         </select>
                     </label>
 
@@ -562,10 +561,9 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                             onChange={(event) => setEditUserForm((previous) => ({ ...previous, role: event.target.value as UserInput['role'] }))}
                             disabled={editingSelf}
                         >
-                            <option value="participant">{t('pages.accounts.roles.participant')}</option>
-                            <option value="guest">{t('pages.accounts.roles.guest')}</option>
-                            <option value="zev_owner">{t('pages.accounts.roles.zev_owner')}</option>
-                            <option value="admin">{t('pages.accounts.roles.admin')}</option>
+                            {ROLES.map((role) => (
+                                <option key={role} value={role}>{roleLabel(role)}</option>
+                            ))}
                         </select>
                     </label>
 

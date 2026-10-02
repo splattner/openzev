@@ -63,10 +63,10 @@ class AccessWorldMixin:
     @classmethod
     def setUpTestData(cls):
         cls.admin = make_user("acc_admin", UserRole.ADMIN)
-        cls.owner = make_user("acc_owner_a", UserRole.ZEV_OWNER)
-        cls.owner_b = make_user("acc_owner_b", UserRole.ZEV_OWNER)
-        cls.tenant = make_user("acc_tenant", UserRole.PARTICIPANT)
-        cls.guest = make_user("acc_guest", UserRole.GUEST)
+        cls.owner = make_user("acc_owner_a", UserRole.USER, may_create_zev=True)
+        cls.owner_b = make_user("acc_owner_b", UserRole.USER, may_create_zev=True)
+        cls.tenant = make_user("acc_tenant", UserRole.USER)
+        cls.guest = make_user("acc_guest", UserRole.USER)
 
         cls.alpha = build_populated_zev(cls.owner, name="Alpha", meter_prefix="ALPHA")
         cls.beta = build_populated_zev(cls.owner_b, name="Beta", meter_prefix="BETA")
@@ -203,11 +203,11 @@ class SingleRelationshipVisibilityMatrixTests(AccessWorldMixin, TestCase):
         url = "/api/v1/metering/readings/dashboard-summary/"
         with self.subTest(role="admin"):
             response = self.client_as("admin").get(url, {"zev_id": self.beta.pk})
-            self.assertEqual((response.status_code, response.json()["role"]), (200, "zev_owner"))
+            self.assertEqual((response.status_code, response.json()["summary_kind"]), (200, "zev"))
             self.assertEqual(self.client_as("admin").get(url).status_code, 400)
         with self.subTest(role="owner"):
             client = self.client_as("owner")
-            self.assertEqual(client.get(url).json()["role"], "zev_owner")
+            self.assertEqual(client.get(url).json()["summary_kind"], "zev")
             self.assertEqual(client.get(url, {"zev_id": self.alpha.pk}).status_code, 200)
             self.assertEqual(client.get(url, {"zev_id": self.beta.pk}).status_code, 403)
         for role in ("tenant", "guest"):
@@ -217,7 +217,7 @@ class SingleRelationshipVisibilityMatrixTests(AccessWorldMixin, TestCase):
                     response = client.get(url, {"zev_id": zev_id} if zev_id else {})
                     self.assertEqual(response.status_code, 200)
                     body = response.json()
-                    self.assertEqual(body["role"], "participant")
+                    self.assertEqual(body["summary_kind"], "participant")
                     # Beta produced 104 kWh; a participant must never get it.
                     self.assertLess(body["zev_totals"]["produced_kwh"], 100)
                     if role == "guest":

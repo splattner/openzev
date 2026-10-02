@@ -1,7 +1,5 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
-from accounts.permissions import may_hold_management_access
-
 from . import access
 
 
@@ -19,7 +17,7 @@ class BaseZevScopedPermission(BasePermission):
         user = request.user
         if not user.is_authenticated:
             return False
-        if user.is_admin or may_hold_management_access(user):
+        if user.is_admin:
             return True
         if request.method in SAFE_METHODS:
             return self.allow_participant_safe_methods or bool(access.viewable_zev_ids(user))

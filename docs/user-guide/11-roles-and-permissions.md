@@ -1,21 +1,20 @@
 # Roles and Permissions
 
-This guide explains user roles and access boundaries in OpenZEV.
+This guide explains accounts, access and the boundaries between communities
+in OpenZEV.
 
-## User Roles
+## Accounts and Access
 
-OpenZEV supports four distinct roles:
+Every account has one **platform role**:
 
-| Role | Scope | Typical User | Purpose |
+| Platform role | Scope | Typical User | Purpose |
 | --- | --- | --- | --- |
 | **Admin** | Global system | Platform operator, IT | Full access to all ZEVs, settings, accounts |
-| **ZEV Owner** | Single ZEV (scoped) | Community operator | Manage one or more ZEV communities |
-| **Participant** | Own data only | Community member | View own consumption, download invoices |
-| **Guest** | None until linked | Unlinked account | Stand-by log-in; no community access until linked to a participant |
+| **User** | What it has access to | Everyone else | Manages, views or takes part in communities |
 
-> **Note:** The **guest** role is an internal transitional role. It normally has
-> no domain access and is used when an account is not (or no longer) linked to a
-> ZEV or participant.
+A **User** account can do nothing on its own. What it may do comes from its
+access to each community, described next. An account with no community yet
+can sign in but sees nothing to manage.
 
 ### Access per community: managers and viewers
 
@@ -43,7 +42,7 @@ automatically. Participants get theirs by being linked to a participant entry.
 ### Admin Capabilities
 
 - **Account Management:** Create, edit, remove user accounts
-- **User Roles:** Assign roles and ZEV scopes to other users
+- **Access:** Make other accounts admins, and give access to any community
 - **System Settings:** regional date formats, VAT rate configuration, feature flags, and OAuth providers
 - **Overview hub:** KPIs, multi-ZEV oversight, all invoices, the platform audit log, and system health
 - **Accounts:** user management and platform-wide API keys
@@ -69,13 +68,15 @@ Accessible via **Platform → Overview**:
 
 > **Important:** Give admin access sparingly. It grants unrestricted power.
 
-## ZEV Owner Role
+## Managers (ZEV Owners)
 
-**ZEV Owners** manage one or more energy communities (ZEVs).
+A **manager** runs a community. The ZEV's owner is always a manager; other
+managers — a property management company, a co-owner — get access under
+**ZEV settings → Access**.
 
-### ZEV Owner Capabilities
+### Manager Capabilities
 
-**Per assigned ZEV:**
+**Per managed ZEV:**
 - Manage participants (add, edit, view)
 - Configure metering points
 - Import metering data
@@ -87,22 +88,23 @@ Accessible via **Platform → Overview**:
 - Customize email templates
 - Configure ZEV settings (billing interval, VAT number, etc.)
 - Turn participant invoice access on or off, and revoke a printed access link
+- Give other people access as manager or viewer
 
 **Restrictions:**
-- Cannot access other ZEVs (unless assigned to multiple)
+- Cannot access other ZEVs (unless they have access there too)
 - Cannot access admin settings
 - Cannot manage global user accounts
 - Cannot view other ZEV's metering data or invoices
 
 ### ZEV Scope
 
-A ZEV Owner is **scoped** to one or more ZEVs:
+A manager is **scoped** to the ZEVs it has access to:
 
-- **Single ZEV:** Owner manages one community only
-- **Multiple ZEVs:** Owner can switch between assigned communities via ZEV selector
+- **Single ZEV:** the manager sees one community only
+- **Multiple ZEVs:** the community switcher lists each one
 - Each ZEV is isolated—data from one ZEV is not visible in another
 
-### Who Should Be ZEV Owner?
+### Who Should Be a Manager?
 
 - Community president or board representative
 - Energy manager for a specific community
@@ -159,19 +161,15 @@ whether an address has an account.
 A ZEV owner or admin can revoke any printed link; see
 [Invoice Management → Participant access links](09-invoice-management.md#participant-access-links).
 
-## Guest Role
+## Accounts Without a Community
 
-A **Guest** is a log-in account that is not currently linked to a participant. It
-has no access to a ZEV's data until an admin links it to a participant.
-
-- **Where Guests come from:** accounts created before unlinking stopped
-  changing roles. Unlinking an account from a participant no longer changes its
-  role; it simply has one participant record less.
-- **Re-linking:** a guest account can be linked to a participant again by an
-  admin (same as any other account).
-- **Restrictions:** guests cannot manage communities or settings and cannot
-  impersonate others. An admin can impersonate a guest, as any other account
-  that is not an admin.
+An account that is neither a manager, a viewer nor a participant anywhere has
+no access to any community's data. That is the case for an account created on
+**Platform → Accounts** before it is given access, an account whose
+participant link was removed, or a self-registered account that never set up
+its ZEV. Give it access under **ZEV settings → Access**, or link it to a
+participant. An admin can impersonate it, as any other account that is not an
+admin.
 
 ## Access Control Matrix
 
@@ -186,12 +184,12 @@ has no access to a ZEV's data until an admin links it to a participant.
 | **Settings** | Global settings | ZEV settings, give access | View | Account profile |
 | **Admin Panel** | Full access | — | — | — |
 
-> **Note:** Guest accounts have no access in any column above until they are
-> linked to a participant, after which they follow the Participant rules.
+> **Note:** An account without a community has no access in any column above.
 
-## Assigning Roles
+## Managing Accounts
 
-**Only Admins** can assign roles to other users.
+**Only Admins** manage accounts and platform roles. Managers give access to
+their own community under **ZEV settings → Access**.
 
 ### The Accounts list
 
@@ -202,7 +200,7 @@ each:
 
 - **Account** — name, username, email and the account's **platform role**.
 - **Communities** — one chip per community the account belongs to, marked
-  *Owner* or *Participant*. An account that belongs to several communities
+  *Manager*, *Viewer*, *Participant* or *Former participant*. An account that belongs to several communities
   still has a single row. Click a chip to open that community's Participants
   page.
 - **Security** — which second factors the account has (authenticator app,
@@ -211,22 +209,23 @@ each:
   last signed in, or *Never signed in*.
 
 Use **Search**, **Platform role**, **Community** and **Two-factor** to narrow
-the list — the community filter finds everyone who is an owner or participant
+the list — the community filter finds everyone who has access or takes part
 there, and the two-factor filter narrows to accounts that still need to set it
 up. The **Never signed in** stat at the top counts accounts nobody has ever
 signed into — useful for spotting a stale invitation or an account that can be
-cleaned up.
+cleaned up. **Accounts without a community** counts the accounts that still
+need access or a participant link.
 
-> **Platform role vs. community membership.** The platform role (Admin, ZEV
-> Owner, Participant, Guest) belongs to the *account* and applies in every
-> community. Which communities an account belongs to is set on each community's
-> **Participants** page, not here.
+> **Platform role vs. community access.** The platform role (Admin or User)
+> belongs to the *account*. Which communities an account belongs to, and how,
+> is set in each community — under **ZEV settings → Access** for managers and
+> viewers, on the **Participants** page for participants — not here.
 
 ### Change an Account's Role
 
 1. Go to **Platform → Accounts → Users**
 2. Click **Edit** on the account
-3. Change the **Platform role** (and name or email if needed)
+3. Change the **Platform role** between Admin and User (and name or email if needed)
 4. Click **Save account**
 
 Changes take effect immediately. You cannot change your own role.
@@ -294,9 +293,9 @@ OpenZEV enforces data boundaries:
 
 ### ZEV Isolation
 
-- ZEV Owners assigned to ZEV A **cannot** see ZEV B's data
+- A manager of ZEV A **cannot** see ZEV B's data unless it has access there too
 - Tariffs, metering points, and invoices are entirely isolated by ZEV
-- Admins can view all ZEVs but typically delegate operations to ZEV Owners
+- Admins can view all ZEVs but typically delegate operations to managers
 
 ### Audit Trail
 
@@ -447,7 +446,7 @@ If operating multiple communities:
 
 **Admin perspective:**
 - Can oversee all ZEVs
-- Can assign ZEV Owners to specific communities
+- Can give managers and viewers access to specific communities
 - Can monitor cross-ZEV metrics and KPIs
 
 **Manager, viewer and participant perspective:**

@@ -17,8 +17,8 @@ from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType
 class InvoicePeriodOverviewTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("overview_owner", UserRole.ZEV_OWNER)
-        self.other_owner = make_user("overview_other_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("overview_owner", UserRole.USER)
+        self.other_owner = make_user("overview_other_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Overview ZEV")
 
         self.p_with_data = make_participant(self.zev, first="With", last="Data")
@@ -183,7 +183,7 @@ class InvoicePeriodOverviewTests(TestCase):
 class GenerationEligibilityTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("eligibility_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("eligibility_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Eligibility ZEV")
         self.zev.billing_interval = "quarterly"
         self.zev.save()

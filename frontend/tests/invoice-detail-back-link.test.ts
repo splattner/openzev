@@ -6,7 +6,6 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MantineProvider } from '@mantine/core'
 import { InvoiceDetailPage } from '../src/pages/InvoiceDetailPage'
-import type { UserRole } from '../src/types/api'
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
@@ -31,6 +30,7 @@ vi.mock('../src/lib/api/invoices', () => ({
         Promise.resolve({
             id: '1',
             invoice_number: 'R-1',
+            zev: 'z1',
             zev_name: 'Muster ZEV',
             participant_name: 'Anna Consumer',
             period_start: '2026-01-01',
@@ -44,8 +44,14 @@ vi.mock('../src/lib/api/invoices', () => ({
     generateInvoicePdf: vi.fn(),
 }))
 
-function mockRole(role: UserRole) {
-    mockAuth.mockReturnValue({ user: { id: 7, username: `${role}@x.ch`, role } })
+/** A non-admin account managing, or taking part in, the invoice's community (#761). */
+function mockRole(relation: 'manager' | 'participant') {
+    const membership = {
+        zev: 'z1', zev_name: 'Muster ZEV', zev_disabled: false,
+        access: relation === 'manager' ? 'manager' : null,
+        participants: relation === 'participant' ? [{ id: 'p1', valid_from: '2026-01-01', valid_to: null, live: true }] : [],
+    }
+    mockAuth.mockReturnValue({ user: { id: 7, username: `${relation}@x.ch`, role: 'user', memberships: [membership] } })
 }
 
 async function renderDetail(initialEntries: unknown[] = ['/billing/invoices/1']) {
@@ -102,7 +108,7 @@ describe('InvoiceDetailPage return link', () => {
     })
 
     it('keeps the invoices return for owners', async () => {
-        mockRole('zev_owner')
+        mockRole('manager')
         const container = await renderDetail()
         const link = container.querySelector('header a.button') as HTMLAnchorElement
         expect(link.getAttribute('href')).toBe('/billing/invoices')
@@ -111,7 +117,7 @@ describe('InvoiceDetailPage return link', () => {
     })
 
     it('returns owners to the dashboard origin', async () => {
-        mockRole('zev_owner')
+        mockRole('manager')
         const container = await renderDetail([{ pathname: '/billing/invoices/1', state: { from: '/' } }])
         const link = container.querySelector('header a.button') as HTMLAnchorElement
         expect(link.getAttribute('href')).toBe('/')
@@ -119,7 +125,7 @@ describe('InvoiceDetailPage return link', () => {
     })
 
     it('returns owners to the invoice period they came from', async () => {
-        mockRole('zev_owner')
+        mockRole('manager')
         const container = await renderDetail([{
             pathname: '/billing/invoices/1',
             state: { from: '/billing/invoices', period_start: '2026-08-01', period_end: '2026-08-31' },
@@ -130,7 +136,7 @@ describe('InvoiceDetailPage return link', () => {
     })
 
     it('returns owners to a historical period that no longer aligns', async () => {
-        mockRole('zev_owner')
+        mockRole('manager')
         const container = await renderDetail([{
             pathname: '/billing/invoices/1',
             state: { from: '/billing/invoices', period_start: '2026-02-01', period_end: '2026-02-28' },
@@ -151,7 +157,7 @@ describe('InvoiceDetailPage return link', () => {
     })
 
     it('keeps the generate-PDF control for owners', async () => {
-        mockRole('zev_owner')
+        mockRole('manager')
         const container = await renderDetail()
         const buttons = Array.from(container.querySelectorAll('button'))
         expect(buttons.some((b) => b.textContent === 'pages.invoiceDetail.generatePdf')).toBe(true)

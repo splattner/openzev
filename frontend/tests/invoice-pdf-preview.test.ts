@@ -17,7 +17,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('../src/lib/auth', () => ({
-    useAuth: () => ({ user: { id: 7, role: 'participant' } }),
+    useAuth: () => ({ user: { id: 7, role: 'user' } }),
 }))
 
 vi.mock('../src/lib/appSettings', () => ({

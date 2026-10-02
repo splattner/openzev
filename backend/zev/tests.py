@@ -38,6 +38,8 @@ from zev.models import (
 	Participant,
 	VatMode,
 	Zev,
+	ZevAccessGrant,
+	ZevAccessRole,
 	ZevType,
 )
 
@@ -79,7 +81,7 @@ class ZevPaymentTermTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
 		self.admin = make_user("payterm_admin", UserRole.ADMIN)
-		self.owner = make_user("payterm_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("payterm_owner", UserRole.USER)
 		self.zev = Zev.objects.create(name="PayTerm ZEV", owner=self.owner)
 
 	def test_payment_term_days_defaults_to_30(self):
@@ -121,7 +123,7 @@ class ZevVatModeTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
 		self.admin = make_user("vatmode_admin", UserRole.ADMIN)
-		self.owner = make_user("vatmode_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("vatmode_owner", UserRole.USER)
 		self.zev = Zev.objects.create(name="VAT Mode ZEV", owner=self.owner)
 
 	def test_defaults_to_not_registered(self):
@@ -166,8 +168,8 @@ class ZevVatModeTests(TestCase):
 class ParticipantEndpointRestrictionTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
-		self.owner = make_user("zev_owner_case", UserRole.ZEV_OWNER)
-		self.participant_user = make_user("participant_case", UserRole.PARTICIPANT)
+		self.owner = make_user("zev_owner_case", UserRole.USER)
+		self.participant_user = make_user("participant_case", UserRole.USER)
 
 		self.zev = Zev.objects.create(
 			name="Owner ZEV",
@@ -243,7 +245,7 @@ class ZevCreationWizardTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
 		self.admin = make_user("admin_creator", UserRole.ADMIN)
-		self.owner = make_user("owner_creator", UserRole.ZEV_OWNER)
+		self.owner = make_user("owner_creator", UserRole.USER)
 
 	def test_non_admin_cannot_create_zev(self):
 		auth(self.client, self.owner)
@@ -344,7 +346,7 @@ class ZevCreationWizardTests(TestCase):
 		self.assertTrue(resp.data["owner"]["temporary_password"])
 
 		created_zev = Zev.objects.get(name="Wizard ZEV")
-		self.assertEqual(created_zev.owner.role, UserRole.ZEV_OWNER)
+		self.assertEqual(created_zev.owner.role, UserRole.USER)
 		self.assertTrue(created_zev.owner.check_password(resp.data["owner"]["temporary_password"]))
 
 		owner_participant = Participant.objects.get(zev=created_zev, user=created_zev.owner)
@@ -429,7 +431,7 @@ class ZevCreationWizardTests(TestCase):
 class ZevSelfSetupTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
-		self.owner = make_user("self_setup_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("self_setup_owner", UserRole.USER, may_create_zev=True)
 
 	def test_self_setup_persists_bank_iban_and_bank_name(self):
 		auth(self.client, self.owner)
@@ -502,7 +504,7 @@ class ZevSelfSetupTests(TestCase):
 class ParticipantAccountLifecycleTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
-		self.owner = make_user("participant_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("participant_owner", UserRole.USER)
 		self.zev = Zev.objects.create(
 			name="Lifecycle ZEV",
 			owner=self.owner,
@@ -533,7 +535,7 @@ class ParticipantAccountLifecycleTests(TestCase):
 		self.assertEqual(resp.status_code, 201)
 		participant = Participant.objects.get(pk=resp.data["id"])
 		self.assertIsNotNone(participant.user)
-		self.assertEqual(participant.user.role, UserRole.PARTICIPANT)
+		self.assertEqual(participant.user.role, UserRole.USER)
 		self.assertEqual(resp.data["account_username"], participant.user.username)
 		self.assertNotIn("initial_password", resp.data)
 		self.assertFalse(participant.user.has_usable_password())
@@ -569,7 +571,7 @@ class ParticipantAccountLifecycleTests(TestCase):
 		self.assertEqual(participant.phone, "+41 79 111 11 11")
 		self.assertEqual(participant.address_line1, "Updated 2")
 		self.assertEqual(participant.city, "Bern")
-		self.assertEqual(participant.user.role, UserRole.PARTICIPANT)
+		self.assertEqual(participant.user.role, UserRole.USER)
 
 	def test_send_onboarding_link_emails_a_link_and_stays_passwordless(self):
 		resp_create = self.client.post(
@@ -606,7 +608,7 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 
 	def setUp(self):
 		self.client = APIClient()
-		self.owner = make_user("owner_for_edit_test", UserRole.ZEV_OWNER)
+		self.owner = make_user("owner_for_edit_test", UserRole.USER)
 		self.zev = Zev.objects.create(
 			name="Owner Edit ZEV",
 			owner=self.owner,
@@ -641,14 +643,14 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 		self.assertEqual(self.owner_participant.address_line1, "New Street 5")
 		self.assertEqual(self.owner_participant.city, "Bern")
 		self.owner.refresh_from_db()
-		self.assertEqual(self.owner.role, UserRole.ZEV_OWNER)
+		self.assertEqual(self.owner.role, UserRole.USER)
 		auth(self.client, self.owner)
 		self.assertEqual(self.client.get(f"/api/v1/zev/zevs/{self.zev.id}/").status_code, 200)
 
 	@mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay")
 	def test_profile_sync_preserves_privileged_roles(self, mock_geocode_delay):
 		admin = make_user("admin_edit_privileged", UserRole.ADMIN)
-		for role in (UserRole.ZEV_OWNER, UserRole.ADMIN):
+		for role in (UserRole.ADMIN, UserRole.USER):
 			with self.subTest(role=role):
 				self.owner.role = role
 				self.owner.save(update_fields=["role"])
@@ -670,9 +672,19 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 	def test_onboarding_link_leaves_roles_alone_and_keeps_privileged_logins(self):
 		admin = make_user("admin_invite_privileged", UserRole.ADMIN)
 		auth(self.client, admin)
-		for role in (UserRole.ZEV_OWNER, UserRole.ADMIN, UserRole.PARTICIPANT, UserRole.GUEST):
-			with self.subTest(role=role):
-				account = make_user(f"invite_{role}", role)
+		other_zev = Zev.objects.create(name="Managed elsewhere", owner=self.owner, zev_type="vzev", invoice_prefix="M")
+		for kind, role, has_own_login in (
+			("plain", UserRole.USER, False),
+			("admin", UserRole.ADMIN, True),
+			("self_registered", UserRole.USER, True),
+			("manager", UserRole.USER, True),
+		):
+			with self.subTest(kind=kind):
+				account = make_user(f"invite_{kind}", role, may_create_zev=kind == "self_registered")
+				if kind == "manager":
+					ZevAccessGrant.objects.create(
+						zev=other_zev, user=account, role=ZevAccessRole.MANAGER, valid_from=date(2026, 1, 1),
+					)
 				participant = Participant.objects.create(
 					zev=self.zev, user=account, first_name="Invited", last_name="Person",
 					email=account.email, valid_from=date(2026, 1, 1),
@@ -683,13 +695,10 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 				# The role is no longer rewritten (#761): what an account may
 				# do comes from its grants and participant rows.
 				self.assertEqual(account.role, role)
-				# An owner or admin's own login must survive being invited as
-				# a participant of one of their own ZEVs — only an account with
-				# no login of its own is neutralized.
-				if role in (UserRole.PARTICIPANT, UserRole.GUEST):
-					self.assertFalse(account.has_usable_password())
-				else:
-					self.assertTrue(account.has_usable_password())
+				# A login of its own (admin, self-registered, manager) must
+				# survive being invited as a participant — only an account
+				# with no login of its own is neutralized.
+				self.assertEqual(account.has_usable_password(), has_own_login)
 				self.assertEqual(mail.outbox[-1].to, [participant.email])
 				self.assertIn(resp.data["onboarding_url"], mail.outbox[-1].body)
 
@@ -712,7 +721,7 @@ class ParticipantAccountLinkingTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
 		self.admin = make_user("admin_linker", UserRole.ADMIN)
-		self.zev_owner = make_user("owner_linker", UserRole.ZEV_OWNER)
+		self.zev_owner = make_user("owner_linker", UserRole.USER)
 		self.zev = Zev.objects.create(
 			name="Linking ZEV",
 			owner=self.zev_owner,
@@ -733,8 +742,8 @@ class ParticipantAccountLinkingTests(TestCase):
 			email="with.account@example.com",
 			valid_from=date(2026, 1, 1),
 		)
-		self.linkable_account = make_user("linkable.participant", UserRole.PARTICIPANT)
-		self.linked_account = make_user("already.linked", UserRole.PARTICIPANT)
+		self.linkable_account = make_user("linkable.participant", UserRole.USER)
+		self.linked_account = make_user("already.linked", UserRole.USER)
 		self.participant_with_account.user = self.linked_account
 		self.participant_with_account.save(update_fields=["user", "updated_at"])
 		auth(self.client, self.admin)
@@ -781,7 +790,7 @@ class ParticipantAccountLinkingTests(TestCase):
 		self.linked_account.refresh_from_db()
 		self.assertIsNone(self.participant_with_account.user_id)
 		# The account is left as it is; it is no longer demoted to guest (#761).
-		self.assertEqual(self.linked_account.role, UserRole.PARTICIPANT)
+		self.assertEqual(self.linked_account.role, UserRole.USER)
 
 	def test_admin_can_create_and_link_a_passwordless_account_via_onboarding_link(self):
 		resp = self.client.post(
@@ -840,8 +849,8 @@ class ZevOwnerRoleSyncTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
 		self.admin = make_user("admin_role_sync", UserRole.ADMIN)
-		self.owner = make_user("owner_role_sync", UserRole.ZEV_OWNER)
-		self.participant_user = make_user("participant_role_sync", UserRole.PARTICIPANT)
+		self.owner = make_user("owner_role_sync", UserRole.USER)
+		self.participant_user = make_user("participant_role_sync", UserRole.USER)
 		self.zev = Zev.objects.create(
 			name="Role Sync ZEV",
 			owner=self.owner,
@@ -868,8 +877,8 @@ class ZevOwnerRoleSyncTests(TestCase):
 		self.assertEqual(resp.status_code, 200)
 		self.participant_user.refresh_from_db()
 		self.owner.refresh_from_db()
-		self.assertEqual(self.participant_user.role, UserRole.ZEV_OWNER)
-		self.assertEqual(self.owner.role, UserRole.PARTICIPANT)
+		self.assertEqual(self.participant_user.role, UserRole.USER)
+		self.assertEqual(self.owner.role, UserRole.USER)
 
 
 class MeteringPointAssignmentValidationTests(TestCase):
@@ -1036,11 +1045,11 @@ class AssignmentSaveOverlapGuardTests(TestCase):
 	windows (ADR 0013 follow-up)."""
 
 	def setUp(self):
-		self.owner = make_user("ovguard_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("ovguard_owner", UserRole.USER)
 		self.zev = Zev.objects.create(name="OV ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="OV")
 		self.participant = Participant.objects.create(
 			zev=self.zev,
-			user=make_user("ovguard_p1", UserRole.PARTICIPANT),
+			user=make_user("ovguard_p1", UserRole.USER),
 			first_name="Anna",
 			last_name="One",
 			email="anna@example.com",
@@ -1048,7 +1057,7 @@ class AssignmentSaveOverlapGuardTests(TestCase):
 		)
 		self.participant2 = Participant.objects.create(
 			zev=self.zev,
-			user=make_user("ovguard_p2", UserRole.PARTICIPANT),
+			user=make_user("ovguard_p2", UserRole.USER),
 			first_name="Beat",
 			last_name="Two",
 			email="beat@example.com",
@@ -1129,11 +1138,11 @@ class SeedDemoAssignmentReseedTests(TestCase):
 	drops the prior open-ended window before creating the next one."""
 
 	def setUp(self):
-		self.owner = make_user("seed_assign_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("seed_assign_owner", UserRole.USER)
 		self.zev = Zev.objects.create(name="Seed Assign ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="SA")
 		self.participant = Participant.objects.create(
 			zev=self.zev,
-			user=make_user("seed_assign_p1", UserRole.PARTICIPANT),
+			user=make_user("seed_assign_p1", UserRole.USER),
 			first_name="Cara",
 			last_name="Three",
 			email="cara@example.com",
@@ -1163,7 +1172,7 @@ class SeedDemoSecondCommunityTests(TestCase):
 
 	def setUp(self):
 		self.command = SeedDemoCommand()
-		self.owner = make_user("seed_second_zev_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("seed_second_zev_owner", UserRole.USER)
 
 	def _upsert_demo_zevs(self):
 		self.command._upsert_zev(
@@ -1245,7 +1254,7 @@ class SeedDemoSecondCommunityTests(TestCase):
 	def test_legacy_name_of_another_owner_is_untouched(self):
 		# Identification is scoped to the demo owner: a tenant community that
 		# happens to share the display name must never be renamed or deleted.
-		stranger = make_user("seed_legacy_stranger", UserRole.ZEV_OWNER)
+		stranger = make_user("seed_legacy_stranger", UserRole.USER)
 		tenant = Zev.objects.create(
 			name=DEMO_ZEV_LEGACY_NAME,
 			owner=stranger,
@@ -1285,8 +1294,8 @@ class SeedDemoSecondCommunitySeedTests(TestCase):
 
 	def setUp(self):
 		self.command = SeedDemoCommand()
-		self.owner = make_user("seed_second_seed_owner", UserRole.ZEV_OWNER)
-		self.clara_user = make_user("seed_second_clara", UserRole.PARTICIPANT)
+		self.owner = make_user("seed_second_seed_owner", UserRole.USER)
+		self.clara_user = make_user("seed_second_clara", UserRole.USER)
 		self.zev = self.command._upsert_zev(
 			owner=self.owner,
 			name="Seeded Second ZEV",
@@ -1362,7 +1371,7 @@ class SeedDemoQualityGapTests(TestCase):
 
 	def setUp(self):
 		self.command = SeedDemoCommand()
-		self.owner = make_user("seed_gap_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("seed_gap_owner", UserRole.USER)
 		self.zev = Zev.objects.create(name="Gap ZEV", owner=self.owner)
 		self.meter = MeteringPoint.objects.create(
 			zev=self.zev,
@@ -1547,7 +1556,7 @@ class SeedDemoCounterRefreshTests(TestCase):
 
 	def setUp(self):
 		self.command = SeedDemoCommand()
-		self.owner = make_user("seed_counter_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("seed_counter_owner", UserRole.USER)
 
 	def _upsert(self):
 		return self.command._upsert_zev(
@@ -1589,7 +1598,7 @@ class SeedDemoHourlyHistoryTests(TestCase):
 
 	def setUp(self):
 		self.command = SeedDemoCommand()
-		self.owner = make_user("seed_history_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("seed_history_owner", UserRole.USER)
 		self.zev = Zev.objects.create(
 			name="History ZEV",
 			owner=self.owner,
@@ -1647,7 +1656,7 @@ class SeedDemoReadingResolutionTests(TestCase):
 
 	def setUp(self):
 		self.command = SeedDemoCommand()
-		self.owner = make_user("seed_resolution_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("seed_resolution_owner", UserRole.USER)
 		self.zev = Zev.objects.create(
 			name="Resolution ZEV",
 			owner=self.owner,
@@ -1726,7 +1735,7 @@ class SeedDemoInvoiceSettlementTests(TestCase):
 
 	def setUp(self):
 		self.command = SeedDemoCommand()
-		self.owner = make_user("seed_settle_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("seed_settle_owner", UserRole.USER)
 		self.zev = Zev.objects.create(
 			name="Settlement ZEV",
 			owner=self.owner,
@@ -1809,7 +1818,7 @@ class MeteringPointReadingsDeletionTests(TestCase):
 		self.owner_client = APIClient()
 
 		self.admin = make_user("admin_delete_readings", UserRole.ADMIN)
-		self.owner = make_user("owner_delete_readings", UserRole.ZEV_OWNER)
+		self.owner = make_user("owner_delete_readings", UserRole.USER)
 
 		self.zev = Zev.objects.create(
 			name="Delete Readings ZEV",
@@ -1974,7 +1983,7 @@ class MeteringPointCascadeInfoTests(TestCase):
 
 		self.zev = Zev.objects.create(
 			name="Cascade Info ZEV",
-			owner=make_user("owner_cascade_info", UserRole.ZEV_OWNER),
+			owner=make_user("owner_cascade_info", UserRole.USER),
 			zev_type="vzev",
 			invoice_prefix="CI",
 		)
@@ -2075,7 +2084,7 @@ class MeteringPointBehindMeterGenerationTests(TestCase):
 		self.admin = make_user("admin_behind_meter", UserRole.ADMIN)
 		self.zev = Zev.objects.create(
 			name="Behind Meter ZEV",
-			owner=make_user("owner_behind_meter", UserRole.ZEV_OWNER),
+			owner=make_user("owner_behind_meter", UserRole.USER),
 			zev_type="vzev",
 			invoice_prefix="BM",
 		)
@@ -2137,7 +2146,7 @@ class NextInvoiceNumberTests(TestCase):
 	"""Guards the F()-expression counter increment used during invoice generation."""
 
 	def setUp(self):
-		self.owner = make_user("inv_num_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("inv_num_owner", UserRole.USER)
 		self.zev = Zev.objects.create(
 			name="Counter ZEV",
 			owner=self.owner,
@@ -2205,7 +2214,7 @@ class SeedDemoTariffVersionTests(TestCase):
 	to appear, and the previous seed produced exactly one per name."""
 
 	def setUp(self):
-		self.owner = make_user("seed_tariffs_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("seed_tariffs_owner", UserRole.USER)
 		self.zev = Zev.objects.create(name="Seed Tariffs ZEV", owner=self.owner)
 		self.valid_from = date(2026, 4, 1)
 
@@ -2394,8 +2403,8 @@ class SeedDemoLegacyNameCollisionTests(TestCase):
 
 	def setUp(self):
 		self.command = SeedDemoCommand()
-		self.owner = make_user("seed_legacy_collision_owner", UserRole.ZEV_OWNER)
-		self.stranger = make_user("seed_legacy_collision_stranger", UserRole.ZEV_OWNER)
+		self.owner = make_user("seed_legacy_collision_owner", UserRole.USER)
+		self.stranger = make_user("seed_legacy_collision_stranger", UserRole.USER)
 
 	def _create(self, name, owner=None):
 		return Zev.objects.create(
@@ -2484,8 +2493,8 @@ class SeedDemoWindowShiftTests(TestCase):
 
 	def setUp(self):
 		self.command = SeedDemoCommand()
-		self.owner = make_user("seed_window_owner", UserRole.ZEV_OWNER)
-		self.clara_user = make_user("seed_window_clara", UserRole.PARTICIPANT)
+		self.owner = make_user("seed_window_owner", UserRole.USER)
+		self.clara_user = make_user("seed_window_clara", UserRole.USER)
 		self.zev = self.command._upsert_zev(
 			owner=self.owner,
 			name="Seeded Second ZEV",
@@ -2541,10 +2550,10 @@ class SeedDemoAuditResetTests(TestCase):
 
 	def setUp(self):
 		self.command = SeedDemoCommand()
-		self.owner = make_user("seed_audit_owner", UserRole.ZEV_OWNER)
+		self.owner = make_user("seed_audit_owner", UserRole.USER)
 		self.admin = make_user("seed_audit_admin", UserRole.ADMIN)
-		self.anna_user = make_user("seed_audit_anna", UserRole.PARTICIPANT)
-		self.stranger = make_user("seed_audit_stranger", UserRole.PARTICIPANT)
+		self.anna_user = make_user("seed_audit_anna", UserRole.USER)
+		self.stranger = make_user("seed_audit_stranger", UserRole.USER)
 		self.demo_one = Zev.objects.create(name="Demo One", owner=self.owner)
 		self.demo_two = Zev.objects.create(name="Demo Two", owner=self.owner)
 		self.other_zev = Zev.objects.create(name="Other Community", owner=self.owner)

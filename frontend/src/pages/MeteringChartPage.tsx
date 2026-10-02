@@ -40,6 +40,7 @@ import { formatMeteringBucketLabel, meteringPointOptionLabel, outReadingLabelKey
 import type { AppSettings, ChartDataPoint, DataQualitySeverity, MeteringPoint, MeteringPointDataQuality } from '../types/api'
 import { AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CONS_COLORS, NEGATIVE_COLOR, PROD_COLORS } from '../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../lib/chartTheme'
+import { soleCommunityName } from '../lib/membership'
 
 // ── Custom Tooltip ────────────────────────────────────────────────────────────
 
@@ -183,7 +184,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
     const { user } = useAuth()
     const { settings } = useAppSettings()
     const { selectedZevId, selectedZev } = useManagedZev()
-    const participantScopeName = user?.zev_count === 1 ? user?.zev_name : undefined
+    const participantScopeName = soleCommunityName(user)
     const { isZevScope: isManagedScope } = useCommunityAccess()
     const interval: BillingInterval = (selectedZev?.billing_interval as BillingInterval) ?? 'monthly'
 

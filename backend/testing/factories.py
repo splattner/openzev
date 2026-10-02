@@ -57,7 +57,7 @@ class UserFactory(DjangoModelFactory):
 
     username = factory.Sequence(lambda n: f"user{n}")
     email = factory.LazyAttribute(lambda o: f"{o.username}@example.com")
-    role = UserRole.PARTICIPANT
+    role = UserRole.USER
     password = factory.PostGenerationMethodCall("set_password", "pass1234")
 
 
@@ -69,14 +69,13 @@ class AdminFactory(UserFactory):
 
 class OwnerFactory(UserFactory):
     username = factory.Sequence(lambda n: f"owner{n}")
-    role = UserRole.ZEV_OWNER
-    # As migration accounts.0020 grants every existing owner account (#761).
+    # A self-registered owner: it may set up a ZEV; owning one grants it
+    # manager access (#761).
     may_create_zev = True
 
 
 class ParticipantUserFactory(UserFactory):
     username = factory.Sequence(lambda n: f"participant{n}")
-    role = UserRole.PARTICIPANT
 
 
 # ---------------------------------------------------------------------------

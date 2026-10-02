@@ -36,7 +36,7 @@ def _subjects() -> list[str]:
 
 class ComposeTests(TestCase):
     def setUp(self):
-        self.user = make_user("nt_compose", UserRole.PARTICIPANT)
+        self.user = make_user("nt_compose", UserRole.USER)
         self.user.first_name = "Ada"
 
     def test_every_event_composes(self):
@@ -87,26 +87,26 @@ class ComposeTests(TestCase):
 
 class NotifyGuardTests(TestCase):
     def test_no_mail_without_an_address(self):
-        user = make_user("nt_noaddr", UserRole.PARTICIPANT)
+        user = make_user("nt_noaddr", UserRole.USER)
         user.email = ""
         notifications.notify(user, "password_changed")
         self.assertEqual(mail.outbox, [])
 
     def test_no_mail_to_an_inactive_account(self):
-        user = make_user("nt_inactive", UserRole.PARTICIPANT)
+        user = make_user("nt_inactive", UserRole.USER)
         user.is_active = False
         notifications.notify(user, "password_changed")
         self.assertEqual(mail.outbox, [])
 
     def test_an_account_gone_by_send_time_gets_nothing(self):
-        user = make_user("nt_gone", UserRole.PARTICIPANT)
+        user = make_user("nt_gone", UserRole.USER)
         user_id = user.pk
         user.delete()
         send_security_notification(user_id, "password_changed", {})
         self.assertEqual(mail.outbox, [])
 
     def test_an_account_deactivated_before_send_time_gets_nothing(self):
-        user = make_user("nt_late", UserRole.PARTICIPANT)
+        user = make_user("nt_late", UserRole.USER)
         type(user).objects.filter(pk=user.pk).update(is_active=False)
         send_security_notification(user.pk, "password_changed", {})
         self.assertEqual(mail.outbox, [])
@@ -115,7 +115,7 @@ class NotifyGuardTests(TestCase):
 @override_settings(MFA_ENCRYPTION_KEYS=[TEST_KEY], WEBAUTHN_RP_ID=RP_ID, WEBAUTHN_ORIGIN=ORIGIN)
 class NotificationHookTests(TestCase):
     def setUp(self):
-        self.user = make_user("nt_user", UserRole.ZEV_OWNER)
+        self.user = make_user("nt_user", UserRole.USER)
         self.client = APIClient()
         auth(self.client, self.user)
 
@@ -178,7 +178,7 @@ class NotificationHookTests(TestCase):
 class AdminActionNotificationTests(TestCase):
     def setUp(self):
         self.admin = make_user("nt_admin", UserRole.ADMIN)
-        self.target = make_user("nt_target", UserRole.PARTICIPANT)
+        self.target = make_user("nt_target", UserRole.USER)
         self.client = APIClient()
         auth(self.client, self.admin)
 
@@ -212,7 +212,7 @@ class AdminActionNotificationTests(TestCase):
 
 class SendingCanNeverBreakTheAction(TestCase):
     def setUp(self):
-        self.user = make_user("nt_resilient", UserRole.ZEV_OWNER)
+        self.user = make_user("nt_resilient", UserRole.USER)
         self.client = APIClient()
         auth(self.client, self.user)
         self.body = {"old_password": "pass1234", "new_password": "Uniquely-Long-9164!"}

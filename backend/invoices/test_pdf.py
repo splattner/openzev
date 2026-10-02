@@ -58,7 +58,7 @@ class InvoicePdfQrTests(TestCase):
         self.owner = User.objects.create_user(
             username="pdf_owner",
             password="pass1234",
-            role=UserRole.ZEV_OWNER,
+            role=UserRole.USER,
         )
         self.zev = Zev.objects.create(
             name="QR ZEV",
@@ -317,7 +317,7 @@ class InvoicePdfQrTests(TestCase):
         from pypdf import PdfReader
 
         owner = User.objects.create_user(
-            username="struct_owner", password="pass1234", role=UserRole.ZEV_OWNER,
+            username="struct_owner", password="pass1234", role=UserRole.USER,
         )
         zev = Zev.objects.create(
             name="Struct ZEV", owner=owner, zev_type="vzev",
@@ -826,7 +826,7 @@ class InvoicePdfVatLabelTests(TestCase):
 
     def setUp(self):
         self.owner = User.objects.create_user(
-            username="vat_label_owner", password="pass1234", role=UserRole.ZEV_OWNER,
+            username="vat_label_owner", password="pass1234", role=UserRole.USER,
         )
         self.zev = Zev.objects.create(
             name="VAT Label ZEV", owner=self.owner, zev_type="vzev",
@@ -888,7 +888,7 @@ class InvoicePdfRenderingTests(TestCase):
 
     def setUp(self):
         self.owner = User.objects.create_user(
-            username="render_owner", password="pass1234", role=UserRole.ZEV_OWNER,
+            username="render_owner", password="pass1234", role=UserRole.USER,
         )
         self.zev = Zev.objects.create(
             name="Render ZEV", owner=self.owner, zev_type="vzev",
@@ -1321,7 +1321,7 @@ class StatusTranslationTests(TestCase):
         owner = User.objects.create_user(
             username="status_owner",
             password="pass1234",
-            role=UserRole.ZEV_OWNER,
+            role=UserRole.USER,
         )
         zev = Zev.objects.create(
             name="Status ZEV",
@@ -1371,7 +1371,7 @@ class PeriodParticipantStatsTests(TestCase):
         self.zev = Zev.objects.create(
             name="Stats ZEV",
             owner=User.objects.create_user(
-                username="stats_owner", password="pass1234", role=UserRole.ZEV_OWNER),
+                username="stats_owner", password="pass1234", role=UserRole.USER),
             zev_type="vzev",
             start_date=self.PERIOD_START,
             billing_interval="monthly",
@@ -1468,7 +1468,7 @@ class PeriodParticipantStatsTests(TestCase):
         other_zev = Zev.objects.create(
             name="Other ZEV",
             owner=User.objects.create_user(
-                username="other_owner", password="pass1234", role=UserRole.ZEV_OWNER),
+                username="other_owner", password="pass1234", role=UserRole.USER),
             zev_type="vzev",
             start_date=self.PERIOD_START,
             billing_interval="monthly",
@@ -1520,7 +1520,7 @@ class SaveInvoicePdfConcurrencyTests(TestCase):
         self.owner = User.objects.create_user(
             username="pdf_race_owner",
             password="pass1234",
-            role=UserRole.ZEV_OWNER,
+            role=UserRole.USER,
         )
         self.zev = Zev.objects.create(
             name="Race ZEV",

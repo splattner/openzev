@@ -27,11 +27,12 @@ SELF_SETUP = f"{ZEVS}self-setup/"
 
 class _OneOwnerOneZev(TestCase):
     def setUp(self):
-        self.owner = make_user("de_owner", UserRole.ZEV_OWNER)
-        self.other_owner = make_user("de_other_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("de_owner", UserRole.USER, may_create_zev=True)
+        self.other_owner = make_user("de_other_owner", UserRole.USER, may_create_zev=True)
         self.admin = make_user("de_admin", UserRole.ADMIN)
         self.zev = Zev.objects.create(name="Lifecycle ZEV", owner=self.owner)
-        self.participant_user = make_user("de_participant", UserRole.PARTICIPANT)
+        Zev.objects.create(name="Other ZEV", owner=self.other_owner)
+        self.participant_user = make_user("de_participant", UserRole.USER)
         self.participant = Participant.objects.create(
             zev=self.zev, user=self.participant_user,
             first_name="Paula", last_name="Participant",

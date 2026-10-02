@@ -27,7 +27,7 @@ class AccountCreationTests(TestCase):
     def _create(self, **overrides):
         payload = {
             "username": "aa_new", "email": "aa_new@example.com",
-            "first_name": "New", "last_name": "Account", "role": "participant",
+            "first_name": "New", "last_name": "Account", "role": "user",
             **overrides,
         }
         return self.client.post(USERS_URL, payload, format="json")
@@ -84,9 +84,9 @@ class AccountCreationTests(TestCase):
 
     def test_non_admin_cannot_create_an_account(self):
         client = APIClient()
-        authenticate(client, make_user("aa_owner", UserRole.ZEV_OWNER))
+        authenticate(client, make_user("aa_owner", UserRole.USER))
         response = client.post(USERS_URL, {"username": "aa_blocked", "email": "x@example.com",
-                                            "first_name": "x", "last_name": "y", "role": "participant"}, format="json")
+                                            "first_name": "x", "last_name": "y", "role": "user"}, format="json")
         self.assertEqual(response.status_code, 403)
 
 
@@ -104,7 +104,7 @@ class SelfDeactivationGuardTests(TestCase):
         self.assertTrue(self.admin.is_active)
 
     def test_an_admin_can_deactivate_someone_else(self):
-        other = make_user("sd_other", UserRole.PARTICIPANT)
+        other = make_user("sd_other", UserRole.USER)
         response = self.client.patch(_detail(other.pk), {"is_active": False}, format="json")
         self.assertEqual(response.status_code, 200, response.content)
         other.refresh_from_db()
@@ -120,7 +120,7 @@ class SelfDeactivationGuardTests(TestCase):
     def test_deactivating_someone_else_still_revokes_their_sessions(self):
         from .jwt_utils import make_jwt_for_user
 
-        other = make_user("sd_sessions", UserRole.PARTICIPANT)
+        other = make_user("sd_sessions", UserRole.USER)
         tokens = make_jwt_for_user(other)
         other_client = APIClient()
         other_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")

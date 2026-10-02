@@ -48,8 +48,8 @@ class _TwoPopulatedCommunities(TestCase):
 
     def setUp(self):
         self.admin = make_user("zf_admin", UserRole.ADMIN)
-        self.owner_a = make_user("zf_owner_a", UserRole.ZEV_OWNER)
-        self.owner_b = make_user("zf_owner_b", UserRole.ZEV_OWNER)
+        self.owner_a = make_user("zf_owner_a", UserRole.USER)
+        self.owner_b = make_user("zf_owner_b", UserRole.USER)
         self.zev_a = Zev.objects.create(name="Community A", owner=self.owner_a, invoice_prefix="AAA")
         self.zev_b = Zev.objects.create(name="Community B", owner=self.owner_b, invoice_prefix="BBB")
 
@@ -179,7 +179,7 @@ class FilterCannotWidenScopeTests(_TwoPopulatedCommunities):
         self.assertEqual([row["first_name"] for row in _rows(response)], ["A"])
 
     def test_participant_naming_a_foreign_community_gets_nothing(self):
-        member = make_user("zf_member", UserRole.PARTICIPANT)
+        member = make_user("zf_member", UserRole.USER)
         self.participant_a.user = member
         self.participant_a.save(update_fields=["user"])
 

@@ -141,7 +141,7 @@ class EnginePdfStatsAnalyticsReconciliationTests(_ReconciliationBase):
 
     def setUp(self):
         self.owner = User.objects.create_user(
-            username="recon_owner", password="pass1234", role=UserRole.ZEV_OWNER
+            username="recon_owner", password="pass1234", role=UserRole.USER
         )
         self.zev = Zev.objects.create(
             name="Recon ZEV",
@@ -262,7 +262,7 @@ class MultiMeterBidirectionalReconciliationTests(_ReconciliationBase):
 
     def setUp(self):
         self.owner = User.objects.create_user(
-            username="recon_multi", password="pass1234", role=UserRole.ZEV_OWNER
+            username="recon_multi", password="pass1234", role=UserRole.USER
         )
         self.zev = Zev.objects.create(
             name="Multi ZEV",
@@ -482,7 +482,7 @@ class UnassignedProductionReconciliationTests(_ReconciliationBase):
 
     def setUp(self):
         self.owner = User.objects.create_user(
-            username="recon_unprod", password="pass1234", role=UserRole.ZEV_OWNER
+            username="recon_unprod", password="pass1234", role=UserRole.USER
         )
         self.zev = Zev.objects.create(
             name="Unprod ZEV",
@@ -551,7 +551,7 @@ class AnnualStatementPhysicalPoolTests(_ReconciliationBase):
 
     def setUp(self):
         self.owner = User.objects.create_user(
-            username="annual_pool_owner", password="pass1234", role=UserRole.ZEV_OWNER
+            username="annual_pool_owner", password="pass1234", role=UserRole.USER
         )
         self.zev = Zev.objects.create(
             name="Annual Pool ZEV", owner=self.owner, zev_type="vzev",
@@ -609,7 +609,7 @@ class AnnualStatementDirectionTypePairingTests(_ReconciliationBase):
 
     def setUp(self):
         self.owner = User.objects.create_user(
-            username="pairing_owner", password="pass1234", role=UserRole.ZEV_OWNER
+            username="pairing_owner", password="pass1234", role=UserRole.USER
         )
         self.zev = Zev.objects.create(
             name="Pairing ZEV", owner=self.owner, zev_type="vzev",
@@ -668,7 +668,7 @@ class CommunityMeterReconciliationTests(_ReconciliationBase):
 
     def setUp(self):
         self.owner = User.objects.create_user(
-            username="recon_community", password="pass1234", role=UserRole.ZEV_OWNER
+            username="recon_community", password="pass1234", role=UserRole.USER
         )
         self.zev = Zev.objects.create(
             name="Community Recon ZEV",

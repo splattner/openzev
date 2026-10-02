@@ -25,7 +25,7 @@ def _daily_rows(*, meter="M1", days=("01.02.2026", "02.02.2026"), slots=96, sep=
 class DetectCsvSettingsTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("detect_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("detect_owner", UserRole.USER)
         auth(self.client, self.owner)
         self.zev = Zev.objects.create(name="Detect ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="D")
         for meter_id in ("M1", "CH-DEMO-CONS-0001"):
@@ -190,7 +190,7 @@ class DetectCsvSettingsTests(TestCase):
 
     def test_participants_cannot_use_detection(self):
         client = APIClient()
-        auth(client, make_user("detect_participant", UserRole.PARTICIPANT))
+        auth(client, make_user("detect_participant", UserRole.USER))
         resp = detect_csv(client, "data.csv", b"a,b\n1,2\n")
         self.assertEqual(resp.status_code, 403)
 

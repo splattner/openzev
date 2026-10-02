@@ -260,9 +260,9 @@ Add a new include in `backend/config/urls.py`:
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
-| `/api/v1/audit/events/` | GET | Authenticated admin or `zev_owner` | Paginated list with role-scoped filtering |
-| `/api/v1/audit/events/{id}/` | GET | Authenticated admin or `zev_owner` | Single event detail if event is visible to actor |
-| `/api/v1/audit/events/filter-options/` | GET | Authenticated admin or `zev_owner` | Unpaginated `{zevs, actors}` distinct options derived from the visible event queryset |
+| `/api/v1/audit/events/` | GET | Authenticated admin, or an account with a manager or viewer grant | Paginated list with role-scoped filtering |
+| `/api/v1/audit/events/{id}/` | GET | Authenticated admin, or an account with a manager or viewer grant | Single event detail if event is visible to actor |
+| `/api/v1/audit/events/filter-options/` | GET | Authenticated admin, or an account with a manager or viewer grant | Unpaginated `{zevs, actors}` distinct options derived from the visible event queryset |
 
 ### 5.3 List query parameters
 
@@ -339,7 +339,7 @@ Proposed classes:
 1. Admin: unrestricted queryset.
 2. Managers and viewers: only events of ZEVs they hold an active grant for (`zev_id__in=zev.access.viewable_zev_ids(user)`, #761).
 3. Events with `zev = null` are admin-only in v1.
-4. Accounts without a grant receive HTTP `403` (`CanViewAuditEvents`), except accounts still carrying the old `zev_owner` role, which see an empty list until they hold a grant.
+4. Accounts without a grant receive HTTP `403` (`CanViewAuditEvents`).
 
 ---
 
@@ -446,8 +446,9 @@ avoid noise.
 - Route: admin scope at `/admin/audit` (Overview hub tab), owner scope at
   `/zev-settings/audit` (ZEV settings hub tab); the legacy routes
   `/admin/audit-logs` and `/audit-logs` redirect there
-- ProtectedRoute roles: `['admin']` for admin scope, `['admin', 'zev_owner']`
-  for owner scope (guard on the parent settings hub)
+- ProtectedRoute roles: `['admin']` for admin scope, `ZEV_SCOPE`
+  (`['admin', 'manager', 'viewer']` shell roles, #761) for owner scope (guard
+  on the parent settings hub)
 - `embedded` prop: drops the page header when mounted inside a hub tab
 - Query: `useQuery({ queryKey: queryKeys.admin.auditEvents(filters), queryFn: () => fetchAuditEvents(filters) })`
 - Detail query: `useQuery({ queryKey: queryKeys.admin.auditEvent(eventId), queryFn: () => fetchAuditEvent(eventId), enabled: !!eventId })`

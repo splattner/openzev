@@ -40,8 +40,8 @@ class _TwoCommunities(TestCase):
     """One victim community and one attacker community, each with an owner."""
 
     def setUp(self):
-        self.victim = make_user("ws_victim", UserRole.ZEV_OWNER)
-        self.attacker = make_user("ws_attacker", UserRole.ZEV_OWNER)
+        self.victim = make_user("ws_victim", UserRole.USER)
+        self.attacker = make_user("ws_attacker", UserRole.USER)
         self.admin = make_user("ws_admin", UserRole.ADMIN)
 
         self.victim_zev = Zev.objects.create(name="Victim ZEV", owner=self.victim)

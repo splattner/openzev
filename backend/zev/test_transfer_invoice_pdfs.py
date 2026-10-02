@@ -18,6 +18,7 @@ from rest_framework.test import APIClient
 from accounts.models import UserRole
 from invoices.models import Invoice, InvoicePdfStatus
 from testing.helpers import authenticate as auth, make_user
+from zev.models import Zev
 from zev.transfer import ImportFailed, import_archive
 from zev.transfer.export import pdf_member_name
 from zev.transfer.schema import FORMAT_VERSION, SECTIONS, SUPPORTED_FORMAT_VERSIONS
@@ -65,7 +66,7 @@ class MemberNamingTests(TestCase):
 class RoundTripTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.owner = make_user("pdf_owner", UserRole.ZEV_OWNER)
+        cls.owner = make_user("pdf_owner", UserRole.USER)
         cls.importer = make_user("pdf_importer", UserRole.ADMIN)
 
     def _zev_with_pdf_invoice(self, *, meter_prefix):
@@ -137,7 +138,7 @@ def _legacy_manifest(raw, *, version):
 class ManifestVerificationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.owner = make_user("pdf_verify_owner", UserRole.ZEV_OWNER)
+        cls.owner = make_user("pdf_verify_owner", UserRole.USER)
         cls.importer = make_user("pdf_verify_importer", UserRole.ADMIN)
 
     def test_a_dropped_pdf_member_is_reported_not_silently_missing(self):
@@ -164,8 +165,9 @@ class TransferEndpointInvoicePdfTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = make_user("pdf_ep_owner", UserRole.ZEV_OWNER)
+        cls.owner = make_user("pdf_ep_owner", UserRole.USER)
         cls.admin = make_user("pdf_ep_admin", UserRole.ADMIN)
+        Zev.objects.create(name="PDF endpoint ZEV", owner=cls.owner)
 
     def setUp(self):
         self.client = APIClient()

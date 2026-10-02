@@ -3,18 +3,14 @@ import { act, createElement, useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchZevs } from '../src/lib/api/zev'
-import { ManagedZevProvider, resolveManagedSelection, useManagedZev } from '../src/lib/managedZev'
-import type { User, UserRole, Zev } from '../src/types/api'
+import { ManagedZevProvider, resolveCommunitySelection, useManagedZev } from '../src/lib/managedZev'
+import type { Membership, User, Zev } from '../src/types/api'
 
-type IdOnly = Pick<Zev, 'id'>
-
-const zev = (id: string): IdOnly => ({ id })
-
-describe('resolveManagedSelection — admin', () => {
+describe('resolveCommunitySelection — admin', () => {
     it('is always selectable and can pick any managed ZEV', () => {
-        const resolution = resolveManagedSelection({
-            role: 'admin',
-            managedZevs: [zev('z1'), zev('z2')],
+        const resolution = resolveCommunitySelection({
+            isAdmin: true,
+            entryIds: ['z1', 'z2'],
             currentId: 'z1',
         })
         expect(resolution.isSelectable).toBe(true)
@@ -23,18 +19,18 @@ describe('resolveManagedSelection — admin', () => {
     })
 
     it('keeps the current selection while it exists', () => {
-        const resolution = resolveManagedSelection({
-            role: 'admin',
-            managedZevs: [zev('z1'), zev('z2')],
+        const resolution = resolveCommunitySelection({
+            isAdmin: true,
+            entryIds: ['z1', 'z2'],
             currentId: 'z2',
         })
         expect(resolution.selection).toBe('z2')
     })
 
     it('falls back to the first ZEV when the stored id is stale', () => {
-        const resolution = resolveManagedSelection({
-            role: 'admin',
-            managedZevs: [zev('z1'), zev('z2')],
+        const resolution = resolveCommunitySelection({
+            isAdmin: true,
+            entryIds: ['z1', 'z2'],
             currentId: 'deleted-zev',
         })
         expect(resolution.selection).toBe('z1')
@@ -42,9 +38,9 @@ describe('resolveManagedSelection — admin', () => {
     })
 
     it('uses the account preference instead of the first-by-name ZEV', () => {
-        const resolution = resolveManagedSelection({
-            role: 'admin',
-            managedZevs: [zev('z1'), zev('z2')],
+        const resolution = resolveCommunitySelection({
+            isAdmin: true,
+            entryIds: ['z1', 'z2'],
             currentId: '',
             preferredZevId: 'z2',
         })
@@ -52,9 +48,9 @@ describe('resolveManagedSelection — admin', () => {
     })
 
     it('ignores a preference for a ZEV that is no longer managed', () => {
-        const resolution = resolveManagedSelection({
-            role: 'admin',
-            managedZevs: [zev('z1')],
+        const resolution = resolveCommunitySelection({
+            isAdmin: true,
+            entryIds: ['z1'],
             currentId: '',
             preferredZevId: 'transferred-away',
         })
@@ -62,11 +58,11 @@ describe('resolveManagedSelection — admin', () => {
     })
 })
 
-describe('resolveManagedSelection — zev_owner', () => {
-    it('pins a single owned ZEV and is not selectable', () => {
-        const resolution = resolveManagedSelection({
-            role: 'zev_owner',
-            managedZevs: [zev('own')],
+describe('resolveCommunitySelection — non-admin account', () => {
+    it('pins a single community and is not selectable', () => {
+        const resolution = resolveCommunitySelection({
+            isAdmin: false,
+            entryIds: ['own'],
             currentId: '',
         })
         expect(resolution.isSelectable).toBe(false)
@@ -74,10 +70,10 @@ describe('resolveManagedSelection — zev_owner', () => {
         expect(resolution.isAllowedId('own')).toBe(true)
     })
 
-    it('an owner with more than one ZEV can switch among them', () => {
-        const resolution = resolveManagedSelection({
-            role: 'zev_owner',
-            managedZevs: [zev('own1'), zev('own2')],
+    it('an account with more than one community can switch among them', () => {
+        const resolution = resolveCommunitySelection({
+            isAdmin: false,
+            entryIds: ['own1', 'own2'],
             currentId: 'own1',
         })
         expect(resolution.isSelectable).toBe(true)
@@ -87,9 +83,9 @@ describe('resolveManagedSelection — zev_owner', () => {
     })
 
     it('falls back to the first owned ZEV when nothing is stored yet', () => {
-        const resolution = resolveManagedSelection({
-            role: 'zev_owner',
-            managedZevs: [zev('own1'), zev('own2')],
+        const resolution = resolveCommunitySelection({
+            isAdmin: false,
+            entryIds: ['own1', 'own2'],
             currentId: '',
         })
         expect(resolution.isSelectable).toBe(true)
@@ -97,27 +93,27 @@ describe('resolveManagedSelection — zev_owner', () => {
     })
 
     it('rejects a selection that is not one of the owned ZEVs', () => {
-        const resolution = resolveManagedSelection({
-            role: 'zev_owner',
-            managedZevs: [zev('own1'), zev('own2')],
+        const resolution = resolveCommunitySelection({
+            isAdmin: false,
+            entryIds: ['own1', 'own2'],
             currentId: 'own1',
         })
         expect(resolution.isAllowedId('someone-elses-zev')).toBe(false)
     })
 
     it('keeps an owned selection instead of re-pinning to the first entry', () => {
-        const resolution = resolveManagedSelection({
-            role: 'zev_owner',
-            managedZevs: [zev('own1'), zev('own2')],
+        const resolution = resolveCommunitySelection({
+            isAdmin: false,
+            entryIds: ['own1', 'own2'],
             currentId: 'own2',
         })
         expect(resolution.selection).toBe('own2')
     })
 
     it('prefers the explicit in-session pick over the account preference', () => {
-        const resolution = resolveManagedSelection({
-            role: 'zev_owner',
-            managedZevs: [zev('own1'), zev('own2')],
+        const resolution = resolveCommunitySelection({
+            isAdmin: false,
+            entryIds: ['own1', 'own2'],
             currentId: 'own2',
             preferredZevId: 'own1',
         })
@@ -125,9 +121,9 @@ describe('resolveManagedSelection — zev_owner', () => {
     })
 
     it('lands on the account preference when nothing is picked yet', () => {
-        const resolution = resolveManagedSelection({
-            role: 'zev_owner',
-            managedZevs: [zev('own1'), zev('own2')],
+        const resolution = resolveCommunitySelection({
+            isAdmin: false,
+            entryIds: ['own1', 'own2'],
             currentId: '',
             preferredZevId: 'own2',
         })
@@ -135,9 +131,9 @@ describe('resolveManagedSelection — zev_owner', () => {
     })
 
     it('falls back to the first owned ZEV when the stored id is stale', () => {
-        const resolution = resolveManagedSelection({
-            role: 'zev_owner',
-            managedZevs: [zev('taken-over-1'), zev('taken-over-2')],
+        const resolution = resolveCommunitySelection({
+            isAdmin: false,
+            entryIds: ['taken-over-1', 'taken-over-2'],
             currentId: 'transferred-away',
         })
         expect(resolution.isSelectable).toBe(true)
@@ -146,25 +142,12 @@ describe('resolveManagedSelection — zev_owner', () => {
     })
 })
 
-describe('resolveManagedSelection — roles without management scope', () => {
-    it.each(['participant', 'guest'] as const)('%s gets neither selection nor switching', (role) => {
-        const resolution = resolveManagedSelection({
-            role,
-            managedZevs: [zev('z1')],
+describe('resolveCommunitySelection — no community', () => {
+    it('selects nothing for an account without a community, or before it is loaded', () => {
+        const resolution = resolveCommunitySelection({
+            isAdmin: false,
+            entryIds: [],
             currentId: 'z1',
-        })
-        expect(resolution.isSelectable).toBe(false)
-        expect(resolution.selection).toBe('')
-        expect(resolution.isAllowedId('z1')).toBe(false)
-    })
-})
-
-describe('resolveManagedSelection — missing data', () => {
-    it('selects nothing before the user or the list is loaded', () => {
-        const resolution = resolveManagedSelection({
-            role: undefined,
-            managedZevs: [],
-            currentId: '',
         })
         expect(resolution.isSelectable).toBe(false)
         expect(resolution.selection).toBe('')
@@ -199,15 +182,21 @@ const fullZev = (id: string, owner: number): Zev => ({
     billing_interval: 'monthly',
 })
 
-const userWithRole = (role: UserRole): User => ({
+const managing = (zev: string): Membership => ({
+    zev, zev_name: zev, zev_disabled: false, access: 'manager', participants: [],
+})
+
+/** A non-admin account; by default the manager of own1 and own2. */
+const account = (memberships: Membership[] = [managing('own1'), managing('own2')]): User => ({
     id: 1,
     username: 'owner1',
     email: 'owner1@example.com',
     first_name: 'Owner',
     last_name: 'One',
-    role,
+    role: 'user',
     must_change_password: false,
     preferred_zev: null,
+    memberships,
 })
 
 const adminUser = (id: number, preferredZev: string | null): User => ({
@@ -290,13 +279,14 @@ describe('ManagedZevProvider selection persistence', () => {
         })
     }
 
-    it('selects nothing while the list is loading, then lands on the account preference', async () => {
-        authState.current = { ...userWithRole('zev_owner'), preferred_zev: 'own2' }
+    it('lands on the account preference from its memberships, before the ZEV list arrives', async () => {
+        authState.current = { ...account(), preferred_zev: 'own2' }
         deferFetch()
 
         const { latest } = renderProvider()
 
-        expect(latest.current?.selectedZevId).toBe('')
+        expect(latest.current?.selectedZevId).toBe('own2')
+        expect(latest.current?.selectedZev).toBeNull()
 
         await resolveTwoZevs()
 
@@ -305,7 +295,7 @@ describe('ManagedZevProvider selection persistence', () => {
     })
 
     it('falls back to the first managed ZEV without an account preference', async () => {
-        authState.current = userWithRole('zev_owner')
+        authState.current = account()
         deferFetch()
 
         const { latest } = renderProvider()
@@ -316,7 +306,7 @@ describe('ManagedZevProvider selection persistence', () => {
     })
 
     it('ignores an account preference for a ZEV that is no longer managed', async () => {
-        authState.current = { ...userWithRole('zev_owner'), preferred_zev: 'transferred-away' }
+        authState.current = { ...account(), preferred_zev: 'transferred-away' }
         deferFetch()
 
         const { latest } = renderProvider()
@@ -327,7 +317,7 @@ describe('ManagedZevProvider selection persistence', () => {
     })
 
     it('keeps an explicit pick instead of re-pinning to the first entry', async () => {
-        authState.current = userWithRole('zev_owner')
+        authState.current = account()
         deferFetch()
 
         const { latest } = renderProvider()
@@ -343,7 +333,7 @@ describe('ManagedZevProvider selection persistence', () => {
     })
 
     it('prefers the explicit pick even when the account preference differs', async () => {
-        authState.current = { ...userWithRole('zev_owner'), preferred_zev: 'own1' }
+        authState.current = { ...account(), preferred_zev: 'own1' }
         deferFetch()
 
         const { latest } = renderProvider()
@@ -358,7 +348,7 @@ describe('ManagedZevProvider selection persistence', () => {
     })
 
     it('persists a user-initiated switch as the account preference', async () => {
-        authState.current = userWithRole('zev_owner')
+        authState.current = account()
         deferFetch()
 
         const { latest } = renderProvider()
@@ -376,7 +366,7 @@ describe('ManagedZevProvider selection persistence', () => {
     })
 
     it('does not persist a switch to a ZEV the user no longer manages', async () => {
-        authState.current = userWithRole('zev_owner')
+        authState.current = account()
         deferFetch()
 
         const { latest } = renderProvider()
@@ -392,7 +382,7 @@ describe('ManagedZevProvider selection persistence', () => {
     })
 
     it('a failed preference save leaves the local selection usable', async () => {
-        authState.current = userWithRole('zev_owner')
+        authState.current = account()
         deferFetch()
 
         const { latest } = renderProvider()
@@ -449,8 +439,8 @@ describe('ManagedZevProvider selection persistence', () => {
         expect(latest.current?.selectedZevId).toBe('own1')
     })
 
-    it('clears the selection for a non-managing role', async () => {
-        authState.current = userWithRole('participant')
+    it('clears the selection for an account without a community', async () => {
+        authState.current = account([])
 
         const { latest } = renderProvider()
 

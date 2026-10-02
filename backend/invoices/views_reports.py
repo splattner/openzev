@@ -26,8 +26,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import UserRole
-from accounts.permissions import HasZevAccess, may_hold_management_access
+from accounts.permissions import HasZevAccess
 from zev import access
 from zev.models import Participant, Zev
 
@@ -118,9 +117,8 @@ def _self_service(request) -> tuple[bool, Participant | None]:
     (naming another ZEV is refused there). An account that only participates is
     always self-service: it gets its row in the named ZEV, or — as before
     per-ZEV grants, when a participant's ids were simply ignored — its first
-    current one. With no current row, a plain participant account still gets a
-    404 while a guest is served as a manager; that distinction rests on the old
-    role until it collapses (#761).
+    current one. With no current row, a former participant gets a 404, while an
+    account that never took part is served as a manager (#761).
     """
     from zev.services import own_participant_for_user
 
@@ -128,13 +126,15 @@ def _self_service(request) -> tuple[bool, Participant | None]:
     zev_id = request.query_params.get("zev_id")
     if zev_id and access.can_view(user, zev_id):
         return False, None
-    if user.is_admin or access.viewable_zev_ids(user) or may_hold_management_access(user):
+    if user.is_admin or access.viewable_zev_ids(user):
         participant = own_participant_for_user(user, zev_id=zev_id) if zev_id else None
         return participant is not None, participant
     participant = (zev_id and own_participant_for_user(user, zev_id=zev_id)) or own_participant_for_user(user)
     if participant is not None:
         return True, participant
-    return user.role == UserRole.PARTICIPANT, None
+    # A former participant has nothing left to ask about (404); an account
+    # that never took part is served by the manager branch (400 without ids).
+    return user.participations.exists(), None
 
 
 def _pdf_response(pdf_bytes: bytes, filename: str, *, disposition: str) -> HttpResponse:

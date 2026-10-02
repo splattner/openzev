@@ -43,7 +43,7 @@ class TestAllowList:
                 user=owner_user,
             )
 
-    def test_allows_a_url_on_the_allow_list(self, owner_user):
+    def test_allows_a_url_on_the_allow_list(self, zev, owner_user):
         api_key, _ = make_api_key(owner_user)
         outer = _outer_request(owner_user, api_key)
         sub = dispatch_get(

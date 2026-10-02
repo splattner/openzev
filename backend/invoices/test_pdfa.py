@@ -58,7 +58,7 @@ class RenderPdfVariantTests(TestCase):
 class InvoicePdfaTests(TestCase):
     def setUp(self):
         self.owner = User.objects.create_user(
-            username="pdfa_owner", password="pass1234", role=UserRole.ZEV_OWNER
+            username="pdfa_owner", password="pass1234", role=UserRole.USER
         )
         self.zev = Zev.objects.create(
             name="PDFA ZEV",

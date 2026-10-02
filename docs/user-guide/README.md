@@ -5,7 +5,7 @@ Welcome to the OpenZEV user documentation. This guide covers everything you need
 ## Getting Started
 
 - **[Getting Started](01-getting-started.md)** — Demo and production installation (Docker Compose, Kubernetes), creating the first admin account, and demo accounts
-- **[Understanding Roles and Permissions](11-roles-and-permissions.md)** — Learn about admin, ZEV owner, participant, and guest roles
+- **[Understanding Roles and Permissions](11-roles-and-permissions.md)** — Admins and users, and access per community as manager, viewer or participant
 
 ## Planning
 
@@ -47,14 +47,14 @@ Welcome to the OpenZEV user documentation. This guide covers everything you need
 
 ## Navigating the Interface
 
-OpenZEV is organized by role:
+OpenZEV is organized by what you may do in each community:
 
 **Admins** have access to:
 - Account and user management
 - Regional and VAT settings
 - Admin dashboard with operational KPIs
 
-**ZEV Owners** can:
+**Managers (ZEV owners)** can:
 - Manage their ZEV's settings and preferences
 - Import and manage metering data
 - Configure tariffs and invoicing

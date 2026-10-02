@@ -39,8 +39,9 @@ class TemplateAdminPermissionTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.admin = make_user("tpl_admin", UserRole.ADMIN)
-        self.owner = make_user("tpl_owner", UserRole.ZEV_OWNER)
-        self.participant = make_user("tpl_participant", UserRole.PARTICIPANT)
+        self.owner = make_user("tpl_owner", UserRole.USER)
+        make_zev(self.owner)
+        self.participant = make_user("tpl_participant", UserRole.USER)
 
     def _call(self, method, url, payload):
         fn = getattr(self.client, method)
@@ -348,7 +349,7 @@ class PdfTemplatePreviewTests(TestCase):
         """Preview is stateless — unlike the mutation views it has no denial_audit
         override, so a non-admin 403 must not write a GOVERNANCE event."""
         client = APIClient()
-        auth(client, make_user("preview_participant", UserRole.PARTICIPANT))
+        auth(client, make_user("preview_participant", UserRole.USER))
         before = AuditEvent.objects.filter(status=AuditEventStatus.DENIED).count()
 
         resp = client.post(
@@ -488,7 +489,7 @@ class PdfTemplateOverrideIntegrityTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         auth(self.client, make_user("override_admin", UserRole.ADMIN))
-        self.owner = make_user("override_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("override_owner", UserRole.USER)
 
     def test_broken_override_is_rejected_and_nothing_is_stored(self):
         url = "/api/v1/invoices/invoices/contract-pdf-template/"
@@ -646,9 +647,9 @@ class InvoicePdfDownloadTests(TestCase):
         from invoices.test_helpers import make_invoice
 
         self.client = APIClient()
-        self.owner = make_user("pdfdl_owner", UserRole.ZEV_OWNER)
-        self.participant_user = make_user("pdfdl_participant", UserRole.PARTICIPANT)
-        self.stranger = make_user("pdfdl_stranger", UserRole.ZEV_OWNER)
+        self.owner = make_user("pdfdl_owner", UserRole.USER)
+        self.participant_user = make_user("pdfdl_participant", UserRole.USER)
+        self.stranger = make_user("pdfdl_stranger", UserRole.USER)
         self.zev = make_zev(self.owner, "PDF DL ZEV")
         self.participant = make_participant(self.zev, user=self.participant_user,
                                             first="Pdf", last="Downloader")

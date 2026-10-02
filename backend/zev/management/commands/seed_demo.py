@@ -1,7 +1,7 @@
 """python manage.py seed_demo — idempotent demo environment.
 
 Two communities owned by one demo owner (flagship STWEG + company ZEV),
-accounts, meters, readings, tariffs, invoices in every status, and
+accounts (including a viewer and a property manager with per-ZEV access), meters, readings, tariffs, invoices in every status, and
 operational history (import/email logs, contracts, audit events). See the
 README for the full list and the demo login credentials.
 """
@@ -44,6 +44,8 @@ from zev.models import (
     Participant,
     VatMode,
     Zev,
+    ZevAccessGrant,
+    ZevAccessRole,
     ZevType,
 )
 
@@ -318,7 +320,7 @@ class Command(BaseCommand):
             username="demo_owner",
             email="owner@openzev.local",
             password="owner1234",
-            role="zev_owner",
+            role="user",
             first_name="Paula",
             last_name="Producer",
         )
@@ -327,7 +329,7 @@ class Command(BaseCommand):
             username="participant1",
             email="anna@openzev.local",
             password="anna1234",
-            role="participant",
+            role="user",
             first_name="Anna",
             last_name="Consumer",
         )
@@ -336,7 +338,7 @@ class Command(BaseCommand):
             username="participant2",
             email="ben@openzev.local",
             password="ben1234",
-            role="participant",
+            role="user",
             first_name="Ben",
             last_name="Consumer",
         )
@@ -348,7 +350,7 @@ class Command(BaseCommand):
             username="participant3",
             email="clara@openzev.local",
             password="clara1234",
-            role="participant",
+            role="user",
             first_name="Clara",
             last_name="Müller",
         )
@@ -409,6 +411,32 @@ class Command(BaseCommand):
             local_tariff_notes=SECOND_DEMO_LOCAL_TARIFF_NOTES,
             additional_contract_notes=SECOND_DEMO_ADDITIONAL_CONTRACT_NOTES,
         )
+
+        # Per-ZEV access (#761): a viewer of the flagship community, and a
+        # property manager (Verwaltung) who manages both communities — the
+        # switcher lists both with their relation. Neither is a participant,
+        # so billing data is unaffected.
+        viewer = self._upsert_user(
+            User,
+            username="demo_viewer",
+            email="viewer@openzev.local",
+            password="viewer1234",
+            role="user",
+            first_name="Vera",
+            last_name="Viewer",
+        )
+        property_manager = self._upsert_user(
+            User,
+            username="demo_manager",
+            email="manager@openzev.local",
+            password="manager1234",
+            role="user",
+            first_name="Marco",
+            last_name="Verwaltung",
+        )
+        self._upsert_grant(zev=zev, user=viewer, role=ZevAccessRole.VIEWER, granted_by=owner)
+        self._upsert_grant(zev=zev, user=property_manager, role=ZevAccessRole.MANAGER, granted_by=owner)
+        self._upsert_grant(zev=second_zev, user=property_manager, role=ZevAccessRole.MANAGER, granted_by=owner)
 
         # Participants and their meter assignments are valid from the start of
         # the previous calendar year — not just from the seed window — so
@@ -631,6 +659,8 @@ class Command(BaseCommand):
             "  Participant 1: anna@openzev.local / anna1234                  (ZEV 1)",
             "  Participant 2: ben@openzev.local / ben1234                    (ZEV 1)",
             "  Participant 3: clara@openzev.local / clara1234                (ZEV 2)",
+            "  Viewer:        viewer@openzev.local / viewer1234              (ZEV 1, read-only)",
+            "  Manager:       manager@openzev.local / manager1234            (ZEV 1 + ZEV 2)",
             "",
             f"ZEV 1: {zev.name} (full dataset, {zev.billing_interval} "
             f"{zev.invoice_language.upper()} invoices, VAT folded into prices)",
@@ -1336,6 +1366,23 @@ class Command(BaseCommand):
         user.set_password(password)
         user.save()
         return user
+
+    def _upsert_grant(self, *, zev: Zev, user, role: str, granted_by) -> ZevAccessGrant:
+        """An open grant of ``role`` for ``user`` on ``zev``, valid since the
+        community started (or today, for a community that starts later)."""
+        grant = ZevAccessGrant.objects.filter(zev=zev, user=user, valid_to__isnull=True).first()
+        if grant is None:
+            grant = ZevAccessGrant.objects.create(
+                zev=zev,
+                user=user,
+                role=role,
+                valid_from=min(zev.start_date, date.today()),
+                granted_by=granted_by,
+            )
+        elif grant.role != role:
+            grant.role = role
+            grant.save(update_fields=["role", "updated_at"])
+        return grant
 
     def _upsert_participant(
         self,

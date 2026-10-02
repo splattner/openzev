@@ -29,7 +29,7 @@ DETAIL_URL = "/api/v1/invoices/invoices/{pk}/"
 class PublicInvoiceTestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("pia_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("pia_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Access ZEV")
         self.zev.participant_invoice_access = True
         self.zev.save()
@@ -487,7 +487,7 @@ class MagicLinkTests(PublicInvoiceTestCase):
         user = User.objects.create_user(
             username="legacy.participant",
             password="still-here-from-before",
-            role=UserRole.PARTICIPANT,
+            role=UserRole.USER,
             must_change_password=True,
         )
         self.participant.user = user
@@ -852,13 +852,14 @@ class RevokeAccessLinkTests(PublicInvoiceTestCase):
         self.assertEqual(event.metadata_json["token_prefix"], self.token.prefix)
 
     def test_a_participant_cannot_revoke(self):
-        participant_user = make_user("revoke_participant", UserRole.PARTICIPANT)
+        participant_user = make_user("revoke_participant", UserRole.USER)
         self.client.force_authenticate(participant_user)
 
         self.assertEqual(self._post_revoke().status_code, 403)
 
     def test_another_owner_cannot_revoke(self):
-        stranger = make_user("revoke_stranger", UserRole.ZEV_OWNER)
+        stranger = make_user("revoke_stranger", UserRole.USER)
+        make_zev(stranger, name="Stranger ZEV")
         self.client.force_authenticate(stranger)
 
         self.assertEqual(self._post_revoke().status_code, 404)
@@ -917,7 +918,7 @@ class ParticipantInvoiceAccessDefaultTests(TestCase):
     """
 
     def test_a_new_zev_is_not_opted_in(self):
-        owner = make_user("default_owner", UserRole.ZEV_OWNER)
+        owner = make_user("default_owner", UserRole.USER)
 
         self.assertFalse(make_zev(owner, "Fresh ZEV").participant_invoice_access)
 

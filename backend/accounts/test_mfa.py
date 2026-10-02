@@ -61,7 +61,7 @@ def totp_step(secret: str, step: int):
 class TotpEnrolmentTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.user = make_user("totp_enrol_user", UserRole.PARTICIPANT)
+        self.user = make_user("totp_enrol_user", UserRole.USER)
         auth(self.client, self.user)
 
     def test_begin_enrolment_creates_unconfirmed_device(self):
@@ -199,7 +199,7 @@ class TotpEnrolmentTests(TestCase):
 class TotpLoginTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.user = make_user("totp_login_user", UserRole.PARTICIPANT)
+        self.user = make_user("totp_login_user", UserRole.USER)
         auth(self.client, self.user)
         begin = self.client.post(TOTP_DEVICE_URL)
         self.secret = begin.data["secret"]
@@ -272,7 +272,7 @@ class TotpLoginTests(TestCase):
         self.assertEqual(second.status_code, 400)
 
     def test_account_without_a_factor_is_unaffected(self):
-        plain_user = make_user("totp_login_plain", UserRole.PARTICIPANT)
+        plain_user = make_user("totp_login_plain", UserRole.USER)
 
         resp = self.client.post(TOKEN_URL, {"username": plain_user.username, "password": "pass1234"})
 
@@ -300,7 +300,7 @@ class MfaDoorTests(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.user = make_user("door_user", UserRole.PARTICIPANT)
+        self.user = make_user("door_user", UserRole.USER)
         auth(self.client, self.user)
         begin = self.client.post(TOTP_DEVICE_URL)
         self.secret = begin.data["secret"]
@@ -362,7 +362,7 @@ class MfaDoorTests(TestCase):
 
         pending = User.objects.create_user(
             username="door_verify", email="verify@example.com", password="pass1234",
-            role=UserRole.PARTICIPANT, is_active=False,
+            role=UserRole.USER, is_active=False,
         )
         token = EmailVerificationToken.objects.create(user=pending, token="verify-token-123")
 
@@ -383,7 +383,7 @@ class MfaThrottleTests(TestCase):
     def setUp(self):
         cache.clear()
         self.client = APIClient()
-        self.user = make_user("throttle_user", UserRole.PARTICIPANT)
+        self.user = make_user("throttle_user", UserRole.USER)
         auth(self.client, self.user)
         begin = self.client.post(TOTP_DEVICE_URL)
         self.secret = begin.data["secret"]
@@ -407,7 +407,7 @@ class MfaThrottleTests(TestCase):
 
         # A DIFFERENT account, same IP (the same test client), is unaffected —
         # this is the property a per-IP budget would not give us.
-        other = make_user("throttle_other", UserRole.PARTICIPANT)
+        other = make_user("throttle_other", UserRole.USER)
         other_client = APIClient()
         auth(other_client, other)
         other_secret = other_client.post(TOTP_DEVICE_URL).data["secret"]

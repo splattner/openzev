@@ -286,8 +286,8 @@ Duplicate detection for `daily_15min` batches the day's existing `(metering_poin
 
 **Meter visibility:** meters are scoped to role **and** the validated
 target ZEV (`_meter_queryset_for_user(user, zev)`): `admin` → all meters in the
-ZEV; `zev_owner` → that ZEV when owned (403 otherwise); `participant` → no
-import access. A file with meters from multiple ZEVs imports only rows for
+ZEV; an account that manages it (`zev.access.can_manage`) → that ZEV (403
+otherwise); a participant → no import access. A file with meters from multiple ZEVs imports only rows for
 the target ZEV; preview uses the same ZEV-scoped lookup.
 
 ### 4.2 SDAT-CH (ebIX XML) importer
@@ -538,13 +538,15 @@ a day with no visible readings returns an empty array with HTTP 200.
 |---|---|---|---|
 | `GET` | `/readings/dashboard-summary/` | `IsAuthenticated` | `zev_id`, `participant_id`, `date_from`, `date_to`, `bucket` |
 
-Returns role-differentiated response shapes:
+Returns two response shapes, told apart by `summary_kind` (#761; the key was
+`role`, with `"zev_owner"` / `"participant"`, until the platform role
+collapsed):
 
-**ZEV owner / admin response:**
+**Community (manager, viewer, admin) response:**
 
 ```json
 {
-  "role": "zev_owner",
+  "summary_kind": "zev",
   "bucket": "day",
   "totals": {
     "produced_kwh": 500.0,
@@ -592,7 +594,7 @@ routing, ADR 0013.)
 
 ```json
 {
-  "role": "participant",
+  "summary_kind": "participant",
   "bucket": "day",
   "totals": {
     "consumed_from_zev_kwh": 150.0,
@@ -1012,10 +1014,10 @@ interface MeteringPointDataQuality {
   gaps: Array<{ start_date: string; end_date: string; duration_days: number }>
 }
 
-// Dashboard responses discriminated by role:
+// Dashboard responses discriminated by summary_kind:
 type MeteringDashboardSummary =
-  | ZevOwnerDashboardSummary    // role: "zev_owner"
-  | ParticipantDashboardSummary // role: "participant"
+  | ZevOwnerDashboardSummary    // summary_kind: "zev"
+  | ParticipantDashboardSummary // summary_kind: "participant"
 ```
 
 ---

@@ -7,7 +7,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Layout } from '../src/components/Layout'
 import { fetchFeasibilityCalculatorEnabled } from '../src/lib/api/feasibility'
 import { setZevUnsavedDraftGuard } from '../src/lib/zevUnsavedGuard'
-import type { UserRole } from '../src/types/api'
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
@@ -47,12 +46,16 @@ vi.mock('../src/lib/toast', () => ({
 const ZEV = { id: 1, name: 'Muster ZEV', owner: 9 }
 const SECOND_ZEV = { id: 2, name: 'Second ZEV', owner: 9 }
 
-function mockSession(role: UserRole, impersonating = false, managedZevCount = 2) {
+/** An admin, or a non-admin account managing or taking part in a community (#761). */
+type Persona = 'admin' | 'manager' | 'participant'
+
+function mockSession(persona: Persona, impersonating = false, managedZevCount = 2) {
+    const role = persona === 'admin' ? 'admin' : 'user'
     mockAuth.mockReturnValue({
         user: {
             id: 7,
-            username: `${role}@example.com`,
-            email: `${role}@example.com`,
+            username: `${persona}@example.com`,
+            email: `${persona}@example.com`,
             first_name: 'Test',
             last_name: 'User',
             role,
@@ -68,16 +71,20 @@ function mockSession(role: UserRole, impersonating = false, managedZevCount = 2)
     // Participants have no managed ZEV selection. Two communities by default
     // so the sidebar switcher renders (it hides for exactly one — there is
     // nothing to switch).
-    const manages = role === 'admin' || role === 'zev_owner'
+    const manages = persona !== 'participant'
     const managedZevs = manages ? [ZEV, SECOND_ZEV].slice(0, managedZevCount) : []
+    // What the provider lists for the switcher (#761): a manager's
+    // communities, every one for an admin, a participant's one community.
+    const entries = manages
+        ? managedZevs.map((zev) => ({ id: zev.id, name: zev.name, relation: persona }))
+        : [{ id: ZEV.id, name: ZEV.name, relation: 'participant' }]
     mockManagedZev.mockReturnValue({
         managedZevs,
-        // What the provider lists for the switcher (#761): an owner's
-        // communities as a manager, every one for an admin.
-        entries: managedZevs.map((zev) => ({ id: zev.id, name: zev.name, relation: role === 'admin' ? 'admin' : 'manager' })),
-        selectedZevId: manages ? 1 : '',
-        selectedZev: manages ? ZEV : null,
-        isSelectable: role === 'admin' || (role === 'zev_owner' && managedZevCount > 1),
+        entries,
+        relation: entries[0]?.relation,
+        selectedZevId: entries[0]?.id ?? '',
+        selectedZev: manages && managedZevs.length > 0 ? ZEV : null,
+        isSelectable: persona === 'admin' || entries.length > 1,
         isLoading: false,
         setSelectedZevId: vi.fn(),
     })
@@ -143,7 +150,7 @@ async function renderLayoutAt(path: string) {
 afterEach(() => setZevUnsavedDraftGuard(false))
 
 describe('community switching with unsaved settings', () => {
-    it.each(['admin', 'zev_owner'] as const)('lets a %s cancel or confirm a dirty community switch', async (role) => {
+    it.each(['admin', 'manager'] as const)('lets a %s cancel or confirm a dirty community switch', async (role) => {
         mockSession(role)
         setZevUnsavedDraftGuard(true)
         const page = await renderLayoutAt('/zev-settings/general')
@@ -254,7 +261,7 @@ describe('phase-3 hub nav (see docs/specs/2026-03-community-and-access.md §9.3)
     })
 
     it('owner sees Reports and imports but no Platform group', async () => {
-        mockSession('zev_owner')
+        mockSession('manager')
         const page = await renderLayout()
         expect(page.hasHref('/metering/chart')).toBe(true)
         // Imports moved into the metering hub (phase 3): no standalone link.
@@ -289,7 +296,7 @@ describe('phase-3 hub nav (see docs/specs/2026-03-community-and-access.md §9.3)
     })
 
     it('a single managed community renders no switcher — the page eyebrow carries the name', async () => {
-        mockSession('zev_owner', false, 1)
+        mockSession('manager', false, 1)
         const page = await renderLayout()
         expect(page.html()).not.toContain('sidebar-zev-menu')
         expect(page.hasHref('/participants')).toBe(true)
@@ -466,7 +473,7 @@ describe('active navigation state is exposed to assistive tech', () => {
     })
 
     it('keeps Overview inactive on the Energy balance page', async () => {
-        mockSession('zev_owner')
+        mockSession('manager')
         const page = await renderLayoutAt('/dashboard')
         expect(page.link('/dashboard')?.getAttribute('aria-current')).toBe('page')
         expect(page.link('/')?.getAttribute('aria-current')).toBe(null)

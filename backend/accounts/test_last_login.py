@@ -31,7 +31,7 @@ TOTP_KEY = Fernet.generate_key().decode()
 
 class PasswordLoginStampsLastLoginTests(TestCase):
     def test_a_plain_password_login_stamps_it(self):
-        user = make_user("ll_plain", UserRole.PARTICIPANT)
+        user = make_user("ll_plain", UserRole.USER)
         self.assertIsNone(user.last_login)
 
         APIClient().post(TOKEN_URL, {"username": user.username, "password": "pass1234"})
@@ -40,7 +40,7 @@ class PasswordLoginStampsLastLoginTests(TestCase):
         self.assertIsNotNone(user.last_login)
 
     def test_a_failed_login_does_not_stamp_it(self):
-        user = make_user("ll_failed", UserRole.PARTICIPANT)
+        user = make_user("ll_failed", UserRole.USER)
 
         APIClient().post(TOKEN_URL, {"username": user.username, "password": "wrong"})
 
@@ -52,7 +52,7 @@ class PasswordLoginStampsLastLoginTests(TestCase):
         /token/mfa/ completes it, so nothing has logged in yet."""
         from .test_mfa import totp_step
 
-        user = make_user("ll_pending_mfa", UserRole.PARTICIPANT)
+        user = make_user("ll_pending_mfa", UserRole.USER)
         client = APIClient()
         auth(client, user)
         with self.settings(MFA_ENCRYPTION_KEYS=[TOTP_KEY]):
@@ -78,7 +78,7 @@ class VerifyEmailStampsLastLoginTests(TestCase):
 
         pending = User.objects.create_user(
             username="ll_verify", email="ll_verify@example.com", password="pass1234",
-            role=UserRole.PARTICIPANT, is_active=False,
+            role=UserRole.USER, is_active=False,
         )
         token = EmailVerificationToken.objects.create(user=pending, token="ll-verify-token")
 
@@ -100,7 +100,7 @@ class ReissuesAreNotLoginsTests(TestCase):
         return user.last_login
 
     def test_changing_your_password_does_not_restamp_it(self):
-        user = make_user("ll_pwchange", UserRole.ZEV_OWNER)
+        user = make_user("ll_pwchange", UserRole.USER)
         first_login = self._stamp_via_login(user)
         client = APIClient()
         auth(client, user)
@@ -115,7 +115,7 @@ class ReissuesAreNotLoginsTests(TestCase):
 
         pending = User.objects.create_user(
             username="ll_initial", email="ll_initial@example.com", password="pass1234",
-            role=UserRole.PARTICIPANT, is_active=False,
+            role=UserRole.USER, is_active=False,
         )
         pending.set_unusable_password()
         pending.save()
@@ -134,7 +134,7 @@ class ReissuesAreNotLoginsTests(TestCase):
 class ImpersonationDoesNotTouchLastLoginTests(TestCase):
     def test_neither_account_is_restamped_by_impersonation(self):
         admin = make_user("ll_admin", UserRole.ADMIN)
-        target = make_user("ll_target", UserRole.PARTICIPANT)
+        target = make_user("ll_target", UserRole.USER)
         admin_client = APIClient()
         admin_client.post(TOKEN_URL, {"username": admin.username, "password": "pass1234"})
         admin.refresh_from_db()

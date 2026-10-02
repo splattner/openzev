@@ -34,8 +34,8 @@ class GrantTestCase(TestCase):
         patcher = on_day(TODAY)
         patcher.start()
         self.addCleanup(patcher.stop)
-        self.owner = make_user("ga_owner", UserRole.ZEV_OWNER)
-        self.other = make_user("ga_other", UserRole.PARTICIPANT)
+        self.owner = make_user("ga_owner", UserRole.USER)
+        self.other = make_user("ga_other", UserRole.USER)
         self.zev = Zev.objects.create(name="Grant ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="G")
 
     def grant(self, user, role=VIEWER, valid_from=date(2026, 1, 1), valid_to=None):
@@ -87,7 +87,7 @@ class ZevAccessGrantModelTests(GrantTestCase):
 
 class AccessHelperTests(GrantTestCase):
     def test_manager_viewer_and_stranger(self):
-        viewer = make_user("ga_viewer", UserRole.PARTICIPANT)
+        viewer = make_user("ga_viewer", UserRole.USER)
         self.grant(viewer)
         cases = {
             # user: (can_manage, can_view)
@@ -134,7 +134,7 @@ class AccessHelperTests(GrantTestCase):
         }
         for label, (valid_from, valid_to, active) in cases.items():
             with self.subTest(label):
-                user = make_user(f"ga_{label.replace(' ', '_')}", UserRole.PARTICIPANT)
+                user = make_user(f"ga_{label.replace(' ', '_')}", UserRole.USER)
                 self.grant(user, valid_from=valid_from, valid_to=valid_to)
                 self.assertEqual(access.can_view(user, self.zev), active)
 
@@ -171,7 +171,7 @@ class AccessHelperTests(GrantTestCase):
         self.assertTrue(access.is_last_manager(owner_grant))
         self.grant(self.other, role=MANAGER)
         self.assertFalse(access.is_last_manager(owner_grant))
-        self.assertFalse(access.is_last_manager(self.grant(make_user("ga_v2", UserRole.PARTICIPANT))))
+        self.assertFalse(access.is_last_manager(self.grant(make_user("ga_v2", UserRole.USER))))
 
 
 class OwnerGrantInvariantTests(GrantTestCase):
@@ -186,7 +186,7 @@ class OwnerGrantInvariantTests(GrantTestCase):
         self.assertEqual(ZevAccessGrant.objects.filter(zev=self.zev).count(), 1)
 
     def test_moving_ownership_moves_the_manager_grant(self):
-        new_owner = make_user("ga_new_owner", UserRole.ZEV_OWNER)
+        new_owner = make_user("ga_new_owner", UserRole.USER)
         zev = Zev.objects.get(pk=self.zev.pk)
         zev.owner = new_owner
         zev.save()
@@ -232,7 +232,7 @@ class OwnerGrantInvariantTests(GrantTestCase):
 
         source = build_populated_zev(self.owner, name="Exported", meter_prefix="GAEXP")
         raw = export_to_bytes(source)
-        importer = make_user("ga_importer", UserRole.ZEV_OWNER)
+        importer = make_user("ga_importer", UserRole.USER)
         # Meter ids are unique across the instance, so the exported ZEV goes
         # first (its invoices protect it from deletion).
         Invoice.objects.filter(zev=source).delete()
@@ -249,7 +249,7 @@ class GrantMigrationTests(TransactionTestCase):
     def test_migration_grants_every_owner(self):
         call_command("migrate", "zev", "0030", verbosity=0, interactive=False)
         try:
-            owner = make_user("mig_owner", UserRole.ZEV_OWNER)
+            owner = make_user("mig_owner", UserRole.USER)
             # bulk_create: Zev.save() would write a grant into a table 0030 lacks.
             zevs = Zev.objects.bulk_create([
                 Zev(name=f"Mig {n}", owner=owner, zev_type="vzev", invoice_prefix="M", start_date=date(2030, 1, 1))

@@ -1,4 +1,5 @@
-export type UserRole = 'admin' | 'zev_owner' | 'participant' | 'guest'
+/** Platform role: an administrator, or not. Access to a community comes from `memberships` (#761). */
+export type UserRole = 'admin' | 'user'
 
 export interface ImpersonationResult {
     impersonated_user: User
@@ -15,10 +16,6 @@ export interface User {
     must_change_password: boolean
     /** Account-level default community (ZEV id), always present; null = first managed by name. */
     preferred_zev: string | null
-    /** Participants only: name of their community (from /auth/me). */
-    zev_name?: string | null
-    /** Participants only: number of held memberships (from /auth/me). */
-    zev_count?: number | null
     /** From /auth/me: whether the account can re-authenticate with a password (participants and OAuth-only accounts cannot). */
     has_usable_password?: boolean
     /** Present when this session is an impersonation session. */
@@ -1403,7 +1400,7 @@ export interface EmailTemplateResponse {
 export type EmailTemplateMutationResponse = Omit<EmailTemplateResponse, 'fields'> & { detail: string }
 
 export interface ZevOwnerDashboardSummary {
-    role: 'zev_owner'
+    summary_kind: 'zev'
     bucket: 'day' | 'hour' | 'month'
     selected_participant_id?: string | null
     selected_participant_name?: string | null
@@ -1441,7 +1438,7 @@ export interface ZevOwnerDashboardSummary {
 }
 
 export interface ParticipantDashboardSummary {
-    role: 'participant'
+    summary_kind: 'participant'
     bucket: 'day' | 'hour' | 'month'
     totals: {
         consumed_from_zev_kwh: number

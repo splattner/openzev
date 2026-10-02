@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { act } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { ProtectedRoute } from '../src/components/ProtectedRoute'
+import type { ShellRole } from '../src/lib/communityAccess'
 import type { UserRole } from '../src/types/api'
 
 vi.mock('react-i18next', () => ({
@@ -14,6 +15,12 @@ const mockAuth = vi.fn()
 
 vi.mock('../src/lib/auth', () => ({
     useAuth: () => mockAuth(),
+}))
+
+const mockManaged = vi.fn(() => ({}))
+
+vi.mock('../src/lib/managedZev', () => ({
+    useManagedZev: () => mockManaged(),
 }))
 
 function mockUser(role: UserRole, extra: Record<string, unknown> = {}) {
@@ -36,7 +43,7 @@ function mockUser(role: UserRole, extra: Record<string, unknown> = {}) {
     })
 }
 
-function renderGuard(allowedRoles?: UserRole[]) {
+function renderGuard(allowedRoles?: ShellRole[]) {
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root = createRoot(container)
@@ -65,20 +72,21 @@ function renderGuard(allowedRoles?: UserRole[]) {
 describe('ProtectedRoute unit (role matrix lives in route-guard-matrix.test.ts)', () => {
     beforeEach(() => {
         mockAuth.mockReset()
+        mockManaged.mockReturnValue({})
     })
 
     it('is default-allow when allowedRoles is omitted (auth-only)', () => {
-        mockUser('participant')
+        mockUser('user')
         const page = renderGuard(undefined)
         expect(page.allowed()).toBe(true)
         page.unmount()
     })
 
     it('lets an impersonating admin through participant-only routes', () => {
-        // The backend mints the participant role into the impersonation JWT
-        // (views_impersonation.py sets refresh["role"]), so role-based guards
-        // see an impersonating admin as a participant.
-        mockUser('participant', { impersonated_by: { id: 1, username: 'admin' } })
+        // Impersonation is on the account (#761): the session carries the
+        // target's relations, so the guard sees a participant.
+        mockUser('user', { impersonated_by: { id: 1, username: 'admin' } })
+        mockManaged.mockReturnValue({ relation: 'participant' })
         const page = renderGuard(['participant'])
         expect(page.allowed()).toBe(true)
         page.unmount()

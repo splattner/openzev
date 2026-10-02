@@ -37,7 +37,7 @@ class CsvImportCharacterizationTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.owner = User.objects.create_user(
-            username="charact_owner", password="pass1234", role=UserRole.ZEV_OWNER
+            username="charact_owner", password="pass1234", role=UserRole.USER
         )
         auth(self.client, self.owner)
         self.zev = Zev.objects.create(

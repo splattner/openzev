@@ -18,12 +18,17 @@ const YEAR_COUNT = 5
 export function ReportsPage() {
     const { t } = useTranslation()
     const { user } = useAuth()
-    const { selectedZevId, isLoading: managedZevLoading, managedZevs, selectedZev } = useManagedZev()
+    const { selectedZevId, isLoading: managedZevLoading, managedZevs, selectedZev, entries } = useManagedZev()
 
     const { isZevScope: isZevScopedRole, isParticipantScope: isParticipant } = useCommunityAccess()
     const hasValidZev = !isZevScopedRole || !!(selectedZevId && selectedZev)
     const showGuard = isZevScopedRole && !hasValidZev && !managedZevLoading
-    const scopeName = isZevScopedRole ? selectedZev?.name : user?.zev_name
+    // A participant of several communities asks about the selected one; with
+    // one, the request stays as it was (the server picks the membership).
+    const participantZevId = isParticipant && (entries?.length ?? 0) > 1 ? selectedZevId : undefined
+    const scopeName = isZevScopedRole
+        ? selectedZev?.name
+        : entries?.find((entry) => entry.id === selectedZevId)?.name
 
     // Recomputed per render so a long-lived session picks up the year rollover.
     const years = Array.from({ length: YEAR_COUNT }, (_, i) => new Date().getFullYear() - i)
@@ -97,6 +102,7 @@ export function ReportsPage() {
                 <ParticipantYearDocuments
                     key={user.id}
                     userId={user.id}
+                    zevId={participantZevId}
                     year={selectedYear}
                     years={years}
                     onYearChange={setYear}

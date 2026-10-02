@@ -27,7 +27,7 @@ from zev.models import MeteringPoint, MeteringPointType, Participant, Zev
 class CsvLimitTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("csv_limit_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("csv_limit_owner", UserRole.USER)
         auth(self.client, self.owner)
         self.zev = Zev.objects.create(name="CSV Limit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="X")
 
@@ -182,7 +182,7 @@ class XlsxZipLimitTests(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("xlsx_limit_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("xlsx_limit_owner", UserRole.USER)
         auth(self.client, self.owner)
         self.zev = Zev.objects.create(name="XLSX Limit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="Y")
 

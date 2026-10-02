@@ -24,7 +24,7 @@ class AuditApiTestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.admin = make_user("audit_admin", UserRole.ADMIN)
-        self.owner = make_user("audit_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("audit_owner", UserRole.USER)
         self.zev = Zev.objects.create(name="Audit ZEV", owner=self.owner)
         self.participant = Participant.objects.create(
             zev=self.zev,
@@ -136,7 +136,7 @@ class AuditRequestContextTests(AuditApiTestCase):
 
 class AuditServiceSanitizationTests(TestCase):
     def setUp(self):
-        self.owner = make_user("audit_sanitize_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("audit_sanitize_owner", UserRole.USER)
         self.admin = make_user("audit_sanitize_admin", UserRole.ADMIN)
         self.zev = Zev.objects.create(name="Sanitize ZEV", owner=self.owner)
 

@@ -5,7 +5,6 @@ from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 
-from accounts.permissions import may_hold_management_access
 from zev import access
 
 from .models import AuditEvent
@@ -23,7 +22,6 @@ class CanViewAuditEvents(BasePermission):
         # Managers and viewers see the trail of the ZEVs they hold (#761).
         return (
             request.user.is_admin
-            or may_hold_management_access(request.user)
             or bool(access.viewable_zev_ids(request.user))
         )
 

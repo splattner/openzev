@@ -26,7 +26,7 @@ from .services import get_participant_onboarding_link, send_participant_onboardi
 
 class OnboardingTokenServiceTests(TestCase):
     def setUp(self):
-        owner = make_user("owner_onboarding_svc", UserRole.ZEV_OWNER)
+        owner = make_user("owner_onboarding_svc", UserRole.USER)
         self.zev = Zev.objects.create(
             name="Onboarding ZEV", owner=owner, zev_type="vzev", invoice_prefix="O",
         )
@@ -81,7 +81,7 @@ class OnboardingTokenServiceTests(TestCase):
 
 class SendOnboardingLinkServiceTests(TestCase):
     def setUp(self):
-        owner = make_user("owner_onboarding_send", UserRole.ZEV_OWNER)
+        owner = make_user("owner_onboarding_send", UserRole.USER)
         self.zev = Zev.objects.create(
             name="Send ZEV", owner=owner, zev_type="vzev", invoice_prefix="S",
         )
@@ -181,7 +181,7 @@ class OnboardingConsumeViewTests(TestCase):
     CONSUME_URL = "/api/v1/public/onboarding/consume/"
 
     def setUp(self):
-        owner = make_user("owner_onboarding_consume", UserRole.ZEV_OWNER)
+        owner = make_user("owner_onboarding_consume", UserRole.USER)
         self.zev = Zev.objects.create(
             name="Consume ZEV", owner=owner, zev_type="vzev", invoice_prefix="C",
         )
@@ -261,7 +261,7 @@ class OnboardingConsumeViewTests(TestCase):
 class RevokeAndUnlinkTests(TestCase):
     def setUp(self):
         self.admin = make_user("admin_revoke", UserRole.ADMIN)
-        owner = make_user("owner_revoke", UserRole.ZEV_OWNER)
+        owner = make_user("owner_revoke", UserRole.USER)
         self.zev = Zev.objects.create(
             name="Revoke ZEV", owner=owner, zev_type="vzev", invoice_prefix="R",
         )
@@ -315,7 +315,7 @@ class RevokeAndUnlinkTests(TestCase):
 
 class OnboardingExpiryTests(TestCase):
     def setUp(self):
-        owner = make_user("owner_onboarding_expiry", UserRole.ZEV_OWNER)
+        owner = make_user("owner_onboarding_expiry", UserRole.USER)
         self.zev = Zev.objects.create(
             name="Expiry ZEV", owner=owner, zev_type="vzev", invoice_prefix="E",
         )
@@ -450,7 +450,7 @@ class OnboardingExpiryTests(TestCase):
         self.assertEqual(event.metadata_json["onboarding_links_revoked"], 1)
 
     def test_changing_a_password_revokes_the_link(self):
-        user = make_user("pw_change_participant", UserRole.PARTICIPANT)
+        user = make_user("pw_change_participant", UserRole.USER)
         participant = Participant.objects.create(
             zev=self.zev, user=user, first_name="Pam", last_name="Word",
             email="pam@example.com", valid_from=date(2026, 1, 1),
@@ -563,7 +563,7 @@ class OnboardingConstraintUpgradeTests(TransactionTestCase):
 
         call_command("migrate", "zev", "0028", verbosity=0, interactive=False)
         try:
-            owner = make_user("owner_mig_0029", UserRole.ZEV_OWNER)
+            owner = make_user("owner_mig_0029", UserRole.USER)
             # bulk_create, not create: Zev.save() also writes the owner's
             # access grant, whose table does not exist at 0028.
             zev = Zev.objects.bulk_create([

@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const auth = vi.hoisted(() => vi.fn())
 vi.mock('../src/lib/auth', () => ({ useAuth: () => auth() }))
+const managed = vi.hoisted(() => vi.fn())
+vi.mock('../src/lib/managedZev', () => ({ useManagedZev: () => managed() }))
 vi.mock('../src/pages/OverviewPage', () => ({
     OverviewPage: () => createElement('div', { 'data-testid': 'overview' }),
 }))
@@ -16,8 +18,10 @@ import { HomePage } from '../src/pages/HomePage'
 const cleanups: Array<() => void> = []
 afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
 
-function renderRole(role: 'admin' | 'zev_owner' | 'participant') {
-    auth.mockReturnValue({ user: { role } })
+/** An admin, or a non-admin account with this relation to the selected community (#761). */
+function renderRole(persona: 'admin' | 'manager' | 'participant') {
+    auth.mockReturnValue({ user: { role: persona === 'admin' ? 'admin' : 'user' } })
+    managed.mockReturnValue({ relation: persona })
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root = createRoot(container)
@@ -30,7 +34,7 @@ function renderRole(role: 'admin' | 'zev_owner' | 'participant') {
 }
 
 describe('role-aware home page', () => {
-    it.each(['admin', 'zev_owner'] as const)('opens Overview for %s', (role) => {
+    it.each(['admin', 'manager'] as const)('opens Overview for %s', (role) => {
         const page = renderRole(role)
         expect(page.querySelector('[data-testid="overview"]')).not.toBeNull()
         expect(page.querySelector('[data-testid="dashboard"]')).toBeNull()

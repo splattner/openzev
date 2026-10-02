@@ -37,7 +37,7 @@ class _FullyWiredZev(TestCase):
     CASCADE child, both PROTECT relations, and every SET_NULL survivor."""
 
     def setUp(self):
-        self.owner = make_user("purge_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("purge_owner", UserRole.USER)
         self.admin = make_user("purge_admin", UserRole.ADMIN)
         self.zev = Zev.objects.create(name="Purge Me ZEV", owner=self.owner)
 

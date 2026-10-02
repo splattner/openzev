@@ -15,7 +15,7 @@ from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType
 
 class InvoiceMathEdgeCaseTests(TestCase):
     def setUp(self):
-        self.owner = make_user("math_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("math_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Math ZEV")
         self.participant = make_participant(self.zev, first="Math", last="Case")
 
@@ -151,7 +151,7 @@ class InvoiceMathEdgeCaseTests(TestCase):
 class InvoiceVatRateSelectionTests(TestCase):
     def setUp(self):
         clear_vat_rates()
-        self.owner = make_user("vat_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("vat_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "VAT ZEV")
         self.participant = make_participant(self.zev, first="Vat", last="Case")
 
@@ -260,7 +260,7 @@ class InvoiceVatInclusiveModeTests(TestCase):
     def setUp(self):
         # This class also covers the no-active-rate case.
         clear_vat_rates()
-        self.owner = make_user("incl_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("incl_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Inclusive ZEV")
         self.zev.vat_mode = VatMode.INCLUSIVE
         self.zev.save(update_fields=["vat_mode"])
@@ -352,7 +352,7 @@ class InvoiceSeededVatHistoryTests(TestCase):
         self.assertEqual(VatRate.objects.count(), 2)
 
     def _setup(self, tag, valid_from, vat_mode, vat_number=""):
-        owner = make_user(f"seedvat_{tag}_owner", UserRole.ZEV_OWNER)
+        owner = make_user(f"seedvat_{tag}_owner", UserRole.USER)
         zev = make_zev(owner, f"Seed VAT {tag}")
         zev.vat_mode = vat_mode
         zev.vat_number = vat_number

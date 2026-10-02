@@ -45,8 +45,8 @@ The assistant authenticates the same way a script does — see
    if it ever leaks.
 5. Choose **Create key** and copy the value shown — it is not shown again.
 
-Only `admin` and `zev_owner` accounts can use the MCP endpoint. A
-participant's key is refused with `403`.
+Only admins and accounts that manage or view a community can use the MCP
+endpoint. A participant's key is refused with `403`.
 
 ## Connecting a client
 
@@ -158,6 +158,6 @@ assistant itself, since `audit_query` can answer that question too.
 | --- | --- |
 | `404` on the endpoint | `mcp_server_enabled` is off — ask an administrator to enable it. The endpoint answers `404` to everyone while the flag is off, so this is the first thing to check. |
 | `401` | Missing, wrong, revoked or expired key. Same causes as any other API key — see [API Keys → Troubleshooting](16-api-keys.md#troubleshooting). |
-| `403` | You are signed in as a participant, or your key's account role changed. Only `admin` and `zev_owner` can use MCP. |
+| `403` | Your key's account manages or views no community (for example, it is only a participant), or its access was removed. Only admins, managers and viewers can use MCP. |
 | The assistant says a tool failed with "Permission denied" or "not found" | You (or the assistant) named a ZEV or invoice your account cannot see. This is the same scoping the REST API enforces — it is not a bug. |
 | Answers feel stale | Ask the assistant to call the tool again — MCP calls always read live data, there is no caching layer of its own. |

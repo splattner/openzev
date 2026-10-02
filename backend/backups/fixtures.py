@@ -41,8 +41,8 @@ class World:
 
 def build_world() -> World:
     admin = make_user("bk_admin", UserRole.ADMIN)
-    owner = make_user("bk_owner", UserRole.ZEV_OWNER)
-    member = make_user("bk_member", UserRole.PARTICIPANT)
+    owner = make_user("bk_owner", UserRole.USER)
+    member = make_user("bk_member", UserRole.USER)
 
     alpha = build_populated_zev(owner, name="Alpha", meter_prefix="ALPHA")
     beta = build_populated_zev(owner, name="Beta", meter_prefix="BETA")

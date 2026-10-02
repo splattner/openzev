@@ -501,7 +501,7 @@ class PlanningTests(TestCase):
     doubles somebody's bill."""
 
     def setUp(self):
-        self.owner = make_user("vse_plan_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("vse_plan_owner", UserRole.USER)
         self.zev = Zev.objects.create(name="Plan ZEV", owner=self.owner, zev_type="zev")
 
     def _apply(self, doc, selections=None, url="https://example.ch/tariffs.json"):
@@ -1020,7 +1020,7 @@ class PlanningTests(TestCase):
             )
         self.assertEqual(DynamicTariffSource.objects.count(), 1)
 
-        other_owner = make_user("vse_plan_other_owner", UserRole.ZEV_OWNER)
+        other_owner = make_user("vse_plan_other_owner", UserRole.USER)
         other_zev = Zev.objects.create(name="Other Plan ZEV", owner=other_owner, zev_type="zev")
         other_document = parse_document(document(entry(
             tariffForm="dynamic", prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
@@ -1138,7 +1138,7 @@ class BillingModeChoiceTests(TestCase):
     the offered set and what the write path accepts must be the same set."""
 
     def setUp(self):
-        self.owner = make_user("vse_mode_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("vse_mode_owner", UserRole.USER)
         self.zev = Zev.objects.create(name="Mode ZEV", owner=self.owner, zev_type="zev")
 
     def _fee_and_energy(self):
@@ -1236,7 +1236,7 @@ class EnginePricingTests(TestCase):
     published — asserting on the stored rows alone would not show that."""
 
     def setUp(self):
-        self.owner = make_user("vse_price_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("vse_price_owner", UserRole.USER)
         self.zev = Zev.objects.create(name="Pricing ZEV", owner=self.owner, zev_type="zev")
         parsed = parse_document(real_document())
         wanted = by_name(parsed, "Netznutzung Leistung (Arbeitspreis)")
@@ -1415,7 +1415,7 @@ class ImportEndpointTests(TestCase):
     URL = "https://werke.example.ch/tarife.json"
 
     def setUp(self):
-        self.owner = make_user("vse_api_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("vse_api_owner", UserRole.USER)
         self.zev = Zev.objects.create(name="API ZEV", owner=self.owner, zev_type="zev")
         self.client = APIClient()
         authenticate(self.client, self.owner)
@@ -1453,7 +1453,7 @@ class ImportEndpointTests(TestCase):
 
     def test_participants_cannot_import_tariffs(self):
         client = APIClient()
-        authenticate(client, make_user("vse_api_participant", UserRole.PARTICIPANT))
+        authenticate(client, make_user("vse_api_participant", UserRole.USER))
 
         response = client.post(PREVIEW_URL, {"zev": str(self.zev.id)}, format="json")
 
@@ -1462,7 +1462,7 @@ class ImportEndpointTests(TestCase):
     def test_an_owner_cannot_import_into_somebody_elses_zev(self):
         """The role check alone would let any ZEV owner write tariffs into any
         other ZEV."""
-        other = make_user("vse_api_other_owner", UserRole.ZEV_OWNER)
+        other = make_user("vse_api_other_owner", UserRole.USER)
         other_zev = Zev.objects.create(name="Other ZEV", owner=other, zev_type="zev")
 
         response = self.client.post(PREVIEW_URL, {"zev": str(other_zev.id)}, format="json")

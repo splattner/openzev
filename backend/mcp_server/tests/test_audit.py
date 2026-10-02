@@ -15,7 +15,7 @@ pytestmark = pytest.mark.django_db
 
 
 class TestToolCallAudit:
-    def test_successful_call_is_recorded(self, owner_mcp_client):
+    def test_successful_call_is_recorded(self, zev, owner_mcp_client):
         call_tool(owner_mcp_client, "list_zevs")
 
         event = AuditEvent.objects.get(action_type="mcp.tool.call")
@@ -35,7 +35,7 @@ class TestToolCallAudit:
         event = AuditEvent.objects.filter(action_type="mcp.tool.call").latest("created_at")
         assert event.zev_id == zev.id
 
-    def test_zev_not_visible_to_caller_is_not_attached(self, owner_mcp_client, owner_user):
+    def test_zev_not_visible_to_caller_is_not_attached(self, zev, owner_mcp_client, owner_user):
         other_owner_zev = ZevFactory()  # a different owner
         call_tool(owner_mcp_client, "period_readiness", {"zev_id": str(other_owner_zev.id)})
 
@@ -44,7 +44,7 @@ class TestToolCallAudit:
         # The tool call itself still resolves to isError, not a leak.
         assert event.status == AuditEventStatus.DENIED
 
-    def test_failed_tool_call_is_recorded_as_denied_or_failed(self, owner_mcp_client, owner_user):
+    def test_failed_tool_call_is_recorded_as_denied_or_failed(self, zev, owner_mcp_client, owner_user):
         call_tool(owner_mcp_client, "explain_invoice", {"invoice_id": str(uuid.uuid4())})
         event = AuditEvent.objects.filter(action_type="mcp.tool.call").latest("created_at")
         assert event.status in (AuditEventStatus.FAILED, AuditEventStatus.DENIED)

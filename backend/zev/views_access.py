@@ -267,9 +267,8 @@ class ZevAccessListView(_ZevAccessBase):
                 account = User.objects.create_user(
                     username=build_unique_username(first_name="", last_name="", email=email, fallback="user"),
                     email=email,
-                    # The lowest of the old roles; what the account may do comes
-                    # from its grants. The role collapses later (#761 step 7).
-                    role=UserRole.PARTICIPANT,
+                    # What the account may do comes from its grants (#761).
+                    role=UserRole.USER,
                     is_active=False,
                 )
                 account.set_unusable_password()

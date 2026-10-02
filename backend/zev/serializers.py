@@ -3,7 +3,6 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from .geocoding import get_cached_building_footprint
 from .grid_operators import grid_operator_ids
 from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode
-from accounts.models import UserRole
 from .services import create_zev_with_owner_setup, ensure_participant_account, has_its_own_login
 from .tasks import trigger_geocode_if_address_present
 from .iban import (
@@ -359,27 +358,6 @@ class ZevSerializer(BankIbanValidationMixin, serializers.ModelSerializer):
         if request and "owner" not in validated_data:
             validated_data["owner"] = request.user
         return super().create(validated_data)
-
-    def update(self, instance, validated_data):
-        previous_owner = instance.owner
-        new_owner = validated_data.get("owner", previous_owner)
-
-        updated = super().update(instance, validated_data)
-
-        if new_owner != previous_owner:
-            if new_owner.role != UserRole.ADMIN and new_owner.role != UserRole.ZEV_OWNER:
-                new_owner.role = UserRole.ZEV_OWNER
-                new_owner.save(update_fields=["role"])
-
-            if (
-                previous_owner.role == UserRole.ZEV_OWNER
-                and not previous_owner.owned_zevs.exists()
-                and not previous_owner.is_superuser
-            ):
-                previous_owner.role = UserRole.PARTICIPANT
-                previous_owner.save(update_fields=["role"])
-
-        return updated
 
     class Meta:
         model = Zev

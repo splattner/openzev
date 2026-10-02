@@ -19,20 +19,21 @@ from accounts.models import User, UserRole, VatRate
 from zev.models import Participant
 
 
-def make_user(username: str, role: str, password: str = "pass1234") -> User:
+def make_user(
+    username: str, role: str = UserRole.USER, password: str = "pass1234", *, may_create_zev: bool = False,
+) -> User:
     """Create a bare user with a role and a conventional ``@example.com`` email.
 
     Seven test modules each defined their own copy of this exact function
     (two near-identical variants) before it was consolidated here. Prefer the
     factory_boy factories in ``testing.factories`` for anything that needs a
     fuller object graph (a Zev, a Participant, ...); reach for this when a
-    test genuinely only needs a user.
+    test genuinely only needs a user. What the account may do in a ZEV comes
+    from its grants (owning a ZEV makes one) and participant links (#761).
     """
-    # A zev_owner-role account may set up a ZEV of its own, as migration
-    # accounts.0020 grants every existing owner account (#761).
     return User.objects.create_user(
         username=username, email=f"{username}@example.com", password=password, role=role,
-        may_create_zev=role == UserRole.ZEV_OWNER,
+        may_create_zev=may_create_zev,
     )
 
 

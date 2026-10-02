@@ -15,7 +15,7 @@ from testing.factories import assignment_for
 
 class InvoiceDescriptionSerializationTests(TestCase):
     def test_serializer_strips_period_suffix_for_legacy_item_descriptions(self):
-        owner = make_user("desc_owner", UserRole.ZEV_OWNER)
+        owner = make_user("desc_owner", UserRole.USER)
         zev = make_zev(owner, "Description ZEV")
         participant = make_participant(zev, first="Des", last="Crip")
         invoice = make_invoice(zev, participant, InvoiceStatus.DRAFT)
@@ -46,7 +46,7 @@ class InvoiceListPayloadTests(TestCase):
     """
 
     def setUp(self):
-        self.owner = make_user("list_payload_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("list_payload_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "List Payload ZEV")
         self.participant = make_participant(self.zev, first="List", last="Payload")
         self.invoice = make_invoice(self.zev, self.participant, InvoiceStatus.DRAFT)

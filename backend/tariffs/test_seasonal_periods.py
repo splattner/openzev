@@ -69,7 +69,7 @@ class SeasonalPricingTests(TestCase):
     place a season can change a number on an invoice."""
 
     def setUp(self):
-        self.owner = make_user("seasonal_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("seasonal_owner", UserRole.USER)
         self.zev = Zev.objects.create(name="Seasonal ZEV", owner=self.owner, zev_type="zev")
 
     def _tariff(self, *periods) -> Tariff:

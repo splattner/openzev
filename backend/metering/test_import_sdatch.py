@@ -19,8 +19,8 @@ from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType
 class SdatchImportTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("sdatch_owner", UserRole.ZEV_OWNER)
-        self.other_owner = make_user("sdatch_other_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("sdatch_owner", UserRole.USER)
+        self.other_owner = make_user("sdatch_other_owner", UserRole.USER)
         self.admin = make_user("sdatch_admin", UserRole.ADMIN)
         auth(self.client, self.owner)
 
@@ -285,7 +285,7 @@ class SdatchImportTests(TestCase):
 class SdatchLimitTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("sdatch_limit_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("sdatch_limit_owner", UserRole.USER)
         auth(self.client, self.owner)
         self.zev = Zev.objects.create(name="SDAT Limit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="Y")
 

@@ -21,16 +21,16 @@ MANAGER, VIEWER = ZevAccessRole.MANAGER, ZevAccessRole.VIEWER
 
 class AccessApiTestCase(TestCase):
     def setUp(self):
-        self.owner = make_user("api_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("api_owner", UserRole.USER)
         self.zev = Zev.objects.create(name="Grant ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="G",
                                       invoice_language="de")
-        self.viewer = make_user("api_viewer", UserRole.PARTICIPANT)
+        self.viewer = make_user("api_viewer", UserRole.USER)
         # Started earlier, so ending it leaves a row (a grant that starts today
         # is deleted when revoked — it never took effect).
         self.viewer_grant = ZevAccessGrant.objects.create(
             zev=self.zev, user=self.viewer, role=VIEWER, valid_from=date(2026, 1, 1),
         )
-        self.stranger = make_user("api_stranger", UserRole.ZEV_OWNER)
+        self.stranger = make_user("api_stranger", UserRole.USER)
         self.admin = make_user("api_admin", UserRole.ADMIN)
         self.owner_grant = ZevAccessGrant.objects.get(zev=self.zev, user=self.owner)
 
@@ -172,7 +172,7 @@ class ZevAccessInvitationTests(AccessApiTestCase):
         self.assertTrue(account.is_active)
         self.assertTrue(access.can_manage(account, self.zev))
         # A signup token still says so.
-        signup = EmailVerificationToken.objects.create(user=make_user("api_signup", UserRole.ZEV_OWNER), token="s" * 40)
+        signup = EmailVerificationToken.objects.create(user=make_user("api_signup", UserRole.USER), token="s" * 40)
         self.assertEqual(
             APIClient().post("/api/v1/auth/verify-email/", {"token": signup.token}, format="json").json()["purpose"],
             "signup",

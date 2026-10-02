@@ -7,7 +7,8 @@ import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const mockState = vi.hoisted(() => ({
-    role: 'zev_owner',
+    // The account's relation to the selected community (#761).
+    relation: 'manager',
     summary: null as unknown,
     summaryCalls: [] as Array<Record<string, unknown>>,
     hourlyProfile: null as unknown,
@@ -25,7 +26,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../src/lib/auth', () => ({
     useAuth: () => ({
-        user: { role: mockState.role, zev_count: 1, zev_name: 'Z1' },
+        user: { role: 'user' },
     }),
 }))
 
@@ -34,6 +35,8 @@ vi.mock('../src/lib/managedZev', () => ({
         managedZevs: [{ id: 'z1', name: 'Z1' }],
         selectedZevId: 'z1',
         selectedZev: { id: 'z1', name: 'Z1', billing_interval: 'monthly' },
+        relation: mockState.relation,
+        entries: [{ id: 'z1', name: 'Z1', relation: mockState.relation }],
         isLoading: false,
     }),
 }))
@@ -77,7 +80,7 @@ afterEach(() => {
 
 function managerSummary() {
     return {
-        role: 'zev_owner',
+        summary_kind: 'zev',
         bucket: 'day',
         zev_totals: { produced_kwh: 100, consumed_kwh: 80, imported_kwh: 20, exported_kwh: 40 },
         timeline: [],
@@ -105,7 +108,7 @@ function managerSummary() {
 
 function participantSummary(currentParticipantId: string | null) {
     return {
-        role: 'participant',
+        summary_kind: 'participant',
         bucket: 'day',
         totals: { consumed_from_zev_kwh: 35, imported_from_grid_kwh: 15, total_consumed_kwh: 50 },
         timeline: [],
@@ -160,7 +163,7 @@ async function flush() {
 
 describe('dashboard behavior preservation', () => {
     it('manager sees the per-participant breakdown table and no metering migration card', async () => {
-        mockState.role = 'zev_owner'
+        mockState.relation = 'manager'
         mockState.summary = managerSummary()
         mockState.summaryCalls = []
         mockState.invoiceCalls = []
@@ -183,7 +186,7 @@ describe('dashboard behavior preservation', () => {
     })
 
     it('flagged participant row shows — for the from-ZEV share and the ZEV-wide note appears', async () => {
-        mockState.role = 'zev_owner'
+        mockState.relation = 'manager'
         const base = managerSummary()
         mockState.summary = {
             ...base,
@@ -213,7 +216,7 @@ describe('dashboard behavior preservation', () => {
     })
 
     it('manager row click selects the participant and loads the hourly profile', async () => {
-        mockState.role = 'zev_owner'
+        mockState.relation = 'manager'
         mockState.summaryCalls = []
         mockState.summary = ((args: Record<string, unknown>) => {
             const base = managerSummary()
@@ -280,7 +283,7 @@ describe('dashboard behavior preservation', () => {
     })
 
     it('manager participant buttons and numeric cells select their rows', async () => {
-        mockState.role = 'zev_owner'
+        mockState.relation = 'manager'
         mockState.summaryCalls = []
         mockState.summary = managerSummary()
         mockState.hourlyProfile = null
@@ -320,7 +323,7 @@ describe('dashboard behavior preservation', () => {
     })
 
     it('participant energy flow requires current_participant_id', async () => {
-        mockState.role = 'participant'
+        mockState.relation = 'participant'
         mockState.hourlyProfile = null
         mockState.hourlyCalls = []
         mockState.summaryCalls = []
@@ -341,7 +344,7 @@ describe('dashboard behavior preservation', () => {
     })
 
     it('participant invoices keep the sent/paid pdf filter with details actions', async () => {
-        mockState.role = 'participant'
+        mockState.relation = 'participant'
         mockState.hourlyProfile = null
         mockState.hourlyCalls = []
         mockState.summaryCalls = []

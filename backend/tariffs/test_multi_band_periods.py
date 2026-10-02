@@ -37,7 +37,7 @@ SUMMER = "4,5,6,7,8,9"
 
 class BandFixture(TestCase):
     def setUp(self):
-        self.owner = make_user(f"band_owner_{self._testMethodName[:30]}", UserRole.ZEV_OWNER)
+        self.owner = make_user(f"band_owner_{self._testMethodName[:30]}", UserRole.USER)
         self.zev = Zev.objects.create(name="Band ZEV", owner=self.owner, zev_type="zev")
         self.tariff = Tariff.objects.create(
             zev=self.zev, name="Grid", category=TariffCategory.GRID_FEES,

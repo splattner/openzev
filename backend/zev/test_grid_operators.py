@@ -89,7 +89,7 @@ class GridOperatorFixtureTests(TestCase):
 
 class GridOperatorEndpointTests(TestCase):
     def setUp(self):
-        self.user = make_user("grid_operator_reader", UserRole.PARTICIPANT)
+        self.user = make_user("grid_operator_reader", UserRole.USER)
         self.client = APIClient()
 
     def test_requires_authentication(self):
@@ -267,7 +267,7 @@ class GridOperatorsForPostalCodeTests(TestCase):
 
 class GridOperatorSuggestionEndpointTests(TestCase):
     def setUp(self):
-        self.user = make_user("grid_operator_suggestion_reader", UserRole.PARTICIPANT)
+        self.user = make_user("grid_operator_suggestion_reader", UserRole.USER)
         self.client = APIClient()
         self.client.force_authenticate(self.user)
 

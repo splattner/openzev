@@ -163,7 +163,8 @@ export function Layout() {
 
     const ownerById = new Map((usersQuery.data ?? []).map((candidate) => [candidate.id, candidate]))
     const selectedZevOwner = selectedZev ? ownerById.get(selectedZev.owner) : undefined
-    const effectiveOwner = selectedZevOwner ?? (user?.role === 'zev_owner' ? user : undefined)
+    // Non-admins cannot list accounts; an owner still sees itself named.
+    const effectiveOwner = selectedZevOwner ?? (selectedZev && user && selectedZev.owner === user.id ? user : undefined)
     const selectedZevOwnerName = effectiveOwner
         ? `${effectiveOwner.first_name} ${effectiveOwner.last_name}`.trim() || effectiveOwner.username
         : '-'

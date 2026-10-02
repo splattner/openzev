@@ -27,7 +27,7 @@ from testing.helpers import authenticate as auth, make_user
 
 class AuditEventModelTests(TestCase):
     def setUp(self):
-        self.owner = make_user("audit_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("audit_owner", UserRole.USER)
         self.admin = make_user("audit_admin", UserRole.ADMIN)
         self.zev = Zev.objects.create(name="Audit ZEV", owner=self.owner)
 
@@ -200,9 +200,9 @@ class AuditEventApiTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.admin = make_user("audit_admin_api", UserRole.ADMIN)
-        self.owner1 = make_user("audit_owner1_api", UserRole.ZEV_OWNER)
-        self.owner2 = make_user("audit_owner2_api", UserRole.ZEV_OWNER)
-        self.participant_user = make_user("audit_participant_api", UserRole.PARTICIPANT)
+        self.owner1 = make_user("audit_owner1_api", UserRole.USER)
+        self.owner2 = make_user("audit_owner2_api", UserRole.USER)
+        self.participant_user = make_user("audit_participant_api", UserRole.USER)
 
         self.zev1 = Zev.objects.create(name="ZEV 1", owner=self.owner1)
         self.zev2 = Zev.objects.create(name="ZEV 2", owner=self.owner2)
@@ -383,8 +383,8 @@ class AuditInstrumentationTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.admin = make_user("phase2_admin", UserRole.ADMIN)
-        self.owner = make_user("phase2_owner", UserRole.ZEV_OWNER)
-        self.participant_user = make_user("phase2_participant", UserRole.PARTICIPANT)
+        self.owner = make_user("phase2_owner", UserRole.USER)
+        self.participant_user = make_user("phase2_participant", UserRole.USER)
         self.zev = Zev.objects.create(name="Phase2 ZEV", owner=self.owner)
         self.participant = Participant.objects.create(
             zev=self.zev,
@@ -447,9 +447,9 @@ class AuditPhase3InstrumentationTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.admin = make_user("phase3_admin", UserRole.ADMIN)
-        self.owner = make_user("phase3_owner", UserRole.ZEV_OWNER)
-        self.participant_user = make_user("phase3_participant", UserRole.PARTICIPANT)
-        self.guest_user = make_user("phase3_guest", UserRole.GUEST)
+        self.owner = make_user("phase3_owner", UserRole.USER)
+        self.participant_user = make_user("phase3_participant", UserRole.USER)
+        self.guest_user = make_user("phase3_guest", UserRole.USER)
         self.zev = Zev.objects.create(name="Phase3 ZEV", owner=self.owner)
         self.participant = Participant.objects.create(
             zev=self.zev,

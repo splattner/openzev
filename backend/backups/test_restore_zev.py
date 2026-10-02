@@ -197,7 +197,7 @@ class AccountRelinkTests(ZevRestoreTestCase):
         member = self.world.member
         email = member.email
         member.delete()
-        replacement = make_user("member-again", UserRole.PARTICIPANT)
+        replacement = make_user("member-again", UserRole.USER)
         User.objects.filter(pk=replacement.pk).update(email=email)
 
         result = restore_from(self.raw, self.alpha_id)
@@ -221,13 +221,13 @@ class AccountRelinkTests(ZevRestoreTestCase):
         Zev.objects.all().delete()
         email = self.world.owner.email
         self.world.owner.delete()
-        new_owner = make_user("owner-again", UserRole.ZEV_OWNER)
+        new_owner = make_user("owner-again", UserRole.USER)
         User.objects.filter(pk=new_owner.pk).update(email=email)
         restore_from(self.raw, self.alpha_id)
         self.assertEqual(Zev.objects.get(pk=self.alpha_id).owner_id, new_owner.pk)
 
     def test_a_community_that_exists_keeps_its_owner_when_the_backups_owner_is_gone(self):
-        current_owner = make_user("later-owner", UserRole.ZEV_OWNER)
+        current_owner = make_user("later-owner", UserRole.USER)
         Zev.objects.filter(pk=self.alpha_id).update(owner=current_owner)
         Zev.objects.filter(pk=self.beta_id).update(owner=current_owner)
         self.world.owner.delete()  # the backup's owner no longer exists
@@ -510,7 +510,7 @@ class AccessGrantRestoreTests(ZevRestoreTestCase):
     def test_existing_grants_are_left_exactly_as_they_are(self):
         from zev.models import ZevAccessGrant, ZevAccessRole
 
-        viewer = make_user("restore_viewer", UserRole.PARTICIPANT)
+        viewer = make_user("restore_viewer", UserRole.USER)
         ZevAccessGrant.objects.create(zev_id=self.alpha_id, user=viewer, role=ZevAccessRole.VIEWER)
         before = list(ZevAccessGrant.objects.filter(zev_id=self.alpha_id).order_by("pk").values())
         self.damage_alpha()

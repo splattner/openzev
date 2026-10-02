@@ -32,9 +32,9 @@ class AnnualReportTestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.admin = make_user("ar_admin", UserRole.ADMIN)
-        self.owner = make_user("ar_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("ar_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Annual ZEV")
-        self.puser = make_user("ar_participant", UserRole.PARTICIPANT)
+        self.puser = make_user("ar_participant", UserRole.USER)
 
         self.producer = make_participant(self.zev, user=self.owner, first="Paul", last="Produzent")
         self.consumer = make_participant(self.zev, user=self.puser, first="Pia", last="Muster")
@@ -49,7 +49,7 @@ class AnnualReportTestCase(TestCase):
         self._reading(self.consumption_mp, datetime(2026, 6, 15, 12, 0, tzinfo=ZURICH), "4", ReadingDirection.IN)
         self._reading(self.consumption_mp, datetime(2026, 6, 15, 22, 0, tzinfo=ZURICH), "6", ReadingDirection.IN)
 
-        self.other_owner = make_user("ar_other_owner", UserRole.ZEV_OWNER)
+        self.other_owner = make_user("ar_other_owner", UserRole.USER)
         self.other_zev = make_zev(self.other_owner, "Other ZEV")
 
     def _metering_point(self, meter_id, meter_type, participant):

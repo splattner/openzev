@@ -27,7 +27,7 @@ SECRET = pyotp.random_base32()
 @override_settings(MFA_ENCRYPTION_KEYS=[Fernet.generate_key().decode()])
 class TotpDeviceTests(TestCase):
     def setUp(self):
-        self.user = make_user("totp_device_user", UserRole.PARTICIPANT)
+        self.user = make_user("totp_device_user", UserRole.USER)
         self.device = TotpDevice(user=self.user)
         self.device.set_secret(SECRET)
         self.device.save()
@@ -99,7 +99,7 @@ class MfaRecoveryCodeTests(TestCase):
     def test_hash_round_trips_via_the_shared_api_key_hasher(self):
         """Spec §4.3: reuse api_keys.hash_secret/verify_secret rather than a
         second hashing path."""
-        user = make_user("mfa_recovery_user", UserRole.PARTICIPANT)
+        user = make_user("mfa_recovery_user", UserRole.USER)
         plaintext = secrets.token_hex(5)
         code = MfaRecoveryCode.objects.create(user=user, code_hash=hash_secret(plaintext))
 
@@ -107,7 +107,7 @@ class MfaRecoveryCodeTests(TestCase):
         self.assertFalse(verify_secret("0" * 10, code.code_hash))
 
     def test_is_active_reflects_use(self):
-        user = make_user("mfa_recovery_use", UserRole.PARTICIPANT)
+        user = make_user("mfa_recovery_use", UserRole.USER)
         code = MfaRecoveryCode.objects.create(user=user, code_hash=hash_secret(secrets.token_hex(5)))
 
         self.assertTrue(code.is_active)

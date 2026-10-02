@@ -49,13 +49,13 @@ class AdminUserListTests(TestCase):
         return {row["username"]: row for row in response.json()["results"]}
 
     def test_account_without_any_community_has_no_memberships(self):
-        make_user("ual_loner", UserRole.GUEST)
+        make_user("ual_loner", UserRole.USER)
         self.assertEqual(self._rows()["ual_loner"]["memberships"], [])
 
     def test_participant_membership_names_the_community_and_the_participant(self):
-        owner = make_user("ual_owner", UserRole.ZEV_OWNER)
+        owner = make_user("ual_owner", UserRole.USER)
         zev = Zev.objects.create(name="Sonnenberg", owner=owner, zev_type="vzev", invoice_prefix="S")
-        tenant = make_user("ual_tenant", UserRole.PARTICIPANT)
+        tenant = make_user("ual_tenant", UserRole.USER)
         participant = _participant(zev, tenant)
 
         self.assertEqual(
@@ -69,7 +69,7 @@ class AdminUserListTests(TestCase):
     def test_owner_who_is_also_their_own_participant_is_one_membership(self):
         # Two relations, one community: reading it as two roles is the
         # confusion the list exists to remove.
-        owner = make_user("ual_owner2", UserRole.ZEV_OWNER)
+        owner = make_user("ual_owner2", UserRole.USER)
         zev = Zev.objects.create(name="Alpenblick", owner=owner, zev_type="vzev", invoice_prefix="A")
         participant = _participant(zev, owner, "Olga", "Owner")
 
@@ -82,7 +82,7 @@ class AdminUserListTests(TestCase):
         )
 
     def test_owner_of_several_communities_lists_each_sorted_by_name(self):
-        owner = make_user("ual_multi", UserRole.ZEV_OWNER)
+        owner = make_user("ual_multi", UserRole.USER)
         for name in ("Zermatt", "alpha", "Bern"):
             Zev.objects.create(name=name, owner=owner, zev_type="vzev", invoice_prefix=name[:1].upper())
 
@@ -91,9 +91,9 @@ class AdminUserListTests(TestCase):
         self.assertTrue(all(m["access"] == "manager" and m["participants"] == [] for m in memberships))
 
     def test_mfa_methods_report_only_confirmed_totp_and_passkeys(self):
-        both = make_user("ual_both", UserRole.PARTICIPANT)
-        pending = make_user("ual_pending", UserRole.PARTICIPANT)
-        make_user("ual_none", UserRole.PARTICIPANT)
+        both = make_user("ual_both", UserRole.USER)
+        pending = make_user("ual_pending", UserRole.USER)
+        make_user("ual_none", UserRole.USER)
         with override_settings(MFA_ENCRYPTION_KEYS=[_fernet_key()]):
             for user, confirmed in ((both, True), (pending, False)):
                 device = TotpDevice(user=user, confirmed_at=timezone.now() if confirmed else None)
@@ -109,8 +109,8 @@ class AdminUserListTests(TestCase):
         self.assertEqual(rows["ual_none"]["mfa_methods"], [])
 
     def test_last_login_is_exposed_and_null_before_the_first_sign_in(self):
-        make_user("ual_never", UserRole.PARTICIPANT)
-        signed_in = make_user("ual_signed_in", UserRole.PARTICIPANT)
+        make_user("ual_never", UserRole.USER)
+        signed_in = make_user("ual_signed_in", UserRole.USER)
         signed_in.last_login = timezone.now()
         signed_in.save(update_fields=["last_login"])
 
@@ -120,10 +120,10 @@ class AdminUserListTests(TestCase):
 
     def test_query_count_does_not_grow_with_the_number_of_accounts(self):
         def build(prefix, n):
-            owner = make_user(f"{prefix}_owner", UserRole.ZEV_OWNER)
+            owner = make_user(f"{prefix}_owner", UserRole.USER)
             zev = Zev.objects.create(name=f"Z {prefix}", owner=owner, zev_type="vzev", invoice_prefix=prefix[:2].upper())
             for i in range(n):
-                tenant = make_user(f"{prefix}_t{i}", UserRole.PARTICIPANT)
+                tenant = make_user(f"{prefix}_t{i}", UserRole.USER)
                 _participant(zev, tenant, f"T{i}", prefix)
                 WebAuthnCredential.objects.create(
                     user=tenant, credential_id=secrets.token_bytes(32), public_key=b"pk", sign_count=0, name="k",
@@ -181,19 +181,19 @@ class MfaComplianceFieldTests(TestCase):
             )
 
     def test_none_when_the_policy_is_off(self):
-        make_user("mc_free", UserRole.PARTICIPANT)
+        make_user("mc_free", UserRole.USER)
         self.assertIsNone(self._rows()["mc_free"]["mfa_compliance"])
 
     def test_grace_before_the_deadline(self):
         self._set_policy(mfa_required=True, mfa_grace_period_days=30)
-        make_user("mc_grace", UserRole.PARTICIPANT)
+        make_user("mc_grace", UserRole.USER)
         entry = self._rows()["mc_grace"]["mfa_compliance"]
         self.assertEqual(entry["status"], "grace")
         self.assertIsNotNone(entry["deadline"])
 
     def test_overdue_once_the_grace_period_has_passed(self):
         self._set_policy(mfa_required=True, mfa_grace_period_days=1, changed_days_ago=400)
-        stale = make_user("mc_overdue", UserRole.PARTICIPANT)
+        stale = make_user("mc_overdue", UserRole.USER)
         from datetime import timedelta
 
         from django.utils import timezone
@@ -203,7 +203,7 @@ class MfaComplianceFieldTests(TestCase):
 
     def test_compliant_once_enrolled_regardless_of_the_deadline(self):
         self._set_policy(mfa_required=True, mfa_grace_period_days=1, changed_days_ago=400)
-        enrolled = make_user("mc_compliant", UserRole.PARTICIPANT)
+        enrolled = make_user("mc_compliant", UserRole.USER)
         from datetime import timedelta
 
         from django.utils import timezone
@@ -218,11 +218,11 @@ class MfaComplianceFieldTests(TestCase):
     def test_field_does_not_add_a_query_per_account(self):
         self._set_policy(mfa_required=True, mfa_grace_period_days=30)
         for i in range(3):
-            make_user(f"mc_q_{i}", UserRole.PARTICIPANT)
+            make_user(f"mc_q_{i}", UserRole.USER)
         with CaptureQueriesContext(connection) as small:
             self.client.get(URL)
         for i in range(10):
-            make_user(f"mc_q_more_{i}", UserRole.PARTICIPANT)
+            make_user(f"mc_q_more_{i}", UserRole.USER)
         with CaptureQueriesContext(connection) as large:
             self.client.get(URL)
         self.assertEqual(len(small), len(large))

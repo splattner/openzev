@@ -31,9 +31,9 @@ class InvoiceRBACTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.admin = make_user("rbac_admin", UserRole.ADMIN)
-        self.owner1 = make_user("rbac_owner1", UserRole.ZEV_OWNER)
-        self.owner2 = make_user("rbac_owner2", UserRole.ZEV_OWNER)
-        self.puser = make_user("rbac_participant", UserRole.PARTICIPANT)
+        self.owner1 = make_user("rbac_owner1", UserRole.USER)
+        self.owner2 = make_user("rbac_owner2", UserRole.USER)
+        self.puser = make_user("rbac_participant", UserRole.USER)
 
         self.zev1 = make_zev(self.owner1, "ZEV-1")
         self.zev2 = make_zev(self.owner2, "ZEV-2")
@@ -304,7 +304,7 @@ class InvoiceRBACTests(TestCase):
 class InvoiceBillingIntegrationTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("billing_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("billing_owner", UserRole.USER)
         self.zev = make_zev(self.owner, "Billing ZEV")
         self.participant = make_participant(self.zev, first="Bill", last="Ing")
 

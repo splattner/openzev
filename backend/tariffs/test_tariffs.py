@@ -22,7 +22,7 @@ class TariffActionTests(TestCase):
         return User.objects.create_user(
             username=username,
             password="pass1234",
-            role=UserRole.ZEV_OWNER,
+            role=UserRole.USER,
         )
 
     def make_client(self, user: User) -> APIClient:

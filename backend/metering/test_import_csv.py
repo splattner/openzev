@@ -24,8 +24,8 @@ ZURICH = ZoneInfo("Europe/Zurich")
 class CsvImportTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.owner = make_user("csv_import_owner", UserRole.ZEV_OWNER)
-        self.other_owner = make_user("csv_import_other_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("csv_import_owner", UserRole.USER)
+        self.other_owner = make_user("csv_import_other_owner", UserRole.USER)
         auth(self.client, self.owner)
 
         self.zev = Zev.objects.create(name="CSV Import ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="C")

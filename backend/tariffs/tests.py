@@ -17,7 +17,7 @@ class TariffPermissionTests(TestCase):
 		participant = User.objects.create_user(
 			username="tariff_participant",
 			password="pass1234",
-			role=UserRole.PARTICIPANT,
+			role=UserRole.USER,
 		)
 		auth(client, participant)
 
@@ -29,7 +29,7 @@ class TariffPermissionTests(TestCase):
 		owner = User.objects.create_user(
 			username="tariff_owner",
 			password="pass1234",
-			role=UserRole.ZEV_OWNER,
+			role=UserRole.USER,
 		)
 		zev = Zev.objects.create(name="Tariff ZEV", owner=owner, zev_type="vzev")
 		auth(client, owner)
@@ -50,7 +50,7 @@ class TariffPermissionTests(TestCase):
 		owner = User.objects.create_user(
 			username="tariff_owner_3",
 			password="pass1234",
-			role=UserRole.ZEV_OWNER,
+			role=UserRole.USER,
 		)
 		zev = Zev.objects.create(name="Tariff ZEV 3", owner=owner, zev_type="vzev")
 		auth(client, owner)
@@ -73,7 +73,7 @@ class TariffPermissionTests(TestCase):
 		owner = User.objects.create_user(
 			username="tariff_owner_shared",
 			password="pass1234",
-			role=UserRole.ZEV_OWNER,
+			role=UserRole.USER,
 		)
 		zev = Zev.objects.create(name="Tariff ZEV Shared", owner=owner, zev_type="vzev")
 		auth(client, owner)
@@ -95,7 +95,7 @@ class TariffPermissionTests(TestCase):
 		owner = User.objects.create_user(
 			username="tariff_owner_shared_2",
 			password="pass1234",
-			role=UserRole.ZEV_OWNER,
+			role=UserRole.USER,
 		)
 		zev = Zev.objects.create(name="Tariff ZEV Shared 2", owner=owner, zev_type="vzev")
 		auth(client, owner)
@@ -132,7 +132,7 @@ class TariffPermissionTests(TestCase):
 		owner = User.objects.create_user(
 			username="tariff_overlap_owner",
 			password="pass1234",
-			role=UserRole.ZEV_OWNER,
+			role=UserRole.USER,
 		)
 		zev = Zev.objects.create(name="Tariff Overlap ZEV", owner=owner, zev_type="vzev")
 		auth(client, owner)
@@ -154,7 +154,7 @@ class TariffPermissionTests(TestCase):
 		owner = User.objects.create_user(
 			username="tariff_components_owner",
 			password="pass1234",
-			role=UserRole.ZEV_OWNER,
+			role=UserRole.USER,
 		)
 		zev = Zev.objects.create(name="Tariff Components ZEV", owner=owner, zev_type="vzev")
 		auth(client, owner)
@@ -176,7 +176,7 @@ class TariffPermissionTests(TestCase):
 		owner = User.objects.create_user(
 			username="tariff_seasonal_owner",
 			password="pass1234",
-			role=UserRole.ZEV_OWNER,
+			role=UserRole.USER,
 		)
 		zev = Zev.objects.create(name="Tariff Seasonal ZEV", owner=owner, zev_type="vzev")
 		auth(client, owner)
@@ -194,7 +194,7 @@ class TariffPermissionTests(TestCase):
 		owner = User.objects.create_user(
 			username="tariff_fee_overlap_owner",
 			password="pass1234",
-			role=UserRole.ZEV_OWNER,
+			role=UserRole.USER,
 		)
 		zev = Zev.objects.create(name="Tariff Fee Overlap ZEV", owner=owner, zev_type="vzev")
 		auth(client, owner)
@@ -216,7 +216,7 @@ class TariffPermissionTests(TestCase):
 		owner = User.objects.create_user(
 			username="tariff_nonoverlap_owner",
 			password="pass1234",
-			role=UserRole.ZEV_OWNER,
+			role=UserRole.USER,
 		)
 		zev = Zev.objects.create(name="Tariff NonOverlap ZEV", owner=owner, zev_type="vzev")
 		auth(client, owner)
@@ -261,7 +261,7 @@ class SplitKeyModelAndApiTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
 		self.owner = User.objects.create_user(
-			username="split_key_owner", password="pass1234", role=UserRole.ZEV_OWNER,
+			username="split_key_owner", password="pass1234", role=UserRole.USER,
 		)
 		self.zev = Zev.objects.create(name="Split Key ZEV", owner=self.owner, zev_type="vzev")
 		auth(self.client, self.owner)

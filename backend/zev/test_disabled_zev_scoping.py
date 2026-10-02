@@ -58,11 +58,11 @@ class _OwnerAndParticipant(TestCase):
     a metering point, an assignment, a tariff, a reading, and an invoice."""
 
     def setUp(self):
-        self.owner = make_user("dz_owner", UserRole.ZEV_OWNER)
+        self.owner = make_user("dz_owner", UserRole.USER)
         self.admin = make_user("dz_admin", UserRole.ADMIN)
         self.zev = Zev.objects.create(name="Disable-scoping ZEV", owner=self.owner)
 
-        self.participant_user = make_user("dz_participant", UserRole.PARTICIPANT)
+        self.participant_user = make_user("dz_participant", UserRole.USER)
         self.participant = Participant.objects.create(
             zev=self.zev, user=self.participant_user, first_name="Paula", last_name="Participant",
             email="paula@example.com", valid_from=date(2026, 1, 1),

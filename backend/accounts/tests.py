@@ -29,9 +29,9 @@ from testing.helpers import clear_vat_rates
 class UserModelTests(TestCase):
 	def test_user_role_helpers(self):
 		admin = User.objects.create_user(username="admin", password="x", role=UserRole.ADMIN)
-		owner = User.objects.create_user(username="owner", password="x", role=UserRole.ZEV_OWNER)
+		owner = User.objects.create_user(username="owner", password="x", role=UserRole.USER)
 		participant = User.objects.create_user(
-			username="participant", password="x", role=UserRole.PARTICIPANT
+			username="participant", password="x", role=UserRole.USER
 		)
 
 		self.assertTrue(admin.is_admin)
@@ -57,7 +57,7 @@ class UserModelTests(TestCase):
 				username="invalid-root",
 				email="invalid@example.com",
 				password="super-secret",
-				role=UserRole.PARTICIPANT,
+				role=UserRole.USER,
 			)
 
 
@@ -75,7 +75,7 @@ class PasswordChangeFlagTests(TestCase):
 		user = User.objects.create_user(
 			username="mustchange",
 			password="old-pass-123",
-			role=UserRole.PARTICIPANT,
+			role=UserRole.USER,
 			must_change_password=True,
 		)
 
@@ -100,7 +100,7 @@ class TokenLoginCredentialTests(TestCase):
 			username="email_login",
 			email="email-login@example.com",
 			password="pass1234",
-			role=UserRole.PARTICIPANT,
+			role=UserRole.USER,
 		)
 
 		resp = client.post(
@@ -123,7 +123,7 @@ class PasswordLoginAuditTests(TestCase):
 			username="audit_login_ok",
 			email="audit-login-ok@example.com",
 			password="pass1234",
-			role=UserRole.PARTICIPANT,
+			role=UserRole.USER,
 		)
 
 		resp = client.post(
@@ -145,7 +145,7 @@ class PasswordLoginAuditTests(TestCase):
 			username="audit_login_badpass",
 			email="audit-login-badpass@example.com",
 			password="pass1234",
-			role=UserRole.PARTICIPANT,
+			role=UserRole.USER,
 		)
 
 		resp = client.post(
@@ -182,7 +182,7 @@ class PasswordLoginAuditTests(TestCase):
 		user = User.objects.create_user(
 			username="audit_login_inactive",
 			password="pass1234",
-			role=UserRole.PARTICIPANT,
+			role=UserRole.USER,
 			is_active=False,
 		)
 
@@ -218,7 +218,7 @@ class RegistrationTests(TestCase):
 		self.assertEqual(resp.status_code, 201)
 		user = User.objects.get(email__iexact="new.owner@example.com")
 		self.assertEqual(user.username, "newowner")
-		self.assertEqual(user.role, UserRole.ZEV_OWNER)
+		self.assertEqual(user.role, UserRole.USER)
 		self.assertFalse(user.is_active)
 		self.assertTrue(user.must_change_password)
 		self.assertGreaterEqual(len(mail.outbox), 1)
@@ -249,7 +249,7 @@ class RegistrationTests(TestCase):
 			username="existing.owner",
 			email="existing.owner@example.com",
 			password="pass1234",
-			role=UserRole.ZEV_OWNER,
+			role=UserRole.USER,
 		)
 		client = APIClient()
 
@@ -268,7 +268,7 @@ class RegistrationTests(TestCase):
 			username="username_login",
 			email="username-login@example.com",
 			password="pass1234",
-			role=UserRole.PARTICIPANT,
+			role=UserRole.USER,
 		)
 
 		resp = client.post(
@@ -307,7 +307,7 @@ class FeatureFlagsApiTests(TestCase):
 		self.assertEqual(resp.status_code, 401)
 
 		# Non-admin authenticated callers are denied with 403.
-		User.objects.create_user(username="owner_ff", password="pass1234", role=UserRole.ZEV_OWNER)
+		User.objects.create_user(username="owner_ff", password="pass1234", role=UserRole.USER)
 		_cookie_auth(client, "owner_ff", "pass1234")
 		resp = client.get("/api/v1/auth/feature-flags/")
 		self.assertEqual(resp.status_code, 403)
@@ -368,7 +368,7 @@ class ImpersonationTests(TestCase):
 	def test_admin_can_impersonate_participant(self):
 		client = APIClient()
 		admin = User.objects.create_user(username="admin_imp", password="pass1234", role=UserRole.ADMIN)
-		participant = User.objects.create_user(username="part_imp", password="pass1234", role=UserRole.PARTICIPANT)
+		participant = User.objects.create_user(username="part_imp", password="pass1234", role=UserRole.USER)
 		self._auth(client, admin)
 
 		resp = client.post(f"/api/v1/auth/users/{participant.id}/impersonate/")
@@ -381,8 +381,8 @@ class ImpersonationTests(TestCase):
 
 	def test_non_admin_cannot_impersonate(self):
 		client = APIClient()
-		owner = User.objects.create_user(username="owner_imp", password="pass1234", role=UserRole.ZEV_OWNER)
-		participant = User.objects.create_user(username="part_imp_2", password="pass1234", role=UserRole.PARTICIPANT)
+		owner = User.objects.create_user(username="owner_imp", password="pass1234", role=UserRole.USER)
+		participant = User.objects.create_user(username="part_imp_2", password="pass1234", role=UserRole.USER)
 		self._auth(client, owner)
 
 		resp = client.post(f"/api/v1/auth/users/{participant.id}/impersonate/")
@@ -392,7 +392,7 @@ class ImpersonationTests(TestCase):
 	def test_admin_cannot_impersonate_non_participant(self):
 		client = APIClient()
 		admin = User.objects.create_user(username="admin_imp_2", password="pass1234", role=UserRole.ADMIN)
-		owner = User.objects.create_user(username="owner_imp_2", password="pass1234", role=UserRole.ZEV_OWNER)
+		owner = User.objects.create_user(username="owner_imp_2", password="pass1234", role=UserRole.USER)
 		self._auth(client, admin)
 
 		resp = client.post(f"/api/v1/auth/users/{owner.id}/impersonate/")
@@ -419,9 +419,9 @@ class LinkedAccountSafetyTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
 		self.admin = User.objects.create_user(username="admin_safety", password="pass1234", role=UserRole.ADMIN)
-		self.owner = User.objects.create_user(username="owner_safety", password="pass1234", role=UserRole.ZEV_OWNER)
-		self.linked_account = User.objects.create_user(username="linked_account", password="pass1234", role=UserRole.PARTICIPANT)
-		self.unlinked_account = User.objects.create_user(username="unlinked_account", password="pass1234", role=UserRole.PARTICIPANT)
+		self.owner = User.objects.create_user(username="owner_safety", password="pass1234", role=UserRole.USER)
+		self.linked_account = User.objects.create_user(username="linked_account", password="pass1234", role=UserRole.USER)
+		self.unlinked_account = User.objects.create_user(username="unlinked_account", password="pass1234", role=UserRole.USER)
 
 		zev = Zev.objects.create(name="Safety ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="S")
 		Participant.objects.create(
@@ -438,13 +438,13 @@ class LinkedAccountSafetyTests(TestCase):
 	def test_admin_can_edit_linked_account(self):
 		resp = self.client.patch(
 			f"/api/v1/auth/users/{self.linked_account.id}/",
-			{"first_name": "Updated", "role": "zev_owner"},
+			{"first_name": "Updated", "role": "user"},
 			format="json",
 		)
 		self.assertEqual(resp.status_code, 200)
 		self.linked_account.refresh_from_db()
 		self.assertEqual(self.linked_account.first_name, "Updated")
-		self.assertEqual(self.linked_account.role, "zev_owner")
+		self.assertEqual(self.linked_account.role, "user")
 
 	def test_admin_cannot_delete_linked_account(self):
 		resp = self.client.delete(f"/api/v1/auth/users/{self.linked_account.id}/")
@@ -496,7 +496,7 @@ class LinkedAccountSafetyTests(TestCase):
 	def test_admin_cannot_change_own_role_via_user_detail(self):
 		resp = self.client.patch(
 			f"/api/v1/auth/users/{self.admin.id}/",
-			{"role": UserRole.PARTICIPANT},
+			{"role": UserRole.USER},
 			format="json",
 		)
 		self.assertEqual(resp.status_code, 400)
@@ -504,7 +504,7 @@ class LinkedAccountSafetyTests(TestCase):
 	def test_admin_cannot_change_own_role_via_me(self):
 		resp = self.client.patch(
 			"/api/v1/auth/me/",
-			{"role": UserRole.PARTICIPANT},
+			{"role": UserRole.USER},
 			format="json",
 		)
 		self.assertEqual(resp.status_code, 400)
@@ -514,11 +514,11 @@ class MeEndpointParticipantContextTests(TestCase):
 	def _auth(self, client, user, password="pass1234"):
 		_cookie_auth(client, user.username, password)
 
-	def test_participant_me_includes_community_name(self):
+	def test_participant_me_lists_its_community(self):
 		client = APIClient()
-		owner = User.objects.create_user(username="owner_me", password="pass1234", role=UserRole.ZEV_OWNER)
+		owner = User.objects.create_user(username="owner_me", password="pass1234", role=UserRole.USER)
 		zev = Zev.objects.create(name="Context ZEV", owner=owner, zev_type="vzev", invoice_prefix="C")
-		participant_user = User.objects.create_user(username="p_me", password="pass1234", role=UserRole.PARTICIPANT)
+		participant_user = User.objects.create_user(username="p_me", password="pass1234", role=UserRole.USER)
 		Participant.objects.create(
 			zev=zev,
 			user=participant_user,
@@ -532,8 +532,10 @@ class MeEndpointParticipantContextTests(TestCase):
 		resp = client.get("/api/v1/auth/me/")
 
 		self.assertEqual(resp.status_code, 200)
-		self.assertEqual(resp.data["zev_name"], "Context ZEV")
-		self.assertEqual(resp.data["zev_count"], 1)
+		self.assertEqual([m["zev_name"] for m in resp.data["memberships"]], ["Context ZEV"])
+		# The single-community name and count gave way to memberships (#761).
+		self.assertNotIn("zev_name", resp.data)
+		self.assertNotIn("zev_count", resp.data)
 
 	def test_admin_me_has_no_community_name(self):
 		client = APIClient()
@@ -544,24 +546,24 @@ class MeEndpointParticipantContextTests(TestCase):
 
 		self.assertEqual(resp.status_code, 200)
 		self.assertNotIn("zev_name", resp.data)
+		self.assertEqual(resp.data["memberships"], [])
 
-	def test_participant_without_membership_has_no_community_name(self):
+	def test_account_without_membership_lists_none(self):
 		client = APIClient()
-		participant_user = User.objects.create_user(username="p_lone", password="pass1234", role=UserRole.PARTICIPANT)
+		participant_user = User.objects.create_user(username="p_lone", password="pass1234", role=UserRole.USER)
 
 		self._auth(client, participant_user)
 		resp = client.get("/api/v1/auth/me/")
 
 		self.assertEqual(resp.status_code, 200)
-		self.assertNotIn("zev_name", resp.data)
-		self.assertEqual(resp.data["zev_count"], 0)
+		self.assertEqual(resp.data["memberships"], [])
 
-	def test_participant_with_two_memberships_reports_count(self):
+	def test_participant_with_two_memberships_lists_both(self):
 		client = APIClient()
-		owner = User.objects.create_user(username="owner_multi", password="pass1234", role=UserRole.ZEV_OWNER)
+		owner = User.objects.create_user(username="owner_multi", password="pass1234", role=UserRole.USER)
 		first_zev = Zev.objects.create(name="First ZEV", owner=owner, zev_type="vzev", invoice_prefix="F")
 		second_zev = Zev.objects.create(name="Second ZEV", owner=owner, zev_type="vzev", invoice_prefix="S")
-		participant_user = User.objects.create_user(username="p_multi", password="pass1234", role=UserRole.PARTICIPANT)
+		participant_user = User.objects.create_user(username="p_multi", password="pass1234", role=UserRole.USER)
 		Participant.objects.create(
 			zev=first_zev,
 			user=participant_user,
@@ -583,8 +585,7 @@ class MeEndpointParticipantContextTests(TestCase):
 		resp = client.get("/api/v1/auth/me/")
 
 		self.assertEqual(resp.status_code, 200)
-		self.assertEqual(resp.data["zev_name"], "Second ZEV")
-		self.assertEqual(resp.data["zev_count"], 2)
+		self.assertEqual([m["zev_name"] for m in resp.data["memberships"]], ["First ZEV", "Second ZEV"])
 
 
 class AppSettingsTests(TestCase):
@@ -594,7 +595,7 @@ class AppSettingsTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
 		self.admin = User.objects.create_user(username="admin_settings", password="pass1234", role=UserRole.ADMIN)
-		self.owner = User.objects.create_user(username="owner_settings", password="pass1234", role=UserRole.ZEV_OWNER)
+		self.owner = User.objects.create_user(username="owner_settings", password="pass1234", role=UserRole.USER)
 
 	def test_authenticated_user_can_read_settings(self):
 		self._auth(self.client, self.owner)
@@ -644,7 +645,7 @@ class VatRateSettingsTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
 		self.admin = User.objects.create_user(username="admin_vat", password="pass1234", role=UserRole.ADMIN)
-		self.owner = User.objects.create_user(username="owner_vat", password="pass1234", role=UserRole.ZEV_OWNER)
+		self.owner = User.objects.create_user(username="owner_vat", password="pass1234", role=UserRole.USER)
 		clear_vat_rates()
 
 	def test_admin_can_crud_vat_rates(self):
@@ -720,7 +721,7 @@ class OAuthProviderConfigTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
 		self.admin = User.objects.create_user(username="admin_oauth", password="pass1234", role=UserRole.ADMIN)
-		self.owner = User.objects.create_user(username="owner_oauth", password="pass1234", role=UserRole.ZEV_OWNER)
+		self.owner = User.objects.create_user(username="owner_oauth", password="pass1234", role=UserRole.USER)
 
 	def test_admin_can_create_provider_with_internal_host_urls(self):
 		self._auth(self.client, self.admin)
@@ -962,8 +963,8 @@ class UserListCreateAdminOnlyTests(TestCase):
 
 	def setUp(self):
 		self.admin = User.objects.create_user(username="ul_admin", password="pass1234", role=UserRole.ADMIN)
-		self.owner = User.objects.create_user(username="ul_owner", password="pass1234", role=UserRole.ZEV_OWNER)
-		self.participant_user = User.objects.create_user(username="ul_participant", password="pass1234", role=UserRole.PARTICIPANT)
+		self.owner = User.objects.create_user(username="ul_owner", password="pass1234", role=UserRole.USER)
+		self.participant_user = User.objects.create_user(username="ul_participant", password="pass1234", role=UserRole.USER)
 
 		self.admin_client = APIClient()
 		_cookie_auth(self.admin_client, "ul_admin")
@@ -988,7 +989,7 @@ class UserListCreateAdminOnlyTests(TestCase):
 		response = self.owner_client.post(
 			"/api/v1/auth/users/",
 			{"username": "ul_backdoor", "email": "backdoor@example.com", "first_name": "Back",
-			 "last_name": "Door", "password": "pass1234", "password2": "pass1234", "role": "participant"},
+			 "last_name": "Door", "password": "pass1234", "password2": "pass1234", "role": "user"},
 			format="json",
 		)
 		self.assertEqual(response.status_code, 403)
@@ -1004,7 +1005,7 @@ class UserListCreateAdminOnlyTests(TestCase):
 		response = self.admin_client.post(
 			"/api/v1/auth/users/",
 			{"username": "ul_created", "email": "created@example.com", "first_name": "New",
-			 "last_name": "User", "password": "Uniquely-Long-9164!", "password2": "Uniquely-Long-9164!", "role": "participant"},
+			 "last_name": "User", "password": "Uniquely-Long-9164!", "password2": "Uniquely-Long-9164!", "role": "user"},
 			format="json",
 		)
 		self.assertEqual(response.status_code, 201, response.content)
@@ -1019,9 +1020,9 @@ class RbacEndpointMatrixTests(TestCase):
 		self.clients = {}
 
 		self.admin = User.objects.create_user(username="rbac_matrix_admin", password="pass1234", role=UserRole.ADMIN)
-		self.owner = User.objects.create_user(username="rbac_matrix_owner", password="pass1234", role=UserRole.ZEV_OWNER)
-		self.participant_user = User.objects.create_user(username="rbac_matrix_participant", password="pass1234", role=UserRole.PARTICIPANT)
-		self.guest = User.objects.create_user(username="rbac_matrix_guest", password="pass1234", role=UserRole.GUEST)
+		self.owner = User.objects.create_user(username="rbac_matrix_owner", password="pass1234", role=UserRole.USER)
+		self.participant_user = User.objects.create_user(username="rbac_matrix_participant", password="pass1234", role=UserRole.USER)
+		self.guest = User.objects.create_user(username="rbac_matrix_guest", password="pass1234", role=UserRole.USER)
 
 		self.zev = Zev.objects.create(name="RBAC Matrix ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="R")
 		self.participant = Participant.objects.create(
@@ -1270,7 +1271,7 @@ class OAuthTokenCleanupTaskTests(TestCase):
 			username="oauth-cleanup-user",
 			email="oauth-cleanup@example.com",
 			password="pass1234",
-			role=UserRole.PARTICIPANT,
+			role=UserRole.USER,
 		)
 
 		expired_state = OAuthState.objects.create(state="expired-state", provider=provider)
@@ -1306,16 +1307,16 @@ class PreferredZevApiTests(TestCase):
 		from testing.helpers import authenticate
 
 		self.owner = User.objects.create_user(
-			username="pref_owner", password="pass1234", role=UserRole.ZEV_OWNER
+			username="pref_owner", password="pass1234", role=UserRole.USER
 		)
 		self.other_owner = User.objects.create_user(
-			username="pref_other_owner", password="pass1234", role=UserRole.ZEV_OWNER
+			username="pref_other_owner", password="pass1234", role=UserRole.USER
 		)
 		self.admin = User.objects.create_user(
 			username="pref_admin", password="pass1234", role=UserRole.ADMIN
 		)
 		self.participant = User.objects.create_user(
-			username="pref_participant", password="pass1234", role=UserRole.PARTICIPANT
+			username="pref_participant", password="pass1234", role=UserRole.USER
 		)
 		self.zev = Zev.objects.create(name="Preferred ZEV", owner=self.owner)
 		self.other_zev = Zev.objects.create(name="Somebody Else's ZEV", owner=self.other_owner)
