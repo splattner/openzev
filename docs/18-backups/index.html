@@ -2360,8 +2360,7 @@ backup one.</p>
    switch that appears.</li>
 <li><em>cannot be overridden</em> — going ahead would damage something else: a <strong>meter
    id</strong> in the backup that now belongs to another community, a price source the
-   backup refers to that no longer exists, an <strong>owner</strong> with no matching account
-   (when the community has to be recreated), or an <strong>export or another restore</strong>
+   backup refers to that no longer exists, or an <strong>export or another restore</strong>
    running for that community. Resolve these first, then preview again.</li>
 </ul>
 </li>
@@ -2378,10 +2377,10 @@ backup one.</p>
 <p>A backup refers to people by an internal number that means nothing elsewhere, so
 a restore looks each person up <strong>by email address</strong> (then username) among today's
 accounts and links them again. Someone with no matching account is listed in the
-preview and left unlinked — a restore <strong>never creates an account</strong>. If the
-community's owner has no matching account, an existing community keeps its
-current owner; a community that has to be recreated cannot be, until the owner's
-account exists.</p>
+preview and left unlinked — a restore <strong>never creates an account</strong>. Who may
+manage the community is not restored either: an existing community keeps its
+managers, and a recreated one has none until an admin grants access in
+<strong>ZEV Settings → Access</strong>.</p>
 <h3 id="what-else-to-know">What else to know<a class="headerlink" href="#what-else-to-know" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>A deleted community is recreated</strong> with everything the backup holds. Its old

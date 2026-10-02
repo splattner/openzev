@@ -2426,12 +2426,14 @@ to the matching hub tab.</p>
 <li><strong>Step 3</strong> — optionally add initial metering points for the responsible person</li>
 <li><strong>Step 4</strong> — review, then click <strong>Create ZEV</strong></li>
 </ol>
-<p>The system creates the ZEV, the responsible-person account — the ZEV's owner
-and manager — with a temporary password, its participant record, and the listed
-metering points. The temporary password is shown once at the end — pass it on
+<p>The system creates the ZEV, the responsible-person account — the ZEV's manager —
+with a temporary password, its participant record (the issuer of the ZEV's
+invoices and contracts), and the listed metering points. The temporary password is shown once at the end — pass it on
 to the responsible person, who sets their own password at first sign-in.</p>
-<p>Admins can also create a bare ZEV (without the wizard) through the API,
-assigning an existing user as owner.</p>
+<p>Admins can also create a bare ZEV (without the wizard) through the API. Nobody
+manages it until an admin grants access in <strong>ZEV Settings → Access</strong>.</p>
+<p>The ZEV list shows each community's <strong>issuer</strong> — whom its invoices and contracts
+are from.</p>
 <p><img alt="Admin ZEV management" src="../screenshots/15-admin-zevs.png" /></p>
 <h2 id="dynamic-price-sources">Dynamic Price Sources<a class="headerlink" href="#dynamic-price-sources" title="Permanent link">&para;</a></h2>
 <p><strong>Platform → Overview → Dynamic prices</strong> (<code>/admin/dynamic-sources</code>) is the
