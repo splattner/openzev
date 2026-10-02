@@ -1700,8 +1700,8 @@ can tell (<code>404</code>, whether or not they are signed in).</p>
    if it ever leaks.</li>
 <li>Choose <strong>Create key</strong> and copy the value shown — it is not shown again.</li>
 </ol>
-<p>Only <code>admin</code> and <code>zev_owner</code> accounts can use the MCP endpoint. A
-participant's key is refused with <code>403</code>.</p>
+<p>Only admins and accounts that manage or view a community can use the MCP
+endpoint. A participant's key is refused with <code>403</code>.</p>
 <h2 id="connecting-a-client">Connecting a client<a class="headerlink" href="#connecting-a-client" title="Permanent link">&para;</a></h2>
 <p>The endpoint is <code>https://&lt;your-openzev-host&gt;/api/v1/mcp/</code>, speaking MCP's
 <em>Streamable HTTP</em> transport. Send the key as a bearer token.</p>
@@ -1845,7 +1845,7 @@ assistant itself, since <code>audit_query</code> can answer that question too.</
 </tr>
 <tr>
 <td><code>403</code></td>
-<td>You are signed in as a participant, or your key's account role changed. Only <code>admin</code> and <code>zev_owner</code> can use MCP.</td>
+<td>Your key's account manages or views no community (for example, it is only a participant), or its access was removed. Only admins, managers and viewers can use MCP.</td>
 </tr>
 <tr>
 <td>The assistant says a tool failed with "Permission denied" or "not found"</td>
