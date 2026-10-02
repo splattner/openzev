@@ -439,6 +439,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="User Roles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#access-per-community-managers-and-viewers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access per community: managers and viewers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1869,6 +1886,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="User Roles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#access-per-community-managers-and-viewers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access per community: managers and viewers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2429,6 +2463,41 @@
 no domain access and is used when an account is not (or no longer) linked to a
 ZEV or participant.</p>
 </blockquote>
+<h3 id="access-per-community-managers-and-viewers">Access per community: managers and viewers<a class="headerlink" href="#access-per-community-managers-and-viewers" title="Permanent link">&para;</a></h3>
+<p>What an account may do in a community comes from its <strong>relation to that
+community</strong>, not from one role for the whole platform. One account can have
+different relations in different communities — for example manage one ZEV and
+rent a flat in another, or be a tenant in two communities.</p>
+<table>
+<thead>
+<tr>
+<th>Relation</th>
+<th>What it allows in that community</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Manager</strong></td>
+<td>Everything a ZEV owner can do: participants, metering, tariffs, invoices, settings, and giving others access</td>
+</tr>
+<tr>
+<td><strong>Viewer</strong></td>
+<td>Sees everything a manager sees and may download and export, but changes nothing</td>
+</tr>
+<tr>
+<td><strong>Participant</strong></td>
+<td>Own consumption, own invoices and annual statement</td>
+</tr>
+<tr>
+<td><strong>Former participant</strong></td>
+<td>Own invoices that were sent, after leaving the community</td>
+</tr>
+</tbody>
+</table>
+<p>Managers and viewers get their access from the community's managers (or an
+admin) under <strong>ZEV settings → Access</strong> — see
+<a href="../02-zev-setup/#access-tab">Access tab</a>. The ZEV's owner is a manager
+automatically. Participants get theirs by being linked to a participant entry.</p>
 <h2 id="admin-role">Admin Role<a class="headerlink" href="#admin-role" title="Permanent link">&para;</a></h2>
 <p><strong>Admins</strong> have unrestricted access to the entire system.</p>
 <h3 id="admin-capabilities">Admin Capabilities<a class="headerlink" href="#admin-capabilities" title="Permanent link">&para;</a></h3>
@@ -2558,7 +2627,8 @@ has no access to a ZEV's data until an admin links it to a participant.</p>
 <tr>
 <th>Feature</th>
 <th>Admin</th>
-<th>ZEV Owner</th>
+<th>Manager (ZEV Owner)</th>
+<th>Viewer</th>
 <th>Participant</th>
 </tr>
 </thead>
@@ -2566,48 +2636,56 @@ has no access to a ZEV's data until an admin links it to a participant.</p>
 <tr>
 <td><strong>Participants</strong></td>
 <td>View all</td>
-<td>View own ZEV</td>
+<td>Manage in the ZEV</td>
+<td>View in the ZEV</td>
 <td>View self</td>
 </tr>
 <tr>
 <td><strong>Metering Points</strong></td>
 <td>View all</td>
-<td>View own ZEV</td>
+<td>Manage in the ZEV</td>
+<td>View in the ZEV</td>
 <td>View own meters</td>
 </tr>
 <tr>
 <td><strong>Metering Data</strong></td>
 <td>View all</td>
-<td>View own ZEV</td>
+<td>Import and view in the ZEV</td>
+<td>View in the ZEV</td>
 <td>View own readings</td>
 </tr>
 <tr>
 <td><strong>Tariffs</strong></td>
 <td>View all</td>
-<td>Create/edit own ZEV</td>
+<td>Create/edit in the ZEV</td>
+<td>View, download the overview</td>
 <td>View only</td>
 </tr>
 <tr>
 <td><strong>Invoices</strong></td>
 <td>View all</td>
-<td>Create own ZEV</td>
+<td>Create, approve, send in the ZEV</td>
+<td>View, download PDFs</td>
 <td>View own only</td>
 </tr>
 <tr>
 <td><strong>Email Templates</strong></td>
 <td>Manage defaults</td>
-<td>Customize own ZEV</td>
+<td>Customize in the ZEV</td>
+<td>View</td>
 <td>—</td>
 </tr>
 <tr>
 <td><strong>Settings</strong></td>
 <td>Global settings</td>
-<td>Own ZEV settings</td>
+<td>ZEV settings, give access</td>
+<td>View</td>
 <td>Account profile</td>
 </tr>
 <tr>
 <td><strong>Admin Panel</strong></td>
 <td>Full access</td>
+<td>—</td>
 <td>—</td>
 <td>—</td>
 </tr>
@@ -2846,20 +2924,27 @@ credentials and stay valid — see <a href="../16-api-keys/">API keys</a>.</p>
 <li>Can assign ZEV Owners to specific communities</li>
 <li>Can monitor cross-ZEV metrics and KPIs</li>
 </ul>
-<p><strong>ZEV Owner perspective:</strong></p>
+<p><strong>Manager, viewer and participant perspective:</strong></p>
 <ul>
-<li>Use the ZEV switcher (sidebar top) to switch between assigned ZEVs</li>
+<li>The community switcher (sidebar top) lists every community your account
+  relates to, with your relation (Manager, Viewer, Participant, Former
+  participant) under each name</li>
+<li>The navigation follows the selected community: management pages for a
+  manager or viewer, your dashboard and invoices for a participant, only your
+  invoices for a former participant</li>
 <li>Each ZEV has isolated data</li>
-<li>Can be assigned to manage 1 or many ZEVs</li>
+<li>With only one community there is nothing to switch, and the switcher is
+  hidden</li>
 </ul>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="cannot-access-feature-permission-error">"Cannot access [feature]" (permission error)<a class="headerlink" href="#cannot-access-feature-permission-error" title="Permanent link">&para;</a></h3>
 <p>Ask an admin to check your account's <strong>Platform role</strong> and communities under
 <strong>Platform → Accounts → Users</strong>. If the role is wrong, they can change it there.</p>
 <h3 id="cannot-see-other-zevs">"Cannot see other ZEVs"<a class="headerlink" href="#cannot-see-other-zevs" title="Permanent link">&para;</a></h3>
-<p><strong>Expected behavior:</strong> ZEV Owners are scoped to the ZEVs they own.</p>
-<p><strong>If you need access:</strong> ask an admin to make you the owner of that ZEV
-(<strong>Platform → Overview → ZEVs</strong>).</p>
+<p><strong>Expected behavior:</strong> you see the communities you manage, view or take part
+in — nothing else.</p>
+<p><strong>If you need access:</strong> ask a manager of that ZEV (or an admin) to give you
+access under <strong>ZEV settings → Access</strong>.</p>
 <h3 id="user-cannot-login">"User cannot login"<a class="headerlink" href="#user-cannot-login" title="Permanent link">&para;</a></h3>
 <p><strong>Possible causes:</strong></p>
 <ul>
