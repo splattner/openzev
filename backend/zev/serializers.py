@@ -2,7 +2,9 @@ from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .geocoding import get_cached_building_footprint
 from .grid_operators import grid_operator_ids
-from .models import Zev, Participant, Party, PartyKind, PartyTitle, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode
+from django.utils import timezone
+
+from .models import Zev, Participant, Party, PartyKind, PartyTitle, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode, ZevPartyRole
 from .services import create_zev_with_owner_setup, ensure_participant_account, has_its_own_login
 from .tasks import trigger_geocode_if_address_present
 from .iban import (
@@ -139,6 +141,15 @@ class MeteringPointAssignmentSerializer(serializers.ModelSerializer):
 
         return attrs
 
+def current_roles(party) -> list[dict]:
+    """``party``'s roles active today or later (#761); reads ``party.roles``
+    from a prefetch when there is one."""
+    today = timezone.localdate()
+    rows = [row for row in party.roles.all() if row.valid_to is None or row.valid_to >= today]
+    rows.sort(key=lambda row: (row.role, row.valid_from))
+    return [{"id": str(row.pk), "role": row.role, "valid_from": row.valid_from, "valid_to": row.valid_to} for row in rows]
+
+
 class ParticipantSerializer(serializers.ModelSerializer):
     account_username = serializers.CharField(source="user.username", read_only=True)
     full_name = serializers.ReadOnlyField()
@@ -164,6 +175,10 @@ class ParticipantSerializer(serializers.ModelSerializer):
     building_footprint = serializers.SerializerMethodField()
     onboarding_status = serializers.SerializerMethodField()
     onboarding_link_expires_at = serializers.SerializerMethodField()
+    roles = serializers.SerializerMethodField()
+
+    def get_roles(self, obj):
+        return current_roles(obj.party)
 
     def _latest_token(self, obj):
         if "_onboarding_token_cache" not in obj.__dict__:
@@ -298,6 +313,7 @@ class ParticipantSerializer(serializers.ModelSerializer):
             "metering_points",
             "has_metering_point_assignment",
             "building_footprint",
+            "roles",
             "created_at",
             "updated_at",
         ]
@@ -309,12 +325,50 @@ class ParticipantSerializer(serializers.ModelSerializer):
             "onboarding_link_expires_at",
             "full_name",
             "display_name",
+            "roles",
             "metering_points",
             "has_metering_point_assignment",
             "building_footprint",
             "created_at",
             "updated_at",
         ]
+
+
+class PartySerializer(serializers.ModelSerializer):
+    """A person or organisation of a ZEV with its participations and roles (#761)."""
+
+    display_name = serializers.ReadOnlyField()
+    participations = serializers.SerializerMethodField()
+    roles = serializers.SerializerMethodField()
+
+    def get_participations(self, obj):
+        return [
+            {"id": str(row.pk), "valid_from": row.valid_from, "valid_to": row.valid_to}
+            for row in sorted(obj.participations.all(), key=lambda row: (row.valid_from, str(row.pk)))
+        ]
+
+    def get_roles(self, obj):
+        return current_roles(obj)
+
+    class Meta:
+        model = Party
+        fields = [
+            "id", "zev", "kind", "title", "first_name", "last_name", "organisation_name", "name_addition",
+            "email", "phone", "address_line1", "address_line2", "postal_code", "city", "notes",
+            "display_name", "participations", "roles", "created_at", "updated_at",
+        ]
+        read_only_fields = fields
+
+
+class ZevPartyRoleSerializer(serializers.ModelSerializer):
+    """A party's dated role in a ZEV: issuer, representative or landowner (#761)."""
+
+    party_display_name = serializers.CharField(source="party.display_name", read_only=True)
+
+    class Meta:
+        model = ZevPartyRole
+        fields = ["id", "zev", "party", "party_display_name", "role", "valid_from", "valid_to", "created_at", "updated_at"]
+        read_only_fields = fields
 
 
 class GridOperatorSerializer(serializers.Serializer):

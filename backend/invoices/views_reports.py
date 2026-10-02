@@ -29,6 +29,7 @@ from rest_framework.views import APIView
 from accounts.permissions import HasZevAccess
 from zev import access
 from zev.models import Participant, Zev
+from zev.parties import issuer_on
 
 from .annual_report import build_annual_report
 from .annual_statement import generate_annual_statement_pdf
@@ -191,7 +192,7 @@ class FinancialSummaryView(APIView):
 
     A participant gets their own. An owner or admin must name the ZEV, and may
     name the participant; without one it falls back to their own record in that
-    ZEV, then to the ZEV owner's.
+    ZEV, then to the participation of the ZEV's issuer on 31 December.
     """
 
     permission_classes = [IsAuthenticated]
@@ -221,10 +222,13 @@ class FinancialSummaryView(APIView):
                 if error:
                     return error
             else:
-                # Default to the caller's own record in this ZEV, then the owner's.
+                # Default to the caller's own record in this ZEV, then the
+                # issuer's participation in it.
                 participant = Participant.objects.filter(user=request.user, zev=zev).first()
-                if not participant and zev.owner:
-                    participant = Participant.objects.filter(user=zev.owner, zev=zev).first()
+                if not participant:
+                    issuer = issuer_on(zev, date(year, 12, 31))
+                    if issuer is not None:
+                        participant = issuer.participations.order_by("-valid_from").first()
                 if not participant:
                     return Response(
                         {"error": "participant_id is required (no default participant found)."},

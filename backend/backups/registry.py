@@ -84,6 +84,7 @@ ZEV_SECTIONS: tuple[tuple[str, tuple[ZevPart, ...]], ...] = (
             ZevPart("zev.Party", "zev"),
             ZevPart("zev.Participant", "zev"),
             ZevPart("zev.ParticipantOnboardingToken", "participant__zev"),
+            ZevPart("zev.ZevPartyRole", "zev"),
         ),
     ),
     (

@@ -773,12 +773,14 @@ class InvoiceViewSet(
         # One conditional UPDATE per draft, each writing the issuer/recipient
         # copy a last time (frozen from approval on, #761). A draft approved
         # or deleted concurrently simply does not count.
-        issuer = build_issuer(_zev)
+        issuers = {}
         count = 0
         for draft in invoices.filter(status=InvoiceStatus.DRAFT):
+            if draft.period_end not in issuers:
+                issuers[draft.period_end] = build_issuer(_zev, draft.period_end)
             count += Invoice.objects.filter(pk=draft.pk, status=InvoiceStatus.DRAFT).update(
                 status=InvoiceStatus.APPROVED,
-                issuer=issuer,
+                issuer=issuers[draft.period_end],
                 recipient=build_recipient(draft.participant),
             )
         _record_invoice_event(

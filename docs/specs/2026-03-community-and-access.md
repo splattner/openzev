@@ -221,6 +221,11 @@ base manager) always `select_related("party")`.
 **Computed properties:** `full_name` / `display_name` → `party.display_name`;
 `name_lines` → `party.name_lines`; `get_title_display()`.
 
+**`zev.ZevPartyRole`** — a party's dated role in the ZEV (`issuer`,
+`representative`, `landowner`; at most one issuer and one representative on
+any day). Grants nothing in OpenZEV. Model, constraints and the
+`zev/parties.py` service: SPEC-2026-10-zev-parties §4.4–4.5.
+
 ### 3.6 MeteringPoint and MeteringPointAssignment
 
 Covered in `2026-03-metering-point-management.md`. Relevant to access:
@@ -1580,6 +1585,8 @@ isAdmin}`: `admin` and `manager` may read and write the management view,
 | POST | `/participants/{id}/link-account/` | admin only | Link user account to participant |
 | POST | `/participants/{id}/unlink-account/` | admin only | Unlink user account from participant |
 | POST | `/participants/{id}/create-account/` | admin only | Create + link user account |
+| GET | `/parties/`, `/parties/{id}/` | IsAuthenticated, BaseZevScopedPermission (managers and viewers; no participant link) | A ZEV's parties with their participations and current roles — read-only (SPEC-2026-10-zev-parties §5.2) |
+| GET | `/party-roles/`, `/party-roles/{id}/` | IsAuthenticated, BaseZevScopedPermission (managers and viewers; no participant link) | Current and future roles; `?include_ended=true` adds the history — read-only (§5.3) |
 | GET / POST | `/metering-points/` | IsAuthenticated, MeteringPointPermission | List/create metering points |
 | GET / PATCH / PUT / DELETE | `/metering-points/{id}/` | IsAuthenticated, MeteringPointPermission | Metering point detail |
 | GET / POST | `/metering-point-assignments/` | IsAuthenticated, MeteringPointAssignmentPermission | List/create assignments |
@@ -1711,6 +1718,8 @@ fields written through — `kind`, `title`, `first_name`, `last_name`,
 - `account_username` (read-only, from linked user)
 - `initial_password` (read-only, only present when account is first created)
 - `full_name`, `display_name` (read-only, the party's display name)
+- `roles` (read-only, the party's roles active today or later:
+  `[{id, role, valid_from, valid_to}]`, from the `party__roles` prefetch)
 - `metering_points` (read-only, nested `MeteringPointSerializer`)
 - `has_metering_point_assignment` (read-only, boolean)
 

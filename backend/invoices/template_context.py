@@ -32,6 +32,28 @@ class _Obj:
         return self.__dict__.get("_full_name", "")
 
 
+def _sample_issuer() -> dict:
+    """The issuer every sample document is from (#761)."""
+    return {
+        "party": "", "kind": "person", "organisation_name": "", "name_addition": "",
+        "name": "Maria Muster", "name_lines": ["Maria Muster"],
+        "address_line1": "Solarweg 1", "address_line2": "", "postal_code": "8000", "city": "Zürich",
+        "email": "maria@example.com", "phone": "+41 44 987 65 43",
+        "iban": "CH93 0076 2011 6238 5295 7", "bank_name": "Example Bank",
+        "vat_number": "CHE-123.456.789", "zev_name": "Solar Community Example", "from_participant": True,
+    }
+
+
+def _sample_representative() -> dict:
+    """The representative toward the grid operator in every sample document."""
+    return {
+        "party": "", "kind": "organisation", "organisation_name": "Verwaltung Sonnenhof AG",
+        "name_addition": "", "name": "Verwaltung Sonnenhof AG", "name_lines": ["Verwaltung Sonnenhof AG"],
+        "address_line1": "Bahnhofstrasse 10", "address_line2": "", "postal_code": "8001", "city": "Zürich",
+        "email": "info@example.com", "phone": "+41 44 111 22 33",
+    }
+
+
 def build_sample_invoice_context() -> dict:
     tr = dict(INVOICE_TRANSLATIONS.get("en", INVOICE_TRANSLATIONS["de"]))
     tr["notes_question"] = tr["notes_question"].format(email="info@example.com")
@@ -73,13 +95,8 @@ def build_sample_invoice_context() -> dict:
             bank_iban="CH93 0076 2011 6238 5295 7",
         ),
         # The invoice's copy of who it is from and to (#761).
-        "issuer": {
-            "name": "Maria Muster", "name_lines": ["Maria Muster"],
-            "address_line1": "Solarweg 1", "address_line2": "", "postal_code": "8000", "city": "Zürich",
-            "email": "maria@example.com", "phone": "+41 44 000 00 00",
-            "iban": "CH93 0076 2011 6238 5295 7", "bank_name": "Example Bank",
-            "vat_number": "CHE-123.456.789", "zev_name": "Solar Community Example", "from_participant": True,
-        },
+        "issuer": _sample_issuer(),
+        "representative": _sample_representative(),
         "recipient": {
             "name": "Hans Beispiel", "name_lines": ["Hans Beispiel"], "title": "", "first_name": "Hans",
             "last_name": "Beispiel", "address_line1": "Musterstrasse 42", "address_line2": "",
@@ -162,6 +179,8 @@ def build_sample_contract_context() -> dict:
             phone="+41 31 123 45 67",
             email="hans@example.com",
         ),
+        "issuer": _sample_issuer(),
+        "representative": _sample_representative(),
         "owner_participant": _Obj(
             full_name="Maria Muster",
 
@@ -260,6 +279,8 @@ def build_sample_annual_statement_context() -> dict:
             postal_code="3000",
             city="Bern",
         ),
+        "issuer": _sample_issuer(),
+        "representative": _sample_representative(),
         "owner_participant": _Obj(
             full_name="Maria Muster",
 

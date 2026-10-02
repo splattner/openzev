@@ -346,7 +346,9 @@ the write stays under CSRF protection (#448).
 | Key | Source |
 |---|---|
 | `participant` | The participant record |
-| `owner_participant` | ZEV owner's participant profile |
+| `issuer` | The issuer on the contract date (`build_issuer(zev, as_of)`, SPEC-2026-10-zev-parties §7.1) |
+| `representative` | The representative toward the grid operator on the contract date, or `None` |
+| `owner_participant` | Deprecated alias of `issuer` (`IssuerView`) |
 | `zev` | The ZEV record |
 | `consumption_mps` | Consumption/bidirectional metering points from assignments that are current or start in the future |
 | `production_mps` | Production metering points from assignments that are current or start in the future |
@@ -372,7 +374,7 @@ Template: `TEMPLATE_NAME = "invoices/invoice_pdf.html"` — editable by admins v
 - Loads `AppSettings.load()` for date formatting
 - Language: `invoice.zev.invoice_language or "de"`, uses `INVOICE_TRANSLATIONS[lang]`
 - Dates formatted as `_format_date_value(date, app_settings.date_format_short)` for invoice_date, period_start, period_end, due_date
-- Includes: invoice, `vat_rate_percent` (`invoice.vat_rate × 100`), items grouped by category (`grouped_items`), zev, participant, owner_participant, QR-Rechnung SVG, `inline_qr_payment` flag, invoice-number prefix/suffix split, localized `status_display`, energy comparison chart SVG, hourly profile chart SVG, energy-flow Sankey SVG, energy summary KPIs, savings data, and the translation dict (`tr`)
+- Includes: invoice, `vat_rate_percent` (`invoice.vat_rate × 100`), items grouped by category (`grouped_items`), zev, participant, issuer, recipient, representative, owner_participant (deprecated alias), QR-Rechnung SVG, `inline_qr_payment` flag, invoice-number prefix/suffix split, localized `status_display`, energy comparison chart SVG, hourly profile chart SVG, energy-flow Sankey SVG, energy summary KPIs, savings data, and the translation dict (`tr`)
 
 `generate_pdf(invoice)` renders HTML via `_render_template()`, which prefers a DB `PdfTemplate` override (rendered with `Template(content).render(Context(context))`) and falls back to `render_to_string()` for the on-disk default, then converts to PDF/A-3b via `render_pdf()` (`invoices/pdf_render.py`, shared with contract/annual-statement/financial-summary rendering).
 `save_invoice_pdf(invoice)` generates and attaches as `invoice_{number}.pdf`, writing back only `pdf_file`/`updated_at` via a conditional row update (concurrent workflow changes survive; a concurrently deleted row raises instead of being recreated).

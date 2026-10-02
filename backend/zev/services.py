@@ -198,6 +198,7 @@ def get_participant_onboarding_link(participant) -> tuple[str, ParticipantOnboar
 @transaction.atomic
 def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_points_data: list[dict]) -> dict:
     from .models import MeteringPoint, MeteringPointAssignment, Participant, Zev
+    from .parties import ensure_initial_roles
 
     first_name = owner_data['first_name']
     last_name = owner_data['last_name']
@@ -232,6 +233,7 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
         city=owner_data.get('city', ''),
         valid_from=zev.start_date,
     )
+    ensure_initial_roles(zev, owner_participant.party, zev.start_date)
 
     from .tasks import trigger_geocode_if_address_present
     trigger_geocode_if_address_present(owner_participant)
@@ -274,8 +276,12 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
 
 @transaction.atomic
 def create_zev_for_existing_owner(*, owner_user, zev_data: dict, participant_data: dict | None = None) -> dict:
-    """Create a ZEV and its owner participant for a self-registered user."""
+    """Create a ZEV and its owner participant for a self-registered user.
+
+    The owner's party is the ZEV's issuer and a landowner from its start date.
+    """
     from .models import Participant, Zev
+    from .parties import ensure_initial_roles
 
     zev = Zev.objects.create(owner=owner_user, **zev_data)
     owner_participant = Participant.objects.create(
@@ -287,6 +293,7 @@ def create_zev_for_existing_owner(*, owner_user, zev_data: dict, participant_dat
         **(participant_data or {}),
         valid_from=zev.start_date,
     )
+    ensure_initial_roles(zev, owner_participant.party, zev.start_date)
     return {
         'zev': {'id': str(zev.id), 'name': zev.name},
         'owner_participant_id': str(owner_participant.id),

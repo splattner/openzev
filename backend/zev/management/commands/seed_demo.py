@@ -48,6 +48,7 @@ from zev.models import (
     ZevAccessRole,
     ZevType,
 )
+from zev.parties import ensure_initial_roles
 
 
 
@@ -455,6 +456,7 @@ class Command(BaseCommand):
             city="Bern",
             valid_from=main_valid_from,
         )
+        ensure_initial_roles(zev, owner_participant.party, main_valid_from)
         participant_one = self._upsert_participant(
             zev=zev,
             user=participant_one_user,
@@ -878,6 +880,7 @@ class Command(BaseCommand):
             city="Bern",
             valid_from=start_date,
         )
+        ensure_initial_roles(zev, owner_participant.party, start_date)
         participant_one = self._upsert_participant(
             zev=zev,
             user=clara_user,

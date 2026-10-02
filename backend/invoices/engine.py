@@ -68,14 +68,15 @@ class InvoiceGenerationContext:
     weight_sum_by_date: dict[date, Decimal]
     weight_sums_by_tariff: dict[UUID, dict[date, Decimal]] = field(default_factory=dict)
     participant_counts_by_tariff: dict[UUID, dict[date, int]] = field(default_factory=dict)
-    # The issuer block copied onto every invoice of the batch (#761), built once.
+    # The issuer block copied onto every invoice of the batch (#761): the
+    # issuer on the period's last day, built once.
     _issuer: dict | None = field(default=None, repr=False)
     # Valid only while the current invoice holds the source locks.
     _dynamic_series_cache: "dict[UUID, _DynamicSeries]" = field(default_factory=dict, repr=False)
 
     def issuer(self, zev: Zev) -> dict:
         if self._issuer is None:
-            self._issuer = build_issuer(zev)
+            self._issuer = build_issuer(zev, self.scope[2])
         return self._issuer
 
     def dynamic_series(self, source_id: UUID) -> "_DynamicSeries":

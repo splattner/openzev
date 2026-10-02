@@ -821,3 +821,63 @@ class ZevAccessGrant(models.Model):
 
     def __str__(self):
         return f"{self.user} {self.role} {self.zev.name}"
+
+
+class PartyRole(models.TextChoices):
+    ISSUER = "issuer", "Issuer"
+    REPRESENTATIVE = "representative", "Representative"
+    LANDOWNER = "landowner", "Landowner"
+
+
+# Roles held by at most one party on any day.
+SINGLE_HOLDER_ROLES = (PartyRole.ISSUER, PartyRole.REPRESENTATIVE)
+
+
+class ZevPartyRole(models.Model):
+    """A party's role in a ZEV for a dated window (#761, ADR 0028).
+
+    ``issuer``: whom the ZEV's documents are from (name and address on
+    invoices, the QR creditor, the contract's counterparty); ``representative``:
+    who acts for the ZEV toward the grid operator; ``landowner``: an owner of
+    the land or building. Issuer and representative have at most one holder on
+    any day, landowners any number. The window is inclusive at both ends, as in
+    ADR 0001; ``valid_to`` null is open-ended. Holding a role grants nothing in
+    OpenZEV — accounts act through ``ZevAccessGrant``. Written through
+    ``zev.parties``, which keeps the windows of a single-holder role apart.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    zev = models.ForeignKey(Zev, on_delete=models.CASCADE, related_name="party_roles")
+    party = models.ForeignKey(Party, on_delete=models.CASCADE, related_name="roles")
+    role = models.CharField(max_length=20, choices=PartyRole.choices)
+    valid_from = models.DateField()
+    valid_to = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["role", "-valid_from", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=models.F("valid_from")),
+                name="party_role_window_order",
+            ),
+            models.UniqueConstraint(
+                fields=["zev", "role"],
+                condition=models.Q(valid_to__isnull=True, role__in=["issuer", "representative"]),
+                name="one_open_single_holder_role",
+            ),
+            models.UniqueConstraint(
+                fields=["zev", "party", "role"],
+                condition=models.Q(valid_to__isnull=True),
+                name="one_open_role_per_party",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.party_id and self.zev_id and self.party.zev_id != self.zev_id:
+            raise ValidationError({"party": "The party belongs to another ZEV."})
+
+    def __str__(self):
+        return f"{self.party} {self.role} {self.valid_from}–{self.valid_to or ''}"

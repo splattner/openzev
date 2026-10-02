@@ -14,6 +14,7 @@ from accounts.models import AppSettings, VatRate
 from .band_labels import band_description
 from .contract_translations import CONTRACT_TRANSLATIONS
 from .dates import format_date_value
+from .document_parties import issuer_context
 from .pdf_render import render_pdf
 from .tariff_pricing import display_grid_base_summary, percentage_band_rows
 
@@ -179,9 +180,6 @@ def _build_contract_context(participant, document_id: str | None = None,
         zip(tr["privacy_retention_categories"], tr["privacy_retention_periods"])
     )
 
-    # ZEV owner as participant (for address details)
-    owner_participant = zev.participants.filter(user=zev.owner).first()
-
     # The effective issue date: "today" for a fresh render, the snapshot's
     # rendered_on for a change-detection re-render. Every date-sensitive lookup
     # below (assignment filtering, contract date, active VAT rate, active
@@ -190,6 +188,9 @@ def _build_contract_context(participant, document_id: str | None = None,
     # localdate() applies Django's configured timezone (Europe/Zurich) rather
     # than the server's, so the document date matches the business calendar.
     as_of = as_of or timezone.localdate()
+
+    # The contract's counterparty: the issuer on the contract date (#761).
+    parties = issuer_context(zev, as_of)
 
     # Include all non-ended assignments so the contract can be prefilled for
     # participants who start on a future meter assignment.
@@ -268,7 +269,7 @@ def _build_contract_context(participant, document_id: str | None = None,
 
     return {
         "participant": participant,
-        "owner_participant": owner_participant,
+        **parties,
         "zev": zev,
         "consumption_mps": consumption_mps,
         "production_mps": production_mps,

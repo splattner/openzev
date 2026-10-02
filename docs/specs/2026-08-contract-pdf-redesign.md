@@ -132,7 +132,9 @@ Built by `_build_contract_context(participant)` in `invoices/contract_pdf.py`.
 | Key | Type | Derivation |
 |---|---|---|
 | `participant` | `Participant` | The participant the contract is generated for |
-| `owner_participant` | `Participant \| None` | `zev.participants.filter(user=zev.owner).first()` |
+| `issuer` | `dict` | `document_parties.build_issuer(zev, as_of)`: the party holding the `issuer` role on the contract date (SPEC-2026-10-zev-parties §7.1), same keys as the invoice's issuer copy; the ZEV name alone (`from_participant: false`) when there is none |
+| `representative` | `dict \| None` | `build_representative(zev, as_of)`: the representative toward the grid operator on the contract date |
+| `owner_participant` | `IssuerView \| None` | Deprecated alias of `issuer` for custom templates (`full_name` = `issuer.name`); `None` without an issuer. The built-in template uses `issuer.*` |
 | `zev` | `Zev` | `participant.zev` |
 | `consumption_mps` | `list[MeteringPoint]` | Metering points of non-ended assignments (valid_to null or `>= today`) with meter type `CONSUMPTION` or `BIDIRECTIONAL` (`MeteringPoint.objects.filter(id__in=assigned_mp_ids)`, DB order) |
 | `production_mps` | `list[MeteringPoint]` | Same assignment filter, meter type `PRODUCTION` or `BIDIRECTIONAL` |
@@ -492,7 +494,7 @@ formula green-box line and the clause-5 rule; the flat-rate branch is covered
 by unit tests. The sample sets `is_preview: True` so the template editor
 preview can show placeholder guidance in empty freetext boxes — issued
 contracts never do. The existing sample keys already include
-`contract_date`, `tr`, `lang`, `owner_participant`, `consumption_mps`,
+`contract_date`, `tr`, `lang`, `issuer`, `representative`, `owner_participant`, `consumption_mps`,
 `production_mps`, `local_tariff_rows`, `local_tariff_notes`,
 `additional_contract_notes`.
 

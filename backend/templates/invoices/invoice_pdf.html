@@ -715,10 +715,10 @@
                         <div class="company-name">{{ zev.name }}</div>
                     </div>
                     <div class="company-address">
-                        {% if owner_participant %}
-                        {{ owner_participant.full_name }}{% if owner_participant.name_addition %}<br>{{ owner_participant.name_addition }}{% endif %}<br>
-                        {{ owner_participant.address_line1 }}{% if owner_participant.address_line2 %}, {{ owner_participant.address_line2 }}{% endif %}<br>
-                        {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{% endif %}<br>
+                        {% if issuer.from_participant %}
+                        {{ issuer.name }}{% if issuer.name_addition %}<br>{{ issuer.name_addition }}{% endif %}<br>
+                        {{ issuer.address_line1 }}{% if issuer.address_line2 %}, {{ issuer.address_line2 }}{% endif %}<br>
+                        {{ issuer.postal_code }}{% if issuer.city %} {{ issuer.city }}{% endif %}<br>
                         {% endif %}
                         {% if zev.vat_number %}VAT: {{ zev.vat_number }}{% endif %}
                     </div>

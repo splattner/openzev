@@ -480,6 +480,54 @@ export type ParticipantOnboardingStatus = 'not_sent' | 'sent' | 'active' | 'revo
 /** Whether a party is a person or an organisation (#761). */
 export type PartyKind = 'person' | 'organisation'
 
+/** A role a party holds in a ZEV for a dated window (#761). */
+export type PartyRoleName = 'issuer' | 'representative' | 'landowner'
+
+/** One of a party's roles as listed on the party or its participations (active today or later). */
+export interface PartyRoleWindow {
+    id: string
+    role: PartyRoleName
+    valid_from: string
+    valid_to: string | null
+}
+
+/** GET /zev/parties/ — a person or organisation of a ZEV (#761, ADR 0028). */
+export interface Party {
+    id: string
+    zev: string
+    kind: PartyKind
+    title: 'mr' | 'mrs' | 'ms' | 'dr' | 'prof' | ''
+    first_name: string
+    last_name: string
+    organisation_name: string
+    name_addition: string
+    email: string
+    phone: string
+    address_line1: string
+    address_line2: string
+    postal_code: string
+    city: string
+    notes: string
+    display_name: string
+    participations: { id: string; valid_from: string; valid_to: string | null }[]
+    roles: PartyRoleWindow[]
+    created_at: string
+    updated_at: string
+}
+
+/** GET /zev/party-roles/ — the issuer, representative and landowners of a ZEV, and since when. */
+export interface ZevPartyRole {
+    id: string
+    zev: string
+    party: string
+    party_display_name: string
+    role: PartyRoleName
+    valid_from: string
+    valid_to: string | null
+    created_at: string
+    updated_at: string
+}
+
 export interface Participant {
     id: string
     zev: string
@@ -512,6 +560,8 @@ export interface Participant {
     metering_points?: MeteringPoint[]
     has_metering_point_assignment?: boolean
     building_footprint?: ParticipantBuildingFootprint | null
+    /** The party's roles active today or later. */
+    roles?: PartyRoleWindow[]
     allocation_weight: string
 }
 

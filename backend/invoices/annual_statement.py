@@ -33,6 +33,7 @@ from .generated_chart_tokens import (
     _CHART_LOCAL,
     _CHART_MUTED,
 )
+from .document_parties import issuer_context
 from .models import Invoice, InvoiceStatus, sent_to_participant
 from .pdf import _format_date_value, _render_template
 
@@ -598,8 +599,6 @@ def generate_annual_statement_pdf(
 
     savings = compute_savings(year_invoices)
 
-    owner_participant = zev.participants.filter(user=zev.owner).first()
-
     monthly_chart_svg = _build_monthly_chart_svg(monthly_data, tr)
 
     context = {
@@ -608,7 +607,8 @@ def generate_annual_statement_pdf(
         "year": year,
         "zev": zev,
         "participant": participant,
-        "owner_participant": owner_participant,
+        # Who the statement is from: the issuer on the year's last day (#761).
+        **issuer_context(zev, date(year, 12, 31)),
         "monthly_data": monthly_data,
         "totals": totals,
         "has_behind_meter_generation": totals["has_behind_meter_generation"],

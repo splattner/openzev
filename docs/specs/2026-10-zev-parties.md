@@ -189,16 +189,26 @@ share a day.
 
 `Meta.ordering = ["role", "-valid_from", "id"]`.
 
+**Migrations (PR 4):** `zev.0035_party_role` creates the table; `zev.0036_party_roles_from_owner`
+(depends on `invoices.0019`) gives every ZEV that has no issuer row yet, and whose owner account
+has a participation in it, an `issuer` and a `landowner` row for that participation's party
+(first by `party__sort_name, party__first_name, id`), open-ended, from the earliest of
+`Zev.start_date`, the first participant `valid_from`, the first invoice `period_start` and the
+first `ContractIssue.rendered_on` — so every document already dated in the ZEV keeps its issuer.
+A ZEV whose owner has no participation gets no role (its documents keep naming the ZEV). The
+reverse deletes every role row.
+
 ### 4.5 Service `zev/parties.py`
 
 | Function | Behaviour |
 |---|---|
 | `holders_on(zev, role, day) -> QuerySet[Party]` | Parties with that role active on `day` (`allocation.validity.active_on`) |
-| `holder_on(zev, role, day) -> Party \| None` | First of `holders_on` for single-holder roles |
-| `issuer_on(zev, day)` | `holder_on(zev, "issuer", day)` |
-| `assign_role(zev, party, role, valid_from, *, valid_to=None)` | Single-holder roles: the role active on `valid_from` (if any) is ended `valid_from - 1 day`; a role starting after `valid_from` → `ValidationError` ("A later holder exists; end it first."). A role row whose window would become empty is deleted. Landowner: refuses a second open row for the same party. Atomic, `select_for_update` on the ZEV's rows of that role |
+| `holder_on(zev, role, day) -> Party \| None` | The party of the role row active on `day` (latest `valid_from`), one query with `select_related("party")` |
+| `issuer_on(zev, day)` | `holder_on(zev, "issuer", day)`. Until `Zev.owner` is dropped (PR 5): a ZEV that has **no** issuer row at all falls back to the party of the owner account's participation (one more query, `~Exists(issuer rows)`), so a ZEV created without its owner as participant behaves as before once the owner is added |
+| `representative_on(zev, day)` | `holder_on(zev, "representative", day)` |
+| `assign_role(zev, party, role, valid_from, *, valid_to=None)` | A party of another ZEV → `ValidationError` on `party`; `valid_to < valid_from` → on `valid_to`. Single-holder roles: a row starting after `valid_from` → `ValidationError` ("A later holder exists; end it first."); every row still active on or after `valid_from` is ended `valid_from - 1 day` through `end_role` (deleted when that empties its window); the same party already holding the role open-ended is returned unchanged. Landowner: refuses a second open row for the same party ("The party already holds this role."). Atomic, `select_for_update` on the ZEV's rows of that role; the new row is `full_clean()`ed |
 | `end_role(role_row, last_day)` | Sets `valid_to = last_day`; a row with `last_day < valid_from` is deleted |
-| `ensure_initial_roles(zev, party, valid_from)` | Issuer + landowner from `valid_from` unless the ZEV already has an issuer; used by creation flows (§6) |
+| `ensure_initial_roles(zev, party, valid_from)` | Issuer + landowner from `valid_from` unless the ZEV already has an issuer row; called by the wizard and self-setup (`zev/services.py`, from PR 4) and `seed_demo` |
 
 ### 4.6 Zev
 
@@ -219,7 +229,7 @@ share a day.
 | `organisation_name` | read/write | |
 | `name_addition` | read/write | |
 | `display_name` | read-only | `party.display_name` |
-| `roles` | read-only | `[{role, valid_from, valid_to}]` of the party, active today or later (from PR 4) |
+| `roles` | read-only | `[{id, role, valid_from, valid_to}]` of the party, active today or later, sorted by role then `valid_from` (`serializers.current_roles`, from the `party__roles` prefetch; from PR 4) |
 
 Name/contact/address fields write through to the party (shared by every participation of it).
 Validation: a person needs `last_name`, an organisation `organisation_name`; attaching to a party
@@ -235,6 +245,10 @@ of another ZEV → 400 `{"party": ["The party belongs to another ZEV."]}`. The e
 | GET / PATCH | `/zev/parties/{id}/` | Read / edit; edits show on every participation |
 | DELETE | `/zev/parties/{id}/` | Only without participations and roles → else 400 `"This party is still a participant or holds a role."` |
 
+PR 4 ships the two GETs read-only (`PartyViewSet` is a `ReadOnlyModelViewSet`: POST → 405);
+PR 6 adds the writes. List queryset: `select_related("zev")`, `prefetch_related("participations",
+"roles")`; `participations` sorted by `valid_from`; `roles` as on participants (today or later).
+
 Serializer `PartySerializer`: `id`, `zev`, `kind`, `title`, `first_name`, `last_name`,
 `organisation_name`, `name_addition`, `email`, `phone`, `address_line1`, `address_line2`,
 `postal_code`, `city`, `notes`, `display_name` (ro), `participations` (ro), `roles` (ro),
@@ -247,6 +261,12 @@ Serializer `PartySerializer`: `id`, `zev`, `kind`, `title`, `first_name`, `last_
 | GET | `/zev/party-roles/?zev_id=&include_ended=` | Active and future roles; `include_ended=true` adds history |
 | POST | `/zev/party-roles/` | `{zev, party, role, valid_from, valid_to?}` → `assign_role` (201); conflicts → 400 with the service message |
 | POST | `/zev/party-roles/{id}/end/` | `{last_day}` → `end_role` (200, or 204 when the row was deleted) |
+
+PR 4 ships the GETs read-only (`ZevPartyRoleViewSet`, `ReadOnlyModelViewSet`); the list
+filter applies to `list` only. Serializer `ZevPartyRoleSerializer`: `id`, `zev`, `party`,
+`party_display_name`, `role`, `valid_from`, `valid_to`, `created_at`, `updated_at`, all
+read-only. Both viewsets: `zev_lookup = "zev"`, no participant path; a participant-only account
+gets 403. `BaseZevScopedPermission._get_zev` resolves `Party` and `ZevPartyRole` through `.zev`.
 
 No PATCH/DELETE: history is changed by assigning or ending. Audit events (§10):
 `party.create`, `party.update`, `party.delete`, `party_role.assign`, `party_role.end`, scoped to
@@ -277,10 +297,14 @@ The admin "change owner" (`PATCH zev.owner`) is gone.
 | Invoice | `issuer_on(zev, invoice.period_end)` | `invoices/document_parties.build_issuer(zev, day)` — the copy (§3.1a of the invoice spec) |
 | Contract | `issuer_on(zev, rendered_on)` | `invoices/contract_pdf.py` |
 | Annual statement | `issuer_on(zev, date(year, 12, 31))` | `invoices/annual_statement.py` |
-| Reports default participant (`views_reports.py`) | the caller's own row, else the issuer's participation in the ZEV | |
+| Reports default participant (`views_reports.py` `FinancialSummaryView`) | the caller's own row, else the latest participation of the issuer on 31 Dec of the year | |
 
-Without an issuer on that day: name = ZEV name, no address (`from_participant` → renamed
-`from_party: false`), as today without an owner row.
+The issuer block is `document_parties.build_issuer(zev, day)`; contracts and statements get it
+with `representative` (`build_representative`) and the `owner_participant` alias from
+`issuer_context(zev, day)`. Without an issuer on that day: name = ZEV name, no address,
+`from_participant: false` (the key keeps its name, since frozen copies carry it), as before
+without an owner row. A statement for a year before the first issuer's `valid_from` (a year
+before the ZEV started) therefore names the ZEV, where it used to name the owner.
 
 ### 7.2 Issuer copy schema change (PR 3)
 
@@ -307,8 +331,13 @@ renders byte-identical HTML and no contract version is minted by the template ch
 | `owner_participant.*` | Deprecated alias of `issuer` (`full_name` → `issuer.name`) |
 | `zev.owner.get_full_name`, `zev.owner.email` | Deprecated alias → `issuer.name`, `issuer.email`; `zev.owner.username` → `""` |
 
-`field_catalog_data.py` lists the new groups (`issuer`, `representative`) and drops the
-`ownerParticipant` / owner-account entries; the deprecated aliases keep rendering. The built-in
+`field_catalog_data.py` lists the new groups (`issuer`, `representative`; name, name addition,
+organisation name, address, phone, email, and for the issuer IBAN, bank name and VAT number) in
+all three catalogues and drops `ownerParticipant`; the deprecated aliases keep rendering. The
+contract catalogue keeps a `zevOwner` group (`zev.owner.get_full_name`, `.username`, `.email`)
+until PR 5, because the built-in contract template still prints the owner account where there
+is no issuer. New i18n keys `admin.fields.issuer`, `representative`, `zevOwner`, `partyName`,
+`organisationName`, `bankName`; `ownerParticipant` is removed. The built-in
 templates (`templates/invoices/invoice_pdf.html`, `annual_statement_pdf.html`,
 `templates/contracts/participant_contract_pdf.html`) use `issuer.*` and render
 `issuer.name_lines` / `participant.name_lines` in address blocks. The QR bill uses
@@ -409,7 +438,7 @@ through the participant endpoints keep the existing participant audit events.
 | 1 | Invoice issuer/recipient copy — shipped (#875) |
 | 2 | This spec + ADR 0028 |
 | 3 | `Party`, `Participant.party`, facade, migrations `zev.0032_party` / `0033_participant_parties_data` / `0034_participant_party_required` (one party per participant), ORM lookups, `kind` / `organisation_name` / `name_addition` / `display_name` in API, copy, QR and built-in templates — no other behaviour change |
-| 4 | `ZevPartyRole`, `zev/parties.py`, data migration (issuer + landowner from the owner's party; a party from the owner account when it has no participant row), issuer by date in copy / contract / statement / reports, template variables and catalogue, read-only party and role endpoints |
+| 4 | `ZevPartyRole`, `zev/parties.py`, data migration (issuer + landowner from the owner's party; no role when the owner has no participation), issuer by date in copy / contract / statement / reports, wizard and self-setup set the roles, template variables and catalogue, read-only party and role endpoints, `ParticipantSerializer.roles`, `zev.ZevPartyRole` in backups |
 | 5 | Drop `Zev.owner`: creation flows with explicit grants and roles, `ZevSerializer.issuer`, admin owner dialog removed, transfer v5, backups, frontend owner reads replaced |
 | 6 | Party and role write endpoints, Parties tab, participant form and badges, user guide |
 
@@ -436,10 +465,23 @@ through the participant endpoints keep the existing participant audit events.
   moved its name lookups to `party__…`; `zev/test_onboarding.py`'s upgrade test now writes its
   rows with the historical models. Golden check on the dev data: 21 invoices, 9 contracts and
   18 annual statements render byte-identical HTML before and after.
-- **PR 4** `zev/test_party_roles.py`: constraints, `assign_role` ending the previous holder,
-  refusing a later holder, landowner duplicates, `end_role` deleting empty windows; the
-  migration (issuer from the owner row, a new party when none); invoice / contract / statement
-  issuer by date (before and after an issuer change); template aliases; the field catalogue.
+- **PR 4** `zev/test_party_roles.py` (22, shipped): `AssignRoleTests` (7: a new issuer ends
+  the previous one the day before, a holder replaced on its first day is removed, a later
+  holder must be ended first, landowners many but once per party, another ZEV's party refused,
+  ending before the start removes the role, the database allows one open issuer and an ordered
+  window), `IssuerLookupTests` (3: the owner fallback without issuer rows, no fallback once a ZEV
+  has issuer rows, self-setup makes the owner issuer and landowner and `ensure_initial_roles`
+  is idempotent), `DocumentIssuerByDateTests` (5: invoice by `period_end`, an approved invoice
+  keeps its issuer after a change, contract by its date plus the `owner_participant` alias,
+  statement by 31 Dec, representative on the contract date), `PartyRoleApiTests` (6: a viewer
+  lists parties with participations and roles, roles current vs. `include_ended`, read-only
+  405, a participant gets 403, a participant row lists its party's roles, another ZEV's party
+  404), `PartyRoleMigrationTests` (1: issuer and landowner from the first dated document, none
+  without an owner participation, reverse removes them). `test_allocation_query_counts`
+  budget 17 → 18 (the owner fallback on a ZEV without roles). Golden check on the dev data:
+  21 invoices, 2 issued and 9 current contracts and 15 of 18 annual statements render
+  byte-identical HTML; the 3 others are 2025 statements of a ZEV that started in April 2026
+  (§7.1).
 - **PR 5**: creation flows (party, participant, roles, grant), no `owner` in API, transfer v5
   round trip and v4 import, backups restore; frontend owner reads.
 - **PR 6**: party and role endpoints (scoping, viewer read-only, audit); frontend

@@ -2,7 +2,7 @@ import logging
 import tempfile
 
 from django.conf import settings as django_settings
-from django.db.models import Count, Max, Min
+from django.db.models import Count, Max, Min, Q
 from django.http import FileResponse, HttpResponse
 from django.utils import timezone as dj_timezone
 from rest_framework import serializers, status, viewsets
@@ -18,7 +18,7 @@ from accounts.models import FeatureFlag, User
 from allocation.validity import period_window
 from metering.models import MeterReading
 from . import access, onboarding
-from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment
+from .models import Zev, Participant, Party, MeteringPoint, MeteringPointAssignment, ZevPartyRole
 from .purge import ZevPurgeError, purge_zev
 from .scoping import ZevScopedQuerySetMixin
 from .serializers import (
@@ -29,6 +29,8 @@ from .serializers import (
     ZevCreateWithOwnerSerializer,
     SelfSetupOwnerAddressSerializer,
     ParticipantSerializer,
+    PartySerializer,
+    ZevPartyRoleSerializer,
     MeteringPointSerializer,
     MeteringPointReadingsDeleteSerializer,
     MeteringPointAssignmentSerializer,
@@ -516,7 +518,7 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
 
     def get_queryset(self):
         return self.scope_queryset(
-            Participant.objects.prefetch_related("metering_point_assignments", "onboarding_tokens")
+            Participant.objects.prefetch_related("metering_point_assignments", "onboarding_tokens", "party__roles")
         )
 
     def get_audit_create_summary(self, instance):
@@ -949,6 +951,34 @@ class MeteringPointAssignmentViewSet(AuditedCreateDestroyMixin, AuditedUpdateMix
 
     def get_audit_destroy_metadata(self, instance):
         return {"participant_id": str(instance.participant_id)}
+
+
+class PartyViewSet(ZevScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet):
+    """The people and organisations of a ZEV, with their participations and
+    roles (#761). Managers and viewers of the ZEV; read-only for now."""
+
+    serializer_class = PartySerializer
+    permission_classes = [IsAuthenticated, BaseZevScopedPermission]
+    zev_lookup = "zev"
+
+    def get_queryset(self):
+        return self.scope_queryset(Party.objects.select_related("zev").prefetch_related("participations", "roles"))
+
+
+class ZevPartyRoleViewSet(ZevScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet):
+    """Who is a ZEV's issuer, representative and landowners, and since when
+    (#761). Active and future roles; ``?include_ended=true`` adds the history."""
+
+    serializer_class = ZevPartyRoleSerializer
+    permission_classes = [IsAuthenticated, BaseZevScopedPermission]
+    zev_lookup = "zev"
+
+    def get_queryset(self):
+        qs = ZevPartyRole.objects.select_related("zev", "party")
+        if self.action == "list" and self.request.query_params.get("include_ended", "").lower() not in ("1", "true"):
+            today = dj_timezone.localdate()
+            qs = qs.filter(Q(valid_to__isnull=True) | Q(valid_to__gte=today))
+        return self.scope_queryset(qs)
 
 
 class GridOperatorListView(APIView):

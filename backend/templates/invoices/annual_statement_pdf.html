@@ -265,10 +265,10 @@
                 <h3>{{ tr.from_label }}</h3>
                 <p>
                     {{ zev.name }}<br>
-                    {% if owner_participant %}
-                    {{ owner_participant.full_name }}{% if owner_participant.name_addition %}<br>{{ owner_participant.name_addition }}{% endif %}<br>
-                    {% if owner_participant.address_line1 %}{{ owner_participant.address_line1 }}<br>{% endif %}
-                    {% if owner_participant.postal_code or owner_participant.city %}{{ owner_participant.postal_code }} {{ owner_participant.city }}{% endif %}
+                    {% if issuer.from_participant %}
+                    {{ issuer.name }}{% if issuer.name_addition %}<br>{{ issuer.name_addition }}{% endif %}<br>
+                    {% if issuer.address_line1 %}{{ issuer.address_line1 }}<br>{% endif %}
+                    {% if issuer.postal_code or issuer.city %}{{ issuer.postal_code }} {{ issuer.city }}{% endif %}
                     {% endif %}
                 </p>
             </div>

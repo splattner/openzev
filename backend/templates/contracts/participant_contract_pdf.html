@@ -524,10 +524,10 @@
                         <div class="company-name">{{ zev.name }}</div>
                     </div>
                     <div class="company-address">
-                        {% if owner_participant %}
-                        {{ owner_participant.full_name }}{% if owner_participant.name_addition %}<br>{{ owner_participant.name_addition }}{% endif %}<br>
-                        {{ owner_participant.address_line1 }}{% if owner_participant.address_line2 %}, {{ owner_participant.address_line2 }}{% endif %}<br>
-                        {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{% endif %}<br>
+                        {% if issuer.from_participant %}
+                        {{ issuer.name }}{% if issuer.name_addition %}<br>{{ issuer.name_addition }}{% endif %}<br>
+                        {{ issuer.address_line1 }}{% if issuer.address_line2 %}, {{ issuer.address_line2 }}{% endif %}<br>
+                        {{ issuer.postal_code }}{% if issuer.city %} {{ issuer.city }}{% endif %}<br>
                         {% endif %}
                         {% if zev.vat_number %}{{ tr.vat_label }}: {{ zev.vat_number }}{% endif %}
                     </div>
@@ -625,20 +625,20 @@
                 <!-- ZEV owner / manager -->
                 <div class="party-card">
                     <div class="party-role">{{ tr.owner_label }}</div>
-                    {% if owner_participant %}
-                    <div class="party-name">{{ owner_participant.full_name }}{% if owner_participant.name_addition %}<br>{{ owner_participant.name_addition }}{% endif %}</div>
+                    {% if issuer.from_participant %}
+                    <div class="party-name">{{ issuer.name }}{% if issuer.name_addition %}<br>{{ issuer.name_addition }}{% endif %}</div>
                     <dl>
                         <div class="party-fact">
                             <dt>{{ tr.field_address }}</dt>
-                            <dd>{{ owner_participant.address_line1 }}{% if owner_participant.address_line2 %}, {{ owner_participant.address_line2 }}{% endif %}{% if owner_participant.postal_code or owner_participant.city %}, {{ owner_participant.postal_code }} {{ owner_participant.city }}{% endif %}</dd>
+                            <dd>{{ issuer.address_line1 }}{% if issuer.address_line2 %}, {{ issuer.address_line2 }}{% endif %}{% if issuer.postal_code or issuer.city %}, {{ issuer.postal_code }} {{ issuer.city }}{% endif %}</dd>
                         </div>
                         <div class="party-fact">
                             <dt>{{ tr.field_phone }}</dt>
-                            <dd{% if not owner_participant.phone %} class="empty"{% endif %}>{{ owner_participant.phone|default:"—" }}</dd>
+                            <dd{% if not issuer.phone %} class="empty"{% endif %}>{{ issuer.phone|default:"—" }}</dd>
                         </div>
                         <div class="party-fact">
                             <dt>{{ tr.field_email }}</dt>
-                            <dd{% if not owner_participant.email %} class="empty"{% endif %}>{{ owner_participant.email|default:"—" }}</dd>
+                            <dd{% if not issuer.email %} class="empty"{% endif %}>{{ issuer.email|default:"—" }}</dd>
                         </div>
                     </dl>
                     {% else %}
@@ -766,7 +766,7 @@
                     <div class="sig-block">
                         <div class="sig-label">{{ tr.sig_owner }}</div>
                         <div class="sig-name">
-                            {% if owner_participant %}{{ owner_participant.full_name }}{% else %}{{ zev.owner.get_full_name|default:zev.owner.username }}{% endif %}
+                            {% if issuer.from_participant %}{{ issuer.name }}{% else %}{{ zev.owner.get_full_name|default:zev.owner.username }}{% endif %}
                         </div>
                         <div class="sig-line"></div>
                         <div class="sig-line-label">{{ tr.sig_place_date }}</div>
@@ -837,11 +837,11 @@
             <div class="info-block">
                 <div class="info-block-title">{{ tr.privacy_controller_title }}</div>
                 <p class="clause-text">{{ tr.privacy_controller_text }}</p>
-                {% if owner_participant %}
+                {% if issuer.from_participant %}
                 {% comment %}One source line on purpose: `.clause-text` uses white-space: pre-line,
                    so any source newline between these tags would render as a line break
                    (the comma used to start its own line).{% endcomment %}
-                <p class="clause-text"><strong>{{ owner_participant.full_name }}</strong>{% if owner_participant.address_line1 %}<br>{{ owner_participant.address_line1 }}{% endif %}{% if owner_participant.postal_code or owner_participant.city %}, {{ owner_participant.postal_code }} {{ owner_participant.city }}{% endif %}{% if owner_participant.email %}<br>{{ owner_participant.email }}{% endif %}</p>
+                <p class="clause-text"><strong>{{ issuer.name }}</strong>{% if issuer.address_line1 %}<br>{{ issuer.address_line1 }}{% endif %}{% if issuer.postal_code or issuer.city %}, {{ issuer.postal_code }} {{ issuer.city }}{% endif %}{% if issuer.email %}<br>{{ issuer.email }}{% endif %}</p>
                 {% endif %}
             </div>
 

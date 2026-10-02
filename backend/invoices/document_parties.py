@@ -10,7 +10,8 @@ the participant's *current* address.
 the invoice is generated, refreshed on every render while the invoice is a
 draft, written a last time on approval, and never touched again — so an
 approved, sent, paid or cancelled invoice always renders the same document.
-The PDF reads only the copy (``invoices.pdf``).
+The PDF reads only the copy (``invoices.pdf``). The issuer is whoever held the
+issuer role on the invoice's ``period_end`` (``zev.parties.issuer_on``).
 
 Schema (both plain JSON objects, every value a string unless noted):
 
@@ -31,6 +32,8 @@ A copy written before parties existed lacks the party keys; they read as empty.
 
 from __future__ import annotations
 
+from datetime import date
+
 from django.db.models import Q
 
 from .models import Invoice, InvoiceStatus
@@ -40,17 +43,11 @@ def _text(value) -> str:
     return (value or "").strip() if isinstance(value, str) else ("" if value is None else str(value))
 
 
-def issuer_party(zev):
-    """The party the issuer block is taken from: the ZEV owner's own.
+def issuer_party(zev, day: date):
+    """The party the issuer block is taken from: the issuer on ``day``."""
+    from zev.parties import issuer_on
 
-    The party of the owner account's participation in the ZEV. The dated
-    issuer role replaces this lookup (#761 phase 2).
-    """
-    from zev.models import Party
-
-    if zev.owner_id is None:
-        return None
-    return Party.objects.filter(zev=zev, participations__user_id=zev.owner_id).first()
+    return issuer_on(zev, day)
 
 
 def _party_keys(party) -> dict:
@@ -62,26 +59,50 @@ def _party_keys(party) -> dict:
     }
 
 
-def build_issuer(zev) -> dict:
-    """The issuer block for an invoice of ``zev``, from today's data."""
-    party = issuer_party(zev)
-    name = party.display_name if party else zev.name
+def party_block(party) -> dict:
+    """Name, contact and address of ``party`` — the keys an issuer and a
+    representative share."""
     return {
         **_party_keys(party),
-        "name": _text(name),
-        "name_lines": [_text(line) for line in party.name_lines] if party else [_text(name)],
-        "address_line1": _text(getattr(party, "address_line1", "")),
-        "address_line2": _text(getattr(party, "address_line2", "")),
-        "postal_code": _text(getattr(party, "postal_code", "")),
-        "city": _text(getattr(party, "city", "")),
-        "email": _text(getattr(party, "email", "")),
-        "phone": _text(getattr(party, "phone", "")),
+        "name": _text(party.display_name),
+        "name_lines": [_text(line) for line in party.name_lines],
+        "address_line1": _text(party.address_line1),
+        "address_line2": _text(party.address_line2),
+        "postal_code": _text(party.postal_code),
+        "city": _text(party.city),
+        "email": _text(party.email),
+        "phone": _text(party.phone),
+    }
+
+
+def build_issuer(zev, day: date) -> dict:
+    """The issuer block for a document of ``zev`` dated ``day``, from today's
+    data. Without an issuer on that day, the ZEV's name alone."""
+    party = issuer_party(zev, day)
+    if party is not None:
+        block = party_block(party)
+    else:
+        name = _text(zev.name)
+        block = {
+            **_party_keys(None), "name": name, "name_lines": [name],
+            **dict.fromkeys(("address_line1", "address_line2", "postal_code", "city", "email", "phone"), ""),
+        }
+    return {
+        **block,
         "iban": _text(zev.bank_iban),
         "bank_name": _text(zev.bank_name),
         "vat_number": _text(zev.vat_number),
         "zev_name": _text(zev.name),
         "from_participant": party is not None,
     }
+
+
+def build_representative(zev, day: date) -> dict | None:
+    """The representative toward the grid operator on ``day``, or ``None``."""
+    from zev.parties import representative_on
+
+    party = representative_on(zev, day)
+    return party_block(party) if party is not None else None
 
 
 def build_recipient(participant) -> dict:
@@ -105,7 +126,7 @@ def build_recipient(participant) -> dict:
 def build_copy(invoice) -> dict:
     """``{"issuer": …, "recipient": …}`` for ``invoice``, from today's data."""
     return {
-        "issuer": build_issuer(invoice.zev),
+        "issuer": build_issuer(invoice.zev, invoice.period_end),
         "recipient": build_recipient(invoice.participant),
     }
 
@@ -197,6 +218,7 @@ def template_parties(invoice, issuer: dict, recipient: dict) -> dict:
     return {
         "issuer": issuer,
         "recipient": recipient,
+        "representative": build_representative(invoice.zev, invoice.period_end),
         "owner_participant": IssuerView(issuer) if issuer.get("from_participant") else None,
         "participant": FrozenView(invoice.participant, {
             "full_name": recipient.get("name", ""),
@@ -213,4 +235,16 @@ def template_parties(invoice, issuer: dict, recipient: dict) -> dict:
             "bank_iban": issuer.get("iban", ""),
             "bank_name": issuer.get("bank_name", ""),
         }),
+    }
+
+
+def issuer_context(zev, day: date) -> dict:
+    """``issuer``, ``representative`` and the deprecated ``owner_participant``
+    for a live-rendered document of ``zev`` dated ``day`` (contract, annual
+    statement)."""
+    issuer = build_issuer(zev, day)
+    return {
+        "issuer": issuer,
+        "representative": build_representative(zev, day),
+        "owner_participant": IssuerView(issuer) if issuer["from_participant"] else None,
     }

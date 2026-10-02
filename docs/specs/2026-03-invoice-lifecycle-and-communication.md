@@ -95,10 +95,14 @@ participant's address changed (`invoices/document_parties.py`).
 | `address_line1`, `address_line2`, `postal_code`, `city`, `email` | issuer party's | participant's party's |
 | `phone` | issuer party's | — |
 | `iban`, `bank_name`, `vat_number`, `zev_name` | `Zev.bank_iban`, `bank_name`, `vat_number`, `name` | — |
-| `from_participant` | bool: an owner participant row exists | — |
+| `from_participant` | bool: an issuer party is on record (the key predates parties) | — |
 
-The issuer party is the party of the ZEV owner account's participation
-(`issuer_party(zev)`); the dated issuer role replaces it (SPEC-2026-10-zev-parties).
+The issuer party is whoever held the `issuer` role on the invoice's
+`period_end` (`issuer_party(zev, day)` → `zev.parties.issuer_on`,
+SPEC-2026-10-zev-parties §4.5, §7.1); without one, the issuer is the ZEV name
+alone (`from_participant: false`). A batch builds the issuer once for its
+period (`InvoiceGenerationContext.issuer`), and `approve-all` once per
+`period_end`.
 Copies written before parties existed lack the party keys, which read as empty.
 The QR bill names are the `name_lines` on one line, at most 70 characters.
 
@@ -802,7 +806,8 @@ The invoice PDF template receives:
 | `issuer` | The invoice's issuer copy (§3.1a) |
 | `recipient` | The invoice's recipient copy (§3.1a) |
 | `zev` | The ZEV, with `name`, `vat_number`, `bank_iban`, `bank_name` answered from the issuer copy (`FrozenView`); anything else reads the live ZEV |
-| `owner_participant` | The issuer copy shaped like a participant (`full_name`, address fields, `email`, `phone`; `IssuerView`), or `None` when the issuer is the ZEV name alone |
+| `representative` | The representative toward the grid operator on `period_end` (`build_representative`: `party`, `kind`, `organisation_name`, `name_addition`, `name`, `name_lines`, address, `email`, `phone`), live, or `None` |
+| `owner_participant` | Deprecated alias: the issuer copy shaped like a participant (`full_name`, address fields, `email`, `phone`; `IssuerView`), or `None` when the issuer is the ZEV name alone. The built-in template uses `issuer.*` |
 | `participant` | The billed participant, with `full_name`, `title`, `first_name`, `last_name`, address fields and `email` answered from the recipient copy (`FrozenView`); anything else reads the live row |
 | `qr_svg` | Swiss QR-Rechnung SVG (or `None`) |
 | `energy_chart_svg` | Period-comparison stacked bar chart SVG (or `None`) |
