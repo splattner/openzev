@@ -183,6 +183,11 @@ class PartyMigrationTests(TransactionTestCase):
         executor.migrate(targets)
         return executor.loader.project_state(targets).apps
 
+    def setUp(self):
+        # Start from the latest schema: a plan that moves one app back while
+        # another must move forward is refused, whatever an earlier test left.
+        self.tearDown()
+
     def tearDown(self):
         executor = MigrationExecutor(connection)
         executor.loader.build_graph()

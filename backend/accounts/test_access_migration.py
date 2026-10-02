@@ -15,6 +15,11 @@ class AccessGrantsAccountsMigrationTests(TransactionTestCase):
         executor.migrate(targets)
         return executor.loader.project_state(targets).apps
 
+    def setUp(self):
+        # Start from the latest schema: a plan that moves one app back while
+        # another must move forward is refused, whatever an earlier test left.
+        self.tearDown()
+
     def tearDown(self):
         executor = MigrationExecutor(connection)
         executor.loader.build_graph()
@@ -57,6 +62,7 @@ class CollapseUserRoleMigrationTests(TransactionTestCase):
 
     migrate = AccessGrantsAccountsMigrationTests.migrate
     tearDown = AccessGrantsAccountsMigrationTests.tearDown
+    setUp = AccessGrantsAccountsMigrationTests.setUp
 
     def test_every_role_but_admin_becomes_user_and_back(self):
         old = self.migrate(self.BEFORE)

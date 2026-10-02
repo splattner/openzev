@@ -566,6 +566,9 @@ class OnboardingConstraintUpgradeTests(TransactionTestCase):
         def migrate(target):
             executor = MigrationExecutor(connection)
             executor.loader.build_graph()
+            # Latest first: a plan mixing directions across apps is refused.
+            executor.migrate(executor.loader.graph.leaf_nodes())
+            executor.loader.build_graph()
             executor.migrate([target])
             return executor.loader.project_state([target]).apps
 
