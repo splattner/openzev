@@ -24,6 +24,7 @@ from django.template import Context, Template
 from django.template.loader import render_to_string
 from tariffs.models import TariffCategory
 
+from zev.models import QR_NAME_MAX_LENGTH
 from .document_parties import copy_for_render, template_parties
 from .dates import format_date_value
 from .description_utils import strip_period_suffix
@@ -165,6 +166,13 @@ def _group_items_by_category(items, period_start: date, period_end: date, tr: di
     return grouped
 
 
+def _qr_name(block: dict) -> str:
+    """A party's name on the QR bill: its name lines on one line, at most 70
+    characters (the QR-bill limit), so a household's second line still shows."""
+    lines = block.get("name_lines") or [block.get("name", "")]
+    return " ".join(_normalize_text(line) for line in lines if _normalize_text(line))[:QR_NAME_MAX_LENGTH].strip()
+
+
 def _build_qr_svg(invoice, issuer: dict | None = None, recipient: dict | None = None) -> str | None:
     """Generate the Swiss QR-Rechnung SVG if IBAN and required addresses are configured.
 
@@ -179,14 +187,14 @@ def _build_qr_svg(invoice, issuer: dict | None = None, recipient: dict | None = 
         return None
 
     creditor = _build_qr_party(
-        name=issuer.get("name"),
+        name=_qr_name(issuer),
         line1=issuer.get("address_line1"),
         postal_code=issuer.get("postal_code"),
         city=issuer.get("city"),
         role="creditor",
     )
     debtor = _build_qr_party(
-        name=recipient.get("name"),
+        name=_qr_name(recipient),
         line1=recipient.get("address_line1"),
         postal_code=recipient.get("postal_code"),
         city=recipient.get("city"),

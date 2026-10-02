@@ -51,7 +51,7 @@ class InvoiceDashboardView(APIView):
         )
 
         recent_invoices = (
-            Invoice.objects.select_related("participant", "zev")
+            Invoice.objects.select_related("participant__party", "zev")
             .order_by("-created_at")[:RECENT_INVOICE_LIMIT]
         )
 

@@ -107,7 +107,7 @@ def _export_zev(zev):
 def _export_participants(zev):
     return [
         {"id": str(participant.id), **_fields(participant, PARTICIPANT_FIELDS)}
-        for participant in Participant.objects.filter(zev=zev).order_by("last_name", "first_name", "id")
+        for participant in Participant.objects.filter(zev=zev).order_by("party__sort_name", "party__first_name", "id")
     ]
 
 

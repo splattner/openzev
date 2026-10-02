@@ -721,10 +721,10 @@ class AnnualStatementExportBuilderTests(ExportJobApiTestCase):
         make_participant(self.zev, first="Bea", last="Zweit")
         bytes_, generated, omitted = self._build()
 
-        pia0 = self.zev.participants.get(first_name="Pia0")
-        pia1 = self.zev.participants.get(first_name="Pia1")
+        pia0 = self.zev.participants.get(party__first_name="Pia0")
+        pia1 = self.zev.participants.get(party__first_name="Pia1")
         self.assertEqual(generated, [str(pia0.pk), str(pia1.pk),
-                                     str(self.zev.participants.get(first_name="Bea").pk)])
+                                     str(self.zev.participants.get(party__first_name="Bea").pk)])
         self.assertEqual(omitted, [])
         with zipfile.ZipFile(io.BytesIO(bytes_)) as archive:
             names = archive.namelist()
@@ -759,7 +759,7 @@ class AnnualStatementExportBuilderTests(ExportJobApiTestCase):
     def test_zip_omits_only_failed_statements_and_names_them(self):
         for index in range(3):
             make_participant(self.zev, first=f"Extra{index}", last=f"Zed{index}")
-        participants = list(self.zev.participants.order_by("last_name", "first_name"))
+        participants = list(self.zev.participants.order_by("party__sort_name", "party__first_name", "id"))
         failed_pk = participants[1].pk
 
         def _generate(participant, *args, **kwargs):

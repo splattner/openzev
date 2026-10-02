@@ -560,27 +560,36 @@ class OnboardingConstraintUpgradeTests(TransactionTestCase):
 
     def test_upgrade_revokes_older_duplicates_then_constrains(self):
         from django.core.management import call_command
+        from django.db import connection
+        from django.db.migrations.executor import MigrationExecutor
 
-        call_command("migrate", "zev", "0028", verbosity=0, interactive=False)
+        def migrate(target):
+            executor = MigrationExecutor(connection)
+            executor.loader.build_graph()
+            executor.migrate([target])
+            return executor.loader.project_state([target]).apps
+
+        # The rows are written with the models as they were at 0028, not
+        # today's (a participant had its own name columns then).
+        old_apps = migrate(("zev", "0028_onboarding_token_expires_at"))
         try:
             owner = make_user("owner_mig_0029", UserRole.USER)
-            # bulk_create, not create: Zev.save() also writes the owner's
-            # access grant, whose table does not exist at 0028.
-            zev = Zev.objects.bulk_create([
-                Zev(name="Mig ZEV", owner=owner, zev_type="vzev", invoice_prefix="M"),
-            ])[0]
-            participant = Participant.objects.create(
+            OldZev = old_apps.get_model("zev", "Zev")
+            OldParticipant = old_apps.get_model("zev", "Participant")
+            OldToken = old_apps.get_model("zev", "ParticipantOnboardingToken")
+            zev = OldZev.objects.create(name="Mig ZEV", owner_id=owner.pk, zev_type="vzev", invoice_prefix="M")
+            participant = OldParticipant.objects.create(
                 zev=zev, first_name="Mig", last_name="Rate",
                 email="mig@example.com", valid_from=date(2026, 1, 1),
             )
-            old = ParticipantOnboardingToken.objects.create(
+            old = OldToken.objects.create(
                 participant=participant, prefix="mig-old", secret="o" * 32,
                 expires_at=timezone.now() + timedelta(days=30),
             )
-            ParticipantOnboardingToken.objects.filter(pk=old.pk).update(
+            OldToken.objects.filter(pk=old.pk).update(
                 created_at=timezone.now() - timedelta(days=1)
             )
-            new = ParticipantOnboardingToken.objects.create(
+            new = OldToken.objects.create(
                 participant=participant, prefix="mig-new", secret="n" * 32,
                 expires_at=timezone.now() + timedelta(days=30),
             )
@@ -588,10 +597,11 @@ class OnboardingConstraintUpgradeTests(TransactionTestCase):
             call_command("migrate", "zev", verbosity=0, interactive=False)
 
             live = list(
-                participant.onboarding_tokens.filter(revoked_at__isnull=True)
+                ParticipantOnboardingToken.objects.filter(participant_id=participant.pk, revoked_at__isnull=True)
             )
             self.assertEqual([t.pk for t in live], [new.pk])
-            old.refresh_from_db()
-            self.assertIsNotNone(old.revoked_at)
+            self.assertIsNotNone(ParticipantOnboardingToken.objects.get(pk=old.pk).revoked_at)
+            # The upgrade carried the participant's name onto its party.
+            self.assertEqual(Participant.objects.get(pk=participant.pk).full_name, "Mig Rate")
         finally:
             call_command("migrate", "zev", verbosity=0, interactive=False)

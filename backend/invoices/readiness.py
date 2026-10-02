@@ -18,7 +18,7 @@ from metering.models import MeterReading
 from tariffs.dynamic.fetch import coverage_gaps
 from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory
-from zev.models import MeteringPoint, MeteringPointAssignment, Participant
+from zev.models import PARTY_NAME_FIELDS, MeteringPoint, MeteringPointAssignment, Participant
 from zev.iban import is_valid_iban
 
 from .models import EmailLog, Invoice, InvoiceStatus
@@ -168,7 +168,7 @@ def resolve_cockpit_period(zev, today: date | None = None) -> tuple[date, date] 
 
     participants = {
         p.id: (p.valid_from, p.valid_to)
-        for p in Participant.objects.filter(zev=zev).only("id", "valid_from", "valid_to")
+        for p in Participant.objects.filter(zev=zev).select_related(None).only("id", "valid_from", "valid_to")
     }
     assignments: dict[int, list[tuple[date, date | None]]] = {}
     for pid, valid_from, valid_to in (
@@ -509,7 +509,8 @@ def _load_bulk(zev, span_start: date, span_end: date) -> BulkData:
     participants = {
         p.id: p
         for p in Participant.objects.filter(zev=zev).only(
-            "id", "valid_from", "valid_to", "first_name", "last_name"
+            "id", "valid_from", "valid_to", "party",
+            *(f"party__{name}" for name in PARTY_NAME_FIELDS),
         )
     }
     assignments = list(

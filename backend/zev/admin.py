@@ -1,12 +1,13 @@
 from django.contrib import admin
-from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment, ZevAccessGrant
+from .models import Zev, Participant, Party, MeteringPoint, MeteringPointAssignment, ZevAccessGrant
 
 
 class ParticipantInline(admin.TabularInline):
     model = Participant
     extra = 0
     show_change_link = True
-    fields = ("first_name", "last_name", "email", "valid_from", "valid_to", "allocation_weight")
+    fields = ("party", "valid_from", "valid_to", "allocation_weight")
+    raw_id_fields = ("party",)
 
 
 class MeteringPointAssignmentInline(admin.TabularInline):
@@ -24,11 +25,19 @@ class ZevAdmin(admin.ModelAdmin):
     inlines = [ParticipantInline]
 
 
+@admin.register(Party)
+class PartyAdmin(admin.ModelAdmin):
+    list_display = ("display_name", "kind", "zev", "email", "city")
+    list_filter = ("kind", "zev")
+    search_fields = ("organisation_name", "first_name", "last_name", "email")
+
+
 @admin.register(Participant)
 class ParticipantAdmin(admin.ModelAdmin):
     list_display = ("full_name", "zev", "email", "valid_from", "valid_to")
     list_filter = ("zev",)
-    search_fields = ("first_name", "last_name", "email")
+    search_fields = ("party__organisation_name", "party__first_name", "party__last_name", "party__email")
+    raw_id_fields = ("party", "user")
     inlines = [MeteringPointAssignmentInline]
 
 

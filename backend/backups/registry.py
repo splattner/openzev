@@ -80,6 +80,8 @@ ZEV_SECTIONS: tuple[tuple[str, tuple[ZevPart, ...]], ...] = (
     (
         "participants",
         (
+            # Parties first: every participant points at one (ADR 0028).
+            ZevPart("zev.Party", "zev"),
             ZevPart("zev.Participant", "zev"),
             ZevPart("zev.ParticipantOnboardingToken", "participant__zev"),
         ),

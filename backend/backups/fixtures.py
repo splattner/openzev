@@ -49,7 +49,7 @@ def build_world() -> World:
     owner.preferred_zev = alpha
     owner.save()
 
-    alice = Participant.objects.get(zev=alpha, first_name="Alice")
+    alice = Participant.objects.get(zev=alpha, party__first_name="Alice")
     alice.user = member
     alice.save()
 
@@ -100,7 +100,7 @@ def build_world() -> World:
         target_type="accounts.AppSettings", summary="Instance-level change.", user=admin,
     )
     orphan = ContractIssue.objects.create(
-        zev=beta, participant=Participant.objects.get(zev=beta, first_name="Alice"),
+        zev=beta, participant=Participant.objects.get(zev=beta, party__first_name="Alice"),
         version=1, document_number="C-ORPHAN-1", language="de", context_hash="b" * 64,
         pdf=b"%PDF-orphaned-contract", issued_by=admin,
     )

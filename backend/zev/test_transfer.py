@@ -28,7 +28,9 @@ from zev.models import (
     MeteringPoint,
     MeteringPointAssignment,
     MeteringPointType,
+    PARTY_FACADE_FIELDS,
     Participant,
+    Party,
     Zev,
 )
 from zev.transfer import ArchiveError, ImportFailed, build_archive, import_archive
@@ -362,7 +364,9 @@ class RoundTripTests(TestCase):
     def test_participants_arrive_unlinked_even_when_an_account_shares_the_email(self):
         """Re-linking by email would let an edited archive hand over an account."""
         existing = make_user("alice_account", UserRole.USER)
-        self.source.participants.filter(first_name="Alice").update(email=existing.email)
+        Party.objects.filter(participations__in=self.source.participants.filter(party__first_name="Alice")).update(
+            email=existing.email,
+        )
         result = self._import()
         imported = Zev.objects.get(pk=result["zev_id"])
         self.assertEqual(imported.participants.filter(user__isnull=False).count(), 0)
@@ -1140,7 +1144,8 @@ class SchemaParityTests(TestCase):
             "disabled_by",
             "disabled_reason",
         },
-        "PARTICIPANT_FIELDS": {"id", "zev", "user", "created_at", "updated_at"},
+        # ``party`` travels flattened: its facade fields sit on each participant.
+        "PARTICIPANT_FIELDS": {"id", "zev", "user", "party", "created_at", "updated_at"},
         "METERING_POINT_FIELDS": {"id", "zev", "created_at", "updated_at"},
         "ASSIGNMENT_FIELDS": {"id", "metering_point", "participant", "created_at", "updated_at"},
         # dynamic_source travels as a nested natural key, not as its FK id,
@@ -1168,6 +1173,8 @@ class SchemaParityTests(TestCase):
         for list_name, model in self.MODEL_BY_SECTION.items():
             declared = set(getattr(schema, list_name))
             model_fields = {field.name for field in model._meta.fields}
+            if model is Participant:
+                model_fields |= set(PARTY_FACADE_FIELDS)
             excluded = self.FIELDS_EXCLUDED_FROM_ARCHIVE[list_name]
             self.assertEqual(
                 declared,

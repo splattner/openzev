@@ -333,7 +333,7 @@ class UserListCreateView(generics.ListCreateAPIView):
                 zev_access.active_grants_prefetch(),
                 Prefetch(
                     "participations",
-                    queryset=Participant.objects.select_related("zev")
+                    queryset=Participant.objects.select_related(None).select_related("zev")
                     .only("id", "user_id", "zev_id", "valid_from", "valid_to", "zev__name", "zev__disabled_at")
                     .order_by("valid_from", "id"),
                 ),

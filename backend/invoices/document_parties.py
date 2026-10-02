@@ -15,14 +15,18 @@ The PDF reads only the copy (``invoices.pdf``).
 Schema (both plain JSON objects, every value a string unless noted):
 
 ``issuer``
-    ``name``, ``name_lines`` (list of strings), ``address_line1``,
-    ``address_line2``, ``postal_code``, ``city``, ``email``, ``phone``,
-    ``iban``, ``bank_name``, ``vat_number``, ``zev_name``, and
-    ``from_participant`` (bool: whether the issuer is a person or company on
-    record, rather than the ZEV name alone).
+    ``party`` (UUID or ``""``), ``kind``, ``organisation_name``,
+    ``name_addition``, ``name``, ``name_lines`` (list of strings),
+    ``address_line1``, ``address_line2``, ``postal_code``, ``city``, ``email``,
+    ``phone``, ``iban``, ``bank_name``, ``vat_number``, ``zev_name``, and
+    ``from_participant`` (bool: whether the issuer is a party on record,
+    rather than the ZEV name alone).
 ``recipient``
-    ``name``, ``name_lines``, ``title``, ``first_name``, ``last_name``,
+    ``party``, ``kind``, ``organisation_name``, ``name_addition``, ``name``,
+    ``name_lines``, ``title``, ``first_name``, ``last_name``,
     ``address_line1``, ``address_line2``, ``postal_code``, ``city``, ``email``.
+
+A copy written before parties existed lacks the party keys; they read as empty.
 """
 
 from __future__ import annotations
@@ -36,28 +40,36 @@ def _text(value) -> str:
     return (value or "").strip() if isinstance(value, str) else ("" if value is None else str(value))
 
 
-def issuer_participant(zev):
-    """The participant row the issuer block is taken from: the ZEV owner's own.
+def issuer_party(zev):
+    """The party the issuer block is taken from: the ZEV owner's own.
 
-    Phase 2 of #761 replaces this with the dated issuer role.
+    The party of the owner account's participation in the ZEV. The dated
+    issuer role replaces this lookup (#761 phase 2).
     """
+    from zev.models import Party
+
     if zev.owner_id is None:
         return None
-    return (
-        zev.participants.filter(user_id=zev.owner_id)
-        .only("title", "first_name", "last_name", "email", "phone",
-              "address_line1", "address_line2", "postal_code", "city")
-        .first()
-    )
+    return Party.objects.filter(zev=zev, participations__user_id=zev.owner_id).first()
+
+
+def _party_keys(party) -> dict:
+    return {
+        "party": str(party.pk) if party is not None else "",
+        "kind": _text(getattr(party, "kind", "")),
+        "organisation_name": _text(getattr(party, "organisation_name", "")),
+        "name_addition": _text(getattr(party, "name_addition", "")),
+    }
 
 
 def build_issuer(zev) -> dict:
     """The issuer block for an invoice of ``zev``, from today's data."""
-    party = issuer_participant(zev)
-    name = party.full_name if party else zev.name
+    party = issuer_party(zev)
+    name = party.display_name if party else zev.name
     return {
+        **_party_keys(party),
         "name": _text(name),
-        "name_lines": [_text(name)],
+        "name_lines": [_text(line) for line in party.name_lines] if party else [_text(name)],
         "address_line1": _text(getattr(party, "address_line1", "")),
         "address_line2": _text(getattr(party, "address_line2", "")),
         "postal_code": _text(getattr(party, "postal_code", "")),
@@ -74,9 +86,11 @@ def build_issuer(zev) -> dict:
 
 def build_recipient(participant) -> dict:
     """The recipient block for an invoice billed to ``participant``."""
+    party = participant.party
     return {
-        "name": _text(participant.full_name),
-        "name_lines": [_text(participant.full_name)],
+        **_party_keys(party),
+        "name": _text(party.display_name),
+        "name_lines": [_text(line) for line in party.name_lines],
         "title": _text(participant.title),
         "first_name": _text(participant.first_name),
         "last_name": _text(participant.last_name),
@@ -186,9 +200,11 @@ def template_parties(invoice, issuer: dict, recipient: dict) -> dict:
         "owner_participant": IssuerView(issuer) if issuer.get("from_participant") else None,
         "participant": FrozenView(invoice.participant, {
             "full_name": recipient.get("name", ""),
+            "display_name": recipient.get("name", ""),
             **{key: recipient[key] for key in (
                 "title", "first_name", "last_name", "address_line1", "address_line2",
-                "postal_code", "city", "email",
+                "postal_code", "city", "email", "kind", "organisation_name", "name_addition",
+                "name_lines",
             ) if key in recipient},
         }),
         "zev": FrozenView(invoice.zev, {

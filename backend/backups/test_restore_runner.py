@@ -64,7 +64,7 @@ class RestoreRunnerTestCase(TestCase):
 
     def damage(self):
         Zev.objects.filter(pk=self.alpha_id).update(name="Damaged")
-        Participant.objects.filter(zev_id=self.alpha_id, first_name="Alice").delete()
+        Participant.objects.filter(zev_id=self.alpha_id, party__first_name="Alice").delete()
         MeterReading.objects.filter(metering_point__zev_id=self.alpha_id).delete()
 
     def events(self, action_type):

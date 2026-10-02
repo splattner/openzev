@@ -281,6 +281,7 @@ export const fr = {
             dueDate: 'Date d\'échéance',
             participant: 'Participant',
             fullName: 'Nom complet',
+            nameAddition: 'Deuxième ligne de nom (p. ex. autre membre du ménage)',
             addressLine1: 'Adresse ligne 1',
             addressLine2: 'Adresse ligne 2',
             postalCode: 'Code postal',

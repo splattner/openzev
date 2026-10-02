@@ -281,6 +281,7 @@ export const de = {
             dueDate: 'Fälligkeitsdatum',
             participant: 'Teilnehmer',
             fullName: 'Vollständiger Name',
+            nameAddition: 'Zweite Namenszeile (z. B. weitere Person im Haushalt)',
             addressLine1: 'Adresszeile 1',
             addressLine2: 'Adresszeile 2',
             postalCode: 'Postleitzahl',

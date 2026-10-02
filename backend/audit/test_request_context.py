@@ -230,7 +230,7 @@ class AuditMixinAtomicityTests(AuditApiTestCase):
         ):
             with self.assertRaises(DatabaseError):
                 self._create_participant(email="rollback@example.com")
-        self.assertFalse(Participant.objects.filter(email="rollback@example.com").exists())
+        self.assertFalse(Participant.objects.filter(party__email="rollback@example.com").exists())
 
     def test_destroy_emits_audit_event(self):
         participant_id = str(self.participant.id)

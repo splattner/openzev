@@ -36,7 +36,7 @@ def compute_period_overview(*, zev, period_start: date_type, period_end: date_ty
     participants = list(
         active_during(
             Participant.objects.filter(zev=zev), period_start, period_end
-        ).order_by("last_name", "first_name")
+        ).order_by("party__sort_name", "party__first_name", "id")
     )
 
     # Newest invoice wins per participant (deterministic across readiness and
@@ -46,7 +46,7 @@ def compute_period_overview(*, zev, period_start: date_type, period_end: date_ty
         zev=zev,
         period_start=period_start,
         period_end=period_end,
-    ).select_related("participant", "zev").order_by("-created_at", "-id")
+    ).select_related("participant__party", "zev").order_by("-created_at", "-id")
     invoice_rows = invoice_rows.prefetch_related("items", "email_logs").annotate(
         last_email_status=Subquery(
             EmailLog.objects.filter(invoice=OuterRef("pk")).order_by("-created_at", "-id").values("status")[:1]
@@ -81,7 +81,7 @@ def compute_period_overview(*, zev, period_start: date_type, period_end: date_ty
         participants += list(
             Participant.objects.filter(
                 zev=zev, id__in=invoice_participant_ids - participant_ids
-            ).order_by("last_name", "first_name")
+            ).order_by("party__sort_name", "party__first_name", "id")
         )
 
     rows = []

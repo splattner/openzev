@@ -33,7 +33,7 @@ class Command(BaseCommand):
                 "Enable it in Admin → System Settings → Features before running this command."
             )
 
-        participants = Participant.objects.exclude(address_line1="").exclude(city="")
+        participants = Participant.objects.exclude(party__address_line1="").exclude(party__city="")
 
         geocoded = 0
         for participant in participants:

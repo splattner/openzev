@@ -1107,7 +1107,7 @@ class Command(BaseCommand):
         EmailLog.objects.filter(invoice__zev__in=[zev, second_zev]).delete()
         for invoice in Invoice.objects.filter(
             zev__in=[zev, second_zev], sent_at__isnull=False
-        ).select_related("participant", "zev"):
+        ).select_related("participant__party", "zev"):
             subject_template = invoice.zev.email_subject_template or DEFAULT_INVOICE_EMAIL_SUBJECT
             # A presenter may have added other {placeholders} to the template in
             # the settings UI; fall back to the default subject rather than
@@ -1141,7 +1141,7 @@ class Command(BaseCommand):
         # (``handle`` is atomic), so it is warned and skipped.
         for participant in Participant.objects.filter(
             zev__in=[zev, second_zev],
-            first_name__in=["Anna", "Clara"],
+            party__first_name__in=["Anna", "Clara"],
         ):
             try:
                 issue_contract_pdf(participant, issued_by=owner)
@@ -1166,8 +1166,8 @@ class Command(BaseCommand):
             second_zev=second_zev,
         )
 
-        anna_participant = Participant.objects.get(zev=zev, first_name="Anna")
-        clara_participant = Participant.objects.get(zev=second_zev, first_name="Clara")
+        anna_participant = Participant.objects.get(zev=zev, party__first_name="Anna")
+        clara_participant = Participant.objects.get(zev=second_zev, party__first_name="Clara")
         sent_invoice = Invoice.objects.filter(zev=zev, status=InvoiceStatus.SENT).first()
         draft_invoice = Invoice.objects.filter(zev=zev, status=InvoiceStatus.DRAFT).first()
         grid_tariff = (
@@ -1399,24 +1399,23 @@ class Command(BaseCommand):
         city: str,
         valid_from: date,
     ) -> Participant:
-        participant, _ = Participant.objects.update_or_create(
-            zev=zev,
-            first_name=first_name,
-            last_name=last_name,
-            defaults={
-                "user": user,
-                "title": title,
-                "email": email,
-                "phone": phone,
-                "address_line1": address_line1,
-                "postal_code": postal_code,
-                "city": city,
-                "valid_from": valid_from,
-                # A re-seed is the refresh: any manually-ended window is
-                # reopened so the seed's assignments stay open-ended.
-                "valid_to": None,
-            },
-        )
+        participant = Participant.objects.filter(
+            zev=zev, party__first_name=first_name, party__last_name=last_name,
+        ).first() or Participant(zev=zev)
+        participant.first_name = first_name
+        participant.last_name = last_name
+        participant.user = user
+        participant.title = title
+        participant.email = email
+        participant.phone = phone
+        participant.address_line1 = address_line1
+        participant.postal_code = postal_code
+        participant.city = city
+        participant.valid_from = valid_from
+        # A re-seed is the refresh: any manually-ended window is reopened so
+        # the seed's assignments stay open-ended.
+        participant.valid_to = None
+        participant.save()
         return participant
 
     def _upsert_metering_point(

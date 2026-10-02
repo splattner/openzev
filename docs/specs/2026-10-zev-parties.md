@@ -96,9 +96,11 @@ is read-only for non-admins (unchanged rule). Frontend: the Parties tab sits in 
 | `postal_code` | `CharField(10)` | `""` | blank |
 | `city` | `CharField(100)` | `""` | blank |
 | `notes` | `TextField` | `""` | blank |
+| `sort_name` | `CharField(200)`, indexed, not editable | `""` | `organisation_name` (organisation) or `last_name` (person), set by `save()` |
 | `created_at`, `updated_at` | `DateTimeField` | auto | |
 
-`Meta.ordering = ["organisation_name", "last_name", "first_name", "id"]`.
+`Meta.ordering = ["sort_name", "first_name", "id"]`, so organisations sort by
+their name among people sorted by last name.
 
 **`clean()`:** a `person` needs `last_name` (`"A person needs a last name."`); an
 `organisation` needs `organisation_name` (`"An organisation needs a name."`).
@@ -125,10 +127,11 @@ and city present).
 
 | Change | Detail |
 |---|---|
-| `party` | New FK → `Party`, `PROTECT`, `related_name="participations"`; must be in the same ZEV (`clean()`: `"The party belongs to another ZEV."`) |
+| `party` | New FK → `Party`, `RESTRICT`, `related_name="participations"`; must be in the same ZEV (`clean()`: `"The party belongs to another ZEV."`). `RESTRICT` (not `PROTECT`) so that deleting a ZEV cascades to both its parties and its participants |
 | `title`, `first_name`, `last_name`, `email`, `phone`, `address_line1`, `address_line2`, `postal_code`, `city` | Columns removed; become facade properties (§4.3) |
 | `full_name` | Property → `party.display_name` (an organisation participant shows its organisation name everywhere `full_name` is read) |
-| `Meta.ordering` | `["party__organisation_name", "party__last_name", "party__first_name", "id"]` |
+| `Meta.ordering` | `["party__sort_name", "party__first_name", "id"]` |
+| Manager | `ParticipantManager` (default and base manager) always `select_related("party")`; a queryset that uses `.only()` without party fields calls `select_related(None)` first |
 
 `Participant.Title` stays as an alias of `PartyTitle` so `Participant.Title.MS` keeps working.
 
@@ -148,8 +151,11 @@ names. `save()` (in one `transaction.atomic()`):
 2. A party and staged values: write them to the party, `full_clean()`, save it.
 3. Clear `_pending`, save the participant.
 
-`kind`, `organisation_name` and `name_addition` are staged the same way. `refresh_from_db()`
-clears `_pending`. ORM lookups do not go through the facade: every `filter`, `order_by`,
+`kind`, `organisation_name` and `name_addition` are staged the same way
+(`PARTY_FACADE_FIELDS` lists all twelve). `save(update_fields=[…])` routes facade
+names to the party and saves only the rest on the participant (no participant
+write when nothing else is left). `refresh_from_db()` clears `_pending`;
+`refresh_from_db(fields=[…])` refreshes facade names on the party. ORM lookups do not go through the facade: every `filter`, `order_by`,
 `values` and `select_related` on the moved fields uses `party__<field>`
 (`invoices/period_overview.py`, `invoices/annual_statement_export.py`, `zev/transfer/export.py`,
 participant search in `zev/views.py`, `Meta.ordering`), and querysets that read names add
@@ -213,7 +219,7 @@ share a day.
 | `organisation_name` | read/write | |
 | `name_addition` | read/write | |
 | `display_name` | read-only | `party.display_name` |
-| `roles` | read-only | `[{role, valid_from, valid_to}]` of the party, active today or later |
+| `roles` | read-only | `[{role, valid_from, valid_to}]` of the party, active today or later (from PR 4) |
 
 Name/contact/address fields write through to the party (shared by every participation of it).
 Validation: a person needs `last_name`, an organisation `organisation_name`; attaching to a party
@@ -276,12 +282,20 @@ The admin "change owner" (`PATCH zev.owner`) is gone.
 Without an issuer on that day: name = ZEV name, no address (`from_participant` → renamed
 `from_party: false`), as today without an owner row.
 
-### 7.2 Issuer copy schema change
+### 7.2 Issuer copy schema change (PR 3)
 
-`Invoice.issuer` gains `party` (UUID string), `kind`, `organisation_name`, `name_addition`, and
-`name_lines` from `Party.name_lines`; `Invoice.recipient` the same from the participant's party.
-`from_participant` is kept as an alias key of `from_party`. Old copies stay valid (missing keys
-read as empty).
+`Invoice.issuer` and `Invoice.recipient` gain `party` (UUID string or `""`), `kind`,
+`organisation_name` and `name_addition`, and take `name` / `name_lines` from the party's
+`display_name` / `name_lines`. The issuer is the party of the owner account's participation
+(`document_parties.issuer_party`) until PR 4 moves it to the dated role. Old copies stay valid
+(missing keys read as empty). The QR bill's creditor and debtor names are the copy's
+`name_lines` joined on one line, cut at 70 characters (`pdf._qr_name`). In the invoice
+template context, `participant.display_name`, `.name_lines`, `.kind`,
+`.organisation_name` and `.name_addition` come from the recipient copy.
+
+The built-in invoice, contract and annual-statement templates print `name_addition` after
+the issuer's and the participant's name. The conditional is inline, so a party without one
+renders byte-identical HTML and no contract version is minted by the template change.
 
 ### 7.3 Template variables
 
@@ -369,12 +383,17 @@ Keys in all four locales under `pages.zevSettings.tabs.parties`, `pages.zevSetti
 
 ## 9. Transfer archive and backups
 
-- Archive **format version 5**: new sections `parties` (`PARTY_FIELDS` + archive `id`) and
+- PR 3 keeps format version 4: `PARTICIPANT_FIELDS` gains the optional `kind`,
+  `organisation_name` and `name_addition`, the importer builds one party per participant
+  from the flat fields (`Party.full_clean()` first), and an older archive imports every
+  participant as a person.
+- PR 5, archive **format version 5**: new sections `parties` (`PARTY_FIELDS` + archive `id`) and
   `party_roles` (`party_id`, `role`, `valid_from`, `valid_to`), written before participants;
   `PARTICIPANT_FIELDS` loses the moved fields and gains `party_id`.
 - Importing v1–4: one party per participant from its fields (`kind=person`), no roles (the
   archive never named the owner).
-- `backups/registry.py`: `zev.Party` and `zev.ZevPartyRole` in the per-ZEV section;
+- `backups/registry.py`: `zev.Party` (PR 3, written before `zev.Participant`) and
+  `zev.ZevPartyRole` (PR 4) in the per-ZEV section;
   `restore_zev.py` drops the `owner_id` account transform.
 
 ## 10. Observability and audit
@@ -389,7 +408,7 @@ through the participant endpoints keep the existing participant audit events.
 |---|---|
 | 1 | Invoice issuer/recipient copy — shipped (#875) |
 | 2 | This spec + ADR 0028 |
-| 3 | `Party`, `Participant.party`, facade, data migration (one party per participant), ORM lookups, `kind` / `organisation_name` / `name_addition` / `display_name` in API, copy and QR — no other behaviour change |
+| 3 | `Party`, `Participant.party`, facade, migrations `zev.0032_party` / `0033_participant_parties_data` / `0034_participant_party_required` (one party per participant), ORM lookups, `kind` / `organisation_name` / `name_addition` / `display_name` in API, copy, QR and built-in templates — no other behaviour change |
 | 4 | `ZevPartyRole`, `zev/parties.py`, data migration (issuer + landowner from the owner's party; a party from the owner account when it has no participant row), issuer by date in copy / contract / statement / reports, template variables and catalogue, read-only party and role endpoints |
 | 5 | Drop `Zev.owner`: creation flows with explicit grants and roles, `ZevSerializer.issuer`, admin owner dialog removed, transfer v5, backups, frontend owner reads replaced |
 | 6 | Party and role write endpoints, Parties tab, participant form and badges, user guide |
@@ -406,12 +425,17 @@ through the participant endpoints keep the existing participant audit events.
 
 ## 13. Test plan
 
-- **PR 3** `zev/test_parties.py`: party validation (person/organisation), `display_name` /
-  `name_lines` / `qr_name`; the facade (construct with kwargs, read, edit through, two
-  participations share edits, refresh clears staged values); the migration (one party per
-  participant, fields copied); `ParticipantSerializer` (new fields, `party` attach in the same
-  ZEV only); ordering by party name; an organisation participant on the invoice copy and QR
-  bill. Full suite unchanged.
+- **PR 3** `zev/test_parties.py` (16, shipped): `PartyTests` (4: validation by kind, names
+  and name lines, the 70-character QR name, sorting organisations among people),
+  `ParticipantFacadeTests` (7: creating makes the party, edits write through incl.
+  `update_fields`, two participations share edits, refresh drops staged values, another ZEV's
+  party refused, an organisation participant's recipient copy, the QR debtor name with the
+  second line), `ParticipantApiTests` (4: organisation participant, names required by kind, a
+  second participation of the same party, another ZEV's party refused), `PartyMigrationTests`
+  (1: forward copies every field into a party, backward restores them). The rest of the suite
+  moved its name lookups to `party__…`; `zev/test_onboarding.py`'s upgrade test now writes its
+  rows with the historical models. Golden check on the dev data: 21 invoices, 9 contracts and
+  18 annual statements render byte-identical HTML before and after.
 - **PR 4** `zev/test_party_roles.py`: constraints, `assign_role` ending the previous holder,
   refusing a later holder, landowner duplicates, `end_role` deleting empty windows; the
   migration (issuer from the owner row, a new party when none); invoice / contract / statement

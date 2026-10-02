@@ -87,17 +87,20 @@ participant's address changed (`invoices/document_parties.py`).
 
 | Key | `issuer` | `recipient` |
 |---|---|---|
-| `name` | owner participant's `full_name`, else `Zev.name` | participant `full_name` |
-| `name_lines` | `[name]` (list; a second line arrives with organisation parties) | `[name]` |
+| `party` | UUID of the issuer's party, or `""` | UUID of the participant's party |
+| `kind`, `organisation_name`, `name_addition` | the issuer party's | the participant's party's |
+| `name` | issuer party's `display_name`, else `Zev.name` | party `display_name` |
+| `name_lines` | party `name_lines` (display name, then `name_addition`), else `[name]` | party `name_lines` |
 | `title`, `first_name`, `last_name` | — | participant fields |
-| `address_line1`, `address_line2`, `postal_code`, `city`, `email` | owner participant's | participant's |
-| `phone` | owner participant's | — |
+| `address_line1`, `address_line2`, `postal_code`, `city`, `email` | issuer party's | participant's party's |
+| `phone` | issuer party's | — |
 | `iban`, `bank_name`, `vat_number`, `zev_name` | `Zev.bank_iban`, `bank_name`, `vat_number`, `name` | — |
 | `from_participant` | bool: an owner participant row exists | — |
 
-The owner participant is the ZEV owner's participant row
-(`issuer_participant(zev)`, the lookup the PDF used before); phase 2 of #761
-replaces it with the dated issuer role.
+The issuer party is the party of the ZEV owner account's participation
+(`issuer_party(zev)`); the dated issuer role replaces it (SPEC-2026-10-zev-parties).
+Copies written before parties existed lack the party keys, which read as empty.
+The QR bill names are the `name_lines` on one line, at most 70 characters.
 
 **Lifecycle of the copy.**
 

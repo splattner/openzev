@@ -45,7 +45,9 @@ from tariffs.dynamic.adapters import DynamicApiVersion
 from tariffs.dynamic.models import DynamicTariffSource, FetchStatus
 from tariffs.dynamic.protocol import V2_PRODUCT_REQUIRED
 from tariffs.models import BillingMode, PeriodType, Tariff, TariffPeriod
-from zev.models import MeteringPoint, MeteringPointAssignment, Participant, VatMode, Zev
+from zev.models import (
+    PARTY_FACADE_FIELDS, MeteringPoint, MeteringPointAssignment, Participant, Party, VatMode, Zev,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -321,9 +323,15 @@ def _import_participants(archive, zev, collector):
                 {"id": [f"Duplicate participant source id '{source_id}'."]},
             )
             continue
-        participant = Participant(zev=zev, **fields)
+        party = Party(zev=zev, **{name: value for name, value in fields.items() if name in PARTY_FACADE_FIELDS})
+        participant = Participant(
+            zev=zev, **{name: value for name, value in fields.items() if name not in PARTY_FACADE_FIELDS},
+        )
         try:
             with transaction.atomic():  # savepoint: one rejection must not poison the rest
+                party.full_clean(exclude=["zev"])
+                party.save()
+                participant.party = party
                 participant.full_clean(exclude=["zev", "user"])
                 participant.save()
         except (DjangoValidationError, ValueError, TypeError) as exc:

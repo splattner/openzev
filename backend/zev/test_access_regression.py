@@ -76,7 +76,7 @@ class AccessWorldMixin:
             email="olivia@example.com", valid_from=date(2026, 1, 1),
         )
         # Bob holds Alpha's consumption meter; the tenant is Bob.
-        cls.tenant_participant = Participant.objects.get(zev=cls.alpha, first_name="Bob")
+        cls.tenant_participant = Participant.objects.get(zev=cls.alpha, party__first_name="Bob")
         cls.tenant_participant.user = cls.tenant
         cls.tenant_participant.save()
         cls.tenant_meter = MeteringPoint.objects.get(meter_id="ALPHA-CONS-1")
@@ -91,7 +91,7 @@ class AccessWorldMixin:
             status=InvoiceStatus.DRAFT, total_chf=Decimal("11.00"),
         )
         cls.beta_draft = Invoice.objects.create(
-            zev=cls.beta, participant=Participant.objects.get(zev=cls.beta, first_name="Bob"),
+            zev=cls.beta, participant=Participant.objects.get(zev=cls.beta, party__first_name="Bob"),
             invoice_number="BETA-BOB-DRAFT", period_start=date(2026, 3, 1), period_end=date(2026, 3, 31),
             status=InvoiceStatus.DRAFT, total_chf=Decimal("12.00"),
         )
@@ -158,7 +158,7 @@ class SingleRelationshipVisibilityMatrixTests(AccessWorldMixin, TestCase):
                         self.assertEqual(_ids(response), expected)
 
     def test_owner_cannot_open_another_communitys_rows(self):
-        beta_bob = Participant.objects.get(zev=self.beta, first_name="Bob")
+        beta_bob = Participant.objects.get(zev=self.beta, party__first_name="Bob")
         beta_rows = {
             "zev": f"/api/v1/zev/zevs/{self.beta.pk}/",
             "participant": f"/api/v1/zev/participants/{beta_bob.pk}/",
@@ -173,7 +173,7 @@ class SingleRelationshipVisibilityMatrixTests(AccessWorldMixin, TestCase):
 
     def test_tenant_opens_only_their_own_sent_invoice(self):
         client = self.client_as("tenant")
-        alice_invoice = Invoice.objects.get(zev=self.alpha, participant__first_name="Alice")
+        alice_invoice = Invoice.objects.get(zev=self.alpha, participant__party__first_name="Alice")
         self.assertEqual(client.get(f"/api/v1/invoices/invoices/{self.tenant_sent.pk}/").status_code, 200)
         self.assertEqual(client.get(f"/api/v1/invoices/invoices/{self.tenant_draft.pk}/").status_code, 404)
         self.assertEqual(client.get(f"/api/v1/invoices/invoices/{alice_invoice.pk}/").status_code, 404)
@@ -225,7 +225,7 @@ class SingleRelationshipVisibilityMatrixTests(AccessWorldMixin, TestCase):
 
     def test_self_service_statement_matrix(self):
         url = "/api/v1/invoices/invoices/annual-statement/"
-        beta_bob = Participant.objects.get(zev=self.beta, first_name="Bob")
+        beta_bob = Participant.objects.get(zev=self.beta, party__first_name="Bob")
         with mock.patch("invoices.views_reports.generate_annual_statement_pdf", return_value=b"%PDF-stub"):
             self.assertEqual(self.client_as("tenant").get(url, {"year": 2026}).status_code, 200)
             # A guest is not treated as self-service (that keys on the
@@ -284,8 +284,8 @@ class SingleRelationshipWriteMatrixTests(AccessWorldMixin, TestCase):
         self.assert_matrix("patch", f"/api/v1/zev/zevs/{self.beta.pk}/", (200, 404, 403, 403), {"notes": "x"})
 
     def test_participant_edit(self):
-        alice = Participant.objects.get(zev=self.alpha, first_name="Alice")
-        beta_alice = Participant.objects.get(zev=self.beta, first_name="Alice")
+        alice = Participant.objects.get(zev=self.alpha, party__first_name="Alice")
+        beta_alice = Participant.objects.get(zev=self.beta, party__first_name="Alice")
         self.assert_matrix("patch", f"/api/v1/zev/participants/{alice.pk}/", (200, 200, 403, 403), {"city": "Bern"})
         self.assert_matrix("patch", f"/api/v1/zev/participants/{beta_alice.pk}/", (200, 404, 403, 403), {"city": "Bern"})
 
@@ -326,7 +326,7 @@ class SingleRelationshipWriteMatrixTests(AccessWorldMixin, TestCase):
         self.assert_matrix("post", f"/api/v1/zev/zevs/{self.beta.pk}/disable/", (200, 404, 403, 403), {"reason": "x"})
 
     def test_account_linking_is_admin_only(self):
-        alice = Participant.objects.get(zev=self.alpha, first_name="Alice")
+        alice = Participant.objects.get(zev=self.alpha, party__first_name="Alice")
         self.assert_matrix(
             "post", f"/api/v1/zev/participants/{alice.pk}/link-account/",
             (200, 403, 403, 403), {"user_id": self.guest.pk},

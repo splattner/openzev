@@ -18,7 +18,7 @@ class EmailLogInline(admin.TabularInline):
 class InvoiceAdmin(admin.ModelAdmin):
     list_display = ("invoice_number", "participant", "zev", "period_start", "period_end", "total_chf", "status")
     list_filter = ("status", "zev")
-    search_fields = ("invoice_number", "participant__first_name", "participant__last_name")
+    search_fields = ("invoice_number", "participant__party__first_name", "participant__party__last_name", "participant__party__organisation_name")
     inlines = [InvoiceItemInline, EmailLogInline]
     readonly_fields = ("invoice_number", "created_at", "updated_at")
     date_hierarchy = "period_end"

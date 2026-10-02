@@ -106,7 +106,7 @@ class ViewerTests(GrantWorldMixin, TestCase):
 
     def test_disabled_zev_stays_readable_and_not_writable(self):
         Zev.objects.filter(pk=self.alpha.pk).update(disabled_at=timezone.now())
-        alice = Participant.objects.get(zev=self.alpha, first_name="Alice")
+        alice = Participant.objects.get(zev=self.alpha, party__first_name="Alice")
         url = f"/api/v1/zev/participants/{alice.pk}/"
         self.assertEqual(self.client_as("viewer").get(url).status_code, 200)
         self.assertEqual(self.client_as("viewer").patch(url, {"city": "x"}, format="json").status_code, 403)
@@ -150,7 +150,7 @@ class ViewerWriteRouterWalkTests(GrantWorldMixin, TestCase):
         log = EmailLog.objects.create(invoice=self.tenant_draft, recipient="x@example.com", subject="s", status="sent")
         return {
             Zev: self.alpha.pk,
-            Participant: Participant.objects.get(zev=self.alpha, first_name="Alice").pk,
+            Participant: Participant.objects.get(zev=self.alpha, party__first_name="Alice").pk,
             MeteringPoint: self.tenant_meter.pk,
             MeteringPointAssignment: MeteringPointAssignment.objects.filter(metering_point__zev=self.alpha).first().pk,
             Tariff: tariff.pk,
@@ -232,7 +232,7 @@ class ViewerWriteRouterWalkTests(GrantWorldMixin, TestCase):
 
 class MultiRelationshipScopingTests(GrantWorldMixin, TestCase):
     def test_a_tenant_in_two_communities_sees_both(self):
-        beta_bob = Participant.objects.get(zev=self.beta, first_name="Bob")
+        beta_bob = Participant.objects.get(zev=self.beta, party__first_name="Bob")
         beta_bob.user = self.tenant
         beta_bob.save()
         Invoice.objects.filter(pk=self.beta_draft.pk).update(status=InvoiceStatus.SENT)
@@ -244,7 +244,7 @@ class MultiRelationshipScopingTests(GrantWorldMixin, TestCase):
         )
 
     def test_an_owner_who_rents_elsewhere_sees_their_own_rows_there(self):
-        beta_alice = Participant.objects.get(zev=self.beta, first_name="Alice")
+        beta_alice = Participant.objects.get(zev=self.beta, party__first_name="Alice")
         beta_alice.user = self.owner
         beta_alice.save()
         beta_invoice = Invoice.objects.get(zev=self.beta, participant=beta_alice)
@@ -307,7 +307,7 @@ class FormerParticipantTests(GrantWorldMixin, TestCase):
             self.assertEqual(client.get("/api/v1/invoices/invoices/annual-statement/", {"year": 2026}).status_code, 404)
 
     def test_a_current_row_elsewhere_keeps_that_community(self):
-        beta_bob = Participant.objects.get(zev=self.beta, first_name="Bob")
+        beta_bob = Participant.objects.get(zev=self.beta, party__first_name="Bob")
         beta_bob.user = self.tenant
         beta_bob.save()
         self.assertEqual(

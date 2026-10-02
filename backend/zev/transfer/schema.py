@@ -127,7 +127,14 @@ ZEV_FIELDS = (
     "additional_contract_notes",
 )
 
+# The name, contact and address fields are the participant's party's (ADR
+# 0028); an archive keeps them flat on each participant. ``kind``,
+# ``organisation_name`` and ``name_addition`` are optional: an archive written
+# before parties existed imports every participant as a person.
 PARTICIPANT_FIELDS = (
+    "kind",
+    "organisation_name",
+    "name_addition",
     "title",
     "first_name",
     "last_name",

@@ -281,6 +281,7 @@ export const it = {
             dueDate: 'Data di scadenza',
             participant: 'Partecipante',
             fullName: 'Nome completo',
+            nameAddition: 'Seconda riga del nome (ad es. altro membro del nucleo)',
             addressLine1: 'Indirizzo riga 1',
             addressLine2: 'Indirizzo riga 2',
             postalCode: 'CAP',

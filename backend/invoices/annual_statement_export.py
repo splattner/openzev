@@ -102,7 +102,7 @@ def _eligible_participants(zev, year: int):
     """Participants active at any point during ``year``, in display order."""
     return list(
         active_during(zev.participants, date(year, 1, 1), date(year, 12, 31))
-        .order_by("last_name", "first_name")
+        .order_by("party__sort_name", "party__first_name", "id")
     )
 
 

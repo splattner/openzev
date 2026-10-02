@@ -285,18 +285,170 @@ class Zev(models.Model):
         return num
 
 
-class Participant(models.Model):
-    """A person or entity participating in a ZEV."""
+class ParticipantManager(models.Manager):
+    """Participants always come with their party: almost every read of a
+    participant reads its name or address (ADR 0028)."""
 
-    class Title(models.TextChoices):
-        MR = "mr", "Mr."
-        MRS = "mrs", "Mrs."
-        MS = "ms", "Ms."
-        DR = "dr", "Dr."
-        PROF = "prof", "Prof."
+    def get_queryset(self):
+        return super().get_queryset().select_related("party")
+
+
+class PartyKind(models.TextChoices):
+    PERSON = "person", "Person"
+    ORGANISATION = "organisation", "Organisation"
+
+
+class PartyTitle(models.TextChoices):
+    MR = "mr", "Mr."
+    MRS = "mrs", "Mrs."
+    MS = "ms", "Ms."
+    DR = "dr", "Dr."
+    PROF = "prof", "Prof."
+
+
+# A party's names, contact data and address: the fields Participant reads
+# through to (its facade, ADR 0028).
+PARTY_FACADE_FIELDS = (
+    "kind",
+    "title",
+    "first_name",
+    "last_name",
+    "organisation_name",
+    "name_addition",
+    "email",
+    "phone",
+    "address_line1",
+    "address_line2",
+    "postal_code",
+    "city",
+)
+
+# The party fields a name is built from (display_name, name_lines).
+PARTY_NAME_FIELDS = ("kind", "title", "first_name", "last_name", "organisation_name", "name_addition")
+
+QR_NAME_MAX_LENGTH = 70
+
+
+class Party(models.Model):
+    """A person or organisation of a ZEV (#761, ADR 0028).
+
+    Whoever the ZEV deals with is a party: its participants (each participation
+    is a ``Participant`` row of a party), the issuer of its invoices, its
+    representative toward the grid operator, its landowners — and contacts that
+    are none of these yet. A party belongs to one ZEV; the same company in two
+    ZEVs is two parties.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    zev = models.ForeignKey("Zev", on_delete=models.CASCADE, related_name="parties")
+    kind = models.CharField(max_length=20, choices=PartyKind.choices, default=PartyKind.PERSON)
+    title = models.CharField(max_length=10, choices=PartyTitle.choices, blank=True)
+    first_name = models.CharField(max_length=100, blank=True)
+    last_name = models.CharField(max_length=100, blank=True)
+    organisation_name = models.CharField(max_length=200, blank=True)
+    # A second name line: another member of the household, "c/o …".
+    name_addition = models.CharField(max_length=200, blank=True)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=30, blank=True)
+    address_line1 = models.CharField(max_length=200, blank=True)
+    address_line2 = models.CharField(max_length=200, blank=True)
+    postal_code = models.CharField(max_length=10, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    notes = models.TextField(blank=True)
+    # What lists sort by: the organisation's name or the person's last name.
+    sort_name = models.CharField(max_length=200, blank=True, editable=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_name", "first_name", "id"]
+        verbose_name_plural = "parties"
+
+    def clean(self):
+        super().clean()
+        if self.kind == PartyKind.ORGANISATION and not self.organisation_name.strip():
+            raise ValidationError({"organisation_name": "An organisation needs a name."})
+        if self.kind == PartyKind.PERSON and not self.last_name.strip():
+            raise ValidationError({"last_name": "A person needs a last name."})
+
+    def save(self, *args, **kwargs):
+        self.sort_name = self.compute_sort_name()
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "sort_name" not in update_fields:
+            kwargs["update_fields"] = [*update_fields, "sort_name"]
+        super().save(*args, **kwargs)
+
+    def compute_sort_name(self) -> str:
+        if self.kind == PartyKind.ORGANISATION:
+            return self.organisation_name.strip()
+        return self.last_name.strip()
+
+    @property
+    def person_name(self) -> str:
+        title_display = self.get_title_display() if self.title else ""
+        return f"{title_display} {self.first_name} {self.last_name}".strip()
+
+    @property
+    def display_name(self) -> str:
+        if self.kind == PartyKind.ORGANISATION:
+            return self.organisation_name.strip()
+        return self.person_name
+
+    @property
+    def name_lines(self) -> list[str]:
+        lines = [self.display_name]
+        if self.name_addition.strip():
+            lines.append(self.name_addition.strip())
+        return lines
+
+    @property
+    def qr_name(self) -> str:
+        """The name on a QR bill: one line of at most 70 characters."""
+        return " ".join(self.name_lines)[:QR_NAME_MAX_LENGTH].strip()
+
+    def __str__(self):
+        return self.display_name
+
+
+def _facade_property(name):
+    """A Participant attribute that reads and writes its party's field ``name``.
+
+    A write is staged on the participant and lands on the party when the
+    participant is saved, so ``Participant(first_name=…)`` and
+    ``participant.city = …; participant.save()`` keep working.
+    """
+
+    def getter(self):
+        pending = self.__dict__.get("_party_pending", {})
+        if name in pending:
+            return pending[name]
+        party = self._party_or_none()
+        if party is not None:
+            return getattr(party, name)
+        return Party._meta.get_field(name).get_default()
+
+    def setter(self, value):
+        self.__dict__.setdefault("_party_pending", {})[name] = value
+
+    return property(getter, setter, doc=f"The party's ``{name}`` (read through, ADR 0028).")
+
+
+class Participant(models.Model):
+    """A party's billing relationship with a ZEV (#761, ADR 0028).
+
+    What is about being billed lives here: the dates, the allocation weight,
+    the meter assignments and invoices, the account link. Names, contact data
+    and the address belong to the ``party``; the attributes of the same names
+    on a participant read and write through to it (``PARTY_FACADE_FIELDS``).
+    ORM lookups go through ``party__…``. Several participations may share one
+    party — someone moving within a ZEV, a flat plus a business unit.
+    """
+
+    Title = PartyTitle
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     zev = models.ForeignKey(Zev, on_delete=models.CASCADE, related_name="participants")
+    party = models.ForeignKey(Party, on_delete=models.RESTRICT, related_name="participations")
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -305,15 +457,6 @@ class Participant(models.Model):
         related_name="participations",
         help_text="Linked user account (optional)",
     )
-    title = models.CharField(max_length=10, choices=Title.choices, blank=True)
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    email = models.EmailField(blank=True)
-    phone = models.CharField(max_length=30, blank=True)
-    address_line1 = models.CharField(max_length=200, blank=True)
-    address_line2 = models.CharField(max_length=200, blank=True)
-    postal_code = models.CharField(max_length=10, blank=True)
-    city = models.CharField(max_length=100, blank=True)
     valid_from = models.DateField()
     valid_to = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
@@ -330,13 +473,92 @@ class Participant(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = ParticipantManager()
+
     class Meta:
-        ordering = ["last_name", "first_name", "id"]
+        ordering = ["party__sort_name", "party__first_name", "id"]
+        base_manager_name = "objects"
+
+    for _name in PARTY_FACADE_FIELDS:
+        locals()[_name] = _facade_property(_name)
+    del _name
+
+    def _party_or_none(self):
+        if self.party_id is None:
+            return None
+        return self.party
+
+    def get_title_display(self):
+        title = self.title
+        return PartyTitle(title).label if title in PartyTitle.values else title
 
     @property
-    def full_name(self):
-        title_display = self.get_title_display() if self.title else ""
-        return f"{title_display} {self.first_name} {self.last_name}".strip()
+    def full_name(self) -> str:
+        """The name the participant is billed under (the party's display name)."""
+        party = self._party_or_none()
+        if party is None or self.__dict__.get("_party_pending"):
+            return self._staged_party().display_name
+        return party.display_name
+
+    @property
+    def display_name(self) -> str:
+        return self.full_name
+
+    @property
+    def name_lines(self) -> list[str]:
+        party = self._party_or_none()
+        if party is None or self.__dict__.get("_party_pending"):
+            return self._staged_party().name_lines
+        return party.name_lines
+
+    def _staged_party(self) -> Party:
+        """An unsaved party with the current values, staged ones applied."""
+        values = {name: getattr(self, name) for name in PARTY_FACADE_FIELDS}
+        return Party(zev_id=self.zev_id, **values)
+
+    def clean(self):
+        super().clean()
+        if self.party_id is not None and self.zev_id is not None and self.party.zev_id != self.zev_id:
+            raise ValidationError({"party": "The party belongs to another ZEV."})
+
+    def save(self, *args, **kwargs):
+        pending = self.__dict__.pop("_party_pending", {})
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            # Facade names are party fields: written to the party below.
+            facade = [name for name in update_fields if name in PARTY_FACADE_FIELDS]
+            kwargs["update_fields"] = [name for name in update_fields if name not in PARTY_FACADE_FIELDS]
+            for name in facade:
+                pending.setdefault(name, getattr(self._party_or_none(), name, ""))
+        with transaction.atomic():
+            if self.party_id is None:
+                party = Party(zev_id=self.zev_id, **pending)
+                party.save()
+                self.party = party
+                if kwargs.get("update_fields") is not None:
+                    kwargs["update_fields"] = [*kwargs["update_fields"], "party"]
+            elif pending:
+                party = self.party
+                for name, value in pending.items():
+                    setattr(party, name, value)
+                party.save(update_fields=[*pending, "updated_at"])
+            if kwargs.get("update_fields") == []:
+                return
+            super().save(*args, **kwargs)
+
+    def refresh_from_db(self, using=None, fields=None, from_queryset=None):
+        if fields is None:
+            self.__dict__.pop("_party_pending", None)
+        else:
+            facade = [name for name in fields if name in PARTY_FACADE_FIELDS]
+            fields = [name for name in fields if name not in PARTY_FACADE_FIELDS]
+            if facade and self.party_id is not None:
+                self.party.refresh_from_db(using=using, fields=facade)
+            if not fields:
+                return
+        super().refresh_from_db(using=using, fields=fields, from_queryset=from_queryset)
+        if fields is None and self.party_id is not None and "party" in self._state.fields_cache:
+            self.party.refresh_from_db(using=using)
 
     def __str__(self):
         return f"{self.full_name} ({self.zev.name})"

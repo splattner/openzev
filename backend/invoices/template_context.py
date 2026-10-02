@@ -87,6 +87,8 @@ def build_sample_invoice_context() -> dict:
         },
         "owner_participant": _Obj(
             full_name="Maria Muster",
+
+            name_addition="",
             address_line1="Solarweg 1",
             address_line2="",
             postal_code="8000",
@@ -94,6 +96,8 @@ def build_sample_invoice_context() -> dict:
         ),
         "participant": _Obj(
             full_name="Hans Beispiel",
+
+            name_addition="",
             address_line1="Musterstrasse 42",
             postal_code="3000",
             city="Bern",
@@ -149,6 +153,8 @@ def build_sample_contract_context() -> dict:
     return {
         "participant": _Obj(
             full_name="Hans Beispiel",
+
+            name_addition="",
             address_line1="Musterstrasse 42",
             address_line2="",
             postal_code="3000",
@@ -158,6 +164,8 @@ def build_sample_contract_context() -> dict:
         ),
         "owner_participant": _Obj(
             full_name="Maria Muster",
+
+            name_addition="",
             address_line1="Solarweg 1",
             address_line2="",
             postal_code="8000",
@@ -245,6 +253,8 @@ def build_sample_annual_statement_context() -> dict:
         ),
         "participant": _Obj(
             full_name="Hans Beispiel",
+
+            name_addition="",
             address_line1="Musterstrasse 42",
             address_line2="",
             postal_code="3000",
@@ -252,6 +262,8 @@ def build_sample_annual_statement_context() -> dict:
         ),
         "owner_participant": _Obj(
             full_name="Maria Muster",
+
+            name_addition="",
             address_line1="Solarweg 1",
             address_line2="",
             postal_code="8000",

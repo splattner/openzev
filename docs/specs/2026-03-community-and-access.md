@@ -160,22 +160,46 @@ per ZEV rather than in `AppSettings` because there is no central registry —
 each operator hosts its own address — and one deployment serves ZEVs on
 different operators.
 
-### 3.5 Participant
+### 3.5 Participant and Party
+
+Since #761 phase 2 (ADR 0028, SPEC-2026-10-zev-parties) a participant is a
+**party's** billing relationship with the ZEV. Names, contact data and the
+address are the party's.
+
+**`zev.Party`**
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `UUIDField` (PK) | Auto-generated |
+| `zev` | FK → `Zev` (`CASCADE`, `related_name="parties"`) | A party belongs to one ZEV |
+| `kind` | `CharField(20)` choices `PartyKind` | `person` (default) or `organisation` |
+| `title` | `CharField(10)` choices `PartyTitle` | `mr`, `mrs`, `ms`, `dr`, `prof`, or blank |
+| `first_name`, `last_name` | `CharField(100)`, blank OK | For an organisation: its contact person |
+| `organisation_name` | `CharField(200)`, blank OK | |
+| `name_addition` | `CharField(200)`, blank OK | Second name line (another household member, "c/o …") |
+| `email` | `EmailField`, blank OK | Required at participant API validation level |
+| `phone` | `CharField(30)` | |
+| `address_line1`, `address_line2` | `CharField(200)` | |
+| `postal_code` | `CharField(10)` | |
+| `city` | `CharField(100)` | |
+| `notes` | `TextField` | |
+| `sort_name` | `CharField(200)`, indexed, not editable | `organisation_name` or `last_name`, set on save |
+| `created_at`, `updated_at` | `DateTimeField` (auto) | |
+
+`clean()`: a person needs `last_name`, an organisation `organisation_name`.
+Properties: `person_name` (`"{title_display} {first_name} {last_name}"`),
+`display_name` (organisation name or person name), `name_lines`
+(`display_name`, then `name_addition`), `qr_name` (name lines on one line, at
+most 70 characters). Ordering `["sort_name", "first_name", "id"]`.
+
+**`zev.Participant`**
 
 | Field | Type | Description |
 |---|---|---|
 | `id` | `UUIDField` (PK) | Auto-generated |
 | `zev` | FK → `Zev` (`CASCADE`) | Parent community |
+| `party` | FK → `Party` (`RESTRICT`, `related_name="participations"`) | Same ZEV (`clean()`); several participations may share a party |
 | `user` | FK → `User` (`SET_NULL`, nullable) | Linked user account (optional) |
-| `title` | `CharField(10)` choices `Title` | `mr`, `mrs`, `ms`, `dr`, `prof`, or blank |
-| `first_name` | `CharField(100)` | |
-| `last_name` | `CharField(100)` | |
-| `email` | `EmailField` (blank OK) | Required at API validation level |
-| `phone` | `CharField(30)` | |
-| `address_line1` | `CharField(200)` | |
-| `address_line2` | `CharField(200)` | |
-| `postal_code` | `CharField(10)` | |
-| `city` | `CharField(100)` | |
 | `valid_from` | `DateField` | Start of participation |
 | `valid_to` | `DateField` (nullable) | End of participation (open = active) |
 | `notes` | `TextField` | |
@@ -183,9 +207,19 @@ different operators.
 | `created_at` | `DateTimeField` (auto) | |
 | `updated_at` | `DateTimeField` (auto) | |
 
-**Ordering:** `["last_name", "first_name"]`.
+**Facade:** `kind`, `title`, `first_name`, `last_name`, `organisation_name`,
+`name_addition`, `email`, `phone`, `address_line1`, `address_line2`,
+`postal_code`, `city` (`PARTY_FACADE_FIELDS`) are properties that read the
+party; setting one stages the value, and `save()` creates the party (none yet)
+or writes the staged values to it, in one transaction. `save(update_fields=…)`
+routes facade names to the party. `refresh_from_db()` drops staged values. ORM
+lookups use `party__…`. The default manager (`ParticipantManager`, also the
+base manager) always `select_related("party")`.
 
-**Computed property:** `full_name` → `"{title_display} {first_name} {last_name}"` (stripped).
+**Ordering:** `["party__sort_name", "party__first_name", "id"]`.
+
+**Computed properties:** `full_name` / `display_name` → `party.display_name`;
+`name_lines` → `party.name_lines`; `get_title_display()`.
 
 ### 3.6 MeteringPoint and MeteringPointAssignment
 
@@ -1245,9 +1279,13 @@ IBAN requires `owner_address_line1`, `owner_postal_code`, and `owner_city`.
 **Serializer:** `ParticipantSerializer` with auto-account creation.
 
 On create:
-1. Validate `email` is present (required at serializer level).
+1. Validate `email` is present (required at serializer level), and the name
+   by kind: a person needs `last_name`, an organisation `organisation_name`.
 2. Reject if `user` field is passed directly (accounts are created
    automatically).
+2a. Without `party`, a new party is created from the name, contact and address
+   fields; with `party` (an existing party of the same ZEV, else 400
+   `"The party belongs to another ZEV."`), the new participation shares it.
 3. Call `ensure_participant_account()`:
    - Generates unique username from participant name/email.
    - Creates `User` with `role=user`, `must_change_password=True`,
@@ -1664,10 +1702,15 @@ create (`UserCreateSerializer`) or detail/update (`UserSerializer`).
 
 ### 13.3 ParticipantSerializer
 
-**Fields:** all model fields plus computed:
+**Fields:** `id`, `zev`, `user`, `party` (write on create: attach to an
+existing party; a participation cannot move to another party), the party's
+fields written through — `kind`, `title`, `first_name`, `last_name`,
+`organisation_name`, `name_addition`, `email`, `phone`, `address_line1`,
+`address_line2`, `postal_code`, `city` — `valid_from`, `valid_to`, `notes`,
+`allocation_weight`, `created_at`, `updated_at`, plus computed:
 - `account_username` (read-only, from linked user)
 - `initial_password` (read-only, only present when account is first created)
-- `full_name` (read-only)
+- `full_name`, `display_name` (read-only, the party's display name)
 - `metering_points` (read-only, nested `MeteringPointSerializer`)
 - `has_metering_point_assignment` (read-only, boolean)
 
@@ -1675,7 +1718,8 @@ create (`UserCreateSerializer`) or detail/update (`UserSerializer`).
 - `user` field cannot be set directly ("Participant accounts are created
   automatically.").
 - `email` is required (even though the model allows blank).
-- If user is already linked, their role must be `participant`.
+- A person needs `last_name`, an organisation `organisation_name`.
+- A non-admin may not edit a row whose account has its own login (§8.2).
 
 ### 13.4 ZevSerializer / ZevDetailSerializer
 

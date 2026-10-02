@@ -525,7 +525,7 @@
                     </div>
                     <div class="company-address">
                         {% if owner_participant %}
-                        {{ owner_participant.full_name }}<br>
+                        {{ owner_participant.full_name }}{% if owner_participant.name_addition %}<br>{{ owner_participant.name_addition }}{% endif %}<br>
                         {{ owner_participant.address_line1 }}{% if owner_participant.address_line2 %}, {{ owner_participant.address_line2 }}{% endif %}<br>
                         {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{% endif %}<br>
                         {% endif %}
@@ -584,7 +584,7 @@
                 <!-- Participant -->
                 <div class="party-card">
                     <div class="party-role">{{ tr.participant_label }}</div>
-                    <div class="party-name">{{ participant.full_name }}</div>
+                    <div class="party-name">{{ participant.full_name }}{% if participant.name_addition %}<br>{{ participant.name_addition }}{% endif %}</div>
                     <dl>
                         <div class="party-fact">
                             <dt>{{ tr.field_address }}</dt>
@@ -626,7 +626,7 @@
                 <div class="party-card">
                     <div class="party-role">{{ tr.owner_label }}</div>
                     {% if owner_participant %}
-                    <div class="party-name">{{ owner_participant.full_name }}</div>
+                    <div class="party-name">{{ owner_participant.full_name }}{% if owner_participant.name_addition %}<br>{{ owner_participant.name_addition }}{% endif %}</div>
                     <dl>
                         <div class="party-fact">
                             <dt>{{ tr.field_address }}</dt>

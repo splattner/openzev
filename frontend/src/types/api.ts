@@ -477,6 +477,9 @@ export interface ParticipantBuildingFootprint {
 
 export type ParticipantOnboardingStatus = 'not_sent' | 'sent' | 'active' | 'revoked' | 'expired'
 
+/** Whether a party is a person or an organisation (#761). */
+export type PartyKind = 'person' | 'organisation'
+
 export interface Participant {
     id: string
     zev: string
@@ -485,6 +488,15 @@ export interface Participant {
     onboarding_status?: ParticipantOnboardingStatus
     /** ISO datetime of the latest non-revoked onboarding link, even when expired; null when never sent or revoked. */
     onboarding_link_expires_at?: string | null
+    /** The participant's party (#761, ADR 0028): names, contact data and address are the party's and shared by every participation of it. */
+    party?: string
+    kind?: PartyKind
+    /** The name the participant is billed under: the organisation's name, or the person's. */
+    display_name?: string
+    full_name?: string
+    organisation_name?: string
+    /** Second name line: another household member, "c/o …". */
+    name_addition?: string
     title?: 'mr' | 'mrs' | 'ms' | 'dr' | 'prof' | ''
     first_name: string
     last_name: string

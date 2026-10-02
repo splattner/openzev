@@ -133,7 +133,7 @@ class InvoiceViewSet(
 
     def get_queryset(self):
         # Participants see only their own invoices, and only once sent.
-        queryset = Invoice.objects.select_related("participant", "zev")
+        queryset = Invoice.objects.select_related("participant__party", "zev")
         # Prefetching what the list serializer does not render would keep the
         # database cost the payload change just removed. getattr because schema
         # generation instantiates the view without an action.
@@ -759,7 +759,7 @@ class InvoiceViewSet(
             zev=zev,
             period_start=s.validated_data["period_start"],
             period_end=s.validated_data["period_end"],
-        ).select_related("participant", "zev").prefetch_related("items", "email_logs")
+        ).select_related("participant__party", "zev").prefetch_related("items", "email_logs")
         return zev, invoices, None
 
     @action(detail=False, methods=["post"], url_path="approve-all",

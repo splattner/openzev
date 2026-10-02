@@ -21,7 +21,7 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
     from .workflow import record_email_delivery
 
     try:
-        invoice = Invoice.objects.select_related("participant", "zev").get(pk=invoice_id)
+        invoice = Invoice.objects.select_related("participant__party", "zev").get(pk=invoice_id)
     except Invoice.DoesNotExist:
         logger.error("Invoice %s not found for email task", invoice_id)
         record_audit_event(
@@ -314,7 +314,7 @@ def generate_invoice_pdf_task(self, invoice_id: str):
     from .models import Invoice
 
     try:
-        invoice = Invoice.objects.select_related("participant", "zev").get(pk=invoice_id)
+        invoice = Invoice.objects.select_related("participant__party", "zev").get(pk=invoice_id)
     except Invoice.DoesNotExist:
         logger.error("Invoice %s not found for PDF generation", invoice_id)
         return
@@ -468,7 +468,7 @@ def generate_zev_pdfs_task(self, zev_id: str, period_start: str, period_end: str
         zev=zev,
         period_start=period_start,
         period_end=period_end,
-    ).select_related("participant", "zev")
+    ).select_related("participant__party", "zev")
 
     try:
         failed = _render_pdfs(invoices)

@@ -290,6 +290,7 @@ export const en = {
             dueDate: 'Due date',
             participant: 'Participant',
             fullName: 'Full name',
+            nameAddition: 'Second name line (e.g. another household member)',
             addressLine1: 'Address line 1',
             addressLine2: 'Address line 2',
             postalCode: 'Postal code',

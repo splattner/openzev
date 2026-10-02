@@ -82,7 +82,7 @@ class ZevRestoreTestCase(TestCase):
     def damage_alpha(self):
         """Change alpha the way a bad week might: rename it, lose people and readings, add an invoice."""
         Zev.objects.filter(pk=self.alpha_id).update(name="Damaged")
-        Participant.objects.filter(zev_id=self.alpha_id, first_name="Alice").delete()
+        Participant.objects.filter(zev_id=self.alpha_id, party__first_name="Alice").delete()
         MeterReading.objects.filter(metering_point__zev_id=self.alpha_id).delete()
 
 
@@ -202,7 +202,7 @@ class AccountRelinkTests(ZevRestoreTestCase):
 
         result = restore_from(self.raw, self.alpha_id)
 
-        alice = Participant.objects.get(zev_id=self.alpha_id, first_name="Alice")
+        alice = Participant.objects.get(zev_id=self.alpha_id, party__first_name="Alice")
         self.assertEqual(alice.user_id, replacement.pk)
         self.assertEqual(result.plan["accounts"]["missing"], [])
         replacement.refresh_from_db()
@@ -213,7 +213,7 @@ class AccountRelinkTests(ZevRestoreTestCase):
         self.world.member.delete()
         result = restore_from(self.raw, self.alpha_id)
         self.assertIn(email, result.plan["accounts"]["missing"])
-        self.assertIsNone(Participant.objects.get(zev_id=self.alpha_id, first_name="Alice").user_id)
+        self.assertIsNone(Participant.objects.get(zev_id=self.alpha_id, party__first_name="Alice").user_id)
         self.assertFalse(User.objects.filter(email=email).exists(), "a restore never creates an account")
 
     def test_the_owner_follows_the_email_when_the_owner_account_was_recreated(self):
@@ -278,7 +278,7 @@ class ConflictTests(ZevRestoreTestCase):
         self.assertEqual(Invoice.objects.get(pk=self.world.alpha_invoice.pk).status, InvoiceStatus.DRAFT)
 
     def test_an_issued_contract_the_restore_would_delete_needs_force(self):
-        alice = Participant.objects.get(zev_id=self.alpha_id, first_name="Alice")
+        alice = Participant.objects.get(zev_id=self.alpha_id, party__first_name="Alice")
         ContractIssue.objects.create(
             zev_id=self.alpha_id, participant=alice, version=2, document_number="C-NEW", language="de",
             context_hash="c" * 64, pdf=b"%PDF-new", issued_by=self.world.owner,

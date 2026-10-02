@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .geocoding import get_cached_building_footprint
 from .grid_operators import grid_operator_ids
-from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode
+from .models import Zev, Participant, Party, PartyKind, PartyTitle, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode
 from .services import create_zev_with_owner_setup, ensure_participant_account, has_its_own_login
 from .tasks import trigger_geocode_if_address_present
 from .iban import (
@@ -142,6 +142,23 @@ class MeteringPointAssignmentSerializer(serializers.ModelSerializer):
 class ParticipantSerializer(serializers.ModelSerializer):
     account_username = serializers.CharField(source="user.username", read_only=True)
     full_name = serializers.ReadOnlyField()
+    display_name = serializers.ReadOnlyField()
+    # Names, contact data and address belong to the participant's party and are
+    # written through to it (ADR 0028): every participation of that party shows
+    # the change. ``party`` attaches a new participation to an existing party.
+    party = serializers.PrimaryKeyRelatedField(queryset=Party.objects.all(), required=False)
+    kind = serializers.ChoiceField(choices=PartyKind.choices, required=False)
+    title = serializers.ChoiceField(choices=PartyTitle.choices, required=False, allow_blank=True)
+    first_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    organisation_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    name_addition = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    address_line1 = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    address_line2 = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    postal_code = serializers.CharField(max_length=10, required=False, allow_blank=True)
+    city = serializers.CharField(max_length=100, required=False, allow_blank=True)
     metering_points = serializers.SerializerMethodField()
     has_metering_point_assignment = serializers.SerializerMethodField()
     building_footprint = serializers.SerializerMethodField()
@@ -198,7 +215,28 @@ class ParticipantSerializer(serializers.ModelSerializer):
         if "user" in attrs:
             raise serializers.ValidationError({"user": "Participant accounts are created automatically."})
 
-        email = attrs.get("email", getattr(self.instance, "email", "")).strip()
+        party = attrs.get("party")
+        if party is not None:
+            if self.instance is not None and party.pk != self.instance.party_id:
+                raise serializers.ValidationError({"party": "A participation cannot move to another party."})
+            zev = attrs.get("zev", getattr(self.instance, "zev", None))
+            if zev is not None and party.zev_id != zev.pk:
+                raise serializers.ValidationError({"party": "The party belongs to another ZEV."})
+
+        def current(name):
+            """The value the party will have: the payload's, else today's."""
+            if name in attrs:
+                return attrs[name] or ""
+            source = self.instance if self.instance is not None else party
+            return getattr(source, name, "") if source is not None else ""
+
+        kind = current("kind") or PartyKind.PERSON
+        if kind == PartyKind.ORGANISATION and not current("organisation_name").strip():
+            raise serializers.ValidationError({"organisation_name": "An organisation needs a name."})
+        if kind == PartyKind.PERSON and not current("last_name").strip():
+            raise serializers.ValidationError({"last_name": "A person needs a last name."})
+
+        email = current("email").strip()
         if not email:
             raise serializers.ValidationError({"email": "Participant email is required."})
 
@@ -239,9 +277,14 @@ class ParticipantSerializer(serializers.ModelSerializer):
             "onboarding_status",
             "onboarding_link_expires_at",
             "full_name",
+            "display_name",
+            "party",
+            "kind",
             "title",
             "first_name",
             "last_name",
+            "organisation_name",
+            "name_addition",
             "email",
             "phone",
             "address_line1",
@@ -265,6 +308,7 @@ class ParticipantSerializer(serializers.ModelSerializer):
             "onboarding_status",
             "onboarding_link_expires_at",
             "full_name",
+            "display_name",
             "metering_points",
             "has_metering_point_assignment",
             "building_footprint",
