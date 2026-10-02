@@ -24,6 +24,7 @@ from tariffs.dynamic.vse_v1 import PricePoint
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
 from testing import factories
 from zev.models import MeteringPointType
+from testing.helpers import zev_manager
 
 pytestmark = pytest.mark.django_db
 
@@ -120,7 +121,7 @@ def test_dynamic_price_matches_offsetless_csv_reading():
 
     import_csv(
         _csv("swiss.csv", f"meter_id,timestamp,energy_kwh\n{meter.meter_id},2026-07-01 12:00,10\n"),
-        participant.zev.owner, zev=participant.zev,
+        zev_manager(participant.zev), zev=participant.zev,
     )
     invoice = generate_invoice(participant, date(2026, 7, 1), date(2026, 7, 31))
 
@@ -144,10 +145,10 @@ def test_mixed_sdat_and_csv_allocate_on_same_instant():
     ).encode()
     sdat_file = BytesIO(sdat)
     sdat_file.name = "production.xml"
-    import_sdatch(sdat_file, participant.zev, participant.zev.owner)
+    import_sdatch(sdat_file, participant.zev, zev_manager(participant.zev))
     import_csv(
         _csv("consumption.csv", f"meter_id,timestamp,energy_kwh\n{consumption.meter_id},2026-07-01 12:00,3\n"),
-        participant.zev.owner, zev=participant.zev,
+        zev_manager(participant.zev), zev=participant.zev,
     )
 
     stamps = set(MeterReading.objects.values_list("timestamp", flat=True))

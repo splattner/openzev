@@ -107,7 +107,6 @@ links there (§4.1), never from the role.
 |---|---|---|
 | `id` | `UUIDField` (PK) | Auto-generated |
 | `name` | `CharField(200)` | Community display name |
-| `owner` | FK → `User` (`PROTECT`) | The owning user account |
 | `start_date` | `DateField` | Community start date |
 | `zev_type` | `CharField(10)` | `zev` or `vzev` |
 | `grid_operator` | `CharField(200)`, blank | Name of the VNB — free text (see §3.4a) |
@@ -294,9 +293,13 @@ account with no current participant row gets 404 when it has an ended one,
 and is served as a manager (400 without ids) when it never took part.
 `User.is_zev_owner` no longer exists.
 
-The owner of a ZEV holds a manager grant through the transitional invariant
-in `Zev.save()` (SPEC-2026-10-zev-access-grants §4.7): creating a ZEV or
-changing `Zev.owner` gives the owner one and revokes the previous owner's.
+A ZEV has no owner account (`Zev.owner` was removed in #761 phase 2,
+migration `zev.0037_remove_zev_owner`, SPEC-2026-10-zev-parties §4.6). Whoever
+creates a ZEV through the wizard, self-setup or a transfer import gets a
+manager grant from `zev.access.grant_manager(zev, user)` (an existing open
+grant is promoted, an active manager grant kept); a ZEV an admin creates
+through `POST /zevs/` gets no grant. Whom its documents are from is the dated
+issuer role (SPEC-2026-10-zev-parties §4.4).
 
 ### 4.2 Backend permission classes
 
@@ -898,7 +901,7 @@ request per row:
   the query-count test.
 
 Both `memberships` and `mfa_methods` are derived from prefetched relations
-(`select_related("totp_device")`, `prefetch_related` on `owned_zevs`,
+(`select_related("totp_device")`, `prefetch_related` on the active grants,
 `participations__zev`, `webauthn_credentials`), so the list costs a fixed
 number of queries whatever the number of accounts (pinned by a query-count
 test). `/auth/me/`, impersonation responses and the detail view keep the plain
@@ -1068,12 +1071,11 @@ read-only on `ZevSerializer` regardless of disabled state.
 uses `ZevDetailSerializer` which nests `participants` (via
 `ParticipantSerializer`, many=True, read-only).
 
-**Owner assignment on create:** if `owner` not in validated data, defaults to
-`request.user`.
-
-**Owner transfer on update:** no role changes (#761). `Zev.save()` keeps the
-grant invariant: the new owner holds an active manager grant, the previous
-owner's grant is revoked (`zev.access.sync_owner_grant`).
+**Issuer:** `ZevSerializer` adds read-only `issuer` — `{party, display_name}`
+of the party holding the issuer role today, or `null` — read from the
+`issuer_roles` prefetch (`Prefetch("party_roles", ZevPartyRole issuer rows
+with select_related("party"))`) that `ZevViewSet.get_queryset` adds, so a
+list costs one query for all ZEVs. There is no `owner` field (#761).
 
 ### 7.1a Disable and enable (ZEV lifecycle, phases 1–2)
 

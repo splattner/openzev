@@ -15,9 +15,8 @@ from django.test import SimpleTestCase, TestCase
 from invoices.engine import _resolve_tariff_band
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
 from tariffs.periods import in_window, resolve_band
-from testing.helpers import make_user
+from testing.helpers import make_user, create_managed_zev
 from accounts.models import UserRole
-from zev.models import Zev
 
 MONDAY = date(2026, 3, 16)
 
@@ -88,7 +87,7 @@ class HtNtAcrossMidnightTests(SimpleTestCase):
 class EngineUsesWrappedWindowsTests(TestCase):
     def test_a_stored_night_band_prices_the_night(self):
         owner = make_user("midnight_owner", UserRole.USER)
-        zev = Zev.objects.create(name="Midnight ZEV", owner=owner, zev_type="zev")
+        zev = create_managed_zev(name="Midnight ZEV", owner=owner, zev_type="zev")
         tariff = Tariff.objects.create(
             zev=zev, name="Grid", category=TariffCategory.ENERGY,
             billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,

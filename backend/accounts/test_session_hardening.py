@@ -14,7 +14,7 @@ from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from audit.models import AuditEvent, AuditEventStatus
-from testing.helpers import authenticate, make_user
+from testing.helpers import authenticate, make_user, create_managed_zev
 
 from .jwt_utils import make_jwt_for_user
 from .models import User, UserRole
@@ -90,10 +90,9 @@ class SelfServiceProfileTests(TestCase):
         self.assertEqual((self.user.first_name, self.user.last_name), ("Ada", "Lovelace"))
 
     def test_owner_can_still_set_a_default_community(self):
-        from zev.models import Zev
 
         owner = make_user("ss_owner", UserRole.USER)
-        zev = Zev.objects.create(name="Mine", owner=owner, zev_type="vzev", invoice_prefix="M")
+        zev = create_managed_zev(name="Mine", owner=owner, zev_type="vzev", invoice_prefix="M")
         client = APIClient()
         authenticate(client, owner)
         response = client.patch(ME, {"preferred_zev": str(zev.pk)}, format="json")

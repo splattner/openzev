@@ -45,13 +45,16 @@ Admins can create a ZEV together with a new responsible-person account in one wi
 4. **Step 3** — optionally add initial metering points for the responsible person
 5. **Step 4** — review, then click **Create ZEV**
 
-The system creates the ZEV, the responsible-person account — the ZEV's owner
-and manager — with a temporary password, its participant record, and the listed
-metering points. The temporary password is shown once at the end — pass it on
+The system creates the ZEV, the responsible-person account — the ZEV's manager —
+with a temporary password, its participant record (the issuer of the ZEV's
+invoices and contracts), and the listed metering points. The temporary password is shown once at the end — pass it on
 to the responsible person, who sets their own password at first sign-in.
 
-Admins can also create a bare ZEV (without the wizard) through the API,
-assigning an existing user as owner.
+Admins can also create a bare ZEV (without the wizard) through the API. Nobody
+manages it until an admin grants access in **ZEV Settings → Access**.
+
+The ZEV list shows each community's **issuer** — whom its invoices and contracts
+are from.
 
 ![Admin ZEV management](screenshots/15-admin-zevs.png)
 

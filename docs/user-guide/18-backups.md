@@ -393,8 +393,7 @@ backup one.
      switch that appears.
    - *cannot be overridden* — going ahead would damage something else: a **meter
      id** in the backup that now belongs to another community, a price source the
-     backup refers to that no longer exists, an **owner** with no matching account
-     (when the community has to be recreated), or an **export or another restore**
+     backup refers to that no longer exists, or an **export or another restore**
      running for that community. Resolve these first, then preview again.
 3. **Choose where the safety backup goes.** Before anything is changed, the
    community *as it is now* is backed up there. If that backup fails, nothing is
@@ -410,10 +409,10 @@ backup one.
 A backup refers to people by an internal number that means nothing elsewhere, so
 a restore looks each person up **by email address** (then username) among today's
 accounts and links them again. Someone with no matching account is listed in the
-preview and left unlinked — a restore **never creates an account**. If the
-community's owner has no matching account, an existing community keeps its
-current owner; a community that has to be recreated cannot be, until the owner's
-account exists.
+preview and left unlinked — a restore **never creates an account**. Who may
+manage the community is not restored either: an existing community keeps its
+managers, and a recreated one has none until an admin grants access in
+**ZEV Settings → Access**.
 
 ### What else to know
 

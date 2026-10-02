@@ -18,10 +18,11 @@ import pytest
 
 from accounts.models import User, UserRole
 from tariffs.models import TariffCategory
-from zev.models import Participant, Zev
+from zev.models import Participant
 from .models import Invoice, InvoiceItem
 from .pdf import generate_pdf
 from .pdf_render import render_pdf
+from testing.helpers import create_managed_zev
 
 
 def _inflate_all(pdf_bytes: bytes) -> bytes:
@@ -60,7 +61,7 @@ class InvoicePdfaTests(TestCase):
         self.owner = User.objects.create_user(
             username="pdfa_owner", password="pass1234", role=UserRole.USER
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="PDFA ZEV",
             owner=self.owner,
             zev_type="vzev",

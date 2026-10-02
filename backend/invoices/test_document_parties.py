@@ -15,19 +15,21 @@ from django.test import TestCase, TransactionTestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
-from testing.helpers import authenticate, make_user
-from zev.models import Participant, Zev
+from testing.helpers import authenticate, make_user, create_managed_zev
+from zev.models import Participant
 
 from . import workflow
 from .document_parties import build_copy, copy_for_render, template_parties
 from .models import Invoice, InvoiceStatus
 from .pdf import _build_qr_svg, _build_template_context
+from zev.models import ZevPartyRole
+from zev.parties import ensure_initial_roles
 
 
 class InvoiceCopyTestCase(TestCase):
     def setUp(self):
         self.owner = make_user("copy_owner", UserRole.USER)
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Copy ZEV", owner=self.owner, zev_type="vzev", start_date=date(2026, 1, 1),
             invoice_prefix="C", bank_iban="CH9300762011623852957", bank_name="First Bank",
             vat_number="CHE-111.111.111",
@@ -36,6 +38,7 @@ class InvoiceCopyTestCase(TestCase):
             zev=self.zev, user=self.owner, first_name="Olga", last_name="Owner", email="olga@example.com",
             address_line1="Bahnhofstrasse 1", postal_code="8001", city="Zuerich", valid_from=date(2026, 1, 1),
         )
+        ensure_initial_roles(self.owner_row.zev, self.owner_row.party, self.owner_row.valid_from)
         self.tenant = Participant.objects.create(
             zev=self.zev, first_name="Alice", last_name="Muster", email="alice@example.com",
             address_line1="Musterweg 3", postal_code="3000", city="Bern", valid_from=date(2026, 1, 1),
@@ -74,8 +77,8 @@ class CopyContentTests(InvoiceCopyTestCase):
         self.assertEqual(copy["recipient"]["name"], "Alice Muster")
         self.assertEqual(copy["recipient"]["address_line1"], "Musterweg 3")
 
-    def test_without_an_owner_row_the_issuer_is_the_zev_name(self):
-        self.owner_row.delete()
+    def test_without_an_issuer_the_issuer_is_the_zev_name(self):
+        ZevPartyRole.objects.filter(zev=self.zev).delete()
         copy = build_copy(self.invoice())
         self.assertEqual(copy["issuer"]["name"], "Copy ZEV")
         self.assertIs(copy["issuer"]["from_participant"], False)

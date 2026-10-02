@@ -37,7 +37,7 @@ copy, not an in-place restore (see `docs/user-guide/17-zev-transfer.md`).
 - SHA-256 per-member checksums in the manifest (decided: not needed — CRC32 is
   validated by the ZIP container itself).
 - In-place restore; audit events / import logs do not travel.
-- Account references (`owner`, participant `user` link) and access grants
+- Account references (participant `user` link; formerly `Zev.owner`) and access grants
   (`ZevAccessGrant`, #761) — never exported.
 - Email/PDF templates from the admin console (instance-wide, not ZEV data).
 
@@ -166,8 +166,8 @@ openzev-export-<community>-<date>.zip
 Field lists (`ZEV_FIELDS`, `PARTICIPANT_FIELDS`, `METERING_POINT_FIELDS`,
 `ASSIGNMENT_FIELDS`, `TARIFF_FIELDS`, `TARIFF_PERIOD_FIELDS`, `INVOICE_FIELDS`,
 `INVOICE_ITEM_FIELDS`, `DYNAMIC_SOURCE_FIELDS`) are hand-written in `schema.py` — a file format with a
-version, not a mirror of the serializers. `owner` (Zev) and `user` (Participant)
-are absent by design; imported participants arrive unlinked. `disabled_at`/
+version, not a mirror of the serializers. `user` (Participant) is absent by
+design (as `Zev.owner` was, before #761 removed it); imported participants arrive unlinked. `disabled_at`/
 `disabled_by`/`disabled_reason` (Zev) are absent for the same reason plus one
 more: `disabled_by` is an account reference, and an import always creates a
 new, active ZEV, so disabled state has nothing to carry across to. `pdf_file`/
@@ -339,9 +339,11 @@ way readings require.
   absent from this query entirely, so it is silently skipped here rather than
   double-reported. `_verify_manifest_counts` still catches a member the
   manifest declared but the archive does not actually contain (§6).
-- The importing admin becomes `owner` of the new ZEV, and through `Zev.save()`'s
-  owner hook also its manager (an active `manager` grant, SPEC-2026-10-zev-access-grants
-  §4.7); `name_override` renames it.
+- The importing account becomes the new ZEV's manager (`zev.access.grant_manager`:
+  an active `manager` grant); the ZEV has no owner field since #761 phase 2.
+  Its parties come from the participants (one per participant, format 4) and no
+  issuer role is set, so its documents carry the ZEV's name until one is assigned.
+  `name_override` renames it.
 
 ## 9. Frontend
 
@@ -443,7 +445,7 @@ for a declared section refused; manifest with a non-object
 **`SchemaParityTests`**: `test_field_lists_match_their_models_exactly` —
 `assertEqual(set(<section fields>), {model._meta.fields names} -
 FIELDS_EXCLUDED_FROM_ARCHIVE[section])` for all eight section/model pairs
-(exclusions: `id`, `owner`, `user`, `zev`/parent FKs, `created_at`,
+(exclusions: `id`, `user`, `zev`/parent FKs, `created_at`,
 `updated_at`, `pdf_file`); `test_reading_csv_columns_exist_on_the_reading_model`.
 
 **`TransferEndpointTests`**: owner can export own ZEV; owner cannot export

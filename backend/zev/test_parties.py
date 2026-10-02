@@ -14,14 +14,15 @@ from accounts.models import UserRole
 from invoices.document_parties import build_recipient
 from invoices.models import Invoice
 from invoices.pdf import _build_qr_svg
-from testing.helpers import authenticate, make_user
+from testing.helpers import authenticate, make_user, create_managed_zev, zev_manager
 
-from .models import Participant, Party, PartyKind, Zev
+from .models import Participant, Party, PartyKind
+from zev.parties import ensure_initial_roles
 
 
 def make_zev(name="Party ZEV"):
     owner = make_user(f"owner_{name.replace(' ', '_').lower()}", UserRole.USER)
-    return Zev.objects.create(name=name, owner=owner, zev_type="vzev", invoice_prefix="P", start_date=date(2026, 1, 1))
+    return create_managed_zev(name=name, owner=owner, zev_type="vzev", invoice_prefix="P", start_date=date(2026, 1, 1))
 
 
 class PartyTests(TestCase):
@@ -117,10 +118,11 @@ class ParticipantFacadeTests(TestCase):
     def test_the_qr_bill_carries_the_organisation_and_its_second_line(self):
         self.zev.bank_iban = "CH9300762011623852957"
         self.zev.save(update_fields=["bank_iban"])
-        Participant.objects.create(
-            zev=self.zev, user=self.zev.owner, first_name="Olga", last_name="Owner",
+        issuer = Participant.objects.create(
+            zev=self.zev, user=zev_manager(self.zev), first_name="Olga", last_name="Owner",
             address_line1="Hof 1", postal_code="8001", city="Zuerich", valid_from=date(2026, 1, 1),
         )
+        ensure_initial_roles(issuer.zev, issuer.party, issuer.valid_from)
         company = Participant.objects.create(
             zev=self.zev, kind=PartyKind.ORGANISATION, organisation_name="Sonne AG", name_addition="Filiale Bern",
             address_line1="Hauptgasse 2", postal_code="3000", city="Bern", valid_from=date(2026, 1, 1),

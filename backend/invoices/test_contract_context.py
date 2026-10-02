@@ -27,6 +27,7 @@ from tariffs.models import BillingMode, EnergyType, PeriodType, TariffPeriod
 from testing.factories import TariffFactory, assignment_for, flat_tariff
 from testing.helpers import clear_vat_rates
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode, Zev
+from zev.parties import ensure_initial_roles
 
 
 _STYLE_BLOCK_RE = re.compile(r"<style>.*?</style>", re.DOTALL)
@@ -935,6 +936,7 @@ class ContractPdfRenderingTests(TestCase):
         VatRate.objects.create(rate=Decimal("0.0810"), valid_from=date(2026, 1, 1))
 
         self.owner_participant = make_participant(self.zev, user=self.owner, first="Maria", last="Muster")
+        ensure_initial_roles(self.owner_participant.zev, self.owner_participant.party, self.owner_participant.valid_from)
         self.owner_participant.address_line1 = "Solarweg 1"
         self.owner_participant.postal_code = "8000"
         self.owner_participant.city = "Zürich"

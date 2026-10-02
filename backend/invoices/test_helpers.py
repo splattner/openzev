@@ -8,15 +8,15 @@ from datetime import date
 from decimal import Decimal
 
 from invoices.models import Invoice, InvoiceStatus
-from testing.helpers import make_user as make_user
-from zev.models import Participant, Zev
+from testing.helpers import make_user as make_user, create_managed_zev
+from zev.models import Participant
 
 
 _counter = 0
 
 
 def make_zev(owner, name="Test ZEV"):
-    return Zev.objects.create(name=name, owner=owner, zev_type="vzev", invoice_prefix="T")
+    return create_managed_zev(name=name, owner=owner, zev_type="vzev", invoice_prefix="T")
 
 
 def make_participant(zev, user=None, first="Jane", last="Doe"):

@@ -2,7 +2,7 @@ import logging
 import tempfile
 
 from django.conf import settings as django_settings
-from django.db.models import Count, Max, Min, Q
+from django.db.models import Count, Max, Min, Prefetch, Q
 from django.http import FileResponse, HttpResponse
 from django.utils import timezone as dj_timezone
 from rest_framework import serializers, status, viewsets
@@ -18,7 +18,7 @@ from accounts.models import FeatureFlag, User
 from allocation.validity import period_window
 from metering.models import MeterReading
 from . import access, onboarding
-from .models import Zev, Participant, Party, MeteringPoint, MeteringPointAssignment, ZevPartyRole
+from .models import Zev, Participant, Party, PartyRole, MeteringPoint, MeteringPointAssignment, ZevPartyRole
 from .purge import ZevPurgeError, purge_zev
 from .scoping import ZevScopedQuerySetMixin
 from .serializers import (
@@ -113,7 +113,12 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         # scoped queryset already includes a disabled ZEV for its managers and
         # viewers — which is what gives them read-only visibility of it (see
         # has_object_permission).
-        return self.scope_queryset(Zev.objects.all())
+        issuer_roles = Prefetch(
+            "party_roles",
+            queryset=ZevPartyRole.objects.filter(role=PartyRole.ISSUER).select_related("party"),
+            to_attr="issuer_roles",
+        )
+        return self.scope_queryset(Zev.objects.prefetch_related(issuer_roles))
 
     def get_serializer_class(self):
         if self.action == "create_with_owner":
@@ -169,7 +174,7 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         participant_data = owner_address_serializer.validated_data
         serializer = ZevSerializer(data=zev_payload, context=self.get_serializer_context())
         serializer.is_valid(raise_exception=True)
-        zev_data = {k: v for k, v in serializer.validated_data.items() if k != 'owner'}
+        zev_data = dict(serializer.validated_data)
         if not has_required_iban_address(
             zev_data.get("bank_iban"),
             address_line1=participant_data["address_line1"],
@@ -699,9 +704,6 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         participant = self.get_object()
         if participant.user is None:
             return Response({"detail": "Participant has no linked account."}, status=status.HTTP_400_BAD_REQUEST)
-
-        if participant.zev.owner_id == participant.user_id:
-            return Response({"detail": "Cannot unlink the owner account from the owner participant."}, status=status.HTTP_400_BAD_REQUEST)
 
         # The account itself is left as it is: what it may do elsewhere comes
         # from its other rows and grants, not from a role (#761).

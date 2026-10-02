@@ -605,7 +605,6 @@ def generate_annual_statement_pdf(
         "lang": lang,
         "tr": tr,
         "year": year,
-        "zev": zev,
         "participant": participant,
         # Who the statement is from: the issuer on the year's last day (#761).
         **issuer_context(zev, date(year, 12, 31)),

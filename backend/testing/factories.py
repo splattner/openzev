@@ -24,6 +24,7 @@ import factory
 from factory.django import DjangoModelFactory
 
 from accounts.models import User, UserRole
+from zev.access import grant_manager
 from invoices.models import Invoice, InvoiceItem, InvoiceStatus
 from tariffs.models import (
     BillingMode,
@@ -87,9 +88,21 @@ class ZevFactory(DjangoModelFactory):
         model = Zev
 
     name = factory.Sequence(lambda n: f"Test ZEV {n}")
+    # Not a field (#761): the account that manages the ZEV, through a grant.
     owner = factory.SubFactory(OwnerFactory)
     zev_type = ZevType.VZEV
     invoice_prefix = "INV"
+
+    @classmethod
+    def _create(cls, model_class, *args, owner=None, **kwargs):
+        zev = super()._create(model_class, *args, **kwargs)
+        if owner is not None:
+            grant_manager(zev, owner)
+        return zev
+
+    @classmethod
+    def _build(cls, model_class, *args, owner=None, **kwargs):
+        return super()._build(model_class, *args, **kwargs)
 
 
 class ParticipantFactory(DjangoModelFactory):

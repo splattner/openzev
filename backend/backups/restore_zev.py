@@ -15,8 +15,8 @@ accounts that must not notice it. The rules that follow from that:
   contains everything the backup's copy does; the restore adds one entry.
 * **Access grants are not restored either.** Who may manage or view a
   community today is not part of rolling its data back, any more than accounts
-  are. When a restore recreates a deleted community, which then has no grants,
-  its owner is made its manager (``zev.access.ensure_a_manager``).
+  are. A restore that recreates a deleted community leaves it without
+  managers; an admin grants access to it afterwards.
 * **Every check runs twice**: once to tell the operator (a dry run is the plan),
   and again under the row lock immediately before the first write, because
   minutes can pass between them.
@@ -41,7 +41,6 @@ from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.db import DatabaseError, IntegrityError, connection, transaction
 
-from zev.access import ensure_a_manager
 
 from . import archive
 from .registry import ZEV_SECTIONS
@@ -79,7 +78,6 @@ class ArchiveFacts:
 
     zev_id: str
     zev_name: str
-    owner_ref: int | None
     users: list[dict]
     invoices: dict[str, str]  # invoice id → status
     contract_issue_ids: set[str]
@@ -138,7 +136,6 @@ def read_facts(zf, manifest: dict, entry: dict) -> ArchiveFacts:
     facts = ArchiveFacts(
         zev_id=zev_id,
         zev_name=zev_record["fields"].get("name", ""),
-        owner_ref=zev_record["fields"].get("owner"),
         users=refs.get("users", []),
         invoices={},
         contract_issue_ids=set(),
@@ -263,9 +260,6 @@ def evaluate(facts: ArchiveFacts, *, force: bool, exclude_job=None) -> dict:
             for pk in gone[:_MAX_LISTED]
         ]
 
-    if zev is None and mapping.get(facts.owner_ref) is None:
-        conflicts.append(_conflict("owner_not_found", "the community's owner has no matching account", overridable=False))
-
     export_model = apps.get_model("exports.ExportJob")
     if export_model._base_manager.filter(zev_id=facts.zev_id, status__in=("queued", "running")).exists():
         conflicts.append(_conflict("export_in_progress", "an annual-statement export is running", overridable=False))
@@ -329,7 +323,7 @@ def _clear_zev(zev_id: str, contract_issue_ids: set[str]) -> None:
             apps.get_model(part.label)._base_manager.filter(**{part.lookup: zev_id}).delete()
 
 
-def _account_transform(model, mapping: dict[int, int | None], current_owner_id: int | None):
+def _account_transform(model, mapping: dict[int, int | None]):
     """A per-record hook that points user foreign keys at today's accounts."""
     user_model = get_user_model()
     fields = [f for f in model._meta.concrete_fields if f.is_relation and f.related_model is user_model]
@@ -341,12 +335,7 @@ def _account_transform(model, mapping: dict[int, int | None], current_owner_id: 
             old = getattr(instance, fk.attname)
             if old is None:
                 continue
-            new = mapping.get(old)
-            if new is None and not fk.null:
-                # The one required account link is the community's owner; if the
-                # community exists, its current owner stays.
-                new = current_owner_id
-            setattr(instance, fk.attname, new)
+            setattr(instance, fk.attname, mapping.get(old))
 
     return transform
 
@@ -373,18 +362,16 @@ def _apply(zf, manifest, facts, report: RestoreReport, referenced: set[str], *, 
     base = f"zevs/{zev_id}"
     mapping, _ = resolve_accounts(facts.users)
     zev_model = apps.get_model("zev.Zev")
-    current = zev_model.objects.filter(pk=zev_id).values_list("owner_id", flat=True).first()
-    owner_fallback = current
     for name, parts in _scoped_parts():
         member = f"{base}/{name}.jsonl"
         expected = manifest["members"][member]["models"]
         if name == "zev":
-            transform = _account_transform(zev_model, mapping, owner_fallback)
+            transform = _account_transform(zev_model, mapping)
             _load_zev_row(zf, member, transform, report, write=write)
             continue
         allowed = frozenset(part.label for part in parts)
         # One hook per section: every model in it that has an account link gets remapped.
-        transforms = {p.label: _account_transform(apps.get_model(p.label), mapping, owner_fallback) for p in parts}
+        transforms = {p.label: _account_transform(apps.get_model(p.label), mapping) for p in parts}
 
         def transform(instance, transforms=transforms):
             hook = transforms.get(instance._meta.label)
@@ -473,7 +460,6 @@ def restore_zev(
                 _clear_zev(zev_id, facts.contract_issue_ids)
                 _apply(zf, manifest, facts, report, referenced, write=True)
                 _verify_counts(zev_id, report)
-                ensure_a_manager(zev_model.objects.get(pk=zev_id))
                 connection.check_constraints()
                 progress("Restoring invoice PDFs…")
                 _restore_media(zf, manifest, referenced, report, undo, only_zev=zev_id)

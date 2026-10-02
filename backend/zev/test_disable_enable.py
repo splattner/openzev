@@ -18,7 +18,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from audit.models import AuditEvent
-from testing.helpers import authenticate as auth, make_user
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
 from zev.models import Participant, Zev
 
 ZEVS = "/api/v1/zev/zevs/"
@@ -30,8 +30,8 @@ class _OneOwnerOneZev(TestCase):
         self.owner = make_user("de_owner", UserRole.USER, may_create_zev=True)
         self.other_owner = make_user("de_other_owner", UserRole.USER, may_create_zev=True)
         self.admin = make_user("de_admin", UserRole.ADMIN)
-        self.zev = Zev.objects.create(name="Lifecycle ZEV", owner=self.owner)
-        Zev.objects.create(name="Other ZEV", owner=self.other_owner)
+        self.zev = create_managed_zev(name="Lifecycle ZEV", owner=self.owner)
+        create_managed_zev(name="Other ZEV", owner=self.other_owner)
         self.participant_user = make_user("de_participant", UserRole.USER)
         self.participant = Participant.objects.create(
             zev=self.zev, user=self.participant_user,
@@ -195,4 +195,4 @@ class SelfSetupGuardTests(_OneOwnerOneZev):
         self._disable(self.owner_client)
         response = self.owner_client.post(SELF_SETUP, self._self_setup_payload("Replacement ZEV"), format="json")
         self.assertEqual(response.status_code, 201, response.content)
-        self.assertTrue(Zev.objects.filter(owner=self.owner, name="Replacement ZEV").exists())
+        self.assertTrue(Zev.objects.filter(access_grants__user=self.owner, name="Replacement ZEV").exists())

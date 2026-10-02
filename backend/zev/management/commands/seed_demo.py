@@ -754,39 +754,50 @@ class Command(BaseCommand):
         email_subject_template: str = "",
         email_body_template: str = "",
     ) -> Zev:
-        """Create a demo ZEV, or refresh it to the canonical config (re-applied every run)."""
-        zev, _ = Zev.objects.update_or_create(
-            owner=owner,
-            name=name,
-            defaults={
-                "start_date": start_date,
-                "zev_type": zev_type,
-                "grid_operator": grid_operator,
-                "grid_connection_point": grid_connection_point,
-                "billing_interval": billing_interval,
-                "invoice_prefix": invoice_prefix,
-                "invoice_language": invoice_language,
-                "bank_iban": bank_iban,
-                "bank_name": bank_name,
-                "vat_mode": vat_mode,
-                "vat_number": vat_number,
-                "itemize_tariff_bands": itemize_tariff_bands,
-                "tariff_source_url": tariff_source_url,
-                "local_tariff_notes": local_tariff_notes,
-                "additional_contract_notes": additional_contract_notes,
-                "email_subject_template": email_subject_template,
-                "email_body_template": email_body_template,
-                # The invoice counter is part of the canonical config too: the
-                # seed deletes the demo invoices before regenerating them, so
-                # without the reset the numbers would keep climbing across
-                # re-seeds (the settled year alone consumes twelve). The
-                # contract counter is deliberately left alone — issued
-                # contract snapshots are not deleted, so resetting it could
-                # mint duplicate CTR-YYYY-NNNN document numbers.
-                "invoice_counter": 1,
-            },
-        )
+        """Create a demo ZEV, or refresh it to the canonical config (re-applied every run).
+
+        The demo owner manages it; that grant is how a re-run finds it again.
+        """
+        zev = self._owned_zevs(owner).filter(name=name).order_by("created_at").first() or Zev(name=name)
+        config = {
+            "start_date": start_date,
+            "zev_type": zev_type,
+            "grid_operator": grid_operator,
+            "grid_connection_point": grid_connection_point,
+            "billing_interval": billing_interval,
+            "invoice_prefix": invoice_prefix,
+            "invoice_language": invoice_language,
+            "bank_iban": bank_iban,
+            "bank_name": bank_name,
+            "vat_mode": vat_mode,
+            "vat_number": vat_number,
+            "itemize_tariff_bands": itemize_tariff_bands,
+            "tariff_source_url": tariff_source_url,
+            "local_tariff_notes": local_tariff_notes,
+            "additional_contract_notes": additional_contract_notes,
+            "email_subject_template": email_subject_template,
+            "email_body_template": email_body_template,
+            # The invoice counter is part of the canonical config too: the
+            # seed deletes the demo invoices before regenerating them, so
+            # without the reset the numbers would keep climbing across
+            # re-seeds (the settled year alone consumes twelve). The
+            # contract counter is deliberately left alone — issued
+            # contract snapshots are not deleted, so resetting it could
+            # mint duplicate CTR-YYYY-NNNN document numbers.
+            "invoice_counter": 1,
+        }
+        for field, value in config.items():
+            setattr(zev, field, value)
+        zev.save()
+        self._upsert_grant(zev=zev, user=owner, role=ZevAccessRole.MANAGER, granted_by=None)
         return zev
+
+    @staticmethod
+    def _owned_zevs(owner):
+        """The ZEVs the demo owner manages."""
+        return Zev.objects.filter(
+            access_grants__user=owner, access_grants__role=ZevAccessRole.MANAGER,
+        ).distinct()
 
     def _migrate_legacy_demo_zev_names(self, *, owner) -> None:
         """Rename the demo owner's row still carrying the superseded flagship name.
@@ -800,13 +811,10 @@ class Command(BaseCommand):
         owner: a tenant who happens to carry the same display name on another
         community is never selected, renamed or deleted.
         """
-        legacy_rows = Zev.objects.filter(
-            owner=owner,
-            name=DEMO_ZEV_LEGACY_NAME,
-        ).order_by("created_at")
+        legacy_rows = self._owned_zevs(owner).filter(name=DEMO_ZEV_LEGACY_NAME).order_by("created_at")
         if not legacy_rows.exists():
             return
-        if Zev.objects.filter(owner=owner, name=DEMO_ZEV_NAME).exists():
+        if self._owned_zevs(owner).filter(name=DEMO_ZEV_NAME).exists():
             # The current name is already taken by the owner; any legacy rows
             # left over are superseded duplicates of it.
             self._delete_demo_zev_rows(legacy_rows)

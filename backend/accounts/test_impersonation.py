@@ -19,8 +19,8 @@ from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import AccessToken
 
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
-from testing.helpers import authenticate as auth, make_user
-from zev.models import Participant, Zev
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
+from zev.models import Participant
 
 from .cookies import ACCESS_COOKIE, ADMIN_ACCESS_COOKIE, ADMIN_REFRESH_COOKIE, REFRESH_COOKIE
 from .models import UserRole
@@ -38,10 +38,10 @@ def _account_of_kind(username, kind):
     """A non-admin account: with no relation, managing a ZEV, or a participant."""
     account = make_user(username, UserRole.USER)
     if kind == "manager":
-        Zev.objects.create(name=f"{username} ZEV", owner=account)
+        create_managed_zev(name=f"{username} ZEV", owner=account)
     elif kind == "participant":
         owner = make_user(f"{username}_owner", UserRole.USER)
-        zev = Zev.objects.create(name=f"{username} ZEV", owner=owner)
+        zev = create_managed_zev(name=f"{username} ZEV", owner=owner)
         Participant.objects.create(
             zev=zev, user=account, first_name="P", last_name="Q", email=account.email, valid_from=date(2026, 1, 1),
         )

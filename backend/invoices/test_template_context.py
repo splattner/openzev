@@ -52,8 +52,9 @@ class BuildSampleContractContextTests(SimpleTestCase):
             with self.subTest(key=key):
                 self.assertIn(key, self.ctx)
 
-    def test_zev_has_owner(self):
-        self.assertIsNotNone(self.ctx["zev"].owner)
+    def test_the_issuer_and_representative_are_samples(self):
+        self.assertEqual(self.ctx["issuer"]["name"], "Maria Muster")
+        self.assertIsNotNone(self.ctx["representative"])
 
     def test_metering_points_are_lists(self):
         self.assertIsInstance(self.ctx["consumption_mps"], list)

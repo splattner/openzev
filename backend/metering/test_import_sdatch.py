@@ -12,8 +12,8 @@ from rest_framework.test import APIClient
 from accounts.models import UserRole
 from metering.importers import csv_importer, sdatch_importer
 from metering.models import ImportLog, ImportSource, MeterReading, ReadingDirection
-from testing.helpers import authenticate as auth, make_user
-from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant
 
 
 class SdatchImportTests(TestCase):
@@ -24,8 +24,8 @@ class SdatchImportTests(TestCase):
         self.admin = make_user("sdatch_admin", UserRole.ADMIN)
         auth(self.client, self.owner)
 
-        self.zev = Zev.objects.create(name="SDAT ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="S")
-        self.other_zev = Zev.objects.create(name="Other SDAT ZEV", owner=self.other_owner, zev_type="vzev", invoice_prefix="O")
+        self.zev = create_managed_zev(name="SDAT ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="S")
+        self.other_zev = create_managed_zev(name="Other SDAT ZEV", owner=self.other_owner, zev_type="vzev", invoice_prefix="O")
         self.participant = Participant.objects.create(
             zev=self.zev,
             first_name="SDAT",
@@ -287,7 +287,7 @@ class SdatchLimitTests(TestCase):
         self.client = APIClient()
         self.owner = make_user("sdatch_limit_owner", UserRole.USER)
         auth(self.client, self.owner)
-        self.zev = Zev.objects.create(name="SDAT Limit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="Y")
+        self.zev = create_managed_zev(name="SDAT Limit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="Y")
 
     def test_file_over_size_cap_is_reported_without_parsing(self):
         xml = (

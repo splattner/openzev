@@ -11,8 +11,8 @@ from rest_framework.test import APIClient
 from accounts.models import UserRole
 from metering.importers.csv_importer import _read_table
 from metering.testing import detect_csv, preview_csv
-from testing.helpers import authenticate as auth, make_user
-from zev.models import MeteringPoint, MeteringPointType, Zev
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
+from zev.models import MeteringPoint, MeteringPointType
 
 
 def _daily_rows(*, meter="M1", days=("01.02.2026", "02.02.2026"), slots=96, sep=";", decimal=",", prefix=()):
@@ -27,7 +27,7 @@ class DetectCsvSettingsTests(TestCase):
         self.client = APIClient()
         self.owner = make_user("detect_owner", UserRole.USER)
         auth(self.client, self.owner)
-        self.zev = Zev.objects.create(name="Detect ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="D")
+        self.zev = create_managed_zev(name="Detect ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="D")
         for meter_id in ("M1", "CH-DEMO-CONS-0001"):
             MeteringPoint.objects.create(zev=self.zev, meter_id=meter_id, meter_type=MeteringPointType.CONSUMPTION)
 

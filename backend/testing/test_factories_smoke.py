@@ -16,13 +16,15 @@ from testing.helpers import authenticate
 pytestmark = pytest.mark.django_db
 
 
-def test_zev_factory_creates_owner():
+def test_zev_factory_creates_a_manager():
     zev = factories.ZevFactory()
-    assert zev.owner_id is not None
-    # Owning a ZEV makes its owner a manager through the owner grant (#761).
+    # The factory's ``owner`` manages the ZEV through a grant (#761).
+    from testing.helpers import zev_manager
     from zev import access
 
-    assert access.can_manage(zev.owner, zev)
+    manager = zev_manager(zev)
+    assert manager is not None
+    assert access.can_manage(manager, zev)
 
 
 def test_participant_factory_shares_zev():

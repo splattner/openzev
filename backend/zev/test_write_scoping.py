@@ -19,7 +19,7 @@ from rest_framework.test import APIClient
 from accounts.models import UserRole
 from metering.models import MeterReading
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory, TariffPeriod
-from testing.helpers import authenticate as auth, make_user
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
 from zev.models import (
     MeteringPoint,
     MeteringPointAssignment,
@@ -44,8 +44,8 @@ class _TwoCommunities(TestCase):
         self.attacker = make_user("ws_attacker", UserRole.USER)
         self.admin = make_user("ws_admin", UserRole.ADMIN)
 
-        self.victim_zev = Zev.objects.create(name="Victim ZEV", owner=self.victim)
-        self.attacker_zev = Zev.objects.create(name="Attacker ZEV", owner=self.attacker)
+        self.victim_zev = create_managed_zev(name="Victim ZEV", owner=self.victim)
+        self.attacker_zev = create_managed_zev(name="Attacker ZEV", owner=self.attacker)
 
         self.victim_participant = Participant.objects.create(
             zev=self.victim_zev, first_name="Vera", last_name="Victim",

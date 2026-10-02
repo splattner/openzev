@@ -172,11 +172,10 @@ vi.mock('../src/lib/api/zev', () => ({
     fetchZevs: vi.fn(),
 }))
 
-const fullZev = (id: string, owner: number): Zev => ({
+const fullZev = (id: string): Zev => ({
     id,
     name: id,
     start_date: '2026-01-01',
-    owner,
     zev_type: 'zev',
     grid_operator: 'op',
     billing_interval: 'monthly',
@@ -273,7 +272,7 @@ describe('ManagedZevProvider selection persistence', () => {
      */
     function resolveTwoZevs() {
         return act(async () => {
-            resolveFetch?.([fullZev('own1', 1), fullZev('own2', 1)])
+            resolveFetch?.([fullZev('own1'), fullZev('own2')])
             await new Promise((resolve) => setTimeout(resolve, 0))
             await new Promise((resolve) => setTimeout(resolve, 0))
         })

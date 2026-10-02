@@ -14,7 +14,7 @@ from audit.models import AuditEvent, AuditEventSource
 from backups import crypto
 from backups.fixtures import build_world
 from backups.models import BackupDestination, BackupJob, BackupJobStatus
-from zev.models import Zev
+from testing.helpers import create_managed_zev
 
 KEY = "C" * 40
 
@@ -88,7 +88,7 @@ class BackupCommandTests(CommandTestCase):
         self.assertEqual((job.scope, job.zev_id), ("zev", self.world.alpha.pk))
 
     def test_an_ambiguous_zev_name_is_refused_with_the_ids_to_choose_from(self):
-        twin = Zev.objects.create(name="Alpha", owner=self.world.owner)
+        twin = create_managed_zev(name="Alpha", owner=self.world.owner)
         with self.assertRaises(CommandError) as raised:
             run("openzev_backup", "--path", self.dest_dir.name, "--zev", "Alpha")
         self.assertIn(str(twin.pk), str(raised.exception))

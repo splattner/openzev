@@ -25,9 +25,10 @@ from invoices.models import InvoiceItem
 from metering.models import MeterReading, ReadingDirection
 from tariffs.models import BillingMode, EnergyType, SplitKey, TariffCategory
 from testing import factories
-from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType, Zev
+from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType
 
 from .engine import InvoiceGenerationContext, generate_invoice, generate_invoices_for_zev
+from testing.helpers import create_managed_zev
 
 pytestmark = pytest.mark.django_db
 
@@ -44,7 +45,7 @@ class _SharedMeteringBase:
         self.owner = User.objects.create_user(
             username=f"shared_owner_{id(self)}", password="pass1234", role=UserRole.USER
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Shared Metering ZEV",
             owner=self.owner,
             zev_type="vzev",
@@ -588,7 +589,7 @@ class InvoiceTotalsAndDescriptionTests(_SharedMeteringBase, TestCase):
         }
         for lang, marker in markers.items():
             with self.subTest(lang=lang):
-                zev = Zev.objects.create(
+                zev = create_managed_zev(
                     name=f"Marker ZEV {lang}",
                     owner=self.owner,
                     zev_type="vzev",

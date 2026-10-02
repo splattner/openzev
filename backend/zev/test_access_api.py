@@ -11,7 +11,7 @@ from rest_framework.test import APIClient
 from accounts.models import EmailVerificationToken, User, UserRole
 from audit.models import AuditEvent, AuditEventStatus
 from invoices.models import EmailTemplate
-from testing.helpers import authenticate, make_user
+from testing.helpers import authenticate, make_user, create_managed_zev
 from zev import access
 from zev.models import Participant, Zev, ZevAccessGrant, ZevAccessRole
 from zev.services import ensure_participant_account
@@ -22,7 +22,7 @@ MANAGER, VIEWER = ZevAccessRole.MANAGER, ZevAccessRole.VIEWER
 class AccessApiTestCase(TestCase):
     def setUp(self):
         self.owner = make_user("api_owner", UserRole.USER)
-        self.zev = Zev.objects.create(name="Grant ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="G",
+        self.zev = create_managed_zev(name="Grant ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="G",
                                       invoice_language="de")
         self.viewer = make_user("api_viewer", UserRole.USER)
         # Started earlier, so ending it leaves a row (a grant that starts today
@@ -231,7 +231,7 @@ class ZevAccessInvitationTests(AccessApiTestCase):
 
 class AccountsAroundGrantsTests(AccessApiTestCase):
     def test_me_lists_every_zev_the_account_relates_to(self):
-        other = Zev.objects.create(name="Other", owner=self.stranger, zev_type="vzev", invoice_prefix="O")
+        other = create_managed_zev(name="Other", owner=self.stranger, zev_type="vzev", invoice_prefix="O")
         Participant.objects.create(zev=other, user=self.viewer, first_name="V", last_name="Iewer",
                                    valid_from=date(2026, 1, 1))
         body = self.client_for(self.viewer).get("/api/v1/auth/me/").json()

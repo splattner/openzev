@@ -37,6 +37,7 @@ from invoices.models import Invoice
 from metering.models import MeterReading
 from zev.models import Zev
 from zev.transfer import build_archive as build_transfer_archive
+from testing.helpers import create_managed_zev
 
 
 def snapshot() -> dict[str, list[dict]]:
@@ -265,7 +266,7 @@ class RefusalTests(RestoreTestCase):
 
     def test_force_replaces_the_instance_with_the_backup(self):
         Zev.objects.filter(pk=self.world.alpha.pk).update(name="Renamed after the backup")
-        Zev.objects.create(name="Not in the backup", owner=self.world.owner)
+        create_managed_zev(name="Not in the backup", owner=self.world.owner)
         User.objects.create_user(username="intruder", email="intruder@example.com", password="x" * 12)
         AuditEvent.objects.filter(action_type="invoice.sent").delete()
 

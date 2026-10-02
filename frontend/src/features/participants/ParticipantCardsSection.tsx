@@ -16,13 +16,14 @@ import { useTranslation } from 'react-i18next'
 import { EmptyState } from '../../components/EmptyState'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
 import { formatShortDate } from '../../lib/appSettings'
-import type { AppSettings, Participant } from '../../types/api'
+import type { AppSettings, Participant, PartyRoleName } from '../../types/api'
 import type { ParticipantValidityState } from './types'
 
 type ParticipantCardEntry = {
     participant: Participant
     warnings: string[]
-    ownerRow: boolean
+    /** The party's roles held today (#761). */
+    roles: PartyRoleName[]
     validityState: ParticipantValidityState
     displayName: string
     address: string
@@ -129,7 +130,7 @@ export function ParticipantCardsSection({
 
     return (
         <div className="table-card participant-card-list">
-            {filteredParticipants.map(({ participant, warnings, ownerRow, validityState, displayName, address }) => {
+            {filteredParticipants.map(({ participant, warnings, roles, validityState, displayName, address }) => {
                 const weight = Number(participant.allocation_weight || '1')
                 const weightSharePercent = totalWeight > 0 ? (weight / totalWeight) * 100 : 0
                 const menuItems: ActionMenuItem[] = []
@@ -159,7 +160,6 @@ export function ParticipantCardsSection({
                         })
                     }
 
-                    // The owner's own participant is never detached from their account.
                     if (participant.user == null && canLinkAccount) {
                         menuItems.push({
                             key: 'link-account',
@@ -169,7 +169,7 @@ export function ParticipantCardsSection({
                             onClick: () => onLinkAccount(participant, displayName),
                         })
                     }
-                    if (participant.user != null && !ownerRow && canUnlinkAccount) {
+                    if (participant.user != null && canUnlinkAccount) {
                         menuItems.push({
                             key: 'unlink-account',
                             label: t('pages.accounts.unlink'),
@@ -179,16 +179,14 @@ export function ParticipantCardsSection({
                         })
                     }
 
-                    if (!ownerRow) {
-                        menuItems.push({
-                            key: 'delete',
-                            label: t('common.delete'),
-                            icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
-                            disabled: deletePendingOrDialogLoading,
-                            danger: true,
-                            onClick: () => onConfirmDelete(participant, displayName),
-                        })
-                    }
+                    menuItems.push({
+                        key: 'delete',
+                        label: t('common.delete'),
+                        icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
+                        disabled: deletePendingOrDialogLoading,
+                        danger: true,
+                        onClick: () => onConfirmDelete(participant, displayName),
+                    })
                 }
 
                 return (
@@ -200,7 +198,9 @@ export function ParticipantCardsSection({
                         <div className="participant-card-header">
                             <div className="participant-card-title">
                                 <div className="participant-card-badges">
-                                    {ownerRow && <span className="badge badge-info">{t('pages.participants.owner')}</span>}
+                                    {roles.map((role) => (
+                                        <span key={role} className="badge badge-info">{t(`pages.participants.roles.${role}`)}</span>
+                                    ))}
                                     <span className={participantValidityBadgeClass(validityState)}>
                                         {t(`pages.participants.validity.${validityState}`)}
                                     </span>

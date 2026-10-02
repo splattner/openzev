@@ -28,9 +28,6 @@ class _Obj:
     def get_zev_type_display(self):
         return self.__dict__.get("_zev_type_display", "vZEV")
 
-    def get_full_name(self):
-        return self.__dict__.get("_full_name", "")
-
 
 def _sample_issuer() -> dict:
     """The issuer every sample document is from (#761)."""
@@ -199,11 +196,6 @@ def build_sample_contract_context() -> dict:
             vat_number="CHE-123.456.789",
             bank_iban="CH93 0076 2011 6238 5295 7",
             payment_term_days=30,
-            owner=_Obj(
-                _full_name="Maria Muster",
-                username="maria",
-                email="maria@example.com",
-            ),
         ),
         "consumption_mps": [
             _Obj(meter_id="CH1008845123456000000000000012345", location_description="Apartment 3B"),

@@ -9,7 +9,7 @@ from accounts.models import FeatureFlag, UserRole
 from metering.models import MeterReading
 from invoices.models import Invoice, InvoiceStatus
 from tariffs.models import Tariff, TariffCategory, BillingMode
-from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant
 
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
 from audit.services import (
@@ -22,14 +22,14 @@ from audit.services import (
 from zev.serializers import ParticipantSerializer
 
 
-from testing.helpers import authenticate as auth, make_user
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
 
 
 class AuditEventModelTests(TestCase):
     def setUp(self):
         self.owner = make_user("audit_owner", UserRole.USER)
         self.admin = make_user("audit_admin", UserRole.ADMIN)
-        self.zev = Zev.objects.create(name="Audit ZEV", owner=self.owner)
+        self.zev = create_managed_zev(name="Audit ZEV", owner=self.owner)
 
     def test_audit_event_orders_by_newest_first(self):
         old_event = AuditEvent.objects.create(
@@ -204,8 +204,8 @@ class AuditEventApiTests(TestCase):
         self.owner2 = make_user("audit_owner2_api", UserRole.USER)
         self.participant_user = make_user("audit_participant_api", UserRole.USER)
 
-        self.zev1 = Zev.objects.create(name="ZEV 1", owner=self.owner1)
-        self.zev2 = Zev.objects.create(name="ZEV 2", owner=self.owner2)
+        self.zev1 = create_managed_zev(name="ZEV 1", owner=self.owner1)
+        self.zev2 = create_managed_zev(name="ZEV 2", owner=self.owner2)
 
         self.owner1_event = AuditEvent.objects.create(
             zev=self.zev1,
@@ -385,7 +385,7 @@ class AuditInstrumentationTests(TestCase):
         self.admin = make_user("phase2_admin", UserRole.ADMIN)
         self.owner = make_user("phase2_owner", UserRole.USER)
         self.participant_user = make_user("phase2_participant", UserRole.USER)
-        self.zev = Zev.objects.create(name="Phase2 ZEV", owner=self.owner)
+        self.zev = create_managed_zev(name="Phase2 ZEV", owner=self.owner)
         self.participant = Participant.objects.create(
             zev=self.zev,
             user=self.participant_user,
@@ -450,7 +450,7 @@ class AuditPhase3InstrumentationTests(TestCase):
         self.owner = make_user("phase3_owner", UserRole.USER)
         self.participant_user = make_user("phase3_participant", UserRole.USER)
         self.guest_user = make_user("phase3_guest", UserRole.USER)
-        self.zev = Zev.objects.create(name="Phase3 ZEV", owner=self.owner)
+        self.zev = create_managed_zev(name="Phase3 ZEV", owner=self.owner)
         self.participant = Participant.objects.create(
             zev=self.zev,
             user=self.participant_user,

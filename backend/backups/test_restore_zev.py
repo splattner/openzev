@@ -26,7 +26,7 @@ from exports.models import ExportJob
 from invoices.models import ContractIssue, Invoice, InvoiceStatus
 from metering.models import MeterReading
 from testing.helpers import make_user
-from zev.models import MeteringPoint, Participant, Zev
+from zev.models import MeteringPoint, Participant, Zev, ZevAccessGrant
 
 
 def zev_rows(zev_id) -> dict[str, list[dict]]:
@@ -216,32 +216,14 @@ class AccountRelinkTests(ZevRestoreTestCase):
         self.assertIsNone(Participant.objects.get(zev_id=self.alpha_id, party__first_name="Alice").user_id)
         self.assertFalse(User.objects.filter(email=email).exists(), "a restore never creates an account")
 
-    def test_the_owner_follows_the_email_when_the_owner_account_was_recreated(self):
+    def test_a_recreated_community_does_not_need_its_former_managers(self):
+        # Nothing in a community requires an account since Zev.owner went (#761).
         Invoice.objects.all().delete()
         Zev.objects.all().delete()
-        email = self.world.owner.email
         self.world.owner.delete()
-        new_owner = make_user("owner-again", UserRole.USER)
-        User.objects.filter(pk=new_owner.pk).update(email=email)
-        restore_from(self.raw, self.alpha_id)
-        self.assertEqual(Zev.objects.get(pk=self.alpha_id).owner_id, new_owner.pk)
-
-    def test_a_community_that_exists_keeps_its_owner_when_the_backups_owner_is_gone(self):
-        current_owner = make_user("later-owner", UserRole.USER)
-        Zev.objects.filter(pk=self.alpha_id).update(owner=current_owner)
-        Zev.objects.filter(pk=self.beta_id).update(owner=current_owner)
-        self.world.owner.delete()  # the backup's owner no longer exists
         result = restore_from(self.raw, self.alpha_id)
-        self.assertEqual(Zev.objects.get(pk=self.alpha_id).owner_id, current_owner.pk)
         self.assertFalse(result.plan["blocked"])
-
-    def test_a_community_that_must_be_recreated_without_a_findable_owner_is_refused(self):
-        Invoice.objects.all().delete()
-        Zev.objects.all().delete()
-        self.world.owner.delete()
-        with self.assertRaises(restore_zev.RestoreRefused) as caught:
-            restore_from(self.raw, self.alpha_id, force=True)
-        self.assertEqual([c["kind"] for c in caught.exception.plan["conflicts"]], ["owner_not_found"])
+        self.assertTrue(Zev.objects.filter(pk=self.alpha_id).exists())
 
 
 class ConflictTests(ZevRestoreTestCase):
@@ -518,11 +500,9 @@ class AccessGrantRestoreTests(ZevRestoreTestCase):
         self.assertTrue(result.plan["sections"]["access_grants"]["kept"])
         self.assertEqual(list(ZevAccessGrant.objects.filter(zev_id=self.alpha_id).order_by("pk").values()), before)
 
-    def test_a_recreated_community_gets_its_owner_as_manager(self):
-        from zev import access
-
+    def test_a_recreated_community_starts_without_managers(self):
+        # Grants are not restored; an admin grants access afterwards.
         Invoice.objects.filter(zev_id=self.alpha_id).delete()
         Zev.objects.filter(pk=self.alpha_id).delete()
         restore_from(self.raw, self.alpha_id)
-        owner = Zev.objects.get(pk=self.alpha_id).owner
-        self.assertTrue(access.can_manage(owner, self.alpha_id))
+        self.assertFalse(ZevAccessGrant.objects.filter(zev_id=self.alpha_id).exists())

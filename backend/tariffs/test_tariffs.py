@@ -5,8 +5,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import User, UserRole
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
-from testing.helpers import authenticate as auth
-from zev.models import Zev
+from testing.helpers import authenticate as auth, create_managed_zev
 
 
 class TariffActionTests(TestCase):
@@ -32,7 +31,7 @@ class TariffActionTests(TestCase):
 
     def test_periods_are_rejected_for_fixed_fee_tariffs(self):
         owner = self.make_owner("tariff_fixed_fee_owner")
-        zev = Zev.objects.create(name="Fixed fee ZEV", owner=owner, zev_type="vzev")
+        zev = create_managed_zev(name="Fixed fee ZEV", owner=owner, zev_type="vzev")
         tariff = Tariff.objects.create(
             zev=zev,
             name="Monthly fee",
@@ -63,7 +62,7 @@ class TariffActionTests(TestCase):
         """SPEC-2026-percentage-tariff-bands §4.1, §5.5: a percentage-of-energy
         tariff takes bands too, keyed by ``percentage`` rather than a price."""
         owner = self.make_owner("tariff_percentage_owner")
-        zev = Zev.objects.create(name="Percentage ZEV", owner=owner, zev_type="vzev")
+        zev = create_managed_zev(name="Percentage ZEV", owner=owner, zev_type="vzev")
         tariff = Tariff.objects.create(
             zev=zev,
             name="Percentage tariff",
@@ -90,7 +89,7 @@ class TariffActionTests(TestCase):
 
     def test_a_price_band_is_rejected_on_a_percentage_tariff(self):
         owner = self.make_owner("tariff_percentage_price_owner")
-        zev = Zev.objects.create(name="Percentage ZEV 2", owner=owner, zev_type="vzev")
+        zev = create_managed_zev(name="Percentage ZEV 2", owner=owner, zev_type="vzev")
         tariff = Tariff.objects.create(
             zev=zev,
             name="Percentage tariff 2",
@@ -123,7 +122,7 @@ class TariffActionTests(TestCase):
 
     def test_energy_tariff_period_accepts_time_and_weekday_fields(self):
         owner = self.make_owner("tariff_energy_period_owner")
-        zev = Zev.objects.create(name="Energy period ZEV", owner=owner, zev_type="vzev")
+        zev = create_managed_zev(name="Energy period ZEV", owner=owner, zev_type="vzev")
         tariff = Tariff.objects.create(
             zev=zev,
             name="Timed tariff",

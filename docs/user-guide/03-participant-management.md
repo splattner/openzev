@@ -67,6 +67,10 @@ any existing account other than an admin's, including one that is already a
 participant elsewhere, so one person keeps one login — or **Unlink** the current one. Platform → Accounts lists every account and which communities
 it belongs to; see [Roles and Permissions](11-roles-and-permissions.md).
 
+A card also shows the roles the participant holds in the community today:
+**Issuer** (the invoices and contracts are from them), **Representative**
+(toward the grid operator) and **Landowner**. The issuer's card comes first.
+
 ### A Participant Forgot Their Password
 
 There is no "forgot password" link on the login page. Send or copy the

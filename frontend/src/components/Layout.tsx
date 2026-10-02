@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { useCommunityAccess } from '../lib/communityAccess'
-import { fetchUsers } from '../lib/api/auth'
 import { fetchFeasibilityCalculatorEnabled } from '../lib/api/feasibility'
 import { queryKeys } from '../lib/api/queryKeys'
 import { LanguageSelector } from './LanguageSelector'
@@ -50,11 +49,6 @@ export function Layout() {
         relation: user?.role === 'admin' ? ('admin' as const) : ('manager' as const),
     }))
     const { shellRole, isZevScope, isParticipantScope } = useCommunityAccess()
-    const usersQuery = useQuery({
-        queryKey: queryKeys.auth.users(),
-        queryFn: fetchUsers,
-        enabled: user?.role === 'admin',
-    })
     // Only the roles the nav link would show to anyway; a participant never
     // needs this, and the calculator's own permission scope (see
     // FeasibilityCalculateView) is enforced server-side regardless.
@@ -161,13 +155,8 @@ export function Layout() {
     const adminOverviewActive = useMatch('/admin') != null ||
         ['overview', 'zevs', 'invoices', 'dynamic-sources', 'audit', 'health'].includes(adminOverviewMatch?.params.tab ?? '')
 
-    const ownerById = new Map((usersQuery.data ?? []).map((candidate) => [candidate.id, candidate]))
-    const selectedZevOwner = selectedZev ? ownerById.get(selectedZev.owner) : undefined
-    // Non-admins cannot list accounts; an owner still sees itself named.
-    const effectiveOwner = selectedZevOwner ?? (selectedZev && user && selectedZev.owner === user.id ? user : undefined)
-    const selectedZevOwnerName = effectiveOwner
-        ? `${effectiveOwner.first_name} ${effectiveOwner.last_name}`.trim() || effectiveOwner.username
-        : '-'
+    // Whom the community's documents are from today (#761).
+    const selectedZevIssuerName = selectedZev?.issuer?.display_name ?? ''
 
     // /admin/*: platform scope. Switcher inert; ZEV entry goes through Manage on /admin/zevs.
     const isPlatformScope = location.pathname.startsWith('/admin')
@@ -267,11 +256,10 @@ export function Layout() {
                                 <span className="user-meta">
                                     <strong>{selectedEntry?.name || selectedZev?.name || t('nav.noZevSelected')}</strong>
                                     <small>
-                                        {/* The owner when it is known (an admin, or the owner itself);
-                                            otherwise how this account relates to the community. */}
-                                        {selectedZev && effectiveOwner
-                                            ? `${selectedZevOwnerName} · ${effectiveOwner.email || '-'}`
-                                            : selectedEntry ? t(`nav.relation.${selectedEntry.relation}`) : '-'}
+                                        {/* The issuer when the community has one; otherwise
+                                            how this account relates to the community. */}
+                                        {selectedZevIssuerName
+                                            || (selectedEntry ? t(`nav.relation.${selectedEntry.relation}`) : '-')}
                                     </small>
                                 </span>
                             </button>

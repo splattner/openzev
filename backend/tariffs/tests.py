@@ -5,10 +5,9 @@ from rest_framework.test import APIClient
 
 from accounts.models import User, UserRole
 from tariffs.models import BillingMode, SplitKey, Tariff, TariffCategory
-from zev.models import Zev
 
 
-from testing.helpers import authenticate as auth
+from testing.helpers import authenticate as auth, create_managed_zev
 
 
 class TariffPermissionTests(TestCase):
@@ -31,7 +30,7 @@ class TariffPermissionTests(TestCase):
 			password="pass1234",
 			role=UserRole.USER,
 		)
-		zev = Zev.objects.create(name="Tariff ZEV", owner=owner, zev_type="vzev")
+		zev = create_managed_zev(name="Tariff ZEV", owner=owner, zev_type="vzev")
 		auth(client, owner)
 
 		resp = client.post("/api/v1/tariffs/tariffs/", {
@@ -52,7 +51,7 @@ class TariffPermissionTests(TestCase):
 			password="pass1234",
 			role=UserRole.USER,
 		)
-		zev = Zev.objects.create(name="Tariff ZEV 3", owner=owner, zev_type="vzev")
+		zev = create_managed_zev(name="Tariff ZEV 3", owner=owner, zev_type="vzev")
 		auth(client, owner)
 
 		resp = client.post("/api/v1/tariffs/tariffs/", {
@@ -75,7 +74,7 @@ class TariffPermissionTests(TestCase):
 			password="pass1234",
 			role=UserRole.USER,
 		)
-		zev = Zev.objects.create(name="Tariff ZEV Shared", owner=owner, zev_type="vzev")
+		zev = create_managed_zev(name="Tariff ZEV Shared", owner=owner, zev_type="vzev")
 		auth(client, owner)
 
 		resp = client.post("/api/v1/tariffs/tariffs/", {
@@ -97,7 +96,7 @@ class TariffPermissionTests(TestCase):
 			password="pass1234",
 			role=UserRole.USER,
 		)
-		zev = Zev.objects.create(name="Tariff ZEV Shared 2", owner=owner, zev_type="vzev")
+		zev = create_managed_zev(name="Tariff ZEV Shared 2", owner=owner, zev_type="vzev")
 		auth(client, owner)
 
 		resp = client.post("/api/v1/tariffs/tariffs/", {
@@ -134,7 +133,7 @@ class TariffPermissionTests(TestCase):
 			password="pass1234",
 			role=UserRole.USER,
 		)
-		zev = Zev.objects.create(name="Tariff Overlap ZEV", owner=owner, zev_type="vzev")
+		zev = create_managed_zev(name="Tariff Overlap ZEV", owner=owner, zev_type="vzev")
 		auth(client, owner)
 
 		first = self._post_tariff(client, zev, "Local Energy", valid_from="2026-01-01", valid_to="2026-12-31")
@@ -156,7 +155,7 @@ class TariffPermissionTests(TestCase):
 			password="pass1234",
 			role=UserRole.USER,
 		)
-		zev = Zev.objects.create(name="Tariff Components ZEV", owner=owner, zev_type="vzev")
+		zev = create_managed_zev(name="Tariff Components ZEV", owner=owner, zev_type="vzev")
 		auth(client, owner)
 
 		first = self._post_tariff(
@@ -178,7 +177,7 @@ class TariffPermissionTests(TestCase):
 			password="pass1234",
 			role=UserRole.USER,
 		)
-		zev = Zev.objects.create(name="Tariff Seasonal ZEV", owner=owner, zev_type="vzev")
+		zev = create_managed_zev(name="Tariff Seasonal ZEV", owner=owner, zev_type="vzev")
 		auth(client, owner)
 
 		first = self._post_tariff(client, zev, "Local Energy", valid_from="2026-01-01", valid_to="2026-03-31")
@@ -196,7 +195,7 @@ class TariffPermissionTests(TestCase):
 			password="pass1234",
 			role=UserRole.USER,
 		)
-		zev = Zev.objects.create(name="Tariff Fee Overlap ZEV", owner=owner, zev_type="vzev")
+		zev = create_managed_zev(name="Tariff Fee Overlap ZEV", owner=owner, zev_type="vzev")
 		auth(client, owner)
 
 		first = self._post_tariff(
@@ -218,7 +217,7 @@ class TariffPermissionTests(TestCase):
 			password="pass1234",
 			role=UserRole.USER,
 		)
-		zev = Zev.objects.create(name="Tariff NonOverlap ZEV", owner=owner, zev_type="vzev")
+		zev = create_managed_zev(name="Tariff NonOverlap ZEV", owner=owner, zev_type="vzev")
 		auth(client, owner)
 
 		first_resp = client.post(
@@ -263,7 +262,7 @@ class SplitKeyModelAndApiTests(TestCase):
 		self.owner = User.objects.create_user(
 			username="split_key_owner", password="pass1234", role=UserRole.USER,
 		)
-		self.zev = Zev.objects.create(name="Split Key ZEV", owner=self.owner, zev_type="vzev")
+		self.zev = create_managed_zev(name="Split Key ZEV", owner=self.owner, zev_type="vzev")
 		auth(self.client, self.owner)
 
 	def _post_tariff(self, name, *, billing_mode, energy_type=None, fixed_price_chf="100.00", **extra):

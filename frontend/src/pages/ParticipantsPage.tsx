@@ -19,7 +19,6 @@ import {
     downloadParticipantContractPdf,
     fetchParticipantGeocodingEnabled,
     fetchParticipants,
-    fetchZevs,
     getOnboardingLink,
     revokeOnboardingLink,
     sendOnboardingLink,
@@ -64,7 +63,6 @@ export function ParticipantsPage() {
         queryKey: queryKeys.zev.participants(selectedZevId || undefined),
         queryFn: fetchParticipants,
     })
-    const zevsQuery = useQuery({ queryKey: queryKeys.zev.list(), queryFn: fetchZevs })
     // Off by default (#796) — the map section renders only once this is
     // confirmed true, rather than rendering with no data while loading or on
     // error, since a cached building footprint from before the flag was
@@ -277,28 +275,30 @@ export function ParticipantsPage() {
     if (isError) return <div className="card error-banner">{t('common.error')}</div>
 
     const participants = (data ?? []).filter((participant) => !isManagedScope || !selectedZevId || participant.zev === selectedZevId)
-    const ownerIdByZevId = new Map((zevsQuery.data ?? []).map((zev) => [zev.id, zev.owner]))
-    const isOwnerParticipant = (participant: Participant) => ownerIdByZevId.get(participant.zev) === participant.user
     const editingParticipant = participants.find((participant) => participant.id === editingId)
     const todayIso = todayBusinessIso()
     const participantCards = [...participants]
         .map((participant) => {
             const warnings = participantWarnings(participant)
-            const ownerRow = isOwnerParticipant(participant)
+            // The party's roles held today (#761): issuer, representative, landowner.
+            const roles = [...new Set((participant.roles ?? [])
+                .filter((role) => role.valid_from <= todayIso)
+                .map((role) => role.role))]
             const validityState = getParticipantValidityState(participant, todayIso)
 
             return {
                 participant,
                 warnings,
-                ownerRow,
+                roles,
                 validityState,
                 displayName: formatParticipantNameWithTitle(participant),
                 address: formatParticipantAddress(participant),
             }
         })
         .sort((left, right) => {
-            if (left.ownerRow !== right.ownerRow) {
-                return left.ownerRow ? -1 : 1
+            const leftIssuer = left.roles.includes('issuer')
+            if (leftIssuer !== right.roles.includes('issuer')) {
+                return leftIssuer ? -1 : 1
             }
             return left.displayName.localeCompare(right.displayName)
         })
@@ -314,7 +314,6 @@ export function ParticipantsPage() {
 
         return matchesReadiness && matchesSearch
     })
-    const ownerCount = participantCards.filter((entry) => entry.ownerRow).length
     const warningCount = participantCards.filter((entry) => entry.warnings.length > 0).length
     const noMeteringCount = participantCards.filter((entry) => !entry.participant.has_metering_point_assignment).length
 
@@ -354,7 +353,6 @@ export function ParticipantsPage() {
 
             <ParticipantToolbar
                 totalCount={participantCards.length}
-                ownerCount={ownerCount}
                 warningCount={warningCount}
                 noMeteringCount={noMeteringCount}
                 searchTerm={searchTerm}

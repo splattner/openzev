@@ -11,7 +11,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
-from testing.helpers import make_user
+from testing.helpers import make_user, create_managed_zev
 from zev.grid_operators import grid_operator_ids, grid_operators_for_postal_code, load_grid_operators
 from zev.models import Zev
 
@@ -161,7 +161,7 @@ class ZevGridOperatorIdTests(TestCase):
     def test_existing_zevs_are_unaffected(self):
         """The field is additive: nothing had to be backfilled, and a ZEV
         created before it existed stays valid."""
-        zev = Zev.objects.create(
+        zev = create_managed_zev(
             name="Legacy ZEV", owner=self.admin, zev_type="vzev",
             grid_operator="Typed Long Ago", invoice_prefix="L",
         )
@@ -192,7 +192,7 @@ class ZevPostalCodeTests(TestCase):
         self.assertEqual(Zev.objects.get(pk=response.data["id"]).postal_code, "3110")
 
     def test_postal_code_defaults_to_blank(self):
-        zev = Zev.objects.create(
+        zev = create_managed_zev(
             name="No Postal Code ZEV", owner=self.admin, zev_type="vzev", invoice_prefix="N",
         )
 

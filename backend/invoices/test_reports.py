@@ -24,6 +24,7 @@ from testing.helpers import authenticate as auth, make_user
 from zev.models import Participant
 
 from .test_helpers import make_participant, make_zev
+from zev.parties import ensure_initial_roles
 
 ANNUAL_STATEMENT = "/api/v1/invoices/invoices/annual-statement/"
 FINANCIAL_SUMMARY = "/api/v1/invoices/invoices/financial-summary/"
@@ -171,6 +172,7 @@ class FinancialSummaryTests(ReportTestCase):
         """An admin naming only the ZEV gets the owner's record, since the
         admin has none of their own in it."""
         owner_participant = make_participant(self.zev, user=self.owner, first="Olga", last="Wirt")
+        ensure_initial_roles(owner_participant.zev, owner_participant.party, owner_participant.valid_from)
 
         resp = self._get(FINANCIAL_SUMMARY, self.admin, year=2026, zev_id=str(self.zev.pk))
 

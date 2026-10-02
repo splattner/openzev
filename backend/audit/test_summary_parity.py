@@ -13,13 +13,12 @@ from rest_framework.test import APIClient
 from accounts.models import UserRole
 from audit.models import AuditEvent
 from tariffs.models import BillingMode, Tariff, TariffCategory
-from testing.helpers import authenticate as auth, make_user
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
 from zev.models import (
     MeteringPoint,
     MeteringPointAssignment,
     MeteringPointType,
     Participant,
-    Zev,
 )
 
 
@@ -28,7 +27,7 @@ class AuditSummaryParityTests(TestCase):
         self.client = APIClient()
         self.admin = make_user("parity_admin", UserRole.ADMIN)
         self.owner = make_user("parity_owner", UserRole.USER)
-        self.zev = Zev.objects.create(name="Parity ZEV", owner=self.owner)
+        self.zev = create_managed_zev(name="Parity ZEV", owner=self.owner)
         self.participant = Participant.objects.create(
             zev=self.zev,
             first_name="Par",

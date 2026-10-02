@@ -25,8 +25,8 @@ from rest_framework.test import APIClient
 from accounts.models import User, UserRole
 from metering.models import MeterReading
 from metering.testing import preview_csv, upload_csv
-from testing.helpers import authenticate as auth
-from zev.models import MeteringPoint, MeteringPointType, Zev
+from testing.helpers import authenticate as auth, create_managed_zev
+from zev.models import MeteringPoint, MeteringPointType
 
 ZURICH = ZoneInfo("Europe/Zurich")
 
@@ -40,7 +40,7 @@ class CsvImportCharacterizationTests(TestCase):
             username="charact_owner", password="pass1234", role=UserRole.USER
         )
         auth(self.client, self.owner)
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Characterization ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="X"
         )
         self.metering_point = MeteringPoint.objects.create(

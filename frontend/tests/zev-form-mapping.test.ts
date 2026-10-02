@@ -7,7 +7,6 @@ function zev(overrides: Partial<Zev> = {}): Zev {
     id: 'z-1',
     name: 'Demo',
     start_date: '2026-01-01',
-    owner: 2,
     zev_type: 'vzev',
     billing_interval: 'monthly',
     invoice_prefix: 'INV',

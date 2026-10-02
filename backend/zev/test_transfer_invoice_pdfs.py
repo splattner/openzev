@@ -17,8 +17,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from invoices.models import Invoice, InvoicePdfStatus
-from testing.helpers import authenticate as auth, make_user
-from zev.models import Zev
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
 from zev.transfer import ImportFailed, import_archive
 from zev.transfer.export import pdf_member_name
 from zev.transfer.schema import FORMAT_VERSION, SECTIONS, SUPPORTED_FORMAT_VERSIONS
@@ -167,7 +166,7 @@ class TransferEndpointInvoicePdfTests(TestCase):
     def setUpTestData(cls):
         cls.owner = make_user("pdf_ep_owner", UserRole.USER)
         cls.admin = make_user("pdf_ep_admin", UserRole.ADMIN)
-        Zev.objects.create(name="PDF endpoint ZEV", owner=cls.owner)
+        create_managed_zev(name="PDF endpoint ZEV", owner=cls.owner)
 
     def setUp(self):
         self.client = APIClient()

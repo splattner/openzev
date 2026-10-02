@@ -18,12 +18,12 @@ from .models import (
 )
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
 from invoices.models import EmailTemplate, Invoice, InvoiceStatus
-from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant
 from datetime import date, timedelta
 from django.utils import timezone
 
 from .tasks import cleanup_expired_oauth_tokens
-from testing.helpers import clear_vat_rates
+from testing.helpers import clear_vat_rates, create_managed_zev
 
 
 class UserModelTests(TestCase):
@@ -423,7 +423,7 @@ class LinkedAccountSafetyTests(TestCase):
 		self.linked_account = User.objects.create_user(username="linked_account", password="pass1234", role=UserRole.USER)
 		self.unlinked_account = User.objects.create_user(username="unlinked_account", password="pass1234", role=UserRole.USER)
 
-		zev = Zev.objects.create(name="Safety ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="S")
+		zev = create_managed_zev(name="Safety ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="S")
 		Participant.objects.create(
 			zev=zev,
 			user=self.linked_account,
@@ -517,7 +517,7 @@ class MeEndpointParticipantContextTests(TestCase):
 	def test_participant_me_lists_its_community(self):
 		client = APIClient()
 		owner = User.objects.create_user(username="owner_me", password="pass1234", role=UserRole.USER)
-		zev = Zev.objects.create(name="Context ZEV", owner=owner, zev_type="vzev", invoice_prefix="C")
+		zev = create_managed_zev(name="Context ZEV", owner=owner, zev_type="vzev", invoice_prefix="C")
 		participant_user = User.objects.create_user(username="p_me", password="pass1234", role=UserRole.USER)
 		Participant.objects.create(
 			zev=zev,
@@ -561,8 +561,8 @@ class MeEndpointParticipantContextTests(TestCase):
 	def test_participant_with_two_memberships_lists_both(self):
 		client = APIClient()
 		owner = User.objects.create_user(username="owner_multi", password="pass1234", role=UserRole.USER)
-		first_zev = Zev.objects.create(name="First ZEV", owner=owner, zev_type="vzev", invoice_prefix="F")
-		second_zev = Zev.objects.create(name="Second ZEV", owner=owner, zev_type="vzev", invoice_prefix="S")
+		first_zev = create_managed_zev(name="First ZEV", owner=owner, zev_type="vzev", invoice_prefix="F")
+		second_zev = create_managed_zev(name="Second ZEV", owner=owner, zev_type="vzev", invoice_prefix="S")
 		participant_user = User.objects.create_user(username="p_multi", password="pass1234", role=UserRole.USER)
 		Participant.objects.create(
 			zev=first_zev,
@@ -1024,7 +1024,7 @@ class RbacEndpointMatrixTests(TestCase):
 		self.participant_user = User.objects.create_user(username="rbac_matrix_participant", password="pass1234", role=UserRole.USER)
 		self.guest = User.objects.create_user(username="rbac_matrix_guest", password="pass1234", role=UserRole.USER)
 
-		self.zev = Zev.objects.create(name="RBAC Matrix ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="R")
+		self.zev = create_managed_zev(name="RBAC Matrix ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="R")
 		self.participant = Participant.objects.create(
 			zev=self.zev,
 			user=self.participant_user,
@@ -1318,8 +1318,8 @@ class PreferredZevApiTests(TestCase):
 		self.participant = User.objects.create_user(
 			username="pref_participant", password="pass1234", role=UserRole.USER
 		)
-		self.zev = Zev.objects.create(name="Preferred ZEV", owner=self.owner)
-		self.other_zev = Zev.objects.create(name="Somebody Else's ZEV", owner=self.other_owner)
+		self.zev = create_managed_zev(name="Preferred ZEV", owner=self.owner)
+		self.other_zev = create_managed_zev(name="Somebody Else's ZEV", owner=self.other_owner)
 		authenticate(self.client, self.owner)
 
 	def _me(self):

@@ -21,8 +21,8 @@ from metering.importers import csv_importer
 from metering.models import ImportLog, ImportSource, MeterReading, ReadingDirection, ReadingResolution
 from metering.testing import upload_csv
 from metering.importers.csv_importer import ImportFileError, import_csv, _upsert_reading
-from testing.helpers import authenticate as auth, make_user
-from zev.models import MeteringPoint, MeteringPointType, Participant, Zev
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
+from zev.models import MeteringPoint, MeteringPointType, Participant
 
 
 class ImportLogDeletionTests(TestCase):
@@ -32,8 +32,8 @@ class ImportLogDeletionTests(TestCase):
         self.other_owner = make_user("import_delete_other", UserRole.USER)
         auth(self.client, self.owner)
 
-        self.zev = Zev.objects.create(name="Delete Imports ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="D")
-        self.other_zev = Zev.objects.create(name="Other Imports ZEV", owner=self.other_owner, zev_type="vzev", invoice_prefix="O")
+        self.zev = create_managed_zev(name="Delete Imports ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="D")
+        self.other_zev = create_managed_zev(name="Other Imports ZEV", owner=self.other_owner, zev_type="vzev", invoice_prefix="O")
         self.participant = Participant.objects.create(
             zev=self.zev,
             first_name="Delete",
@@ -245,7 +245,7 @@ class ImportLogDeletionTests(TestCase):
         self.assertTrue(ImportLog.objects.filter(pk=log_out_of_range.id).exists())
 
     def test_bulk_delete_all_without_zev_covers_all_visible_zevs(self):
-        second_zev = Zev.objects.create(name="Second Imports ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="S")
+        second_zev = create_managed_zev(name="Second Imports ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="S")
         second_meter = MeteringPoint.objects.create(
             zev=second_zev,
             meter_id="CH-DELETE-SECOND",
@@ -323,7 +323,7 @@ class ImportLogDeletionTests(TestCase):
         self.assertEqual(listed.data["count"], 1)
 
     def test_bulk_delete_records_one_scoped_audit_event_per_zev(self):
-        second_zev = Zev.objects.create(name="Second Audit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="A")
+        second_zev = create_managed_zev(name="Second Audit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="A")
         second_meter = MeteringPoint.objects.create(
             zev=second_zev, meter_id="CH-DELETE-AUDIT", meter_type=MeteringPointType.CONSUMPTION
         )
@@ -460,7 +460,7 @@ class ImportLogCommitVisibilityTests(TransactionTestCase):
 
     def setUp(self):
         self.owner = make_user("import_visibility_owner", UserRole.USER)
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Visibility ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="V"
         )
         self.metering_point = MeteringPoint.objects.create(

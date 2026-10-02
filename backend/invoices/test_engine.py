@@ -7,8 +7,9 @@ from django.utils.timezone import localdate
 from accounts.models import User, UserRole
 from metering.models import MeterReading, ReadingDirection
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
-from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant
 from .engine import generate_invoice
+from testing.helpers import create_managed_zev
 
 
 class InvoiceEngineTests(TestCase):
@@ -18,7 +19,7 @@ class InvoiceEngineTests(TestCase):
             password="secret",
             role=UserRole.USER,
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="OpenZEV Demo",
             owner=self.owner,
             zev_type="vzev",

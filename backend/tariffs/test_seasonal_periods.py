@@ -18,8 +18,7 @@ from accounts.models import UserRole
 from invoices.engine import _resolve_tariff_band
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory, TariffPeriod
 from tariffs.periods import ALL_MONTHS, month_ranges, months_of, weekdays_of
-from testing.helpers import authenticate, make_user
-from zev.models import Zev
+from testing.helpers import authenticate, make_user, create_managed_zev
 
 WINTER = "1,2,3,10,11,12"
 SUMMER = "4,5,6,7,8,9"
@@ -70,7 +69,7 @@ class SeasonalPricingTests(TestCase):
 
     def setUp(self):
         self.owner = make_user("seasonal_owner", UserRole.USER)
-        self.zev = Zev.objects.create(name="Seasonal ZEV", owner=self.owner, zev_type="zev")
+        self.zev = create_managed_zev(name="Seasonal ZEV", owner=self.owner, zev_type="zev")
 
     def _tariff(self, *periods) -> Tariff:
         tariff = Tariff.objects.create(
@@ -160,7 +159,7 @@ class MonthMaskValidationTests(TestCase):
         self.admin = make_user("seasonal_admin", UserRole.ADMIN)
         self.client = APIClient()
         authenticate(self.client, self.admin)
-        self.zev = Zev.objects.create(name="Validation ZEV", owner=self.admin, zev_type="zev")
+        self.zev = create_managed_zev(name="Validation ZEV", owner=self.admin, zev_type="zev")
         self.tariff = Tariff.objects.create(
             zev=self.zev, name="Grid", category=TariffCategory.GRID_FEES,
             billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,

@@ -35,8 +35,7 @@ from tariffs.importers.vse_json import (
     parse_document,
 )
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory
-from testing.helpers import authenticate, make_user
-from zev.models import Zev
+from testing.helpers import authenticate, make_user, create_managed_zev
 
 
 PREVIEW_URL = "/api/v1/tariffs/imports/vse/preview/"
@@ -502,7 +501,7 @@ class PlanningTests(TestCase):
 
     def setUp(self):
         self.owner = make_user("vse_plan_owner", UserRole.USER)
-        self.zev = Zev.objects.create(name="Plan ZEV", owner=self.owner, zev_type="zev")
+        self.zev = create_managed_zev(name="Plan ZEV", owner=self.owner, zev_type="zev")
 
     def _apply(self, doc, selections=None, url="https://example.ch/tariffs.json"):
         parsed = parse_document(doc)
@@ -1021,7 +1020,7 @@ class PlanningTests(TestCase):
         self.assertEqual(DynamicTariffSource.objects.count(), 1)
 
         other_owner = make_user("vse_plan_other_owner", UserRole.USER)
-        other_zev = Zev.objects.create(name="Other Plan ZEV", owner=other_owner, zev_type="zev")
+        other_zev = create_managed_zev(name="Other Plan ZEV", owner=other_owner, zev_type="zev")
         other_document = parse_document(document(entry(
             tariffForm="dynamic", prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
         )))
@@ -1139,7 +1138,7 @@ class BillingModeChoiceTests(TestCase):
 
     def setUp(self):
         self.owner = make_user("vse_mode_owner", UserRole.USER)
-        self.zev = Zev.objects.create(name="Mode ZEV", owner=self.owner, zev_type="zev")
+        self.zev = create_managed_zev(name="Mode ZEV", owner=self.owner, zev_type="zev")
 
     def _fee_and_energy(self):
         parsed = parse_document(document(entry(prices={
@@ -1237,7 +1236,7 @@ class EnginePricingTests(TestCase):
 
     def setUp(self):
         self.owner = make_user("vse_price_owner", UserRole.USER)
-        self.zev = Zev.objects.create(name="Pricing ZEV", owner=self.owner, zev_type="zev")
+        self.zev = create_managed_zev(name="Pricing ZEV", owner=self.owner, zev_type="zev")
         parsed = parse_document(real_document())
         wanted = by_name(parsed, "Netznutzung Leistung (Arbeitspreis)")
         apply_import(
@@ -1416,7 +1415,7 @@ class ImportEndpointTests(TestCase):
 
     def setUp(self):
         self.owner = make_user("vse_api_owner", UserRole.USER)
-        self.zev = Zev.objects.create(name="API ZEV", owner=self.owner, zev_type="zev")
+        self.zev = create_managed_zev(name="API ZEV", owner=self.owner, zev_type="zev")
         self.client = APIClient()
         authenticate(self.client, self.owner)
         self.document = document(entry())
@@ -1463,7 +1462,7 @@ class ImportEndpointTests(TestCase):
         """The role check alone would let any ZEV owner write tariffs into any
         other ZEV."""
         other = make_user("vse_api_other_owner", UserRole.USER)
-        other_zev = Zev.objects.create(name="Other ZEV", owner=other, zev_type="zev")
+        other_zev = create_managed_zev(name="Other ZEV", owner=other, zev_type="zev")
 
         response = self.client.post(PREVIEW_URL, {"zev": str(other_zev.id)}, format="json")
 

@@ -29,6 +29,8 @@ from rest_framework.test import APIClient
 from accounts.models import UserRole
 from audit.models import AuditEvent, AuditEventSource, AuditEventStatus
 from testing.helpers import authenticate as auth, make_user
+from zev import access
+from zev.models import ZevAccessGrant
 
 from . import exporters
 from . import tasks as tasks_module
@@ -291,10 +293,9 @@ class ExportJobListTests(ExportJobApiTestCase):
 
     def test_requester_who_lost_ownership_no_longer_sees_the_jobs(self):
         job = ExportJob.objects.get(pk=self._create_job().data["job"]["id"])
-        # Through save(), so the owner's manager grant moves with ownership
-        # (#761); losing access means losing the grant.
-        self.zev.owner = self.other_owner
-        self.zev.save()
+        # Losing access means losing the manager grant (#761).
+        for grant in ZevAccessGrant.objects.filter(zev=self.zev, user=self.owner):
+            access.revoke(grant)
 
         auth(self.client, self.owner)
         resp = self.client.get(EXPORTS + "jobs/")

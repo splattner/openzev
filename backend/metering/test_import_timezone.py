@@ -16,8 +16,8 @@ from accounts.models import UserRole
 from metering.importers.sdatch_importer import _parse_ts
 from metering.models import ImportLog, MeterReading
 from metering.testing import preview_csv, upload_csv
-from testing.helpers import authenticate as auth, make_user
-from zev.models import MeteringPoint, MeteringPointType, Zev
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
+from zev.models import MeteringPoint, MeteringPointType
 
 ZURICH = ZoneInfo("Europe/Zurich")
 UTC = timezone.utc
@@ -36,7 +36,7 @@ class ImportTimezoneTests(TestCase):
         self.client = APIClient()
         owner = make_user("tz_import_owner", UserRole.USER)
         auth(self.client, owner)
-        self.zev = Zev.objects.create(name="TZ ZEV", owner=owner, zev_type="vzev", invoice_prefix="Z")
+        self.zev = create_managed_zev(name="TZ ZEV", owner=owner, zev_type="vzev", invoice_prefix="Z")
         self.meter = MeteringPoint.objects.create(
             zev=self.zev, meter_id="CH-TZ-1", meter_type=MeteringPointType.CONSUMPTION,
         )

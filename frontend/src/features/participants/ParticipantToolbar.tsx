@@ -6,7 +6,6 @@ export type ParticipantReadinessFilter = 'all' | 'attention' | 'ready'
 
 type ParticipantToolbarProps = {
   totalCount: number
-  ownerCount: number
   warningCount: number
   noMeteringCount: number
   searchTerm: string
@@ -20,7 +19,6 @@ type ParticipantToolbarProps = {
 
 export function ParticipantToolbar({
   totalCount,
-  ownerCount,
   warningCount,
   noMeteringCount,
   searchTerm,
@@ -39,10 +37,6 @@ export function ParticipantToolbar({
           <span className="participant-summary-stat">
             <span className="participant-summary-label">{t('pages.participants.summary.total')}</span>
             <span className="participant-summary-value">{totalCount}</span>
-          </span>
-          <span className="participant-summary-stat">
-            <span className="participant-summary-label">{t('pages.participants.summary.owners')}</span>
-            <span className="participant-summary-value">{ownerCount}</span>
           </span>
           <span className="participant-summary-stat">
             <span className="participant-summary-label">{t('pages.participants.summary.attention')}</span>

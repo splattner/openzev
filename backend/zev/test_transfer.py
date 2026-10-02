@@ -23,7 +23,7 @@ from invoices.models import Invoice, InvoiceItem, InvoiceStatus
 from metering.models import ImportLog, MeterReading, ReadingResolution
 from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
-from testing.helpers import authenticate as auth, make_user
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
 from zev.models import (
     MeteringPoint,
     MeteringPointAssignment,
@@ -32,7 +32,9 @@ from zev.models import (
     Participant,
     Party,
     Zev,
+    ZevAccessGrant,
 )
+from zev import access
 from zev.transfer import ArchiveError, ImportFailed, build_archive, import_archive
 from zev.transfer.schema import FORMAT_VERSION, MANIFEST_NAME, SECTIONS, missing_dependencies
 
@@ -41,7 +43,7 @@ ZEV_URL = "/api/v1/zev/zevs"
 
 def build_populated_zev(owner, *, name="Transfer ZEV", meter_prefix="TR"):
     """A ZEV holding one of everything the archive can carry."""
-    zev = Zev.objects.create(
+    zev = create_managed_zev(
         name=name,
         owner=owner,
         grid_operator="Testwerke AG",
@@ -174,14 +176,14 @@ class SectionDependencyTests(TestCase):
 
     def test_export_refuses_an_incomplete_selection(self):
         owner = make_user("dep_owner", UserRole.USER)
-        zev = Zev.objects.create(name="Deps", owner=owner)
+        zev = create_managed_zev(name="Deps", owner=owner)
         with self.assertRaises(ValueError) as ctx:
             export_to_bytes(zev, ["readings"])
         self.assertIn("metering_points", str(ctx.exception))
 
     def test_export_refuses_to_run_inside_an_outer_transaction(self):
         owner = make_user("dep_owner2", UserRole.USER)
-        zev = Zev.objects.create(name="Deps", owner=owner)
+        zev = create_managed_zev(name="Deps", owner=owner)
         buffer = io.BytesIO()
         with self.assertRaises(RuntimeError):
             with transaction.atomic():
@@ -292,7 +294,7 @@ class RoundTripTests(TestCase):
         imported = Zev.objects.get(pk=result["zev_id"])
 
         self.assertNotEqual(imported.pk, self.source.pk)
-        self.assertEqual(imported.owner, self.importer)
+        self.assertTrue(access.can_manage(self.importer, imported))
         self.assertEqual(imported.name, self.source.name)
         self.assertEqual(imported.grid_operator, "Testwerke AG")
         self.assertEqual(imported.local_tariff_notes, "Local tariff conditions")
@@ -473,7 +475,7 @@ class RejectedArchiveTests(TestCase):
         with self.assertRaises(ArchiveError) as ctx:
             self._import(raw)
         self.assertIn("99", str(ctx.exception))
-        self.assertFalse(Zev.objects.filter(owner=self.importer).exists())
+        self.assertFalse(Zev.objects.filter(access_grants__user=self.importer).exists())
 
     def test_a_manifest_promising_a_missing_file_is_refused(self):
         raw = self._archive(["tariffs"], drop=("tariffs.json",))
@@ -489,7 +491,7 @@ class RejectedArchiveTests(TestCase):
     def test_a_colliding_meter_id_is_reported_by_name(self):
         raw = export_and_clear(self.source)
         MeteringPoint.objects.create(
-            zev=Zev.objects.create(name="Other", owner=self.owner),
+            zev=create_managed_zev(name="Other", owner=self.owner),
             meter_id="REJ-CONS-1",
             meter_type=MeteringPointType.CONSUMPTION,
         )
@@ -620,7 +622,7 @@ class RejectedArchiveTests(TestCase):
         with self.assertRaises(ArchiveError) as ctx:
             self._import(raw)
         self.assertIn("corrupt", str(ctx.exception))
-        self.assertFalse(Zev.objects.filter(owner=self.importer).exists())
+        self.assertFalse(Zev.objects.filter(access_grants__user=self.importer).exists())
 
     def test_a_corrupt_readings_member_is_reported_not_a_crash(self):
         raw = self._corrupt_member_payload(
@@ -683,7 +685,7 @@ class RejectedArchiveTests(TestCase):
             e for e in ctx.exception.errors if "Duplicate reading" in json.dumps(e["errors"])
         ]
         self.assertEqual(len(duplicates), 2)
-        self.assertFalse(Zev.objects.filter(owner=self.importer).exists())
+        self.assertFalse(Zev.objects.filter(access_grants__user=self.importer).exists())
 
     def test_an_archive_with_readings_missing_from_the_zip_is_rejected(self):
         """The manifest declares 3 readings; the ZIP has none. Importing must
@@ -699,7 +701,7 @@ class RejectedArchiveTests(TestCase):
         entries = [e for e in ctx.exception.errors if e.get("label") == "manifest"]
         self.assertEqual(len(entries), 1)
         self.assertIn("declares 3 readings", json.dumps(entries[0]["errors"]))
-        self.assertFalse(Zev.objects.filter(owner=self.importer).exists())
+        self.assertFalse(Zev.objects.filter(access_grants__user=self.importer).exists())
 
     def test_the_error_list_is_capped_but_the_total_is_not(self):
         raw = self._archive(
@@ -736,7 +738,7 @@ class RejectedArchiveTests(TestCase):
         with self.assertRaises(ArchiveError) as ctx:
             self._import(raw)
         self.assertIn("Assignment", str(ctx.exception))
-        self.assertFalse(Zev.objects.filter(owner=self.importer).exists())
+        self.assertFalse(Zev.objects.filter(access_grants__user=self.importer).exists())
 
     def test_duplicate_invoice_numbers_are_reported_not_a_crash(self):
         """The per-ZEV ``(zev, invoice_number)`` constraint sits outside what
@@ -762,7 +764,7 @@ class RejectedArchiveTests(TestCase):
             self._import(raw)
         self.assertEqual(len(ctx.exception.errors), 1)
         self.assertEqual(ctx.exception.errors[0]["label"], "REJ-00001")
-        self.assertFalse(Zev.objects.filter(owner=self.importer).exists())
+        self.assertFalse(Zev.objects.filter(access_grants__user=self.importer).exists())
 
     def test_a_manifest_missing_counts_is_refused(self):
         """An archive without ``counts`` defeats the manifest verification step;
@@ -775,7 +777,7 @@ class RejectedArchiveTests(TestCase):
         with self.assertRaises(ArchiveError) as ctx:
             self._import(raw)
         self.assertIn("counts", str(ctx.exception))
-        self.assertFalse(Zev.objects.filter(owner=self.importer).exists())
+        self.assertFalse(Zev.objects.filter(access_grants__user=self.importer).exists())
 
     def test_a_manifest_with_a_non_integer_count_is_refused(self):
         """``counts`` values must be non-negative integers; a malformed value is
@@ -831,7 +833,7 @@ class RejectedArchiveTests(TestCase):
             e for e in ctx.exception.errors if "Duplicate participant" in json.dumps(e["errors"])
         ]
         self.assertEqual(len(duplicates), 1)
-        self.assertFalse(Zev.objects.filter(owner=self.importer).exists())
+        self.assertFalse(Zev.objects.filter(access_grants__user=self.importer).exists())
 
 
 class PercentageBandArchiveTests(TestCase):
@@ -843,7 +845,7 @@ class PercentageBandArchiveTests(TestCase):
         self.owner = make_user("pct_archive_owner", UserRole.USER)
 
     def _zev_with_percentage_bands(self):
-        zev = Zev.objects.create(name="Percentage Archive ZEV", owner=self.owner)
+        zev = create_managed_zev(name="Percentage Archive ZEV", owner=self.owner)
         tariff = Tariff.objects.create(
             zev=zev, name="Local Surcharge", category=TariffCategory.LEVIES,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.LOCAL,
@@ -899,7 +901,7 @@ class PercentageBandArchiveTests(TestCase):
         )
 
     def test_a_v3_archive_without_a_percentage_imports_no_band(self):
-        zev = Zev.objects.create(name="Percentage Archive ZEV 2", owner=self.owner)
+        zev = create_managed_zev(name="Percentage Archive ZEV 2", owner=self.owner)
         Tariff.objects.create(
             zev=zev, name="Empty Surcharge", category=TariffCategory.LEVIES,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.LOCAL,
@@ -1136,7 +1138,6 @@ class SchemaParityTests(TestCase):
         },
         "ZEV_FIELDS": {
             "id",
-            "owner",
             "created_at",
             "updated_at",
             "participant_invoice_access",
@@ -1207,7 +1208,7 @@ class TransferEndpointTests(TestCase):
         cls.admin = make_user("tx_admin", UserRole.ADMIN)
         cls.owner = make_user("tx_owner", UserRole.USER)
         cls.other_owner = make_user("tx_other", UserRole.USER)
-        Zev.objects.create(name="Somebody else's ZEV", owner=cls.other_owner)
+        create_managed_zev(name="Somebody else's ZEV", owner=cls.other_owner)
         cls.zev = build_populated_zev(cls.owner, meter_prefix="TX")
 
     def setUp(self):
@@ -1271,7 +1272,7 @@ class TransferEndpointTests(TestCase):
         body = response.json()
         self.assertEqual(body["zev_name"], "Imported TX")
         self.assertEqual(body["counts"]["participants"], 2)
-        self.assertEqual(Zev.objects.get(pk=body["zev_id"]).owner, self.admin)
+        self.assertTrue(ZevAccessGrant.objects.filter(zev_id=body["zev_id"], user=self.admin, role="manager").exists())
 
     def test_a_zev_owner_cannot_import(self):
         """Import creates a ZEV, and only admins create ZEVs on this instance."""

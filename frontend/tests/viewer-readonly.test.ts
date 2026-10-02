@@ -30,7 +30,7 @@ const has = (container: Element, label: string) => container.textContent?.includ
 describe('viewer read-only controls', () => {
     it('participants: no "New participant"', async () => {
         const props = {
-            totalCount: 1, ownerCount: 0, warningCount: 0, noMeteringCount: 0, searchTerm: '',
+            totalCount: 1, warningCount: 0, noMeteringCount: 0, searchTerm: '',
             readinessFilter: 'all' as const, onSearchTermChange: vi.fn(), onReadinessFilterChange: vi.fn(),
             onOpenCreateModal: vi.fn(),
         }

@@ -46,8 +46,8 @@ from invoices.test_allocation_reconciliation import (
 )
 from tariffs.models import BillingMode, SplitKey, TariffCategory
 from testing import factories
-from testing.helpers import make_named_participant
-from zev.models import MeteringPointType, Zev
+from testing.helpers import make_named_participant, create_managed_zev
+from zev.models import MeteringPointType
 
 User = get_user_model()
 
@@ -63,7 +63,7 @@ class AllocationQueryCountTests(_ReconciliationBase):
         self.owner = User.objects.create_user(
             username="recon_multi", password="pass1234", role=UserRole.USER
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Multi ZEV",
             owner=self.owner,
             zev_type="vzev",

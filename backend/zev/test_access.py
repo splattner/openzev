@@ -1,22 +1,22 @@
 """The per-ZEV access grant model and the helpers that read it (#761, spec §4–§5).
 
 Nothing reads grants for access yet (that is step 4 of the rollout); this pins
-the model, the helpers and the transitional invariant that ``Zev.owner`` holds a
-manager grant, so the read-path rewrite can rely on them.
+the model, the helpers and ``grant_manager``, which makes the account that creates
+or imports a ZEV its manager (``Zev.owner`` is gone, ADR 0028).
 """
 
 import io
 from datetime import date, timedelta
 from unittest import mock
 
-from django.core.management import call_command
 from django.db import IntegrityError, connection, transaction
+from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase, TransactionTestCase
 from django.test.utils import CaptureQueriesContext
 
 from accounts.models import UserRole
 from invoices.models import Invoice
-from testing.helpers import make_user
+from testing.helpers import make_user, create_managed_zev
 from zev import access
 from zev.models import Participant, Zev, ZevAccessGrant, ZevAccessRole
 
@@ -36,7 +36,7 @@ class GrantTestCase(TestCase):
         self.addCleanup(patcher.stop)
         self.owner = make_user("ga_owner", UserRole.USER)
         self.other = make_user("ga_other", UserRole.USER)
-        self.zev = Zev.objects.create(name="Grant ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="G")
+        self.zev = create_managed_zev(name="Grant ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="G")
 
     def grant(self, user, role=VIEWER, valid_from=date(2026, 1, 1), valid_to=None):
         return ZevAccessGrant.objects.create(
@@ -142,7 +142,7 @@ class AccessHelperTests(GrantTestCase):
         live = Participant.objects.create(
             zev=self.zev, user=self.other, first_name="L", last_name="Live", valid_from=date(2026, 1, 1),
         )
-        other_zev = Zev.objects.create(name="Old ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="O")
+        other_zev = create_managed_zev(name="Old ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="O")
         Participant.objects.create(
             zev=other_zev, user=self.other, first_name="E", last_name="Ended",
             valid_from=date(2025, 1, 1), valid_to=TODAY - timedelta(days=1),
@@ -174,7 +174,7 @@ class AccessHelperTests(GrantTestCase):
         self.assertFalse(access.is_last_manager(self.grant(make_user("ga_v2", UserRole.USER))))
 
 
-class OwnerGrantInvariantTests(GrantTestCase):
+class CreatorGrantTests(GrantTestCase):
     def test_creating_a_zev_makes_its_owner_manager(self):
         grant = ZevAccessGrant.objects.get(zev=self.zev)
         self.assertEqual((grant.user, grant.role, grant.valid_from, grant.valid_to), (self.owner, MANAGER, TODAY, None))
@@ -185,21 +185,9 @@ class OwnerGrantInvariantTests(GrantTestCase):
         Zev.objects.get(pk=self.zev.pk).save()
         self.assertEqual(ZevAccessGrant.objects.filter(zev=self.zev).count(), 1)
 
-    def test_moving_ownership_moves_the_manager_grant(self):
-        new_owner = make_user("ga_new_owner", UserRole.USER)
-        zev = Zev.objects.get(pk=self.zev.pk)
-        zev.owner = new_owner
-        zev.save()
-        for user in (self.owner, new_owner):
-            access.invalidate(user)
-        self.assertFalse(access.can_view(self.owner, self.zev))
-        self.assertTrue(access.can_manage(new_owner, self.zev))
-
-    def test_a_new_owner_who_was_a_viewer_is_promoted(self):
+    def test_granting_manager_to_a_viewer_promotes_it(self):
         self.grant(self.other)
-        zev = Zev.objects.get(pk=self.zev.pk)
-        zev.owner = self.other
-        zev.save()
+        access.grant_manager(self.zev, self.other)
         access.invalidate(self.other)
         self.assertTrue(access.can_manage(self.other, self.zev))
         self.assertEqual(
@@ -215,16 +203,9 @@ class OwnerGrantInvariantTests(GrantTestCase):
         access.invalidate(self.owner)
         self.assertFalse(access.can_manage(self.owner, self.zev))
 
-    def test_ensure_a_manager_only_acts_when_nobody_manages(self):
-        self.grant(self.other, role=MANAGER)
-        access.revoke(ZevAccessGrant.objects.get(zev=self.zev, user=self.owner))
-        access.ensure_a_manager(self.zev)
-        access.invalidate(self.owner)
-        self.assertFalse(access.can_manage(self.owner, self.zev))
-        access.revoke(ZevAccessGrant.objects.get(zev=self.zev, user=self.other, valid_to__isnull=True))
-        access.ensure_a_manager(self.zev)
-        access.invalidate(self.owner)
-        self.assertTrue(access.can_manage(self.owner, self.zev))
+    def test_granting_manager_twice_keeps_one_grant(self):
+        access.grant_manager(self.zev, self.owner)
+        self.assertEqual(ZevAccessGrant.objects.filter(zev=self.zev, user=self.owner).count(), 1)
 
     def test_transfer_import_makes_the_importer_manager(self):
         from zev.test_transfer import build_populated_zev, export_to_bytes
@@ -246,21 +227,35 @@ class OwnerGrantInvariantTests(GrantTestCase):
 class GrantMigrationTests(TransactionTestCase):
     """0031 gives every existing ZEV's owner a manager grant, starting the day it was created."""
 
+    def setUp(self):
+        # Start from the latest schema: a plan that moves one app back while
+        # another must move forward is refused, whatever an earlier test left.
+        self.tearDown()
+
+    def tearDown(self):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())
+
+    def migrate(self, targets):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(targets)
+        return executor.loader.project_state(targets).apps
+
     def test_migration_grants_every_owner(self):
-        call_command("migrate", "zev", "0030", verbosity=0, interactive=False)
-        try:
-            owner = make_user("mig_owner", UserRole.USER)
-            # bulk_create: Zev.save() would write a grant into a table 0030 lacks.
-            zevs = Zev.objects.bulk_create([
-                Zev(name=f"Mig {n}", owner=owner, zev_type="vzev", invoice_prefix="M", start_date=date(2030, 1, 1))
-                for n in range(2)
-            ])
-            call_command("migrate", "zev", verbosity=0, interactive=False)
-            grants = ZevAccessGrant.objects.filter(zev__in=zevs)
-            self.assertEqual(grants.count(), 2)
-            for grant in grants:
-                self.assertEqual((grant.user_id, grant.role, grant.valid_to), (owner.pk, MANAGER, None))
-                # The creation day, not a start_date in the future.
-                self.assertLessEqual(grant.valid_from, date.today())
-        finally:
-            call_command("migrate", "zev", verbosity=0, interactive=False)
+        old = self.migrate([("zev", "0030_meteringpoint_has_behind_meter_generation")])
+        owner = make_user("mig_owner", UserRole.USER)
+        OldZev = old.get_model("zev", "Zev")
+        zevs = [
+            OldZev.objects.create(name=f"Mig {n}", owner_id=owner.pk, zev_type="vzev", invoice_prefix="M",
+                                  start_date=date(2030, 1, 1))
+            for n in range(2)
+        ]
+        new = self.migrate([("zev", "0031_zev_access_grant")])
+        grants = new.get_model("zev", "ZevAccessGrant").objects.filter(zev_id__in=[zev.pk for zev in zevs])
+        self.assertEqual(grants.count(), 2)
+        for grant in grants:
+            self.assertEqual((grant.user_id, grant.role, grant.valid_to), (owner.pk, MANAGER, None))
+            # The creation day, not a start_date in the future.
+            self.assertLessEqual(grant.valid_from, date.today())

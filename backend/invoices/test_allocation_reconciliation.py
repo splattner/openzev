@@ -26,8 +26,8 @@ from invoices.engine import generate_invoice
 from invoices.pdf_stats import _compute_period_participant_stats
 from metering.analytics import owner_dashboard_summary
 from metering.models import MeterReading, ReadingDirection
-from testing.helpers import make_named_participant
-from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType, Zev
+from testing.helpers import make_named_participant, create_managed_zev
+from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType
 
 User = get_user_model()
 
@@ -143,7 +143,7 @@ class EnginePdfStatsAnalyticsReconciliationTests(_ReconciliationBase):
         self.owner = User.objects.create_user(
             username="recon_owner", password="pass1234", role=UserRole.USER
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Recon ZEV",
             owner=self.owner,
             zev_type="vzev",
@@ -264,7 +264,7 @@ class MultiMeterBidirectionalReconciliationTests(_ReconciliationBase):
         self.owner = User.objects.create_user(
             username="recon_multi", password="pass1234", role=UserRole.USER
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Multi ZEV",
             owner=self.owner,
             zev_type="vzev",
@@ -484,7 +484,7 @@ class UnassignedProductionReconciliationTests(_ReconciliationBase):
         self.owner = User.objects.create_user(
             username="recon_unprod", password="pass1234", role=UserRole.USER
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Unprod ZEV",
             owner=self.owner,
             zev_type="vzev",
@@ -553,7 +553,7 @@ class AnnualStatementPhysicalPoolTests(_ReconciliationBase):
         self.owner = User.objects.create_user(
             username="annual_pool_owner", password="pass1234", role=UserRole.USER
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Annual Pool ZEV", owner=self.owner, zev_type="vzev",
             start_date=PERIOD_START, billing_interval="monthly", invoice_prefix="AP",
         )
@@ -611,7 +611,7 @@ class AnnualStatementDirectionTypePairingTests(_ReconciliationBase):
         self.owner = User.objects.create_user(
             username="pairing_owner", password="pass1234", role=UserRole.USER
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Pairing ZEV", owner=self.owner, zev_type="vzev",
             start_date=PERIOD_START, billing_interval="monthly", invoice_prefix="PZ",
         )
@@ -670,7 +670,7 @@ class CommunityMeterReconciliationTests(_ReconciliationBase):
         self.owner = User.objects.create_user(
             username="recon_community", password="pass1234", role=UserRole.USER
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Community Recon ZEV",
             owner=self.owner,
             zev_type="vzev",

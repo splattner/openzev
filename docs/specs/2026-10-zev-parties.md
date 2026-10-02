@@ -212,9 +212,14 @@ reverse deletes every role row.
 
 ### 4.6 Zev
 
-`owner` (and the `owned_zevs` reverse relation) is removed. `Zev.save()` no longer calls
-`zev.access.sync_owner_grant`; `sync_owner_grant` and `ensure_a_manager` are deleted. The
-`_loaded_owner_id` bookkeeping goes.
+`owner` (and the `owned_zevs` reverse relation) is removed by `zev.0037_remove_zev_owner`:
+`AlterField(null=True)`, a `RunPython` whose reverse fills `owner` with the ZEV's earliest
+open manager grant (else its last one), then `RemoveField`, so the migration reverses.
+`Zev.save()`/`Zev.from_db` are the plain model methods again; `sync_owner_grant` and
+`ensure_a_manager` are deleted. New `zev.access.grant_manager(zev, user, *, by=None)`: an
+active manager grant is kept, an open grant of another role is promoted (`change_role`), else
+an open manager grant from today is created. `issuer_on` loses its owner fallback (PR 4). The
+participant "cannot unlink the owner account" rule goes. Django admin drops the `owner` column.
 
 ## 5. API contracts
 
@@ -274,10 +279,11 @@ the ZEV.
 
 ### 5.4 ZEVs
 
-`ZevSerializer` drops `owner`. `ZevSerializer` gains read-only `issuer`
-(`{party, display_name}` of today's issuer or `null`) for the switcher and the ZEV list.
-`ZevViewSet.create` (admin) and self-setup grant the creator a manager role explicitly (§6).
-The admin "change owner" (`PATCH zev.owner`) is gone.
+`ZevSerializer` drops `owner` (and its `validate_owner` / default-to-caller `create`). It
+gains read-only `issuer` (`{party, display_name}` of today's issuer or `null`) for the
+switcher and the ZEV list, read from the `issuer_roles` prefetch that `ZevViewSet.get_queryset`
+adds (one query for the list). Self-setup grants the caller a manager role explicitly (§6);
+`ZevViewSet.create` (admin) grants nobody. The admin "change owner" (`PATCH zev.owner`) is gone.
 
 ## 6. Creation flows
 
@@ -286,7 +292,8 @@ The admin "change owner" (`PATCH zev.owner`) is gone.
 | Wizard `create_zev_with_owner_setup` | Account (`role=user`, temporary password), ZEV, a **person party** from the owner data, the owner **participant** of that party (`valid_from = start_date`), **issuer + landowner** roles from `start_date`, a **manager grant** for the account, the metering points and their assignments |
 | Self-setup `create_zev_for_existing_owner` | ZEV, the caller's party and participant, issuer + landowner, a manager grant for the caller |
 | Admin `ZevViewSet.create` | The ZEV only (admins need no grant); parties, roles and access are added afterwards in ZEV settings |
-| Transfer import | Parties and roles from the archive (§9); a manager grant for the importing account (unchanged behaviour of the old owner invariant) |
+| Transfer import | Parties from the archive (§9; roles from format 5, a follow-up PR); a manager grant for the importing account (`grant_manager`) |
+| `seed_demo` | Finds its demo ZEVs through the demo owner's manager grant (`_owned_zevs`), and grants it on every run |
 
 ## 7. Documents and templates
 
@@ -329,14 +336,14 @@ renders byte-identical HTML and no contract version is minted by the template ch
 | `representative.*` | Same name/contact/address keys for the representative on the document's date, or `None` |
 | `participant.display_name`, `.name_lines`, `.organisation_name`, `.name_addition`, `.kind` | Recipient |
 | `owner_participant.*` | Deprecated alias of `issuer` (`full_name` → `issuer.name`) |
-| `zev.owner.get_full_name`, `zev.owner.email` | Deprecated alias → `issuer.name`, `issuer.email`; `zev.owner.username` → `""` |
+| `zev.owner.get_full_name`, `zev.owner.email` | Deprecated alias → `issuer.name`, `issuer.email`; `zev.owner.username` → `""` (from PR 5: `document_parties.OwnerAlias`, set as `owner` on the `zev` `FrozenView` in the invoice context and in `issuer_context` for contracts and statements) |
 
 `field_catalog_data.py` lists the new groups (`issuer`, `representative`; name, name addition,
 organisation name, address, phone, email, and for the issuer IBAN, bank name and VAT number) in
-all three catalogues and drops `ownerParticipant`; the deprecated aliases keep rendering. The
-contract catalogue keeps a `zevOwner` group (`zev.owner.get_full_name`, `.username`, `.email`)
-until PR 5, because the built-in contract template still prints the owner account where there
-is no issuer. New i18n keys `admin.fields.issuer`, `representative`, `zevOwner`, `partyName`,
+all three catalogues and drops `ownerParticipant`; the deprecated aliases keep rendering. In PR 4
+the contract catalogue kept a `zevOwner` group for the built-in contract template's
+no-issuer branch; PR 5 prints `issuer.name` / `issuer.email` there (the ZEV name without an
+issuer) and drops the group and its keys. New i18n keys `admin.fields.issuer`, `representative`, `zevOwner`, `partyName`,
 `organisationName`, `bankName`; `ownerParticipant` is removed. The built-in
 templates (`templates/invoices/invoice_pdf.html`, `annual_statement_pdf.html`,
 `templates/contracts/participant_contract_pdf.html`) use `issuer.*` and render
@@ -399,9 +406,18 @@ role, responsive layout).
 
 ### 8.5 Owner reads replaced
 
-`ZevListPage` (owner column and "change owner" dialog → issuer name, dialog removed), `Layout`
-switcher subtitle (`issuer.display_name`), `zevForm.ts` (`owner` dropped), the wizard keeps its
-"responsible person" form (it creates the issuer).
+`ZevListPage` (owner column and "change owner" dialog → `Issuer` column showing
+`issuer.display_name` or "–", dialog, its mutation and the users/participants queries
+removed), `Layout` switcher subtitle (`issuer.display_name`, else the account's relation; the
+admin users query is gone), `zevForm.ts` (`owner` dropped; `ZevFormField = keyof ZevInput`),
+`types/api.ts` (`Zev.owner` → `Zev.issuer`, `ZevInput.owner` and the `owner_not_found` restore
+conflict removed). The participants page shows the party's roles held today as badges
+(`pages.participants.roles.{issuer,representative,landowner}`) instead of the "Owner" badge,
+sorts the issuer first, and drops the "Owners" summary count; the unlink and delete actions no
+longer hide for the owner's row. The wizard keeps its "responsible person" form (it creates the
+issuer). Removed keys: `pages.zevs.ownerModal.*`, `setOwner`, `messages.assignFailed`,
+`validation.selectNewOwner`, `pages.participants.owner`, `summary.owners`,
+`admin.fields.zevOwner*`, `restore…owner_not_found`; `pages.zevs.col.owner` → `col.issuer`.
 
 ### 8.6 i18n
 
@@ -416,14 +432,16 @@ Keys in all four locales under `pages.zevSettings.tabs.parties`, `pages.zevSetti
   `organisation_name` and `name_addition`, the importer builds one party per participant
   from the flat fields (`Party.full_clean()` first), and an older archive imports every
   participant as a person.
-- PR 5, archive **format version 5**: new sections `parties` (`PARTY_FIELDS` + archive `id`) and
+- Archive **format version 5** (split out of PR 5 into its own PR): new sections `parties` (`PARTY_FIELDS` + archive `id`) and
   `party_roles` (`party_id`, `role`, `valid_from`, `valid_to`), written before participants;
   `PARTICIPANT_FIELDS` loses the moved fields and gains `party_id`.
 - Importing v1–4: one party per participant from its fields (`kind=person`), no roles (the
   archive never named the owner).
 - `backups/registry.py`: `zev.Party` (PR 3, written before `zev.Participant`) and
   `zev.ZevPartyRole` (PR 4) in the per-ZEV section;
-  `restore_zev.py` drops the `owner_id` account transform.
+  `restore_zev.py` drops the owner fallback of the account transform, the `owner_ref` fact and
+  the `owner_not_found` conflict, and `ensure_a_manager` after a recreation (PR 5): a recreated
+  community has no managers until an admin grants access.
 
 ## 10. Observability and audit
 
@@ -439,7 +457,8 @@ through the participant endpoints keep the existing participant audit events.
 | 2 | This spec + ADR 0028 |
 | 3 | `Party`, `Participant.party`, facade, migrations `zev.0032_party` / `0033_participant_parties_data` / `0034_participant_party_required` (one party per participant), ORM lookups, `kind` / `organisation_name` / `name_addition` / `display_name` in API, copy, QR and built-in templates — no other behaviour change |
 | 4 | `ZevPartyRole`, `zev/parties.py`, data migration (issuer + landowner from the owner's party; no role when the owner has no participation), issuer by date in copy / contract / statement / reports, wizard and self-setup set the roles, template variables and catalogue, read-only party and role endpoints, `ParticipantSerializer.roles`, `zev.ZevPartyRole` in backups |
-| 5 | Drop `Zev.owner`: creation flows with explicit grants and roles, `ZevSerializer.issuer`, admin owner dialog removed, transfer v5, backups, frontend owner reads replaced |
+| 5 | Drop `Zev.owner` (`zev.0037`): creation flows with explicit grants, `ZevSerializer.issuer`, admin owner dialog removed, `zev.owner.*` template alias, backups, frontend owner reads replaced, role badges on participants |
+| 5b | Transfer archive format 5 (`parties`, `party_roles`) |
 | 6 | Party and role write endpoints, Parties tab, participant form and badges, user guide |
 
 ## 12. Risks and mitigations
@@ -482,8 +501,19 @@ through the participant endpoints keep the existing participant audit events.
   21 invoices, 2 issued and 9 current contracts and 15 of 18 annual statements render
   byte-identical HTML; the 3 others are 2025 statements of a ZEV that started in April 2026
   (§7.1).
-- **PR 5**: creation flows (party, participant, roles, grant), no `owner` in API, transfer v5
-  round trip and v4 import, backups restore; frontend owner reads.
+- **PR 5** (shipped): `zev/test_without_owner.py` (5: a ZEV shows its issuer and no owner, an
+  admin-created ZEV gives nobody access, self-setup makes the caller manager and issuer,
+  `zev.owner.*` in a custom template resolves to the issuer, the migration reverses with the
+  current manager as owner); `zev/test_access.py` `CreatorGrantTests` replaces the owner
+  invariant tests (`grant_manager` promotes a viewer, is idempotent) and `GrantMigrationTests`
+  uses historical models; backups: a recreated community needs no former manager and starts
+  without managers; the suite creates ZEVs with `testing.helpers.create_managed_zev(owner=…)`
+  / `ZevFactory(owner=…)` (ZEV + manager grant) and reads `zev_manager(zev)` where it read
+  `zev.owner`; tests that relied on the owner fallback give the owner's participation the
+  issuer role. Backend 3820 passed. Golden check on the dev data: 21 invoices, 2 issued
+  contracts and 18 annual statements byte-identical; 3 current contracts of a ZEV without an
+  issuer now name the ZEV where they named the owner account.
+- **PR 5b**: transfer v5 round trip and v4 import.
 - **PR 6**: party and role endpoints (scoping, viewer read-only, audit); frontend
   `zev-parties-section.test.ts`, participant form; user guide build.
 

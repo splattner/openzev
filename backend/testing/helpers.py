@@ -16,7 +16,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.jwt_utils import SESSION_CLAIM
 from accounts.models import User, UserRole, VatRate
-from zev.models import Participant
+from zev.access import grant_manager
+from zev.models import Participant, Zev
 
 
 def make_user(
@@ -29,12 +30,36 @@ def make_user(
     factory_boy factories in ``testing.factories`` for anything that needs a
     fuller object graph (a Zev, a Participant, ...); reach for this when a
     test genuinely only needs a user. What the account may do in a ZEV comes
-    from its grants (owning a ZEV makes one) and participant links (#761).
+    from its grants and participant links (#761).
     """
     return User.objects.create_user(
         username=username, email=f"{username}@example.com", password=password, role=role,
         may_create_zev=may_create_zev,
     )
+
+
+def create_managed_zev(*, owner=None, **fields) -> Zev:
+    """Create a ZEV and, when ``owner`` is given, make that account its manager.
+
+    The ZEV's owner account is gone (#761); creating a ZEV for someone is a ZEV
+    plus a manager grant, as the wizard, self-setup and import do.
+    """
+    zev = Zev.objects.create(**fields)
+    if owner is not None:
+        grant_manager(zev, owner)
+    return zev
+
+
+def zev_manager(zev):
+    """The account managing ``zev`` (its earliest open manager grant) — what
+    tests used to reach as ``zev.owner``."""
+    from zev.models import ZevAccessGrant, ZevAccessRole
+
+    grant = (
+        ZevAccessGrant.objects.filter(zev=zev, role=ZevAccessRole.MANAGER, valid_to__isnull=True)
+        .select_related("user").order_by("valid_from", "created_at").first()
+    )
+    return grant.user if grant else None
 
 
 def make_named_participant(zev, name, valid_from, valid_to=None) -> Participant:

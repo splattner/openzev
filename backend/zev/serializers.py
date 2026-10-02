@@ -4,7 +4,7 @@ from .geocoding import get_cached_building_footprint
 from .grid_operators import grid_operator_ids
 from django.utils import timezone
 
-from .models import Zev, Participant, Party, PartyKind, PartyTitle, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode, ZevPartyRole
+from .models import Zev, Participant, Party, PartyKind, PartyTitle, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode, PartyRole, ZevPartyRole
 from .services import create_zev_with_owner_setup, ensure_participant_account, has_its_own_login
 from .tasks import trigger_geocode_if_address_present
 from .iban import (
@@ -407,6 +407,7 @@ class GridOperatorSuggestionSerializer(serializers.Serializer):
 
 
 class ZevSerializer(BankIbanValidationMixin, serializers.ModelSerializer):
+    issuer = serializers.SerializerMethodField()
 
     def validate_grid_operator_elcom_id(self, value):
         """Only ids from the shipped ElCom list are accepted.
@@ -420,14 +421,6 @@ class ZevSerializer(BankIbanValidationMixin, serializers.ModelSerializer):
                 "Unknown ElCom operator id. Leave it empty when the grid operator "
                 "was entered by hand."
             )
-        return value
-
-    def validate_owner(self, value):
-        request = self.context.get("request")
-        if not request or request.user.is_admin:
-            return value
-        if value != request.user:
-            raise serializers.ValidationError("Only admins can assign a different owner.")
         return value
 
     def validate(self, attrs):
@@ -451,11 +444,20 @@ class ZevSerializer(BankIbanValidationMixin, serializers.ModelSerializer):
             )
         return attrs
 
-    def create(self, validated_data):
-        request = self.context.get("request")
-        if request and "owner" not in validated_data:
-            validated_data["owner"] = request.user
-        return super().create(validated_data)
+    def get_issuer(self, obj):
+        """Today's issuer, ``{party, display_name}``, or ``None`` (#761).
+
+        Reads ``issuer_roles`` when the viewset prefetched them, so a list
+        costs one query for all its ZEVs.
+        """
+        today = timezone.localdate()
+        rows = getattr(obj, "issuer_roles", None)
+        if rows is None:
+            rows = obj.party_roles.filter(role=PartyRole.ISSUER).select_related("party")
+        for row in rows:
+            if row.role == PartyRole.ISSUER and row.valid_from <= today and (row.valid_to is None or row.valid_to >= today):
+                return {"party": str(row.party_id), "display_name": row.party.display_name}
+        return None
 
     class Meta:
         model = Zev
@@ -468,9 +470,6 @@ class ZevSerializer(BankIbanValidationMixin, serializers.ModelSerializer):
             "id", "created_at", "updated_at",
             "disabled_at", "disabled_by", "disabled_reason",
         ]
-        extra_kwargs = {
-            "owner": {"required": False},
-        }
 
 
 class ZevDetailSerializer(ZevSerializer):

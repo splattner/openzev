@@ -15,8 +15,8 @@ from accounts.models import UserRole
 from audit.models import AuditEvent
 from metering.models import ImportLog, MeterReading, ReadingDirection
 from metering.testing import preview_csv, upload_csv
-from testing.helpers import authenticate as auth, make_user
-from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant
 
 ZURICH = ZoneInfo("Europe/Zurich")
 
@@ -28,9 +28,9 @@ class CsvImportTests(TestCase):
         self.other_owner = make_user("csv_import_other_owner", UserRole.USER)
         auth(self.client, self.owner)
 
-        self.zev = Zev.objects.create(name="CSV Import ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="C")
+        self.zev = create_managed_zev(name="CSV Import ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="C")
         self.zev_id = str(self.zev.id)
-        self.other_zev = Zev.objects.create(name="Other CSV ZEV", owner=self.other_owner, zev_type="vzev", invoice_prefix="O")
+        self.other_zev = create_managed_zev(name="Other CSV ZEV", owner=self.other_owner, zev_type="vzev", invoice_prefix="O")
         self.participant = Participant.objects.create(
             zev=self.zev,
             first_name="CSV",
@@ -552,7 +552,7 @@ class CsvImportTests(TestCase):
         self.assertEqual(MeterReading.objects.filter(metering_point=self.other_metering_point).count(), 0)
 
     def test_import_scopes_mixed_file_between_own_zevs(self):
-        second_zev = Zev.objects.create(name="Second CSV ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="S")
+        second_zev = create_managed_zev(name="Second CSV ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="S")
         second_meter = MeteringPoint.objects.create(
             zev=second_zev,
             meter_id="CH-IMPORT-SECOND",
@@ -573,7 +573,7 @@ class CsvImportTests(TestCase):
         self.assertEqual(MeterReading.objects.filter(metering_point=second_meter).count(), 0)
 
     def test_preview_scopes_mixed_file_between_own_zevs(self):
-        second_zev = Zev.objects.create(name="Second Preview ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="P")
+        second_zev = create_managed_zev(name="Second Preview ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="P")
         MeteringPoint.objects.create(
             zev=second_zev,
             meter_id="CH-PREVIEW-SECOND",

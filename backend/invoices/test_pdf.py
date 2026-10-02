@@ -14,8 +14,8 @@ from django.test import TestCase
 from django.utils import timezone
 from tariffs.models import TariffCategory
 from metering.models import MeterReading, ReadingDirection
-from testing.helpers import make_named_participant
-from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
+from testing.helpers import make_named_participant, create_managed_zev
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant
 
 from .models import Invoice, InvoiceItem, InvoiceStatus
 from .pdf import (
@@ -35,6 +35,7 @@ from .pdf_charts import (
 from .pdf_stats import _build_energy_summary, _build_savings_data
 from .pdf_translations import INVOICE_TRANSLATIONS
 from .template_context import build_sample_invoice_context
+from zev.parties import ensure_initial_roles
 
 
 _STYLE_BLOCK_RE = re.compile(r"<style>.*?</style>", re.DOTALL)
@@ -60,7 +61,7 @@ class InvoicePdfQrTests(TestCase):
             password="pass1234",
             role=UserRole.USER,
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="QR ZEV",
             owner=self.owner,
             zev_type="vzev",
@@ -80,6 +81,7 @@ class InvoicePdfQrTests(TestCase):
             city="Zuerich",
             valid_from=date(2026, 1, 1),
         )
+        ensure_initial_roles(self.owner_participant.zev, self.owner_participant.party, self.owner_participant.valid_from)
         self.participant = Participant.objects.create(
             zev=self.zev,
             first_name="Alice",
@@ -319,7 +321,7 @@ class InvoicePdfQrTests(TestCase):
         owner = User.objects.create_user(
             username="struct_owner", password="pass1234", role=UserRole.USER,
         )
-        zev = Zev.objects.create(
+        zev = create_managed_zev(
             name="Struct ZEV", owner=owner, zev_type="vzev",
             start_date=date(2026, 1, 1), billing_interval="monthly",
             invoice_prefix="Q", bank_iban="CH9300762011623852957",
@@ -330,6 +332,7 @@ class InvoicePdfQrTests(TestCase):
             email="owner@example.com", address_line1="Bahnhofstrasse 1",
             postal_code="8001", city="Zuerich", valid_from=date(2026, 1, 1),
         )
+        ensure_initial_roles(participant.zev, participant.party, participant.valid_from)
         invoice = Invoice.objects.create(
             invoice_number="Q-00010", zev=zev, participant=participant,
             period_start=date(2026, 1, 1), period_end=date(2026, 1, 31),
@@ -828,7 +831,7 @@ class InvoicePdfVatLabelTests(TestCase):
         self.owner = User.objects.create_user(
             username="vat_label_owner", password="pass1234", role=UserRole.USER,
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="VAT Label ZEV", owner=self.owner, zev_type="vzev",
             start_date=date(2026, 1, 1), billing_interval="monthly",
             invoice_prefix="V", bank_iban="CH9300762011623852957",
@@ -890,7 +893,7 @@ class InvoicePdfRenderingTests(TestCase):
         self.owner = User.objects.create_user(
             username="render_owner", password="pass1234", role=UserRole.USER,
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Render ZEV", owner=self.owner, zev_type="vzev",
             start_date=date(2026, 1, 1), billing_interval="monthly",
             invoice_prefix="Q", bank_iban="CH9300762011623852957",
@@ -901,6 +904,7 @@ class InvoicePdfRenderingTests(TestCase):
             email="owner@example.com", address_line1="Bahnhofstrasse 1",
             postal_code="8001", city="Zuerich", valid_from=date(2026, 1, 1),
         )
+        ensure_initial_roles(self.owner_participant.zev, self.owner_participant.party, self.owner_participant.valid_from)
         self.participant = Participant.objects.create(
             zev=self.zev, first_name="Alice", last_name="Muster",
             email="alice@example.com", address_line1="Musterweg 3",
@@ -1323,7 +1327,7 @@ class StatusTranslationTests(TestCase):
             password="pass1234",
             role=UserRole.USER,
         )
-        zev = Zev.objects.create(
+        zev = create_managed_zev(
             name="Status ZEV",
             owner=owner,
             zev_type="vzev",
@@ -1368,7 +1372,7 @@ class PeriodParticipantStatsTests(TestCase):
     PERIOD_END = date(2026, 1, 31)
 
     def setUp(self):
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Stats ZEV",
             owner=User.objects.create_user(
                 username="stats_owner", password="pass1234", role=UserRole.USER),
@@ -1465,7 +1469,7 @@ class PeriodParticipantStatsTests(TestCase):
 
         # Alice leaves the ZEV after the period: her assignments stay with the
         # metering point, but she is no longer in zev.participants.
-        other_zev = Zev.objects.create(
+        other_zev = create_managed_zev(
             name="Other ZEV",
             owner=User.objects.create_user(
                 username="other_owner", password="pass1234", role=UserRole.USER),
@@ -1522,7 +1526,7 @@ class SaveInvoicePdfConcurrencyTests(TestCase):
             password="pass1234",
             role=UserRole.USER,
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Race ZEV",
             owner=self.owner,
             zev_type="vzev",

@@ -51,6 +51,7 @@ from zev.models import (
 
 logger = logging.getLogger(__name__)
 
+from ..access import grant_manager
 from .export import pdf_member_name
 from .schema import (
     ASSIGNMENT_FIELDS,
@@ -888,12 +889,14 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
     if zev_fields.get("vat_number") and not zev_fields.get("vat_mode"):
         zev_fields["vat_mode"] = VatMode.REGISTERED
 
-    zev = Zev(owner=owner, **zev_fields)
+    zev = Zev(**zev_fields)
     try:
-        zev.full_clean(exclude=["owner"])
+        zev.full_clean()
     except DjangoValidationError as exc:
         raise ImportFailed([{"section": SECTION_ZEV, "position": None, "label": zev_fields["name"], "errors": _normalise(exc)}])
     zev.save()
+    # The importing account manages what it imported.
+    grant_manager(zev, owner)
 
     summary = {
         "zev_id": str(zev.id),

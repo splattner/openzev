@@ -14,7 +14,6 @@ import {
     faSkullCrossbones,
     faTrash,
     faUpload,
-    faUser,
     faXmark,
 } from '@fortawesome/free-solid-svg-icons'
 import { useManagedZev } from '../lib/managedZev'
@@ -25,8 +24,7 @@ import { ZevImportModal } from '../features/zev/ZevImportModal'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { FormModal } from '../components/FormModal'
-import { createZevWithOwner, disableZev, enableZev, fetchParticipants, fetchZevs, purgeZev, updateZev } from '../lib/api/zev'
-import { fetchUsers } from '../lib/api/auth'
+import { createZevWithOwner, disableZev, enableZev, fetchZevs, purgeZev, updateZev } from '../lib/api/zev'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
 import { EmptyState } from '../components/EmptyState'
@@ -100,27 +98,15 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
     const { data, isLoading, isError } = useQuery({ queryKey: queryKeys.zev.list(), queryFn: fetchZevs })
-    const usersQuery = useQuery({
-        queryKey: queryKeys.auth.users(),
-        queryFn: fetchUsers,
-        enabled: isAdmin,
-    })
-    const participantsQuery = useQuery({
-        queryKey: queryKeys.zev.participants(),
-        queryFn: fetchParticipants,
-        enabled: isAdmin,
-    })
 
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editForm, setEditForm] = useState<ZevInput>(getDefaultZevForm())
     const [createForm, setCreateForm] = useState<ZevWizardInput>(defaultCreateForm)
     const [wizardStep, setWizardStep] = useState<WizardStep>(1)
     const [showEditModal, setShowEditModal] = useState(false)
-    const [showOwnerModal, setShowOwnerModal] = useState(false)
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [showImportModal, setShowImportModal] = useState(false)
     const [editError, setEditError] = useState<string | null>(null)
-    const [ownerError, setOwnerError] = useState<string | null>(null)
     const [createError, setCreateError] = useState<string | null>(null)
     const [createdCredentials, setCreatedCredentials] = useState<ZevWizardResult['owner'] | null>(null)
     const [createdZevName, setCreatedZevName] = useState<string>('')
@@ -129,8 +115,6 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
     const [meteringPointKeys, setMeteringPointKeys] = useState<string[]>(() => [createMeteringPointKey()])
     const [editingMeteringPointKey, setEditingMeteringPointKey] = useState<string | null>(null)
     const [editingMeteringPointData, setEditingMeteringPointData] = useState<OwnerMeteringPointInput | null>(null)
-    const [ownerTargetZev, setOwnerTargetZev] = useState<Zev | null>(null)
-    const [newOwnerId, setNewOwnerId] = useState<string>('')
     const createSubmittedRef = useRef(false)
     const [purgeTarget, setPurgeTarget] = useState<Zev | null>(null)
     const [purgeConfirmation, setPurgeConfirmation] = useState('')
@@ -191,18 +175,6 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
         setPurgeError(null)
     }
 
-    const assignOwnerMutation = useMutation({
-        mutationFn: ({ id, owner }: { id: string; owner: number }) => updateZev(id, { owner }),
-        onSuccess: () => {
-            setShowOwnerModal(false)
-            setOwnerTargetZev(null)
-            setNewOwnerId('')
-            setOwnerError(null)
-            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
-        },
-        onError: (error) => setOwnerError(formatApiError(error, t('pages.zevs.messages.assignFailed'))),
-    })
-
     function startEdit(zev: Zev) {
         setEditingId(zev.id)
         setEditForm(mapZevToForm(zev))
@@ -221,20 +193,6 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
         setWizardStep(1)
         setCreateError(null)
         setShowCreateModal(true)
-    }
-
-    function openOwnerModal(zev: Zev) {
-        setOwnerTargetZev(zev)
-        setNewOwnerId(String(zev.owner))
-        setOwnerError(null)
-        setShowOwnerModal(true)
-    }
-
-    function closeOwnerModal() {
-        setShowOwnerModal(false)
-        setOwnerTargetZev(null)
-        setNewOwnerId('')
-        setOwnerError(null)
     }
 
     function closeEditModal() {
@@ -388,29 +346,6 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
         })
     }
 
-    function submitOwnerAssignment(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault()
-        if (!ownerTargetZev || !newOwnerId) {
-            setOwnerError(t('pages.zevs.validation.selectNewOwner'))
-            return
-        }
-
-        const currentOwnerName = ownerNameById.get(ownerTargetZev.owner) ?? `User ${ownerTargetZev.owner}`
-        const nextOwnerNumericId = Number(newOwnerId)
-        const nextOwnerName = ownerNameById.get(nextOwnerNumericId) ?? `User ${newOwnerId}`
-
-        confirm({
-            title: t('pages.zevs.ownerModal.transferTitle'),
-            message: t('pages.zevs.ownerModal.transferMessage', { zev: ownerTargetZev.name, from: currentOwnerName, to: nextOwnerName }),
-            confirmText: t('pages.zevs.ownerModal.transferConfirm'),
-            cancelText: t('common.cancel'),
-            isDangerous: true,
-            onConfirm: async () => {
-                await assignOwnerMutation.mutateAsync({ id: ownerTargetZev.id, owner: nextOwnerNumericId })
-            },
-        })
-    }
-
     function addMeteringPoint() {
         commitEditingMeteringPoint()
         setEditingMeteringPointKey(createMeteringPointKey())
@@ -476,32 +411,6 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
         )
     if (isError) return <div className="card error-banner">{t('common.error')}</div>
 
-    const ownerNameById = new Map((usersQuery.data ?? []).map((candidate) => [candidate.id, `${candidate.first_name} ${candidate.last_name}`]))
-    const linkedParticipantsForTarget = (participantsQuery.data ?? []).filter((participant) => (
-        participant.zev === ownerTargetZev?.id && participant.user != null
-    ))
-    const ownerCandidates = linkedParticipantsForTarget
-        .map((participant) => {
-            const linkedUserId = participant.user as number
-            const linkedUser = usersQuery.data?.find((candidate) => candidate.id === linkedUserId)
-            return {
-                participant,
-                userId: linkedUserId,
-                label: linkedUser
-                    ? `${participant.first_name} ${participant.last_name} (${linkedUser.username})`
-                    : `${participant.first_name} ${participant.last_name}`,
-                email: linkedUser?.email || participant.email || '',
-            }
-        })
-        .sort((left, right) => left.label.localeCompare(right.label))
-
-    const currentOwnerId = ownerTargetZev ? String(ownerTargetZev.owner) : ''
-    const currentOwnerLabel = ownerTargetZev
-        ? ownerCandidates.find((candidate) => String(candidate.userId) === String(ownerTargetZev.owner))?.label
-        ?? ownerNameById.get(ownerTargetZev.owner)
-        ?? `User ${ownerTargetZev.owner}`
-        : ''
-    const eligibleOwnerCandidates = ownerCandidates.filter((candidate) => String(candidate.userId) !== currentOwnerId)
     const reviewIban = createForm.bank_iban?.trim() || '–'
     const reviewBankName = createForm.bank_name?.trim()
     const reviewRecipientAddress = [
@@ -946,58 +855,6 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                 </form>
             </FormModal>
 
-            <FormModal isOpen={showOwnerModal} title={t('pages.zevs.ownerModal.title')} onClose={closeOwnerModal} maxWidth="560px">
-                <form onSubmit={submitOwnerAssignment} style={{ display: 'grid', gap: '1rem' }}>
-                    <p style={{ margin: 0 }}>
-                        {t('pages.zevs.ownerModal.intro', { name: ownerTargetZev?.name ?? '-' })}
-                    </p>
-
-                    <label>
-                        <span>{t('pages.zevs.ownerModal.ownerLabel')}</span>
-                        <select value={newOwnerId} onChange={(event) => setNewOwnerId(event.target.value)} required>
-                            <option value="">{t('pages.zevs.ownerModal.selectOwner')}</option>
-                            {ownerTargetZev && (
-                                <optgroup label={t('pages.zevs.ownerModal.currentGroup')}>
-                                    <option value={String(ownerTargetZev.owner)} disabled>
-                                        {currentOwnerLabel}
-                                    </option>
-                                </optgroup>
-                            )}
-                            {eligibleOwnerCandidates.length > 0 && (
-                                <optgroup label={t('pages.zevs.ownerModal.eligibleGroup')}>
-                                    {eligibleOwnerCandidates.map((candidate) => (
-                                        <option key={candidate.userId} value={candidate.userId}>
-                                            {candidate.label}{candidate.email ? ` (${candidate.email})` : ''}
-                                        </option>
-                                    ))}
-                                </optgroup>
-                            )}
-                        </select>
-                    </label>
-
-                    {eligibleOwnerCandidates.length === 0 && (
-                        <div className="muted">{t('pages.zevs.ownerModal.noEligible')}</div>
-                    )}
-
-                    {ownerError && <div className="error-banner">{ownerError}</div>}
-
-                    <div className="actions-row actions-row-end actions-row-gap-lg">
-                        <button className="button button-secondary" type="button" onClick={closeOwnerModal}>
-                            <FontAwesomeIcon icon={faXmark} fixedWidth />
-                            {t('common.cancel')}
-                        </button>
-                        <button
-                            className="button button-primary"
-                            type="submit"
-                            disabled={assignOwnerMutation.isPending || dialogLoading || !ownerTargetZev || String(ownerTargetZev.owner) === newOwnerId}
-                        >
-                            <FontAwesomeIcon icon={faCheck} fixedWidth />
-                            {t('pages.zevs.ownerModal.saveOwner')}
-                        </button>
-                    </div>
-                </form>
-            </FormModal>
-
             {dialog && (
                 <ConfirmDialog
                     {...dialog}
@@ -1046,7 +903,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                     <thead>
                         <tr>
                             <th>{t('pages.zevs.col.name')}</th>
-                            <th>{t('pages.zevs.col.owner')}</th>
+                            <th>{t('pages.zevs.col.issuer')}</th>
                             <th>{t('pages.zevs.col.startDate')}</th>
                             <th>{t('pages.zevs.col.gridOperator')}</th>
                             <th>{t('pages.zevs.col.billingInterval')}</th>
@@ -1077,7 +934,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                         )}
                                     </div>
                                 </td>
-                                <td>{ownerNameById.get(zev.owner) ?? (user?.id === zev.owner ? user.username : zev.owner)}</td>
+                                <td>{zev.issuer?.display_name ?? '–'}</td>
                                 <td>{formatShortDate(zev.start_date, settings)}</td>
                                 <td>{zev.grid_operator || '-'}</td>
                                 <td>{t(`pages.zevs.billingIntervals.${zev.billing_interval}` as Parameters<typeof t>[0], { defaultValue: zev.billing_interval })}</td>
@@ -1098,12 +955,6 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                             <FontAwesomeIcon icon={faPen} fixedWidth />
                                             {t('common.edit')}
                                         </button>
-                                        {isAdmin && (
-                                            <button className="button button-secondary button-compact" type="button" onClick={() => openOwnerModal(zev)}>
-                                                <FontAwesomeIcon icon={faUser} fixedWidth />
-                                                {t('pages.zevs.setOwner')}
-                                            </button>
-                                        )}
                                         {zev.disabled_at && (
                                             <button
                                                 className="button button-secondary button-compact"

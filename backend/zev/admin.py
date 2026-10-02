@@ -19,7 +19,7 @@ class MeteringPointAssignmentInline(admin.TabularInline):
 
 @admin.register(Zev)
 class ZevAdmin(admin.ModelAdmin):
-    list_display = ("name", "zev_type", "owner", "billing_interval", "disabled_at")
+    list_display = ("name", "zev_type", "billing_interval", "disabled_at")
     list_filter = ("zev_type", "billing_interval", "disabled_at")
     search_fields = ("name", "grid_operator")
     inlines = [ParticipantInline]

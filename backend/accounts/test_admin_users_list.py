@@ -16,8 +16,8 @@ from django.db import connection
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from testing.helpers import authenticate, make_user
-from zev.models import Participant, Zev
+from testing.helpers import authenticate, make_user, create_managed_zev
+from zev.models import Participant
 
 from .models import AppSettings, TotpDevice, UserRole, WebAuthnCredential
 
@@ -54,7 +54,7 @@ class AdminUserListTests(TestCase):
 
     def test_participant_membership_names_the_community_and_the_participant(self):
         owner = make_user("ual_owner", UserRole.USER)
-        zev = Zev.objects.create(name="Sonnenberg", owner=owner, zev_type="vzev", invoice_prefix="S")
+        zev = create_managed_zev(name="Sonnenberg", owner=owner, zev_type="vzev", invoice_prefix="S")
         tenant = make_user("ual_tenant", UserRole.USER)
         participant = _participant(zev, tenant)
 
@@ -70,7 +70,7 @@ class AdminUserListTests(TestCase):
         # Two relations, one community: reading it as two roles is the
         # confusion the list exists to remove.
         owner = make_user("ual_owner2", UserRole.USER)
-        zev = Zev.objects.create(name="Alpenblick", owner=owner, zev_type="vzev", invoice_prefix="A")
+        zev = create_managed_zev(name="Alpenblick", owner=owner, zev_type="vzev", invoice_prefix="A")
         participant = _participant(zev, owner, "Olga", "Owner")
 
         self.assertEqual(
@@ -84,7 +84,7 @@ class AdminUserListTests(TestCase):
     def test_owner_of_several_communities_lists_each_sorted_by_name(self):
         owner = make_user("ual_multi", UserRole.USER)
         for name in ("Zermatt", "alpha", "Bern"):
-            Zev.objects.create(name=name, owner=owner, zev_type="vzev", invoice_prefix=name[:1].upper())
+            create_managed_zev(name=name, owner=owner, zev_type="vzev", invoice_prefix=name[:1].upper())
 
         memberships = self._rows()["ual_multi"]["memberships"]
         self.assertEqual([m["zev_name"] for m in memberships], ["alpha", "Bern", "Zermatt"])
@@ -121,7 +121,7 @@ class AdminUserListTests(TestCase):
     def test_query_count_does_not_grow_with_the_number_of_accounts(self):
         def build(prefix, n):
             owner = make_user(f"{prefix}_owner", UserRole.USER)
-            zev = Zev.objects.create(name=f"Z {prefix}", owner=owner, zev_type="vzev", invoice_prefix=prefix[:2].upper())
+            zev = create_managed_zev(name=f"Z {prefix}", owner=owner, zev_type="vzev", invoice_prefix=prefix[:2].upper())
             for i in range(n):
                 tenant = make_user(f"{prefix}_t{i}", UserRole.USER)
                 _participant(zev, tenant, f"T{i}", prefix)

@@ -28,8 +28,7 @@ from tariffs.models import (
     TariffCategory,
     TariffPeriod,
 )
-from testing.helpers import authenticate, make_user
-from zev.models import Zev
+from testing.helpers import authenticate, make_user, create_managed_zev
 
 WINTER = "1,2,3,10,11,12"
 SUMMER = "4,5,6,7,8,9"
@@ -38,7 +37,7 @@ SUMMER = "4,5,6,7,8,9"
 class BandFixture(TestCase):
     def setUp(self):
         self.owner = make_user(f"band_owner_{self._testMethodName[:30]}", UserRole.USER)
-        self.zev = Zev.objects.create(name="Band ZEV", owner=self.owner, zev_type="zev")
+        self.zev = create_managed_zev(name="Band ZEV", owner=self.owner, zev_type="zev")
         self.tariff = Tariff.objects.create(
             zev=self.zev, name="Grid", category=TariffCategory.GRID_FEES,
             billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
@@ -120,7 +119,7 @@ class FlatBesideBandsTests(TestCase):
         self.admin = make_user("band_admin", UserRole.ADMIN)
         self.client = APIClient()
         authenticate(self.client, self.admin)
-        self.zev = Zev.objects.create(name="Flat ZEV", owner=self.admin, zev_type="zev")
+        self.zev = create_managed_zev(name="Flat ZEV", owner=self.admin, zev_type="zev")
         self.tariff = Tariff.objects.create(
             zev=self.zev, name="Grid", category=TariffCategory.GRID_FEES,
             billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,

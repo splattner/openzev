@@ -15,7 +15,7 @@ from testing.factories import (
     ParticipantFactory,
     ParticipantUserFactory,
 )
-from testing.helpers import authenticate
+from testing.helpers import authenticate, zev_manager
 
 pytestmark = pytest.mark.django_db
 
@@ -147,11 +147,11 @@ def test_participant_without_assignments_sees_no_readings(history, read_energy):
 
 @pytest.mark.parametrize("role", ["owner", "admin"])
 def test_managers_can_read_assignment_gaps(history, read_energy, role):
-    user = history.holder.zev.owner if role == "owner" else AdminFactory()
+    user = zev_manager(history.holder.zev) if role == "owner" else AdminFactory()
     assert read_energy(user, history.meter, "2026-01-21") == {"in": 1.25, "out": 0.75}
 
 
 def test_owner_cannot_read_another_zevs_meter(history, read_energy):
     foreign_meter = MeteringPointFactory()
     add_readings(foreign_meter, "2026-01-10T12:00:00")
-    assert read_energy(history.holder.zev.owner, foreign_meter, "2026-01-10") == {"in": 0, "out": 0}
+    assert read_energy(zev_manager(history.holder.zev), foreign_meter, "2026-01-10") == {"in": 0, "out": 0}

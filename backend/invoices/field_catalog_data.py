@@ -203,15 +203,6 @@ _CONTRACT_FIELDS = [
         ],
     },
     {
-        "group_key": "zevOwner",
-        "group_title_key": "admin.fields.zevOwner",
-        "fields": [
-            {"variable": "{{ zev.owner.get_full_name }}", "description_key": "admin.fields.zevOwnerFullName", "sample_path": "zev.owner.get_full_name"},
-            {"variable": "{{ zev.owner.username }}", "description_key": "admin.fields.zevOwnerUsername", "sample_path": "zev.owner.username"},
-            {"variable": "{{ zev.owner.email }}", "description_key": "admin.fields.zevOwnerEmail", "sample_path": "zev.owner.email"},
-        ],
-    },
-    {
         "group_key": "meteringPoints",
         "group_title_key": "admin.fields.meteringPoints",
         "fields": [

@@ -642,11 +642,11 @@
                         </div>
                     </dl>
                     {% else %}
-                    <div class="party-name">{{ zev.owner.get_full_name|default:zev.owner.username }}</div>
+                    <div class="party-name">{{ issuer.name }}</div>
                     <dl>
                         <div class="party-fact">
                             <dt>{{ tr.field_email }}</dt>
-                            <dd{% if not zev.owner.email %} class="empty"{% endif %}>{{ zev.owner.email|default:"—" }}</dd>
+                            <dd{% if not issuer.email %} class="empty"{% endif %}>{{ issuer.email|default:"—" }}</dd>
                         </div>
                         <div class="party-fact">
                             <dt>{{ tr.field_address }}</dt>
@@ -766,7 +766,7 @@
                     <div class="sig-block">
                         <div class="sig-label">{{ tr.sig_owner }}</div>
                         <div class="sig-name">
-                            {% if issuer.from_participant %}{{ issuer.name }}{% else %}{{ zev.owner.get_full_name|default:zev.owner.username }}{% endif %}
+                            {{ issuer.name }}
                         </div>
                         <div class="sig-line"></div>
                         <div class="sig-line-label">{{ tr.sig_place_date }}</div>

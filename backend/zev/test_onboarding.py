@@ -14,20 +14,20 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from audit.models import AuditEvent, AuditEventSource
-from testing.helpers import authenticate as auth, make_user
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
 
 from . import onboarding
 from invoices.models import EmailTemplate
 
 from .emails import format_expiry_date
-from .models import Participant, ParticipantOnboardingToken, Zev
+from .models import Participant, ParticipantOnboardingToken
 from .services import get_participant_onboarding_link, send_participant_onboarding_link
 
 
 class OnboardingTokenServiceTests(TestCase):
     def setUp(self):
         owner = make_user("owner_onboarding_svc", UserRole.USER)
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Onboarding ZEV", owner=owner, zev_type="vzev", invoice_prefix="O",
         )
         self.participant = Participant.objects.create(
@@ -82,7 +82,7 @@ class OnboardingTokenServiceTests(TestCase):
 class SendOnboardingLinkServiceTests(TestCase):
     def setUp(self):
         owner = make_user("owner_onboarding_send", UserRole.USER)
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Send ZEV", owner=owner, zev_type="vzev", invoice_prefix="S",
         )
         self.owner = owner
@@ -182,7 +182,7 @@ class OnboardingConsumeViewTests(TestCase):
 
     def setUp(self):
         owner = make_user("owner_onboarding_consume", UserRole.USER)
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Consume ZEV", owner=owner, zev_type="vzev", invoice_prefix="C",
         )
         self.participant = Participant.objects.create(
@@ -262,7 +262,7 @@ class RevokeAndUnlinkTests(TestCase):
     def setUp(self):
         self.admin = make_user("admin_revoke", UserRole.ADMIN)
         owner = make_user("owner_revoke", UserRole.USER)
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Revoke ZEV", owner=owner, zev_type="vzev", invoice_prefix="R",
         )
         self.participant = Participant.objects.create(
@@ -316,7 +316,7 @@ class RevokeAndUnlinkTests(TestCase):
 class OnboardingExpiryTests(TestCase):
     def setUp(self):
         owner = make_user("owner_onboarding_expiry", UserRole.USER)
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Expiry ZEV", owner=owner, zev_type="vzev", invoice_prefix="E",
         )
         self.participant = Participant.objects.create(

@@ -20,13 +20,12 @@ from accounts.models import UserRole
 from invoices.models import Invoice, InvoiceStatus
 from metering.models import MeterReading
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory, TariffPeriod
-from testing.helpers import authenticate as auth, make_user
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
 from zev.models import (
     MeteringPoint,
     MeteringPointAssignment,
     MeteringPointType,
     Participant,
-    Zev,
 )
 
 PARTICIPANTS = "/api/v1/zev/participants/"
@@ -50,8 +49,8 @@ class _TwoPopulatedCommunities(TestCase):
         self.admin = make_user("zf_admin", UserRole.ADMIN)
         self.owner_a = make_user("zf_owner_a", UserRole.USER)
         self.owner_b = make_user("zf_owner_b", UserRole.USER)
-        self.zev_a = Zev.objects.create(name="Community A", owner=self.owner_a, invoice_prefix="AAA")
-        self.zev_b = Zev.objects.create(name="Community B", owner=self.owner_b, invoice_prefix="BBB")
+        self.zev_a = create_managed_zev(name="Community A", owner=self.owner_a, invoice_prefix="AAA")
+        self.zev_b = create_managed_zev(name="Community B", owner=self.owner_b, invoice_prefix="BBB")
 
         for zev, tag in ((self.zev_a, "A"), (self.zev_b, "B")):
             participant = Participant.objects.create(

@@ -25,8 +25,8 @@ from allocation.read_model import (
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
 from metering.models import MeterReading, ReadingDirection
-from testing.helpers import make_named_participant
-from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType, Zev
+from testing.helpers import make_named_participant, create_managed_zev
+from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType
 
 User = get_user_model()
 
@@ -49,7 +49,7 @@ class ReadModelTests(TestCase):
         self.owner = User.objects.create_user(
             username="readmodel_owner", password="pass1234", role=UserRole.USER
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="ReadModel ZEV",
             owner=self.owner,
             zev_type="vzev",
@@ -274,7 +274,7 @@ class SharedReadModelTests(TestCase):
         self.owner = User.objects.create_user(
             username="shared_readmodel_owner", password="pass1234", role=UserRole.USER
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Shared ReadModel ZEV", owner=self.owner, zev_type="vzev",
             start_date=PERIOD_START, billing_interval="monthly", invoice_prefix="SR",
         )
@@ -367,7 +367,7 @@ class EligibleParticipantSharesTests(TestCase):
         self.owner = User.objects.create_user(
             username="shares_owner", password="pass1234", role=UserRole.USER
         )
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Shares ZEV", owner=self.owner, zev_type="vzev",
             start_date=PERIOD_START, billing_interval="monthly", invoice_prefix="SH",
         )

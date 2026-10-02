@@ -20,6 +20,7 @@ from backups.test_restore_zev import zev_rows
 from exports.models import ExportJob
 from invoices.models import Invoice
 from zev.models import Participant, Zev
+from testing.helpers import create_managed_zev
 
 
 class ZevCommandTestCase(TestCase):
@@ -124,7 +125,7 @@ class RestoreCommandTests(ZevCommandTestCase):
             self.run_command("--zev", "Nonexistent", "--dry-run")
 
     def test_an_ambiguous_name_lists_the_ids(self):
-        twin = Zev.objects.create(name="Alpha", owner=self.world.owner)
+        twin = create_managed_zev(name="Alpha", owner=self.world.owner)
         with self.assertRaises(CommandError) as caught:
             self.run_command("--zev", "Alpha", "--dry-run")
         self.assertIn(str(twin.pk), str(caught.exception))

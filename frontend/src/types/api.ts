@@ -212,7 +212,8 @@ export interface Zev {
     updated_at: string
     name: string
     start_date: string
-    owner: number
+    /** Today's issuer of the ZEV's documents (#761), or null when none is set. */
+    issuer?: { party: string; display_name: string } | null
     zev_type: 'zev' | 'vzev'
     /** Postal code of the grid connection — used only to suggest a grid operator, not an address. */
     postal_code?: string
@@ -244,7 +245,6 @@ export interface Zev {
 export interface ZevInput {
     name: string
     start_date: string
-    owner?: number
     zev_type: 'zev' | 'vzev'
     postal_code?: string
     grid_operator?: string
@@ -288,7 +288,7 @@ export interface OwnerMeteringPointInput {
     location_description?: string
 }
 
-export interface ZevWizardInput extends Omit<ZevInput, 'owner'> {
+export interface ZevWizardInput extends ZevInput {
     owner: ZevOwnerInput
     metering_points: OwnerMeteringPointInput[]
 }
@@ -2010,7 +2010,6 @@ export type RestoreConflictKind =
     | 'contract_issue_deleted'
     | 'meter_id_owned_by_other_zev'
     | 'referenced_row_missing'
-    | 'owner_not_found'
     | 'export_in_progress'
     | 'restore_in_progress'
 

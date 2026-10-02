@@ -198,6 +198,7 @@ def get_participant_onboarding_link(participant) -> tuple[str, ParticipantOnboar
 @transaction.atomic
 def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_points_data: list[dict]) -> dict:
     from .models import MeteringPoint, MeteringPointAssignment, Participant, Zev
+    from .access import grant_manager
     from .parties import ensure_initial_roles
 
     first_name = owner_data['first_name']
@@ -218,7 +219,8 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
         must_change_password=True,
     )
 
-    zev = Zev.objects.create(owner=owner_user, **zev_data)
+    zev = Zev.objects.create(**zev_data)
+    grant_manager(zev, owner_user)
     owner_participant = Participant.objects.create(
         zev=zev,
         user=owner_user,
@@ -278,12 +280,15 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
 def create_zev_for_existing_owner(*, owner_user, zev_data: dict, participant_data: dict | None = None) -> dict:
     """Create a ZEV and its owner participant for a self-registered user.
 
-    The owner's party is the ZEV's issuer and a landowner from its start date.
+    The caller manages the ZEV; their party is its issuer and a landowner from
+    its start date.
     """
     from .models import Participant, Zev
+    from .access import grant_manager
     from .parties import ensure_initial_roles
 
-    zev = Zev.objects.create(owner=owner_user, **zev_data)
+    zev = Zev.objects.create(**zev_data)
+    grant_manager(zev, owner_user)
     owner_participant = Participant.objects.create(
         zev=zev,
         user=owner_user,

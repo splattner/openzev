@@ -10,8 +10,8 @@ from rest_framework.test import APIClient
 from accounts.models import UserRole
 from invoices.models import Invoice, InvoiceStatus
 from invoices.views import InvoiceViewSet
-from testing.helpers import authenticate as auth, make_user
-from zev.models import Participant, Zev
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
+from zev.models import Participant
 
 INVOICES = "/api/v1/invoices/invoices/"
 
@@ -33,8 +33,8 @@ class _TwoPopulatedCommunitiesMixin:
         self.admin = make_user("isf_admin", UserRole.ADMIN)
         self.owner_a = make_user("isf_owner_a", UserRole.USER)
         self.owner_b = make_user("isf_owner_b", UserRole.USER)
-        self.zev_a = Zev.objects.create(name="Community A", owner=self.owner_a, invoice_prefix="AAA")
-        self.zev_b = Zev.objects.create(name="Community B", owner=self.owner_b, invoice_prefix="BBB")
+        self.zev_a = create_managed_zev(name="Community A", owner=self.owner_a, invoice_prefix="AAA")
+        self.zev_b = create_managed_zev(name="Community B", owner=self.owner_b, invoice_prefix="BBB")
 
         self.participant_a = self._populate(self.zev_a, "A")
         self.participant_b = self._populate(self.zev_b, "B")

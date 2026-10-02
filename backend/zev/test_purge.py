@@ -18,7 +18,7 @@ from invoices.models import ContractIssue, Invoice
 from invoices.test_helpers import make_invoice
 from metering.models import ImportLog, ImportSource, MeterReading
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory, TariffPeriod
-from testing.helpers import authenticate as auth, make_user
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
 from zev.models import (
     MeteringPoint,
     MeteringPointAssignment,
@@ -39,7 +39,7 @@ class _FullyWiredZev(TestCase):
     def setUp(self):
         self.owner = make_user("purge_owner", UserRole.USER)
         self.admin = make_user("purge_admin", UserRole.ADMIN)
-        self.zev = Zev.objects.create(name="Purge Me ZEV", owner=self.owner)
+        self.zev = create_managed_zev(name="Purge Me ZEV", owner=self.owner)
 
         self.participant = Participant.objects.create(
             zev=self.zev, first_name="Paula", last_name="Purged",

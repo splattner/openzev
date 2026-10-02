@@ -14,7 +14,7 @@ import pytest
 
 from tariffs.models import BillingMode, EnergyType, PeriodType, SplitKey, Tariff, TariffCategory
 from testing import factories
-from testing.helpers import authenticate as auth
+from testing.helpers import authenticate as auth, zev_manager
 from rest_framework.test import APIClient
 
 pytestmark = pytest.mark.django_db
@@ -145,7 +145,7 @@ def test_series_are_scoped_to_the_callers_zevs(owner_client):
 
 def test_series_can_be_filtered_to_one_zev(owner_client):
     client, zev = owner_client
-    owner = zev.owner
+    owner = zev_manager(zev)
     second = factories.ZevFactory(owner=owner)
     energy_version(zev, valid_from="2026-01-01")
     energy_version(second, name="Second ZEV Tariff", valid_from="2026-01-01")

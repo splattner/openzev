@@ -177,44 +177,24 @@ def change_role(grant: ZevAccessGrant, role: str, *, by=None) -> ZevAccessGrant:
     )
 
 
-@transaction.atomic
-def sync_owner_grant(zev, previous_owner_id=None) -> None:
-    """Make ``zev.owner`` hold an active manager grant; revoke the previous owner's.
+def grant_manager(zev, user, *, by=None) -> ZevAccessGrant:
+    """Give ``user`` an active manager grant on ``zev`` from today.
 
-    The transitional invariant of #761 phase 1 (spec §4.7): until the party
-    layer replaces ``Zev.owner``, owning a ZEV implies managing it, as the old
-    ``owner == user`` checks did, and handing ownership on takes that away from
-    the previous owner. Called from ``Zev.save`` on create and on owner change.
-    Not enforced afterwards: a manager may revoke the owner's grant (a legal
-    owner handing management to a Verwaltung).
+    What creating a ZEV for an account does (wizard, self-setup, transfer
+    import): the creator manages what it created. An open grant the account
+    already holds is promoted rather than duplicated.
     """
     today = _today()
-    grants = ZevAccessGrant.objects.select_for_update().filter(zev_id=zev.pk)
-    if previous_owner_id is not None and previous_owner_id != zev.owner_id:
-        for grant in active_on(grants.filter(user_id=previous_owner_id, role=ZevAccessRole.MANAGER), today):
-            revoke(grant, today=today)
-    if active_on(grants.filter(user_id=zev.owner_id, role=ZevAccessRole.MANAGER), today).exists():
-        return
-    open_grant = grants.filter(user_id=zev.owner_id, valid_to__isnull=True).first()
+    grants = ZevAccessGrant.objects.filter(zev_id=_zev_id(zev), user=user)
+    current = active_on(grants.filter(role=ZevAccessRole.MANAGER), today).first()
+    if current is not None:
+        return current
+    open_grant = grants.filter(valid_to__isnull=True).first()
     if open_grant is not None:
-        # A viewer grant, or a manager grant that starts later: promote it now.
-        change_role(open_grant, ZevAccessRole.MANAGER)
-    else:
-        ZevAccessGrant.objects.create(
-            zev_id=zev.pk, user_id=zev.owner_id, role=ZevAccessRole.MANAGER, valid_from=today,
-        )
-
-
-def ensure_a_manager(zev) -> None:
-    """Give ``zev.owner`` a manager grant when the ZEV has no active manager at all.
-
-    For paths that write a ZEV without ``Zev.save`` — a per-ZEV backup restore
-    recreating a deleted community loads it raw and keeps (does not restore)
-    grants. A ZEV that still has managers is left exactly as it is.
-    """
-    managers = ZevAccessGrant.objects.filter(zev_id=zev.pk, role=ZevAccessRole.MANAGER)
-    if not active_on(managers, _today()).exists():
-        sync_owner_grant(zev)
+        return change_role(open_grant, ZevAccessRole.MANAGER, by=by)
+    return ZevAccessGrant.objects.create(
+        zev_id=_zev_id(zev), user=user, role=ZevAccessRole.MANAGER, valid_from=today, granted_by=by,
+    )
 
 
 def build_memberships(grants, participants, *, today: date | None = None) -> list[dict]:

@@ -14,8 +14,8 @@ from audit.constants import REQUEST_ID_PATTERN
 from audit.middleware import AuditRequestContextMiddleware
 from audit.models import AuditActionCategory, AuditEvent
 from audit.services import record_audit_event
-from testing.helpers import authenticate as auth, make_user, trusted_proxies
-from zev.models import Zev, Participant
+from testing.helpers import authenticate as auth, make_user, trusted_proxies, create_managed_zev
+from zev.models import Participant
 
 
 class AuditApiTestCase(TestCase):
@@ -25,7 +25,7 @@ class AuditApiTestCase(TestCase):
         self.client = APIClient()
         self.admin = make_user("audit_admin", UserRole.ADMIN)
         self.owner = make_user("audit_owner", UserRole.USER)
-        self.zev = Zev.objects.create(name="Audit ZEV", owner=self.owner)
+        self.zev = create_managed_zev(name="Audit ZEV", owner=self.owner)
         self.participant = Participant.objects.create(
             zev=self.zev,
             first_name="Ada",
@@ -138,7 +138,7 @@ class AuditServiceSanitizationTests(TestCase):
     def setUp(self):
         self.owner = make_user("audit_sanitize_owner", UserRole.USER)
         self.admin = make_user("audit_sanitize_admin", UserRole.ADMIN)
-        self.zev = Zev.objects.create(name="Sanitize ZEV", owner=self.owner)
+        self.zev = create_managed_zev(name="Sanitize ZEV", owner=self.owner)
 
     def _invalid_context(self):
         request = mock.Mock()

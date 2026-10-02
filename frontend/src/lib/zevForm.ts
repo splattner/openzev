@@ -36,7 +36,6 @@ export function mapZevToForm(zev: Zev): ZevInput {
     return {
         name: zev.name,
         start_date: zev.start_date,
-        owner: zev.owner,
         zev_type: zev.zev_type,
         postal_code: zev.postal_code || '',
         grid_operator: zev.grid_operator || '',
@@ -76,7 +75,7 @@ export function isZevFormDirty(draft: ZevInput, baseline: ZevInput): boolean {
 }
 
 /** Editable draft fields that can fail validation, in tab order. */
-export type ZevFormField = Exclude<keyof ZevInput, 'owner'>
+export type ZevFormField = keyof ZevInput
 
 /**
  * Which settings-hub tab renders each draft field. Used to route the user to

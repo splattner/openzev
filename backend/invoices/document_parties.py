@@ -208,6 +208,27 @@ class IssuerView:
         return self._issuer.get("name", "")
 
 
+class OwnerAlias:
+    """What ``zev.owner`` resolves to in templates now that a ZEV has no owner
+    account (#761): the issuer. ``get_full_name`` and ``email`` are the
+    issuer's, ``username`` is empty."""
+
+    username = ""
+
+    def __init__(self, issuer: dict):
+        self._issuer = issuer
+
+    def get_full_name(self):
+        return self._issuer.get("name", "")
+
+    @property
+    def email(self):
+        return self._issuer.get("email", "")
+
+    def __str__(self):
+        return self.get_full_name()
+
+
 def template_parties(invoice, issuer: dict, recipient: dict) -> dict:
     """The template variables that come from the copy.
 
@@ -234,16 +255,19 @@ def template_parties(invoice, issuer: dict, recipient: dict) -> dict:
             "vat_number": issuer.get("vat_number", ""),
             "bank_iban": issuer.get("iban", ""),
             "bank_name": issuer.get("bank_name", ""),
+            "owner": OwnerAlias(issuer),
         }),
     }
 
 
 def issuer_context(zev, day: date) -> dict:
-    """``issuer``, ``representative`` and the deprecated ``owner_participant``
-    for a live-rendered document of ``zev`` dated ``day`` (contract, annual
-    statement)."""
+    """``issuer``, ``representative``, ``zev`` and the deprecated
+    ``owner_participant`` for a live-rendered document of ``zev`` dated ``day``
+    (contract, annual statement). ``zev`` is the live ZEV, except that the
+    deprecated ``zev.owner`` answers with the issuer."""
     issuer = build_issuer(zev, day)
     return {
+        "zev": FrozenView(zev, {"owner": OwnerAlias(issuer)}),
         "issuer": issuer,
         "representative": build_representative(zev, day),
         "owner_participant": IssuerView(issuer) if issuer["from_participant"] else None,

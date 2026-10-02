@@ -14,7 +14,6 @@ from datetime import date, timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Exists
 
 from allocation.validity import active_on
 
@@ -39,22 +38,8 @@ def holder_on(zev, role: str, day: date) -> Party | None:
 
 
 def issuer_on(zev, day: date) -> Party | None:
-    """Whom ``zev``'s documents dated ``day`` are from, or ``None``.
-
-    A ZEV that has never had an issuer falls back to the owner account's own
-    participation, as before the roles existed — the case of a ZEV created
-    without its owner as a participant, who is added later. The fallback goes
-    with ``Zev.owner`` (SPEC-2026-10-zev-parties §11, PR 5).
-    """
-    party = holder_on(zev, PartyRole.ISSUER, day)
-    if party is not None or zev.owner_id is None:
-        return party
-    any_issuer = ZevPartyRole.objects.filter(zev=zev, role=PartyRole.ISSUER)
-    return (
-        Party.objects.filter(zev=zev, participations__user_id=zev.owner_id)
-        .exclude(Exists(any_issuer))
-        .first()
-    )
+    """Whom ``zev``'s documents dated ``day`` are from, or ``None``."""
+    return holder_on(zev, PartyRole.ISSUER, day)
 
 
 def representative_on(zev, day: date) -> Party | None:

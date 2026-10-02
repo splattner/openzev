@@ -16,7 +16,7 @@ from invoices.contract_pdf import _build_contract_context
 from invoices.document_parties import build_copy, copy_for_render
 from invoices.models import Invoice, InvoiceStatus
 from invoices.workflow import approve_invoice
-from testing.helpers import authenticate, make_user
+from testing.helpers import authenticate, create_managed_zev, make_user, zev_manager
 
 from .models import Participant, Party, PartyKind, PartyRole, Zev, ZevAccessGrant, ZevAccessRole, ZevPartyRole
 from .parties import assign_role, end_role, ensure_initial_roles, issuer_on, representative_on
@@ -25,7 +25,7 @@ from .services import create_zev_for_existing_owner
 
 def make_zev(name="Role ZEV"):
     owner = make_user(f"owner_{name.replace(' ', '_').lower()}", UserRole.USER)
-    return Zev.objects.create(name=name, owner=owner, zev_type="vzev", invoice_prefix="R", start_date=date(2026, 1, 1))
+    return create_managed_zev(name=name, owner=owner, zev_type="vzev", invoice_prefix="R", start_date=date(2026, 1, 1))
 
 
 def party(zev, last_name, **fields):
@@ -91,12 +91,12 @@ class IssuerLookupTests(TestCase):
     def setUp(self):
         self.zev = make_zev()
 
-    def test_without_any_issuer_role_the_owner_participation_is_the_issuer(self):
-        own = Participant.objects.create(zev=self.zev, user=self.zev.owner, last_name="Owner", valid_from=date(2026, 1, 1))
-        self.assertEqual(issuer_on(self.zev, date(2026, 3, 1)), own.party)
+    def test_a_participant_with_the_managing_account_is_not_the_issuer_by_itself(self):
+        # Before Zev.owner was dropped its participation stood in; now only the role counts.
+        Participant.objects.create(zev=self.zev, user=zev_manager(self.zev), last_name="Owner", valid_from=date(2026, 1, 1))
+        self.assertIsNone(issuer_on(self.zev, date(2026, 3, 1)))
 
-    def test_once_a_zev_has_issuer_roles_a_gap_has_no_issuer(self):
-        Participant.objects.create(zev=self.zev, user=self.zev.owner, last_name="Owner", valid_from=date(2026, 1, 1))
+    def test_a_day_before_the_first_issuer_has_no_issuer(self):
         assign_role(self.zev, party(self.zev, "Later"), PartyRole.ISSUER, date(2026, 7, 1))
         self.assertIsNone(issuer_on(self.zev, date(2026, 3, 1)))
 

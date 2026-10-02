@@ -19,9 +19,9 @@ from accounts.models import UserRole
 from metering.importers import csv_importer
 from metering.models import MeterReading
 from metering.testing import preview_csv, upload_csv
-from testing.helpers import authenticate as auth, make_user
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
 from testing.zips import ZIP_BOMB_BYTES, zip_upload
-from zev.models import MeteringPoint, MeteringPointType, Participant, Zev
+from zev.models import MeteringPoint, MeteringPointType, Participant
 
 
 class CsvLimitTests(TestCase):
@@ -29,7 +29,7 @@ class CsvLimitTests(TestCase):
         self.client = APIClient()
         self.owner = make_user("csv_limit_owner", UserRole.USER)
         auth(self.client, self.owner)
-        self.zev = Zev.objects.create(name="CSV Limit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="X")
+        self.zev = create_managed_zev(name="CSV Limit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="X")
 
     def test_file_over_size_cap_is_rejected(self):
         with mock.patch.object(csv_importer, "MAX_CSV_BYTES", 10):
@@ -184,7 +184,7 @@ class XlsxZipLimitTests(TestCase):
         self.client = APIClient()
         self.owner = make_user("xlsx_limit_owner", UserRole.USER)
         auth(self.client, self.owner)
-        self.zev = Zev.objects.create(name="XLSX Limit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="Y")
+        self.zev = create_managed_zev(name="XLSX Limit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="Y")
 
     def _upload(self, upload):
         return self.client.post(

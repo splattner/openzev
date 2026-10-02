@@ -270,7 +270,6 @@ def _build_contract_context(participant, document_id: str | None = None,
     return {
         "participant": participant,
         **parties,
-        "zev": zev,
         "consumption_mps": consumption_mps,
         "production_mps": production_mps,
         "local_tariff_rows": local_tariff_rows,

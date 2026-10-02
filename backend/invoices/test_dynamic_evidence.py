@@ -22,6 +22,7 @@ from tariffs.dynamic.services import clear_source_points
 from tariffs.dynamic.vse_v1 import PricePoint
 from tariffs.models import EnergyType, Tariff, TariffCategory
 from testing import factories
+from zev.access import grant_manager
 
 from .engine import (
     DynamicPriceGapError,
@@ -248,8 +249,7 @@ def test_billed_ranges_merge_duplicates_without_protecting_gaps():
 @pytest.mark.django_db
 def test_bulk_preflight_checks_price_use_timestamps_not_the_full_tariff_window(owner_client, owner_user):
     participant, _tariff, source, _point = setup_billing()
-    participant.zev.owner = owner_user
-    participant.zev.save()
+    grant_manager(participant.zev, owner_user)
     payload = {
         "zev_id": str(participant.zev_id),
         "period_start": "2026-01-01",
@@ -287,8 +287,7 @@ def test_bulk_preflight_skips_reading_scan_without_dynamic_tariffs():
 @pytest.mark.django_db
 def test_bulk_preflight_ignores_a_dynamic_type_no_reading_will_price(owner_client, owner_user):
     participant, _tariff, _source, _point = setup_billing()
-    participant.zev.owner = owner_user
-    participant.zev.save()
+    grant_manager(participant.zev, owner_user)
     unused_source = DynamicTariffSource.objects.create(
         label="Feed-in", url="https://example.test/feed-in", tariff_type="feed_in",
     )

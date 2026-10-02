@@ -6,8 +6,8 @@ from django.test import TestCase
 
 from accounts.models import UserRole
 from metering.models import MeterReading, ReadingResolution
-from testing.helpers import make_user
-from zev.models import MeteringPoint, MeteringPointType, Zev
+from testing.helpers import make_user, create_managed_zev
+from zev.models import MeteringPoint, MeteringPointType
 
 
 class GenerateMeteringDataResolutionTests(TestCase):
@@ -20,7 +20,7 @@ class GenerateMeteringDataResolutionTests(TestCase):
 
     def setUp(self):
         self.owner = make_user("gen_owner", UserRole.USER)
-        self.zev = Zev.objects.create(
+        self.zev = create_managed_zev(
             name="Gen ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="G"
         )
         self.metering_point = MeteringPoint.objects.create(

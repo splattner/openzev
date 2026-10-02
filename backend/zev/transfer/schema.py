@@ -84,10 +84,11 @@ SECTION_FILES = {
 
 # ── Field lists ────────────────────────────────────────────────────────────
 #
-# ``owner`` is absent from ZEV_FIELDS and ``user`` from PARTICIPANT_FIELDS by
-# design: an export never carries an account reference, so importing an archive
-# can never grant anybody access to anything. The importing user becomes the
-# owner and participants arrive unlinked, to be connected by hand.
+# No account reference travels (``user`` is absent from PARTICIPANT_FIELDS by
+# design): importing an archive can never grant anybody access to anything. The
+# importing account becomes the ZEV's manager and participants arrive unlinked,
+# to be connected by hand. (Archives written while ``Zev.owner`` existed never
+# carried it either.)
 #
 # ``participant_invoice_access`` is absent for the same reason. It serves
 # invoice data to anyone holding a link, so letting it ride in on an archive

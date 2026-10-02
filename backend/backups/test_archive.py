@@ -121,8 +121,9 @@ class ArchiveShapeTests(TestCase):
 
     def test_foreign_keys_are_written_as_the_real_referenced_key(self):
         alpha = self.world.alpha
-        rows = read_jsonl(self.raw, f"zevs/{alpha.pk}/zev.jsonl")
-        self.assertEqual(rows[0]["fields"]["owner"], self.world.owner.pk)
+        rows = read_jsonl(self.raw, f"zevs/{alpha.pk}/participants.jsonl")
+        linked = [row["fields"]["user"] for row in rows if row["model"] == "zev.participant" and row["fields"]["user"]]
+        self.assertEqual(linked, [self.world.member.pk])
 
     def test_a_zev_only_contains_its_own_rows(self):
         alpha_text = "\n".join(

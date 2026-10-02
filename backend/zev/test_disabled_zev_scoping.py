@@ -35,13 +35,12 @@ from accounts.models import UserRole
 from invoices.test_helpers import make_invoice
 from metering.models import MeterReading
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory, TariffPeriod
-from testing.helpers import authenticate as auth, make_user
+from testing.helpers import authenticate as auth, make_user, create_managed_zev
 from zev.models import (
     MeteringPoint,
     MeteringPointAssignment,
     MeteringPointType,
     Participant,
-    Zev,
 )
 
 PARTICIPANTS = "/api/v1/zev/participants/"
@@ -60,7 +59,7 @@ class _OwnerAndParticipant(TestCase):
     def setUp(self):
         self.owner = make_user("dz_owner", UserRole.USER)
         self.admin = make_user("dz_admin", UserRole.ADMIN)
-        self.zev = Zev.objects.create(name="Disable-scoping ZEV", owner=self.owner)
+        self.zev = create_managed_zev(name="Disable-scoping ZEV", owner=self.owner)
 
         self.participant_user = make_user("dz_participant", UserRole.USER)
         self.participant = Participant.objects.create(

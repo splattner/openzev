@@ -115,9 +115,9 @@ Made while implementing phases 1 to 4; each is reflected in the sections below.
     either.** Who may manage or view a community today is not part of rolling its
     data back, any more than accounts are; the section is *kept*, like the trail.
     A restore that recreates a deleted community (whose grants were deleted with
-    it) ends by making its owner its manager when no active manager grant exists
-    (`zev.access.ensure_a_manager`). An instance restore loads grants like every
-    other per-ZEV section.
+    it) leaves it without managers; an admin grants access afterwards (since #761
+    phase 2 a community has no owner account to fall back to). An instance restore
+    loads grants like every other per-ZEV section.
 19. **The community's own row is updated in place, never deleted and recreated.**
     Deleting it runs `SET NULL` on every audit event that names it and on every
     account whose `preferred_zev` it is — rewriting exactly what §6.6 promises not
@@ -830,8 +830,8 @@ task `run_restore_job` and directly by the command. Rules, in the order enforced
    `contract_issue_deleted` (an issued contract the backup lacks — documented as *"an
    immutable archive"*). *Hard* (never forceable): `meter_id_owned_by_other_zev`,
    `referenced_row_missing` (a price source the backup points at that is gone),
-   `owner_not_found` (the community must be recreated and its owner has no matching
-   account), `export_in_progress`, `restore_in_progress`. Each kind lists up to 20
+   `export_in_progress`, `restore_in_progress`. (`owner_not_found` went with
+   `Zev.owner` in #761 phase 2: no row of a community requires an account.) Each kind lists up to 20
    details and then "and N more". A dry run returns the plan with `blocked: true`
    instead of failing; a real run raises `RestoreRefused` and the job fails with the
    plan attached. See deviation 21.
@@ -857,9 +857,8 @@ task `run_restore_job` and directly by the command. Rules, in the order enforced
    foreign key of the community's rows while loading). Each backed-up user id is
    looked up through `account_refs.json` and matched to today's account by `email`
    (case-insensitive), then `username`; none, or more than one, leaves the link
-   empty and is listed in `plan.accounts.missing`. The one required link, `Zev.owner`,
-   falls back to the community's current owner, and blocks a recreation with
-   `owner_not_found`. **No account row is created, modified or deleted.**
+   empty and is listed in `plan.accounts.missing`. Every user link of a restored
+   section is nullable. **No account row is created, modified or deleted.**
 8. **Audit, never rewrite.** `restore.created` (API), `restore.started`, then
    `zev.restored` with metadata naming the source backup and its time, rows written
    per model, accounts relinked and missing, the kinds of conflict overridden and the
