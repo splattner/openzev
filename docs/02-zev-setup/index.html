@@ -2128,12 +2128,12 @@ held a role on their own date:</p>
 <tbody>
 <tr>
 <td><strong>Issuer</strong></td>
-<td>Invoices, contracts and annual statements are from this party: its name and address head the document, and it is the creditor on the QR bill</td>
+<td>Invoices, contracts and annual statements are from this party: its name and address head the document, and it is the creditor on the QR bill. Its login manages the community</td>
 <td>An invoice: the last day of its period. A contract: the day it is issued. An annual statement: 31 December</td>
 </tr>
 <tr>
 <td><strong>Representative toward the grid operator</strong></td>
-<td>Who acts for the community toward the grid operator (VNB)</td>
+<td>Who acts for the community toward the grid operator (VNB). Its login manages the community</td>
 <td>—</td>
 </tr>
 <tr>
@@ -2148,6 +2148,16 @@ held a role on their own date:</p>
   date. The current holder ends the day before. Invoices for earlier periods
   keep naming the earlier issuer, and an invoice that is already approved never
   changes.</li>
+<li><strong>The issuer and the representative manage the community.</strong> While a party
+  holds one of these roles, its login — its own, or the one of its participant
+  entry — has manager access, exactly as if it had been given under
+  <a href="#access-tab">Access</a>, and loses it when the role ends. Before a change
+  takes effect, a confirmation names the login that gets access, or says that
+  nobody does because the party has no login. A change that would leave the
+  community without any manager is refused: give someone manager access first.</li>
+<li><strong>Landowners and contacts get no access</strong> through the tab. A landowner does
+  not see other participants' data; a contact that should work in OpenZEV gets
+  access under <a href="#access-tab">Access</a>, where you can pick it directly.</li>
 <li>Without an issuer, documents carry only the community's name. The tab says so
   until one is set.</li>
 <li><strong>Add landowner</strong> adds a party from a date; <strong>End</strong> sets a landowner's last
@@ -2391,17 +2401,24 @@ it. <strong>Invitation pending</strong> marks an account that has not been set u
 Tick <strong>Show ended access</strong> to see access that has ended.</p>
 <p>Managers and admins can:</p>
 <ul>
-<li><strong>Give access</strong> — enter an email address, choose <strong>Manager</strong> or <strong>Viewer</strong>
-  and, if the access should end, a last day. Someone with an OpenZEV account
-  gets access straight away and a notice by email; anyone else gets an
-  invitation email to set up their account.</li>
+<li><strong>Give access</strong> — pick a <strong>party of the community</strong> (a participant or a
+  contact from the <a href="#parties-tab">Parties tab</a>) or enter an <strong>email address</strong>,
+  choose <strong>Manager</strong> or <strong>Viewer</strong> and, if the access should end, a last day.
+  Someone with an OpenZEV login gets access straight away and a notice by
+  email; anyone else gets an invitation email to set up their account — a
+  party at its own email address, after which the new login belongs to that
+  party. A party without an email address cannot be invited; add one in the
+  Parties tab first.</li>
 <li><strong>Make manager</strong> / <strong>Make viewer</strong> — change someone's role. Making a manager
   a viewer asks for confirmation.</li>
 <li><strong>Resend invitation</strong> — for an invitation that has not been accepted.</li>
 <li><strong>Remove access</strong> — ends the access immediately, after a confirmation.</li>
 </ul>
-<p>A ZEV always keeps at least one manager: removing the last one, or making them
-a viewer, is refused. Viewers see the list but cannot change it. Every change
+<p>The list also shows who manages the community <strong>as issuer</strong> or <strong>as
+representative</strong>. That access comes from the role and is changed in the
+<a href="#parties-tab">Parties tab</a>, not here.</p>
+<p>A ZEV always keeps at least one manager — by access or through a role:
+removing the last one, or making them a viewer, is refused. Viewers see the list but cannot change it. Every change
 is recorded in the ZEV's audit log.</p>
 <p>Admins manage user accounts in <strong>Platform → Accounts</strong>.</p>
 <p>Participants automatically see only their own metering data and invoices (ZEV-scoped access).</p>
