@@ -22,7 +22,7 @@ from zev.transfer import ImportFailed, import_archive
 from zev.transfer.export import pdf_member_name
 from zev.transfer.schema import FORMAT_VERSION, SECTIONS, SUPPORTED_FORMAT_VERSIONS
 
-from .test_transfer import build_populated_zev, export_and_clear, export_to_bytes, rewrite_archive
+from .test_transfer import as_format_version, build_populated_zev, export_and_clear, export_to_bytes, rewrite_archive
 
 ZEV_URL = "/api/v1/zev/zevs"
 
@@ -37,11 +37,11 @@ def _attach_pdf(invoice, content=b"%PDF-1.4 fake invoice"):
 
 
 class FormatVersionTests(TestCase):
-    def test_format_version_is_4(self):
-        self.assertEqual(FORMAT_VERSION, 4)
+    def test_format_version_is_5(self):
+        self.assertEqual(FORMAT_VERSION, 5)
 
-    def test_versions_1_through_3_remain_supported(self):
-        self.assertEqual(SUPPORTED_FORMAT_VERSIONS, frozenset({1, 2, 3, 4}))
+    def test_versions_1_through_4_remain_supported(self):
+        self.assertEqual(SUPPORTED_FORMAT_VERSIONS, frozenset({1, 2, 3, 4, 5}))
 
     def test_invoice_pdfs_is_a_known_section_depending_on_invoices(self):
         from zev.transfer.schema import SECTION_DEPENDENCIES, SECTION_INVOICE_PDFS, SECTION_INVOICES
@@ -121,17 +121,10 @@ class RoundTripTests(TestCase):
         existed has no invoices/pdf/ members and must still import cleanly."""
         zev = build_populated_zev(self.owner, name="Legacy ZEV", meter_prefix="LEG")
         raw = export_and_clear(zev, ["zev", "participants", "invoices"])
-        raw = rewrite_archive(raw, replace={"manifest.json": _legacy_manifest(raw, version=2)})
+        raw = as_format_version(raw, 2)
 
         result = import_archive(io.BytesIO(raw), owner=self.importer)
         self.assertEqual(result["counts"]["invoices"], 1)
-
-
-def _legacy_manifest(raw, *, version):
-    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
-        manifest = json.loads(archive.read("manifest.json"))
-    manifest["format_version"] = version
-    return manifest
 
 
 class ManifestVerificationTests(TestCase):

@@ -11,15 +11,17 @@ break every archive already sitting on someone's disk.
 """
 
 # Bumped whenever the archive layout changes in a way an older importer cannot
-# read. Version 4 moves the percentage of a percentage-of-energy tariff onto
+# read. Version 5 carries the ZEV's parties and their dated roles (#761):
+# participants point at a party instead of carrying its name and address.
+# Version 4 moves the percentage of a percentage-of-energy tariff onto
 # its periods. Version 3 adds the invoice_pdfs section (issued invoice
 # documents, opt-in — see SECTION_INVOICE_PDFS). Version 2 adds
 # enabled/empty_on_not_found source settings and frozen invoice-to-source
 # provenance. Version 1 remains readable for static exports and legacy
 # adapter-based dynamic descriptors. An archive naming a version that is not
 # listed here is rejected outright rather than imported half-understood.
-FORMAT_VERSION = 4
-SUPPORTED_FORMAT_VERSIONS = frozenset({1, 2, 3, 4})
+FORMAT_VERSION = 5
+SUPPORTED_FORMAT_VERSIONS = frozenset({1, 2, 3, 4, 5})
 
 MANIFEST_NAME = "manifest.json"
 READINGS_DIR = "readings"
@@ -82,6 +84,19 @@ SECTION_FILES = {
     SECTION_INVOICES: "invoices.json",
 }
 
+# Format 5: the participants section is three files. Parties come first (a
+# participant and a role point at one), and a party travels whether or not it
+# is a participant (an outside representative, a landowner).
+PARTIES_FILE = "parties.json"
+PARTY_ROLES_FILE = "party_roles.json"
+
+# Manifest counts that belong to a section without being one.
+SUBCOUNT_SECTIONS = {
+    "assignments": SECTION_METERING_POINTS,
+    "parties": SECTION_PARTICIPANTS,
+    "party_roles": SECTION_PARTICIPANTS,
+}
+
 # ── Field lists ────────────────────────────────────────────────────────────
 #
 # No account reference travels (``user`` is absent from PARTICIPANT_FIELDS by
@@ -128,11 +143,44 @@ ZEV_FIELDS = (
     "additional_contract_notes",
 )
 
-# The name, contact and address fields are the participant's party's (ADR
-# 0028); an archive keeps them flat on each participant. ``kind``,
-# ``organisation_name`` and ``name_addition`` are optional: an archive written
-# before parties existed imports every participant as a person.
+# A person or organisation of the ZEV (ADR 0028), with an archive ``id`` that
+# participants and roles point at.
+PARTY_FIELDS = (
+    "kind",
+    "title",
+    "first_name",
+    "last_name",
+    "organisation_name",
+    "name_addition",
+    "email",
+    "phone",
+    "address_line1",
+    "address_line2",
+    "postal_code",
+    "city",
+    "notes",
+)
+
+# A party's dated role in the ZEV, with the archive ``party_id`` it belongs to.
+PARTY_ROLE_FIELDS = (
+    "role",
+    "valid_from",
+    "valid_to",
+)
+
+# A participant from format 5 on: the billing relationship, plus the archive
+# ``party_id`` of its party.
 PARTICIPANT_FIELDS = (
+    "valid_from",
+    "valid_to",
+    "notes",
+    "allocation_weight",
+)
+
+# A participant in formats 1–4, which carried its party's name, contact and
+# address flat. ``kind``, ``organisation_name`` and ``name_addition`` are
+# optional (format 4 from #761 on): older archives import everyone as a person.
+LEGACY_PARTICIPANT_FIELDS = (
     "kind",
     "organisation_name",
     "name_addition",

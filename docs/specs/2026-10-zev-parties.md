@@ -432,9 +432,12 @@ Keys in all four locales under `pages.zevSettings.tabs.parties`, `pages.zevSetti
   `organisation_name` and `name_addition`, the importer builds one party per participant
   from the flat fields (`Party.full_clean()` first), and an older archive imports every
   participant as a person.
-- Archive **format version 5** (split out of PR 5 into its own PR): new sections `parties` (`PARTY_FIELDS` + archive `id`) and
-  `party_roles` (`party_id`, `role`, `valid_from`, `valid_to`), written before participants;
-  `PARTICIPANT_FIELDS` loses the moved fields and gains `party_id`.
+- Archive **format version 5** (PR 5b): the `participants` section gains two files,
+  `parties.json` (`PARTY_FIELDS` + archive `id`, every party of the ZEV) and `party_roles.json`
+  (`party_id`, `role`, `valid_from`, `valid_to`), written and imported before the participants;
+  `PARTICIPANT_FIELDS` loses the moved fields and each participant gains `party_id`. They are
+  files of the participants section rather than sections of their own, because a participant
+  cannot travel without its party (SPEC-2026-08-zev-transfer-archive §6).
 - Importing v1–4: one party per participant from its fields (`kind=person`), no roles (the
   archive never named the owner).
 - `backups/registry.py`: `zev.Party` (PR 3, written before `zev.Participant`) and
@@ -458,7 +461,7 @@ through the participant endpoints keep the existing participant audit events.
 | 3 | `Party`, `Participant.party`, facade, migrations `zev.0032_party` / `0033_participant_parties_data` / `0034_participant_party_required` (one party per participant), ORM lookups, `kind` / `organisation_name` / `name_addition` / `display_name` in API, copy, QR and built-in templates — no other behaviour change |
 | 4 | `ZevPartyRole`, `zev/parties.py`, data migration (issuer + landowner from the owner's party; no role when the owner has no participation), issuer by date in copy / contract / statement / reports, wizard and self-setup set the roles, template variables and catalogue, read-only party and role endpoints, `ParticipantSerializer.roles`, `zev.ZevPartyRole` in backups |
 | 5 | Drop `Zev.owner` (`zev.0037`): creation flows with explicit grants, `ZevSerializer.issuer`, admin owner dialog removed, `zev.owner.*` template alias, backups, frontend owner reads replaced, role badges on participants |
-| 5b | Transfer archive format 5 (`parties`, `party_roles`) |
+| 5b | Transfer archive format 5 (`parties.json`, `party_roles.json` in the participants section) |
 | 6 | Party and role write endpoints, Parties tab, participant form and badges, user guide |
 
 ## 12. Risks and mitigations
@@ -513,7 +516,11 @@ through the participant endpoints keep the existing participant audit events.
   issuer role. Backend 3820 passed. Golden check on the dev data: 21 invoices, 2 issued
   contracts and 18 annual statements byte-identical; 3 current contracts of a ZEV without an
   issuer now name the ZEV where they named the owner account.
-- **PR 5b**: transfer v5 round trip and v4 import.
+- **PR 5b** (shipped): `zev/test_transfer.py` `PartyTransferTests` (4: parties and roles round
+  trip, a format-4 archive gives each participant a party and no roles, an unknown `party_id`
+  and overlapping issuers are rejected); `SchemaParityTests` covers `PARTY_FIELDS` and
+  `PARTY_ROLE_FIELDS`; the legacy-format tests rewrite exports with `as_format_version`.
+  Backend 3824 passed.
 - **PR 6**: party and role endpoints (scoping, viewer read-only, audit); frontend
   `zev-parties-section.test.ts`, participant form; user guide build.
 

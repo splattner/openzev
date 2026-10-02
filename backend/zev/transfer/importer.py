@@ -46,7 +46,8 @@ from tariffs.dynamic.models import DynamicTariffSource, FetchStatus
 from tariffs.dynamic.protocol import V2_PRODUCT_REQUIRED
 from tariffs.models import BillingMode, PeriodType, Tariff, TariffPeriod
 from zev.models import (
-    PARTY_FACADE_FIELDS, MeteringPoint, MeteringPointAssignment, Participant, Party, VatMode, Zev,
+    PARTY_FACADE_FIELDS, SINGLE_HOLDER_ROLES, MeteringPoint, MeteringPointAssignment, Participant, Party,
+    VatMode, Zev, ZevPartyRole,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,12 @@ from .schema import (
     INVOICE_ITEM_FIELDS,
     MANIFEST_NAME,
     METERING_POINT_FIELDS,
+    LEGACY_PARTICIPANT_FIELDS,
     PARTICIPANT_FIELDS,
+    PARTIES_FILE,
+    PARTY_FIELDS,
+    PARTY_ROLE_FIELDS,
+    PARTY_ROLES_FILE,
     READINGS_DIR,
     SECTION_FILES,
     SECTION_INVOICE_PDFS,
@@ -70,7 +76,7 @@ from .schema import (
     SECTION_READINGS,
     SECTION_TARIFFS,
     SECTION_ZEV,
-    SECTIONS,
+    SUBCOUNT_SECTIONS,
     TARIFF_FIELDS,
     TARIFF_PERIOD_FIELDS,
     ZEV_FIELDS,
@@ -298,8 +304,80 @@ def _pick(raw, names, position, section):
 # ── Section importers ──────────────────────────────────────────────────────
 
 
-def _import_participants(archive, zev, collector):
+def _import_parties(archive, zev, collector):
+    """Create every party of a format-5 archive, returning ``archive id -> party``."""
+    id_map = {}
+    for position, raw in enumerate(_load_json(archive, PARTIES_FILE), start=1):
+        fields = _pick(raw, PARTY_FIELDS, position, "parties")
+        label = fields.get("organisation_name") or f"{fields.get('first_name', '')} {fields.get('last_name', '')}".strip() or f"#{position}"
+        source_id = str(raw["id"]) if raw.get("id") else None
+        if source_id is None or source_id in id_map:
+            collector.add(SECTION_PARTICIPANTS, position, label, {"id": [f"Missing or duplicate party id '{source_id or ''}'."]})
+            continue
+        party = Party(zev=zev, **fields)
+        try:
+            with transaction.atomic():
+                party.full_clean(exclude=["zev"])
+                party.save()
+        except (DjangoValidationError, ValueError, TypeError) as exc:
+            collector.add(SECTION_PARTICIPANTS, position, label, exc)
+            continue
+        id_map[source_id] = party
+    return id_map
+
+
+def _import_party_roles(archive, zev, parties_by_archive_id, collector):
+    """Create the dated roles of a format-5 archive; returns how many."""
+    entries = []
+    for position, raw in enumerate(_load_json(archive, PARTY_ROLES_FILE), start=1):
+        fields = _pick(raw, PARTY_ROLE_FIELDS, position, "party_roles")
+        label = f"{fields.get('role', '')} #{position}"
+        party = parties_by_archive_id.get(str(raw.get("party_id") or ""))
+        if party is None:
+            collector.add(SECTION_PARTICIPANTS, position, label, {"party_id": ["Unknown party."]})
+            continue
+        row = ZevPartyRole(zev=zev, party=party, **fields)
+        try:
+            row.full_clean(exclude=["zev"])
+        except (DjangoValidationError, ValueError, TypeError) as exc:
+            collector.add(SECTION_PARTICIPANTS, position, label, exc)
+            continue
+        entries.append((position, label, row))
+
+    # An issuer or representative has one holder on any day; the database
+    # only guards the open-ended rows, so the windows are checked here.
+    by_role = {}
+    for position, label, row in entries:
+        if row.role in SINGLE_HOLDER_ROLES:
+            by_role.setdefault(row.role, []).append((position, label, row))
+    rejected = set()
+    for rows in by_role.values():
+        rows.sort(key=lambda entry: entry[2].valid_from)
+        for (_, _, earlier), (position, label, later) in zip(rows, rows[1:]):
+            if earlier.valid_to is None or earlier.valid_to >= later.valid_from:
+                collector.add(SECTION_PARTICIPANTS, position, label, {"valid_from": ["Overlaps another holder of this role."]})
+                rejected.add(position)
+
+    count = 0
+    for position, label, row in entries:
+        if position in rejected:
+            continue
+        try:
+            with transaction.atomic():
+                row.save()
+        except IntegrityError:
+            collector.add(SECTION_PARTICIPANTS, position, label, {"party": ["The party already holds this role."]})
+            continue
+        count += 1
+    return count
+
+
+def _import_participants(archive, zev, collector, *, parties_by_archive_id=None):
     """Create every participant, returning ``archive id -> new participant``.
+
+    From format 5 on a participant names its party (``party_id``, created by
+    ``_import_parties``); older archives carry the party's fields flat, and
+    each participant gets a party of its own.
 
     Accounts are deliberately not re-linked. The archive carries no ``user``
     reference, and matching on the email address instead would let anyone who
@@ -307,11 +385,16 @@ def _import_participants(archive, zev, collector):
     imported community's data. Participants arrive unlinked and an admin
     connects them by hand.
     """
+    linked = parties_by_archive_id is not None
     id_map = {}
     seen_ids = set()
     for position, raw in enumerate(_load_json(archive, SECTION_FILES[SECTION_PARTICIPANTS]), start=1):
-        fields = _pick(raw, PARTICIPANT_FIELDS, position, SECTION_PARTICIPANTS)
-        label = f"{fields.get('first_name', '')} {fields.get('last_name', '')}".strip() or f"#{position}"
+        fields = _pick(raw, PARTICIPANT_FIELDS if linked else LEGACY_PARTICIPANT_FIELDS, position, SECTION_PARTICIPANTS)
+        if linked:
+            party = parties_by_archive_id.get(str(raw.get("party_id") or ""))
+            label = party.display_name if party is not None else f"#{position}"
+        else:
+            label = f"{fields.get('first_name', '')} {fields.get('last_name', '')}".strip() or f"#{position}"
         source_id = str(raw["id"]) if raw.get("id") else None
         if source_id is not None and source_id in seen_ids:
             # Two entries sharing an archive id would silently rewire every
@@ -324,14 +407,19 @@ def _import_participants(archive, zev, collector):
                 {"id": [f"Duplicate participant source id '{source_id}'."]},
             )
             continue
-        party = Party(zev=zev, **{name: value for name, value in fields.items() if name in PARTY_FACADE_FIELDS})
+        if linked and party is None:
+            collector.add(SECTION_PARTICIPANTS, position, label, {"party_id": ["Unknown party."]})
+            continue
+        if not linked:
+            party = Party(zev=zev, **{name: value for name, value in fields.items() if name in PARTY_FACADE_FIELDS})
         participant = Participant(
             zev=zev, **{name: value for name, value in fields.items() if name not in PARTY_FACADE_FIELDS},
         )
         try:
             with transaction.atomic():  # savepoint: one rejection must not poison the rest
-                party.full_clean(exclude=["zev"])
-                party.save()
+                if not linked:
+                    party.full_clean(exclude=["zev"])
+                    party.save()
                 participant.party = party
                 participant.full_clean(exclude=["zev", "user"])
                 participant.save()
@@ -908,7 +996,14 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
 
     participants_by_archive_id = {}
     if SECTION_PARTICIPANTS in sections:
-        participants_by_archive_id = _import_participants(archive, zev, collector)
+        parties_by_archive_id = None
+        if (manifest.get("format_version") or 0) >= 5:
+            parties_by_archive_id = _import_parties(archive, zev, collector)
+            summary["counts"]["parties"] = len(parties_by_archive_id)
+            summary["counts"]["party_roles"] = _import_party_roles(archive, zev, parties_by_archive_id, collector)
+        participants_by_archive_id = _import_participants(
+            archive, zev, collector, parties_by_archive_id=parties_by_archive_id,
+        )
         summary["counts"][SECTION_PARTICIPANTS] = len(participants_by_archive_id)
 
     points_by_meter_id = {}
@@ -964,8 +1059,8 @@ def _verify_manifest_counts(manifest, summary, collector):
     for key, expected in declared.items():
         if key not in summary["counts"]:
             continue  # a section the user chose not to import
-        # ``assignments`` is counted under the metering-points section.
-        section = key if key in SECTIONS else SECTION_METERING_POINTS
+        # ``assignments``, ``parties`` and ``party_roles`` count within a section.
+        section = SUBCOUNT_SECTIONS.get(key, key)
         # Entry-level failures already explain a shortfall for that section —
         # re-reporting it as an integrity problem would just be noise. The
         # check exists for the *unexplained* discrepancy: a readings member

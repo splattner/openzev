@@ -28,13 +28,16 @@ from zev.models import (
     MeteringPoint,
     MeteringPointAssignment,
     MeteringPointType,
-    PARTY_FACADE_FIELDS,
     Participant,
     Party,
+    PartyKind,
+    PartyRole,
     Zev,
     ZevAccessGrant,
+    ZevPartyRole,
 )
 from zev import access
+from zev.parties import assign_role, issuer_on
 from zev.transfer import ArchiveError, ImportFailed, build_archive, import_archive
 from zev.transfer.schema import FORMAT_VERSION, MANIFEST_NAME, SECTIONS, missing_dependencies
 
@@ -162,6 +165,36 @@ def rewrite_archive(raw, *, replace=None, drop=()):
     return out.getvalue()
 
 
+def as_format_version(raw, version, *, replace=None):
+    """``raw`` rewritten as an archive of an older ``version``.
+
+    Before format 5 a participant carried its party's fields flat and there were
+    no parties or roles files, so those are folded back into the participants.
+    ``replace`` rewrites further members on top.
+    """
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        names = set(archive.namelist())
+        manifest = json.loads(archive.read(MANIFEST_NAME))
+        parties = json.loads(archive.read("parties.json")) if "parties.json" in names else []
+        participants = json.loads(archive.read("participants.json")) if "participants.json" in names else None
+    manifest["format_version"] = version
+    members = {MANIFEST_NAME: manifest}
+    drop = ()
+    if version < 5:
+        manifest["counts"].pop("parties", None)
+        manifest["counts"].pop("party_roles", None)
+        drop = ("parties.json", "party_roles.json")
+        if participants is not None:
+            by_id = {party["id"]: party for party in parties}
+            flat = []
+            for participant in participants:
+                party = {key: value for key, value in by_id[participant.pop("party_id")].items() if key not in ("id", "notes")}
+                flat.append({**party, **participant})
+            members["participants.json"] = flat
+    members.update(replace or {})
+    return rewrite_archive(raw, replace=members, drop=drop)
+
+
 class SectionDependencyTests(TestCase):
     def test_readings_require_metering_points(self):
         self.assertEqual(missing_dependencies(["readings"]), {"readings": ["metering_points"]})
@@ -245,7 +278,7 @@ class ArchiveShapeTests(TestCase):
         )
         with zipfile.ZipFile(io.BytesIO(export_to_bytes(self.zev))) as archive:
             names = archive.namelist()
-        self.assertTrue(all(name.startswith(("readings/", "manifest", "zev.", "participants", "metering", "tariffs", "invoices")) for name in names))
+        self.assertTrue(all(name.startswith(("readings/", "manifest", "zev.", "participants", "parties", "party_roles", "metering", "tariffs", "invoices")) for name in names))
         self.assertNotIn("../../etc/passwd.csv", names)
         self.assertTrue(any(name.startswith("readings/.._.._etc_passwd-") for name in names))
 
@@ -520,8 +553,10 @@ class RejectedArchiveTests(TestCase):
         self.assertFalse(MeterReading.objects.exists())
 
     def test_every_bad_entry_is_reported_in_one_response(self):
-        raw = self._archive(
-            ["zev", "participants"],
+        # A format-4 archive: participants carry their names flat.
+        raw = as_format_version(
+            self._archive(["zev", "participants"]),
+            4,
             replace={
                 "participants.json": [
                     {"first_name": "A", "last_name": "One", "valid_from": "nope"},
@@ -1048,10 +1083,7 @@ class DynamicSourceImportTests(TestCase):
 
     def test_a_format_version_1_static_archive_still_imports(self):
         zev = build_populated_zev(self.owner, meter_prefix="V1STATIC")
-        raw = export_and_clear(zev)
-        manifest = json.loads(zipfile.ZipFile(io.BytesIO(raw)).read(MANIFEST_NAME))
-        manifest["format_version"] = 1
-        raw = rewrite_archive(raw, replace={MANIFEST_NAME: manifest})
+        raw = as_format_version(export_and_clear(zev), 1)
 
         result = import_archive(io.BytesIO(raw), owner=self.owner)
 
@@ -1075,17 +1107,12 @@ class DynamicSourceImportTests(TestCase):
         DynamicTariffSource.objects.all().delete()
 
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
-            manifest = json.loads(archive.read(MANIFEST_NAME))
             tariffs = json.loads(archive.read("tariffs.json"))
-        manifest["format_version"] = 1
         descriptor = next(item["dynamic_source"] for item in tariffs if item["dynamic_source"])
         for field in ("api_version", "request_mode", "query_tariff_type", "supports_range"):
             descriptor.pop(field, None)
         descriptor["adapter"] = "vse_v1"
-        raw = rewrite_archive(
-            raw,
-            replace={MANIFEST_NAME: manifest, "tariffs.json": tariffs},
-        )
+        raw = as_format_version(raw, 1, replace={"tariffs.json": tariffs})
 
         result = import_archive(io.BytesIO(raw), owner=self.owner)
 
@@ -1105,6 +1132,8 @@ class SchemaParityTests(TestCase):
     MODEL_BY_SECTION = {
         "DYNAMIC_SOURCE_FIELDS": DynamicTariffSource,
         "ZEV_FIELDS": Zev,
+        "PARTY_FIELDS": Party,
+        "PARTY_ROLE_FIELDS": ZevPartyRole,
         "PARTICIPANT_FIELDS": Participant,
         "METERING_POINT_FIELDS": MeteringPoint,
         "ASSIGNMENT_FIELDS": MeteringPointAssignment,
@@ -1145,7 +1174,10 @@ class SchemaParityTests(TestCase):
             "disabled_by",
             "disabled_reason",
         },
-        # ``party`` travels flattened: its facade fields sit on each participant.
+        # ``sort_name`` is derived on save; a party, a role and a participant
+        # point at each other through archive ids (``id``, ``party_id``).
+        "PARTY_FIELDS": {"id", "zev", "sort_name", "created_at", "updated_at"},
+        "PARTY_ROLE_FIELDS": {"id", "zev", "party", "created_at", "updated_at"},
         "PARTICIPANT_FIELDS": {"id", "zev", "user", "party", "created_at", "updated_at"},
         "METERING_POINT_FIELDS": {"id", "zev", "created_at", "updated_at"},
         "ASSIGNMENT_FIELDS": {"id", "metering_point", "participant", "created_at", "updated_at"},
@@ -1174,8 +1206,6 @@ class SchemaParityTests(TestCase):
         for list_name, model in self.MODEL_BY_SECTION.items():
             declared = set(getattr(schema, list_name))
             model_fields = {field.name for field in model._meta.fields}
-            if model is Participant:
-                model_fields |= set(PARTY_FACADE_FIELDS)
             excluded = self.FIELDS_EXCLUDED_FROM_ARCHIVE[list_name]
             self.assertEqual(
                 declared,
@@ -1285,8 +1315,9 @@ class TransferEndpointTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_import_reports_every_failure_in_the_response_body(self):
-        raw = rewrite_archive(
+        raw = as_format_version(
             export_and_clear(self.zev, ["zev", "participants"]),
+            4,
             replace={"participants.json": [{"first_name": "X", "last_name": "Y", "valid_from": "nope"}]},
         )
         auth(self.client, self.admin)
@@ -1317,7 +1348,7 @@ class TransferEndpointTests(TestCase):
         self.assertEqual(response.status_code, 201, response.content)
         body = response.json()
         self.assertEqual(body["sections"], ["zev", "participants"])
-        self.assertEqual(list(body["counts"]), ["participants"])
+        self.assertEqual(list(body["counts"]), ["parties", "party_roles", "participants"])
 
     def test_export_accepts_repeated_sections_query_params(self):
         auth(self.client, self.owner)
@@ -1348,3 +1379,86 @@ class TransferEndpointTests(TestCase):
             f"{ZEV_URL}/inspect-archive/", {"file": self._upload(b"nope")}, format="multipart"
         )
         self.assertEqual(response.status_code, 400)
+
+
+class PartyTransferTests(TestCase):
+    """Format 5 carries a ZEV's parties and their dated roles (#761)."""
+
+    def setUp(self):
+        self.owner = make_user("pt_owner", UserRole.USER)
+        self.importer = make_user("pt_importer", UserRole.ADMIN)
+        self.zev = create_managed_zev(name="Parties", owner=self.owner, invoice_prefix="PT")
+        self.tenant = Participant.objects.create(
+            zev=self.zev, first_name="Ann", last_name="Muster", name_addition="und Max Muster",
+            email="ann@example.com", city="Bern", valid_from=date(2026, 1, 1), valid_to=date(2026, 6, 30),
+        )
+        # The same household again after moving within the ZEV.
+        Participant.objects.create(zev=self.zev, party=self.tenant.party, valid_from=date(2026, 7, 1))
+        self.company = Participant.objects.create(
+            zev=self.zev, kind=PartyKind.ORGANISATION, organisation_name="Sonne AG",
+            email="info@sonne.example", valid_from=date(2026, 1, 1),
+        )
+        self.agency = Party.objects.create(
+            zev=self.zev, kind=PartyKind.ORGANISATION, organisation_name="Verwaltung Nord", notes="Not a participant",
+        )
+        assign_role(self.zev, self.company.party, PartyRole.ISSUER, date(2026, 1, 1))
+        assign_role(self.zev, self.tenant.party, PartyRole.ISSUER, date(2026, 7, 1))
+        assign_role(self.zev, self.agency, PartyRole.REPRESENTATIVE, date(2026, 1, 1))
+        assign_role(self.zev, self.tenant.party, PartyRole.LANDOWNER, date(2026, 1, 1))
+        assign_role(self.zev, self.company.party, PartyRole.LANDOWNER, date(2026, 1, 1))
+
+    def _import(self, raw):
+        return import_archive(io.BytesIO(raw), owner=self.importer, name_override="Copy")
+
+    def test_parties_and_roles_survive_a_round_trip(self):
+        result = self._import(export_to_bytes(self.zev, ["zev", "participants"]))
+        copy = Zev.objects.get(pk=result["zev_id"])
+        self.assertEqual((result["counts"]["parties"], result["counts"]["party_roles"]), (3, 5))
+        self.assertEqual(
+            sorted(copy.parties.values_list("sort_name", "kind", "notes")),
+            [("Muster", "person", ""), ("Sonne AG", "organisation", ""), ("Verwaltung Nord", "organisation", "Not a participant")],
+        )
+        household = copy.parties.get(last_name="Muster")
+        self.assertEqual(household.name_addition, "und Max Muster")
+        self.assertEqual(household.participations.count(), 2)
+        self.assertFalse(copy.parties.get(organisation_name="Verwaltung Nord").participations.exists())
+        self.assertEqual(
+            sorted(copy.party_roles.values_list("role", "party__sort_name", "valid_from", "valid_to")),
+            [
+                ("issuer", "Muster", date(2026, 7, 1), None),
+                ("issuer", "Sonne AG", date(2026, 1, 1), date(2026, 6, 30)),
+                ("landowner", "Muster", date(2026, 1, 1), None),
+                ("landowner", "Sonne AG", date(2026, 1, 1), None),
+                ("representative", "Verwaltung Nord", date(2026, 1, 1), None),
+            ],
+        )
+        self.assertEqual(issuer_on(copy, date(2026, 3, 1)).display_name, "Sonne AG")
+
+    def test_a_format_4_archive_gives_each_participant_a_party_and_no_roles(self):
+        result = self._import(as_format_version(export_to_bytes(self.zev, ["zev", "participants"]), 4))
+        copy = Zev.objects.get(pk=result["zev_id"])
+        self.assertEqual(copy.participants.count(), 3)
+        self.assertEqual(copy.parties.count(), 3)
+        self.assertFalse(copy.party_roles.exists())
+        self.assertEqual(copy.participants.get(party__kind="organisation").display_name, "Sonne AG")
+
+    def test_a_participant_naming_an_unknown_party_is_rejected(self):
+        raw = export_to_bytes(self.zev, ["zev", "participants"])
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            participants = json.loads(archive.read("participants.json"))
+        participants[0]["party_id"] = "not-a-party"
+        with self.assertRaises(ImportFailed) as ctx:
+            self._import(rewrite_archive(raw, replace={"participants.json": participants}))
+        self.assertEqual(ctx.exception.errors[0]["errors"], {"party_id": ["Unknown party."]})
+
+    def test_overlapping_issuers_are_rejected(self):
+        raw = export_to_bytes(self.zev, ["zev", "participants"])
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            roles = json.loads(archive.read("party_roles.json"))
+        for role in roles:
+            if role["role"] == "issuer":
+                role["valid_to"] = None
+        with self.assertRaises(ImportFailed) as ctx:
+            self._import(rewrite_archive(raw, replace={"party_roles.json": roles}))
+        self.assertIn("Overlaps another holder of this role.", str(ctx.exception.errors))
+        self.assertFalse(Zev.objects.filter(name="Copy").exists())

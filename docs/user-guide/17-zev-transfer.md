@@ -98,9 +98,11 @@ ZEVs on an OpenZEV instance.
 5. Untick anything you do not want.
 6. Click **Import**.
 
-The importing admin becomes the manager of the new ZEV. The archive does not
-say who issues its invoices, so its documents carry the community's name until
-an issuer is set.
+The importing admin becomes the manager of the new ZEV. The participants section
+also brings the community's people and organisations (also those who are not
+participants) and who was its issuer, representative and landowner, and since
+when. An archive from an older OpenZEV version has no issuer, so its documents
+carry the community's name until one is set.
 
 > **Importing twice creates two communities.** There is no "have I already
 > imported this?" check, so if you are unsure whether an import went through,

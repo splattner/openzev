@@ -24,7 +24,7 @@ from django.db.models import Prefetch
 from invoices.models import Invoice
 from metering.models import MeterReading
 from tariffs.models import Tariff, TariffPeriod
-from zev.models import MeteringPoint, MeteringPointAssignment, Participant
+from zev.models import MeteringPoint, MeteringPointAssignment, Participant, Party, ZevPartyRole
 
 from .schema import (
     ASSIGNMENT_FIELDS,
@@ -36,6 +36,10 @@ from .schema import (
     MANIFEST_NAME,
     METERING_POINT_FIELDS,
     PARTICIPANT_FIELDS,
+    PARTIES_FILE,
+    PARTY_FIELDS,
+    PARTY_ROLE_FIELDS,
+    PARTY_ROLES_FILE,
     READING_CSV_COLUMNS,
     READINGS_DIR,
     SECTION_FILES,
@@ -104,9 +108,23 @@ def _export_zev(zev):
     return _fields(zev, ZEV_FIELDS)
 
 
+def _export_parties(zev):
+    return [
+        {"id": str(party.id), **_fields(party, PARTY_FIELDS)}
+        for party in Party.objects.filter(zev=zev).order_by("sort_name", "first_name", "id")
+    ]
+
+
+def _export_party_roles(zev):
+    return [
+        {"party_id": str(row.party_id), **_fields(row, PARTY_ROLE_FIELDS)}
+        for row in ZevPartyRole.objects.filter(zev=zev).order_by("role", "valid_from", "id")
+    ]
+
+
 def _export_participants(zev):
     return [
-        {"id": str(participant.id), **_fields(participant, PARTICIPANT_FIELDS)}
+        {"id": str(participant.id), "party_id": str(participant.party_id), **_fields(participant, PARTICIPANT_FIELDS)}
         for participant in Participant.objects.filter(zev=zev).order_by("party__sort_name", "party__first_name", "id")
     ]
 
@@ -300,6 +318,10 @@ def _write_archive(zev, sections, fileobj, *, instance_name=""):
             archive.writestr(SECTION_FILES[SECTION_ZEV], _dump(_export_zev(zev)))
 
         if SECTION_PARTICIPANTS in sections:
+            parties, roles = _export_parties(zev), _export_party_roles(zev)
+            counts["parties"], counts["party_roles"] = len(parties), len(roles)
+            archive.writestr(PARTIES_FILE, _dump(parties))
+            archive.writestr(PARTY_ROLES_FILE, _dump(roles))
             participants = _export_participants(zev)
             counts[SECTION_PARTICIPANTS] = len(participants)
             archive.writestr(SECTION_FILES[SECTION_PARTICIPANTS], _dump(participants))

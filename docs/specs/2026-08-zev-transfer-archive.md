@@ -108,7 +108,21 @@ commit — a failed audit must not cause a duplicate import on client retry).
 
 ## 6. Archive format (`backend/zev/transfer/schema.py`)
 
-`FORMAT_VERSION = 4`, `SUPPORTED_FORMAT_VERSIONS = {1, 2, 3, 4}`. Version 4
+`FORMAT_VERSION = 5`, `SUPPORTED_FORMAT_VERSIONS = {1, 2, 3, 4, 5}`. Version 5
+(#761, SPEC-2026-10-zev-parties §9) carries the ZEV's parties and their dated
+roles inside the `participants` section: `parties.json` (`{"id", <PARTY_FIELDS>}`,
+every party of the ZEV, also those that are not participants) and
+`party_roles.json` (`{"party_id", <PARTY_ROLE_FIELDS>}`), and each participant
+names its party by archive `party_id` instead of carrying its name, contact and
+address. `PARTY_FIELDS = (kind, title, first_name, last_name, organisation_name,
+name_addition, email, phone, address_line1, address_line2, postal_code, city,
+notes)`; `PARTY_ROLE_FIELDS = (role, valid_from, valid_to)`; `PARTICIPANT_FIELDS =
+(valid_from, valid_to, notes, allocation_weight)`. Importing versions 1–4 reads
+`LEGACY_PARTICIPANT_FIELDS` (the party fields flat on each participant, `kind`,
+`organisation_name`, `name_addition` optional) and gives every participant a
+party of its own and no roles. The manifest counts `parties` and `party_roles`
+alongside `participants`; `SUBCOUNT_SECTIONS` maps them (and `assignments`) to
+the section they belong to for `_verify_manifest_counts`. Version 4
 (SPEC-2026-percentage-tariff-bands §5.6) moves the percentage of a
 `percentage_of_energy` tariff off the tariff itself and onto its periods:
 `TARIFF_FIELDS` drops `percentage`, `TARIFF_PERIOD_FIELDS` gains it. Importing
@@ -149,7 +163,9 @@ File layout:
 openzev-export-<community>-<date>.zip
   manifest.json          format_version, exported_at, instance_name, sections, counts
   zev.json               {"id", <ZEV_FIELDS>}  (a single object, not a list)
-  participants.json      [{"id", <PARTICIPANT_FIELDS>}]
+  parties.json           [{"id", <PARTY_FIELDS>}]                    (format 5)
+  party_roles.json       [{"party_id", <PARTY_ROLE_FIELDS>}]         (format 5)
+  participants.json      [{"id", "party_id", <PARTICIPANT_FIELDS>}]  (format 1–4: {"id", <LEGACY_PARTICIPANT_FIELDS>})
   metering_points.json   [{"id", <METERING_POINT_FIELDS>,
                            "assignments": [{"id", "participant_id", <ASSIGNMENT_FIELDS>}]}]
   tariffs.json           [{"id", <TARIFF_FIELDS>,
@@ -163,7 +179,7 @@ openzev-export-<community>-<date>.zip
   invoices/pdf/<invoice_number>.pdf   one file per invoice that has a rendered PDF
 ```
 
-Field lists (`ZEV_FIELDS`, `PARTICIPANT_FIELDS`, `METERING_POINT_FIELDS`,
+Field lists (`ZEV_FIELDS`, `PARTY_FIELDS`, `PARTY_ROLE_FIELDS`, `PARTICIPANT_FIELDS`, `METERING_POINT_FIELDS`,
 `ASSIGNMENT_FIELDS`, `TARIFF_FIELDS`, `TARIFF_PERIOD_FIELDS`, `INVOICE_FIELDS`,
 `INVOICE_ITEM_FIELDS`, `DYNAMIC_SOURCE_FIELDS`) are hand-written in `schema.py` — a file format with a
 version, not a mirror of the serializers. `user` (Participant) is absent by
@@ -313,6 +329,14 @@ way readings require.
   raises `ArchiveError` rather than crashing on `raw.get(...)`.
 - Duplicate participant source ids are rejected (reported per entry) instead of
   silently rewiring every assignment and invoice to the last match.
+- Format 5 (`_import_parties`, `_import_party_roles`, before the participants):
+  a party without an `id` or with a duplicate one is rejected; each party is
+  `full_clean()`ed; a role or participant naming an unknown `party_id` →
+  `{"party_id": ["Unknown party."]}`; issuer and representative windows that
+  share a day → `{"valid_from": ["Overlaps another holder of this role."]}` (the
+  database only guards open-ended rows); a second open landowner row for one
+  party (the `one_open_role_per_party` constraint) → "The party already holds
+  this role." All reported under the `participants` section.
 - Duplicate invoice numbers — invisible to `full_clean(exclude=["zev", ...])`
   because the `(zev, invoice_number)` constraint spans the excluded `zev` — are
   caught at `save()` as an `IntegrityError` and reported per entry.
@@ -341,8 +365,9 @@ way readings require.
   manifest declared but the archive does not actually contain (§6).
 - The importing account becomes the new ZEV's manager (`zev.access.grant_manager`:
   an active `manager` grant); the ZEV has no owner field since #761 phase 2.
-  Its parties come from the participants (one per participant, format 4) and no
-  issuer role is set, so its documents carry the ZEV's name until one is assigned.
+  Its parties and roles come from a format-5 archive; a format 1–4 archive gives
+  each participant a party and sets no issuer, so its documents carry the ZEV's
+  name until one is assigned.
   `name_override` renames it.
 
 ## 9. Frontend
@@ -442,11 +467,20 @@ refused; manifest with a non-integer count refused; manifest missing a count
 for a declared section refused; manifest with a non-object
 `source_zev` refused; duplicate participant source ids rejected.
 
+**`PartyTransferTests`** (format 5): parties (a two-participation household with
+a name addition, an organisation, a non-participant agency with notes) and five
+dated roles survive a round trip, and the copy's issuer on a date is the
+original's; a format-4 rewrite (`as_format_version`) gives each participant a
+party and no roles; a participant naming an unknown party is rejected;
+overlapping issuers are rejected and nothing is created. `as_format_version(raw,
+version, *, replace=None)` rewrites a current export as an older format
+(participants flattened, parties and roles files dropped) for the legacy tests.
+
 **`SchemaParityTests`**: `test_field_lists_match_their_models_exactly` —
 `assertEqual(set(<section fields>), {model._meta.fields names} -
-FIELDS_EXCLUDED_FROM_ARCHIVE[section])` for all eight section/model pairs
-(exclusions: `id`, `user`, `zev`/parent FKs, `created_at`,
-`updated_at`, `pdf_file`); `test_reading_csv_columns_exist_on_the_reading_model`.
+FIELDS_EXCLUDED_FROM_ARCHIVE[section])` for all ten section/model pairs
+(exclusions: `id`, `user`, `zev`/parent FKs, `party` (travels as `party_id`),
+`sort_name` (derived), `created_at`, `updated_at`, `pdf_file`); `test_reading_csv_columns_exist_on_the_reading_model`.
 
 **`TransferEndpointTests`**: owner can export own ZEV; owner cannot export
 another's; section selection accepted; incomplete selection rejected with a
@@ -464,10 +498,10 @@ collector warning that any archived periods on it were dropped; a
 format-version-3 percentage tariff with no `percentage` at all imports with no
 band.
 
-### Backend — `backend/zev/test_transfer_invoice_pdfs.py` (format version 4)
+### Backend — `backend/zev/test_transfer_invoice_pdfs.py` (format version 5)
 
-`FormatVersionTests`: `FORMAT_VERSION == 4`; `SUPPORTED_FORMAT_VERSIONS ==
-{1, 2, 3, 4}`; `invoice_pdfs` is a known section depending on `invoices`.
+`FormatVersionTests`: `FORMAT_VERSION == 5`; `SUPPORTED_FORMAT_VERSIONS ==
+{1, 2, 3, 4, 5}`; `invoice_pdfs` is a known section depending on `invoices`.
 `MemberNamingTests`: `pdf_member_name` is deterministic and collision-safe
 (same construction as reading member names), stays under `invoices/pdf/`.
 `RoundTripTests`: a PDF travels when `invoice_pdfs` is selected and does not
