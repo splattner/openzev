@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MantineProvider } from '@mantine/core'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Participant } from '../src/types/api'
 
 import { ParticipantFormModal } from '../src/features/participants/ParticipantFormModal'
@@ -40,6 +41,9 @@ function renderModal(focusField: 'valid_to' | null) {
   act(() => {
     root.render(
       createElement(
+        QueryClientProvider,
+        { client: new QueryClient() },
+        createElement(
         MantineProvider,
         null,
         createElement(ParticipantFormModal, {
@@ -52,6 +56,7 @@ function renderModal(focusField: 'valid_to' | null) {
           isPending: false,
           focusField,
         }),
+        ),
       ),
     )
   })

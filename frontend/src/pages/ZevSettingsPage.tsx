@@ -18,6 +18,7 @@ import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { useCommunityAccess } from '../lib/communityAccess'
 import { ZevAccessSection } from '../features/zev/ZevAccessSection'
+import { ZevPartiesSection } from '../features/zev/ZevPartiesSection'
 import {
     ZEV_FIELD_TABS,
     focusZevField,
@@ -39,7 +40,9 @@ import type { Zev, ZevInput } from '../types/api'
  * editing tabs and a single sticky save bar persists the whole form (one PATCH).
  */
 
-const TABS: ZevSettingsTab[] = ['general', 'billing', 'documents', 'access', 'audit', 'export']
+const TABS: ZevSettingsTab[] = ['general', 'parties', 'billing', 'documents', 'access', 'audit', 'export']
+// Tabs that save on their own: the sticky bar saves the draft without submitting a form there.
+const OUTSIDE_THE_FORM = new Set<ZevSettingsTab>(['parties', 'access', 'audit', 'export'])
 
 type ZevDraft = {
     zevId: string | null
@@ -385,6 +388,7 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
             >
                 <Tabs.List aria-label={t('pages.zevSettings.title')}>
                     <Tabs.Tab value="general">{t('pages.zevSettings.tabs.general')}</Tabs.Tab>
+                    <Tabs.Tab value="parties">{t('pages.zevSettings.tabs.parties')}</Tabs.Tab>
                     <Tabs.Tab value="billing">{t('pages.zevSettings.tabs.billingPayment')}</Tabs.Tab>
                     <Tabs.Tab value="documents">{t('pages.zevSettings.tabs.documentsEmails')}</Tabs.Tab>
                     <Tabs.Tab value="access">{t('pages.zevSettings.tabs.access')}</Tabs.Tab>
@@ -452,6 +456,10 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                             />
                         </form>
                     </section>
+                </Tabs.Panel>
+
+                <Tabs.Panel value="parties">
+                    <ZevPartiesSection zevId={selectedZevId} canManage={canManage && !disabledForMe} />
                 </Tabs.Panel>
 
                 <Tabs.Panel value="access">
@@ -533,10 +541,10 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                         </button>
                         <button
                             className="button button-primary"
-                            type={tab === 'audit' || tab === 'export' || tab === 'access' ? 'button' : 'submit'}
-                            form={tab === 'audit' || tab === 'export' || tab === 'access' ? undefined : 'zev-settings-form'}
+                            type={OUTSIDE_THE_FORM.has(tab) ? 'button' : 'submit'}
+                            form={OUTSIDE_THE_FORM.has(tab) ? undefined : 'zev-settings-form'}
                             disabled={readOnly || isPending || !isDirty}
-                            onClick={tab === 'audit' || tab === 'export' || tab === 'access' ? attemptSave : undefined}
+                            onClick={OUTSIDE_THE_FORM.has(tab) ? attemptSave : undefined}
                         >
                             {t('pages.zevSettings.saveChanges')}
                         </button>

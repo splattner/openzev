@@ -1587,8 +1587,9 @@ isAdmin}`: `admin` and `manager` may read and write the management view,
 | POST | `/participants/{id}/link-account/` | admin only | Link user account to participant |
 | POST | `/participants/{id}/unlink-account/` | admin only | Unlink user account from participant |
 | POST | `/participants/{id}/create-account/` | admin only | Create + link user account |
-| GET | `/parties/`, `/parties/{id}/` | IsAuthenticated, BaseZevScopedPermission (managers and viewers; no participant link) | A ZEV's parties with their participations and current roles — read-only (SPEC-2026-10-zev-parties §5.2) |
-| GET | `/party-roles/`, `/party-roles/{id}/` | IsAuthenticated, BaseZevScopedPermission (managers and viewers; no participant link) | Current and future roles; `?include_ended=true` adds the history — read-only (§5.3) |
+| GET / POST / PATCH / DELETE | `/parties/`, `/parties/{id}/` | IsAuthenticated, BaseZevScopedPermission (viewers read, managers write; no participant link) | A ZEV's parties with their participations and current roles; delete only while unused (SPEC-2026-10-zev-parties §5.2) |
+| GET / POST | `/party-roles/`, `/party-roles/{id}/` | IsAuthenticated, BaseZevScopedPermission (viewers read, managers write; no participant link) | Current and future roles (`?include_ended=true` adds the history); POST assigns a role from a date (§5.3) |
+| POST | `/party-roles/{id}/end/` | IsAuthenticated, BaseZevScopedPermission (managers) | End a role on `last_day`; 204 when that removed a role that had not started |
 | GET / POST | `/metering-points/` | IsAuthenticated, MeteringPointPermission | List/create metering points |
 | GET / PATCH / PUT / DELETE | `/metering-points/{id}/` | IsAuthenticated, MeteringPointPermission | Metering point detail |
 | GET / POST | `/metering-point-assignments/` | IsAuthenticated, MeteringPointAssignmentPermission | List/create assignments |

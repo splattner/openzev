@@ -229,6 +229,7 @@ export function ParticipantCardsSection({
                                     )}
                                 </div>
                                 <strong>{displayName}</strong>
+                                {participant.name_addition && <span className="muted">{participant.name_addition}</span>}
                             </div>
 
                             <div className="participant-card-actions">

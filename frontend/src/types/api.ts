@@ -515,6 +515,11 @@ export interface Party {
     updated_at: string
 }
 
+/** The editable fields of a party (POST/PATCH /zev/parties/). */
+export type PartyInput = Pick<Party,
+    'kind' | 'title' | 'first_name' | 'last_name' | 'organisation_name' | 'name_addition'
+    | 'email' | 'phone' | 'address_line1' | 'address_line2' | 'postal_code' | 'city' | 'notes'>
+
 /** GET /zev/party-roles/ — the issuer, representative and landowners of a ZEV, and since when. */
 export interface ZevPartyRole {
     id: string
@@ -581,10 +586,15 @@ export interface SendOnboardingLinkResult {
 
 export interface ParticipantInput {
     zev: string
+    /** On create: attach to this existing party (a second participation); its name and address are then kept. */
+    party?: string
+    kind?: PartyKind
+    organisation_name?: string
+    name_addition?: string
     title?: 'mr' | 'mrs' | 'ms' | 'dr' | 'prof' | ''
-    first_name: string
-    last_name: string
-    email: string
+    first_name?: string
+    last_name?: string
+    email?: string
     valid_from: string
     valid_to?: string | null
     phone?: string

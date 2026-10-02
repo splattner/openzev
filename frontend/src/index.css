@@ -4191,6 +4191,59 @@ input.recurrence-chip-input {
   margin: 0;
 }
 
+/* ZEV settings → Parties (#761): issuer, representative, landowners, contacts. */
+.zev-parties-block {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-default);
+}
+
+.zev-parties-block-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.zev-parties-block-header h4 {
+  margin: 0;
+}
+
+.zev-parties-block-header p {
+  margin: 0.15rem 0 0;
+  font-size: 0.9rem;
+}
+
+.zev-parties-holder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+  margin: 0;
+}
+
+.zev-parties-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.zev-parties-history li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.75rem;
+}
+
+.zev-parties-inline-date {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 @media (min-width: 48rem) {
   .zev-access-row {
     grid-template-columns: minmax(0, 1fr) auto;

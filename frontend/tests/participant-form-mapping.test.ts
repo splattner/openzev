@@ -62,6 +62,9 @@ describe('participant form mapping', () => {
 
     expect(input).toEqual({
       zev: 'z-1',
+      kind: 'person',
+      organisation_name: '',
+      name_addition: '',
       title: 'dr',
       first_name: 'Anna',
       last_name: 'Muster',
@@ -75,6 +78,33 @@ describe('participant form mapping', () => {
       valid_from: '2026-01-01',
       valid_to: null,
     })
+  })
+
+  it('sends an organisation with its name and second name line', () => {
+    const input = mapParticipantFormValuesToInput(
+      {
+        ...defaultParticipantFormValues,
+        kind: 'organisation',
+        organisation_name: ' Sonne AG ',
+        name_addition: ' z. Hd. Buchhaltung ',
+        email: 'info@sonne.example',
+      },
+      'z-1',
+    )
+    expect([input.kind, input.organisation_name, input.name_addition]).toEqual(['organisation', 'Sonne AG', 'z. Hd. Buchhaltung'])
+    expect(participantFormSchema.safeParse({ ...defaultParticipantFormValues, kind: 'organisation', email: 'a@example.com' }).success).toBe(false)
+  })
+
+  it('a second participation of an existing party sends only the participation', () => {
+    const input = mapParticipantFormValuesToInput(
+      { ...defaultParticipantFormValues, party: 'party-1', first_name: 'Anna', last_name: 'Muster', email: 'a@example.com' },
+      'z-1',
+    )
+    expect(input.party).toBe('party-1')
+    for (const field of ['kind', 'first_name', 'last_name', 'email', 'city', 'name_addition'] as const) {
+      expect(input).not.toHaveProperty(field)
+    }
+    expect(input.valid_from).toBe(defaultParticipantFormValues.valid_from)
   })
 
   it('preserves an existing allocation_weight when mapping into form values', () => {

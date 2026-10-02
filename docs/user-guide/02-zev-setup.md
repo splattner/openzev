@@ -79,6 +79,8 @@ Admins can create a ZEV together with a new responsible-person account in a sing
 **Setup → Settings**, `/zev-settings`). The settings are organized into tabs:
 
 - **General** — name, start date, ZEV type, grid connection
+- **Parties** — who issues the invoices, who represents the ZEV toward the grid
+  operator, the landowners, and other contacts (see [Parties tab](#parties-tab))
 - **Billing & payment** — billing interval, invoice language, payment term,
   invoice presentation, participant QR code, invoice prefix, bank details, VAT
 - **Documents & emails** — invoice email template, notes, contract notes
@@ -123,6 +125,36 @@ In **Grid Connection**, each field's guidance appears directly beneath it.
 > serves a tariff document. Operators sometimes move the file without
 > ElCom's copy being updated, so an untested suggestion is never saved
 > automatically, and an address you already entered is never overwritten.
+
+### Parties tab
+
+The **Parties** tab records who the community deals with. Every role has a
+start date (and, once it ends, an end date), so documents always name whoever
+held a role on their own date:
+
+| Role | What it does | Which date counts |
+|---|---|---|
+| **Issuer** | Invoices, contracts and annual statements are from this party: its name and address head the document, and it is the creditor on the QR bill | An invoice: the last day of its period. A contract: the day it is issued. An annual statement: 31 December |
+| **Representative toward the grid operator** | Who acts for the community toward the grid operator (VNB) | — |
+| **Landowners** | The owners of the plots or buildings in the community — several when it spans several plots, as a vZEV usually does | — |
+
+- **Change from…** on the issuer or the representative picks a party and a
+  date. The current holder ends the day before. Invoices for earlier periods
+  keep naming the earlier issuer, and an invoice that is already approved never
+  changes.
+- Without an issuer, documents carry only the community's name. The tab says so
+  until one is set.
+- **Add landowner** adds a party from a date; **End** sets a landowner's last
+  day. Ending a role before it started removes it.
+- A party does not have to be a participant. **Other contacts** lists the
+  people and organisations that are not, such as a property management company
+  that represents the community. **Add contact** creates one (a person, or an
+  organisation with a contact person); a contact that holds no role can be
+  deleted. In the party picker, **New contact…** creates one on the spot.
+- The owner of a ZEV created through self-registration or the admin wizard is
+  its issuer and a landowner from the start date.
+
+Viewers see the tab but change nothing.
 
 ### Billing & payment tab
 

@@ -250,14 +250,18 @@ of another ZEV → 400 `{"party": ["The party belongs to another ZEV."]}`. The e
 | GET / PATCH | `/zev/parties/{id}/` | Read / edit; edits show on every participation |
 | DELETE | `/zev/parties/{id}/` | Only without participations and roles → else 400 `"This party is still a participant or holds a role."` |
 
-PR 4 ships the two GETs read-only (`PartyViewSet` is a `ReadOnlyModelViewSet`: POST → 405);
-PR 6 adds the writes. List queryset: `select_related("zev")`, `prefetch_related("participations",
+`PartyViewSet` (`AuditedCreateDestroyMixin`, `AuditedUpdateMixin`, `ZevScopedQuerySetMixin`,
+`ModelViewSet`; `http_method_names` without `put`; `scope_parent_path = ("zev",)`, so a create
+in a ZEV the caller does not manage → 400 on `zev`). Validation (`PartySerializer.validate`): a
+person needs `last_name`, an organisation `organisation_name`; a PATCH cannot move the party to
+another ZEV. A DELETE checks participations and roles (also ended ones) first. List queryset: `select_related("zev")`, `prefetch_related("participations",
 "roles")`; `participations` sorted by `valid_from`; `roles` as on participants (today or later).
 
 Serializer `PartySerializer`: `id`, `zev`, `kind`, `title`, `first_name`, `last_name`,
 `organisation_name`, `name_addition`, `email`, `phone`, `address_line1`, `address_line2`,
 `postal_code`, `city`, `notes`, `display_name` (ro), `participations` (ro), `roles` (ro),
-`created_at` (ro), `updated_at` (ro).
+`created_at` (ro), `updated_at` (ro). Audit: `party.create` / `party.update` (field diff) /
+`party.delete`, category `governance`, target `zev.Party`, display name as target.
 
 ### 5.3 Party roles (`/api/v1/zev/party-roles/`, new; `ZevPartyRoleViewSet`)
 
@@ -267,8 +271,13 @@ Serializer `PartySerializer`: `id`, `zev`, `kind`, `title`, `first_name`, `last_
 | POST | `/zev/party-roles/` | `{zev, party, role, valid_from, valid_to?}` → `assign_role` (201); conflicts → 400 with the service message |
 | POST | `/zev/party-roles/{id}/end/` | `{last_day}` → `end_role` (200, or 204 when the row was deleted) |
 
-PR 4 ships the GETs read-only (`ZevPartyRoleViewSet`, `ReadOnlyModelViewSet`); the list
-filter applies to `list` only. Serializer `ZevPartyRoleSerializer`: `id`, `zev`, `party`,
+`ZevPartyRoleViewSet` is a `ReadOnlyModelViewSet` (no PATCH/PUT/DELETE: 405) with `create`
+and the `end` action. `create` validates `ZevPartyRoleAssignSerializer` (`zev`, `party` of that
+ZEV, `role`, `valid_from`, optional `valid_to`), runs `assert_within_scope`, then `assign_role`;
+a service `ValidationError` becomes a 400 with its `message_dict` (e.g. `{"valid_from": ["A later
+holder exists; end it first."]}`). `end` validates `ZevPartyRoleEndSerializer` (`last_day`),
+refuses a disabled ZEV for non-admins, and returns the ended row or 204 when `end_role` deleted
+it. The list filter applies to `list` only. Serializer `ZevPartyRoleSerializer`: `id`, `zev`, `party`,
 `party_display_name`, `role`, `valid_from`, `valid_to`, `created_at`, `updated_at`, all
 read-only. Both viewsets: `zev_lookup = "zev"`, no participant path; a participant-only account
 gets 403. `BaseZevScopedPermission._get_zev` resolves `Party` and `ZevPartyRole` through `.zev`.
@@ -378,8 +387,12 @@ export interface Party {
 ### 8.2 API client (`lib/api/zev.ts`)
 
 `fetchParties(zevId)`, `createParty`, `updateParty`, `deleteParty`,
-`fetchPartyRoles(zevId, { includeEnded })`, `assignPartyRole`, `endPartyRole`; query keys
-`zev.parties(zevId)`, `zev.partyRoles(zevId, includeEnded)`.
+`fetchPartyRoles(zevId, { includeEnded })`, `assignPartyRole`, `endPartyRole` (resolves `null`
+on 204); query keys `zev.parties(zevId)`, `zev.partyRoles(zevId, includeEnded)`. Types as
+shipped: `PartyRoleName`, `PartyRoleWindow` (`{id, role, valid_from, valid_to}` on parties and
+participants), `Party`, `PartyInput` (its editable fields), `ZevPartyRole` (with
+`party_display_name`); `ParticipantInput` gains optional `party`, `kind`,
+`organisation_name`, `name_addition`, and its name and email fields become optional.
 
 ### 8.3 ZEV settings → Parties (`features/zev/ZevPartiesSection.tsx`, new)
 
@@ -392,15 +405,32 @@ Tab `parties` after General. Sections:
   organisation form) / delete (only unused).
 
 Party picker: every party of the ZEV by `display_name`, with "New contact…" opening the party
-form. Viewers see everything read-only. Follows
-`2026-04-frontend-management-page-design.md` (action hierarchy, `ConfirmDialog` for ending a
-role, responsive layout).
+form; the created contact is selected in the picker. Viewers see everything read-only. Follows
+`2026-04-frontend-management-page-design.md` (action hierarchy, responsive layout).
+
+As shipped: one query of all roles (`include_ended=true`) and one of the parties; each block
+derives today's holder, upcoming rows ("From" badge) and the history client-side
+(`todayBusinessIso`). Issuer and representative (`SingleHolderRole`): "Set" when nobody holds
+the role, else "Change from…", opening an inline `AssignForm` (picker + date, default today)
+with a hint that the previous holder ends the day before; no issuer → `warning-banner`.
+Landowners (for a ZEV and a vZEV alike; the hint says a community spanning several plots has several, and #761 phase 3 links each landowner to its plot or building): current and future rows; "End" opens an inline last-day form (default today);
+"Add landowner" the same `AssignForm`. Other contacts: parties without participations, with
+their role badges; edit in `PartyFormModal` (`features/zev/PartyFormModal.tsx`: kind,
+organisation name, title, first/last name — "contact" labels for an organisation —, name
+addition, email, phone, address, notes); delete (with `ConfirmDialog`) only while it holds no
+role. Every change invalidates parties, roles, the ZEV list (issuer) and participants. The
+ZEV settings save bar treats `parties` like `access` (`OUTSIDE_THE_FORM`). Styles
+`.zev-parties-*` in `index.css`, reusing the `.zev-access-*` rows.
 
 ### 8.4 Participants
 
-- Participant form: kind switch (person / organisation), organisation name, name addition; on
-  create, "Same person as an existing participant" picks a party (fills and locks the name
-  fields).
+- Participant form: kind switch (person / organisation), organisation name, name addition (with
+  a hint), "contact" labels for first/last name of an organisation; a person needs first and
+  last name, an organisation its name (`participantFormSchema`). On create, "Same person or
+  organisation as" (the ZEV's parties, `fetchParties`) picks a party: the party fields are
+  hidden behind a note naming it and the payload carries only `party` plus the participation
+  fields (`mapParticipantFormValuesToInput`). On edit a note says the name and address are the
+  party's. `formatParticipantName` uses the organisation name for an organisation.
 - Cards show `display_name`, the name addition, and role badges (Issuer, Representative,
   Landowner) replacing the "Owner" badge (which compared `zev.owner` with `participant.user`).
 
@@ -521,16 +551,25 @@ through the participant endpoints keep the existing participant audit events.
   and overlapping issuers are rejected); `SchemaParityTests` covers `PARTY_FIELDS` and
   `PARTY_ROLE_FIELDS`; the legacy-format tests rewrite exports with `as_format_version`.
   Backend 3824 passed.
-- **PR 6**: party and role endpoints (scoping, viewer read-only, audit); frontend
-  `zev-parties-section.test.ts`, participant form; user guide build.
+- **PR 6** (shipped): `zev/test_party_roles.py` `PartyWriteApiTests` (10: a manager adds,
+  edits and deletes a contact with audit events; names required by kind; a party in use cannot be
+  deleted; edits show on every participation; a manager of another ZEV cannot add a party here;
+  a viewer reads but cannot write; a new issuer ends the previous one, with the audit event; a
+  later holder is refused with the reason; ending a role, and ending one before it started
+  deletes it); `PartyRoleApiTests` now checks roles only change by assigning and ending (405 on
+  PATCH/DELETE). Frontend `tests/zev-parties-section.test.ts` (4: today's issuer, no
+  representative, landowners and contacts; viewer without actions; set a representative from a
+  date; end a landowner), `tests/participant-form-mapping.test.ts` (+2: organisation payload and
+  validation, a second participation sends only the participation). User guide: ZEV setup →
+  Parties tab, participant management (type, second name line, same party).
 
 ## 14. Acceptance criteria
 
-- [ ] A ZEV records several landowners, an issuer without a login and an outside representative.
-- [ ] Changing the issuer from a date makes invoices for periods before that date name the old
+- [x] A ZEV records several landowners, an issuer without a login and an outside representative.
+- [x] Changing the issuer from a date makes invoices for periods before that date name the old
       issuer and later ones the new issuer; issued invoices never change.
-- [ ] An organisation participant appears with its name on invoices, QR bill and contracts; a
+- [x] An organisation participant appears with its name on invoices, QR bill and contracts; a
       household shows its second name line.
-- [ ] `Zev.owner` no longer exists; creating a ZEV still gives its creator manager access and
+- [x] `Zev.owner` no longer exists; creating a ZEV still gives its creator manager access and
       an issuer in one step.
-- [ ] Custom templates using `owner_participant.*` / `zev.owner.*` keep rendering.
+- [x] Custom templates using `owner_participant.*` / `zev.owner.*` keep rendering.

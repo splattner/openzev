@@ -1,12 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { CivilDateInput } from '../../components/CivilDateInput'
 import { FormModal } from '../../components/FormModal'
 import { FormModalFooter } from '../../components/FormModalFooter'
+import { fetchParties } from '../../lib/api/zev'
+import { queryKeys } from '../../lib/api/queryKeys'
 import { TITLE_KEYS } from '../../lib/participantTitle'
-import type { Participant, ParticipantInput } from '../../types/api'
+import type { Participant, ParticipantInput, Party } from '../../types/api'
 import {
   defaultParticipantFormValues,
   mapParticipantFormValuesToInput,
@@ -43,6 +46,16 @@ export function ParticipantFormModal({
     defaultValues: defaultParticipantFormValues,
   })
   const validToRef = useRef<HTMLButtonElement | null>(null)
+  const isCreate = !initialParticipant
+  // "Same person as …": a new participation of an existing party (ADR 0028).
+  const partiesQuery = useQuery({
+    queryKey: queryKeys.zev.parties(selectedZevId),
+    queryFn: () => fetchParties(selectedZevId),
+    enabled: isOpen && isCreate && Boolean(selectedZevId),
+  })
+  const kind = useWatch({ control: form.control, name: 'kind' })
+  const partyId = useWatch({ control: form.control, name: 'party' })
+  const shared = Boolean(partyId)
 
   useEffect(() => {
     form.reset(initialParticipant ? mapParticipantToFormValues(initialParticipant) : defaultParticipantFormValues)
@@ -53,6 +66,18 @@ export function ParticipantFormModal({
     const timer = window.setTimeout(() => validToRef.current?.focus(), 60)
     return () => window.clearTimeout(timer)
   }, [isOpen, focusField])
+
+  function pickParty(id: string) {
+    form.setValue('party', id)
+    const party: Party | undefined = (partiesQuery.data ?? []).find((candidate) => candidate.id === id)
+    if (!party) return
+    for (const field of [
+      'kind', 'title', 'first_name', 'last_name', 'organisation_name', 'name_addition',
+      'email', 'phone', 'address_line1', 'address_line2', 'postal_code', 'city',
+    ] as const) {
+      form.setValue(field, (party[field] ?? '') as never)
+    }
+  }
 
   function submit(values: ParticipantFormValues) {
     onSubmit(mapParticipantFormValuesToInput(values, selectedZevId))
@@ -66,6 +91,42 @@ export function ParticipantFormModal({
   return (
     <FormModal isOpen={isOpen} title={title} onClose={onClose} maxWidth="960px">
       <form onSubmit={form.handleSubmit(submit)} className="form-grid">
+        {isCreate && (partiesQuery.data ?? []).length > 0 && (
+          <label style={{ gridColumn: '1 / -1' }}>
+            <span>{t('pages.participants.form.sameParty')}</span>
+            <select value={partyId} onChange={(event) => (event.target.value ? pickParty(event.target.value) : form.setValue('party', ''))}>
+              <option value="">{t('pages.participants.form.newParty')}</option>
+              {(partiesQuery.data ?? []).map((party) => (
+                <option key={party.id} value={party.id}>{party.display_name}</option>
+              ))}
+            </select>
+            <small className="muted">{t('pages.participants.form.samePartyHint')}</small>
+          </label>
+        )}
+        {shared && (
+          <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>
+            {t('pages.participants.form.samePartyKept', {
+              name: (partiesQuery.data ?? []).find((party) => party.id === partyId)?.display_name ?? '',
+            })}
+          </p>
+        )}
+        {!isCreate && (
+          <p className="muted" style={{ gridColumn: '1 / -1', margin: 0, fontSize: '0.82rem' }}>{t('pages.participants.form.sharedPartyHint')}</p>
+        )}
+        {!shared && (<>
+        <label>
+          <span>{t('pages.participants.form.kind')}</span>
+          <select {...form.register('kind')}>
+            <option value="person">{t('pages.participants.kind.person')}</option>
+            <option value="organisation">{t('pages.participants.kind.organisation')}</option>
+          </select>
+        </label>
+        {kind === 'organisation' && (
+          <label>
+            <span>{t('pages.participants.form.organisationName')}</span>
+            <input {...form.register('organisation_name')} required />
+          </label>
+        )}
         <label>
           <span>{t('pages.participants.form.title')}</span>
           <select {...form.register('title')}>
@@ -75,12 +136,17 @@ export function ParticipantFormModal({
           </select>
         </label>
         <label>
-          <span>{t('pages.participants.form.firstName')}</span>
-          <input {...form.register('first_name')} required />
+          <span>{t(kind === 'organisation' ? 'pages.participants.form.contactFirstName' : 'pages.participants.form.firstName')}</span>
+          <input {...form.register('first_name')} required={kind === 'person'} />
         </label>
         <label>
-          <span>{t('pages.participants.form.lastName')}</span>
-          <input {...form.register('last_name')} required />
+          <span>{t(kind === 'organisation' ? 'pages.participants.form.contactLastName' : 'pages.participants.form.lastName')}</span>
+          <input {...form.register('last_name')} required={kind === 'person'} />
+        </label>
+        <label style={{ gridColumn: '1 / -1' }}>
+          <span>{t('pages.participants.form.nameAddition')}</span>
+          <input {...form.register('name_addition')} />
+          <small className="muted">{t('pages.participants.form.nameAdditionHint')}</small>
         </label>
         <label>
           <span>{t('pages.participants.form.email')}</span>
@@ -106,6 +172,7 @@ export function ParticipantFormModal({
           <span>{t('pages.participants.form.city')}</span>
           <input {...form.register('city')} />
         </label>
+        </>)}
         <label>
           <span>{t('pages.participants.form.validFrom')}</span>
           <Controller
@@ -148,7 +215,8 @@ export function ParticipantFormModal({
 
         {Object.keys(form.formState.errors).length > 0 && (
           <div className="error-banner" style={{ gridColumn: '1 / -1' }}>
-            {form.formState.errors.first_name?.message
+            {form.formState.errors.organisation_name?.message
+              || form.formState.errors.first_name?.message
               || form.formState.errors.last_name?.message
               || form.formState.errors.email?.message
               || form.formState.errors.valid_from?.message

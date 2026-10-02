@@ -1,5 +1,9 @@
 import type {
   GridOperatorList,
+  Party,
+  PartyInput,
+  PartyRoleName,
+  ZevPartyRole,
   ZevAccessGrant,
   ZevAccessGrantCreated,
   ZevAccessGrantInput,
@@ -245,4 +249,48 @@ export async function revokeZevAccess(zevId: string, grantId: string): Promise<v
 export async function resendZevInvitation(zevId: string, grantId: string): Promise<{ email_sent: boolean }> {
   const { data } = await api.post<{ email_sent: boolean }>(`/zev/zevs/${zevId}/access/${grantId}/resend-invitation/`)
   return data
+}
+
+// ── Parties and their dated roles (#761, SPEC-2026-10-zev-parties §5.2–5.3) ──
+
+export async function fetchParties(zevId: string): Promise<Party[]> {
+  return fetchAllPages<Party>('/zev/parties/', { zev_id: zevId })
+}
+
+export async function createParty(input: PartyInput & { zev: string }): Promise<Party> {
+  const { data } = await api.post<Party>('/zev/parties/', input)
+  return data
+}
+
+export async function updateParty(id: string, input: Partial<PartyInput>): Promise<Party> {
+  const { data } = await api.patch<Party>(`/zev/parties/${id}/`, input)
+  return data
+}
+
+export async function deleteParty(id: string): Promise<void> {
+  await api.delete(`/zev/parties/${id}/`)
+}
+
+export async function fetchPartyRoles(zevId: string, { includeEnded = false } = {}): Promise<ZevPartyRole[]> {
+  return fetchAllPages<ZevPartyRole>('/zev/party-roles/', {
+    zev_id: zevId,
+    ...(includeEnded ? { include_ended: 'true' } : {}),
+  })
+}
+
+export async function assignPartyRole(input: {
+  zev: string
+  party: string
+  role: PartyRoleName
+  valid_from: string
+  valid_to?: string | null
+}): Promise<ZevPartyRole> {
+  const { data } = await api.post<ZevPartyRole>('/zev/party-roles/', input)
+  return data
+}
+
+/** Ends the role on ``lastDay``; ``null`` when that removed a role that had not started yet. */
+export async function endPartyRole(id: string, lastDay: string): Promise<ZevPartyRole | null> {
+  const response = await api.post<ZevPartyRole>(`/zev/party-roles/${id}/end/`, { last_day: lastDay })
+  return response.status === 204 ? null : response.data
 }

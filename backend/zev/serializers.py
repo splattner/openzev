@@ -350,6 +350,22 @@ class PartySerializer(serializers.ModelSerializer):
     def get_roles(self, obj):
         return current_roles(obj)
 
+    def validate(self, attrs):
+        if self.instance is not None and "zev" in attrs and attrs["zev"].pk != self.instance.zev_id:
+            raise serializers.ValidationError({"zev": "A party cannot move to another ZEV."})
+
+        def current(name):
+            if name in attrs:
+                return attrs[name] or ""
+            return getattr(self.instance, name, "") if self.instance is not None else ""
+
+        kind = current("kind") or PartyKind.PERSON
+        if kind == PartyKind.ORGANISATION and not current("organisation_name").strip():
+            raise serializers.ValidationError({"organisation_name": "An organisation needs a name."})
+        if kind == PartyKind.PERSON and not current("last_name").strip():
+            raise serializers.ValidationError({"last_name": "A person needs a last name."})
+        return attrs
+
     class Meta:
         model = Party
         fields = [
@@ -357,7 +373,28 @@ class PartySerializer(serializers.ModelSerializer):
             "email", "phone", "address_line1", "address_line2", "postal_code", "city", "notes",
             "display_name", "participations", "roles", "created_at", "updated_at",
         ]
-        read_only_fields = fields
+        read_only_fields = ["id", "display_name", "participations", "roles", "created_at", "updated_at"]
+
+
+class ZevPartyRoleAssignSerializer(serializers.Serializer):
+    """``POST /zev/party-roles/``: give a party a role from a date (#761)."""
+
+    zev = serializers.PrimaryKeyRelatedField(queryset=Zev.objects.all())
+    party = serializers.PrimaryKeyRelatedField(queryset=Party.objects.all())
+    role = serializers.ChoiceField(choices=PartyRole.choices)
+    valid_from = serializers.DateField()
+    valid_to = serializers.DateField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        if attrs["party"].zev_id != attrs["zev"].pk:
+            raise serializers.ValidationError({"party": "The party belongs to another ZEV."})
+        return attrs
+
+
+class ZevPartyRoleEndSerializer(serializers.Serializer):
+    """``POST /zev/party-roles/{id}/end/``: the role's last day."""
+
+    last_day = serializers.DateField()
 
 
 class ZevPartyRoleSerializer(serializers.ModelSerializer):

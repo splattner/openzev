@@ -18,7 +18,13 @@ A **participant** is a member of a ZEV community:
 
 1. Click **New Participant**
 2. Enter participant details:
-   - **Title**, **First Name** and **Last Name** (first and last name required)
+   - **Type** — a **Person**, or an **Organisation** (a company, an association).
+     An organisation is billed under its **Organisation name**; first and last
+     name are then its contact person and optional.
+   - **Title**, **First Name** and **Last Name** (required for a person)
+   - **Second name line** (optional) — another member of the household, or
+     "c/o …". It is printed under the name on invoices, contracts and the QR
+     bill.
    - **Email** (where onboarding links and invoice emails go)
    - **Phone** (optional)
    - **Address** — address lines, postal code and city (needed on the invoice
@@ -35,6 +41,12 @@ A **participant** is a member of a ZEV community:
    See [Allocation Weight](#allocation-weight) below.
 
 5. Click **Save Participant**
+
+**Same person or organisation as** (at the top of the form) adds a second
+participation of someone already in the community — for example after a move
+to another flat within it. Name, contact and address are then taken from the
+existing party and stay shared: editing them on one card changes them on every
+card of that party.
 
 The participant is added to the list. A card flagged **Needs attention** is
 missing an email address, a postal address or a metering point; the
@@ -96,6 +108,9 @@ issues a new numbered version, and the earlier ones stay on record.
 2. Click **Edit** on the participant's card
 3. Update fields as needed
 4. Click **Save Participant**
+
+Name, contact and address belong to the participant's party. If the party has
+several participations, the change shows on all of them.
 
 ### Updating Validity Periods
 

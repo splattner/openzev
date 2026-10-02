@@ -2,6 +2,8 @@ import logging
 import tempfile
 
 from django.conf import settings as django_settings
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models import Count, Max, Min, Prefetch, Q
 from django.http import FileResponse, HttpResponse
 from django.utils import timezone as dj_timezone
@@ -19,6 +21,7 @@ from allocation.validity import period_window
 from metering.models import MeterReading
 from . import access, onboarding
 from .models import Zev, Participant, Party, PartyRole, MeteringPoint, MeteringPointAssignment, ZevPartyRole
+from .parties import assign_role, end_role
 from .purge import ZevPurgeError, purge_zev
 from .scoping import ZevScopedQuerySetMixin
 from .serializers import (
@@ -30,6 +33,8 @@ from .serializers import (
     SelfSetupOwnerAddressSerializer,
     ParticipantSerializer,
     PartySerializer,
+    ZevPartyRoleAssignSerializer,
+    ZevPartyRoleEndSerializer,
     ZevPartyRoleSerializer,
     MeteringPointSerializer,
     MeteringPointReadingsDeleteSerializer,
@@ -955,25 +960,57 @@ class MeteringPointAssignmentViewSet(AuditedCreateDestroyMixin, AuditedUpdateMix
         return {"participant_id": str(instance.participant_id)}
 
 
-class PartyViewSet(ZevScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet):
+class PartyViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     """The people and organisations of a ZEV, with their participations and
-    roles (#761). Managers and viewers of the ZEV; read-only for now."""
+    roles (#761). Managers write, viewers read. A party that is still a
+    participant or holds a role cannot be deleted."""
 
     serializer_class = PartySerializer
     permission_classes = [IsAuthenticated, BaseZevScopedPermission]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
     zev_lookup = "zev"
+    scope_parent_path = ("zev",)
+
+    audit_action_category = AuditActionCategory.GOVERNANCE
+    audit_action_type = "party.update"
+    audit_target_type = "zev.Party"
+    audit_target_label = "party"
 
     def get_queryset(self):
         return self.scope_queryset(Party.objects.select_related("zev").prefetch_related("participations", "roles"))
 
+    def get_audit_target_display(self, instance):
+        return instance.display_name
+
+    def get_audit_create_metadata(self, instance):
+        return {"zev_id": str(instance.zev_id)}
+
+    def get_audit_destroy_metadata(self, instance):
+        return {"zev_id": str(instance.zev_id)}
+
+    def destroy(self, request, *args, **kwargs):
+        party = self.get_object()
+        if party.participations.exists() or party.roles.exists():
+            return Response(
+                {"detail": "This party is still a participant or holds a role."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        self.perform_destroy(party)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class ZevPartyRoleViewSet(ZevScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet):
     """Who is a ZEV's issuer, representative and landowners, and since when
-    (#761). Active and future roles; ``?include_ended=true`` adds the history."""
+    (#761). Active and future roles; ``?include_ended=true`` adds the history.
+
+    History is written by assigning (``POST``) and ending (``end``), never by
+    editing a row, so it stays the record of who held a role when.
+    """
 
     serializer_class = ZevPartyRoleSerializer
     permission_classes = [IsAuthenticated, BaseZevScopedPermission]
     zev_lookup = "zev"
+    scope_parent_path = ("zev",)
 
     def get_queryset(self):
         qs = ZevPartyRole.objects.select_related("zev", "party")
@@ -981,6 +1018,58 @@ class ZevPartyRoleViewSet(ZevScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet)
             today = dj_timezone.localdate()
             qs = qs.filter(Q(valid_to__isnull=True) | Q(valid_to__gte=today))
         return self.scope_queryset(qs)
+
+    def _audit(self, request, action_type, row, summary):
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.GOVERNANCE,
+            action_type=action_type,
+            target_type="zev.ZevPartyRole",
+            target_id=str(row.pk),
+            target_display=f"{row.party.display_name} ({row.role})",
+            zev=row.zev,
+            summary=summary,
+            metadata={
+                "role": row.role,
+                "party": str(row.party_id),
+                "valid_from": row.valid_from.isoformat(),
+                "valid_to": row.valid_to.isoformat() if row.valid_to else None,
+            },
+        )
+
+    @extend_schema(request=ZevPartyRoleAssignSerializer, responses=ZevPartyRoleSerializer)
+    def create(self, request, *args, **kwargs):
+        payload = ZevPartyRoleAssignSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        data = payload.validated_data
+        self.assert_within_scope(data)
+        try:
+            with transaction.atomic():
+                row = assign_role(data["zev"], data["party"], data["role"], data["valid_from"], valid_to=data.get("valid_to"))
+                self._audit(request, "party_role.assign", row, f"{row.party.display_name} is {row.role} from {row.valid_from}.")
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict if hasattr(exc, "error_dict") else {"detail": exc.messages})
+        return Response(ZevPartyRoleSerializer(row).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(request=ZevPartyRoleEndSerializer, responses=ZevPartyRoleSerializer)
+    @action(detail=True, methods=["post"])
+    def end(self, request, pk=None):
+        row = self.get_object()
+        self.assert_target_not_disabled(row)
+        payload = ZevPartyRoleEndSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        last_day = payload.validated_data["last_day"]
+        with transaction.atomic():
+            # The event names the row as it was; an end before the start deletes it.
+            ended = end_role(row, last_day)
+            self._audit(
+                request, "party_role.end", ended or row,
+                f"{row.party.display_name} is {row.role} until {last_day}." if ended
+                else f"{row.party.display_name} is no longer {row.role}; the role never started.",
+            )
+        if ended is None:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(ZevPartyRoleSerializer(ended).data)
 
 
 class GridOperatorListView(APIView):

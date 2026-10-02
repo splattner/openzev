@@ -226,10 +226,11 @@ class PartyRoleApiTests(TestCase):
         history = history.get("results", history) if isinstance(history, dict) else history
         self.assertEqual(len(history), 3)
 
-    def test_the_endpoints_are_read_only(self):
+    def test_roles_change_only_by_assigning_and_ending(self):
         authenticate(self.client, make_user("party_admin", UserRole.ADMIN))
-        response = self.client.post("/api/v1/zev/parties/", {"zev": str(self.zev.pk), "last_name": "X"}, format="json")
-        self.assertEqual(response.status_code, 405)
+        row = ZevPartyRole.objects.filter(zev=self.zev).first()
+        self.assertEqual(self.client.patch(f"/api/v1/zev/party-roles/{row.pk}/", {"role": "landowner"}, format="json").status_code, 405)
+        self.assertEqual(self.client.delete(f"/api/v1/zev/party-roles/{row.pk}/").status_code, 405)
 
     def test_a_participant_reaches_no_parties(self):
         authenticate(self.client, self.member.user)
@@ -289,3 +290,105 @@ class PartyRoleMigrationTests(TransactionTestCase):
 
         self.migrate(self.BEFORE)
         self.assertFalse(old.get_model("zev", "ZevPartyRole").objects.exists())
+
+
+class PartyWriteApiTests(TestCase):
+    """Managers add, edit and delete parties and assign and end roles; viewers only read."""
+
+    def setUp(self):
+        self.manager = make_user("pw_manager", UserRole.USER)
+        self.zev = create_managed_zev(name="Write ZEV", owner=self.manager, start_date=date(2026, 1, 1))
+        self.viewer = make_user("pw_viewer", UserRole.USER)
+        ZevAccessGrant.objects.create(zev=self.zev, user=self.viewer, role=ZevAccessRole.VIEWER, valid_from=date(2026, 1, 1))
+        self.client = APIClient()
+        authenticate(self.client, self.manager)
+
+    def create_party(self, **fields):
+        body = {"zev": str(self.zev.pk), "kind": "organisation", "organisation_name": "Verwaltung Nord", **fields}
+        return self.client.post("/api/v1/zev/parties/", body, format="json")
+
+    def test_a_manager_adds_edits_and_deletes_a_contact(self):
+        from audit.models import AuditEvent
+
+        created = self.create_party(email="nord@example.com")
+        self.assertEqual(created.status_code, 201, created.content)
+        party_id = created.json()["id"]
+        self.assertEqual(created.json()["display_name"], "Verwaltung Nord")
+        patched = self.client.patch(f"/api/v1/zev/parties/{party_id}/", {"city": "Basel"}, format="json")
+        self.assertEqual((patched.status_code, patched.json()["city"]), (200, "Basel"))
+        self.assertEqual(self.client.delete(f"/api/v1/zev/parties/{party_id}/").status_code, 204)
+        self.assertEqual(
+            list(AuditEvent.objects.filter(target_type="zev.Party").order_by("created_at").values_list("action_type", flat=True)),
+            ["party.create", "party.update", "party.delete"],
+        )
+
+    def test_names_are_required_by_kind(self):
+        self.assertIn("organisation_name", self.create_party(organisation_name="").json())
+        self.assertIn("last_name", self.create_party(kind="person").json())
+
+    def test_a_party_in_use_cannot_be_deleted(self):
+        tenant = Participant.objects.create(zev=self.zev, last_name="Muster", valid_from=date(2026, 1, 1))
+        response = self.client.delete(f"/api/v1/zev/parties/{tenant.party_id}/")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "This party is still a participant or holds a role.")
+
+    def test_edits_show_on_every_participation(self):
+        tenant = Participant.objects.create(zev=self.zev, last_name="Muster", valid_from=date(2026, 1, 1))
+        self.client.patch(f"/api/v1/zev/parties/{tenant.party_id}/", {"name_addition": "c/o Muster"}, format="json")
+        self.assertEqual(Participant.objects.get(pk=tenant.pk).name_addition, "c/o Muster")
+
+    def test_a_manager_of_another_zev_cannot_add_a_party_here(self):
+        stranger = make_user("pw_stranger", UserRole.USER)
+        create_managed_zev(name="Elsewhere", owner=stranger)
+        authenticate(self.client, stranger)
+        response = self.create_party()
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("zev", response.json())
+
+    def test_a_viewer_reads_but_cannot_write(self):
+        party_id = self.create_party().json()["id"]
+        authenticate(self.client, self.viewer)
+        self.assertEqual(self.client.get(f"/api/v1/zev/parties/?zev_id={self.zev.pk}").status_code, 200)
+        self.assertEqual(self.create_party().status_code, 403)
+        self.assertEqual(self.client.patch(f"/api/v1/zev/parties/{party_id}/", {"city": "X"}, format="json").status_code, 403)
+        response = self.client.post("/api/v1/zev/party-roles/", {
+            "zev": str(self.zev.pk), "party": party_id, "role": "issuer", "valid_from": "2026-01-01",
+        }, format="json")
+        self.assertEqual(response.status_code, 403)
+
+    def assign(self, party_id, role, valid_from, **extra):
+        return self.client.post("/api/v1/zev/party-roles/", {
+            "zev": str(self.zev.pk), "party": party_id, "role": role, "valid_from": valid_from, **extra,
+        }, format="json")
+
+    def test_assigning_a_new_issuer_ends_the_previous_one(self):
+        from audit.models import AuditEvent
+
+        first, second = self.create_party().json()["id"], self.create_party(organisation_name="Süd AG").json()["id"]
+        self.assertEqual(self.assign(first, "issuer", "2026-01-01").status_code, 201)
+        response = self.assign(second, "issuer", "2026-07-01")
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(response.json()["party_display_name"], "Süd AG")
+        self.assertEqual(
+            sorted(self.zev.party_roles.values_list("party__organisation_name", "valid_to")),
+            [("Süd AG", None), ("Verwaltung Nord", date(2026, 6, 30))],
+        )
+        event = AuditEvent.objects.filter(action_type="party_role.assign").latest("created_at")
+        self.assertEqual((event.zev_id, event.metadata_json["role"], event.metadata_json["valid_from"]), (self.zev.pk, "issuer", "2026-07-01"))
+
+    def test_a_later_holder_is_refused_with_the_reason(self):
+        first, second = self.create_party().json()["id"], self.create_party(organisation_name="Süd AG").json()["id"]
+        self.assign(first, "issuer", "2026-07-01")
+        response = self.assign(second, "issuer", "2026-01-01")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"valid_from": ["A later holder exists; end it first."]})
+
+    def test_ending_a_role(self):
+        party_id = self.create_party().json()["id"]
+        role_id = self.assign(party_id, "landowner", "2026-01-01").json()["id"]
+        ended = self.client.post(f"/api/v1/zev/party-roles/{role_id}/end/", {"last_day": "2026-12-31"}, format="json")
+        self.assertEqual((ended.status_code, ended.json()["valid_to"]), (200, "2026-12-31"))
+        future = self.assign(party_id, "representative", "2027-03-01").json()["id"]
+        gone = self.client.post(f"/api/v1/zev/party-roles/{future}/end/", {"last_day": "2027-02-28"}, format="json")
+        self.assertEqual(gone.status_code, 204)
+        self.assertFalse(ZevPartyRole.objects.filter(pk=future).exists())
