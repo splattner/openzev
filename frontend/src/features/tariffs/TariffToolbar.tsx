@@ -12,6 +12,8 @@ type TariffToolbarProps = {
   validityFilter: TariffValidityFilter
   onValidityFilterChange: (value: TariffValidityFilter) => void
   onOpenCreateTariffModal: () => void
+  /** A viewer reads only (#761): no "New tariff". */
+  readOnly?: boolean
   /** Absent when no single ZEV is selected — an import needs one target. */
   onOpenImportModal?: () => void
   /** Absent when no single ZEV is selected — same reason as the import button. */
@@ -27,6 +29,7 @@ export function TariffToolbar({
   validityFilter,
   onValidityFilterChange,
   onOpenCreateTariffModal,
+  readOnly = false,
   onOpenImportModal,
   onDownloadOverview,
   overviewBusy,
@@ -72,10 +75,12 @@ export function TariffToolbar({
               {overviewBusy ? t('pages.tariffs.overviewPdf.busy') : t('pages.tariffs.overviewPdf.action')}
             </button>
           )}
-          <button className="button button-primary" onClick={onOpenCreateTariffModal}>
-            <FontAwesomeIcon icon={faPlus} fixedWidth />
-            {t('pages.tariffs.newTariff')}
-          </button>
+          {!readOnly && (
+            <button className="button button-primary" onClick={onOpenCreateTariffModal}>
+              <FontAwesomeIcon icon={faPlus} fixedWidth />
+              {t('pages.tariffs.newTariff')}
+            </button>
+          )}
         </div>
       </div>
 

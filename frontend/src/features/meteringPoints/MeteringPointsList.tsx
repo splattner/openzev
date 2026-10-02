@@ -40,6 +40,8 @@ type MeteringPointsListProps = {
   holderLessByMeteringPoint: Map<string, boolean>
   settings: AppSettings
   canManageMeteringPoints: boolean
+  /** A viewer reads only (#761): no edit, assign, delete. */
+  readOnly?: boolean
   canDeleteData: boolean
   deleteMeteringPointPending: boolean
   deleteAssignmentPending: boolean
@@ -61,6 +63,7 @@ export function MeteringPointsList({
   holderLessByMeteringPoint,
   settings,
   canManageMeteringPoints,
+  readOnly = false,
   canDeleteData,
   deleteMeteringPointPending,
   deleteAssignmentPending,
@@ -122,7 +125,7 @@ export function MeteringPointsList({
           && getAssignmentState(sortedAssignments[0], todayIso) === 'current'
 
         const pointMenuItems: ActionMenuItem[] = []
-        if (canManageMeteringPoints) {
+        if (canManageMeteringPoints && !readOnly) {
           pointMenuItems.push({
             key: 'edit',
             label: t('common.edit'),
@@ -195,7 +198,7 @@ export function MeteringPointsList({
               </div>
 
               <div className="metering-point-actions">
-                {canManageMeteringPoints && (
+                {canManageMeteringPoints && !readOnly && (
                   <button
                     className="button button-primary button-compact"
                     type="button"
@@ -213,7 +216,7 @@ export function MeteringPointsList({
                   <FontAwesomeIcon icon={faChartLine} fixedWidth />
                   {t('pages.meteringPoints.chart')}
                 </Link>
-                {canManageMeteringPoints && (
+                {canManageMeteringPoints && !readOnly && (
                   <ActionMenu
                     label={t('pages.meteringPoints.moreActions')}
                     icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
@@ -238,6 +241,7 @@ export function MeteringPointsList({
                         </span>
                       )}
                     </span>
+                    {!readOnly && (
                     <div className="metering-assignment-actions">
                       <button
                         className="button button-secondary button-compact"
@@ -253,6 +257,7 @@ export function MeteringPointsList({
                         items={assignmentMenuItems(sortedAssignments[0])}
                       />
                     </div>
+                    )}
                   </div>
                 ) : sortedAssignments.length > 0 ? (
                   <div className="metering-assignment-list">
@@ -278,6 +283,7 @@ export function MeteringPointsList({
                             </div>
                           </div>
 
+                          {!readOnly && (
                           <div className="metering-assignment-actions">
                             <button
                               className="button button-secondary button-compact"
@@ -293,6 +299,7 @@ export function MeteringPointsList({
                               items={assignmentMenuItems(assignment)}
                             />
                           </div>
+                          )}
                         </div>
                       )
                     })}

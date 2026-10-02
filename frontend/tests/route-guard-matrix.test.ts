@@ -26,9 +26,11 @@ vi.mock('../src/lib/auth', () => ({
     useAuth: () => mockAuth(),
 }))
 
+const mockManaged = vi.fn(() => ({}))
+
 vi.mock('../src/lib/managedZev', () => ({
     ManagedZevProvider: (props: { children: unknown }) => props.children,
-    useManagedZev: () => ({}),
+    useManagedZev: () => mockManaged(),
 }))
 
 vi.mock('../src/components/Layout', () => ({
@@ -186,6 +188,35 @@ describe('route guard matrix (tests AppRoutes, not the guard in isolation)', () 
                 expect(page.shows('home')).toBe(true)
             }
             page.unmount()
+        }
+    })
+})
+
+// #761: the guard follows the relation to the selected community, not the
+// platform role. A participant-role account that views a ZEV gets its
+// management pages; a former participant only its invoices.
+describe('route guard by relation to the selected community', () => {
+    const cases: Array<{ relation: string; path: string; marker: string; allow: boolean }> = [
+        { relation: 'viewer', path: '/participants', marker: 'participants', allow: true },
+        { relation: 'viewer', path: '/tariffs', marker: 'tariffs', allow: true },
+        { relation: 'viewer', path: '/zev-settings/access', marker: 'zev-settings', allow: true },
+        { relation: 'viewer', path: '/me/statement', marker: 'reports', allow: false },
+        { relation: 'manager', path: '/billing/invoices', marker: 'billing-hub', allow: true },
+        { relation: 'former', path: '/me/invoices', marker: 'my-invoices', allow: true },
+        { relation: 'former', path: '/me/statement', marker: 'reports', allow: false },
+        { relation: 'former', path: '/participants', marker: 'participants', allow: false },
+    ]
+
+    it.each(cases)('$relation → $path', async ({ relation, path, marker, allow }) => {
+        mockRole('participant')
+        mockManaged.mockReturnValue({ relation })
+        try {
+            const page = await renderPath(path)
+            expect(page.shows(marker)).toBe(allow)
+            if (!allow) expect(page.shows('home')).toBe(true)
+            page.unmount()
+        } finally {
+            mockManaged.mockReturnValue({})
         }
     })
 })

@@ -9,7 +9,8 @@ interface ImportHistoryTableProps<T> {
     getRowId: (row: T) => string
     filters: ColumnFiltersState
     onFiltersChange: (filters: ColumnFiltersState) => void
-    onNewImport: () => void
+    /** Absent for a viewer (#761): no create action in the empty state. */
+    onNewImport?: () => void
 }
 
 export function ImportHistoryTable<T>({ rows, columns, getRowId, filters, onFiltersChange, onNewImport }: ImportHistoryTableProps<T>) {
@@ -28,9 +29,9 @@ export function ImportHistoryTable<T>({ rows, columns, getRowId, filters, onFilt
             <EmptyState
                 titleKey="pages.imports.emptyState.title"
                 descriptionKey="pages.imports.emptyState.description"
-                actions={[
+                actions={onNewImport ? [
                     { labelKey: 'pages.imports.emptyState.createAction', onClick: onNewImport, variant: 'primary', icon: faPlus },
-                ]}
+                ] : []}
             />
         )
     }

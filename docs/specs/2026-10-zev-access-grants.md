@@ -659,7 +659,8 @@ export interface Membership {
 
 export interface User {
     // …existing fields…
-    memberships: Membership[]
+    memberships?: Membership[]   // from /auth/me; absent in older sessions
+    may_create_zev?: boolean
 }
 
 export interface ZevAccessGrant {
@@ -673,98 +674,143 @@ export interface ZevAccessGrant {
     created_at: string
     user: { id: number; email: string; first_name: string; last_name: string; pending_invitation: boolean }
 }
+
+export interface ZevAccessGrantCreated extends ZevAccessGrant { email_sent: boolean }
+export interface ZevAccessGrantInput { email: string; role: ZevAccessRole; valid_to?: string | null }
 ```
 
 `AccountMembership` (admin accounts list) is replaced by `Membership`.
 `AppSettings.mfa_required_roles: UserRole[]` → `mfa_required: boolean`.
 
-### 9.2 Community context (`frontend/src/lib/managedZev.tsx` → `lib/community.tsx`)
+### 9.2 Community context (`frontend/src/lib/managedZev.tsx`, `lib/membership.ts`, `lib/communityAccess.ts`)
 
-`CommunityProvider` replaces `ManagedZevProvider` (the old name is kept as an
-alias export until PR 7).
+`ManagedZevProvider` / `useManagedZev()` keep their names and existing fields
+(dozens of pages and tests use them) and gain two:
 
-- **Entries:** admin → every ZEV (`fetchZevs`), each with relation `admin`;
-  everyone else → `user.memberships`, each with relation `manager` / `viewer` if
-  `access` is set, else `participant` if any participant row is live, else
-  `former`.
-- **Selection** (`resolveCommunitySelection`, pure and unit-tested, replaces
-  `resolveManagedSelection`): explicit in-session pick if still listed →
-  `user.preferred_zev` if listed → first entry by name. Reset on account change
-  (unchanged).
-- **Switcher** shown when there is more than one entry; each option shows the
-  ZEV name and the relation label (`nav.relation.manager` etc.).
-- **`useCommunityAccess()`** → `{ zevId, relation, canManage, canView, isParticipantHere }`
-  for the selected entry. `canManage` = admin or manager; `canView` = canManage or viewer.
+- **`entries: CommunityEntry[]`** (`{ id, name, relation }`) — every community the
+  account relates to, built by `communityEntries(user, zevs)`: admin → every ZEV
+  (`fetchZevs`), relation `admin`; an account with `user.memberships` → one entry
+  per membership with `relationOf(membership)` (`lib/membership.ts`: the grant's
+  `manager` / `viewer`, else `participant` while a row is live, else `former`);
+  a session without memberships (from before /auth/me listed them) → the old
+  rule, an owner's own ZEVs as `manager`.
+- **`relation?: CommunityRelation`** — the selected entry's relation.
 
-`preferred_zev` may now name any ZEV the account relates to (backend §6.3).
+`managedZevs` (ZEV records) is now every ZEV for an admin and the ZEVs the
+account holds a grant for otherwise; `fetchZevs` runs for admins, grant
+holders, and (transitional) `zev_owner`-role accounts without memberships.
+`selectedZev` is `null` for a participant-only entry (its record is not
+readable).
+
+**Selection** — `resolveCommunitySelection({ isAdmin, entryIds, currentId,
+preferredZevId })`, pure: explicit in-session pick if still listed →
+`user.preferred_zev` if listed → first entry. An admin may always switch;
+anyone else once there is more than one entry. `resolveManagedSelection` stays
+as the role-only wrapper for old callers. Reset on account change (unchanged).
+
+**`useCommunityAccess()`** (`lib/communityAccess.ts`) →
+`{ shellRole, isZevScope, canManage, isParticipantScope, isAdmin }`:
+
+| `shellRole` | from | `isZevScope` (read the management view) | `canManage` (write) | `isParticipantScope` |
+|---|---|---|---|---|
+| `admin` | `user.role === 'admin'` | yes | yes | no |
+| `manager` | selected relation (or, without one, `role === 'zev_owner'`) | yes | yes | no |
+| `viewer` | selected relation | yes | no | no |
+| `participant` | selected relation (or, without one, `role === 'participant'`) | no | no | yes |
+| `former` | selected relation | no | no | yes (invoices only) |
+| `none` | anything else | no | no | no |
+
+`shellRoleFor(user, relation)` holds the fallback, so sessions and tests from
+before per-ZEV access keep their meaning until the role collapses (step 7).
+Outside the auth provider (an isolated page test) the hook answers as for a
+manager — those pages' old behaviour; the backend enforces access regardless.
+`relationToZev(user, zevId)` / `shellRoleForZev` answer for a given community,
+for pages about one record that may belong to another community than the
+selected one (`InvoiceDetailPage`).
+
+`preferred_zev` may name any ZEV the account relates to (backend §6.3).
 
 ### 9.3 Routes (`components/AppRoutes.tsx`, `components/ProtectedRoute.tsx`)
 
-`ProtectedRoute` prop `requires`:
+`ProtectedRoute`'s `allowedRoles` now lists **shell roles** (`ShellRole[]`) and
+compares them with `useCommunityAccess().shellRole`:
 
-| `requires` | Passes when |
-|---|---|
-| `'admin'` | `user.role === 'admin'` |
-| `'zevAccess'` | the selected entry's `canView` |
-| `'participant'` | the selected entry's relation is `participant` or `former` (former: only `/me/invoices`) |
-
-| Routes | Old `allowedRoles` | New `requires` |
+| Routes | Old `allowedRoles` | New `allowedRoles` |
 |---|---|---|
-| `/admin/**`, `/admin/system-settings` | `admin` | `admin` |
-| `/participants`, `/zev-settings`, `/zev-settings/:tab`, `/metering/quality`, `/tariffs`, `/billing/periods`, `/billing/invoices`, `/billing/emails`, `/feasibility`, `/metering/imports` | `admin`, `zev_owner` | `zevAccess` |
-| `/me/statement` | `participant` | `participant` (live only) |
-| `/me/invoices` | `participant` | `participant` |
-| `/reports` | `admin`, `zev_owner`, `participant` | any relation |
+| `/admin/**`, `/admin/system-settings` | `admin` | `['admin']` |
+| `/participants`, `/zev-settings`, `/zev-settings/:tab`, `/metering/quality`, `/tariffs`, `/billing/periods`, `/billing/invoices`, `/billing/emails`, `/feasibility`, `/metering/imports` | `admin`, `zev_owner` | `ZEV_SCOPE` = `['admin', 'manager', 'viewer']` |
+| `/me/statement` | `participant` | `['participant']` |
+| `/me/invoices` | `participant` | `['participant', 'former']` |
+| `/reports` | `admin`, `zev_owner`, `participant` | `[...ZEV_SCOPE, 'participant']` |
 
 ### 9.4 Navigation (`components/Layout.tsx`)
 
-The sidebar follows the selected entry's relation: `admin`/`manager`/`viewer` →
-the Setup and Billing groups (today's owner navigation); `participant` →
-Dashboard, My invoices, Annual statement (today's participant navigation),
-scoped to the selected ZEV through `zev_id` on their queries; `former` → My
-invoices only. The Platform group stays admin-only. An account with exactly one
-relationship sees today's sidebar unchanged.
+The sidebar follows the selected entry's shell role: `isZevScope` → Overview,
+Energy balance, Metering, Billing, Reports and the Setup group (the owner
+navigation as before), Feasibility when enabled; `participant` → Dashboard, My
+invoices, Annual statement; `former` → My invoices only. The Platform group
+stays admin-only.
 
-`DashboardPage` reads `summary.role` (`summary_kind` after PR 7) as today; it
-passes the selected `zev_id` for every relation.
+The **switcher** shows when the account can manage something or has more than
+one entry, and not with exactly one entry (nothing to switch). It lists
+`entries`, each with the relation below the name (`nav.relation.*`, class
+`zev-dropdown-relation`). Its header shows the owner when it is known (an
+admin, or the owner itself), else the account's relation. A context without
+`entries` (the older shape) lists `managedZevs`.
+
+`DashboardPage`: `isZevScope` → the community dashboard for the selected ZEV
+(as before); `isParticipantScope` → the participant dashboard, asking about the
+selected ZEV (`zev_id`) only when the account has more than one entry, so a
+single membership sends exactly the old request. `summary.role` is read as
+before (`summary_kind` after step 7). `HomePage`: `isZevScope` → Overview, else
+the dashboard.
 
 ### 9.5 Viewer read-only
 
-Every write affordance is gated on `useCommunityAccess().canManage`, hidden (not
-disabled) for viewers, following the action hierarchy of
-`2026-04-frontend-management-page-design.md`:
+Write affordances are hidden (not disabled) when `canManage` is false; reads,
+downloads and exports stay:
 
-- `features/invoices/useInvoiceActions.tsx` — generate, approve, mark sent/paid,
-  cancel, delete, send, regenerate PDF, batch actions (PDF ZIP download stays).
-- `ParticipantsPage` — create/edit/delete, onboarding links, contract issue
-  (contract download stays).
-- `MeteringPointsPage`, `MeteringChartPage` (import entry), imports pages —
-  create/edit/delete/assign/import.
-- `TariffsPage` — create/edit/delete, VSE import, dynamic source actions.
-- `ZevSettingsPage` — all forms read-only; disable action hidden; Access section
-  read-only (§9.6).
-- `ReportsPage` — unchanged (all reads).
+| Page / component | Hidden for a viewer | Kept |
+|---|---|---|
+| `ParticipantsPage` → `ParticipantToolbar`, `ParticipantCardsSection` (`readOnly`) | New participant, Edit, the whole card menu (onboarding links, link/unlink account, delete), the empty state's create action | Contract PDF — through `downloadIssuedParticipantContractPdf` (GET of the latest issued version, 404 before the first) instead of the issuing POST |
+| `MeteringPointsPage` → `MeteringPointsToolbar`, `MeteringPointsList`, `MeteringPointsEmptyState` (`readOnly`; `canManageMeteringPoints` keeps its meaning of "management view") | New metering point, assign, point and assignment edit/delete menus | assignment history, summary stats, chart links |
+| `TariffsPage` → `TariffToolbar`, `TariffEmptyState`, `TariffCategorySections`, `TariffDetailDrawer` (`readOnly`) | New tariff, VSE import, Edit, new version / rename / duplicate, version edit/delete, add/edit/delete band | tariff overview PDF, version history |
+| `InvoicesPage` | the row's primary action, every row menu item except navigation (`review-conflict`), the batch recommended action and batch menu | Download all PDFs |
+| `InvoiceDetailPage` (decided by the invoice's own ZEV, `shellRoleForZev`) | Generate PDF, revoke access link | the PDF, back link |
+| `BillingEmailsPage` | Retry (row and history modal) | delivery history |
+| `ImportsPage` → `ImportHistoryTable` (`onNewImport` optional) | the "start import" card (new import, delete imports), the row delete column, the empty state's create action | history, protocols |
+| `ZevSettingsPage` | every form is read-only (`readOnly = disabledForMe \|\| !canManage`), the disable section | audit log, transfer export, Access list |
+| `ReportsPage`, `MeteringChartPage`, Overview | — (reads only) | everything |
 
 A viewer who reaches a write through a stale link gets the backend 404/403 and
 the page's existing error state.
 
 ### 9.6 ZEV settings → Access (`features/zev/ZevAccessSection.tsx`, new)
 
-Tab `access` on `/zev-settings/:tab`. Query
-`queryKeys.zev.access(zevId)` → `fetchZevAccess(zevId)`.
+Tab `access` on `/zev-settings/:tab` (after Documents; `ZevSettingsTab`
+includes `'access'`; no save button, like Audit and Export). Query
+`queryKeys.zev.access(zevId, includeEnded)` → `fetchZevAccess(zevId, { includeEnded })`.
+The section gets `canManage = canManage && !disabledForMe` (a disabled ZEV is
+read-only for everyone but an admin).
 
-- Table: name/email (with "Invitation pending" badge and a *Resend* action),
-  role, since, until, granted by. Ended grants behind a "Show ended" toggle
-  (`include_ended`).
-- Primary action "Give access": form with email + role (`manager`/`viewer`) +
-  optional end date → `createZevAccess`. Success toast distinguishes "Access
-  granted" and "Invitation sent"; `email_sent: false` shows a warning.
-- Row actions (managers/admins only): change role, set end date, revoke —
-  revoke and downgrade through `ConfirmDialog`. The last-manager refusal shows
-  the backend message.
-- Viewers see the table without actions.
-- On mutation success: invalidate `queryKeys.zev.access(zevId)` and, when the
-  change affects the current user, `queryKeys.auth.me()`.
+- List (`zev-access-list`, one row per grant): name (or email), email, role
+  badge, "Invitation pending" badge, "Ended" badge (`valid_to` before today),
+  since / until, granted by. Rows stack on a phone and turn two-column from
+  48rem. Ended grants behind a "Show ended access" checkbox (`include_ended`).
+- Primary action "Give access" (managers/admins): inline form with email, role
+  (`manager` / `viewer`, default viewer) and optional end date →
+  `createZevAccess`. Toast: "Invitation sent" when the account is new
+  (`user.pending_invitation`), "Access granted" otherwise, an error toast when
+  `email_sent` is false. An empty email is refused before the request.
+- Row actions on a grant that has not ended (managers/admins only): "Make
+  manager" (immediate), "Make viewer" (through `ConfirmDialog`), "Resend
+  invitation" (pending accounts, `resendZevInvitation`), "Remove access"
+  (`ConfirmDialog`, danger). Changing an end date is API-only for now.
+- Every refusal (the last manager, an admin email, …) shows the backend message
+  through `formatApiError` in an error toast.
+- Viewers see the list without actions.
+- On mutation success: invalidate `['zev', 'access', zevId]` and, when the
+  grant is the signed-in account's, `refreshUser()` (memberships change).
 
 Shipped in PR 5, because the API shapes they read changed there:
 
@@ -801,9 +847,11 @@ Shipped in PR 5, because the API shapes they read changed there:
 
 New keys in all four locales (`frontend/src/i18n/locales/{de,fr,it,en}`):
 `nav.relation.{admin,manager,viewer,participant,former}`,
-`zevSettings.access.*` (title, table columns, actions, confirmations, toasts,
-pending badge, errors), `auth.verify.invitation*`,
-`admin.settings.mfa.requiredAll`. Removed: the per-role MFA checkbox labels.
+`pages.zevSettings.tabs.access`, `pages.zevSettings.access.*` (title,
+description, form labels and hints, actions, confirmations, toasts, badges,
+since/until/granted-by); PR 5 added the invitation, email-template and
+`adminSystemSettings.mfaPolicy.required*` keys and removed the per-role MFA
+checkbox labels.
 
 ## 10. Async and integration behavior
 
@@ -827,7 +875,7 @@ Each PR is green on its own; numbering follows the implementation plan.
 | 3 | `ZevAccessGrant`, migration, `zev/access.py`, owner invariant, backups registry/restore — no behaviour change |
 | 4 | Scoping/permissions/hand checks on grants; viewer; union; former participants; dashboard/reports `zev_id`; remove `is_zev_owner` |
 | 5 | Grant API, invitations, link/unlink, impersonation, MFA switch, self-setup gate, `/auth/me` memberships — plus the frontend consumers of the changed shapes: `Membership` type and account chips, link/impersonation rules in `accountList.ts`, the single 2FA switch, `VerifyEmailPage` invitation path, the two new email-template tabs |
-| 6 | Frontend (§9) |
+| 6 | Frontend (§9): community switcher with relations, shell roles in routes and navigation, viewer read-only pages, ZEV settings → Access |
 | 7 | Collapse `User.role` to `admin`/`user`; remove `zev_name`/`zev_count`, `ManagedZevProvider` alias, `summary.role`; test-suite role churn; `seed_demo` personas |
 
 Baseline specs updated in the PR that changes their behaviour:
@@ -847,7 +895,7 @@ Baseline specs updated in the PR that changes their behaviour:
 | Per-request query cost of grant lookups | Medium | One grant query + one participant query per request, memoised (§5) |
 | 2FA policy migration forces 2FA on accounts that never had it | Medium | Grace period restarts at migration; release notes |
 | Invitation spam / account creation by managers | Medium | Only managers/admins can invite; invited accounts are inactive until accepted; audit trail; resend is per grant |
-| Frontend drift between `requires` and backend rules | Medium | Backend is authoritative; frontend gating is UX only (ADR 0027 keeps ADR 0003's layering) |
+| Frontend drift between shell roles and backend rules | Medium | Backend is authoritative; frontend gating is UX only (ADR 0027 keeps ADR 0003's layering) |
 | `Zev.owner` and grants diverge during the transition | Low | Intended (owner handing over to a Verwaltung); phase 2 removes `Zev.owner` |
 
 ## 13. Test plan
@@ -1015,16 +1063,31 @@ Frontend in PR 5 (the parts the changed API shapes require):
 `tests/account-list.test.ts` (new `Membership` shape, link and impersonation
 rules) and `tests/templates-hub.test.ts` (9 template tabs).
 
-### Frontend (PR 6)
+### Frontend (PR 6, shipped)
 
-`community.test.ts` (selection resolution, relation per entry, switcher
-visibility), `protected-route.test.ts` (`requires`), `layout-nav.test.ts`
-(navigation per relation, single-relationship accounts unchanged),
-`zev-access-section.test.ts` (list, create/invite, role change, revoke,
-last-manager error, viewer read-only), `viewer-readonly.test.ts` (write
-affordances hidden on the pages in §9.5), `verify-email.test.ts` (invitation
-skips the ZEV wizard), `mfa-policy.test.ts`. Plus `npm run lint`,
-`lint:style`, hex check, `test:unit`, `build`.
+- `tests/community-access.test.ts` (13): `relationOf` (grant, then a live
+  row, else former); `shellRoleFor` (admin wins, follows the relation, falls
+  back to the old role, `none`); `accessFor` per shell role;
+  `relationToZev` / `shellRoleForZev` answer for the record's own community;
+  `communityEntries` (admin = every ZEV, memberships with relations, owner
+  fallback); `resolveCommunitySelection` (pick → preference → first;
+  switchable with two entries, an admin always).
+- `tests/route-guard-matrix.test.ts`: the route matrix per shell role, plus
+  relation cases (a viewer reads the ZEV pages, a participant-only selection
+  gets the participant routes, `former` reaches My invoices only, a manager
+  relation opens the ZEV pages for a `participant`-role account).
+- `tests/layout-nav.test.ts`: navigation per role with `entries` in the mock
+  (single-relationship accounts unchanged).
+- `tests/zev-access-section.test.ts` (5): lists grants with role and pending
+  badge; a viewer gets no actions; a manager gives access by email (invited
+  toast); "Make manager" acts at once, "Make viewer" asks first; the
+  last-manager refusal is shown from the server message.
+- `tests/viewer-readonly.test.ts` (4): Participants toolbar, Tariffs
+  toolbar (overview PDF stays) and empty state, and the import history empty
+  state hide their create actions when read-only.
+- The PR 5 tests (`verify-email`, MFA switch, account chips) are unchanged.
+
+Plus `npm run lint`, `lint:style`, hex check, `test:unit`, `build`.
 
 ### Acceptance criteria
 

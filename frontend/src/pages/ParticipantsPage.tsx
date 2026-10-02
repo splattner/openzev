@@ -15,6 +15,7 @@ import { ParticipantToolbar, type ParticipantReadinessFilter } from '../features
 import {
     createParticipant,
     deleteParticipant,
+    downloadIssuedParticipantContractPdf,
     downloadParticipantContractPdf,
     fetchParticipantGeocodingEnabled,
     fetchParticipants,
@@ -28,6 +29,7 @@ import { formatApiError } from '../lib/api/errors'
 import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
+import { useCommunityAccess } from '../lib/communityAccess'
 import { queryKeys } from '../lib/api/queryKeys'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
@@ -55,7 +57,8 @@ export function ParticipantsPage() {
     const focusId = searchParams.get('focus')
     const focusField = searchParams.get('field')
     const [highlightedId, setHighlightedId] = useState<string | null>(null)
-    const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
+    const { isZevScope, canManage } = useCommunityAccess()
+    const isManagedScope = isZevScope
     const accountLinking = useParticipantAccountLinking({ isAdmin: user?.role === 'admin', confirm })
     const { data, isLoading, isError } = useQuery({
         queryKey: queryKeys.zev.participants(selectedZevId || undefined),
@@ -321,7 +324,9 @@ export function ParticipantsPage() {
     }
 
     function downloadContract(participant: Participant) {
-        void downloadParticipantContractPdf(
+        // A viewer may read the issued contract but not issue a new version.
+        const download = canManage ? downloadParticipantContractPdf : downloadIssuedParticipantContractPdf
+        void download(
             participant.id,
             `contract_${participant.last_name}_${participant.first_name}.pdf`,
         ).catch(() => pushToast(t('pages.participants.contractDownloadError'), 'error'))
@@ -357,6 +362,7 @@ export function ParticipantsPage() {
                 onSearchTermChange={setSearchTerm}
                 onReadinessFilterChange={setReadinessFilter}
                 onOpenCreateModal={openCreateModal}
+                readOnly={!canManage}
             />
 
             <ParticipantFormModal
@@ -405,6 +411,7 @@ export function ParticipantsPage() {
                 onboardingLinkPending={onboardingLinkPending}
                 deletePendingOrDialogLoading={deleteMutation.isPending || dialogLoading}
                 focusParticipantId={highlightedId}
+                readOnly={!canManage}
             />
 
             {accountLinking.linkModal}

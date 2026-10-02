@@ -1,13 +1,9 @@
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useManagedZev } from '../../lib/managedZev'
+import { relationOf } from '../../lib/membership'
 import type { Membership } from '../../types/api'
 
-/** The label for how an account relates to one community (#761). */
-function membershipKind(membership: Membership): 'manager' | 'viewer' | 'participant' | 'former' {
-    if (membership.access) return membership.access
-    return membership.participants.some((row) => row.live) ? 'participant' : 'former'
-}
 
 /**
  * The communities an account belongs to, one chip each. Selecting a chip
@@ -39,7 +35,7 @@ export function AccountMemberships({ memberships }: { memberships: Membership[] 
                         }}
                     >
                         <span className="account-membership-kind">
-                            {t(`pages.accounts.membership.${membershipKind(membership)}`)}
+                            {t(`pages.accounts.membership.${relationOf(membership)}`)}
                         </span>
                         <span>{membership.zev_name}</span>
                     </button>

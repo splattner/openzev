@@ -7,6 +7,10 @@ import { ProtectedRoute } from './ProtectedRoute'
 import { AliasNavigate, InvoiceDetailAlias, MeteringDataAlias } from './RouteAliases'
 import { PageSkeleton } from './PageSkeleton'
 import { ManagedZevProvider } from '../lib/managedZev'
+import type { ShellRole } from '../lib/communityAccess'
+
+/** Management views of the selected community: readable by admins, managers and viewers (#761). */
+const ZEV_SCOPE: ShellRole[] = ['admin', 'manager', 'viewer']
 
 const AccountProfilePage = lazy(async () => ({ default: (await import('../pages/AccountProfilePage')).AccountProfilePage }))
 const AdminOverviewHubPage = lazy(async () => ({ default: (await import('../pages/AdminOverviewHubPage')).AdminOverviewHubPage }))
@@ -150,7 +154,7 @@ export function AppRoutes() {
           <Route
             path="participants"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
+              <ProtectedRoute allowedRoles={ZEV_SCOPE}>
                 <ParticipantsPage />
               </ProtectedRoute>
             }
@@ -160,7 +164,7 @@ export function AppRoutes() {
           <Route
             path="zev-settings"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
+              <ProtectedRoute allowedRoles={ZEV_SCOPE}>
                 <ZevSettingsTabRoute />
               </ProtectedRoute>
             }
@@ -168,7 +172,7 @@ export function AppRoutes() {
           <Route
             path="zev-settings/:tab"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
+              <ProtectedRoute allowedRoles={ZEV_SCOPE}>
                 <ZevSettingsTabRoute />
               </ProtectedRoute>
             }
@@ -190,7 +194,7 @@ export function AppRoutes() {
           <Route
             path="metering/quality"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
+              <ProtectedRoute allowedRoles={ZEV_SCOPE}>
                 <MeteringChartPage tab="quality" />
               </ProtectedRoute>
             }
@@ -200,7 +204,7 @@ export function AppRoutes() {
           <Route
             path="tariffs"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
+              <ProtectedRoute allowedRoles={ZEV_SCOPE}>
                 <TariffsPage />
               </ProtectedRoute>
             }
@@ -210,7 +214,7 @@ export function AppRoutes() {
           <Route
             path="billing/periods"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
+              <ProtectedRoute allowedRoles={ZEV_SCOPE}>
                 <AliasNavigate to="/" />
               </ProtectedRoute>
             }
@@ -218,7 +222,7 @@ export function AppRoutes() {
           <Route
             path="billing/invoices"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
+              <ProtectedRoute allowedRoles={ZEV_SCOPE}>
                 <BillingHubPage tab="invoices" />
               </ProtectedRoute>
             }
@@ -226,7 +230,7 @@ export function AppRoutes() {
           <Route
             path="billing/emails"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
+              <ProtectedRoute allowedRoles={ZEV_SCOPE}>
                 <BillingHubPage tab="emails" />
               </ProtectedRoute>
             }
@@ -254,7 +258,7 @@ export function AppRoutes() {
           <Route
             path="me/invoices"
             element={
-              <ProtectedRoute allowedRoles={['participant']}>
+              <ProtectedRoute allowedRoles={['participant', 'former']}>
                 <MyInvoicesPage />
               </ProtectedRoute>
             }
@@ -262,7 +266,7 @@ export function AppRoutes() {
           <Route
             path="reports"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'zev_owner', 'participant']}>
+              <ProtectedRoute allowedRoles={[...ZEV_SCOPE, 'participant']}>
                 <ReportsPage />
               </ProtectedRoute>
             }
@@ -270,7 +274,7 @@ export function AppRoutes() {
           <Route
             path="feasibility"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
+              <ProtectedRoute allowedRoles={ZEV_SCOPE}>
                 <FeasibilityCalculatorPage />
               </ProtectedRoute>
             }
@@ -281,7 +285,7 @@ export function AppRoutes() {
           <Route
             path="metering/imports"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
+              <ProtectedRoute allowedRoles={ZEV_SCOPE}>
                 <MeteringChartPage tab="imports" />
               </ProtectedRoute>
             }

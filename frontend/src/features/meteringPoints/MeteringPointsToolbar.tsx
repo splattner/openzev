@@ -11,6 +11,8 @@ import type {
 
 type MeteringPointsToolbarProps = {
   canManageMeteringPoints: boolean
+  /** A viewer reads only (#761): no "New metering point". */
+  readOnly?: boolean
   totalCount: number
   activeCount: number
   inactiveCount: number
@@ -32,6 +34,7 @@ type MeteringPointsToolbarProps = {
 
 export function MeteringPointsToolbar({
   canManageMeteringPoints,
+  readOnly = false,
   totalCount,
   activeCount,
   inactiveCount,
@@ -109,7 +112,7 @@ export function MeteringPointsToolbar({
           </button>
         </div>
 
-        {canManageMeteringPoints && (
+        {canManageMeteringPoints && !readOnly && (
           <button className="button button-primary" type="button" onClick={onOpenCreateModal}>
             <FontAwesomeIcon icon={faPlus} fixedWidth />
             {t('pages.meteringPoints.newMeteringPoint')}

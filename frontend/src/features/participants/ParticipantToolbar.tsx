@@ -14,6 +14,8 @@ type ParticipantToolbarProps = {
   onSearchTermChange: (value: string) => void
   onReadinessFilterChange: (value: ParticipantReadinessFilter) => void
   onOpenCreateModal: () => void
+  /** A viewer reads only (#761): no "New participant". */
+  readOnly?: boolean
 }
 
 export function ParticipantToolbar({
@@ -26,6 +28,7 @@ export function ParticipantToolbar({
   onSearchTermChange,
   onReadinessFilterChange,
   onOpenCreateModal,
+  readOnly = false,
 }: ParticipantToolbarProps) {
   const { t } = useTranslation()
 
@@ -51,10 +54,12 @@ export function ParticipantToolbar({
           </span>
         </div>
 
-        <button className="button button-primary" type="button" onClick={onOpenCreateModal}>
-          <FontAwesomeIcon icon={faPlus} fixedWidth />
-          {t('pages.participants.newParticipant')}
-        </button>
+        {!readOnly && (
+          <button className="button button-primary" type="button" onClick={onOpenCreateModal}>
+            <FontAwesomeIcon icon={faPlus} fixedWidth />
+            {t('pages.participants.newParticipant')}
+          </button>
+        )}
       </div>
 
       <div className="participant-filter-grid">

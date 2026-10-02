@@ -5,6 +5,7 @@ import { downloadFinancialSummary } from '../lib/api/invoices'
 import { downloadBlob } from '../lib/downloadBlob'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
+import { useCommunityAccess } from '../lib/communityAccess'
 import { ReportsEmptyState } from '../features/reports/ReportsEmptyState'
 import { YearDownloadCard } from '../features/reports/YearDownloadCard'
 import { AnnualReportSection } from '../features/reports/AnnualReportSection'
@@ -19,8 +20,7 @@ export function ReportsPage() {
     const { user } = useAuth()
     const { selectedZevId, isLoading: managedZevLoading, managedZevs, selectedZev } = useManagedZev()
 
-    const isZevScopedRole = user?.role === 'admin' || user?.role === 'zev_owner'
-    const isParticipant = user?.role === 'participant'
+    const { isZevScope: isZevScopedRole, isParticipantScope: isParticipant } = useCommunityAccess()
     const hasValidZev = !isZevScopedRole || !!(selectedZevId && selectedZev)
     const showGuard = isZevScopedRole && !hasValidZev && !managedZevLoading
     const scopeName = isZevScopedRole ? selectedZev?.name : user?.zev_name

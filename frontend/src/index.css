@@ -760,6 +760,18 @@ label > small.muted {
   opacity: 0.7;
 }
 
+/* The account's relation to the community (manager, viewer, participant),
+   below the name: the sidebar dropdown is too narrow for both on one line. */
+.zev-dropdown-item {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.zev-dropdown-relation {
+  color: var(--muted);
+  font-weight: 400;
+}
+
 .zev-dropdown-item-muted {
   border-style: dashed;
   color: var(--muted);
@@ -4124,4 +4136,73 @@ input.recurrence-chip-input {
   display: grid;
   gap: 0.5rem;
   justify-items: start;
+}
+
+/* ZEV settings → Access (#761): who may manage or view the community. */
+.zev-access-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.zev-access-row {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border-default);
+  border-radius: 0.6rem;
+  background: var(--white);
+}
+
+.zev-access-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+  min-width: 0;
+}
+
+.zev-access-who .muted {
+  overflow-wrap: anywhere;
+}
+
+.zev-access-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.zev-access-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 1rem;
+  font-size: 0.9rem;
+}
+
+.zev-access-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.zev-access-form-hint {
+  margin: 0;
+}
+
+@media (min-width: 48rem) {
+  .zev-access-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .zev-access-meta {
+    grid-column: 1;
+  }
+
+  .zev-access-actions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
 }

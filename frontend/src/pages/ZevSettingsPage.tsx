@@ -16,6 +16,8 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
+import { useCommunityAccess } from '../lib/communityAccess'
+import { ZevAccessSection } from '../features/zev/ZevAccessSection'
 import {
     ZEV_FIELD_TABS,
     focusZevField,
@@ -37,7 +39,7 @@ import type { Zev, ZevInput } from '../types/api'
  * editing tabs and a single sticky save bar persists the whole form (one PATCH).
  */
 
-const TABS: ZevSettingsTab[] = ['general', 'billing', 'documents', 'audit', 'export']
+const TABS: ZevSettingsTab[] = ['general', 'billing', 'documents', 'access', 'audit', 'export']
 
 type ZevDraft = {
     zevId: string | null
@@ -91,11 +93,13 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
 
     const isAdmin = user?.role === 'admin'
     const isDisabled = Boolean(selectedZev?.disabled_at)
-    // The owner keeps read access to a disabled ZEV but loses write access
+    const { canManage } = useCommunityAccess()
+    // A manager keeps read access to a disabled ZEV but loses write access
     // (backend: BaseZevScopedPermission.has_object_permission) — an admin
-    // can still edit. Mirrored here across every control; the backend
-    // enforces it regardless.
-    const readOnly = isDisabled && !isAdmin
+    // can still edit. A viewer never writes (#761). Mirrored here across every
+    // control; the backend enforces it regardless.
+    const disabledForMe = isDisabled && !isAdmin
+    const readOnly = disabledForMe || !canManage
 
     const selectedZevIdRef = useRef(selectedZevId)
     const draftRef = useRef(draft)
@@ -383,6 +387,7 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                     <Tabs.Tab value="general">{t('pages.zevSettings.tabs.general')}</Tabs.Tab>
                     <Tabs.Tab value="billing">{t('pages.zevSettings.tabs.billingPayment')}</Tabs.Tab>
                     <Tabs.Tab value="documents">{t('pages.zevSettings.tabs.documentsEmails')}</Tabs.Tab>
+                    <Tabs.Tab value="access">{t('pages.zevSettings.tabs.access')}</Tabs.Tab>
                     <Tabs.Tab value="audit">{t('pages.zevSettings.tabs.auditLog')}</Tabs.Tab>
                     <Tabs.Tab value="export">{t('pages.zevSettings.tabs.exportTransfer')}</Tabs.Tab>
                 </Tabs.List>
@@ -449,6 +454,10 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                     </section>
                 </Tabs.Panel>
 
+                <Tabs.Panel value="access">
+                    <ZevAccessSection zevId={selectedZevId} canManage={canManage && !disabledForMe} />
+                </Tabs.Panel>
+
                 <Tabs.Panel value="audit">
                     {/* Owner-scoped audit log as a tab of its ZEV (spec §5): the
                         component locks scope to 'owner' — the platform log never
@@ -476,7 +485,7 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                         </div>
                     </section>
 
-                    {!isDisabled && (
+                    {!isDisabled && canManage && (
                         <section className="card page-stack">
                             <div>
                                 <h3 style={{ marginTop: 0 }}>{t('pages.zevSettings.lifecycle.disableSectionTitle')}</h3>
@@ -524,10 +533,10 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                         </button>
                         <button
                             className="button button-primary"
-                            type={tab === 'audit' || tab === 'export' ? 'button' : 'submit'}
-                            form={tab === 'audit' || tab === 'export' ? undefined : 'zev-settings-form'}
+                            type={tab === 'audit' || tab === 'export' || tab === 'access' ? 'button' : 'submit'}
+                            form={tab === 'audit' || tab === 'export' || tab === 'access' ? undefined : 'zev-settings-form'}
                             disabled={readOnly || isPending || !isDirty}
-                            onClick={tab === 'audit' || tab === 'export' ? attemptSave : undefined}
+                            onClick={tab === 'audit' || tab === 'export' || tab === 'access' ? attemptSave : undefined}
                         >
                             {t('pages.zevSettings.saveChanges')}
                         </button>

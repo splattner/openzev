@@ -12,6 +12,7 @@ import {
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
+import { shellRoleForZev } from '../lib/communityAccess'
 import { PdfPreview } from '../components/PdfPreview'
 import { InvoiceAccessLinkCard } from '../features/invoices/InvoiceAccessLinkCard'
 
@@ -25,7 +26,8 @@ export function InvoiceDetailPage() {
     const { settings } = useAppSettings()
     // Participants reach this page for their own invoices; revoking is a
     // management control and must not be offered to the person holding the QR.
-    const canManageAccessLink = user?.role === 'admin' || user?.role === 'zev_owner'
+    // Decided by the invoice's own community, which need not be the selected
+    // one (an account may manage one ZEV and rent in another, #761).
 
     const invoiceQuery = useQuery({
         queryKey: queryKeys.invoices.detail(invoiceId as string),
@@ -62,7 +64,9 @@ export function InvoiceDetailPage() {
     // Return link follows its origin (the invoice period it came from, or My
     // invoices); participants without
     // one fall back to /me/invoices.
-    const isParticipant = user?.role === 'participant'
+    const invoiceShellRole = shellRoleForZev(user, invoiceQuery.data?.zev)
+    const canManageAccessLink = invoiceShellRole === 'admin' || invoiceShellRole === 'manager'
+    const isParticipant = invoiceShellRole === 'participant' || invoiceShellRole === 'former'
     const origin = (location.state as { from?: string; period_start?: string; period_end?: string } | null)
     const isoDay = /^\d{4}-\d{2}-\d{2}$/
     const originPeriod =
@@ -163,12 +167,12 @@ export function InvoiceDetailPage() {
                         <p className="muted" style={{ margin: 0 }}>
                             {generateError ? <span className="text-error">{t('pdf.generateError')}</span> : t('pdf.noDocument')}
                         </p>
-                        {/* PDF generation is owner/admin-only (403 for participants). */}
-                        {isParticipant ? null : (
+                        {/* PDF generation takes a manager of the invoice's ZEV (#761). */}
+                        {canManageAccessLink ? (
                             <button className="button" type="button" disabled={generating || pdfLoading} onClick={handleGeneratePdf}>
                                 {generating ? t('common.loading') : t('pages.invoiceDetail.generatePdf')}
                             </button>
-                        )}
+                        ) : null}
                     </div>
                 )}
             </section>

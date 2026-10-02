@@ -3,6 +3,8 @@ import { EmptyState } from '../../components/EmptyState'
 
 type MeteringPointsEmptyStateProps = {
   canManageMeteringPoints: boolean
+  /** A viewer reads only (#761): no create action. */
+  readOnly?: boolean
   hasFilters: boolean
   onOpenCreateModal: () => void
   onClearFilters: () => void
@@ -10,6 +12,7 @@ type MeteringPointsEmptyStateProps = {
 
 export function MeteringPointsEmptyState({
   canManageMeteringPoints,
+  readOnly = false,
   hasFilters,
   onOpenCreateModal,
   onClearFilters,
@@ -35,7 +38,7 @@ export function MeteringPointsEmptyState({
       titleKey="pages.meteringPoints.emptyState.title"
       descriptionKey="pages.meteringPoints.emptyState.description"
       actions={
-        canManageMeteringPoints
+        canManageMeteringPoints && !readOnly
           ? [
               {
                 labelKey: 'pages.meteringPoints.emptyState.createAction' as const,

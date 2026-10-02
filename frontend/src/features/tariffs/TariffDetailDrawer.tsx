@@ -42,6 +42,8 @@ type TariffDetailDrawerProps = {
     onNewVersion: (series: TariffSeries, source: TariffVersion) => void
     onDuplicate: (series: TariffSeries, source: TariffVersion) => void
     onRenameSeries: (series: TariffSeries, source: TariffVersion) => void
+    /** A viewer reads only (#761): no version, edit, rename, duplicate, delete or band changes. */
+    readOnly?: boolean
 }
 
 /**
@@ -68,6 +70,7 @@ export function TariffDetailDrawer({
     onNewVersion,
     onDuplicate,
     onRenameSeries,
+    readOnly = false,
 }: TariffDetailDrawerProps) {
     const { t } = useTranslation()
     const monthNames = MONTH_KEYS.map(
@@ -205,6 +208,7 @@ export function TariffDetailDrawer({
                 </header>
 
                 <div className="tariff-drawer-body page-stack">
+                    {!readOnly && (
                     <div className="tariff-drawer-actions actions-row actions-row-wrap">
                         <button
                             className="button button-primary button-compact"
@@ -235,6 +239,7 @@ export function TariffDetailDrawer({
                             {t('pages.tariffs.versions.duplicate')}
                         </button>
                     </div>
+                    )}
 
                     <div className="tariff-card-summary-row">
                         {!usesPeriods && (
@@ -307,6 +312,7 @@ export function TariffDetailDrawer({
                                             follow-up to adding a new one, and going through "select
                                             the row, then use the actions above" made it look
                                             unsupported. */}
+                                        {!readOnly && (<>
                                         <button
                                             className="button button-secondary button-compact"
                                             type="button"
@@ -326,6 +332,7 @@ export function TariffDetailDrawer({
                                         >
                                             <FontAwesomeIcon icon={faTrash} fixedWidth />
                                         </button>
+                                        </>)}
                                     </div>
                                 )
                             })}
@@ -388,14 +395,16 @@ export function TariffDetailDrawer({
                                             : t('pages.tariffs.openEnded')}
                                     </span>
                                 </div>
-                                <button
-                                    className="button button-secondary button-compact"
-                                    type="button"
-                                    onClick={() => onOpenCreatePeriodModal(shown.id)}
-                                >
-                                    <FontAwesomeIcon icon={faPlus} fixedWidth />
-                                    {t('pages.tariffs.addPeriod')}
-                                </button>
+                                {!readOnly && (
+                                    <button
+                                        className="button button-secondary button-compact"
+                                        type="button"
+                                        onClick={() => onOpenCreatePeriodModal(shown.id)}
+                                    >
+                                        <FontAwesomeIcon icon={faPlus} fixedWidth />
+                                        {t('pages.tariffs.addPeriod')}
+                                    </button>
+                                )}
                             </div>
 
                             {shown.periods.length === 0 ? (
@@ -435,6 +444,7 @@ export function TariffDetailDrawer({
                                                 </div>
                                             </div>
 
+                                            {!readOnly && (
                                             <div className="tariff-period-actions">
                                                 <button className="button button-secondary button-compact" type="button" onClick={() => onEditPeriod(period)}>
                                                     <FontAwesomeIcon icon={faPen} fixedWidth />
@@ -450,6 +460,7 @@ export function TariffDetailDrawer({
                                                     {t('common.delete')}
                                                 </button>
                                             </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>

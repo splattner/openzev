@@ -1,12 +1,12 @@
-import { useAuth } from '../lib/auth'
+import { useCommunityAccess } from '../lib/communityAccess'
 import { DashboardPage } from './DashboardPage'
 import { OverviewPage } from './OverviewPage'
 
-/** Role-aware start page: operational work for managers, the existing
- * personal dashboard for participants. */
+/** Start page by the account's relation to the selected community (#761):
+ * operational work for admins, managers and viewers, the personal dashboard
+ * for participants. */
 export function HomePage() {
-    const { user } = useAuth()
-    const canManage = user?.role === 'admin' || user?.role === 'zev_owner'
+    const { isZevScope } = useCommunityAccess()
 
-    return canManage ? <OverviewPage /> : <DashboardPage />
+    return isZevScope ? <OverviewPage /> : <DashboardPage />
 }

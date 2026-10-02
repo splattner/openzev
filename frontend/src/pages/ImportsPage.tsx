@@ -22,6 +22,7 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { businessDayStartMs, nextIsoDate } from '../lib/dates'
 import { useManagedZev } from '../lib/managedZev'
+import { useCommunityAccess } from '../lib/communityAccess'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 import type { ImportLog, ImportTimestampTimezone } from '../types/api'
@@ -64,6 +65,9 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
     const { settings } = useAppSettings()
     const { selectedZevId, selectedZev } = useManagedZev()
+    // A viewer sees the import history and its protocols, but imports and
+    // deletes nothing (#761).
+    const { canManage } = useCommunityAccess()
     const { t } = useTranslation()
 
     const { data, isLoading, isError, error: logsError, refetch: refetchLogs } = useQuery({ queryKey: queryKeys.metering.importLogs(), queryFn: fetchImportLogs })
@@ -351,7 +355,8 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     )
 
     const importLogColumns = useMemo<ColumnDef<(typeof importLogRows)[number], unknown>[]>(
-        () => [
+        () => {
+            const columns: ColumnDef<(typeof importLogRows)[number], unknown>[] = [
             {
                 accessorKey: 'created_at',
                 header: t('pages.imports.columns.created'),
@@ -437,8 +442,10 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                     />
                 ),
             },
-        ],
-        [t, settings, confirm, deleteImportMutation, dialogLoading],
+        ]
+            return canManage ? columns : columns.filter((column) => column.id !== 'actions')
+        },
+        [t, settings, confirm, deleteImportMutation, dialogLoading, canManage],
     )
 
     function clearDetection() {
@@ -807,6 +814,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                 </header>
             )}
 
+            {canManage && (
             <section className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 <div>
                     <h3 style={{ marginBottom: '0.3rem' }}>{t('pages.imports.startTitle')}</h3>
@@ -825,6 +833,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                     )}
                 </div>
             </section>
+            )}
 
             {wizardOpen && (
                 <ImportWizardModal
@@ -886,7 +895,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                 getRowId={(row) => row.id}
                 filters={historyFilters}
                 onFiltersChange={setHistoryFilters}
-                onNewImport={() => setWizardOpen(true)}
+                onNewImport={canManage ? () => setWizardOpen(true) : undefined}
             />
 
             <BulkDeleteModal

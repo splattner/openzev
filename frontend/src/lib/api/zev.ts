@@ -1,5 +1,9 @@
 import type {
   GridOperatorList,
+  ZevAccessGrant,
+  ZevAccessGrantCreated,
+  ZevAccessGrantInput,
+  ZevAccessRole,
   GridOperatorSuggestion,
   MeteringPoint,
   MeteringPointAssignment,
@@ -128,6 +132,13 @@ export async function downloadParticipantContractPdf(participantId: string, file
   downloadBlob(response.data as Blob, filename)
 }
 
+/** The latest already-issued contract, without issuing a new version — what a
+ * viewer may download (#761). The backend answers 404 before the first issue. */
+export async function downloadIssuedParticipantContractPdf(participantId: string, filename: string): Promise<void> {
+  const response = await api.get(`/zev/participants/${participantId}/contract-pdf/`, { responseType: 'blob' })
+  downloadBlob(response.data as Blob, filename)
+}
+
 /**
  * Whether `FeatureFlag.PARTICIPANT_GEOCODING_ENABLED` is on — checked by any
  * authenticated role, mirroring `fetchFeasibilityCalculatorEnabled`. Off by
@@ -202,4 +213,36 @@ export async function updateMeteringPointAssignment(id: string, payload: Partial
 
 export async function deleteMeteringPointAssignment(id: string): Promise<void> {
   await api.delete(`/zev/metering-point-assignments/${id}/`)
+}
+
+// ── Access to a ZEV (#761) ────────────────────────────────────────────────
+
+export async function fetchZevAccess(zevId: string, { includeEnded = false } = {}): Promise<ZevAccessGrant[]> {
+  const { data } = await api.get<ZevAccessGrant[]>(`/zev/zevs/${zevId}/access/`, {
+    params: includeEnded ? { include_ended: 'true' } : undefined,
+  })
+  return data
+}
+
+export async function createZevAccess(zevId: string, input: ZevAccessGrantInput): Promise<ZevAccessGrantCreated> {
+  const { data } = await api.post<ZevAccessGrantCreated>(`/zev/zevs/${zevId}/access/`, input)
+  return data
+}
+
+export async function updateZevAccess(
+  zevId: string,
+  grantId: string,
+  input: { role?: ZevAccessRole; valid_to?: string | null },
+): Promise<ZevAccessGrant> {
+  const { data } = await api.patch<ZevAccessGrant>(`/zev/zevs/${zevId}/access/${grantId}/`, input)
+  return data
+}
+
+export async function revokeZevAccess(zevId: string, grantId: string): Promise<void> {
+  await api.delete(`/zev/zevs/${zevId}/access/${grantId}/`)
+}
+
+export async function resendZevInvitation(zevId: string, grantId: string): Promise<{ email_sent: boolean }> {
+  const { data } = await api.post<{ email_sent: boolean }>(`/zev/zevs/${zevId}/access/${grantId}/resend-invitation/`)
+  return data
 }

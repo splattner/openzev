@@ -22,6 +22,8 @@ type TariffCategorySectionsProps = {
     /** The series currently shown in the detail drawer, so its card can be highlighted. */
     openSeriesKey: string | null
     onEditTariff: (tariff: Tariff) => void
+    /** A viewer reads only (#761): no Edit. */
+    readOnly?: boolean
     onOpenDetail: (series: TariffSeries) => void
 }
 
@@ -36,6 +38,7 @@ export function TariffCategorySections({
     settings,
     openSeriesKey,
     onEditTariff,
+    readOnly = false,
     onOpenDetail,
 }: TariffCategorySectionsProps) {
     const { t } = useTranslation()
@@ -130,10 +133,12 @@ export function TariffCategorySections({
                                         </div>
 
                                         <div className="tariff-card-actions">
-                                            <button className="button button-secondary button-compact" type="button" onClick={() => onEditTariff(active)}>
-                                                <FontAwesomeIcon icon={faPen} fixedWidth />
-                                                {t('common.edit')}
-                                            </button>
+                                            {!readOnly && (
+                                                <button className="button button-secondary button-compact" type="button" onClick={() => onEditTariff(active)}>
+                                                    <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                    {t('common.edit')}
+                                                </button>
+                                            )}
                                             <button
                                                 className="button button-primary button-compact"
                                                 type="button"

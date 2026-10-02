@@ -3,6 +3,7 @@ import { faEnvelope, faRotate } from '@fortawesome/free-solid-svg-icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useCommunityAccess } from '../lib/communityAccess'
 import { EmailLogsModal } from '../components/EmailLogsModal'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
@@ -31,6 +32,8 @@ function badgeFor(status: string | null | undefined): string {
 }
 
 export function BillingEmailsPage() {
+    // Retrying a delivery is a write: a viewer sees the history only (#761).
+    const { canManage } = useCommunityAccess()
     const { t } = useTranslation()
     const { settings } = useAppSettings()
     const { selectedZevId, isLoading: managedZevLoading } = useManagedZev()
@@ -172,7 +175,7 @@ export function BillingEmailsPage() {
                                                     ? t('common.loading')
                                                     : t('pages.billingEmails.viewHistory')}
                                             </button>
-                                            {invoice.last_email_status === 'failed' && invoice.last_email_log_id && (
+                                            {canManage && invoice.last_email_status === 'failed' && invoice.last_email_log_id && (
                                                 <button
                                                     type="button"
                                                     className="button button-primary button-compact"
@@ -200,9 +203,9 @@ export function BillingEmailsPage() {
                 emailLogs={historyLogs}
                 isOpen={historyInvoice !== null}
                 onClose={() => setHistoryInvoice(null)}
-                onRetry={(emailLogId) => {
+                onRetry={canManage ? (emailLogId) => {
                     if (historyInvoice) retryMutation.mutate({ invoice: historyInvoice, emailLogId })
-                }}
+                } : undefined}
                 isRetrying={retryMutation.isPending}
             />
         </div>

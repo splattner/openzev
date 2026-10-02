@@ -11,6 +11,7 @@ import { useMeteringPointActions } from '../features/meteringPoints/useMeteringP
 import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
+import { useCommunityAccess } from '../lib/communityAccess'
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -20,7 +21,10 @@ export function MeteringPointsPage() {
     const participantScopeName = user?.zev_count === 1 ? user?.zev_name : undefined
     const { settings } = useAppSettings()
     const { t } = useTranslation()
-    const canManageMeteringPoints = user?.role === 'admin' || user?.role === 'zev_owner'
+    // The management view (scope) is open to viewers; writes need a manager (#761).
+    const { isZevScope, canManage } = useCommunityAccess()
+    const canManageMeteringPoints = isZevScope
+    const readOnly = !canManage
 
     const {
         meteringPointsQuery,
@@ -145,6 +149,7 @@ export function MeteringPointsPage() {
 
             <MeteringPointsToolbar
                 canManageMeteringPoints={canManageMeteringPoints}
+                        readOnly={readOnly}
                 totalCount={scopedMeteringPoints.length}
                 activeCount={activeCount}
                 inactiveCount={inactiveCount}
@@ -201,6 +206,7 @@ export function MeteringPointsPage() {
                 {scopedMeteringPoints.length === 0 ? (
                     <MeteringPointsEmptyState
                         canManageMeteringPoints={canManageMeteringPoints}
+                        readOnly={readOnly}
                         hasFilters={false}
                         onOpenCreateModal={openCreateMpModal}
                         onClearFilters={() => undefined}
@@ -208,6 +214,7 @@ export function MeteringPointsPage() {
                 ) : meteringPoints.length === 0 ? (
                     <MeteringPointsEmptyState
                         canManageMeteringPoints={canManageMeteringPoints}
+                        readOnly={readOnly}
                         hasFilters={hasFilters}
                         onOpenCreateModal={openCreateMpModal}
                         onClearFilters={clearFilters}
@@ -221,6 +228,7 @@ export function MeteringPointsPage() {
                         healthByMeteringPoint={meteringPointHealthById}
                         holderLessByMeteringPoint={meteringPointHolderLessById}
                         canManageMeteringPoints={canManageMeteringPoints}
+                        readOnly={readOnly}
                         canDeleteData={user?.role === 'admin'}
                         deleteMeteringPointPending={deleteMpMutation.isPending}
                         deleteAssignmentPending={deleteAssignMutation.isPending}

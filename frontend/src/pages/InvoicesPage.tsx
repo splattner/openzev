@@ -25,6 +25,7 @@ import { fetchInvoicePeriodOverview } from '../lib/api/invoices'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
+import { useCommunityAccess } from '../lib/communityAccess'
 
 /**
  * The period-scoped invoice table (Billing hub → Invoices tab since phase 3).
@@ -152,7 +153,14 @@ export function InvoicesPage({ embedded = false }: { embedded?: boolean }) {
         return row.invoice.pdf_status === 'pending'
     }
 
-    const isOwnerOrAdmin = user?.role === 'admin' || user?.role === 'zev_owner'
+    const { isZevScope: isOwnerOrAdmin, canManage } = useCommunityAccess()
+    // A viewer sees the period and may download the PDFs, but generates,
+    // approves, sends and deletes nothing (#761): only navigation stays.
+    const READ_ONLY_ROW_ITEMS = new Set(['review-conflict'])
+    const primaryRowAction = canManage ? getPrimaryRowAction : () => null
+    const rowMenuItems = canManage
+        ? getRowMenuItems
+        : (row: Parameters<typeof getRowMenuItems>[0]) => getRowMenuItems(row).filter((item) => READ_ONLY_ROW_ITEMS.has(item.key))
 
     const batchStats = [
         { key: 'invoices', label: t('pages.invoices.batch.summaryInvoices'), value: stats.invoiceCount },
@@ -204,8 +212,8 @@ export function InvoicesPage({ embedded = false }: { embedded?: boolean }) {
                     {isOwnerOrAdmin && (
                         <InvoiceBatchToolbar
                             stats={batchStats}
-                            recommendedAction={recommendedBatchAction}
-                            menuItems={batchMenuItems}
+                            recommendedAction={canManage ? recommendedBatchAction : null}
+                            menuItems={canManage ? batchMenuItems : []}
                             anyBatchPending={anyBatchPending}
                             pdfCount={stats.pdfCount}
                             onDownloadAll={() => downloadAllPdfsMutation.mutate()}
@@ -221,8 +229,8 @@ export function InvoicesPage({ embedded = false }: { embedded?: boolean }) {
                     <InvoicePeriodRowsTable
                         rows={rows}
                         period={period}
-                        getPrimaryRowAction={getPrimaryRowAction}
-                        getRowMenuItems={getRowMenuItems}
+                        getPrimaryRowAction={primaryRowAction}
+                        getRowMenuItems={rowMenuItems}
                         isPdfPending={isPdfPending}
                     />
                 </>

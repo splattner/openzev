@@ -82,6 +82,7 @@ Admins can create a ZEV together with a new responsible-person account in a sing
 - **Billing & payment** — billing interval, invoice language, payment term,
   invoice presentation, participant QR code, invoice prefix, bank details, VAT
 - **Documents & emails** — invoice email template, notes, contract notes
+- **Access** — who may manage or view this ZEV (see [Access tab](#access-tab))
 - **Audit log** — this ZEV's audit events (see
   [Audit Logs](14-admin-console.md#audit-logs))
 - **Export / transfer** — whole-ZEV export archive (see
@@ -277,13 +278,36 @@ For more details on email delivery, see [Email Configuration](10-email-configura
 
 ## Access Control
 
-ZEV access is controlled via **role assignments**:
+Access to a ZEV is given per community:
 
-| Role | Access |
+| Relation | Access |
 | --- | --- |
 | **Admin** | Global access to all ZEVs, users, and settings |
-| **ZEV Owner** | Full operational management of owned ZEV(s) |
+| **Manager** | Full operational management of this ZEV (the owner is always one) |
+| **Viewer** | Sees everything a manager sees, may download and export, changes nothing |
 | **Participant** | Read-only access to own metering data and invoices |
+
+### Access tab
+
+**ZEV settings → Access** lists everyone who may manage or view this ZEV,
+with their role, since when (and until when) they have access, and who gave
+it. **Invitation pending** marks an account that has not been set up yet.
+Tick **Show ended access** to see access that has ended.
+
+Managers and admins can:
+
+- **Give access** — enter an email address, choose **Manager** or **Viewer**
+  and, if the access should end, a last day. Someone with an OpenZEV account
+  gets access straight away and a notice by email; anyone else gets an
+  invitation email to set up their account.
+- **Make manager** / **Make viewer** — change someone's role. Making a manager
+  a viewer asks for confirmation.
+- **Resend invitation** — for an invitation that has not been accepted.
+- **Remove access** — ends the access immediately, after a confirmation.
+
+A ZEV always keeps at least one manager: removing the last one, or making them
+a viewer, is refused. Viewers see the list but cannot change it. Every change
+is recorded in the ZEV's audit log.
 
 Admins manage user accounts in **Platform → Accounts**.
 
@@ -301,7 +325,7 @@ If running multiple ZEVs:
 
 1. **ZEV switcher:** Use the ZEV switcher at the top of the sidebar (top-left); the selected community is also shown above the page title on every page. Under Platform pages (`/admin/*`) the switcher is replaced by the **Platform administration** indicator — enter a ZEV via **Platform → Overview → ZEVs → Manage** instead
 2. **Each ZEV is independent:** Tariffs, participants, and invoices are isolated
-3. **Owners can manage one or more ZEVs:** Admin can assign ownership of additional ZEVs
+3. **One account, several communities:** an account can manage or view several ZEVs and take part in others; the switcher lists each with your relation to it
 
 ## Next Steps
 

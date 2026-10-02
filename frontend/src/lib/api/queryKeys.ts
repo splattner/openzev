@@ -22,6 +22,7 @@ export const queryKeys = {
     gridOperators: () => ['zev', 'grid-operators'] as const,
     gridOperatorSuggestions: (postalCode: string) => ['zev', 'grid-operators', 'suggest', postalCode] as const,
     participantGeocodingEnabled: () => ['zev', 'participant-geocoding-enabled'] as const,
+    access: (zevId: string, includeEnded = false) => ['zev', 'access', zevId, includeEnded] as const,
   },
   tariffs: {
     series: (zevId?: string) => ['tariffs', 'series', zevId ?? 'all'] as const,

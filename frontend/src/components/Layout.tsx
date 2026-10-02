@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, matchPath, useLocation, useMatch, useNavigate } 
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
+import { useCommunityAccess } from '../lib/communityAccess'
 import { fetchUsers } from '../lib/api/auth'
 import { fetchFeasibilityCalculatorEnabled } from '../lib/api/feasibility'
 import { queryKeys } from '../lib/api/queryKeys'
@@ -41,7 +42,14 @@ function SidebarLink({ to, label, icon, active, end, className }: {
 export function Layout() {
     const { t } = useTranslation()
     const { user, logout, isImpersonating, impersonator, stopImpersonation } = useAuth()
-    const { managedZevs, selectedZevId, selectedZev, isSelectable, isLoading: managedZevLoading, setSelectedZevId } = useManagedZev()
+    const { entries: providedEntries, managedZevs, selectedZevId, selectedZev, isSelectable, isLoading: managedZevLoading, setSelectedZevId } = useManagedZev()
+    // A context without `entries` (the shape before #761) lists the readable ZEVs.
+    const entries = providedEntries ?? managedZevs.map((zev) => ({
+        id: zev.id,
+        name: zev.name,
+        relation: user?.role === 'admin' ? ('admin' as const) : ('manager' as const),
+    }))
+    const { shellRole, isZevScope, isParticipantScope } = useCommunityAccess()
     const usersQuery = useQuery({
         queryKey: queryKeys.auth.users(),
         queryFn: fetchUsers,
@@ -53,7 +61,7 @@ export function Layout() {
     const feasibilityEnabledQuery = useQuery({
         queryKey: queryKeys.feasibility.enabled(),
         queryFn: fetchFeasibilityCalculatorEnabled,
-        enabled: user?.role === 'admin' || user?.role === 'zev_owner',
+        enabled: isZevScope,
         staleTime: 5 * 60 * 1000,
     })
     const location = useLocation()
@@ -137,8 +145,11 @@ export function Layout() {
     }, [isUserMenuOpen, isZevMenuOpen, isMobileMenuOpen])
 
     const displayName = `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || user?.username || ''
-    const canManage = user?.role === 'admin' || user?.role === 'zev_owner'
-    const isParticipant = user?.role === 'participant'
+    // What the shell shows follows the account's relation to the selected
+    // community, not a platform role (#761).
+    const canManage = isZevScope
+    const isFormerParticipant = shellRole === 'former'
+    const selectedEntry = entries.find((entry) => entry.id === selectedZevId)
     // Hub entries light on their sub-routes (chart/quality/imports are tabs
     // of the metering hub since phase 3).
     const meteringChartActive = useMatch('/metering/chart') != null
@@ -225,7 +236,7 @@ export function Layout() {
 
                     {/* Exactly one managed community means there is nothing to
                         switch — the page eyebrows carry the name instead. */}
-                    {canManage && !isPlatformScope && managedZevs.length !== 1 && (
+                    {(canManage || entries.length > 1) && !isPlatformScope && entries.length !== 1 && (
                         <div
                             className="user-menu zev-menu sidebar-zev-menu"
                             ref={zevMenuRef}
@@ -253,8 +264,14 @@ export function Layout() {
                             >
                                 <span className="user-avatar" aria-hidden="true">🏢</span>
                                 <span className="user-meta">
-                                    <strong>{selectedZev?.name || t('nav.noZevSelected')}</strong>
-                                    <small>{selectedZevOwnerName} · {effectiveOwner?.email || '-'}</small>
+                                    <strong>{selectedEntry?.name || selectedZev?.name || t('nav.noZevSelected')}</strong>
+                                    <small>
+                                        {/* The owner when it is known (an admin, or the owner itself);
+                                            otherwise how this account relates to the community. */}
+                                        {selectedZev && effectiveOwner
+                                            ? `${selectedZevOwnerName} · ${effectiveOwner.email || '-'}`
+                                            : selectedEntry ? t(`nav.relation.${selectedEntry.relation}`) : '-'}
+                                    </small>
                                 </span>
                             </button>
 
@@ -265,10 +282,10 @@ export function Layout() {
                                         <div className="zev-dropdown-list">
                                             {managedZevLoading ? (
                                                 <div className="zev-dropdown-item zev-dropdown-item-muted">{t('nav.loadingZevs')}</div>
-                                            ) : managedZevs.length === 0 ? (
+                                            ) : entries.length === 0 ? (
                                                 <div className="zev-dropdown-item zev-dropdown-item-muted">{t('nav.noZevAvailable')}</div>
                                             ) : (
-                                                managedZevs.map((zev) => {
+                                                entries.map((zev) => {
                                                     const isSelected = zev.id === selectedZevId
                                                     return (
                                                         <button
@@ -285,7 +302,10 @@ export function Layout() {
                                                             disabled={!isSelectable && !isSelected}
                                                             aria-current={isSelected ? 'true' : undefined}
                                                         >
-                                                            {zev.name}
+                                                            <span>{zev.name}</span>
+                                                            {zev.relation !== 'admin' && (
+                                                                <small className="zev-dropdown-relation">{t(`nav.relation.${zev.relation}`)}</small>
+                                                            )}
                                                         </button>
                                                     )
                                                 })
@@ -314,7 +334,7 @@ export function Layout() {
                             </>
                         )}
 
-                        {isParticipant && (
+                        {isParticipantScope && !isFormerParticipant && (
                             <>
                                 <SidebarLink to="/" label={t('nav.dashboard')} icon={<DashboardIcon />} />
 
@@ -322,6 +342,11 @@ export function Layout() {
 
                                 <SidebarLink to="/me/statement" label={t('nav.annualStatement')} icon={<ReportsIcon />} />
                             </>
+                        )}
+
+                        {/* A former participant keeps only the invoices it was sent. */}
+                        {isFormerParticipant && (
+                            <SidebarLink to="/me/invoices" label={t('nav.myInvoices')} icon={<InvoiceIcon />} />
                         )}
 
                         {canManage && (

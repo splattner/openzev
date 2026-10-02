@@ -23,8 +23,8 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { todayBusinessIso } from '../lib/dates'
 import { downloadBlob } from '../lib/downloadBlob'
 import { useAppSettings } from '../lib/appSettings'
-import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
+import { useCommunityAccess } from '../lib/communityAccess'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
@@ -39,11 +39,12 @@ export function TariffsPage() {
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
-    const { user } = useAuth()
     const { settings } = useAppSettings()
     const { selectedZevId, selectedZev } = useManagedZev()
     const { t } = useTranslation()
-    const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
+    const { isZevScope, canManage } = useCommunityAccess()
+    const isManagedScope = isZevScope
+    const readOnly = !canManage
     const [validityFilter, setValidityFilter] = useState<TariffValidityFilter>('valid')
     const [showImportModal, setShowImportModal] = useState(false)
     const [searchParams, setSearchParams] = useSearchParams()
@@ -268,7 +269,8 @@ export function TariffsPage() {
                 validityFilter={validityFilter}
                 onValidityFilterChange={setValidityFilter}
                 onOpenCreateTariffModal={openCreateTariffModal}
-                onOpenImportModal={selectedZevId ? () => setShowImportModal(true) : undefined}
+                onOpenImportModal={selectedZevId && !readOnly ? () => setShowImportModal(true) : undefined}
+                readOnly={readOnly}
                 onDownloadOverview={selectedZevId ? () => overviewMutation.mutate() : undefined}
                 overviewBusy={overviewMutation.isPending}
             />
@@ -318,7 +320,7 @@ export function TariffsPage() {
             />
 
             {tariffs.length === 0 ? (
-                <TariffEmptyState onOpenCreateTariffModal={openCreateTariffModal} />
+                <TariffEmptyState onOpenCreateTariffModal={openCreateTariffModal} readOnly={readOnly} />
             ) : visibleSeries.length === 0 ? (
                 <section className="card" style={{ display: 'grid', gap: '0.75rem' }}>
                     <h3 style={{ margin: 0 }}>{t('pages.tariffs.noResults.title')}</h3>
@@ -336,6 +338,7 @@ export function TariffsPage() {
                     openSeriesKey={openSeries ? seriesKeyOf(openSeries) : null}
                     onEditTariff={startTariffEdit}
                     onOpenDetail={openDetail}
+                    readOnly={readOnly}
                 />
             )}
 
@@ -356,6 +359,7 @@ export function TariffsPage() {
                 onNewVersion={versions.openNewVersion}
                 onDuplicate={versions.openDuplicate}
                 onRenameSeries={versions.openRename}
+                readOnly={readOnly}
             />
 
             {dialog && (

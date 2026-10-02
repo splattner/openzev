@@ -10,6 +10,7 @@ import { formatMeteringBucketLabel } from '../lib/meteringLabels'
 import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
+import { useCommunityAccess } from '../lib/communityAccess'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { StatCard } from '../components/StatCard'
 import { PeriodSelector } from '../components/PeriodSelector'
@@ -25,14 +26,18 @@ export function DashboardPage() {
     const { t } = useTranslation()
     const { user } = useAuth()
     const { settings } = useAppSettings()
-    const { managedZevs, selectedZevId, selectedZev, isLoading: managedZevLoading } = useManagedZev()
+    const { managedZevs, entries, selectedZevId, selectedZev, isLoading: managedZevLoading } = useManagedZev()
+    const { isZevScope, isParticipantScope } = useCommunityAccess()
 
     const interval: BillingInterval = (selectedZev?.billing_interval as BillingInterval) ?? 'monthly'
     const [period, setPeriod] = useState<{ from: string; to: string }>(() => getCurrentBillingPeriod(interval))
     const [bucket, setBucket] = useState<'day' | 'hour' | 'month'>('day')
     const [selectedParticipantId, setSelectedParticipantId] = useState('')
 
-    const isZevScopedRole = user?.role === 'admin' || user?.role === 'zev_owner'
+    const isZevScopedRole = isZevScope
+    // A participant of several communities sees the selected one (#761); with a
+    // single membership the request stays as it always was.
+    const participantZevId = isParticipantScope && (entries?.length ?? 0) > 1 ? selectedZevId : undefined
     const formatBucketLabel = (value: string) => formatMeteringBucketLabel(value, bucket, settings)
     const formatBucketTooltipLabel = (label: unknown) => formatBucketLabel(String(label ?? ''))
 
@@ -57,17 +62,17 @@ export function DashboardPage() {
                 dateFrom: period.from,
                 dateTo: period.to,
                 bucket,
-                zevId: isZevScopedRole ? selectedZevId : undefined,
+                zevId: isZevScopedRole ? selectedZevId : participantZevId,
                 participantId: isZevScopedRole && selectedParticipantId ? selectedParticipantId : undefined,
             }),
-        enabled: user?.role === 'participant' || (isZevScopedRole && !!selectedZevId),
+        enabled: isParticipantScope || (isZevScopedRole && !!selectedZevId),
     })
     const invoicesQuery = useQuery({
         queryKey: queryKeys.invoices.list(),
         queryFn: () => fetchInvoices(),
         // Managers use Overview's period cards. Participants still receive
         // their own invoices here from the role-scoped endpoint.
-        enabled: user?.role === 'participant',
+        enabled: isParticipantScope,
     })
     const hourlyProfileQuery = useQuery({
         queryKey: queryKeys.metering.hourlyProfile(period.from, period.to, selectedZevId || undefined, selectedParticipantId || undefined),
@@ -75,10 +80,10 @@ export function DashboardPage() {
             fetchHourlyProfile({
                 dateFrom: period.from,
                 dateTo: period.to,
-                zevId: isZevScopedRole ? selectedZevId : undefined,
+                zevId: isZevScopedRole ? selectedZevId : participantZevId,
                 participantId: isZevScopedRole && selectedParticipantId ? selectedParticipantId : undefined,
             }),
-        enabled: user?.role === 'participant' || (isZevScopedRole && !!selectedParticipantId),
+        enabled: isParticipantScope || (isZevScopedRole && !!selectedParticipantId),
     })
 
     const summary = summaryQuery.data
@@ -157,7 +162,7 @@ export function DashboardPage() {
                 <p className="muted">{t(isZevScopedRole ? 'pages.energyBalancePage.description' : 'dashboard.description')}</p>
             </header>
 
-            {(user?.role === 'admin' || user?.role === 'zev_owner') && (
+            {isZevScope && (
                 <section className="card">
                     <div className="grid">
                         <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={setPeriod} />
@@ -187,7 +192,7 @@ export function DashboardPage() {
                 </section>
             )}
 
-            {user?.role === 'participant' && (
+            {isParticipantScope && (
                 <section className="card">
                     <div className="grid">
                         <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={setPeriod} />

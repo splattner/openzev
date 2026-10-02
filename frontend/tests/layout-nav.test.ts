@@ -69,8 +69,12 @@ function mockSession(role: UserRole, impersonating = false, managedZevCount = 2)
     // so the sidebar switcher renders (it hides for exactly one — there is
     // nothing to switch).
     const manages = role === 'admin' || role === 'zev_owner'
+    const managedZevs = manages ? [ZEV, SECOND_ZEV].slice(0, managedZevCount) : []
     mockManagedZev.mockReturnValue({
-        managedZevs: manages ? [ZEV, SECOND_ZEV].slice(0, managedZevCount) : [],
+        managedZevs,
+        // What the provider lists for the switcher (#761): an owner's
+        // communities as a manager, every one for an admin.
+        entries: managedZevs.map((zev) => ({ id: zev.id, name: zev.name, relation: role === 'admin' ? 'admin' : 'manager' })),
         selectedZevId: manages ? 1 : '',
         selectedZev: manages ? ZEV : null,
         isSelectable: role === 'admin' || (role === 'zev_owner' && managedZevCount > 1),

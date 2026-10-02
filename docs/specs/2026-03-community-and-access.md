@@ -1318,14 +1318,23 @@ render `/zev-settings` through `AppRoutes` must use the data-router setup —
 2. If not authenticated → redirect to `/login`.
 3. If `must_change_password` and not impersonating and not on `/account` →
    redirect to `/account`.
-4. If `allowedRoles` specified and user role not in list → redirect to `/`.
+4. If `allowedRoles` (a `ShellRole[]`) is specified and the account's shell
+   role for the selected community (`useCommunityAccess().shellRole`, §9.4) is
+   not in the list → redirect to `/`.
 5. Otherwise → render children.
 
 ### 9.2 Route → role mapping
 
+Allowed roles are **shell roles** (`ShellRole` in `lib/communityAccess.ts`:
+`admin` · `manager` · `viewer` · `participant` · `former` · `none`), the
+account's relation to the selected community (§9.4). "ZEV scope" below is
+`ZEV_SCOPE = ['admin', 'manager', 'viewer']` in `AppRoutes.tsx`; a viewer
+reaches every ZEV-scope route and sees its pages read-only
+(SPEC-2026-10-zev-access-grants §9.5).
+
 | Route | Allowed roles | Page component |
 |---|---|---|
-| `/` | any authenticated | `HomePage`: `OverviewPage` for `admin` / `zev_owner`; `DashboardPage` for `participant` |
+| `/` | any authenticated | `HomePage`: `OverviewPage` in ZEV scope; `DashboardPage` otherwise |
 | `/dashboard` | any authenticated | `DashboardPage` (manager title/navigation: Energy balance; participant root remains `/`) |
 | `/account` | any authenticated | `AccountProfilePage` — tabs `profile` (default) · `security` (password, linked accounts, two-factor) · `api-keys`, chosen by `?tab=`; a forced password change and an OAuth link return open `security` (`resolveAccountTab`) |
 | `/admin` | `admin` | `AdminOverviewHubPage` (tabs = routes; default tab `overview`) |
@@ -1339,28 +1348,28 @@ render `/zev-settings` through `AppRoutes` must use the data-router setup —
 | `/admin/templates/pdf` · `/admin/templates/email` | `admin` | `AdminTemplatesHubPage tab=…` |
 | `/admin/pdf-templates` | `admin` | alias → `/admin/templates/pdf` |
 | `/admin/email-templates` | `admin` | alias → `/admin/templates/email` |
-| `/participants` | `admin`, `zev_owner` | `ParticipantsPage` |
-| `/zev-settings` | `admin`, `zev_owner` | `ZevSettingsTabRoute` → `ZevSettingsPage` (General tab) |
-| `/zev-settings/:tab` (`general` · `billing` · `documents` · `audit` · `export`) | `admin`, `zev_owner` | `ZevSettingsTabRoute` → `ZevSettingsPage tab=…` (audit tab embeds `AuditLogsPage scope="owner"`; export tab keeps the transfer archive) |
-| `/audit-logs` | `admin`, `zev_owner` | alias → `/zev-settings/audit` (owner-scoped log in the settings hub) |
+| `/participants` | ZEV scope | `ParticipantsPage` |
+| `/zev-settings` | ZEV scope | `ZevSettingsTabRoute` → `ZevSettingsPage` (General tab) |
+| `/zev-settings/:tab` (`general` · `billing` · `documents` · `access` · `audit` · `export`) | ZEV scope | `ZevSettingsTabRoute` → `ZevSettingsPage tab=…` (access tab lists and manages grants, SPEC-2026-10-zev-access-grants §9.6; audit tab embeds `AuditLogsPage scope="owner"`; export tab keeps the transfer archive) |
+| `/audit-logs` | ZEV scope | alias → `/zev-settings/audit` (owner-scoped log in the settings hub) |
 | `/metering/points` | any authenticated | `MeteringPointsPage` (read-only for participants, no nav entry) |
 | `/metering-points` | any authenticated | alias → `/metering/points` |
 | `/metering/chart` | any authenticated | `MeteringChartPage` (`tab="chart"`, wrapped in default-allow `ProtectedRoute` so tab switches don't remount) |
-| `/metering/quality` | `admin`, `zev_owner` | `MeteringChartPage` (`tab="quality"`) — intentional participant restriction: quality shows whole-ZEV severity counts, participant names, and overlap warnings (operator view; backend role-scoping means no leak either way) |
-| `/metering/imports` | `admin`, `zev_owner` | `MeteringChartPage` (`tab="imports"`, embedding `ImportsPage embedded`) |
+| `/metering/quality` | ZEV scope | `MeteringChartPage` (`tab="quality"`) — intentional participant restriction: quality shows whole-ZEV severity counts, participant names, and overlap warnings (operator view; backend role-scoping means no leak either way) |
+| `/metering/imports` | ZEV scope | `MeteringChartPage` (`tab="imports"`, embedding `ImportsPage embedded`) |
 | `/metering-data` | any authenticated | alias → `/metering/chart`, except `?tab=quality` → guarded `/metering/quality`; `tab` is always stripped, remaining params preserved |
-| `/imports` | `admin`, `zev_owner` | alias → `/metering/imports` (query preserved) |
-| `/tariffs` | `admin`, `zev_owner` | `TariffsPage` |
-| `/billing/invoices` · `/billing/emails` | `admin`, `zev_owner` | `BillingHubPage tab=…` (invoices · email delivery/history + retry) |
+| `/imports` | ZEV scope | alias → `/metering/imports` (query preserved) |
+| `/tariffs` | ZEV scope | `TariffsPage` |
+| `/billing/invoices` · `/billing/emails` | ZEV scope | `BillingHubPage tab=…` (invoices · email delivery/history + retry) |
 | `/billing/statements` | any authenticated | alias → `/reports` (the annual-statement ZIP moved there with the other yearly documents) |
-| `/billing/periods` | `admin`, `zev_owner` | compatibility alias → `/`, where period work lives on manager Overview |
-| `/billing/invoices?period_start&period_end` | `admin`, `zev_owner` | deep link from the Overview period table preselects that period |
-| `/billing` | `admin`, `zev_owner` | alias → `/billing/invoices` |
-| `/invoices` | `admin`, `zev_owner` | alias → `/billing/invoices` (query preserved) |
+| `/billing/periods` | ZEV scope | compatibility alias → `/`, where period work lives on manager Overview |
+| `/billing/invoices?period_start&period_end` | ZEV scope | deep link from the Overview period table preselects that period |
+| `/billing` | ZEV scope | alias → `/billing/invoices` |
+| `/invoices` | ZEV scope | alias → `/billing/invoices` (query preserved) |
 | `/invoices/:invoiceId` · `/billing/invoices/:invoiceId` | any authenticated | `InvoiceDetailPage` (own invoices only for participants, backend-enforced) |
-| `/me/statement` | `participant` | `ReportsPage` (participant branch; impersonating admins carry the participant role) |
-| `/me/invoices` | `participant` | `MyInvoicesPage` (own invoices, read-only; reuses the role-scoped invoice list — no new grant, recorded exception 2) |
-| `/reports` | any authenticated | `ReportsPage` (participants: own downloads; owners/admins: annual ZEV report, tax overview, and annual-statement ZIP) |
+| `/me/statement` | `participant` | `ReportsPage` (participant branch; impersonating admins carry the target account's relations) |
+| `/me/invoices` | `participant`, `former` | `MyInvoicesPage` (own invoices, read-only; reuses the role-scoped invoice list — no new grant, recorded exception 2) |
+| `/reports` | ZEV scope, `participant` | `ReportsPage` (participants: own downloads; owners/admins: annual ZEV report, tax overview, and annual-statement ZIP) |
 | `/login` | public | `LoginPage` |
 | `/verify-email` | public | `VerifyEmailPage` |
 
@@ -1374,21 +1383,27 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 
 | Section | Condition |
 |---|---|
-| Overview (`/`), Energy balance (`/dashboard`), Metering (`/metering/chart`, active on `/metering/chart` + `/metering/quality` + `/metering/imports`), Billing (`/billing/invoices`, active on `/billing/*`), Reports | `canManage` = `role == 'admin' \|\| role == 'zev_owner'` ("owner-only in nav" = owner AND admin; the `/reports` route itself still allows participants) |
-| Dashboard (`/`) | `role == 'participant'` |
-| My invoices (`/me/invoices`), Annual statement (`/me/statement`) | `role == 'participant'` (consumption is available on the participant dashboard) |
-| Setup group (participants, metering points `/metering/points`, tariffs, ZEV settings `/zev-settings`) | `canManage` (audit logs live in the ZEV settings hub; no standalone entry) |
-| Feasibility | `canManage` |
+| Overview (`/`), Energy balance (`/dashboard`), Metering (`/metering/chart`, active on `/metering/chart` + `/metering/quality` + `/metering/imports`), Billing (`/billing/invoices`, active on `/billing/*`), Reports | `isZevScope` (shell role `admin`, `manager` or `viewer`; the `/reports` route itself also allows participants) |
+| Dashboard (`/`) | shell role `participant` |
+| My invoices (`/me/invoices`) | shell role `participant` or `former` (a former participant sees only this entry) |
+| Annual statement (`/me/statement`) | shell role `participant` (consumption is available on the participant dashboard) |
+| Setup group (participants, metering points `/metering/points`, tariffs, ZEV settings `/zev-settings`) | `isZevScope` (audit logs live in the ZEV settings hub; no standalone entry) |
+| Feasibility | `isZevScope` |
 | Platform group (four entries: Overview `/admin`, Accounts `/admin/accounts`, Templates `/admin/templates`, System settings `/admin/system-settings`) | `role == 'admin'` (ZEVs/API keys/invoices/audit-logs/pdf+email templates live as hub tabs) |
 
 Overview stays active on `/admin` and its five tab routes, without matching
 Accounts, Templates or System settings.
 
-The ZEV switcher lives at the sidebar top for `canManage` roles (inline
-expander, full sidebar width, expands-first when collapsed, auto-closes on
-entry into platform scope) only when there is something to switch — several
-managed communities, or none (empty state). With exactly one managed
-community it is unmounted; participants get no switcher.
+The community switcher lives at the sidebar top (inline expander, full
+sidebar width, expands-first when collapsed, auto-closes on entry into
+platform scope) only when there is something to switch: it shows for an
+account in ZEV scope or with more than one community, and is unmounted with
+exactly one community. It lists the provider's `entries` (§9.4) — every
+community the account relates to — each with the account's relation below the
+name (`nav.relation.{admin,manager,viewer,participant,former}`, class
+`zev-dropdown-relation`). The trigger's subtitle shows the owner when it is
+known, otherwise the relation. A participant with one community gets no
+switcher, as before.
 The switcher is a keyboard-operable disclosure: opening it focuses the first
 enabled community button (or the empty/loading panel), Escape closes it and
 returns focus to the trigger, selecting a community closes it and restores
@@ -1436,28 +1451,47 @@ The manager Overview uses period cards (`BillingPeriodsPage` and
 `/api/v1/invoices/invoices/readiness/` and `…/attention/` — the contract is
 documented in `2026-03-invoice-lifecycle-and-communication.md` §5.6a.
 
-### 9.4 ManagedZevProvider (global ZEV context)
+### 9.4 ManagedZevProvider (global community context)
 
-`ManagedZevProvider` provides the active ZEV context for all management pages.
+`ManagedZevProvider` / `useManagedZev()` provide the selected community for
+every page (`lib/managedZev.tsx`; the name stays until step 7 of #761).
 
 **Behaviour:**
-- Fetches ZEV list only if `canManageZev` (admin or zev_owner).
-- `admin` → all ZEVs; can switch via dropdown (`isSelectable = true`).
-- `zev_owner` → only owned ZEVs. One ZEV: pin it (`isSelectable = false`).
-  Two or more: switch among them (`isSelectable = true`).
-- `participant` / `guest` → empty list, no selection.
+- `entries: CommunityEntry[]` (`{id, name, relation}`) from
+  `communityEntries(user, zevs)`: an admin → every ZEV with relation `admin`;
+  otherwise one entry per `user.memberships` item (`/auth/me`), its relation
+  from `relationOf` in `lib/membership.ts` (the grant's `manager` / `viewer`,
+  else `participant` while a participant row is live, else `former`); a
+  session without memberships → a `zev_owner`'s own ZEVs as `manager`.
+- `managedZevs`: ZEV records — every ZEV for an admin, the ZEVs with a
+  manager or viewer entry otherwise. The ZEV list is fetched for admins,
+  grant holders, and (transitional) `zev_owner` accounts without memberships.
+- `selectedZev` is the record for the selection, `null` for a
+  participant-only entry; `relation` is the selected entry's relation.
+- `isSelectable`: an admin always; anyone else with more than one entry
+  (`resolveCommunitySelection`). `resolveManagedSelection` remains as the
+  role-only wrapper.
 - The selection is server-authoritative: the account's `User.preferred_zev`
   (saved on every switch) follows the user across browsers. No browser
   storage is used, so one account's choice cannot leak into another session.
-- Resolution order: the session's explicit pick (if still managed) → the
-  account's `preferred_zev` (if still managed) → the first managed ZEV by
-  name. The pick resets on every account change; until the user switches,
-  the server preference wins.
+- Resolution order: the session's explicit pick (if still listed) → the
+  account's `preferred_zev` (if listed) → the first entry by name. The pick
+  resets on every account change; until the user switches, the server
+  preference wins.
 - Switches apply optimistically; `AuthProvider.updatePreferredZev`
   serializes the `PATCH /auth/me/` saves per user so the latest choice wins,
   and session transitions prevent queued saves from dispatching and ignore
   late in-flight responses. A failed save keeps the local selection
   for the rest of the session.
+
+**`useCommunityAccess()`** (`lib/communityAccess.ts`) turns the selected
+relation into `{shellRole, isZevScope, canManage, isParticipantScope,
+isAdmin}`: `admin` and `manager` may read and write the management view,
+`viewer` only read it (pages hide their write controls), `participant` and
+`former` get the participant view. Without a known relation the old role
+mapping applies (`zev_owner` → manager, `participant` → participant, else
+`none`). `shellRoleForZev(user, zevId)` answers for a record's own community
+(the invoice detail page). Details: SPEC-2026-10-zev-access-grants §9.
 
 ---
 

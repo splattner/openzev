@@ -32,6 +32,30 @@ export interface User {
 /** Per-ZEV access an account holds through a grant (#761). */
 export type ZevAccessRole = 'manager' | 'viewer'
 
+/** One manager or viewer grant on a ZEV, as the access API returns it (#761). */
+export interface ZevAccessGrant {
+    id: string
+    zev: string
+    role: ZevAccessRole
+    valid_from: string
+    valid_to: string | null
+    is_active: boolean
+    granted_by: { id: number; full_name: string } | null
+    created_at: string
+    user: { id: number; email: string; first_name: string; last_name: string; pending_invitation: boolean }
+}
+
+/** POST /zev/zevs/{id}/access/ answers with the grant and whether its email went out. */
+export interface ZevAccessGrantCreated extends ZevAccessGrant {
+    email_sent: boolean
+}
+
+export interface ZevAccessGrantInput {
+    email: string
+    role: ZevAccessRole
+    valid_to?: string | null
+}
+
 /** One participant row an account is linked to in a community. */
 export interface MembershipParticipant {
     id: string

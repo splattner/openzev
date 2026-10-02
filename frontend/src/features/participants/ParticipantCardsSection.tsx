@@ -50,6 +50,8 @@ type ParticipantCardsSectionProps = {
     deletePendingOrDialogLoading: boolean
     /** Participant id to highlight (deep link `?focus=`), if still visible. */
     focusParticipantId?: string | null
+    /** A viewer reads only (#761): no create, edit, onboarding, linking or delete. */
+    readOnly?: boolean
 }
 
 function participantValidityBadgeClass(state: ParticipantValidityState): string {
@@ -85,6 +87,7 @@ export function ParticipantCardsSection({
     onboardingLinkPending,
     deletePendingOrDialogLoading,
     focusParticipantId,
+    readOnly = false,
 }: ParticipantCardsSectionProps) {
     const { t } = useTranslation()
 
@@ -102,12 +105,12 @@ export function ParticipantCardsSection({
                 titleKey="pages.participants.emptyState.title"
                 descriptionKey="pages.participants.emptyState.description"
                 actions={[
-                    {
+                    ...(readOnly ? [] : [{
                         labelKey: 'pages.participants.emptyState.createAction',
                         onClick: onOpenCreateModal,
-                        variant: 'primary',
+                        variant: 'primary' as const,
                         icon: faPlus,
-                    },
+                    }]),
                     { labelKey: 'pages.participants.emptyState.meteringPointsAction', to: '/metering/points', variant: 'secondary' },
                 ]}
             />
@@ -131,59 +134,61 @@ export function ParticipantCardsSection({
                 const weightSharePercent = totalWeight > 0 ? (weight / totalWeight) * 100 : 0
                 const menuItems: ActionMenuItem[] = []
 
-                menuItems.push({
-                    key: 'send-onboarding-link',
-                    label: t('pages.participants.sendOnboardingLink'),
-                    icon: <FontAwesomeIcon icon={faEnvelope} fixedWidth />,
-                    disabled: onboardingLinkPending || !participant.email,
-                    onClick: () => onSendOnboardingLink(participant.id),
-                })
-                menuItems.push({
-                    key: 'copy-onboarding-link',
-                    label: t('pages.participants.copyOnboardingLink'),
-                    icon: <FontAwesomeIcon icon={faCopy} fixedWidth />,
-                    disabled: onboardingLinkPending,
-                    onClick: () => onCopyOnboardingLink(participant.id),
-                })
-                if (participant.onboarding_status === 'sent' || participant.onboarding_status === 'active') {
+                if (!readOnly) {
                     menuItems.push({
-                        key: 'revoke-onboarding-link',
-                        label: t('pages.participants.revokeOnboardingLink'),
-                        icon: <FontAwesomeIcon icon={faBan} fixedWidth />,
+                        key: 'send-onboarding-link',
+                        label: t('pages.participants.sendOnboardingLink'),
+                        icon: <FontAwesomeIcon icon={faEnvelope} fixedWidth />,
+                        disabled: onboardingLinkPending || !participant.email,
+                        onClick: () => onSendOnboardingLink(participant.id),
+                    })
+                    menuItems.push({
+                        key: 'copy-onboarding-link',
+                        label: t('pages.participants.copyOnboardingLink'),
+                        icon: <FontAwesomeIcon icon={faCopy} fixedWidth />,
                         disabled: onboardingLinkPending,
-                        onClick: () => onRevokeOnboardingLink(participant.id),
+                        onClick: () => onCopyOnboardingLink(participant.id),
                     })
-                }
+                    if (participant.onboarding_status === 'sent' || participant.onboarding_status === 'active') {
+                        menuItems.push({
+                            key: 'revoke-onboarding-link',
+                            label: t('pages.participants.revokeOnboardingLink'),
+                            icon: <FontAwesomeIcon icon={faBan} fixedWidth />,
+                            disabled: onboardingLinkPending,
+                            onClick: () => onRevokeOnboardingLink(participant.id),
+                        })
+                    }
 
-                // The owner's own participant is never detached from their account.
-                if (participant.user == null && canLinkAccount) {
-                    menuItems.push({
-                        key: 'link-account',
-                        label: t('pages.accounts.linkExisting'),
-                        icon: <FontAwesomeIcon icon={faLink} fixedWidth />,
-                        disabled: accountActionPending,
-                        onClick: () => onLinkAccount(participant, displayName),
-                    })
-                }
-                if (participant.user != null && !ownerRow && canUnlinkAccount) {
-                    menuItems.push({
-                        key: 'unlink-account',
-                        label: t('pages.accounts.unlink'),
-                        icon: <FontAwesomeIcon icon={faLinkSlash} fixedWidth />,
-                        disabled: accountActionPending,
-                        onClick: () => onUnlinkAccount(participant, displayName),
-                    })
-                }
+                    // The owner's own participant is never detached from their account.
+                    if (participant.user == null && canLinkAccount) {
+                        menuItems.push({
+                            key: 'link-account',
+                            label: t('pages.accounts.linkExisting'),
+                            icon: <FontAwesomeIcon icon={faLink} fixedWidth />,
+                            disabled: accountActionPending,
+                            onClick: () => onLinkAccount(participant, displayName),
+                        })
+                    }
+                    if (participant.user != null && !ownerRow && canUnlinkAccount) {
+                        menuItems.push({
+                            key: 'unlink-account',
+                            label: t('pages.accounts.unlink'),
+                            icon: <FontAwesomeIcon icon={faLinkSlash} fixedWidth />,
+                            disabled: accountActionPending,
+                            onClick: () => onUnlinkAccount(participant, displayName),
+                        })
+                    }
 
-                if (!ownerRow) {
-                    menuItems.push({
-                        key: 'delete',
-                        label: t('common.delete'),
-                        icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
-                        disabled: deletePendingOrDialogLoading,
-                        danger: true,
-                        onClick: () => onConfirmDelete(participant, displayName),
-                    })
+                    if (!ownerRow) {
+                        menuItems.push({
+                            key: 'delete',
+                            label: t('common.delete'),
+                            icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
+                            disabled: deletePendingOrDialogLoading,
+                            danger: true,
+                            onClick: () => onConfirmDelete(participant, displayName),
+                        })
+                    }
                 }
 
                 return (
@@ -227,19 +232,23 @@ export function ParticipantCardsSection({
                             </div>
 
                             <div className="participant-card-actions">
-                                <button className="button button-primary button-compact" type="button" onClick={() => onStartEdit(participant)}>
-                                    <FontAwesomeIcon icon={faPen} fixedWidth />
-                                    {t('common.edit')}
-                                </button>
+                                {!readOnly && (
+                                    <button className="button button-primary button-compact" type="button" onClick={() => onStartEdit(participant)}>
+                                        <FontAwesomeIcon icon={faPen} fixedWidth />
+                                        {t('common.edit')}
+                                    </button>
+                                )}
                                 <button className="button button-secondary button-compact" type="button" onClick={() => onDownloadContract(participant)}>
                                     <FontAwesomeIcon icon={faDownload} fixedWidth />
                                     {t('pages.participants.downloadContract')}
                                 </button>
-                                <ActionMenu
-                                    label={t('pages.participants.moreActions')}
-                                    icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
-                                    items={menuItems}
-                                />
+                                {menuItems.length > 0 && (
+                                    <ActionMenu
+                                        label={t('pages.participants.moreActions')}
+                                        icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+                                        items={menuItems}
+                                    />
+                                )}
                             </div>
                         </div>
 

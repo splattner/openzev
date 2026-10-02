@@ -26,6 +26,7 @@ import { PeriodSelector } from '../components/PeriodSelector'
 import { RawMeteringTable } from '../components/RawMeteringTable'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
+import { useCommunityAccess } from '../lib/communityAccess'
 import {
     billingRangeFromParams,
     firstAlignedBillingPeriod,
@@ -183,7 +184,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
     const { settings } = useAppSettings()
     const { selectedZevId, selectedZev } = useManagedZev()
     const participantScopeName = user?.zev_count === 1 ? user?.zev_name : undefined
-    const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
+    const { isZevScope: isManagedScope } = useCommunityAccess()
     const interval: BillingInterval = (selectedZev?.billing_interval as BillingInterval) ?? 'monthly'
 
     // The aligned floor only guards whole-period prev/next nav; custom ranges

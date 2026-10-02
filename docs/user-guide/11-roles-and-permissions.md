@@ -17,6 +17,25 @@ OpenZEV supports four distinct roles:
 > no domain access and is used when an account is not (or no longer) linked to a
 > ZEV or participant.
 
+### Access per community: managers and viewers
+
+What an account may do in a community comes from its **relation to that
+community**, not from one role for the whole platform. One account can have
+different relations in different communities — for example manage one ZEV and
+rent a flat in another, or be a tenant in two communities.
+
+| Relation | What it allows in that community |
+| --- | --- |
+| **Manager** | Everything a ZEV owner can do: participants, metering, tariffs, invoices, settings, and giving others access |
+| **Viewer** | Sees everything a manager sees and may download and export, but changes nothing |
+| **Participant** | Own consumption, own invoices and annual statement |
+| **Former participant** | Own invoices that were sent, after leaving the community |
+
+Managers and viewers get their access from the community's managers (or an
+admin) under **ZEV settings → Access** — see
+[Access tab](02-zev-setup.md#access-tab). The ZEV's owner is a manager
+automatically. Participants get theirs by being linked to a participant entry.
+
 ## Admin Role
 
 **Admins** have unrestricted access to the entire system.
@@ -156,16 +175,16 @@ has no access to a ZEV's data until an admin links it to a participant.
 
 ## Access Control Matrix
 
-| Feature | Admin | ZEV Owner | Participant |
-| --- | --- | --- | --- |
-| **Participants** | View all | View own ZEV | View self |
-| **Metering Points** | View all | View own ZEV | View own meters |
-| **Metering Data** | View all | View own ZEV | View own readings |
-| **Tariffs** | View all | Create/edit own ZEV | View only |
-| **Invoices** | View all | Create own ZEV | View own only |
-| **Email Templates** | Manage defaults | Customize own ZEV | — |
-| **Settings** | Global settings | Own ZEV settings | Account profile |
-| **Admin Panel** | Full access | — | — |
+| Feature | Admin | Manager (ZEV Owner) | Viewer | Participant |
+| --- | --- | --- | --- | --- |
+| **Participants** | View all | Manage in the ZEV | View in the ZEV | View self |
+| **Metering Points** | View all | Manage in the ZEV | View in the ZEV | View own meters |
+| **Metering Data** | View all | Import and view in the ZEV | View in the ZEV | View own readings |
+| **Tariffs** | View all | Create/edit in the ZEV | View, download the overview | View only |
+| **Invoices** | View all | Create, approve, send in the ZEV | View, download PDFs | View own only |
+| **Email Templates** | Manage defaults | Customize in the ZEV | View | — |
+| **Settings** | Global settings | ZEV settings, give access | View | Account profile |
+| **Admin Panel** | Full access | — | — | — |
 
 > **Note:** Guest accounts have no access in any column above until they are
 > linked to a participant, after which they follow the Participant rules.
@@ -431,10 +450,16 @@ If operating multiple communities:
 - Can assign ZEV Owners to specific communities
 - Can monitor cross-ZEV metrics and KPIs
 
-**ZEV Owner perspective:**
-- Use the ZEV switcher (sidebar top) to switch between assigned ZEVs
+**Manager, viewer and participant perspective:**
+- The community switcher (sidebar top) lists every community your account
+  relates to, with your relation (Manager, Viewer, Participant, Former
+  participant) under each name
+- The navigation follows the selected community: management pages for a
+  manager or viewer, your dashboard and invoices for a participant, only your
+  invoices for a former participant
 - Each ZEV has isolated data
-- Can be assigned to manage 1 or many ZEVs
+- With only one community there is nothing to switch, and the switcher is
+  hidden
 
 ## Troubleshooting
 
@@ -445,10 +470,11 @@ Ask an admin to check your account's **Platform role** and communities under
 
 ### "Cannot see other ZEVs"
 
-**Expected behavior:** ZEV Owners are scoped to the ZEVs they own.
+**Expected behavior:** you see the communities you manage, view or take part
+in — nothing else.
 
-**If you need access:** ask an admin to make you the owner of that ZEV
-(**Platform → Overview → ZEVs**).
+**If you need access:** ask a manager of that ZEV (or an admin) to give you
+access under **ZEV settings → Access**.
 
 ### "User cannot login"
 
