@@ -15,6 +15,7 @@ from allocation.errors import AllocationError
 from zev.models import Zev, Participant
 from zev import access
 from zev.scoping import ZevScopedQuerySetMixin
+from .document_parties import build_issuer, build_recipient
 from .models import Invoice, InvoicePdfStatus, InvoiceStatus, EmailLog, sent_to_participant
 from .serializers import (
     InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
@@ -769,8 +770,17 @@ class InvoiceViewSet(
         if error:
             return error
 
-        drafts = invoices.filter(status=InvoiceStatus.DRAFT)
-        count = drafts.update(status=InvoiceStatus.APPROVED)
+        # One conditional UPDATE per draft, each writing the issuer/recipient
+        # copy a last time (frozen from approval on, #761). A draft approved
+        # or deleted concurrently simply does not count.
+        issuer = build_issuer(_zev)
+        count = 0
+        for draft in invoices.filter(status=InvoiceStatus.DRAFT):
+            count += Invoice.objects.filter(pk=draft.pk, status=InvoiceStatus.DRAFT).update(
+                status=InvoiceStatus.APPROVED,
+                issuer=issuer,
+                recipient=build_recipient(draft.participant),
+            )
         _record_invoice_event(
             request=request,
             action_type="invoice.approve_all",

@@ -231,6 +231,10 @@ INVOICE_FIELDS = (
     "sent_at",
     "due_date",
     "notes",
+    # The issuer/recipient copy (#761). Optional: an archive written before
+    # it existed imports without it, and the copy is built at the next render.
+    "issuer",
+    "recipient",
 )
 
 INVOICE_ITEM_FIELDS = (

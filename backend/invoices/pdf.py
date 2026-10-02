@@ -24,6 +24,7 @@ from django.template import Context, Template
 from django.template.loader import render_to_string
 from tariffs.models import TariffCategory
 
+from .document_parties import copy_for_render, template_parties
 from .dates import format_date_value
 from .description_utils import strip_period_suffix
 from .pdf_charts import (
@@ -164,25 +165,31 @@ def _group_items_by_category(items, period_start: date, period_end: date, tr: di
     return grouped
 
 
-def _build_qr_svg(invoice) -> str | None:
-    """Generate the Swiss QR-Rechnung SVG if IBAN and required addresses are configured."""
-    iban = _normalize_text(invoice.zev.bank_iban).replace(" ", "")
+def _build_qr_svg(invoice, issuer: dict | None = None, recipient: dict | None = None) -> str | None:
+    """Generate the Swiss QR-Rechnung SVG if IBAN and required addresses are configured.
+
+    Creditor, debtor and IBAN come from the invoice's copy
+    (``invoices.document_parties``), so the slip of an approved invoice never
+    changes with later edits.
+    """
+    if issuer is None or recipient is None:
+        issuer, recipient = copy_for_render(invoice)
+    iban = _normalize_text(issuer.get("iban")).replace(" ", "")
     if not iban:
         return None
 
-    owner_participant = invoice.zev.participants.filter(user=invoice.zev.owner).first()
     creditor = _build_qr_party(
-        name=owner_participant.full_name if owner_participant else invoice.zev.name,
-        line1=owner_participant.address_line1 if owner_participant else "",
-        postal_code=owner_participant.postal_code if owner_participant else "",
-        city=owner_participant.city if owner_participant else "",
+        name=issuer.get("name"),
+        line1=issuer.get("address_line1"),
+        postal_code=issuer.get("postal_code"),
+        city=issuer.get("city"),
         role="creditor",
     )
     debtor = _build_qr_party(
-        name=invoice.participant.full_name,
-        line1=invoice.participant.address_line1,
-        postal_code=invoice.participant.postal_code,
-        city=invoice.participant.city,
+        name=recipient.get("name"),
+        line1=recipient.get("address_line1"),
+        postal_code=recipient.get("postal_code"),
+        city=recipient.get("city"),
         role="debtor",
     )
     if not creditor or not debtor:
@@ -256,10 +263,10 @@ def _build_template_context(
     else:
         period_context.validate_for(invoice)
 
-    qr_svg = _build_qr_svg(invoice)
+    issuer, recipient = copy_for_render(invoice)
+    qr_svg = _build_qr_svg(invoice, issuer, recipient)
     items = list(invoice.items.all())
     app_settings = AppSettings.load()
-    owner_participant = invoice.zev.participants.filter(user=invoice.zev.owner).first()
 
     lang = invoice.zev.invoice_language or "de"
     # Copied rather than used in place: INVOICE_TRANSLATIONS is a module-level
@@ -322,9 +329,9 @@ def _build_template_context(
         "invoice_number_prefix": invoice_number_prefix,
         "invoice_number_suffix": invoice_number_suffix,
         "grouped_items": grouped_items,
-        "zev": invoice.zev,
-        "owner_participant": owner_participant,
-        "participant": invoice.participant,
+        # issuer / recipient, plus zev, owner_participant and participant
+        # answered from the copy for templates written against the models.
+        **template_parties(invoice, issuer, recipient),
         "qr_svg": qr_svg,
         # A short, note-free invoice can share its first page with the standard
         # QR payment part.  Larger invoices retain a separate final payment page

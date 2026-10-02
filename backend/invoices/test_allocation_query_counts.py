@@ -128,9 +128,11 @@ class AllocationQueryCountTests(_ReconciliationBase):
         # allocation-weight sums. #465 dropped the month-granular one from
         # PeriodReadings: it was never read, because the fixed-fee
         # denominators are tariff-clamped and are built inside
-        # _price_fixed_fees instead.
+        # _price_fixed_fees instead. 16 -> 17: the invoice's copy of its
+        # issuer (#761) reads the owner's participant row; a batch reads it
+        # once for all its invoices.
         self._call_at_most(
-            16, generate_invoice, self.alice, PERIOD_START, PERIOD_END
+            17, generate_invoice, self.alice, PERIOD_START, PERIOD_END
         )
 
     def test_weight_keyed_shared_fees_do_not_scale_queries_with_tariff_count(self):

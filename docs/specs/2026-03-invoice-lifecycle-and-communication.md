@@ -71,10 +71,49 @@ lifecycle from scratch.
 | `sent_at` | `DateTimeField` (nullable) | Timestamp of most recent email send |
 | `due_date` | `DateField` (nullable) | Payment due date. Set at generation to the generation date + `Zev.payment_term_days` (per-ZEV, default 30, min 1) |
 | `notes` | `TextField` | Free text |
+| `issuer` | `JSONField` (default `{}`) | Copy of who the invoice is from (§3.1a) |
+| `recipient` | `JSONField` (default `{}`) | Copy of who the invoice is to (§3.1a) |
 | `created_at` | `DateTimeField` (auto) | Creation timestamp |
 | `updated_at` | `DateTimeField` (auto) | Last modification timestamp |
 
 Ordering: `["-period_end", "participant", "id"]` (the `id` tie-break keeps pagination stable).
+
+### 3.1a Issuer and recipient copy (#761)
+
+Like the amounts, prices and VAT rate, an invoice keeps its own copy of who it
+is from and to, so re-rendering an approved, sent or paid invoice gives the
+same document even after the owner's address, the ZEV's IBAN or the
+participant's address changed (`invoices/document_parties.py`).
+
+| Key | `issuer` | `recipient` |
+|---|---|---|
+| `name` | owner participant's `full_name`, else `Zev.name` | participant `full_name` |
+| `name_lines` | `[name]` (list; a second line arrives with organisation parties) | `[name]` |
+| `title`, `first_name`, `last_name` | — | participant fields |
+| `address_line1`, `address_line2`, `postal_code`, `city`, `email` | owner participant's | participant's |
+| `phone` | owner participant's | — |
+| `iban`, `bank_name`, `vat_number`, `zev_name` | `Zev.bank_iban`, `bank_name`, `vat_number`, `name` | — |
+| `from_participant` | bool: an owner participant row exists | — |
+
+The owner participant is the ZEV owner's participant row
+(`issuer_participant(zev)`, the lookup the PDF used before); phase 2 of #761
+replaces it with the dated issuer role.
+
+**Lifecycle of the copy.**
+
+| When | What |
+|---|---|
+| Generation (`engine.generate_invoice`) | Written. A batch builds the issuer once (`InvoiceGenerationContext.issuer`) |
+| Any render while `draft` (`copy_for_render`) | Rebuilt from today's data and stored with a conditional `UPDATE … WHERE status = 'draft'`; if an approval won the race, the approved copy is read back instead |
+| `approve_invoice`, `approve-all` | Written a last time in the same row update as the status |
+| `approved`, `sent`, `paid`, `cancelled` | Frozen: renders read the stored copy |
+| Any non-draft without a copy (an invoice created without one) | Built from today's data once and stored |
+
+Migration `invoices.0019_invoice_issuer_recipient_copy` backfills every
+existing invoice from the data of the migration day (the best available). The
+ZEV transfer archive carries both fields (`INVOICE_FIELDS`, optional: an older
+archive imports without them and gets the copy at the next render). Annual
+statements stay live renders; contracts freeze through `ContractIssue`.
 
 ### 3.2 InvoiceItem
 
@@ -757,9 +796,11 @@ The invoice PDF template receives:
 | `invoice` | Invoice model instance |
 | `vat_rate_percent` | `invoice.vat_rate × 100` as a `Decimal`; formatted to one decimal place in the VAT label |
 | `grouped_items` | Items grouped by `TariffCategory` (energy → grid_fees → levies → metering), each with category subtotal |
-| `zev` | ZEV model instance |
-| `owner_participant` | Participant record of the ZEV owner (for creditor address) |
-| `participant` | Billed participant |
+| `issuer` | The invoice's issuer copy (§3.1a) |
+| `recipient` | The invoice's recipient copy (§3.1a) |
+| `zev` | The ZEV, with `name`, `vat_number`, `bank_iban`, `bank_name` answered from the issuer copy (`FrozenView`); anything else reads the live ZEV |
+| `owner_participant` | The issuer copy shaped like a participant (`full_name`, address fields, `email`, `phone`; `IssuerView`), or `None` when the issuer is the ZEV name alone |
+| `participant` | The billed participant, with `full_name`, `title`, `first_name`, `last_name`, address fields and `email` answered from the recipient copy (`FrozenView`); anything else reads the live row |
 | `qr_svg` | Swiss QR-Rechnung SVG (or `None`) |
 | `energy_chart_svg` | Period-comparison stacked bar chart SVG (or `None`) |
 | `hourly_profile_chart_svg` | Average hourly consumption profile chart SVG (or `None`) |
@@ -787,10 +828,10 @@ energy-flow labels, and savings display, plus a nested
 
 ### 8.4 Swiss QR-Rechnung
 
-A QR-Rechnung SVG is generated when:
-- `zev.bank_iban` is present.
-- **Creditor** address (from owner's participant record): `name`, `address_line1`, `postal_code`, `city` — all non-empty.
-- **Debtor** address (from billed participant): same fields — all non-empty.
+A QR-Rechnung SVG is generated from the invoice's copy (§3.1a) when:
+- the issuer copy's `iban` is present.
+- **Creditor** (issuer copy): `name`, `address_line1`, `postal_code`, `city` — all non-empty.
+- **Debtor** (recipient copy): same fields — all non-empty.
 
 If any required field is missing, QR generation is skipped (logged as warning).
 The `qrbill` Python library generates the SVG.
@@ -1012,6 +1053,7 @@ the cockpit readiness and attention caches.
 
 | File | Test class | Validates |
 |---|---|---|
+| `test_document_parties.py` | `CopyContentTests`, `FreezeTests`, `BatchApprovalTests`, `BackfillMigrationTests` (10) | §3.1a: copy content (owner row or ZEV name), a draft follows today's data and stores it, approval freezes it (PDF context and QR bill unchanged after the owner, IBAN and participant move), a missing copy is filled once, a render racing an approval keeps the approved copy, live fields still reachable, `approve-all` writes it, the migration backfill |
 | `test_invoice_list_filter.py` | `InvoiceStatusFilterTests`, `InvoiceStatusFilterScopingTests` | §5.1: comma-separated `?status=` (single/repeated values, whitespace tolerance, empty = absent, all unknown values → 400, list-only so detail routes are unaffected), status × `zev_id` + role scoping (participant cannot enumerate another ZEV's open invoices), composes with pagination |
 | `test_invoice_list_filter.py` | `InvoiceParticipantAndPeriodFilterTests` | §5.1: `?participant_id=` narrows to that participant and composes with `?status=`, cannot widen an owner's scope, malformed UUID → 400; `?period_from=`/`?period_to=` narrow by period overlap (either alone, both together), malformed date → 400 |
 | `test_participant_invoice_visibility.py` | `ParticipantInvoiceVisibilityTests`, `ParticipantAnnualStatementSentOnlyTests` | §6.1 (#861): participant list shows only sent/paid/cancelled-after-sending invoices, owner list unnarrowed, unsent invoices 404 on detail and `/pdf`, a `sent`/`paid` row without `sent_at` stays visible; `sent_only=True` leaves unsent invoices out of the annual statement, default keeps them, participant download passes `sent_only=True` and owner download `False` |

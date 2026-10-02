@@ -40,6 +40,7 @@ from tariffs.models import BillingMode, EnergyType, SplitKey, Tariff, TariffCate
 from tariffs.periods import resolve_band
 from metering.models import MeterReading, ReadingDirection
 from .band_labels import band_description, translations_for as band_translations_for
+from .document_parties import build_issuer, build_recipient
 from .models import Invoice, InvoiceItem, InvoiceStatus
 
 logger = logging.getLogger(__name__)
@@ -67,8 +68,15 @@ class InvoiceGenerationContext:
     weight_sum_by_date: dict[date, Decimal]
     weight_sums_by_tariff: dict[UUID, dict[date, Decimal]] = field(default_factory=dict)
     participant_counts_by_tariff: dict[UUID, dict[date, int]] = field(default_factory=dict)
+    # The issuer block copied onto every invoice of the batch (#761), built once.
+    _issuer: dict | None = field(default=None, repr=False)
     # Valid only while the current invoice holds the source locks.
     _dynamic_series_cache: "dict[UUID, _DynamicSeries]" = field(default_factory=dict, repr=False)
+
+    def issuer(self, zev: Zev) -> dict:
+        if self._issuer is None:
+            self._issuer = build_issuer(zev)
+        return self._issuer
 
     def dynamic_series(self, source_id: UUID) -> "_DynamicSeries":
         series = self._dynamic_series_cache.get(source_id)
@@ -1834,6 +1842,8 @@ def generate_invoice(
         embedded_vat_chf=embedded_vat_chf if zev.vat_mode == VatMode.INCLUSIVE else None,
         total_chf=total_chf,
         due_date=timezone.localdate() + timedelta(days=zev.payment_term_days),
+        issuer=generation_context.issuer(zev),
+        recipient=build_recipient(participant),
     )
 
     # ─── 9. Create line items ─────────────────────────────────────────────

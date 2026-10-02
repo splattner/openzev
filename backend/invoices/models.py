@@ -85,6 +85,10 @@ class Invoice(models.Model):
     sent_at = models.DateTimeField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
+    # Who the invoice is from and to, copied like the amounts are: refreshed
+    # while a draft, frozen from approval on (invoices.document_parties, #761).
+    issuer = models.JSONField(default=dict, blank=True)
+    recipient = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

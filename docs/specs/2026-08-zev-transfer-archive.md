@@ -174,7 +174,11 @@ new, active ZEV, so disabled state has nothing to carry across to. `pdf_file`/
 `pdf_status` are absent from `INVOICE_FIELDS` regardless of format version —
 the document travels, when it does, through the separate `invoice_pdfs`
 section as raw bytes keyed by `invoice_number`, not as fields on the JSON
-record (see below). `READING_CSV_COLUMNS = ("meter_id", "timestamp",
+record (see below). `INVOICE_FIELDS` carries the invoice's `issuer` /
+`recipient` copy (#761, SPEC invoice-lifecycle §3.1a) as JSON objects; they are
+optional on import, so an archive written before they existed still imports
+(the copy is built at the next render) and needs no format-version bump.
+`READING_CSV_COLUMNS = ("meter_id", "timestamp",
 "energy_kwh", "direction", "resolution", "import_source")` — the same layout the
 normal CSV metering import reads, plus `resolution`/`import_source` so nothing is
 lost in a round trip.

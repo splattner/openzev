@@ -94,12 +94,19 @@ def _lock_and_transition(invoice, *, allowed_from, to_status, invalid_message, e
 
 
 def approve_invoice(invoice: Invoice) -> dict:
-    """Transition draft → approved. Returns the ``before`` diff dict."""
+    """Transition draft → approved. Returns the ``before`` diff dict.
+
+    Writes the issuer/recipient copy a last time: from here on it is frozen,
+    and every render of the invoice shows exactly this (#761).
+    """
+    from .document_parties import build_copy
+
     return _lock_and_transition(
         invoice,
         allowed_from=InvoiceStatus.DRAFT,
         to_status=InvoiceStatus.APPROVED,
         invalid_message=lambda _current: "Only draft invoices can be approved.",
+        extra_fields=build_copy(invoice),
     )
 
 

@@ -72,6 +72,19 @@ def build_sample_invoice_context() -> dict:
             vat_number="CHE-123.456.789",
             bank_iban="CH93 0076 2011 6238 5295 7",
         ),
+        # The invoice's copy of who it is from and to (#761).
+        "issuer": {
+            "name": "Maria Muster", "name_lines": ["Maria Muster"],
+            "address_line1": "Solarweg 1", "address_line2": "", "postal_code": "8000", "city": "Zürich",
+            "email": "maria@example.com", "phone": "+41 44 000 00 00",
+            "iban": "CH93 0076 2011 6238 5295 7", "bank_name": "Example Bank",
+            "vat_number": "CHE-123.456.789", "zev_name": "Solar Community Example", "from_participant": True,
+        },
+        "recipient": {
+            "name": "Hans Beispiel", "name_lines": ["Hans Beispiel"], "title": "", "first_name": "Hans",
+            "last_name": "Beispiel", "address_line1": "Musterstrasse 42", "address_line2": "",
+            "postal_code": "3000", "city": "Bern", "email": "hans@example.com",
+        },
         "owner_participant": _Obj(
             full_name="Maria Muster",
             address_line1="Solarweg 1",
