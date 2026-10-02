@@ -792,10 +792,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#requiring-it-for-a-role-administrators" class="md-nav__link">
+  <a href="#requiring-it-for-everyone-administrators" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Requiring it for a role (administrators)
+        Requiring it for everyone (administrators)
       
     </span>
   </a>
@@ -2222,10 +2222,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#requiring-it-for-a-role-administrators" class="md-nav__link">
+  <a href="#requiring-it-for-everyone-administrators" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Requiring it for a role (administrators)
+        Requiring it for everyone (administrators)
       
     </span>
   </a>
@@ -2543,12 +2543,14 @@ whether an address has an account.</p>
 <p>A <strong>Guest</strong> is a log-in account that is not currently linked to a participant. It
 has no access to a ZEV's data until an admin links it to a participant.</p>
 <ul>
-<li><strong>How a Guest is created:</strong> when an admin <strong>unlinks</strong> an account from a
-  participant, that account's role becomes <code>guest</code>.</li>
+<li><strong>Where Guests come from:</strong> accounts created before unlinking stopped
+  changing roles. Unlinking an account from a participant no longer changes its
+  role; it simply has one participant record less.</li>
 <li><strong>Re-linking:</strong> a guest account can be linked to a participant again by an
-  admin (same as a participant account).</li>
-<li><strong>Restrictions:</strong> guests cannot manage communities or settings, and cannot be
-  impersonated or impersonate others.</li>
+  admin (same as any other account).</li>
+<li><strong>Restrictions:</strong> guests cannot manage communities or settings and cannot
+  impersonate others. An admin can impersonate a guest, as any other account
+  that is not an admin.</li>
 </ul>
 <h2 id="access-control-matrix">Access Control Matrix<a class="headerlink" href="#access-control-matrix" title="Permanent link">&para;</a></h2>
 <table>
@@ -2629,7 +2631,7 @@ each:</p>
   page.</li>
 <li><strong>Security</strong> — which second factors the account has (authenticator app,
   passkey), or <em>No two-factor</em>; whether it is still within its grace period or
-  overdue, for an account the two-factor policy names (see below); and when it
+  overdue, while two-factor authentication is required (see below); and when it
   last signed in, or <em>Never signed in</em>.</li>
 </ul>
 <p>Use <strong>Search</strong>, <strong>Platform role</strong>, <strong>Community</strong> and <strong>Two-factor</strong> to narrow
@@ -2670,15 +2672,16 @@ belongs to:</p>
 <li>On the participant's card, open <strong>More</strong></li>
 <li>Choose <strong>Send onboarding link</strong> or <strong>Copy onboarding link</strong> (creates the
    account and gives the participant a sign-in link), or — as an admin —
-   <strong>Link existing</strong> to attach a guest or participant account that is not yet
-   linked</li>
-<li>To detach an account again, choose <strong>Unlink</strong> (it becomes a Guest account)</li>
+   <strong>Link existing</strong> to attach an existing account — any account except an
+   admin's, also one that is already a participant in another community, so a
+   person who rents in two communities keeps one login</li>
+<li>To detach an account again, choose <strong>Unlink</strong> (the account itself stays as it is)</li>
 </ol>
 <h3 id="other-account-actions">Other Account Actions<a class="headerlink" href="#other-account-actions" title="Permanent link">&para;</a></h3>
 <p>Open <strong>More</strong> on an account row for:</p>
 <ul>
-<li><strong>Impersonate</strong> — view the platform as a participant or owner (never an
-  admin).</li>
+<li><strong>Impersonate</strong> — view the platform as that account sees it, in every
+  community it belongs to (any active account except an admin).</li>
 <li><strong>Reset two-factor</strong> — removes the account's passkeys, authenticator app and
   recovery codes, so someone locked out can sign in with their password again.</li>
 <li><strong>View activity</strong> — opens the platform audit log filtered to this account's
@@ -2777,12 +2780,12 @@ emailed link) then asks for a second step: a recovery code if you only have a pa
 instead</strong> at that point. Keep your recovery codes somewhere safe — they are what gets you in with a
 password if you can't use your passkey.</p>
 </blockquote>
-<h3 id="requiring-it-for-a-role-administrators">Requiring it for a role (administrators)<a class="headerlink" href="#requiring-it-for-a-role-administrators" title="Permanent link">&para;</a></h3>
-<p>Under <strong>Platform → System Settings → Security</strong>, choose which roles must use
-two-factor authentication and set a grace period in days. Users of those roles see a reminder on their
+<h3 id="requiring-it-for-everyone-administrators">Requiring it for everyone (administrators)<a class="headerlink" href="#requiring-it-for-everyone-administrators" title="Permanent link">&para;</a></h3>
+<p>Under <strong>Platform → System Settings → Security</strong>, tick <strong>Require two-factor
+authentication for every account</strong> and set a grace period in days. Users see a reminder on their
 account page and a set-up screen they can postpone until the grace period ends. The period counts from
 the later of the account's creation and the day you last changed the policy, so switching it on never
-locks anyone out immediately. A user whose role requires it cannot remove their last factor.</p>
+locks anyone out immediately. While it is required, nobody can remove their last factor.</p>
 <p>To see who has not enrolled yet, go to <strong>Platform → Accounts → Users</strong>: an account the policy names
 gets a badge in the Security column — "2FA required · due <code>&lt;date&gt;</code>" during the grace period, "2FA
 overdue" once it has passed — and the <strong>Two-factor</strong> filter narrows the list to exactly those

@@ -2516,9 +2516,9 @@ See <a href="#feature-flags">Feature Flags</a> below.</p>
 the matching tab on the System Settings page.</p>
 </blockquote>
 <h3 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h3>
-<p>Choose which roles must use two-factor authentication, and the grace period
-they get, in <strong>Platform → System Settings → Security</strong>. See
-<a href="../11-roles-and-permissions/#requiring-it-for-a-role-administrators">Roles and Permissions → Requiring it for a role</a>.</p>
+<p>Choose whether every account must use two-factor authentication, and the grace
+period they get, in <strong>Platform → System Settings → Security</strong>. See
+<a href="../11-roles-and-permissions/#requiring-it-for-everyone-administrators">Roles and Permissions → Requiring it for everyone</a>.</p>
 <h3 id="vat">VAT<a class="headerlink" href="#vat" title="Permanent link">&para;</a></h3>
 <p>Configure VAT rates in <strong>Platform → System Settings → VAT</strong>. See <a href="#vat-settings">VAT Settings</a> for validity-window behavior and the workflow.</p>
 <h2 id="audit-logs">Audit Logs<a class="headerlink" href="#audit-logs" title="Permanent link">&para;</a></h2>
@@ -2610,7 +2610,7 @@ active for an invoice period, VAT defaults to <strong>0%</strong> in every mode.
 <p><strong>Note:</strong> ZEV owners can also customize email templates for their own ZEV in <strong>ZEV Settings → Documents &amp; emails</strong>. See <a href="../02-zev-setup/#email-templates">ZEV Setup</a> for per-ZEV customization, and <a href="../10-email-configuration/">Email Configuration</a> for SMTP setup and delivery tracking.</p>
 </blockquote>
 <h3 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h3>
-<p>OpenZEV uses four email templates:</p>
+<p>OpenZEV uses six email templates:</p>
 <table>
 <thead>
 <tr>
@@ -2635,8 +2635,18 @@ active for an invoice period, VAT defaults to <strong>0%</strong> in every mode.
 <td><strong>Sign-in Link Email</strong></td>
 <td>Sent when a participant asks for a sign-in link from the QR code on their invoice (see <a href="../02-zev-setup/#participant-access-from-the-invoice">Participant Access from the Invoice</a>)</td>
 </tr>
+<tr>
+<td><strong>ZEV Access Invitation Email</strong></td>
+<td>Sent when someone is given access to a community (as manager or viewer) and has no account yet; its link, valid for 7 days, activates the account and asks for a password</td>
+</tr>
+<tr>
+<td><strong>ZEV Access Notice Email</strong></td>
+<td>Sent when an existing account is given access to a community</td>
+</tr>
 </tbody>
 </table>
+<p>The sign-in link and the two access emails are sent in each community's invoice
+language until you save your own text, which then replaces all four languages.</p>
 <p>The <strong>Sign-in Link Email</strong> is the one template whose recipient never sees a copy
 of anything else you send — it exists only to carry <code>{link_url}</code>. If your edit
 uses a placeholder that does not exist, OpenZEV sends the shipped default
@@ -2645,7 +2655,7 @@ instead, so the link always works even when the wording is not yours.</p>
 <h3 id="accessing-email-templates">Accessing Email Templates<a class="headerlink" href="#accessing-email-templates" title="Permanent link">&para;</a></h3>
 <ol>
 <li>Navigate to <strong>Platform → Templates → Email templates</strong></li>
-<li>The page displays four tabs — one per template type</li>
+<li>The page displays six tabs — one per template type</li>
 </ol>
 <p><img alt="Admin Email Templates" src="../screenshots/14b-admin-email-templates.png" /></p>
 <h3 id="editing-a-template">Editing a Template<a class="headerlink" href="#editing-a-template" title="Permanent link">&para;</a></h3>
