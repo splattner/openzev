@@ -706,6 +706,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#parties-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parties tab
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#billing--payment-tab" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1735,6 +1746,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#parties-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parties tab
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#billing--payment-tab" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2005,6 +2027,8 @@ it off under <strong>Platform → System Settings → Functions</strong>).</p>
 <strong>Setup → Settings</strong>, <code>/zev-settings</code>). The settings are organized into tabs:</p>
 <ul>
 <li><strong>General</strong> — name, start date, ZEV type, grid connection</li>
+<li><strong>Parties</strong> — who issues the invoices, who represents the ZEV toward the grid
+  operator, the landowners, and other contacts (see <a href="#parties-tab">Parties tab</a>)</li>
 <li><strong>Billing &amp; payment</strong> — billing interval, invoice language, payment term,
   invoice presentation, participant QR code, invoice prefix, bank details, VAT</li>
 <li><strong>Documents &amp; emails</strong> — invoice email template, notes, contract notes</li>
@@ -2089,6 +2113,54 @@ serves a tariff document. Operators sometimes move the file without
 ElCom's copy being updated, so an untested suggestion is never saved
 automatically, and an address you already entered is never overwritten.</p>
 </blockquote>
+<h3 id="parties-tab">Parties tab<a class="headerlink" href="#parties-tab" title="Permanent link">&para;</a></h3>
+<p>The <strong>Parties</strong> tab records who the community deals with. Every role has a
+start date (and, once it ends, an end date), so documents always name whoever
+held a role on their own date:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>What it does</th>
+<th>Which date counts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Issuer</strong></td>
+<td>Invoices, contracts and annual statements are from this party: its name and address head the document, and it is the creditor on the QR bill</td>
+<td>An invoice: the last day of its period. A contract: the day it is issued. An annual statement: 31 December</td>
+</tr>
+<tr>
+<td><strong>Representative toward the grid operator</strong></td>
+<td>Who acts for the community toward the grid operator (VNB)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>Landowners</strong></td>
+<td>The owners of the plots or buildings in the community — several when it spans several plots, as a vZEV usually does</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Change from…</strong> on the issuer or the representative picks a party and a
+  date. The current holder ends the day before. Invoices for earlier periods
+  keep naming the earlier issuer, and an invoice that is already approved never
+  changes.</li>
+<li>Without an issuer, documents carry only the community's name. The tab says so
+  until one is set.</li>
+<li><strong>Add landowner</strong> adds a party from a date; <strong>End</strong> sets a landowner's last
+  day. Ending a role before it started removes it.</li>
+<li>A party does not have to be a participant. <strong>Other contacts</strong> lists the
+  people and organisations that are not, such as a property management company
+  that represents the community. <strong>Add contact</strong> creates one (a person, or an
+  organisation with a contact person); a contact that holds no role can be
+  deleted. In the party picker, <strong>New contact…</strong> creates one on the spot.</li>
+<li>The owner of a ZEV created through self-registration or the admin wizard is
+  its issuer and a landowner from the start date.</li>
+</ul>
+<p>Viewers see the tab but change nothing.</p>
 <h3 id="billing--payment-tab">Billing &amp; payment tab<a class="headerlink" href="#billing--payment-tab" title="Permanent link">&para;</a></h3>
 <p><img alt="Billing and payment settings" src="../screenshots/06b-zev-billing-settings.png" /></p>
 <h4 id="billing--payment">Billing &amp; Payment<a class="headerlink" href="#billing--payment" title="Permanent link">&para;</a></h4>
