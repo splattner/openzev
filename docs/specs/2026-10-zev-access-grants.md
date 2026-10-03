@@ -809,6 +809,11 @@ the page's existing error state.
 
 ### 9.6 ZEV settings → Access (`features/zev/ZevAccessSection.tsx`, new)
 
+> Since #761 phase 2 the section is the middle card of the **People & access** tab
+> (`/zev-settings/people`, SPEC-2026-10-zev-parties §8.3); `/zev-settings/access` redirects
+> there. Its rows group by login: an account's issuer/representative entry shows on its grant
+> row. The text below describes the section itself.
+
 Tab `access` on `/zev-settings/:tab` (after Documents; `ZevSettingsTab`
 includes `'access'`; no save button, like Audit and Export). Query
 `queryKeys.zev.access(zevId, includeEnded)` → `fetchZevAccess(zevId, { includeEnded })`.

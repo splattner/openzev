@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faBan, faDownload, faPlay, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
 import { Tabs } from '@mantine/core'
-import { useBlocker, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useBlocker, useNavigate, useParams } from 'react-router-dom'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { ZevEmailTemplateFields } from '../components/ZevEmailTemplateFields'
@@ -17,8 +17,7 @@ import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { useCommunityAccess } from '../lib/communityAccess'
-import { ZevAccessSection } from '../features/zev/ZevAccessSection'
-import { ZevPartiesSection } from '../features/zev/ZevPartiesSection'
+import { ZevPeopleSection } from '../features/zev/ZevPeopleSection'
 import {
     ZEV_FIELD_TABS,
     focusZevField,
@@ -40,9 +39,11 @@ import type { Zev, ZevInput } from '../types/api'
  * editing tabs and a single sticky save bar persists the whole form (one PATCH).
  */
 
-const TABS: ZevSettingsTab[] = ['general', 'parties', 'billing', 'documents', 'access', 'audit', 'export']
+const TABS: ZevSettingsTab[] = ['general', 'people', 'billing', 'documents', 'audit', 'export']
+// Tabs merged into People & access (#761); old links keep working.
+const MERGED_INTO_PEOPLE = new Set(['parties', 'access'])
 // Tabs that save on their own: the sticky bar saves the draft without submitting a form there.
-const OUTSIDE_THE_FORM = new Set<ZevSettingsTab>(['parties', 'access', 'audit', 'export'])
+const OUTSIDE_THE_FORM = new Set<ZevSettingsTab>(['people', 'audit', 'export'])
 
 type ZevDraft = {
     zevId: string | null
@@ -67,6 +68,9 @@ function focusDraftField(field: string) {
 /** /zev-settings/:tab — renders the hub with the routed tab (404s unknown). */
 export function ZevSettingsTabRoute() {
     const { tab = 'general' } = useParams<{ tab: string }>()
+    if (MERGED_INTO_PEOPLE.has(tab)) {
+        return <Navigate to="/zev-settings/people" replace />
+    }
     const active = TABS.includes(tab as ZevSettingsTab) ? (tab as ZevSettingsTab) : null
     if (!active) {
         return <NotFoundPage />
@@ -388,10 +392,9 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
             >
                 <Tabs.List aria-label={t('pages.zevSettings.title')}>
                     <Tabs.Tab value="general">{t('pages.zevSettings.tabs.general')}</Tabs.Tab>
-                    <Tabs.Tab value="parties">{t('pages.zevSettings.tabs.parties')}</Tabs.Tab>
+                    <Tabs.Tab value="people">{t('pages.zevSettings.tabs.people')}</Tabs.Tab>
                     <Tabs.Tab value="billing">{t('pages.zevSettings.tabs.billingPayment')}</Tabs.Tab>
                     <Tabs.Tab value="documents">{t('pages.zevSettings.tabs.documentsEmails')}</Tabs.Tab>
-                    <Tabs.Tab value="access">{t('pages.zevSettings.tabs.access')}</Tabs.Tab>
                     <Tabs.Tab value="audit">{t('pages.zevSettings.tabs.auditLog')}</Tabs.Tab>
                     <Tabs.Tab value="export">{t('pages.zevSettings.tabs.exportTransfer')}</Tabs.Tab>
                 </Tabs.List>
@@ -458,13 +461,10 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                     </section>
                 </Tabs.Panel>
 
-                <Tabs.Panel value="parties">
-                    <ZevPartiesSection zevId={selectedZevId} canManage={canManage && !disabledForMe} />
+                <Tabs.Panel value="people">
+                    <ZevPeopleSection zevId={selectedZevId} canManage={canManage && !disabledForMe} />
                 </Tabs.Panel>
 
-                <Tabs.Panel value="access">
-                    <ZevAccessSection zevId={selectedZevId} canManage={canManage && !disabledForMe} />
-                </Tabs.Panel>
 
                 <Tabs.Panel value="audit">
                     {/* Owner-scoped audit log as a tab of its ZEV (spec §5): the

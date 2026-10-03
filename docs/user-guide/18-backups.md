@@ -412,7 +412,7 @@ accounts and links them again. Someone with no matching account is listed in the
 preview and left unlinked — a restore **never creates an account**. Who may
 manage the community is not restored either: an existing community keeps its
 managers, and a recreated one has none until an admin grants access in
-**ZEV Settings → Access**.
+**ZEV Settings → People & access**.
 
 ### What else to know
 

@@ -1,8 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faKey, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { CivilDateInput } from '../../components/CivilDateInput'
 import { ConfirmDialog, useConfirmDialog } from '../../components/ConfirmDialog'
 import {
@@ -12,6 +12,7 @@ import {
     endPartyRole,
     fetchParties,
     fetchPartyRoles,
+    fetchZevAccess,
     updateParty,
 } from '../../lib/api/zev'
 import { formatApiError } from '../../lib/api/errors'
@@ -26,6 +27,10 @@ interface Props {
     zevId: string
     /** Change roles and contacts. A viewer (or a disabled ZEV) only reads. */
     canManage: boolean
+    /** Rendered between the roles and the contacts: the access card of the People & access tab. */
+    accessSlot?: ReactNode
+    /** "Give access" on a contact without access: opens the access form for that party. */
+    onGiveAccess?: (party: Party) => void
 }
 
 const NEW_CONTACT = '__new__'
@@ -43,7 +48,7 @@ function activeOn(row: ZevPartyRole, day: string): boolean {
  * holder the day before, so documents dated earlier keep naming the earlier
  * holder.
  */
-export function ZevPartiesSection({ zevId, canManage }: Props) {
+export function ZevPartiesSection({ zevId, canManage, accessSlot, onGiveAccess }: Props) {
     const { t } = useTranslation()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
@@ -65,9 +70,17 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
         enabled: Boolean(zevId),
     })
 
+    // Which contacts can already sign in to this ZEV, and how (the access list's rows).
+    const accessQuery = useQuery({
+        queryKey: queryKeys.zev.access(zevId, false),
+        queryFn: () => fetchZevAccess(zevId),
+        enabled: Boolean(zevId),
+    })
+
     function afterChange() {
         void queryClient.invalidateQueries({ queryKey: ['zev', 'parties', zevId] })
         void queryClient.invalidateQueries({ queryKey: ['zev', 'partyRoles', zevId] })
+        void queryClient.invalidateQueries({ queryKey: ['zev', 'access', zevId] })
         void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
         void queryClient.invalidateQueries({ queryKey: ['zev', 'participants'] })
     }
@@ -154,8 +167,14 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
     const roles = rolesQuery.data ?? []
     const busy = assign.isPending || end.isPending
     const contacts = parties.filter((party) => party.participations.length === 0)
+    const accessByAccount = new Map<number, string>()
+    for (const entry of accessQuery.data ?? []) {
+        if (entry.is_active && !accessByAccount.has(entry.user.id)) accessByAccount.set(entry.user.id, entry.role)
+    }
+    const contactAccess = (party: Party) => party.accounts.map((account) => accessByAccount.get(account.id)).find(Boolean)
 
     return (
+        <>
         <section className="card page-stack">
             <div>
                 <h3 style={{ marginTop: 0 }}>{t('pages.zevSettings.parties.title')}</h3>
@@ -189,11 +208,19 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
                         onEnd={(row, lastDay) => end.mutateAsync({ row, lastDay })}
                         onNewContact={openNewContact}
                     />
+                </>
+            )}
+        </section>
 
-                    <div className="zev-parties-block">
+        {accessSlot}
+
+        <section className="card page-stack">
+            {partiesQuery.isSuccess && rolesQuery.isSuccess && (
+                <>
+                    <div className="zev-parties-block zev-parties-block-first">
                         <div className="zev-parties-block-header">
                             <div>
-                                <h4>{t('pages.zevSettings.parties.contacts')}</h4>
+                                <h3 style={{ margin: 0 }}>{t('pages.zevSettings.parties.contacts')}</h3>
                                 <p className="muted">{t('pages.zevSettings.parties.contactsHint')}</p>
                             </div>
                             {canManage && (
@@ -215,6 +242,11 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
                                                 {[...new Set(party.roles.map((row) => row.role))].map((role) => (
                                                     <span key={role} className="badge badge-info">{t(`pages.participants.roles.${role}`)}</span>
                                                 ))}
+                                                {contactAccess(party) && (
+                                                    <span className="badge badge-neutral">
+                                                        {t('pages.zevSettings.parties.hasAccess', { role: t(`nav.relation.${contactAccess(party)}`) })}
+                                                    </span>
+                                                )}
                                             </span>
                                         </div>
                                         <div className="zev-access-meta muted">
@@ -236,6 +268,16 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
                                                     <FontAwesomeIcon icon={faPen} fixedWidth />
                                                     {t('common.edit')}
                                                 </button>
+                                                {onGiveAccess && !contactAccess(party) && (party.accounts.length > 0 || party.email) && (
+                                                    <button
+                                                        type="button"
+                                                        className="button button-secondary button-compact"
+                                                        onClick={() => onGiveAccess(party)}
+                                                    >
+                                                        <FontAwesomeIcon icon={faKey} fixedWidth />
+                                                        {t('pages.zevSettings.access.add')}
+                                                    </button>
+                                                )}
                                                 {party.roles.length === 0 && (
                                                     <button
                                                         type="button"
@@ -268,6 +310,7 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
                 <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />
             )}
         </section>
+        </>
     )
 }
 

@@ -51,7 +51,7 @@ invoices and contracts), and the listed metering points. The temporary password 
 to the responsible person, who sets their own password at first sign-in.
 
 Admins can also create a bare ZEV (without the wizard) through the API. Nobody
-manages it until an admin grants access in **ZEV Settings → Access**.
+manages it until an admin grants access in **ZEV Settings → People & access**.
 
 The ZEV list shows each community's **issuer** — whom its invoices and contracts
 are from.

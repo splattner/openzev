@@ -45,7 +45,7 @@ first and is a prerequisite.
 | API | Parties and party-role endpoints; participant fields `party`, `kind`, `organisation_name`, `name_addition`, `display_name` |
 | Creation flows | Wizard, self-setup, admin create and transfer import create the party, roles and an explicit manager grant |
 | Transfer / backups | Archive format 5 (`parties`, `party_roles`); backups registry |
-| Frontend | ZEV settings → Parties tab; participant form (kind, organisation, name addition, existing party); role badges; owner reads replaced |
+| Frontend | ZEV settings → People & access tab (roles, access, contacts); participant form (kind, organisation, name addition, existing party); role badges; owner reads replaced |
 | Docs | User guide (ZEV setup, participants), baseline specs |
 
 ### Out of scope
@@ -71,7 +71,7 @@ first and is a prerequisite.
 Backend: the party and party-role viewsets use `ZevScopedQuerySetMixin` with
 `zev_lookup = "zev"`, no participant path, and `BaseZevScopedPermission`
 (`allow_participant_safe_methods = False`). Unsafe methods require `can_manage`; a disabled ZEV
-is read-only for non-admins (unchanged rule). Frontend: the Parties tab sits in ZEV settings
+is read-only for non-admins (unchanged rule). Frontend: the People & access tab sits in ZEV settings
 (`ZEV_SCOPE`); write controls follow `useCommunityAccess().canManage`.
 
 ## 4. Data model
@@ -353,9 +353,9 @@ would have none today → `ValidationError({"party": [NO_MANAGER_LEFT]})` with `
   `party`; `Membership.roles`; `Party.accounts`.
 - Zugang (`ZevAccessSection`): "Give access to" a party (default; picker of the ZEV's parties
   with their login, "invite <email>" or "no email address" — the last disabled) or an email
-  address. Role entries show an "As <role>" badge and "Through the role of <party>; changes in
-  the Parties tab", without actions. The end date uses `CivilDateInput` (`minDate` today).
-- Parties tab: assigning the issuer or representative opens a `ConfirmDialog` naming the logins
+  address. Role entries show an "As <role>" badge and "Through the role of <party>; changes with
+  the role above", without actions (on the login's grant row when it has one, §8.3). The end date uses `CivilDateInput` (`minDate` today).
+- Roles card: assigning the issuer or representative opens a `ConfirmDialog` naming the logins
   that get manager access (`grantsAccess`) or saying nobody does (`noLogin`); contacts show
   their login. Issuer, representative and contacts hints say what the role or contact means for
   access.
@@ -460,9 +460,28 @@ participants), `Party`, `PartyInput` (its editable fields), `ZevPartyRole` (with
 `party_display_name`); `ParticipantInput` gains optional `party`, `kind`,
 `organisation_name`, `name_addition`, and its name and email fields become optional.
 
-### 8.3 ZEV settings → Parties (`features/zev/ZevPartiesSection.tsx`, new)
+### 8.3 ZEV settings → People & access (`features/zev/ZevPeopleSection.tsx`)
 
-Tab `parties` after General. Sections:
+Tab `people` after General (`ZevSettingsTab = 'general' | 'people' | 'billing' | 'documents' |
+'audit' | 'export'`); `/zev-settings/parties` and `/zev-settings/access` redirect to it
+(`MERGED_INTO_PEOPLE` in `ZevSettingsTabRoute`, `<Navigate replace>`). The save bar treats it
+like Audit and Export (`OUTSIDE_THE_FORM`). `ZevPeopleSection` renders three cards from
+`ZevPartiesSection`, with `ZevAccessSection` passed in as `accessSlot` between the second and
+the third:
+
+1. **Roles** (title "Roles", the description says the issuer and representative also manage the
+   ZEV): issuer, representative, landowners — as below.
+2. **Who has access** (`ZevAccessSection`, SPEC-2026-10-zev-access-grants §9.6, §5.5 here): one
+   row per login — a role entry is shown on the same login's active grant row ("As issuer"
+   badge and "Through the role of …; changes with the role above") and only gets a row of its
+   own when the login has no grant. A `request` prop (`{partyId}`, a new object per request)
+   opens the "Give access" form with that party chosen (state adjusted during render, no
+   effect); the card has `id="zev-access-section"` so the request scrolls it into view.
+3. **Other contacts**: each contact shows its access (`hasAccess` badge, from the access list
+   query `queryKeys.zev.access(zevId, false)`, matched through `Party.accounts`); "Give access"
+   (managers, contacts without access that have a login or an email) calls `onGiveAccess`.
+
+Sections of the roles and contacts cards:
 
 - **Issuer** and **Representative**: today's holder with "since", the history behind "Show
   history", and "Change from…" (party picker + date) for managers.
@@ -484,9 +503,9 @@ Landowners (for a ZEV and a vZEV alike; the hint says a community spanning sever
 their role badges; edit in `PartyFormModal` (`features/zev/PartyFormModal.tsx`: kind,
 organisation name, title, first/last name — "contact" labels for an organisation —, name
 addition, email, phone, address, notes); delete (with `ConfirmDialog`) only while it holds no
-role. Every change invalidates parties, roles, the ZEV list (issuer) and participants. The
-ZEV settings save bar treats `parties` like `access` (`OUTSIDE_THE_FORM`). Styles
-`.zev-parties-*` in `index.css`, reusing the `.zev-access-*` rows.
+role. Every change invalidates parties, roles, access, the ZEV list (issuer) and participants.
+Styles `.zev-parties-*` in `index.css` (`.zev-parties-block-first` drops the divider of the
+contacts card's first block), reusing the `.zev-access-*` rows.
 
 ### 8.4 Participants
 
@@ -560,6 +579,7 @@ through the participant endpoints keep the existing participant audit events.
 | 5b | Transfer archive format 5 (`parties.json`, `party_roles.json` in the participants section) |
 | 6 | Party and role write endpoints, Parties tab, participant form and badges, user guide |
 | 7 | The issuer and representative manage the ZEV (§5.5): `Party.user`, derived access, guards, Zugang by party, role entries in Zugang, confirmation in the Parties tab (ADR 0028 decision 8) |
+| 8 | One People & access tab: roles, access (one row per login) and contacts, "Give access" from a contact; old tab URLs redirect |
 
 ## 12. Risks and mitigations
 
@@ -641,6 +661,9 @@ through the participant endpoints keep the existing participant audit events.
   gets no parties, today's issuer's does. Query budgets: `/auth/me` 3 → 4, the access memo 1 → 2
   queries. Frontend: `zev-access-section.test.ts` +2 (access to a party; role entries without
   actions), `zev-parties-section.test.ts` (setting a representative confirms the login first).
+- **PR 8** (shipped): frontend `tests/zev-people-section.test.ts` (2: three cards with one access
+  row per login carrying the issuer badge; "Give access" on a contact opens the form with that
+  party). `zev-parties-section.test.ts` mocks the access list. No backend change.
 
 ## 14. Acceptance criteria
 

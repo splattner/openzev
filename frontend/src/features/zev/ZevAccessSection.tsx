@@ -18,6 +18,8 @@ interface Props {
     zevId: string
     /** Give, change and take away access. A viewer (or a disabled ZEV) only sees the list. */
     canManage: boolean
+    /** Open the form for this party ("Give access" on a contact); a new object each time it is asked for. */
+    request?: { partyId: string } | null
 }
 
 const ROLES: ZevAccessRole[] = ['manager', 'viewer']
@@ -37,7 +39,7 @@ function displayName(grant: ZevAccessGrant): string {
  * party is issuer or representative are listed too, read-only: that access
  * changes with the role in the Parties tab (ADR 0028, amended).
  */
-export function ZevAccessSection({ zevId, canManage }: Props) {
+export function ZevAccessSection({ zevId, canManage, request = null }: Props) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
     const { pushToast } = useToast()
@@ -52,6 +54,16 @@ export function ZevAccessSection({ zevId, canManage }: Props) {
     const [email, setEmail] = useState('')
     const [role, setRole] = useState<ZevAccessRole>('viewer')
     const [validTo, setValidTo] = useState('')
+    // A contact's "Give access" opens the form with that party chosen.
+    const [seenRequest, setSeenRequest] = useState(request)
+    if (request !== seenRequest) {
+        setSeenRequest(request)
+        if (request) {
+            setIsAdding(true)
+            setTarget('party')
+            setPartyId(request.partyId)
+        }
+    }
 
     const partiesQuery = useQuery({
         queryKey: queryKeys.zev.parties(zevId),
@@ -163,12 +175,26 @@ export function ZevAccessSection({ zevId, canManage }: Props) {
         })
     }
 
-    const grants = accessQuery.data ?? []
+    // One row per login: access through the issuer or representative role is
+    // shown on the same login's grant row when it has one, else as its own row.
+    const entries = accessQuery.data ?? []
+    const grantRows = entries.filter((entry) => entry.source !== 'role')
+    const rolesByRow = new Map<string, ZevAccessGrant[]>()
+    const grants: ZevAccessGrant[] = [...grantRows]
+    for (const entry of entries.filter((item) => item.source === 'role')) {
+        const host = grantRows.find((row) => row.user.id === entry.user.id && row.is_active)
+        if (host) {
+            rolesByRow.set(host.id, [...(rolesByRow.get(host.id) ?? []), entry])
+        } else {
+            grants.push(entry)
+            rolesByRow.set(entry.id, [entry])
+        }
+    }
     const today = todayBusinessIso()
     const busy = createMutation.isPending || roleMutation.isPending || resendMutation.isPending || revokeMutation.isPending
 
     return (
-        <section className="card page-stack">
+        <section className="card page-stack" id="zev-access-section">
             <div>
                 <h3 style={{ marginTop: 0 }}>{t('pages.zevSettings.access.title')}</h3>
                 <p className="muted" style={{ margin: 0 }}>{t('pages.zevSettings.access.description')}</p>
@@ -251,6 +277,7 @@ export function ZevAccessSection({ zevId, canManage }: Props) {
                     {grants.map((grant) => {
                         const ended = grant.valid_to !== null && grant.valid_to < today
                         const byRole = grant.source === 'role'
+                        const viaRoles = (rolesByRow.get(grant.id) ?? []).filter((entry) => entry.party_role)
                         const actionable = canManage && !ended && !byRole
                         return (
                             <li key={grant.id} className="zev-access-row">
@@ -261,11 +288,11 @@ export function ZevAccessSection({ zevId, canManage }: Props) {
                                         <span className={`badge ${grant.role === 'manager' ? 'badge-info' : 'badge-neutral'}`}>
                                             {t(`nav.relation.${grant.role}`)}
                                         </span>
-                                        {byRole && grant.party_role && (
-                                            <span className="badge badge-neutral">
-                                                {t('pages.zevSettings.access.byRole', { role: t(`pages.participants.roles.${grant.party_role.role}`) })}
+                                        {viaRoles.map((entry) => (
+                                            <span key={entry.id} className="badge badge-neutral">
+                                                {t('pages.zevSettings.access.byRole', { role: t(`pages.participants.roles.${entry.party_role!.role}`) })}
                                             </span>
-                                        )}
+                                        ))}
                                         {grant.user.pending_invitation && (
                                             <span className="badge badge-warning">{t('pages.zevSettings.access.pending')}</span>
                                         )}
@@ -280,9 +307,9 @@ export function ZevAccessSection({ zevId, canManage }: Props) {
                                     {grant.granted_by && (
                                         <span>{t('pages.zevSettings.access.grantedBy', { name: grant.granted_by.full_name })}</span>
                                     )}
-                                    {byRole && grant.party_role && (
-                                        <span>{t('pages.zevSettings.access.byRoleHint', { name: grant.party_role.party_display_name })}</span>
-                                    )}
+                                    {viaRoles.map((entry) => (
+                                        <span key={entry.id}>{t('pages.zevSettings.access.byRoleHint', { name: entry.party_role!.party_display_name })}</span>
+                                    ))}
                                 </div>
                                 {actionable && (
                                     <div className="zev-access-actions actions-row actions-row-wrap">

@@ -4199,6 +4199,11 @@ input.recurrence-chip-input {
   border-top: 1px solid var(--border-default);
 }
 
+.zev-parties-block-first {
+  padding-top: 0;
+  border-top: 0;
+}
+
 .zev-parties-block-header {
   display: flex;
   flex-wrap: wrap;

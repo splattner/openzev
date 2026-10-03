@@ -32,11 +32,11 @@ rent a flat in another, or be a tenant in two communities.
 | **Former participant** | Own invoices that were sent, after leaving the community |
 
 Managers and viewers get their access from the community's managers (or an
-admin) under **ZEV settings → Access** — see
-[Access tab](02-zev-setup.md#access-tab). Whoever creates a ZEV is its manager.
+admin) under **ZEV settings → People & access** — see
+[People & access tab](02-zev-setup.md#people-and-access-tab). Whoever creates a ZEV is its manager.
 The login of the community's **issuer** and of its **representative toward the
 grid operator** manages it for as long as the role lasts — see
-[Parties tab](02-zev-setup.md#parties-tab); a landowner gets no access by that
+[People & access tab](02-zev-setup.md#people-and-access-tab); a landowner gets no access by that
 role. Participants get theirs by being linked to a participant entry.
 
 ## Admin Role
@@ -76,7 +76,7 @@ Accessible via **Platform → Overview**:
 
 A **manager** runs a community. The ZEV's owner is always a manager; other
 managers — a property management company, a co-owner — get access under
-**ZEV settings → Access**.
+**ZEV settings → People & access**.
 
 ### Manager Capabilities
 
@@ -171,7 +171,7 @@ An account that is neither a manager, a viewer nor a participant anywhere has
 no access to any community's data. That is the case for an account created on
 **Platform → Accounts** before it is given access, an account whose
 participant link was removed, or a self-registered account that never set up
-its ZEV. Give it access under **ZEV settings → Access**, or link it to a
+its ZEV. Give it access under **ZEV settings → People & access**, or link it to a
 participant. An admin can impersonate it, as any other account that is not an
 admin.
 
@@ -193,7 +193,7 @@ admin.
 ## Managing Accounts
 
 **Only Admins** manage accounts and platform roles. Managers give access to
-their own community under **ZEV settings → Access**.
+their own community under **ZEV settings → People & access**.
 
 ### The Accounts list
 
@@ -222,7 +222,7 @@ need access or a participant link.
 
 > **Platform role vs. community access.** The platform role (Admin or User)
 > belongs to the *account*. Which communities an account belongs to, and how,
-> is set in each community — under **ZEV settings → Access** for managers and
+> is set in each community — under **ZEV settings → People & access** for managers and
 > viewers, on the **Participants** page for participants — not here.
 
 ### Change an Account's Role
@@ -477,7 +477,7 @@ Ask an admin to check your account's **Platform role** and communities under
 in — nothing else.
 
 **If you need access:** ask a manager of that ZEV (or an admin) to give you
-access under **ZEV settings → Access**.
+access under **ZEV settings → People & access**.
 
 ### "User cannot login"
 

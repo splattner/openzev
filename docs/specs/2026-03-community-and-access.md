@@ -1396,7 +1396,7 @@ reaches every ZEV-scope route and sees its pages read-only
 | `/admin/email-templates` | `admin` | alias → `/admin/templates/email` |
 | `/participants` | ZEV scope | `ParticipantsPage` |
 | `/zev-settings` | ZEV scope | `ZevSettingsTabRoute` → `ZevSettingsPage` (General tab) |
-| `/zev-settings/:tab` (`general` · `billing` · `documents` · `access` · `audit` · `export`) | ZEV scope | `ZevSettingsTabRoute` → `ZevSettingsPage tab=…` (access tab lists and manages grants, SPEC-2026-10-zev-access-grants §9.6; audit tab embeds `AuditLogsPage scope="owner"`; export tab keeps the transfer archive) |
+| `/zev-settings/:tab` (`general` · `people` · `billing` · `documents` · `audit` · `export`; `parties` and `access` redirect to `people`) | ZEV scope | `ZevSettingsTabRoute` → `ZevSettingsPage tab=…` (people tab: roles, access and contacts, SPEC-2026-10-zev-parties §8.3, SPEC-2026-10-zev-access-grants §9.6; audit tab embeds `AuditLogsPage scope="owner"`; export tab keeps the transfer archive) |
 | `/audit-logs` | ZEV scope | alias → `/zev-settings/audit` (owner-scoped log in the settings hub) |
 | `/metering/points` | any authenticated | `MeteringPointsPage` (read-only for participants, no nav entry) |
 | `/metering-points` | any authenticated | alias → `/metering/points` |

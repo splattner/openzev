@@ -28,6 +28,7 @@ vi.mock('../src/lib/api/zev', () => ({
     deleteParty: vi.fn(),
     assignPartyRole: vi.fn(),
     endPartyRole: vi.fn(),
+    fetchZevAccess: vi.fn(() => Promise.resolve([])),
 }))
 
 import { assignPartyRole, endPartyRole, fetchParties, fetchPartyRoles } from '../src/lib/api/zev'
