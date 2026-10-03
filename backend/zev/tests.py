@@ -2688,6 +2688,12 @@ class SeedDemoEndToEndTests(TestCase):
 		self.assertFalse(ZevAccessGrant.objects.filter(zev=flagship, user=account).exists())
 		access.invalidate(account)
 		self.assertTrue(access.can_manage(account, flagship))
+		# The issuer manages both ZEVs through its role, without a grant on top.
+		owner = flagship.participants.get(party__last_name="Producer").user
+		for zev in Zev.objects.all():
+			self.assertFalse(ZevAccessGrant.objects.filter(zev=zev, user=owner).exists(), zev.name)
+			access.invalidate(owner)
+			self.assertTrue(access.can_manage(owner, zev), zev.name)
 		contact = Party.objects.get(zev=flagship, last_name="Hauswart")
 		self.assertFalse(contact.roles.exists())
 		self.assertFalse(contact.participations.exists())

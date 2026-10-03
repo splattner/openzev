@@ -17,7 +17,7 @@ from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 
 from accounts.models import FeatureFlag, VatRate
 from allocation.validity import active_during, business_tz, civil_date, period_start_dt, period_window, wall_clock
@@ -462,6 +462,7 @@ class Command(BaseCommand):
             valid_from=main_valid_from,
         )
         ensure_initial_roles(zev, owner_participant.party, main_valid_from)
+        self._drop_grant_covered_by_role(zev, owner)
         participant_one = self._upsert_participant(
             zev=zev,
             user=participant_one_user,
@@ -791,7 +792,9 @@ class Command(BaseCommand):
     ) -> Zev:
         """Create a demo ZEV, or refresh it to the canonical config (re-applied every run).
 
-        The demo owner manages it; that grant is how a re-run finds it again.
+        The demo owner manages it — first by grant, then through the issuer
+        role (``_drop_grant_covered_by_role``); either is how a re-run finds it
+        again.
         """
         zev = self._owned_zevs(owner).filter(name=name).order_by("created_at").first() or Zev(name=name)
         config = {
@@ -829,10 +832,21 @@ class Command(BaseCommand):
 
     @staticmethod
     def _owned_zevs(owner):
-        """The ZEVs the demo owner manages."""
+        """The ZEVs the demo owner manages, by grant or as their issuer."""
         return Zev.objects.filter(
-            access_grants__user=owner, access_grants__role=ZevAccessRole.MANAGER,
+            Q(access_grants__user=owner, access_grants__role=ZevAccessRole.MANAGER)
+            | Q(party_roles__role=PartyRole.ISSUER, party_roles__party__participations__user=owner),
         ).distinct()
+
+    @staticmethod
+    def _drop_grant_covered_by_role(zev: Zev, user) -> None:
+        """Remove ``user``'s grant on ``zev`` once a role makes it manager today:
+        the issuer manages through its role (#761), and a grant on top would
+        list the same person twice under People & access."""
+        from zev import access
+
+        if any(account == user for account, _row in access.role_managers(zev)):
+            ZevAccessGrant.objects.filter(zev=zev, user=user).delete()
 
     def _migrate_legacy_demo_zev_names(self, *, owner) -> None:
         """Rename the demo owner's row still carrying the superseded flagship name.
@@ -924,6 +938,7 @@ class Command(BaseCommand):
             valid_from=start_date,
         )
         ensure_initial_roles(zev, owner_participant.party, start_date)
+        self._drop_grant_covered_by_role(zev, owner)
         participant_one = self._upsert_participant(
             zev=zev,
             user=clara_user,
