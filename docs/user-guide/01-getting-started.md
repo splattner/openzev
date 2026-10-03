@@ -258,11 +258,11 @@ Then:
 2. Under **Account → Security**, turn on two-factor authentication or add a
    passkey for the admin account.
 3. Create the other people's accounts in **Platform → Accounts → Users**, or
-   create a community and its owner with the wizard in **Platform → ZEVs** —
+   create a community and its first manager with the wizard in **Platform → ZEVs** —
    see [Platform Administration](14-admin-console.md).
-4. Decide whether strangers may sign up. **ZEV owner self-registration is on by
-   default**: anyone who can reach the login page can register an owner
-   account and create a community. On a public instance you run only for your
+4. Decide whether strangers may sign up. **Self-registration is on by
+   default**: anyone who can reach the login page can register an account
+   and create a community, which makes them its issuer and manager. On a public instance you run only for your
    own community, turn it off under **Platform → System Settings → Functions**,
    or set `FEATURE_ZEV_SELF_REGISTRATION_ENABLED=false` in `backend/.env`.
 
@@ -273,8 +273,8 @@ Use `createsuperuser` again whenever you need another admin and cannot sign in
 
 A demo dataset is available for testing. It is loaded by starting the stack
 with `scripts/start-demo-environment.sh`, or by running `seed_demo` on an
-already-running stack (see below). It contains two communities owned by the
-same owner — the flagship **ZEV STWEG Sonnenhof** and the smaller
+already-running stack (see below). It contains two communities with the
+same issuer — the flagship **ZEV STWEG Sonnenhof** and the smaller
 **ZEV Sonnenfirma AG** — so both sides of the community switcher have real
 data to show. It also has a viewer of the flagship community and a property
 manager who manages both, to show per-community access. Credentials and the full list of what the seed creates are in
@@ -300,7 +300,7 @@ pages look the same, just without data.
 ### 1. Login
 
 1. Navigate to http://localhost:8080 (or your instance's `https://` URL)
-2. Login with admin credentials (or ZEV owner to manage a community)
+2. Login with admin credentials (or a manager's account to manage a community)
 3. Managers land on **Overview**; participants land on their personal dashboard
 
 The interface follows your browser's language (German, French, Italian or
@@ -319,12 +319,12 @@ If logged in as admin:
 - The sidebar ZEV switcher (top-left) selects the working community anywhere else; the selected community is shown above the page title on every page, so it stays visible even when the navigation scrolls, the sidebar is collapsed, or you are on mobile
 - For keyboard access, open the switcher or account button with Enter or Space, use Tab to move through its options, and press Escape to close it. After selecting a community, focus returns to the switcher. On mobile, Escape closes the navigation drawer and returns focus to its menu button.
 
-### 3. Explore as ZEV Owner
+### 3. Explore as a Manager
 
-If logged in as a ZEV owner:
+If logged in as a community's manager:
 - Go to **Overview** for setup guidance and billing work grouped by period
 - Go to **Energy balance** to analyse production, consumption, self-consumption, and grid exchange for a period
-- Go to **Settings** to configure your community parameters (General · Billing & payment · Documents & emails · Audit log · Export/transfer)
+- Go to **Settings** to configure your community parameters (General · People & access · Billing & payment · Documents & emails · Audit log · Export/transfer)
 - Go to **Participants** to view member list
 - Go to **Metering Points** to see participant meters
 - Go to **Metering** for consumption charts, data quality, and import history

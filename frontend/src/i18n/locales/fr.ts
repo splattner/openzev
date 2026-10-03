@@ -1936,11 +1936,12 @@ export const fr = {
             noMemberships: 'Dans aucune communauté',
             openInCommunity: 'Ouvrir dans {{zev}}',
             membership: {
-                owner: 'Propriétaire',
                 participant: 'Participant',
                 manager: 'Gestion',
                 viewer: 'Consultation',
                 former: 'Ancien participant',
+                issuer: 'Émetteur',
+                representative: 'Représentant',
             },
             inactive: 'Inactif',
             mfa: {

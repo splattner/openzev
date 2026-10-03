@@ -21,7 +21,7 @@ Each tariff has:
 
 ## Creating a Tariff
 
-**ZEV Owners** create tariffs in **Tariffs**.
+**Managers** create tariffs in **Tariffs**.
 
 1. Click **New Tariff**
 2. Enter details:
@@ -495,9 +495,9 @@ For a worked example of how a shared fee splits as members join and leave, and
 how rounding works, see
 [How Energy Allocation and Billing Works](08-billing-allocation-explained.md#shared-fees-and-changing-membership).
 
-**A note on the ZEV owner:** the owner is counted like anyone else, provided
-they have a participant record in the ZEV. If the owner is not a participant,
-they are not counted and not charged.
+**A note on the issuer:** the issuer is counted like anyone else, provided
+they have a participant record in the ZEV. An issuer that is not a participant
+(a property management company, say) is not counted and not charged.
 
 **Credits:** enter a negative amount to distribute a community-wide *rebate*
 across the participants. It appears on invoices as a credit line.
@@ -805,8 +805,8 @@ Metering) — the same grouping and order as an invoice's line items.
   downloading to include superseded and future tariff versions, shown
   greyed out with their full validity span instead of "from …".
 
-There is no date picker (yet) — the overview always reflects today. Only ZEV
-owners and admins can download it; there is nothing on this document a
+There is no date picker (yet) — the overview always reflects today. Only the
+community's managers and viewers, and admins, can download it; there is nothing on this document a
 participant does not already see broken out on their own participation
 contract or invoice.
 

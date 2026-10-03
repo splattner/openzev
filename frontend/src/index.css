@@ -2329,6 +2329,7 @@ input.recurrence-chip-input {
 .account-membership-chip {
   display: inline-flex;
   align-items: center;
+  text-align: start;
   gap: 0.4rem;
   padding: 0.18rem 0.6rem;
   border: 1px solid var(--border-default);
@@ -2346,6 +2347,8 @@ input.recurrence-chip-input {
 }
 
 .account-membership-kind {
+  /* "Verwaltung · Rechnungssteller" stays on one line; the ZEV name wraps. */
+  white-space: nowrap;
   color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 700;

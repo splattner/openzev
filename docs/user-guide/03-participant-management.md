@@ -14,7 +14,7 @@ A **participant** is a member of a ZEV community:
 
 ## Adding a Participant
 
-**ZEV Owners** add new participants in **Participants**.
+**Managers** add new participants in **Participants**.
 
 1. Click **New Participant**
 2. Enter participant details:
@@ -239,7 +239,7 @@ Participant records are kept permanently for:
 - Reproducibility of past invoices
 - Regulatory compliance
 
-**Data Privacy:** Only ZEV owners and admins can view participant details. Participants cannot see other members.
+**Data Privacy:** Only managers, viewers and admins can view participant details. Participants cannot see other members.
 
 ## Troubleshooting
 

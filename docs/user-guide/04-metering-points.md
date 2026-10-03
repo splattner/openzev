@@ -26,7 +26,7 @@ OpenZEV supports three metering point types:
 
 ## Creating a Metering Point
 
-**ZEV Owners** create metering points in **Metering Points**.
+**Managers** create metering points in **Metering Points**.
 
 1. Click **New Metering Point**
 2. Enter details:

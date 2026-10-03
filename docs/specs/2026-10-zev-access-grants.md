@@ -845,7 +845,9 @@ Shipped in PR 5, because the API shapes they read changed there:
 
 - `features/accounts/AccountMemberships.tsx`: renders `Membership[]`, one chip
   per community labelled `pages.accounts.membership.{manager,viewer,participant,former}`
-  (grant first; otherwise participant while a row is current, else former);
+  (grant first; otherwise participant while a row is current, else former),
+  followed by ` · pages.accounts.membership.{issuer,representative}` for each
+  entry of `membership.roles` (#761);
   clicking opens the Participants page focused on the current (or first)
   participant row. The admin list's role filter, create and edit forms offer
   `admin` and `user` (PR 7); the "accounts without a community" stat counts

@@ -18,13 +18,13 @@ Use the selectors above the chart:
 
 | Selector | Purpose | Default |
 | --- | --- | --- |
-| **Metering Point** | Single meter, or (admin/ZEV owner only) **Whole ZEV total** to sum every meter in the selected ZEV into one series — **required** to see a chart | None selected |
+| **Metering Point** | Single meter, or (admins and managers only) **Whole ZEV total** to sum every meter in the selected ZEV into one series — **required** to see a chart | None selected |
 | **Date Range** | Period to display | Current billing period (matches the ZEV's billing interval) |
 | **Resolution** | Aggregation level (`Hourly`, `Daily`, `Monthly`) | Daily |
 
 Until a metering point is selected, the chart area shows a prompt instead of
 data. The **Whole ZEV total** option is only offered when managing a ZEV
-(admin or ZEV owner) — a participant selects among their own metering
+(admin or manager) — a participant selects among their own metering
 points instead. Selecting it hides the Raw Readings Table below, since raw
 readings only make sense for one physical meter.
 

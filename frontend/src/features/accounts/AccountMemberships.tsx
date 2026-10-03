@@ -4,9 +4,15 @@ import { useManagedZev } from '../../lib/managedZev'
 import { relationOf } from '../../lib/membership'
 import type { Membership } from '../../types/api'
 
+/** Why a manager manages: the role it holds there today (#761). */
+const ROLE_LABELS = {
+    issuer: 'pages.accounts.membership.issuer',
+    representative: 'pages.accounts.membership.representative',
+} as const
 
 /**
- * The communities an account belongs to, one chip each. Selecting a chip
+ * The communities an account belongs to, one chip each; a manager through the
+ * issuer or representative role names that role. Selecting a chip
  * switches the shell to that community and opens its Participants page —
  * memberships are managed there, not on the accounts page.
  */
@@ -36,6 +42,7 @@ export function AccountMemberships({ memberships }: { memberships: Membership[] 
                     >
                         <span className="account-membership-kind">
                             {t(`pages.accounts.membership.${relationOf(membership)}`)}
+                            {(membership.roles ?? []).map((role) => ` · ${t(ROLE_LABELS[role])}`).join('')}
                         </span>
                         <span>{membership.zev_name}</span>
                     </button>

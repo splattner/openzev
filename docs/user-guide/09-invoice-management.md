@@ -252,7 +252,7 @@ The detail page shows:
 
 **The invoice document** — the stored PDF itself is embedded below the summary cards in a full document viewer (the same file the participant receives by email). It contains the line items, grouped by **tariff category** (e.g. Energy, Fee),
 with each line's type, description, quantity (kWh), unit price (CHF), and
-total, plus a subtotal per group. If no PDF has been generated yet, the page shows a **Generate PDF** button instead (owners/admins only — a participant sees a plain document-unavailable message, since the API rejects their generation attempt); the viewer appears once the document exists.
+total, plus a subtotal per group. If no PDF has been generated yet, the page shows a **Generate PDF** button instead (managers and admins only — a participant sees a plain document-unavailable message, since the API rejects their generation attempt); the viewer appears once the document exists.
 
 > **Note:** Invoices cannot be edited directly. If a correction is needed on a
 > draft, fix the underlying data (metering readings or tariff prices) and
@@ -339,7 +339,7 @@ Invoices can be deleted to clean up incorrect or test data.
 
 **Delete visibility rules:**
 
-- **Draft** or **Cancelled** invoices — **More → Delete** is available to ZEV owners.
+- **Draft** or **Cancelled** invoices — **More → Delete** is available to managers.
 - **Any status** — admins can always delete.
 
 Deletion is permanent; the invoice is removed from the database.
@@ -349,7 +349,7 @@ Deletion is permanent; the invoice is removed from the database.
 Open **Reports** (`/reports`) and select a year at the top of the page. The
 default is the last completed year.
 
-**Admins and ZEV owners** see the selected ZEV's annual report first:
+**Admins and managers** see the selected ZEV's annual report first:
 
 - **Key figures** — the year's **self-consumption rate** (share of the ZEV's
   production used inside the ZEV), **self-sufficiency rate** (share of the

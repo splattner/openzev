@@ -4,7 +4,7 @@ The Feasibility Calculator estimates whether forming a vZEV is financially worth
 
 ## Who can use it and how to open it
 
-- Available to the **admin** and **ZEV owner** roles.
+- Available to **admins** and **managers**.
 - Open **Feasibility Calculator** in the sidebar. It works standalone — you do not need an existing ZEV to use it.
 - It is **off by default**. If the sidebar has no entry, an admin turns it on
   under **Platform → System Settings → Functions**

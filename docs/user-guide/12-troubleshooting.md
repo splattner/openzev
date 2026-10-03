@@ -51,7 +51,7 @@ Development stack (`docker-compose.dev.yml`) uses port 8001 instead.
 | Symptom | Likely Cause | Solution |
 | --- | --- | --- |
 | "Invalid credentials" | Wrong username/password | Sign in with the email address, not the username. Check the [demo accounts](01-getting-started.md#demo-accounts); on a new production instance, [create the first admin account](01-getting-started.md#creating-the-first-admin-account) |
-| Participant never set a password | The onboarding link was not used, or has expired | The community owner sends a new onboarding link from the participant's card |
+| Participant never set a password | The onboarding link was not used, or has expired | A manager of the community sends a new onboarding link from the participant's card |
 | "Permission denied" | Your account has no access to that community, or only view access | Ask a manager of the ZEV (or an admin) for access under **ZEV settings → People & access** |
 | Signed out on every device without logging out | Your password or email was changed, your two-factor was reset, or someone chose **Sign out everywhere** for your account | Sign in again; if you did not expect it, change your password and check with your administrator |
 | Email-change link says it "does not work" | The link was already used, is older than 24 hours, or your password or address changed after you asked | Request the change again under **My Account → Profile** |
@@ -61,11 +61,11 @@ Development stack (`docker-compose.dev.yml`) uses port 8001 instead.
 
 There is no "forgot password" link on the login page.
 
-- **Participants:** ask the community owner to send the onboarding link again
+- **Participants:** ask a manager of the community to send the onboarding link again
   (**Participants → More → Send onboarding link**). It signs you in, and you
   choose a new password. If your invoice has a participant QR code, you can
   also request a sign-in link from the page it opens.
-- **Owners and admins:** someone with server access sets a new password — see
+- **Managers and admins:** someone with server access sets a new password — see
   [Roles and Permissions → "User cannot login"](11-roles-and-permissions.md#user-cannot-login).
 
 ### "Unauthorized" / "403 Forbidden" Errors

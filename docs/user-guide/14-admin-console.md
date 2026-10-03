@@ -169,7 +169,7 @@ billing-relevant, and destructive actions.
 - **Platform → Overview → Audit log** (`/admin/audit`) — admins can view **all**
   events across the platform.
 - **Setup → Settings → Audit log** (`/zev-settings/audit`) — admins **and
-  ZEV owners** see the events of the currently selected community. Owners only
+  managers** see the events of the currently selected community. Managers only
   see events for ZEVs they manage; they cannot see global or other-ZEV events.
   There is no community selector here (it follows the sidebar switcher) and no
   text search; the filters are date range, actor, category, action type, and
@@ -236,7 +236,7 @@ VAT rates are validity-window based — you can set rates for specific time peri
 
 ### How VAT Works
 
-1. A ZEV owner chooses the ZEV's **VAT treatment** in [ZEV Settings](02-zev-setup.md#vat-configuration)
+1. A manager chooses the ZEV's **VAT treatment** in [ZEV Settings](02-zev-setup.md#vat-configuration)
    (*VAT-registered* also needs the **VAT Number**)
 2. An admin configures the applicable VAT rate(s) in **Platform → System Settings → VAT**
 3. When invoices are generated, the system looks up the rate active on the invoice period's end date
@@ -263,7 +263,7 @@ Admins can manage the HTML/CSS template used for invoice PDF generation in **Pla
 
 Admins manage system-wide default email templates in **Platform → Templates → Email templates** (`/admin/templates/email`).
 
-> **Note:** ZEV owners can also customize email templates for their own ZEV in **ZEV Settings → Documents & emails**. See [ZEV Setup](02-zev-setup.md#email-templates) for per-ZEV customization, and [Email Configuration](10-email-configuration.md) for SMTP setup and delivery tracking.
+> **Note:** Managers can also customize email templates for their own ZEV in **ZEV Settings → Documents & emails**. See [ZEV Setup](02-zev-setup.md#email-templates) for per-ZEV customization, and [Email Configuration](10-email-configuration.md) for SMTP setup and delivery tracking.
 
 ### Overview
 
@@ -272,7 +272,7 @@ OpenZEV uses six email templates:
 | Template | Purpose |
 | --- | --- |
 | **Invoice Email** | Sent to participants when invoices are delivered |
-| **Onboarding Email** | Sent when an owner chooses **Send onboarding link** on a participant, with a reusable onboarding link |
+| **Onboarding Email** | Sent when a manager chooses **Send onboarding link** on a participant, with a reusable onboarding link |
 | **Verification Email** | Sent for email address verification |
 | **Sign-in Link Email** | Sent when a participant asks for a sign-in link from the QR code on their invoice (see [Participant Access from the Invoice](02-zev-setup.md#participant-access-from-the-invoice)) |
 | **ZEV Access Invitation Email** | Sent when someone is given access to a community (as manager or viewer) and has no account yet; its link, valid for 7 days, activates the account and asks for a password |
@@ -286,7 +286,7 @@ of anything else you send — it exists only to carry `{link_url}`. If your edit
 uses a placeholder that does not exist, OpenZEV sends the shipped default
 instead, so the link always works even when the wording is not yours.
 
-Administrators can edit the default subject and body for each template. ZEV owners can override the invoice-email subject and body independently for their community.
+Administrators can edit the default subject and body for each template. Managers can override the invoice-email subject and body independently for their community.
 
 ### Accessing Email Templates
 
@@ -402,8 +402,8 @@ The backend and frontend both read the same feature flag state.
 
 | Flag name | Default | Purpose |
 | --- | --- | --- |
-| `zev_self_registration_enabled` | `true` | Allows ZEV owner self-registration from the login page |
-| `feasibility_calculator_enabled` | `false` | Shows the [feasibility calculator](13-feasibility-calculator.md) to admins and ZEV owners |
+| `zev_self_registration_enabled` | `true` | Allows self-registration (setting up one's own ZEV) from the login page |
+| `feasibility_calculator_enabled` | `false` | Shows the [feasibility calculator](13-feasibility-calculator.md) to admins and managers |
 | `participant_geocoding_enabled` | `false` | Looks up participant buildings on OpenStreetMap for the [participant map](03-participant-management.md#map); sends addresses to the public Nominatim service |
 | `mcp_server_enabled` | `false` | Lets AI assistants read OpenZEV data through the [MCP endpoint](19-ai-assistants.md) using a user's API key; answers are sent to the assistant's LLM provider |
 

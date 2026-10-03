@@ -125,8 +125,8 @@ Example questions:
 - **No raw meter data.** Consumption is aggregated into monthly, daily or
   (for up to a week) hourly buckets; the underlying 15-minute readings are not
   exposed through MCP.
-- **Scoped to your account.** An assistant connected with a ZEV owner's key
-  sees only that owner's ZEVs — the same tenant isolation that protects the
+- **Scoped to your account.** An assistant connected with a manager's key
+  sees only that manager's ZEVs — the same tenant isolation that protects the
   REST API protects MCP, because MCP tools call the same REST endpoints
   internally.
 - **Bearer-token clients only, for now.** The endpoint accepts a static API

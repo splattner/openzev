@@ -23,9 +23,9 @@ There are two types:
 
 There are two ways to create a ZEV:
 
-### Option A: Self-Registration (ZEV Owner)
+### Option A: Self-Registration { #option-a-self-registration }
 
-New ZEV owners can register themselves and create their ZEV without admin involvement.
+New users can register themselves and create their ZEV without admin involvement.
 
 **Step 1: Register on the login page**
 
@@ -63,7 +63,7 @@ it off under **Platform → System Settings → Functions**).
    - **Bank Name** — Bank holding the payment account (optional)
    - **Bank IBAN** — Account receiving participant payments (optional; required for QR payment details)
 2. Click **Create ZEV & finish**
-3. You are redirected to the dashboard as the owner of your new ZEV
+3. You are redirected to the dashboard as the issuer and manager of your new ZEV
 
 > **Note:** A self-registered account may set up a ZEV of its own, and becomes its manager. It can create one ZEV this way; to run more, an admin creates them or another manager gives access.
 >
@@ -75,7 +75,7 @@ Admins can create a ZEV together with a new responsible-person account in a sing
 
 ## ZEV Settings
 
-**ZEV Owners** configure their community in **ZEV Settings** (sidebar entry
+**Managers** configure their community in **ZEV Settings** (sidebar entry
 **Setup → Settings**, `/zev-settings`). The settings are organized into tabs:
 
 - **General** — name, start date, ZEV type, grid connection
@@ -164,8 +164,10 @@ always name whoever held a role on their own date:
   so until one is set.
 - **Add landowner** adds a party from a date; **End** sets a landowner's last
   day. Ending a role before it started removes it.
-- The owner of a ZEV created through self-registration or the admin wizard is
-  its issuer and a landowner from the start date.
+- Whoever a ZEV is created for — through self-registration or the admin
+  wizard — is its issuer and a landowner from the start date, and manages it
+  through the issuer role. A ZEV that starts later gives them manager access
+  until the start date, so they can set it up beforehand.
 
 #### Access on each row
 
@@ -341,7 +343,7 @@ From the page, **Send me a sign-in link** emails a one-time link to the address 
 
 ### Email Templates
 
-**ZEV Owners** can customize invoice email templates in **ZEV Settings → Documents & emails**:
+**Managers** can customize invoice email templates in **ZEV Settings → Documents & emails**:
 
 ![Document and email settings](screenshots/06c-zev-documents-settings.png)
 
@@ -380,7 +382,7 @@ Participants automatically see only their own metering data and invoices (ZEV-sc
 ## Data Ownership and Privacy
 
 - All metering data is scoped to the ZEV — participants cannot see other participants' readings
-- Invoices are private to their recipient and ZEV owners
+- Invoices are private to their recipient and the community's managers and viewers
 - Admins have global read access for monitoring and compliance
 
 ## Multi-ZEV Operations

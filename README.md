@@ -402,7 +402,7 @@ its default start.
 Seeded demo users:
 
 - Admin: `admin@openzev.local` / `admin1234`
-- ZEV Owner: `owner@openzev.local` / `owner1234`
+- Issuer and manager: `owner@openzev.local` / `owner1234`
 - Participant (ZEV 1): `anna@openzev.local` / `anna1234`
 - Participant (ZEV 1): `ben@openzev.local` / `ben1234`
 - Participant (ZEV 2): `clara@openzev.local` / `clara1234`

@@ -54,7 +54,7 @@ OpenZEV is organized by what you may do in each community:
 - Regional and VAT settings
 - Admin dashboard with operational KPIs
 
-**Managers (ZEV owners)** can:
+**Managers** can:
 - Manage their ZEV's settings and preferences
 - Import and manage metering data
 - Configure tariffs and invoicing

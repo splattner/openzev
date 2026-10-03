@@ -83,7 +83,7 @@ Cursor or n8n questions about a ZEV instead of calling the API by hand.
 ## What a key can and cannot do
 
 A key **acts with your permissions**. A participant's key sees only that
-participant's data; a ZEV owner's key sees their ZEVs. Creating a key never
+participant's data; a manager's key sees the ZEVs they have access to. Creating a key never
 grants access you did not already have.
 
 ### Read-only keys

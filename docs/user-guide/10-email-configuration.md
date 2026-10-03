@@ -60,9 +60,9 @@ docker compose restart backend worker
 
 ## Email Templates
 
-**ZEV Owners** customize email templates in **ZEV Settings → Documents & emails**.
+**Managers** customize email templates in **ZEV Settings → Documents & emails**.
 
-The sections below describe the **invoice** email, which is the one ZEV owners
+The sections below describe the **invoice** email, which is the one managers
 customize per ZEV. Five further templates are system-wide and edited by admins
 in **Platform → Templates → Email templates**: onboarding, address verification,
 the **sign-in link** email sent when a participant requests

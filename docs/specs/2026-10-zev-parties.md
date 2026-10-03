@@ -364,7 +364,9 @@ manager access first."` lives in `zev/access.py` (re-exported by `zev/parties.py
   to send an invitation to. Add one first."]}`. A party without an account is linked to the
   account the grant went to (`Party.user`). Errors about the account (an admin, already has
   access) are keyed by the field used. The audit event's metadata names the `party`.
-- `/auth/me` and the admin accounts list: memberships carry `roles`.
+- `/auth/me` and the admin accounts list: memberships carry `roles`; the accounts list chip
+  (`AccountMemberships`) appends each role's label (`pages.accounts.membership.issuer` /
+  `.representative`), e.g. "Verwaltung · Rechnungssteller".
 
 **Frontend.**
 
@@ -702,6 +704,9 @@ through the participant endpoints keep the existing participant audit events.
   a grant; a ZEV starting later gets a bridging grant to the day before the start;
   `EndCoveredGrantsMigrationTests` (0039 ends the issuer's grant, another manager's stays).
   `testing.helpers.zev_manager` falls back to the first role manager.
+- **Wording and roles in the accounts list**: frontend `tests/account-memberships.test.ts` (1: a
+  manager through a role names it, a grant or a viewer names none). The unused
+  `pages.accounts.membership.owner` label is removed.
 
 ## 14. Acceptance criteria
 

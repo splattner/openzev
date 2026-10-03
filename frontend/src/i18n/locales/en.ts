@@ -1947,11 +1947,12 @@ export const en = {
             noMemberships: 'Not in any community',
             openInCommunity: 'Open in {{zev}}',
             membership: {
-                owner: 'Owner',
                 participant: 'Participant',
                 manager: 'Manager',
                 viewer: 'Viewer',
                 former: 'Former participant',
+                issuer: 'Issuer',
+                representative: 'Representative',
             },
             inactive: 'Inactive',
             mfa: {

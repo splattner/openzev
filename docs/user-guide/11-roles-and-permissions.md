@@ -25,7 +25,7 @@ rent a flat in another, or be a tenant in two communities.
 
 | Relation | What it allows in that community |
 | --- | --- |
-| **Manager** | Everything a ZEV owner can do: participants, metering, tariffs, invoices, settings, and giving others access |
+| **Manager** | Everything in the community: participants, metering, tariffs, invoices, settings, and giving others access |
 | **Issuer** or **representative** | The same as a manager, while the role lasts |
 | **Viewer** | Sees everything a manager sees and may download and export, but changes nothing |
 | **Participant** | Own consumption, own invoices and annual statement |
@@ -72,11 +72,11 @@ Accessible via **Platform → Overview**:
 
 > **Important:** Give admin access sparingly. It grants unrestricted power.
 
-## Managers (ZEV Owners)
+## Managers
 
-A **manager** runs a community. The ZEV's owner is always a manager; other
-managers — a property management company, a co-owner — get access under
-**ZEV settings → People & access**.
+A **manager** runs a community. Its issuer and its representative are
+managers through their role; anyone else — a co-owner, a bookkeeper — gets
+manager access under **ZEV settings → People & access**.
 
 ### Manager Capabilities
 
@@ -162,7 +162,7 @@ participant scoping above. The requester never names the destination address —
 the invoice identifies who they are — so there is no way to use it to find out
 whether an address has an account.
 
-A ZEV owner or admin can revoke any printed link; see
+A manager or admin can revoke any printed link; see
 [Invoice Management → Participant access links](09-invoice-management.md#participant-access-links).
 
 ## Accounts Without a Community
@@ -177,7 +177,7 @@ admin.
 
 ## Access Control Matrix
 
-| Feature | Admin | Manager (ZEV Owner) | Viewer | Participant |
+| Feature | Admin | Manager | Viewer | Participant |
 | --- | --- | --- | --- | --- |
 | **Participants** | View all | Manage in the ZEV | View in the ZEV | View self |
 | **Metering Points** | View all | Manage in the ZEV | View in the ZEV | View own meters |
@@ -204,7 +204,9 @@ each:
 
 - **Account** — name, username, email and the account's **platform role**.
 - **Communities** — one chip per community the account belongs to, marked
-  *Manager*, *Viewer*, *Participant* or *Former participant*. An account that belongs to several communities
+  *Manager*, *Viewer*, *Participant* or *Former participant*. A manager through a
+  role says which: *Manager · Issuer* or *Manager · Representative*. An account
+  that belongs to several communities
   still has a single row. Click a chip to open that community's Participants
   page.
 - **Security** — which second factors the account has (authenticator app,
@@ -282,8 +284,9 @@ Open **More** on an account row for:
   let you deactivate yourself, since it would sign you out with no way back in
   except another administrator.
 - **Delete** — only available for accounts that do not belong to a community.
-  Unlink the account from its participant first; an owner's account cannot be
-  deleted while it owns a community.
+  Unlink the account from its participant first. An account that is a
+  community's last manager cannot be deleted either: give someone else manager
+  access first.
 
 ## Data Privacy and Scoping
 
@@ -309,7 +312,7 @@ Security-relevant and billing-relevant user actions are logged:
 - What changed (old → new values)
 
 Audit logs are visible to **admins** (all events, **Platform → Overview →
-Audit log**) and to **ZEV owners** for their own communities (scoped events,
+Audit log**) and to **managers** for their own communities (scoped events,
 **Setup → Settings → Audit log**).
 
 ## Best Practices
@@ -418,7 +421,7 @@ link works once, and stops working if your password or address changes before yo
 
 Accounts that have no password — participants, who sign in with emailed links, and accounts that
 only use an external identity provider — cannot do this themselves. For participants the address is
-maintained by the community owner on the participant record; an administrator can change any
+maintained by the community's managers on the participant record; an administrator can change any
 account's address under **Platform → Accounts → Edit**.
 
 ### Signing out other devices
@@ -489,10 +492,10 @@ access under **ZEV settings → People & access**.
 **Fix:**
 1. Check the account under **Platform → Accounts → Users**: is it active, and
    has it ever signed in?
-2. **Participant:** the community owner sends or copies the onboarding link
+2. **Participant:** a manager of the community sends or copies the onboarding link
    again from the participant's card (**More**). It signs them in, and they
    choose a new password.
-3. **Owner or admin who forgot their password:** someone with server access
+3. **Manager or admin who forgot their password:** someone with server access
    sets a new one on the command line (the user then signs in with it):
 
    ```bash
