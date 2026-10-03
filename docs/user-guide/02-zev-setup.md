@@ -134,6 +134,8 @@ the community, can only read, or has no access, and the buttons to change it.
 It has two parts: **Roles** and **Other people**. Viewers see the tab but
 change nothing.
 
+![People & access tab](screenshots/06d-zev-people.png)
+
 #### Roles
 
 Every role has a start date (and, once it ends, an end date), so documents

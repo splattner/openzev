@@ -27,7 +27,11 @@ import {
   screenshotFull as captureFull,
   screenshotViewport as captureViewport,
   API_BASE,
+  DEMO_ZEV_NAME,
+  SECOND_DEMO_ZEV_NAME,
 } from './helpers'
+
+const DEMO_ZEV_NAMES = [DEMO_ZEV_NAME, SECOND_DEMO_ZEV_NAME]
 
 
 const __filename = fileURLToPath(import.meta.url)
@@ -136,6 +140,25 @@ test.describe('User Guide Screenshots', () => {
     await screenshotViewport(page, '03b-participant-allocation-weight')
   })
 
+  // 03c — The participant form for an organisation: the type switch, the
+  // organisation name and the contact person, and the second name line.
+  test('03c-participant-organisation', async ({ page }) => {
+    await navigateTo(page, '/participants')
+    await page.waitForSelector('table, .card', { timeout: 10_000 })
+    await page
+      .getByRole('button', {
+        name: /new participant|neuer teilnehmer|nouveau participant|nuovo partecipante/i,
+      })
+      .click()
+    await page.locator('select:has(option[value="organisation"])').selectOption('organisation')
+    await page.locator('input[name="organisation_name"]').fill('Bäckerei Muster GmbH')
+    await page.locator('input[name="first_name"]').fill('Lea')
+    await page.locator('input[name="last_name"]').fill('Muster')
+    await page.locator('input[name="name_addition"]').fill('Filiale Aarestrasse')
+    await page.waitForTimeout(300)
+    await screenshotViewport(page, '03c-participant-organisation')
+  })
+
   // 04 — Metering Points
   test('04-metering-points', async ({ page }) => {
     await navigateTo(page, '/metering-points')
@@ -214,6 +237,7 @@ test.describe('User Guide Screenshots', () => {
   // selected-community/platform context stay visible in the documentation.
   for (const [name, route] of [
     ['06b-zev-billing-settings', '/zev-settings/billing'],
+    ['06d-zev-people', '/zev-settings/people'],
     ['08e-billing-emails', '/billing/emails'],
     ['10b-admin-health', '/admin/health'],
   ]) {
@@ -398,7 +422,18 @@ test.describe('User Guide Screenshots', () => {
   })
 
   // 15 — Admin ZEV List
+  // Only the two demo communities: a developer's own ZEVs on the same stack
+  // (real names, real addresses) must never end up in the published guide.
   test('15-admin-zevs', async ({ page }) => {
+    await page.route(/\/zev\/zevs\/(\?.*)?$/, async (route) => {
+      const response = await route.fetch()
+      const body = await response.json() as { results?: Array<{ name: string }>, count?: number } | Array<{ name: string }>
+      const demo = (zev: { name: string }) => DEMO_ZEV_NAMES.includes(zev.name)
+      const filtered = Array.isArray(body)
+        ? body.filter(demo)
+        : { ...body, results: body.results?.filter(demo), count: body.results?.filter(demo).length }
+      await route.fulfill({ response, json: filtered })
+    })
     await navigateTo(page, '/admin/zevs')
     await page.waitForSelector('table, .card', { timeout: 10_000 })
     await screenshotFull(page, '15-admin-zevs')
@@ -428,6 +463,8 @@ test.describe('User Guide Screenshots', () => {
   test('17-admin-invoices', async ({ page }) => {
     await navigateTo(page, '/admin/invoices')
     await page.waitForSelector('.data-table, .card', { timeout: 10_000 })
+    // The card is there while the list still loads; wait for the list itself.
+    await expect(page.getByText(/werden geladen|loading/i)).toHaveCount(0, { timeout: 15_000 })
     await screenshotFull(page, '17-admin-invoices')
   })
 

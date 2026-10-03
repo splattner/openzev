@@ -42,6 +42,8 @@ A **participant** is a member of a ZEV community:
 
 5. Click **Save Participant**
 
+![The participant form for an organisation](screenshots/03c-participant-organisation.png)
+
 **Same person or organisation as** (at the top of the form) adds a second
 participation of someone already in the community — for example after a move
 to another flat within it. Name, contact and address are then taken from the

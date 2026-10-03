@@ -42,13 +42,17 @@ from zev.models import (
     MeteringPointAssignment,
     MeteringPointType,
     Participant,
+    Party,
+    PartyKind,
+    PartyRole,
     VatMode,
     Zev,
     ZevAccessGrant,
     ZevAccessRole,
+    ZevPartyRole,
     ZevType,
 )
-from zev.parties import ensure_initial_roles
+from zev.parties import assign_role, ensure_initial_roles
 
 
 
@@ -416,7 +420,8 @@ class Command(BaseCommand):
         # Per-ZEV access (#761): a viewer of the flagship community, and a
         # property manager (Verwaltung) who manages both communities — the
         # switcher lists both with their relation. Neither is a participant,
-        # so billing data is unaffected.
+        # so billing data is unaffected. The Verwaltung manages the flagship
+        # through its representative role (below), the second one by grant.
         viewer = self._upsert_user(
             User,
             username="demo_viewer",
@@ -436,7 +441,7 @@ class Command(BaseCommand):
             last_name="Verwaltung",
         )
         self._upsert_grant(zev=zev, user=viewer, role=ZevAccessRole.VIEWER, granted_by=owner)
-        self._upsert_grant(zev=zev, user=property_manager, role=ZevAccessRole.MANAGER, granted_by=owner)
+        ZevAccessGrant.objects.filter(zev=zev, user=property_manager).delete()
         self._upsert_grant(zev=second_zev, user=property_manager, role=ZevAccessRole.MANAGER, granted_by=owner)
 
         # Participants and their meter assignments are valid from the start of
@@ -482,6 +487,35 @@ class Command(BaseCommand):
             postal_code="3000",
             city="Bern",
             valid_from=main_valid_from,
+        )
+
+        # Parties that are not participants (#761): the Verwaltung represents
+        # the community toward the grid operator, and its login manages the
+        # ZEV through that role; the caretaker is a contact without a role or
+        # access. A re-seed restores both and the representative role.
+        verwaltung = self._upsert_party(
+            zev=zev,
+            kind=PartyKind.ORGANISATION,
+            organisation_name="Verwaltung Muster AG",
+            first_name="Marco",
+            last_name="Verwaltung",
+            email=property_manager.email,
+            phone="+41 31 555 40 40",
+            address_line1="Bundesgasse 8",
+            postal_code="3011",
+            city="Bern",
+            user=property_manager,
+        )
+        ZevPartyRole.objects.filter(zev=zev, role=PartyRole.REPRESENTATIVE).delete()
+        assign_role(zev, verwaltung, PartyRole.REPRESENTATIVE, main_valid_from)
+        self._upsert_party(
+            zev=zev,
+            kind=PartyKind.PERSON,
+            first_name="Hans",
+            last_name="Hauswart",
+            email="hauswart@openzev.local",
+            phone="+41 79 555 50 50",
+            notes="Hauswart, hat den Schlüssel zum Zählerraum.",
         )
 
         owner_prod = self._upsert_metering_point(
@@ -657,12 +691,13 @@ class Command(BaseCommand):
             "",
             "Accounts:",
             "  Admin:         admin@openzev.local / admin1234",
-            "  ZEV owner:     owner@openzev.local / owner1234",
+            "  Issuer:        owner@openzev.local / owner1234                (ZEV 1 + ZEV 2)",
             "  Participant 1: anna@openzev.local / anna1234                  (ZEV 1)",
             "  Participant 2: ben@openzev.local / ben1234                    (ZEV 1)",
             "  Participant 3: clara@openzev.local / clara1234                (ZEV 2)",
             "  Viewer:        viewer@openzev.local / viewer1234              (ZEV 1, read-only)",
-            "  Manager:       manager@openzev.local / manager1234            (ZEV 1 + ZEV 2)",
+            "  Manager:       manager@openzev.local / manager1234            (ZEV 1 as representative + ZEV 2)",
+            "  Contact:       Hans Hauswart, no login                         (ZEV 1)",
             "",
             f"ZEV 1: {zev.name} (full dataset, {zev.billing_interval} "
             f"{zev.invoice_language.upper()} invoices, VAT folded into prices)",
@@ -1428,6 +1463,20 @@ class Command(BaseCommand):
         participant.valid_to = None
         participant.save()
         return participant
+
+    def _upsert_party(self, *, zev: Zev, kind: str, user=None, **fields) -> Party:
+        """A party that is not a participant, found by its name."""
+        lookup = (
+            {"organisation_name": fields["organisation_name"]}
+            if kind == PartyKind.ORGANISATION
+            else {"first_name": fields["first_name"], "last_name": fields["last_name"]}
+        )
+        party = Party.objects.filter(zev=zev, kind=kind, **lookup).first() or Party(zev=zev, kind=kind)
+        for name, value in fields.items():
+            setattr(party, name, value)
+        party.user = user
+        party.save()
+        return party
 
     def _upsert_metering_point(
         self,

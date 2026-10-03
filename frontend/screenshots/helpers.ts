@@ -27,6 +27,7 @@ export const AUTH_STATE_PATH = path.join(__dirname, '.auth', 'admin.json')
  * cannot move the capture either.
  */
 export const DEMO_ZEV_NAME = 'ZEV STWEG Sonnenhof'
+export const SECOND_DEMO_ZEV_NAME = 'ZEV Sonnenfirma AG'
 
 // ---------------------------------------------------------------------------
 // Helpers

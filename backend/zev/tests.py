@@ -2670,3 +2670,24 @@ class SeedDemoEndToEndTests(TestCase):
 		self.assertEqual(second["audit_events"], first["audit_events"])
 		self.assertEqual(second["contracts"], first["contracts"])
 		self.assertEqual(second["zevs"], 2)
+
+	def test_the_flagship_has_a_representative_and_a_contact(self):
+		"""The Verwaltung represents the flagship and manages it through that
+		role, not a grant; the caretaker is a contact without a role (#761).
+		A re-seed keeps one of each."""
+		from zev import access
+		from zev.models import Party, ZevPartyRole
+
+		self._run()
+		self._run()
+		flagship = Zev.objects.get(name=DEMO_ZEV_NAME)
+		representative = ZevPartyRole.objects.get(zev=flagship, role="representative")
+		self.assertEqual(representative.party.organisation_name, "Verwaltung Muster AG")
+		account = representative.party.user
+		self.assertEqual(account.email, "manager@openzev.local")
+		self.assertFalse(ZevAccessGrant.objects.filter(zev=flagship, user=account).exists())
+		access.invalidate(account)
+		self.assertTrue(access.can_manage(account, flagship))
+		contact = Party.objects.get(zev=flagship, last_name="Hauswart")
+		self.assertFalse(contact.roles.exists())
+		self.assertFalse(contact.participations.exists())
