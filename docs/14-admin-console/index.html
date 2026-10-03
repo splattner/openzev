@@ -1073,15 +1073,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#system-settings" class="md-nav__link">
+  <a href="#settings" class="md-nav__link">
     <span class="md-ellipsis">
       
-        System Settings
+        Settings
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="System Settings">
+    <nav class="md-nav" aria-label="Settings">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1900,15 +1900,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#system-settings" class="md-nav__link">
+  <a href="#settings" class="md-nav__link">
     <span class="md-ellipsis">
       
-        System Settings
+        Settings
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="System Settings">
+    <nav class="md-nav" aria-label="Settings">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2395,7 +2395,7 @@ anchor links; the product term is now <strong>Platform</strong>.</p>
 <li><strong>Overview</strong> (<code>/admin</code>) — KPIs · ZEVs · All invoices · Dynamic price sources · Platform audit log · System health</li>
 <li><strong>Accounts</strong> (<code>/admin/accounts</code>) — Users · API keys</li>
 <li><strong>Templates</strong> (<code>/admin/templates</code>) — PDF templates · Email templates</li>
-<li><strong>System Settings</strong> (<code>/admin/system-settings</code>) — Regional Settings · Functions · OAuth · Security · VAT · Backup</li>
+<li><strong>Settings</strong> (<code>/admin/system-settings</code>) — Regional Settings · Functions · OAuth · Security · VAT · Backup</li>
 </ul>
 <p>Legacy routes (<code>/admin/zevs</code>, <code>/admin/invoices</code>, <code>/admin/audit-logs</code>,
 <code>/admin/api-keys</code>, <code>/admin/pdf-templates</code>, <code>/admin/email-templates</code>) redirect
@@ -2481,12 +2481,13 @@ from a tariff linked to that source — the fetched prices are that invoice's
 supporting evidence and OpenZEV does not let you remove it out from under
 one.</p>
 <p><img alt="Admin dynamic price sources" src="../screenshots/17b-admin-dynamic-sources.png" /></p>
-<h2 id="system-settings">System Settings<a class="headerlink" href="#system-settings" title="Permanent link">&para;</a></h2>
+<p><span id="system-settings"></span></p>
+<h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h2>
 <p>Regional display settings, feature flags, OAuth providers, and VAT rates are consolidated
-under <strong>Platform → System Settings</strong>.</p>
-<p>Backups are configured in <strong>Platform → System Settings → Backup</strong>; see <a href="../18-backups/">Backups</a>.</p>
+under <strong>Platform → Settings</strong>.</p>
+<p>Backups are configured in <strong>Platform → Settings → Backup</strong>; see <a href="../18-backups/">Backups</a>.</p>
 <h3 id="regional">Regional<a class="headerlink" href="#regional" title="Permanent link">&para;</a></h3>
-<p>Configure regional display settings in <strong>Platform → System Settings → Regional</strong>:</p>
+<p>Configure regional display settings in <strong>Platform → Settings → Regional</strong>:</p>
 <p><img alt="Regional settings" src="../screenshots/12-admin-regional-settings.png" /></p>
 <ul>
 <li><strong>Short Date Format</strong> — Compact date display (e.g. <code>DD.MM.YYYY</code>)</li>
@@ -2497,10 +2498,10 @@ under <strong>Platform → System Settings</strong>.</p>
 <p><strong>Note:</strong> The legacy route <code>/admin/settings/regional</code> redirects here.</p>
 </blockquote>
 <h3 id="functions">Functions<a class="headerlink" href="#functions" title="Permanent link">&para;</a></h3>
-<p>Feature flags are managed in <strong>Platform → System Settings → Functions</strong>.
+<p>Feature flags are managed in <strong>Platform → Settings → Functions</strong>.
 See <a href="#feature-flags">Feature Flags</a> below.</p>
 <h3 id="oauth">OAuth<a class="headerlink" href="#oauth" title="Permanent link">&para;</a></h3>
-<p>Configure external OAuth login providers in <strong>Platform → System Settings → OAuth</strong>:</p>
+<p>Configure external OAuth login providers in <strong>Platform → Settings → OAuth</strong>:</p>
 <ul>
 <li><strong>Name</strong> — Provider identifier (e.g. <code>github</code>)</li>
 <li><strong>Display Name</strong> — Human-readable label shown on the login page</li>
@@ -2515,14 +2516,14 @@ See <a href="#feature-flags">Feature Flags</a> below.</p>
 </ul>
 <blockquote>
 <p><strong>Note:</strong> The legacy routes <code>/admin/features</code>, <code>/admin/oauth</code>, and <code>/admin/settings/vat</code> redirect to
-the matching tab on the System Settings page.</p>
+the matching tab on the Settings page.</p>
 </blockquote>
 <h3 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h3>
 <p>Choose whether every account must use two-factor authentication, and the grace
-period they get, in <strong>Platform → System Settings → Security</strong>. See
+period they get, in <strong>Platform → Settings → Security</strong>. See
 <a href="../11-roles-and-permissions/#requiring-it-for-everyone-administrators">Roles and Permissions → Requiring it for everyone</a>.</p>
 <h3 id="vat">VAT<a class="headerlink" href="#vat" title="Permanent link">&para;</a></h3>
-<p>Configure VAT rates in <strong>Platform → System Settings → VAT</strong>. See <a href="#vat-settings">VAT Settings</a> for validity-window behavior and the workflow.</p>
+<p>Configure VAT rates in <strong>Platform → Settings → VAT</strong>. See <a href="#vat-settings">VAT Settings</a> for validity-window behavior and the workflow.</p>
 <h2 id="audit-logs">Audit Logs<a class="headerlink" href="#audit-logs" title="Permanent link">&para;</a></h2>
 <p>The audit log is the cross-cutting, append-only event stream of privileged,
 billing-relevant, and destructive actions.</p>
@@ -2577,7 +2578,7 @@ API keys.</p>
 like passwords, and revoke unused or exposed keys promptly.</p>
 </blockquote>
 <h2 id="vat-settings">VAT Settings<a class="headerlink" href="#vat-settings" title="Permanent link">&para;</a></h2>
-<p>Admins configure VAT rates in <strong>Platform → System Settings → VAT</strong>.</p>
+<p>Admins configure VAT rates in <strong>Platform → Settings → VAT</strong>.</p>
 <p><img alt="VAT settings" src="../screenshots/13-admin-vat-settings.png" /></p>
 <p>The rate, <strong>Valid from</strong>, and optional <strong>Valid to</strong> fields appear together with
 guidance beneath each field. Select either date field to open its calendar;
@@ -2588,7 +2589,7 @@ the fields onto separate rows.</p>
 <ol>
 <li>A manager chooses the ZEV's <strong>VAT treatment</strong> in <a href="../02-zev-setup/#vat-configuration">ZEV Settings</a>
    (<em>VAT-registered</em> also needs the <strong>VAT Number</strong>)</li>
-<li>An admin configures the applicable VAT rate(s) in <strong>Platform → System Settings → VAT</strong></li>
+<li>An admin configures the applicable VAT rate(s) in <strong>Platform → Settings → VAT</strong></li>
 <li>When invoices are generated, the system looks up the rate active on the invoice period's end date</li>
 </ol>
 <p>A ZEV that is <em>Not VAT-registered</em> is billed without VAT. If no VAT rate is
@@ -2816,7 +2817,7 @@ message when available, so you can correct the template and retry.</p>
 <ol>
 <li>Code defaults (defined in backend code)</li>
 <li>Environment variable overrides</li>
-<li>Platform toggles (System Settings → Functions)</li>
+<li>Platform toggles (Settings → Functions)</li>
 </ol>
 <p>The backend and frontend both read the same feature flag state.</p>
 <h3 id="current-feature-flags">Current Feature Flags<a class="headerlink" href="#current-feature-flags" title="Permanent link">&para;</a></h3>
@@ -2855,7 +2856,7 @@ message when available, so you can correct the template and retry.</p>
 <p>For each flag, OpenZEV resolves the final state in this order:</p>
 <ol>
 <li>Environment variable <code>FEATURE_&lt;FLAG_NAME_IN_UPPERCASE&gt;</code></li>
-<li>Value stored in database (set via Platform → System Settings → Functions)</li>
+<li>Value stored in database (set via Platform → Settings → Functions)</li>
 <li>Code default</li>
 <li><code>false</code> fallback</li>
 </ol>
@@ -2863,7 +2864,7 @@ message when available, so you can correct the template and retry.</p>
 <div class="highlight"><pre><span></span><code>FEATURE_ZEV_SELF_REGISTRATION_ENABLED=true
 </code></pre></div>
 <h3 id="managing-flags-via-the-ui">Managing flags via the UI<a class="headerlink" href="#managing-flags-via-the-ui" title="Permanent link">&para;</a></h3>
-<p>Manage flags in <strong>Platform → System Settings → Functions</strong>.</p>
+<p>Manage flags in <strong>Platform → Settings → Functions</strong>.</p>
 <p>Each flag has:</p>
 <ul>
 <li>Name</li>

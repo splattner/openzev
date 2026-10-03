@@ -2498,7 +2498,7 @@ role. Participants get theirs by being linked to a participant entry.</p>
 <ul>
 <li><strong>Account Management:</strong> Create, edit, remove user accounts</li>
 <li><strong>Access:</strong> Make other accounts admins, and give access to any community</li>
-<li><strong>System Settings:</strong> regional date formats, VAT rate configuration, feature flags, and OAuth providers</li>
+<li><strong>Platform settings:</strong> regional date formats, VAT rate configuration, feature flags, and OAuth providers</li>
 <li><strong>Overview hub:</strong> KPIs, multi-ZEV oversight, all invoices, the platform audit log, and system health</li>
 <li><strong>Accounts:</strong> user management and platform-wide API keys</li>
 <li><strong>Templates:</strong> PDF invoice/contract/statement templates and system-wide email defaults</li>
@@ -2613,6 +2613,12 @@ participant link was removed, or a self-registered account that never set up
 its ZEV. Give it access under <strong>ZEV settings → People &amp; access</strong>, or link it to a
 participant. An admin can impersonate it, as any other account that is not an
 admin.</p>
+<p>Signing in without a community opens an explanation page with a link to the
+account profile. The sidebar shows only <strong>Account</strong>; bookmarks to other
+protected pages return to the explanation. Ask an administrator to
+give the account community access or link it to a participant. A new
+invitation may be needed, since unlinking revokes onboarding links. Reload
+the page to pick up access changed by an administrator in another session.</p>
 <h2 id="access-control-matrix">Access Control Matrix<a class="headerlink" href="#access-control-matrix" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2855,7 +2861,7 @@ instead</strong> at that point. Keep your recovery codes somewhere safe — they
 password if you can't use your passkey.</p>
 </blockquote>
 <h3 id="requiring-it-for-everyone-administrators">Requiring it for everyone (administrators)<a class="headerlink" href="#requiring-it-for-everyone-administrators" title="Permanent link">&para;</a></h3>
-<p>Under <strong>Platform → System Settings → Security</strong>, tick <strong>Require two-factor
+<p>Under <strong>Platform → Settings → Security</strong>, tick <strong>Require two-factor
 authentication for every account</strong> and set a grace period in days. Users see a reminder on their
 account page and a set-up screen they can postpone until the grace period ends. The period counts from
 the later of the account's creation and the day you last changed the policy, so switching it on never

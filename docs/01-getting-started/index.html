@@ -2415,7 +2415,7 @@ password through the environment:</p>
 <li>Decide whether strangers may sign up. <strong>Self-registration is on by
    default</strong>: anyone who can reach the login page can register an account
    and create a community, which makes them its issuer and manager. On a public instance you run only for your
-   own community, turn it off under <strong>Platform → System Settings → Functions</strong>,
+   own community, turn it off under <strong>Platform → Settings → Functions</strong>,
    or set <code>FEATURE_ZEV_SELF_REGISTRATION_ENABLED=false</code> in <code>backend/.env</code>.</li>
 </ol>
 <p>Use <code>createsuperuser</code> again whenever you need another admin and cannot sign in
@@ -2443,7 +2443,8 @@ pages look the same, just without data.</p>
 <ol>
 <li>Navigate to http://localhost:8080 (or your instance's <code>https://</code> URL)</li>
 <li>Login with admin credentials (or a manager's account to manage a community)</li>
-<li>Managers land on <strong>Overview</strong>; participants land on their personal dashboard</li>
+<li>Managers land on <strong>Overview</strong>; participants land on their personal dashboard.
+   Unlinked guest accounts see an explanation and a link to <strong>Account settings</strong>.</li>
 </ol>
 <p>The interface follows your browser's language (German, French, Italian or
 English). To change it, open the account menu at the top right
@@ -2454,7 +2455,7 @@ contract PDFs use the community's own <strong>Invoice language</strong> instead.
 <p>If logged in as admin:</p>
 <ul>
 <li>Go to <strong>Platform → Overview</strong> to see system-wide KPIs</li>
-<li>View <strong>ZEVs</strong>, <strong>Accounts</strong>, <strong>Invoices</strong>, and <strong>System Settings</strong> (regional/VAT)</li>
+<li>View <strong>ZEVs</strong>, <strong>Accounts</strong>, <strong>Invoices</strong>, and <strong>Settings</strong> (regional/VAT)</li>
 <li>To work inside a community: open <strong>Platform → Overview → ZEVs</strong> and click <strong>Manage</strong> on a row — this selects the ZEV and takes you to its operational Overview. (While under <code>/admin</code> the shell shows the <strong>Platform administration</strong> indicator instead of the switcher.)</li>
 <li>The sidebar ZEV switcher (top-left) selects the working community anywhere else; the selected community is shown above the page title on every page, so it stays visible even when the navigation scrolls, the sidebar is collapsed, or you are on mobile</li>
 <li>For keyboard access, open the switcher or account button with Enter or Space, use Tab to move through its options, and press Escape to close it. After selecting a community, focus returns to the switcher. On mobile, Escape closes the navigation drawer and returns focus to its menu button.</li>
