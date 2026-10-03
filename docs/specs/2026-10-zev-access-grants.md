@@ -200,8 +200,9 @@ out until then. Reverse: delete all grants. Lossless — the input is exactly
 ### 4.7 Transitional invariant: the owner holds a manager grant
 
 > **Superseded (#761 phase 2, SPEC-2026-10-zev-parties §4.6).** `Zev.owner`,
-> `sync_owner_grant` and `ensure_a_manager` are gone. Creation flows grant the
-> creating account a manager role through `zev.access.grant_manager`; a per-ZEV
+> `sync_owner_grant` and `ensure_a_manager` are gone. The wizard and self-setup
+> make the creator issuer, which is its manager access (a grant only bridges a
+> later start); a transfer import uses `zev.access.grant_manager`; a per-ZEV
 > restore that recreates a community leaves it without managers (§4.8). The text
 > below describes phase 1.
 

@@ -195,4 +195,8 @@ class SelfSetupGuardTests(_OneOwnerOneZev):
         self._disable(self.owner_client)
         response = self.owner_client.post(SELF_SETUP, self._self_setup_payload("Replacement ZEV"), format="json")
         self.assertEqual(response.status_code, 201, response.content)
-        self.assertTrue(Zev.objects.filter(access_grants__user=self.owner, name="Replacement ZEV").exists())
+        # The creator manages it as its issuer, not through a grant (#761).
+        from zev import access
+
+        access.invalidate(self.owner)
+        self.assertTrue(access.can_manage(self.owner, Zev.objects.get(name="Replacement ZEV")))

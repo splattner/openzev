@@ -51,15 +51,20 @@ def create_managed_zev(*, owner=None, **fields) -> Zev:
 
 
 def zev_manager(zev):
-    """The account managing ``zev`` (its earliest open manager grant) — what
-    tests used to reach as ``zev.owner``."""
+    """The account managing ``zev`` — its earliest open manager grant, else the
+    first account managing through the issuer or representative role (what the
+    wizard and self-setup create). What tests used to reach as ``zev.owner``."""
+    from zev import access
     from zev.models import ZevAccessGrant, ZevAccessRole
 
     grant = (
         ZevAccessGrant.objects.filter(zev=zev, role=ZevAccessRole.MANAGER, valid_to__isnull=True)
         .select_related("user").order_by("valid_from", "created_at").first()
     )
-    return grant.user if grant else None
+    if grant:
+        return grant.user
+    managers = access.role_managers(zev)
+    return managers[0][0] if managers else None
 
 
 def make_named_participant(zev, name, valid_from, valid_to=None) -> Participant:

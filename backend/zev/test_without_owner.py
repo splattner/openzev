@@ -2,18 +2,20 @@
 issuer through the dated role, and the old ``zev.owner`` template variables
 answered by the issuer."""
 
-from datetime import date
+from datetime import date, timedelta
 
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.template import Context, Template
 from django.test import TestCase, TransactionTestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from invoices.contract_pdf import _build_contract_context
 from testing.helpers import authenticate, create_managed_zev, make_user
 
+from . import access
 from .models import Participant, Zev, ZevAccessGrant, ZevAccessRole
 from .parties import ensure_initial_roles
 
@@ -52,8 +54,29 @@ class ZevApiTests(TestCase):
         )
         self.assertIn(response.status_code, (200, 201), response.content)
         zev = Zev.objects.get(name="Mine")
-        self.assertTrue(ZevAccessGrant.objects.filter(zev=zev, user=owner, role=ZevAccessRole.MANAGER).exists())
         self.assertEqual(zev.party_roles.filter(role="issuer").get().party.participations.get().user, owner)
+        # The issuer role is the caller's access: no grant on top of it.
+        self.assertFalse(ZevAccessGrant.objects.filter(zev=zev, user=owner).exists())
+        access.invalidate(owner)
+        self.assertTrue(access.can_manage(owner, zev))
+
+    def test_a_zev_starting_later_bridges_the_days_before_with_a_grant(self):
+        owner = make_user("wo_later", UserRole.USER, may_create_zev=True)
+        owner.last_name = "Später"
+        owner.save()
+        authenticate(self.client, owner)
+        start = timezone.localdate() + timedelta(days=30)
+        response = self.client.post("/api/v1/zev/zevs/self-setup/", {
+            "name": "Later", "zev_type": "vzev", "invoice_prefix": "LA", "start_date": start.isoformat(),
+        }, format="json")
+        self.assertIn(response.status_code, (200, 201), response.content)
+        zev = Zev.objects.get(name="Later")
+        grant = ZevAccessGrant.objects.get(zev=zev, user=owner)
+        self.assertEqual((grant.role, grant.valid_from, grant.valid_to), (
+            ZevAccessRole.MANAGER, timezone.localdate(), start - timedelta(days=1),
+        ))
+        access.invalidate(owner)
+        self.assertTrue(access.can_manage(owner, zev))
 
 
 class OwnerAliasTests(TestCase):
@@ -97,3 +120,35 @@ class RemoveOwnerMigrationTests(TransactionTestCase):
         self.assertEqual(back.get_model("zev", "Zev").objects.get(pk=zev.pk).owner_id, manager.pk)
         self.migrate(self.AFTER)
         self.assertFalse(any(field.name == "owner" for field in Zev._meta.get_fields()))
+
+
+class EndCoveredGrantsMigrationTests(TransactionTestCase):
+    """0039 ends a manager grant whose account already manages through a role."""
+
+    def migrate(self, targets):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(targets)
+
+    def tearDown(self):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())
+
+    def test_the_issuers_grant_ends_and_other_grants_stay(self):
+        issuer_account = make_user("ecg_issuer", UserRole.USER)
+        zev = create_managed_zev(name="Covered", owner=issuer_account, start_date=date(2026, 1, 1))
+        issuer = Participant.objects.create(zev=zev, user=issuer_account, last_name="Issuer", valid_from=date(2026, 1, 1))
+        ensure_initial_roles(zev, issuer.party, date(2026, 1, 1))
+        other = make_user("ecg_other", UserRole.USER)
+        ZevAccessGrant.objects.create(zev=zev, user=other, role=ZevAccessRole.MANAGER, valid_from=date(2026, 1, 1))
+        ZevAccessGrant.objects.filter(user=issuer_account).update(valid_from=date(2026, 1, 1))
+
+        self.migrate([("zev", "0038_party_user")])
+        self.migrate([("zev", "0039_end_grants_covered_by_roles")])
+
+        ended = ZevAccessGrant.objects.get(zev=zev, user=issuer_account)
+        self.assertEqual(ended.valid_to, timezone.localdate() - timedelta(days=1))
+        self.assertIsNone(ZevAccessGrant.objects.get(zev=zev, user=other).valid_to)
+        access.invalidate(issuer_account)
+        self.assertTrue(access.can_manage(issuer_account, zev))

@@ -299,10 +299,13 @@ and is served as a manager (400 without ids) when it never took part.
 
 A ZEV has no owner account (`Zev.owner` was removed in #761 phase 2,
 migration `zev.0037_remove_zev_owner`, SPEC-2026-10-zev-parties §4.6). Whoever
-creates a ZEV through the wizard, self-setup or a transfer import gets a
-manager grant from `zev.access.grant_manager(zev, user)` (an existing open
-grant is promoted, an active manager grant kept); a ZEV an admin creates
-through `POST /zevs/` gets no grant. Whom its documents are from is the dated
+creates a ZEV through the wizard or self-setup becomes its issuer and
+landowner and manages it through that role, without a grant (a ZEV starting
+later bridges the days before with `zev.access.grant_manager_until_role`); a
+transfer import gives the importing account a manager grant from
+`zev.access.grant_manager(zev, user)` (an existing open grant is promoted, an
+active manager grant kept); a ZEV an admin creates through `POST /zevs/` gets
+no grant. Whom its documents are from is the dated
 issuer role (SPEC-2026-10-zev-parties §4.4), and the accounts of the issuer
 and the representative manage the ZEV through that role
 (`zev.access.role_holdings`, SPEC-2026-10-zev-parties §5.5): `managed_zev_ids`

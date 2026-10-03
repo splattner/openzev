@@ -364,7 +364,7 @@ Access to a ZEV is given per community:
 | Relation | Access |
 | --- | --- |
 | **Admin** | Global access to all ZEVs, users, and settings |
-| **Manager** | Full operational management of this ZEV (whoever created it is one) |
+| **Manager** | Full operational management of this ZEV (whoever created it manages it as its issuer) |
 | **Viewer** | Sees everything a manager sees, may download and export, changes nothing |
 | **Participant** | Read-only access to own metering data and invoices |
 

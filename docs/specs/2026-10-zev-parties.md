@@ -220,7 +220,12 @@ open manager grant (else its last one), then `RemoveField`, so the migration rev
 `Zev.save()`/`Zev.from_db` are the plain model methods again; `sync_owner_grant` and
 `ensure_a_manager` are deleted. New `zev.access.grant_manager(zev, user, *, by=None)`: an
 active manager grant is kept, an open grant of another role is promoted (`change_role`), else
-an open manager grant from today is created. `issuer_on` loses its owner fallback (PR 4). The
+an open manager grant from today is created; only the transfer import uses it.
+`zev.access.grant_manager_until_role(zev, user, role_start)`: `None` when `role_start <= today`,
+else a manager grant `valid_from = today`, `valid_to = role_start − 1` (wizard and self-setup).
+Migration `zev.0039_end_grants_covered_by_roles` (data, reverse no-op): every open manager grant
+held by an account of a party with an open-ended issuer or representative role that applies
+today is ended yesterday (deleted when it starts today or later). `issuer_on` loses its owner fallback (PR 4). The
 participant "cannot unlink the owner account" rule goes. Django admin drops the `owner` column.
 
 ## 5. API contracts
@@ -378,11 +383,11 @@ manager access first."` lives in `zev/access.py` (re-exported by `zev/parties.py
 
 | Flow | Creates |
 |---|---|
-| Wizard `create_zev_with_owner_setup` | Account (`role=user`, temporary password), ZEV, a **person party** from the owner data, the owner **participant** of that party (`valid_from = start_date`), **issuer + landowner** roles from `start_date`, a **manager grant** for the account, the metering points and their assignments |
-| Self-setup `create_zev_for_existing_owner` | ZEV, the caller's party and participant, issuer + landowner, a manager grant for the caller |
+| Wizard `create_zev_with_owner_setup` | Account (`role=user`, temporary password), ZEV, a **person party** from the owner data, the owner **participant** of that party (`valid_from = start_date`), **issuer + landowner** roles from `start_date`, the metering points and their assignments. The account manages through the issuer role and gets **no grant** — except a ZEV starting later, where `grant_manager_until_role` gives it a manager grant from today to `start_date − 1` |
+| Self-setup `create_zev_for_existing_owner` | ZEV, the caller's party and participant, issuer + landowner; access through the issuer role, a bridging grant only for a later start (as the wizard) |
 | Admin `ZevViewSet.create` | The ZEV only (admins need no grant); parties, roles and access are added afterwards in ZEV settings |
 | Transfer import | Parties from the archive (§9; roles from format 5, a follow-up PR); a manager grant for the importing account (`grant_manager`) |
-| `seed_demo` | Finds its demo ZEVs through the demo owner's manager grant (`_owned_zevs`), and grants it on every run |
+| `seed_demo` | Finds its demo ZEVs through the demo owner's manager grant or issuer role (`_owned_zevs`) |
 
 ## 7. Documents and templates
 
@@ -693,6 +698,10 @@ through the participant endpoints keep the existing participant audit events.
   `invoices/test_readiness.py` `IssuerSetupTests` (2: no issuer; an issuer without and then with
   an address). Frontend `tests/readiness-cockpit.test.ts` +1 (the issuer-address warning links to
   People & access).
+- **Creator by role** (`zev/test_without_owner.py`): self-setup makes the caller issuer without
+  a grant; a ZEV starting later gets a bridging grant to the day before the start;
+  `EndCoveredGrantsMigrationTests` (0039 ends the issuer's grant, another manager's stays).
+  `testing.helpers.zev_manager` falls back to the first role manager.
 
 ## 14. Acceptance criteria
 
@@ -701,6 +710,6 @@ through the participant endpoints keep the existing participant audit events.
       issuer and later ones the new issuer; issued invoices never change.
 - [x] An organisation participant appears with its name on invoices, QR bill and contracts; a
       household shows its second name line.
-- [x] `Zev.owner` no longer exists; creating a ZEV still gives its creator manager access and
-      an issuer in one step.
+- [x] `Zev.owner` no longer exists; creating a ZEV makes its creator the issuer and landowner in
+      one step, and the issuer role is their manager access (no grant on top of it).
 - [x] Custom templates using `owner_participant.*` / `zev.owner.*` keep rendering.

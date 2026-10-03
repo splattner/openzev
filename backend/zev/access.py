@@ -268,8 +268,8 @@ def change_role(grant: ZevAccessGrant, role: str, *, by=None) -> ZevAccessGrant:
 def grant_manager(zev, user, *, by=None) -> ZevAccessGrant:
     """Give ``user`` an active manager grant on ``zev`` from today.
 
-    What creating a ZEV for an account does (wizard, self-setup, transfer
-    import): the creator manages what it created. An open grant the account
+    What a transfer import does for the importing account. The wizard and
+    self-setup make the creator issuer instead (``grant_manager_until_role``). An open grant the account
     already holds is promoted rather than duplicated.
     """
     today = _today()
@@ -282,6 +282,24 @@ def grant_manager(zev, user, *, by=None) -> ZevAccessGrant:
         return change_role(open_grant, ZevAccessRole.MANAGER, by=by)
     return ZevAccessGrant.objects.create(
         zev_id=_zev_id(zev), user=user, role=ZevAccessRole.MANAGER, valid_from=today, granted_by=by,
+    )
+
+
+def grant_manager_until_role(zev, user, role_start: date) -> ZevAccessGrant | None:
+    """Bridge the days before ``user``'s managing role starts.
+
+    Creating a ZEV makes the creator's party its issuer from the start date
+    (ADR 0028, amended), and the role is all the access the creator needs. A
+    ZEV that starts later would leave the creator locked out until then, so
+    they get a manager grant from today that ends the day before the role
+    starts. ``None`` when the role already applies today.
+    """
+    today = _today()
+    if role_start <= today:
+        return None
+    return ZevAccessGrant.objects.create(
+        zev_id=_zev_id(zev), user=user, role=ZevAccessRole.MANAGER,
+        valid_from=today, valid_to=role_start - timedelta(days=1),
     )
 
 

@@ -201,7 +201,7 @@ def get_participant_onboarding_link(participant) -> tuple[str, ParticipantOnboar
 @transaction.atomic
 def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_points_data: list[dict]) -> dict:
     from .models import MeteringPoint, MeteringPointAssignment, Participant, Zev
-    from .access import grant_manager
+    from .access import grant_manager_until_role
     from .parties import ensure_initial_roles
 
     first_name = owner_data['first_name']
@@ -223,7 +223,6 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
     )
 
     zev = Zev.objects.create(**zev_data)
-    grant_manager(zev, owner_user)
     owner_participant = Participant.objects.create(
         zev=zev,
         user=owner_user,
@@ -239,6 +238,8 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
         valid_from=zev.start_date,
     )
     ensure_initial_roles(zev, owner_participant.party, zev.start_date)
+    # The issuer role is the creator's access; a grant only bridges a later start.
+    grant_manager_until_role(zev, owner_user, zev.start_date)
 
     from .tasks import trigger_geocode_if_address_present
     trigger_geocode_if_address_present(owner_participant)
@@ -283,15 +284,14 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
 def create_zev_for_existing_owner(*, owner_user, zev_data: dict, participant_data: dict | None = None) -> dict:
     """Create a ZEV and its owner participant for a self-registered user.
 
-    The caller manages the ZEV; their party is its issuer and a landowner from
-    its start date.
+    The caller's party is its issuer and a landowner from its start date, and
+    manages it through that role — no grant, unless the ZEV starts later.
     """
     from .models import Participant, Zev
-    from .access import grant_manager
+    from .access import grant_manager_until_role
     from .parties import ensure_initial_roles
 
     zev = Zev.objects.create(**zev_data)
-    grant_manager(zev, owner_user)
     owner_participant = Participant.objects.create(
         zev=zev,
         user=owner_user,
@@ -302,6 +302,8 @@ def create_zev_for_existing_owner(*, owner_user, zev_data: dict, participant_dat
         valid_from=zev.start_date,
     )
     ensure_initial_roles(zev, owner_participant.party, zev.start_date)
+    # The issuer role is the creator's access; a grant only bridges a later start.
+    grant_manager_until_role(zev, owner_user, zev.start_date)
     return {
         'zev': {'id': str(zev.id), 'name': zev.name},
         'owner_participant_id': str(owner_participant.id),
