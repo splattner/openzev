@@ -1,5 +1,3 @@
-import { useState } from 'react'
-import { ZevAccessSection } from './ZevAccessSection'
 import { ZevPartiesSection } from './ZevPartiesSection'
 
 interface Props {
@@ -9,29 +7,15 @@ interface Props {
 }
 
 /**
- * ZEV settings → People & access (#761): who the community deals with and who
- * may sign in to it, on one page. Roles first (the issuer and the
- * representative also manage the ZEV), then everyone with access, then the
- * contacts that are not participants — each of which can be given access from
- * its own row.
+ * ZEV settings → People & access (#761): who the community deals with and
+ * what each of them may do in OpenZEV, on the same rows. The issuer and the
+ * representative manage the ZEV through their role; landowners, contacts and
+ * anyone else get access — manager or read-only — from their own row.
  */
 export function ZevPeopleSection({ zevId, canManage }: Props) {
-    const [request, setRequest] = useState<{ partyId: string } | null>(null)
-
     return (
         <div className="page-stack">
-            <ZevPartiesSection
-                zevId={zevId}
-                canManage={canManage}
-                onGiveAccess={(party) => {
-                    setRequest({ partyId: party.id })
-                    window.setTimeout(
-                        () => document.getElementById('zev-access-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-                        50,
-                    )
-                }}
-                accessSlot={<ZevAccessSection zevId={zevId} canManage={canManage} request={request} />}
-            />
+            <ZevPartiesSection zevId={zevId} canManage={canManage} />
         </div>
     )
 }

@@ -4243,6 +4243,29 @@ input.recurrence-chip-input {
   gap: 0.15rem 0.75rem;
 }
 
+/* Access on a person's own row of the People & access tab (#761). */
+.party-access {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.party-access-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  font-size: 0.9rem;
+}
+
+.party-access-line .muted {
+  overflow-wrap: anywhere;
+}
+
+.party-access-line select {
+  width: auto;
+}
+
 .zev-parties-inline-date {
   display: flex;
   align-items: center;

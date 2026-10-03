@@ -12,6 +12,7 @@ vi.mock('react-i18next', () => ({
 }))
 const pushToast = vi.fn()
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast }) }))
+vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ user: { id: 1 }, refreshUser: vi.fn() }) }))
 vi.mock('../src/lib/dates', async (importOriginal) => ({
     ...(await importOriginal<typeof import('../src/lib/dates')>()),
     todayBusinessIso: () => '2026-06-15',

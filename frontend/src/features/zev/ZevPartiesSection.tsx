@@ -21,16 +21,13 @@ import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { todayBusinessIso } from '../../lib/dates'
 import { useToast } from '../../lib/toast'
 import type { Party, PartyInput, PartyRoleName, ZevPartyRole } from '../../types/api'
+import { AccessControls, GiveAccessForm, useAccessActions } from './PartyAccess'
 import { PartyFormModal } from './PartyFormModal'
 
 interface Props {
     zevId: string
     /** Change roles and contacts. A viewer (or a disabled ZEV) only reads. */
     canManage: boolean
-    /** Rendered between the roles and the contacts: the access card of the People & access tab. */
-    accessSlot?: ReactNode
-    /** "Give access" on a contact without access: opens the access form for that party. */
-    onGiveAccess?: (party: Party) => void
 }
 
 const NEW_CONTACT = '__new__'
@@ -48,7 +45,7 @@ function activeOn(row: ZevPartyRole, day: string): boolean {
  * holder the day before, so documents dated earlier keep naming the earlier
  * holder.
  */
-export function ZevPartiesSection({ zevId, canManage, accessSlot, onGiveAccess }: Props) {
+export function ZevPartiesSection({ zevId, canManage }: Props) {
     const { t } = useTranslation()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
@@ -58,6 +55,8 @@ export function ZevPartiesSection({ zevId, canManage, accessSlot, onGiveAccess }
     const [partyModalOpen, setPartyModalOpen] = useState(false)
     // Where a contact created from a role picker should be selected afterwards.
     const [pickAfterCreate, setPickAfterCreate] = useState<((id: string) => void) | null>(null)
+    const [givingAccess, setGivingAccess] = useState(false)
+    const accessActions = useAccessActions(zevId)
 
     const partiesQuery = useQuery({
         queryKey: queryKeys.zev.parties(zevId),
@@ -167,11 +166,37 @@ export function ZevPartiesSection({ zevId, canManage, accessSlot, onGiveAccess }
     const roles = rolesQuery.data ?? []
     const busy = assign.isPending || end.isPending
     const contacts = parties.filter((party) => party.participations.length === 0)
-    const accessByAccount = new Map<number, string>()
-    for (const entry of accessQuery.data ?? []) {
-        if (entry.is_active && !accessByAccount.has(entry.user.id)) accessByAccount.set(entry.user.id, entry.role)
+    const entries = accessQuery.data ?? []
+    const today = todayBusinessIso()
+    const entriesOf = (party: Party | undefined) => {
+        const ids = new Set((party?.accounts ?? []).map((account) => account.id))
+        return entries.filter((entry) => ids.has(entry.user.id))
     }
-    const contactAccess = (party: Party) => party.accounts.map((account) => accessByAccount.get(account.id)).find(Boolean)
+    const partyById = new Map(parties.map((party) => [party.id, party]))
+    /** Access, on the row of the party it belongs to (#761: one place for a person and its login). */
+    const renderAccess = (partyId: string, managingRole = false) => (
+        <AccessControls
+            entries={entriesOf(partyById.get(partyId))}
+            party={partyById.get(partyId)}
+            canManage={canManage}
+            actions={accessActions}
+            managingRole={managingRole}
+        />
+    )
+    // Everyone with access who is not on the page yet: participants given
+    // access, and logins given access by email (a bookkeeper, staff).
+    const shownPartyIds = new Set([
+        ...roles.filter((row) => activeOn(row, today) || (row.role === 'landowner' && row.valid_from > today)).map((row) => row.party),
+        ...contacts.map((party) => party.id),
+    ])
+    const shownAccountIds = new Set(
+        parties.filter((party) => shownPartyIds.has(party.id)).flatMap((party) => party.accounts.map((account) => account.id)),
+    )
+    const otherParties = parties.filter((party) => !shownPartyIds.has(party.id) && entriesOf(party).length > 0)
+    otherParties.forEach((party) => party.accounts.forEach((account) => shownAccountIds.add(account.id)))
+    const bareLogins = [...new Map(
+        entries.filter((entry) => !shownAccountIds.has(entry.user.id)).map((entry) => [entry.user.id, entry]),
+    ).values()]
 
     return (
         <>
@@ -196,6 +221,7 @@ export function ZevPartiesSection({ zevId, canManage, accessSlot, onGiveAccess }
                             busy={busy}
                             onAssign={(party, validFrom) => assignManagingRole(role, party, validFrom)}
                             onNewContact={openNewContact}
+                            renderAccess={renderAccess}
                         />
                     ))}
 
@@ -207,96 +233,107 @@ export function ZevPartiesSection({ zevId, canManage, accessSlot, onGiveAccess }
                         onAssign={(party, validFrom) => assign.mutateAsync({ party, role: 'landowner', valid_from: validFrom })}
                         onEnd={(row, lastDay) => end.mutateAsync({ row, lastDay })}
                         onNewContact={openNewContact}
+                        renderAccess={renderAccess}
                     />
                 </>
             )}
         </section>
 
-        {accessSlot}
-
         <section className="card page-stack">
             {partiesQuery.isSuccess && rolesQuery.isSuccess && (
-                <>
-                    <div className="zev-parties-block zev-parties-block-first">
-                        <div className="zev-parties-block-header">
-                            <div>
-                                <h3 style={{ margin: 0 }}>{t('pages.zevSettings.parties.contacts')}</h3>
-                                <p className="muted">{t('pages.zevSettings.parties.contactsHint')}</p>
-                            </div>
-                            {canManage && (
+                <div className="zev-parties-block zev-parties-block-first">
+                    <div className="zev-parties-block-header">
+                        <div>
+                            <h3 style={{ margin: 0 }}>{t('pages.zevSettings.parties.contacts')}</h3>
+                            <p className="muted">{t('pages.zevSettings.parties.contactsHint')}</p>
+                        </div>
+                        {canManage && (
+                            <div className="actions-row actions-row-wrap">
                                 <button type="button" className="button button-secondary button-compact" onClick={() => openNewContact()}>
                                     <FontAwesomeIcon icon={faPlus} fixedWidth />
                                     {t('pages.zevSettings.parties.addContact')}
                                 </button>
-                            )}
-                        </div>
-                        {contacts.length === 0 && <p className="muted">{t('pages.zevSettings.parties.noContacts')}</p>}
-                        {contacts.length > 0 && (
-                            <ul className="zev-access-list">
-                                {contacts.map((party) => (
-                                    <li key={party.id} className="zev-access-row">
-                                        <div className="zev-access-who">
-                                            <strong>{party.display_name}</strong>
-                                            {party.name_addition && <span className="muted">{party.name_addition}</span>}
-                                            <span className="zev-access-badges">
-                                                {[...new Set(party.roles.map((row) => row.role))].map((role) => (
-                                                    <span key={role} className="badge badge-info">{t(`pages.participants.roles.${role}`)}</span>
-                                                ))}
-                                                {contactAccess(party) && (
-                                                    <span className="badge badge-neutral">
-                                                        {t('pages.zevSettings.parties.hasAccess', { role: t(`nav.relation.${contactAccess(party)}`) })}
-                                                    </span>
-                                                )}
-                                            </span>
-                                        </div>
-                                        <div className="zev-access-meta muted">
-                                            {party.email && <span>{party.email}</span>}
-                                            {party.accounts.length > 0 && (
-                                                <span>{t('pages.zevSettings.parties.login', { email: party.accounts[0].email })}</span>
-                                            )}
-                                            {(party.address_line1 || party.city) && (
-                                                <span>{[party.address_line1, [party.postal_code, party.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')}</span>
-                                            )}
-                                        </div>
-                                        {canManage && (
-                                            <div className="zev-access-actions actions-row actions-row-wrap">
-                                                <button
-                                                    type="button"
-                                                    className="button button-secondary button-compact"
-                                                    onClick={() => { setEditingParty(party); setPartyModalOpen(true) }}
-                                                >
-                                                    <FontAwesomeIcon icon={faPen} fixedWidth />
-                                                    {t('common.edit')}
-                                                </button>
-                                                {onGiveAccess && !contactAccess(party) && (party.accounts.length > 0 || party.email) && (
-                                                    <button
-                                                        type="button"
-                                                        className="button button-secondary button-compact"
-                                                        onClick={() => onGiveAccess(party)}
-                                                    >
-                                                        <FontAwesomeIcon icon={faKey} fixedWidth />
-                                                        {t('pages.zevSettings.access.add')}
-                                                    </button>
-                                                )}
-                                                {party.roles.length === 0 && (
-                                                    <button
-                                                        type="button"
-                                                        className="button button-danger button-compact"
-                                                        disabled={removeParty.isPending}
-                                                        onClick={() => confirmDelete(party)}
-                                                    >
-                                                        <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                                        {t('common.delete')}
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
+                                {!givingAccess && (
+                                    <button type="button" className="button button-secondary button-compact" onClick={() => setGivingAccess(true)}>
+                                        <FontAwesomeIcon icon={faKey} fixedWidth />
+                                        {t('pages.zevSettings.access.add')}
+                                    </button>
+                                )}
+                            </div>
                         )}
                     </div>
-                </>
+                    {givingAccess && (
+                        <GiveAccessForm parties={parties} actions={accessActions} onDone={() => setGivingAccess(false)} />
+                    )}
+                    {contacts.length + otherParties.length + bareLogins.length === 0 && (
+                        <p className="muted">{t('pages.zevSettings.parties.noContacts')}</p>
+                    )}
+                    {contacts.length + otherParties.length + bareLogins.length > 0 && (
+                        <ul className="zev-access-list">
+                            {[...contacts, ...otherParties].map((party) => (
+                                <li key={party.id} className="zev-access-row">
+                                    <div className="zev-access-who">
+                                        <strong>{party.display_name}</strong>
+                                        {party.name_addition && <span className="muted">{party.name_addition}</span>}
+                                        <span className="zev-access-badges">
+                                            {party.participations.length > 0 && (
+                                                <span className="badge badge-neutral">{t('pages.zevSettings.parties.participant')}</span>
+                                            )}
+                                            {[...new Set(party.roles.map((row) => row.role))].map((role) => (
+                                                <span key={role} className="badge badge-info">{t(`pages.participants.roles.${role}`)}</span>
+                                            ))}
+                                        </span>
+                                    </div>
+                                    <div className="zev-access-meta muted">
+                                        {party.email && <span>{party.email}</span>}
+                                        {(party.address_line1 || party.city) && (
+                                            <span>{[party.address_line1, [party.postal_code, party.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')}</span>
+                                        )}
+                                    </div>
+                                    {canManage && party.participations.length === 0 && (
+                                        <div className="zev-access-actions actions-row actions-row-wrap">
+                                            <button
+                                                type="button"
+                                                className="button button-secondary button-compact"
+                                                onClick={() => { setEditingParty(party); setPartyModalOpen(true) }}
+                                            >
+                                                <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                {t('common.edit')}
+                                            </button>
+                                            {party.roles.length === 0 && entriesOf(party).length === 0 && (
+                                                <button
+                                                    type="button"
+                                                    className="button button-danger button-compact"
+                                                    disabled={removeParty.isPending}
+                                                    onClick={() => confirmDelete(party)}
+                                                >
+                                                    <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                                    {t('common.delete')}
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                    <AccessControls entries={entriesOf(party)} party={party} canManage={canManage} actions={accessActions} />
+                                </li>
+                            ))}
+                            {bareLogins.map((entry) => (
+                                <li key={`login-${entry.user.id}`} className="zev-access-row">
+                                    <div className="zev-access-who">
+                                        <strong>{`${entry.user.first_name} ${entry.user.last_name}`.trim() || entry.user.email}</strong>
+                                        <span className="zev-access-badges">
+                                            <span className="badge badge-neutral">{t('pages.zevSettings.parties.loginOnly')}</span>
+                                        </span>
+                                    </div>
+                                    <AccessControls
+                                        entries={entries.filter((item) => item.user.id === entry.user.id)}
+                                        canManage={canManage}
+                                        actions={accessActions}
+                                    />
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
             )}
 
             <PartyFormModal
@@ -309,6 +346,7 @@ export function ZevPartiesSection({ zevId, canManage, accessSlot, onGiveAccess }
             {dialog && (
                 <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />
             )}
+            {accessActions.dialog}
         </section>
         </>
     )
@@ -385,10 +423,12 @@ interface SingleHolderRoleProps {
     busy: boolean
     onAssign: (party: string, validFrom: string) => Promise<unknown>
     onNewContact: (onCreated: (id: string) => void) => void
+    /** The holder's access in OpenZEV, shown on its row. */
+    renderAccess: (partyId: string, managingRole?: boolean) => ReactNode
 }
 
 /** The issuer or the representative: today's holder, what is scheduled, the history, and "Change from…". */
-function SingleHolderRole({ role, rows, parties, canManage, busy, onAssign, onNewContact }: SingleHolderRoleProps) {
+function SingleHolderRole({ role, rows, parties, canManage, busy, onAssign, onNewContact, renderAccess }: SingleHolderRoleProps) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
     const [changing, setChanging] = useState(false)
@@ -416,10 +456,13 @@ function SingleHolderRole({ role, rows, parties, canManage, busy, onAssign, onNe
                 )}
             </div>
             {current ? (
-                <p className="zev-parties-holder">
-                    <strong>{current.party_display_name}</strong>
-                    <span className="muted">{windowText(current)}</span>
-                </p>
+                <div className="zev-access-row">
+                    <p className="zev-parties-holder">
+                        <strong>{current.party_display_name}</strong>
+                        <span className="muted">{windowText(current)}</span>
+                    </p>
+                    {renderAccess(current.party, true)}
+                </div>
             ) : (
                 <p className={role === 'issuer' ? 'warning-banner' : 'muted'}>
                     {t(`pages.zevSettings.parties.${role}None`)}
@@ -473,9 +516,11 @@ interface LandownersProps {
     onAssign: (party: string, validFrom: string) => Promise<unknown>
     onEnd: (row: ZevPartyRole, lastDay: string) => Promise<unknown>
     onNewContact: (onCreated: (id: string) => void) => void
+    /** The landowner's access in OpenZEV, shown on its row (a landowner gets none by its role). */
+    renderAccess: (partyId: string) => ReactNode
 }
 
-function Landowners({ rows, parties, canManage, busy, onAssign, onEnd, onNewContact }: LandownersProps) {
+function Landowners({ rows, parties, canManage, busy, onAssign, onEnd, onNewContact, renderAccess }: LandownersProps) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
     const [adding, setAdding] = useState(false)
@@ -552,6 +597,7 @@ function Landowners({ rows, parties, canManage, busy, onAssign, onEnd, onNewCont
                                     )}
                                 </div>
                             )}
+                            {renderAccess(row.party)}
                         </li>
                     ))}
                 </ul>
