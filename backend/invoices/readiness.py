@@ -996,6 +996,24 @@ def compute_period_list(zev, today: date | None = None) -> list[dict]:
 
 # First-run setup block
 
+# What the QR bill needs of its creditor; without them the slip is left off.
+ISSUER_ADDRESS_FIELDS = ("address_line1", "postal_code", "city")
+
+
+def _issuer_missing(zev, today: date) -> str | None:
+    """Why today's invoices would have no QR bill for want of an issuer:
+    ``"issuer"`` when nobody holds the role, ``"address"`` when the issuer's
+    address is incomplete, else ``None``."""
+    from zev.parties import issuer_on
+
+    party = issuer_on(zev, today)
+    if party is None:
+        return "issuer"
+    if any(not (getattr(party, name) or "").strip() for name in ISSUER_ADDRESS_FIELDS):
+        return "address"
+    return None
+
+
 def first_run_setup(zev, today: date | None = None) -> dict:
     """Setup/completeness state, independent of any billing period.
 
@@ -1008,7 +1026,10 @@ def first_run_setup(zev, today: date | None = None) -> dict:
     ``settings_complete`` flag) without failing ``complete`` or gating
     generation. The IBAN is the one billing setting that is blank-able on the
     model yet required to issue a payable QR-Rechnung — payment terms default
-    to 30 days and VAT registration is enforced by Zev.clean().
+    to 30 days and VAT registration is enforced by Zev.clean(). The issuer is
+    advisory the same way (``issuer_complete``/``issuer_missing``/
+    ``issuer_link``): an invoice without an issuer, or whose issuer has no
+    address, has no QR bill (#761).
     """
     today = today or date.today()
     meter_count = MeteringPoint.objects.filter(zev=zev).count()
@@ -1016,6 +1037,12 @@ def first_run_setup(zev, today: date | None = None) -> dict:
     tariff_count = Tariff.objects.filter(zev=zev).count()
     billing_settings_complete = is_valid_iban(zev.bank_iban or "")
     billing_link = "/zev-settings/billing" if not billing_settings_complete else None
+    issuer_missing = _issuer_missing(zev, today)
+    issuer = {
+        "issuer_complete": issuer_missing is None,
+        "issuer_missing": issuer_missing,
+        "issuer_link": "/zev-settings/people" if issuer_missing else None,
+    }
     if not meter_count or not participant_count:
         return {
             "complete": False,
@@ -1024,6 +1051,7 @@ def first_run_setup(zev, today: date | None = None) -> dict:
             "billing_settings_complete": billing_settings_complete,
             "billing_settings_link": billing_link,
             "settings_complete": billing_settings_complete,
+            **issuer,
             "metering_points": meter_count,
             "participants": participant_count,
             "tariffs": tariff_count,
@@ -1050,6 +1078,7 @@ def first_run_setup(zev, today: date | None = None) -> dict:
         "billing_settings_complete": billing_settings_complete,
         "billing_settings_link": billing_link,
         "settings_complete": billing_settings_complete,
+        **issuer,
         "metering_points": meter_count,
         "participants": participant_count,
         "tariffs": tariff_count,

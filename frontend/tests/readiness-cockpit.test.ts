@@ -110,6 +110,31 @@ describe('SetupGuidance (manager start page)', () => {
         page.unmount()
     })
 
+    it('warns when the issuer\'s address would leave invoices without a QR bill', () => {
+        const page = render(
+            createElement(SetupGuidance, {
+                readinessQuery: {
+                    isLoading: false,
+                    isError: false,
+                    data: {
+                        ...GREEN_READINESS,
+                        setup: {
+                            participants: 1, metering_points: 1, tariffs: 1,
+                            settings_complete: true, complete: true, reason: null, assignment_link: null,
+                            billing_settings_complete: true, billing_settings_link: null,
+                            issuer_complete: false, issuer_missing: 'address', issuer_link: '/zev-settings/people',
+                        },
+                    },
+                },
+            }),
+        )
+        const warnings = page.container.querySelector('.setup-guidance-warnings')
+        expect(warnings?.textContent).toContain('pages.dashboard.cockpit.setupIssuerAddress')
+        expect(warnings?.textContent).not.toContain('pages.dashboard.cockpit.setupIban')
+        expect(warnings?.querySelector('a')?.getAttribute('href')).toBe('/zev-settings/people')
+        page.unmount()
+    })
+
     it('shows setup guidance while awaiting the first period', () => {
         const page = render(
             createElement(SetupGuidance, {

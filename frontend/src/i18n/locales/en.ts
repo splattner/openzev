@@ -2577,6 +2577,9 @@ export const en = {
                 setupAssignLink: 'Assign meters',
                 setupIban: 'No IBAN is set for QR bills, so invoices carry no payment details.',
                 setupIbanLink: 'Billing settings',
+                setupIssuer: 'No issuer is set, so invoices carry no QR bill.',
+                setupIssuerAddress: 'The issuer\'s address is incomplete, so invoices carry no QR bill.',
+                setupIssuerLink: 'People & access',
                 setupSettings: 'Complete billing settings (IBAN)',
                 stepLabels: {
                     metering: 'Metering data',

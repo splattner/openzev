@@ -543,6 +543,16 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
     def get_audit_destroy_metadata(self, instance):
         return {"zev_id": str(instance.zev_id)}
 
+    def destroy(self, request, *args, **kwargs):
+        participant = self.get_object()
+        try:
+            # The issuer's or representative's participant may carry the ZEV's only manager.
+            with access.keeping_a_manager(participant.zev_id):
+                self.perform_destroy(participant)
+        except access.NoManagerLeft:
+            return Response({"detail": access.NO_MANAGER_LEFT}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     def _contract_pdf_access_denied(self, request, participant):
         """True when the caller may not reach this participant's contract.
 
@@ -713,8 +723,14 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         # The account itself is left as it is: what it may do elsewhere comes
         # from its other rows and grants, not from a role (#761).
         unlinked_account = participant.user
-        participant.user = None
-        participant.save(update_fields=["user", "updated_at"])
+        try:
+            # The issuer's or representative's account may be the ZEV's only manager.
+            with access.keeping_a_manager(participant.zev_id):
+                participant.user = None
+                participant.save(update_fields=["user", "updated_at"])
+        except access.NoManagerLeft:
+            participant.user = unlinked_account
+            return Response({"detail": access.NO_MANAGER_LEFT}, status=status.HTTP_400_BAD_REQUEST)
         # Detaching the account must also kill any outstanding onboarding
         # link — otherwise whoever holds it can simply click it again and be
         # handed a freshly recreated account, and this action would not have

@@ -28,6 +28,7 @@ from invoices.readiness import (
     compute_period_list,
     compute_readiness,
     compute_readiness_many,
+    first_run_setup,
     period_end,
     period_starts,
     resolve_cockpit_period,
@@ -2057,3 +2058,33 @@ class InitialSetupGuidanceTests(ReadinessTestCase):
         auth(self.client, self.other_owner)
         response = self._readiness(period_start="2026-01-01", period_end="2026-03-31")
         self.assertEqual(response.status_code, 403)
+
+
+class IssuerSetupTests(TestCase):
+    """Without an issuer, or with its address incomplete, invoices carry no QR
+    bill — the setup block says so, advisory like a blank IBAN (#761)."""
+
+    def setUp(self):
+        from zev.parties import assign_role
+
+        self.zev = make_zev(make_user("issuer_setup_owner", UserRole.USER), "Issuer Setup")
+        self.issuer = make_participant(self.zev, first="Iris", last="Issuer")
+        self.assign_role = assign_role
+
+    def test_no_issuer(self):
+        setup = first_run_setup(self.zev, date(2026, 6, 15))
+        self.assertEqual(
+            (setup["issuer_complete"], setup["issuer_missing"], setup["issuer_link"]),
+            (False, "issuer", "/zev-settings/people"),
+        )
+
+    def test_issuer_without_an_address_then_with_one(self):
+        self.assign_role(self.zev, self.issuer.party, "issuer", date(2026, 1, 1))
+        self.assertEqual(first_run_setup(self.zev, date(2026, 6, 15))["issuer_missing"], "address")
+        party = self.issuer.party
+        party.address_line1, party.postal_code, party.city = "Dorfstrasse 1", "3000", "Bern"
+        party.save()
+        setup = first_run_setup(self.zev, date(2026, 6, 15))
+        self.assertEqual((setup["issuer_complete"], setup["issuer_missing"], setup["issuer_link"]), (True, None, None))
+        # Advisory: the block's own completeness does not depend on it.
+        self.assertEqual(setup["reason"], "no_master_data")

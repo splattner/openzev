@@ -25,6 +25,7 @@ from stale rows; ``invalidate`` drops it outright.
 from __future__ import annotations
 
 import uuid
+from contextlib import contextmanager
 from datetime import date, timedelta
 
 from django.db import transaction
@@ -136,6 +137,31 @@ def has_manager(zev, *, exclude_grant=None, day: date | None = None) -> bool:
     if exclude_grant is not None:
         grants = grants.exclude(pk=exclude_grant.pk)
     return grants.exists() or bool(role_managers(zev, day))
+
+
+NO_MANAGER_LEFT = "This would leave the ZEV without a manager. Give someone manager access first."
+
+
+class NoManagerLeft(Exception):
+    """A change would leave a ZEV without any manager today."""
+
+
+@contextmanager
+def keeping_a_manager(*zevs):
+    """Run a change that may take a ZEV's last manager away, and undo it if it does.
+
+    Each of ``zevs`` that has a manager before the change must still have one
+    after it, or the change's transaction is rolled back and ``NoManagerLeft``
+    raised. Covers what manages without a grant of its own: unlinking or
+    deleting the issuer's participant, deleting an account (its grants and its
+    ``Party.user`` go with it).
+    """
+    zev_ids = {_zev_id(zev) for zev in zevs}
+    with transaction.atomic():
+        managed = [zev_id for zev_id in zev_ids if has_manager(zev_id)]
+        yield
+        if any(not has_manager(zev_id) for zev_id in managed):
+            raise NoManagerLeft
 
 
 def managed_zev_ids(user) -> frozenset:

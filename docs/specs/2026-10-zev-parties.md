@@ -315,17 +315,31 @@ Access is derived from the role rows, never stored as `ZevAccessGrant`s.
 | `role_managers(zev, day=None)` | `[(account, role_row)]` managing `zev` through a role on `day` |
 | `has_manager(zev, *, exclude_grant=None, day=None)` | An active manager grant (other than `exclude_grant`) or any `role_managers` |
 | `is_last_manager(grant)` | A manager grant whose ZEV has no other manager — grant or role (`has_manager(..., exclude_grant=grant)`) |
+| `keeping_a_manager(*zevs)` | Context manager: runs the change in a transaction; any of `zevs` that had a manager and has none afterwards rolls it back and raises `NoManagerLeft` |
 | `role_holdings_by_account(day=None)` | `{account_id: [role rows]}` for the admin accounts list, in a fixed number of queries |
 | `build_memberships(grants, participants, *, roles=())` | Each entry gains `roles` (managing role names held today); a role sets `access` to `manager` |
 
 `bump_generation` is also connected to `Party` and `ZevPartyRole` saves and deletes, so the memo
 never answers from a stale role or account link.
 
-**Guards (`zev/parties.py`).** `assign_role` and `end_role` of a managing role check
-`has_manager` before and after the change, inside its transaction: a ZEV that had a manager and
-would have none today → `ValidationError({"party": [NO_MANAGER_LEFT]})` with `NO_MANAGER_LEFT =
-"This would leave the ZEV without a manager. Give someone manager access first."`; the API
-(`create`, `end`) returns it as a 400. `end_role` is atomic.
+**Guards.** `NO_MANAGER_LEFT = "This would leave the ZEV without a manager. Give someone
+manager access first."` lives in `zev/access.py` (re-exported by `zev/parties.py`).
+
+- `assign_role` and `end_role` of a managing role (`zev/parties.py`) check `has_manager` before
+  and after the change, inside its transaction: a ZEV that had a manager and would have none
+  today → `ValidationError({"party": [NO_MANAGER_LEFT]})`; the API (`create`, `end`) returns it
+  as a 400. `end_role` is atomic.
+- The changes that take a role manager's account away run inside `keeping_a_manager`:
+  - `POST /zev/participants/{id}/unlink-account/` → 400 `{"detail": NO_MANAGER_LEFT}`, the link
+    stays;
+  - `DELETE /zev/participants/{id}/` (`ParticipantViewSet.destroy`) → 400 `{"detail":
+    NO_MANAGER_LEFT}`, the row stays;
+  - `DELETE /auth/users/{id}/` over every ZEV the account manages (`managed_zev_ids`): its manager
+    grants cascade and its `Party.user` is cleared → 403 `NO_MANAGER_LEFT` with a `user.delete`
+    audit event of status `denied`. This also covers an account that is a ZEV's only *grant*
+    manager.
+- `Party.user` is not writable through the API (only an invitation sets it), so deleting the
+  account is the only way it is cleared.
 
 **API.**
 
@@ -672,6 +686,13 @@ through the participant endpoints keep the existing participant audit events.
   manager; a login given access by email is listed with its actions; a viewer gets no access
   controls). `ZevAccessSection` and its test are removed. `zev-parties-section.test.ts` mocks the
   access list and auth. No backend change.
+- **Review follow-up** (QR readiness and last-manager guards): `zev/test_role_access.py`
+  `LastManagerOutsideRolesTests` (5: unlinking the issuer's account and deleting its participant
+  are refused; with a manager grant both go through; deleting the account behind the issuer
+  party is refused with a denied audit event; deleting a ZEV's only grant manager is refused);
+  `invoices/test_readiness.py` `IssuerSetupTests` (2: no issuer; an issuer without and then with
+  an address). Frontend `tests/readiness-cockpit.test.ts` +1 (the issuer-address warning links to
+  People & access).
 
 ## 14. Acceptance criteria
 

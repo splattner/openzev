@@ -424,18 +424,34 @@ class UserDetailView(AuditedUpdateMixin, generics.RetrieveUpdateDestroyAPIView):
             )
             raise PermissionDenied("Linked participant accounts cannot be deleted.")
         user_id = str(instance.pk)
-        # Record before delete so the actor FK is valid;
-        # on_delete=SET_NULL nullifies it when the user row goes.
-        record_audit_event(
-            request=self.request,
-            action_category=AuditActionCategory.AUTH,
-            action_type="user.delete",
-            target_type="accounts.User",
-            target_id=user_id,
-            target_display=user_display,
-            summary=f"Deleted user {user_display}.",
-        )
-        instance.delete()
+        try:
+            # Its manager grants and its party's login go with the account; a
+            # ZEV it alone manages would be left without a manager.
+            with zev_access.keeping_a_manager(*zev_access.managed_zev_ids(instance)):
+                # Record before delete so the actor FK is valid;
+                # on_delete=SET_NULL nullifies it when the user row goes.
+                record_audit_event(
+                    request=self.request,
+                    action_category=AuditActionCategory.AUTH,
+                    action_type="user.delete",
+                    target_type="accounts.User",
+                    target_id=user_id,
+                    target_display=user_display,
+                    summary=f"Deleted user {user_display}.",
+                )
+                instance.delete()
+        except zev_access.NoManagerLeft:
+            record_audit_event(
+                request=self.request,
+                action_category=AuditActionCategory.AUTH,
+                action_type="user.delete",
+                target_type="accounts.User",
+                target_id=user_id,
+                target_display=user_display,
+                summary=f"Denied deletion of {user_display}, the last manager of a ZEV.",
+                status=AuditEventStatus.DENIED,
+            )
+            raise PermissionDenied(zev_access.NO_MANAGER_LEFT)
 
 
 class VatRateListCreateView(generics.ListCreateAPIView):

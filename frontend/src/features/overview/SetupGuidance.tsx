@@ -3,13 +3,14 @@ import { useTranslation } from 'react-i18next'
 import type { ReadinessResponse, ReadinessSetupBlock } from '../../types/api'
 import { PageSkeleton } from '../../components/PageSkeleton'
 
-/** Assignment and billing-settings warnings, rendered beside period work. */
+/** Assignment, billing-settings and issuer warnings, rendered beside period work. */
 function SetupWarnings({ setup }: { setup: ReadinessSetupBlock | null | undefined }) {
     const { t } = useTranslation()
     if (!setup) return null
     const showSetupWarning = !setup.complete && !!setup.assignment_link
     const showIbanWarning = !setup.billing_settings_complete && !!setup.billing_settings_link
-    if (!showSetupWarning && !showIbanWarning) return null
+    const showIssuerWarning = !setup.issuer_complete && !!setup.issuer_link
+    if (!showSetupWarning && !showIbanWarning && !showIssuerWarning) return null
     return (
         <div className="setup-guidance-warnings" role="status">
             {showSetupWarning ? (
@@ -25,6 +26,16 @@ function SetupWarnings({ setup }: { setup: ReadinessSetupBlock | null | undefine
                     {t('pages.dashboard.cockpit.setupIban')}{' '}
                     <Link to={setup.billing_settings_link as string}>
                         {t('pages.dashboard.cockpit.setupIbanLink')}
+                    </Link>
+                </p>
+            ) : null}
+            {showIssuerWarning ? (
+                <p className="warning-banner">
+                    {t(setup.issuer_missing === 'address'
+                        ? 'pages.dashboard.cockpit.setupIssuerAddress'
+                        : 'pages.dashboard.cockpit.setupIssuer')}{' '}
+                    <Link to={setup.issuer_link as string}>
+                        {t('pages.dashboard.cockpit.setupIssuerLink')}
                     </Link>
                 </p>
             ) : null}

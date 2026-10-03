@@ -125,6 +125,58 @@ class LastManagerTests(TestCase):
         self.assertEqual(response.json(), {"party": [NO_MANAGER_LEFT]})
 
 
+class LastManagerOutsideRolesTests(TestCase):
+    """Unlinking or deleting the issuer's participant, or deleting the account,
+    never leaves a managed ZEV without a manager either."""
+
+    def setUp(self):
+        self.zev = create_managed_zev(name="Last Manager Elsewhere", start_date=date(2026, 1, 1))
+        self.account = make_user("lme_issuer", UserRole.USER)
+        self.issuer = Participant.objects.create(zev=self.zev, user=self.account, last_name="Issuer", valid_from=date(2026, 1, 1))
+        assign_role(self.zev, self.issuer.party, PartyRole.ISSUER, date(2026, 1, 1))
+        self.client = APIClient()
+        authenticate(self.client, make_user("lme_admin", UserRole.ADMIN))
+
+    def test_unlinking_the_issuers_account_is_refused(self):
+        response = self.client.post(f"/api/v1/zev/participants/{self.issuer.pk}/unlink-account/")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertEqual(response.json(), {"detail": NO_MANAGER_LEFT})
+        self.issuer.refresh_from_db()
+        self.assertEqual(self.issuer.user, self.account)
+
+    def test_deleting_the_issuers_participant_is_refused(self):
+        response = self.client.delete(f"/api/v1/zev/participants/{self.issuer.pk}/")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertTrue(Participant.objects.filter(pk=self.issuer.pk).exists())
+
+    def test_with_a_manager_grant_both_go_through(self):
+        ZevAccessGrant.objects.create(zev=self.zev, user=make_user("lme_grant", UserRole.USER), role=ZevAccessRole.MANAGER)
+        response = self.client.post(f"/api/v1/zev/participants/{self.issuer.pk}/unlink-account/")
+        self.assertEqual(response.status_code, 200, response.content)
+        response = self.client.delete(f"/api/v1/zev/participants/{self.issuer.pk}/")
+        self.assertEqual(response.status_code, 204, response.content)
+
+    def test_deleting_the_account_behind_the_issuers_party_is_refused(self):
+        agency_account = make_user("lme_agency", UserRole.USER)
+        agency = Party.objects.create(
+            zev=self.zev, kind=PartyKind.ORGANISATION, organisation_name="Verwaltung", user=agency_account,
+        )
+        assign_role(self.zev, agency, PartyRole.ISSUER, timezone.localdate())
+        response = self.client.delete(f"/api/v1/auth/users/{agency_account.pk}/")
+        self.assertEqual(response.status_code, 403, response.content)
+        self.assertTrue(User.objects.filter(pk=agency_account.pk).exists())
+        event = AuditEvent.objects.filter(action_type="user.delete").latest("created_at")
+        self.assertEqual(event.status, "denied")
+
+    def test_deleting_the_only_grant_manager_is_refused(self):
+        other = create_managed_zev(name="Grant Only", start_date=date(2026, 1, 1))
+        manager = make_user("lme_only", UserRole.USER)
+        ZevAccessGrant.objects.create(zev=other, user=manager, role=ZevAccessRole.MANAGER)
+        response = self.client.delete(f"/api/v1/auth/users/{manager.pk}/")
+        self.assertEqual(response.status_code, 403, response.content)
+        self.assertTrue(ZevAccessGrant.objects.filter(zev=other, user=manager).exists())
+
+
 class ZugangTests(TestCase):
     def setUp(self):
         self.manager = make_user("zg_manager", UserRole.USER)

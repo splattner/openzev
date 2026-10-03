@@ -182,9 +182,12 @@ Every person on the tab shows its access to OpenZEV on its own row:
   been accepted, and **Remove access**, after a confirmation.
 
 **Invitation pending** marks a login that has not been set up yet. A ZEV
-always keeps at least one manager — by access or through a role: removing the
-last one, or making them a viewer, is refused. Every change is recorded in the
-ZEV's audit log.
+always keeps at least one manager — by access or through a role. Removing the
+last one, or making them a viewer, is refused, and so is anything else that
+would take the last manager away: ending or handing over the issuer role,
+unlinking the account of the issuer's participant, deleting that participant,
+or deleting the account. Give someone else manager access first. Every change
+is recorded in the ZEV's audit log.
 
 #### Other people
 

@@ -2566,6 +2566,9 @@ export const de = {
                 setupAssignLink: 'Messpunkte zuweisen',
                 setupIban: 'Keine IBAN für QR-Rechnungen hinterlegt, daher enthalten Rechnungen keine Zahlungsangaben.',
                 setupIbanLink: 'Abrechnungseinstellungen',
+                setupIssuer: 'Kein Rechnungssteller festgelegt, daher erhalten Rechnungen keine QR-Rechnung.',
+                setupIssuerAddress: 'Die Adresse des Rechnungsstellers ist unvollständig, daher erhalten Rechnungen keine QR-Rechnung.',
+                setupIssuerLink: 'Personen & Zugang',
                 setupSettings: 'Abrechnungseinstellungen vervollständigen (IBAN)',
                 stepLabels: {
                     metering: 'Messdaten',

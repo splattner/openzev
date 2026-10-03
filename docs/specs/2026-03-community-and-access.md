@@ -959,6 +959,11 @@ human to judge as weak) but is long enough to pass them on the next change.
      account."). Self-deletion is allowed when another admin remains.
   2. **Linked-account guard** — blocked if user has linked participant records
      (→ 403 "Linked participant accounts cannot be deleted.").
+  3. **Last-manager guard** — the delete runs inside `zev.access.keeping_a_manager`
+     over every ZEV the account manages (grant or role, `managed_zev_ids`); when its
+     cascaded manager grants or its cleared `Party.user` leave one of them without a
+     manager, it is rolled back (→ 403 `NO_MANAGER_LEFT`, denied `user.delete` audit
+     event). SPEC-2026-10-zev-parties §5.5.
 
   Success audit is recorded before `instance.delete()` so the actor FK is
   valid; `on_delete=SET_NULL` nullifies `actor_user` on self-deletion while
@@ -1557,7 +1562,7 @@ isAdmin}`: `admin` and `manager` may read and write the management view,
 | POST | `/me/sessions/revoke/` | IsAuthenticated | Sign out every other session (§5.6b) |
 | POST | `/users/{id}/revoke-sessions/` | IsAdmin | Sign an account out everywhere (§5.6b) |
 | GET / POST | `/users/` | IsAdmin | List users / Create user |
-| GET / PATCH / DELETE | `/users/{id}/` | IsAdmin | User detail (delete blocked if linked or last admin) |
+| GET / PATCH / DELETE | `/users/{id}/` | IsAdmin | User detail (delete blocked if linked, last admin, or a ZEV's last manager) |
 | GET | `/me/mfa/` | IsAuthenticated | Own second-factor status: `{totp, passkeys, recovery_codes_remaining, required, grace_until}` |
 | POST / DELETE | `/me/mfa/totp/` | IsAuthenticated | Begin TOTP enrolment (`{provisioning_uri, secret, qr_svg}`, `503` without `MFA_ENCRYPTION_KEYS`) / remove the device and its recovery codes |
 | POST | `/me/mfa/totp/confirm/` | IsAuthenticated | `{code}` activates the device and returns ten recovery codes once |

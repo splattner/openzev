@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from .base import Tool, ToolContext
 
-_LINK_KEYS = {"link", "assignment_link", "billing_settings_link"}
+_LINK_KEYS = {"link", "assignment_link", "billing_settings_link", "issuer_link"}
 
 # Steps whose status means "not done yet" — mirrors
 # ``invoices.readiness._select_next_action``'s own definition of blocking.

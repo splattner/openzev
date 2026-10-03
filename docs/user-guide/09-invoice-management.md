@@ -35,16 +35,20 @@ Three "nothing to do right now" states look similar but behave differently:
 - **First run** — a brand-new ZEV with no participants **or** no metering
   points yet shows a setup checklist.
 - **Awaiting first period** — participants and meters exist, but the first
-  billing period has not ended yet. Missing meter assignments and a blank
-  IBAN still show as warnings above the waiting message.
+  billing period has not ended yet. Missing meter assignments, a blank
+  IBAN and a missing issuer (or an issuer without a full address) still show
+  as warnings above the waiting message.
 - **Caught up** — no ended period needs you right now (nothing waiting at
   draft/approved, every eligible participant invoiced); Overview shows a quiet
   **Up to date** message and keeps completed periods collapsed below it.
 
 An unfinished setup never hides behind a green status: with active
 participants but no current meter assignment Overview says nothing is
-billable yet and links to meter assignment, and a missing IBAN for QR bills
-stays visible beside normal period work without blocking generation.
+billable yet and links to meter assignment. A missing IBAN, and a missing
+issuer or an issuer without a full address, stay visible beside normal period
+work without blocking generation: either way invoices are created without a
+QR bill. The issuer warning links to
+[ZEV settings → People & access](02-zev-setup.md#people-and-access-tab).
 
 Invoice alerts appear in the matching period card: unresolved failed invoice
 emails (a later successful retry clears the item) and overdue sent invoices.

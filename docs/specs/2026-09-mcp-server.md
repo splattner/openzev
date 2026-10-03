@@ -269,7 +269,7 @@ Can a billing period be billed, and what is blocking it.
   passed through unchanged. `blocking` lists steps whose `status` is `"warn"` or `"todo"` (the two
   "not done yet" values in `invoices.readiness.StepResult` — the other two are `"ok"` and `"done"`),
   formatted as `"<key>: <detail>"` (falling back to the bare status if the step carries no `detail`).
-  `link` is dropped from every step and every attention item; `assignment_link`/`billing_settings_link`
+  `link` is dropped from every step and every attention item; `assignment_link`/`billing_settings_link`/`issuer_link`
   are dropped from `setup` the same way. `period: null` responses pass their reason through as extra
   top-level keys (`setup`, `awaiting_first_period`, `caught_up`) exactly as the underlying endpoint
   returns them, minus the same link fields.

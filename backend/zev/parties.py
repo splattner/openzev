@@ -17,9 +17,8 @@ from django.db import transaction
 
 from allocation.validity import active_on
 
+from .access import NO_MANAGER_LEFT
 from .models import MANAGING_ROLES, SINGLE_HOLDER_ROLES, Party, PartyRole, ZevPartyRole
-
-NO_MANAGER_LEFT = "This would leave the ZEV without a manager. Give someone manager access first."
 
 
 def holders_on(zev, role: str, day: date):

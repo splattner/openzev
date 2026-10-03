@@ -1167,6 +1167,11 @@ export interface ReadinessSetupBlock {
     /** Blank IBAN is advisory: reported here without failing `complete`. */
     billing_settings_complete: boolean
     billing_settings_link: string | null
+    /** Advisory too: without an issuer today, or with its address incomplete,
+     * invoices carry no QR bill. */
+    issuer_complete: boolean
+    issuer_missing: 'issuer' | 'address' | null
+    issuer_link: string | null
 }
 
 export interface ReadinessResponse {

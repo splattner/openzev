@@ -2566,6 +2566,9 @@ export const fr = {
                 setupAssignLink: 'Affecter les compteurs',
                 setupIban: 'Aucun IBAN configuré pour les QR-factures, les factures ne contiennent donc aucun moyen de paiement.',
                 setupIbanLink: 'Paramètres de facturation',
+                setupIssuer: 'Aucun émetteur défini, les factures ne contiennent donc pas de QR-facture.',
+                setupIssuerAddress: 'L’adresse de l’émetteur est incomplète, les factures ne contiennent donc pas de QR-facture.',
+                setupIssuerLink: 'Personnes et accès',
                 setupSettings: 'Compléter les paramètres de facturation (IBAN)',
                 stepLabels: {
                     metering: 'Données de comptage',
