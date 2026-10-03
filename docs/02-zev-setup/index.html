@@ -706,13 +706,52 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#parties-tab" class="md-nav__link">
+  <a href="#people-and-access-tab" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Parties tab
+        People &amp; access tab
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="People &amp; access tab">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Roles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#access-on-each-row" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access on each row
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-people" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other people
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -834,23 +873,6 @@
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Access Control">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#access-tab" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Access tab
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1746,13 +1768,52 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#parties-tab" class="md-nav__link">
+  <a href="#people-and-access-tab" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Parties tab
+        People &amp; access tab
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="People &amp; access tab">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Roles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#access-on-each-row" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access on each row
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-people" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other people
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -1874,23 +1935,6 @@
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Access Control">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#access-tab" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Access tab
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -2027,12 +2071,12 @@ it off under <strong>Platform → System Settings → Functions</strong>).</p>
 <strong>Setup → Settings</strong>, <code>/zev-settings</code>). The settings are organized into tabs:</p>
 <ul>
 <li><strong>General</strong> — name, start date, ZEV type, grid connection</li>
-<li><strong>Parties</strong> — who issues the invoices, who represents the ZEV toward the grid
-  operator, the landowners, and other contacts (see <a href="#parties-tab">Parties tab</a>)</li>
+<li><strong>People &amp; access</strong> — who issues the invoices, who represents the ZEV toward
+  the grid operator, the landowners, who may manage or view the ZEV, and other
+  contacts (see <a href="#people-and-access-tab">People &amp; access tab</a>)</li>
 <li><strong>Billing &amp; payment</strong> — billing interval, invoice language, payment term,
   invoice presentation, participant QR code, invoice prefix, bank details, VAT</li>
 <li><strong>Documents &amp; emails</strong> — invoice email template, notes, contract notes</li>
-<li><strong>Access</strong> — who may manage or view this ZEV (see <a href="#access-tab">Access tab</a>)</li>
 <li><strong>Audit log</strong> — this ZEV's audit events (see
   <a href="../14-admin-console/#audit-logs">Audit Logs</a>)</li>
 <li><strong>Export / transfer</strong> — whole-ZEV export archive (see
@@ -2113,10 +2157,15 @@ serves a tariff document. Operators sometimes move the file without
 ElCom's copy being updated, so an untested suggestion is never saved
 automatically, and an address you already entered is never overwritten.</p>
 </blockquote>
-<h3 id="parties-tab">Parties tab<a class="headerlink" href="#parties-tab" title="Permanent link">&para;</a></h3>
-<p>The <strong>Parties</strong> tab records who the community deals with. Every role has a
-start date (and, once it ends, an end date), so documents always name whoever
-held a role on their own date:</p>
+<h3 id="people-and-access-tab">People &amp; access tab<a class="headerlink" href="#people-and-access-tab" title="Permanent link">&para;</a></h3>
+<p><strong>People &amp; access</strong> shows, on one page, who the community deals with and what
+each of them may do in OpenZEV — on the same row: whether a person manages
+the community, can only read, or has no access, and the buttons to change it.
+It has two parts: <strong>Roles</strong> and <strong>Other people</strong>. Viewers see the tab but
+change nothing.</p>
+<h4 id="roles">Roles<a class="headerlink" href="#roles" title="Permanent link">&para;</a></h4>
+<p>Every role has a start date (and, once it ends, an end date), so documents
+always name whoever held a role on their own date:</p>
 <table>
 <thead>
 <tr>
@@ -2150,27 +2199,52 @@ held a role on their own date:</p>
   changes.</li>
 <li><strong>The issuer and the representative manage the community.</strong> While a party
   holds one of these roles, its login — its own, or the one of its participant
-  entry — has manager access, exactly as if it had been given under
-  <a href="#access-tab">Access</a>, and loses it when the role ends. Before a change
-  takes effect, a confirmation names the login that gets access, or says that
-  nobody does because the party has no login. A change that would leave the
-  community without any manager is refused: give someone manager access first.</li>
-<li><strong>Landowners and contacts get no access</strong> through the tab. A landowner does
-  not see other participants' data; a contact that should work in OpenZEV gets
-  access under <a href="#access-tab">Access</a>, where you can pick it directly.</li>
-<li>Without an issuer, documents carry only the community's name. The tab says so
-  until one is set.</li>
+  entry — has manager access, shown on its row (see
+  <a href="#access-on-each-row">Access on each row</a>), and loses it when the role ends. Before a change takes
+  effect, a confirmation names the login that gets access, or says that nobody
+  does because the party has no login. A change that would leave the community
+  without any manager is refused: give someone manager access first.</li>
+<li><strong>Landowners get no access</strong> through their role: a landowner does not see
+  other participants' data.</li>
+<li>Without an issuer, documents carry only the community's name. The page says
+  so until one is set.</li>
 <li><strong>Add landowner</strong> adds a party from a date; <strong>End</strong> sets a landowner's last
   day. Ending a role before it started removes it.</li>
-<li>A party does not have to be a participant. <strong>Other contacts</strong> lists the
-  people and organisations that are not, such as a property management company
-  that represents the community. <strong>Add contact</strong> creates one (a person, or an
-  organisation with a contact person); a contact that holds no role can be
-  deleted. In the party picker, <strong>New contact…</strong> creates one on the spot.</li>
 <li>The owner of a ZEV created through self-registration or the admin wizard is
   its issuer and a landowner from the start date.</li>
 </ul>
-<p>Viewers see the tab but change nothing.</p>
+<h4 id="access-on-each-row">Access on each row<a class="headerlink" href="#access-on-each-row" title="Permanent link">&para;</a></h4>
+<p>Every person on the tab shows its access to OpenZEV on its own row:</p>
+<ul>
+<li><strong>Issuer and representative</strong> — <strong>Manages in OpenZEV</strong> with the login, for
+  as long as the role lasts; that access changes with the role. A holder
+  without a login says so, and <strong>Invite</strong> sends it an invitation to set one up
+  (as manager).</li>
+<li><strong>Landowners and other people</strong> — <strong>Manage</strong> or <strong>Read only</strong> with the
+  login, or <strong>No access to OpenZEV</strong>. Without access, choose <strong>Manage</strong> or
+  <strong>Read only</strong> and press <strong>Give access</strong> (or <strong>Invite</strong>, when the person has
+  no login yet — the invitation goes to the email address on the person).
+  With access: <strong>Make manager</strong> / <strong>Make viewer</strong> (making a manager a viewer
+  asks for confirmation), <strong>Resend invitation</strong> for an invitation that has not
+  been accepted, and <strong>Remove access</strong>, after a confirmation.</li>
+</ul>
+<p><strong>Invitation pending</strong> marks a login that has not been set up yet. A ZEV
+always keeps at least one manager — by access or through a role: removing the
+last one, or making them a viewer, is refused. Every change is recorded in the
+ZEV's audit log.</p>
+<h4 id="other-people">Other people<a class="headerlink" href="#other-people" title="Permanent link">&para;</a></h4>
+<p><strong>Other people</strong> lists the contacts that are not participants — such as a
+property management company that represents the community — and everyone else
+who has access: a participant given read-only access, or a login added by email
+(a bookkeeper). <strong>Add contact</strong> creates a contact (a person, or an organisation
+with a contact person); a contact that holds no role and has no access can be
+deleted. In a role's party picker, <strong>New contact…</strong> creates one on the spot.</p>
+<p><strong>Give access</strong> in the header adds someone who is not listed yet: pick a
+<strong>party of the community</strong> or enter an <strong>email address</strong>, choose <strong>Manage</strong> or
+<strong>Read only</strong> and, if the access should end, a last day. Someone with an
+OpenZEV login gets access straight away and a notice by email; anyone else
+gets an invitation email to set up their account — a party at its own email
+address, after which the new login belongs to that party.</p>
 <h3 id="billing--payment-tab">Billing &amp; payment tab<a class="headerlink" href="#billing--payment-tab" title="Permanent link">&para;</a></h3>
 <p><img alt="Billing and payment settings" src="../screenshots/06b-zev-billing-settings.png" /></p>
 <h4 id="billing--payment">Billing &amp; Payment<a class="headerlink" href="#billing--payment" title="Permanent link">&para;</a></h4>
@@ -2394,32 +2468,8 @@ staged edit. <strong>Use platform default</strong> takes effect after <strong>Sa
 </tr>
 </tbody>
 </table>
-<h3 id="access-tab">Access tab<a class="headerlink" href="#access-tab" title="Permanent link">&para;</a></h3>
-<p><strong>ZEV settings → Access</strong> lists everyone who may manage or view this ZEV,
-with their role, since when (and until when) they have access, and who gave
-it. <strong>Invitation pending</strong> marks an account that has not been set up yet.
-Tick <strong>Show ended access</strong> to see access that has ended.</p>
-<p>Managers and admins can:</p>
-<ul>
-<li><strong>Give access</strong> — pick a <strong>party of the community</strong> (a participant or a
-  contact from the <a href="#parties-tab">Parties tab</a>) or enter an <strong>email address</strong>,
-  choose <strong>Manager</strong> or <strong>Viewer</strong> and, if the access should end, a last day.
-  Someone with an OpenZEV login gets access straight away and a notice by
-  email; anyone else gets an invitation email to set up their account — a
-  party at its own email address, after which the new login belongs to that
-  party. A party without an email address cannot be invited; add one in the
-  Parties tab first.</li>
-<li><strong>Make manager</strong> / <strong>Make viewer</strong> — change someone's role. Making a manager
-  a viewer asks for confirmation.</li>
-<li><strong>Resend invitation</strong> — for an invitation that has not been accepted.</li>
-<li><strong>Remove access</strong> — ends the access immediately, after a confirmation.</li>
-</ul>
-<p>The list also shows who manages the community <strong>as issuer</strong> or <strong>as
-representative</strong>. That access comes from the role and is changed in the
-<a href="#parties-tab">Parties tab</a>, not here.</p>
-<p>A ZEV always keeps at least one manager — by access or through a role:
-removing the last one, or making them a viewer, is refused. Viewers see the list but cannot change it. Every change
-is recorded in the ZEV's audit log.</p>
+<p>Who may manage or view a ZEV is set on the
+<a href="#people-and-access-tab">People &amp; access tab</a>.</p>
 <p>Admins manage user accounts in <strong>Platform → Accounts</strong>.</p>
 <p>Participants automatically see only their own metering data and invoices (ZEV-scoped access).</p>
 <h2 id="data-ownership-and-privacy">Data Ownership and Privacy<a class="headerlink" href="#data-ownership-and-privacy" title="Permanent link">&para;</a></h2>
