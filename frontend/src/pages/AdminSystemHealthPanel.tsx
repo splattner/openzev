@@ -7,6 +7,7 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { fetchSystemHealth } from '../lib/api/auth'
 import { PageSkeleton } from '../components/PageSkeleton'
 import type { SystemHealthStatus } from '../types/api'
+import { Notice } from '../components/Notice'
 
 /**
  * System-health tab of the admin Overview hub (nav-regroup phase 3): a
@@ -42,7 +43,7 @@ function ProbeCard({ status, title, children }: ProbeProps) {
 
 export function AdminSystemHealthPanel() {
     const { t } = useTranslation()
-    const { data: health, isLoading, isError } = useQuery({
+    const { data: health, isLoading, isError, isFetching, refetch } = useQuery({
         queryKey: queryKeys.auth.systemHealth(),
         queryFn: fetchSystemHealth,
         // Health is a point-in-time snapshot, not a live monitor: refetch when
@@ -55,7 +56,7 @@ export function AdminSystemHealthPanel() {
     }
 
     if (isError || !health) {
-        return <div className="card error-banner">{t('common.error')}</div>
+        return <Notice tone="error" onRetry={() => void refetch()} isRetrying={isFetching}>{t('common.error')}</Notice>
     }
 
     return (

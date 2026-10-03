@@ -3,6 +3,7 @@ import { Tabs } from '@mantine/core'
 import { useNavigate } from 'react-router-dom'
 import { AdminAccountsPage } from './AdminAccountsPage'
 import { AdminApiKeysPage } from './AdminApiKeysPage'
+import { PageHeader } from '../components/PageHeader'
 
 /**
  * Admin Accounts hub (nav-regroup phase 3, spec §6): users, roles and
@@ -25,11 +26,11 @@ export function AdminAccountsHubPage({ tab = 'users' }: { tab?: AdminAccountsTab
 
     return (
         <div className="page-stack">
-            <header>
-                <p className="eyebrow">{t('nav.platformScope')}</p>
-                <h2>{t('pages.adminAccounts.title')}</h2>
-                <p className="muted">{t('pages.adminAccounts.description')}</p>
-            </header>
+            <PageHeader
+                eyebrow={t('nav.platformScope')}
+                title={t('pages.adminAccounts.title')}
+                description={t('pages.adminAccounts.description')}
+            />
 
             <Tabs
                 classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}

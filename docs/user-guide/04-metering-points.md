@@ -14,6 +14,9 @@ A single participant can be assigned multiple metering points (e.g., PV on roof 
 
 ![Metering points page](screenshots/04-metering-points.png)
 
+If a refresh fails, the last loaded list and any open form stay available.
+Use **Retry** in the warning to refresh the list.
+
 ## Metering Point Types
 
 OpenZEV supports three metering point types:
@@ -26,7 +29,10 @@ OpenZEV supports three metering point types:
 
 ## Creating a Metering Point
 
-**Managers** create metering points in **Metering Points**.
+**Managers** create metering points in **Metering Points** for the selected
+community. A disabled community is read-only for managers; admins retain write
+access. If the community list cannot load, use **Retry** before working with
+its meters.
 
 1. Click **New Metering Point**
 2. Enter details:
@@ -96,6 +102,12 @@ Assignment validity affects:
 - Which participant is associated with the meter at a given date
 - Whether imported readings can be attributed for billing
 - Invoicing — only active assignment windows in the billing period are used
+
+Unsaved metering and assignment forms close if your account, selected
+community or write access changes. A failed refresh of the same community
+keeps your draft open. Disabling the community also closes managers' dialogs.
+A save already sent may finish even if you switch communities; check its
+original community for the result.
 
 ![Assign participant modal](screenshots/04b-metering-points-assign.png)
 

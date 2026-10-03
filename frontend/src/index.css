@@ -1232,9 +1232,40 @@ label > small.muted {
   gap: 1.5rem;
 }
 
-/* Long German compounds must break, not push past narrow viewports. */
-.page-stack > header h2 {
-  overflow-wrap: break-word;
+.page-header {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.page-header-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.page-header-text {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.page-header-actions {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+.page-header-actions .button {
+  max-width: 100%;
+  white-space: normal;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
 }
 
 .grid {
@@ -1288,6 +1319,7 @@ label > small.muted {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  overflow-wrap: anywhere;
   padding: 1.25rem;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
@@ -1297,12 +1329,87 @@ label > small.muted {
   box-shadow: 0 26px 55px rgba(15, 23, 42, 0.13);
 }
 
-.stat-card h3 {
+.stat-card .stat-value {
+  max-width: 100%;
   font-size: 1.75rem;
   font-weight: 700;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
+}
+
+/* Toggle selection uses the interactive color; severity colors the value. */
+.stat-card--interactive {
+  appearance: none;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stat-card--interactive[aria-pressed='true'] {
+  border-color: var(--interactive);
+  box-shadow: 0 0 0 2px var(--interactive);
+}
+
+/* Tile grids: combine the wide modifier with the base class. */
+.stat-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+}
+
+.stat-grid--wide {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+
+.notice--retry {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.toolbar-main {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.toolbar-actions {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.toolbar-actions .button {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Stack context above actions on narrow screens. */
+@media (max-width: 700px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-actions {
+    justify-content: flex-start;
+  }
 }
 
 .stat-label {
@@ -1329,7 +1436,7 @@ label > small.muted {
   color: var(--brand-accent);
 }
 
-.stat-card--accent h3 {
+.stat-card--accent .stat-value {
   color: var(--white);
 }
 
@@ -1339,19 +1446,19 @@ label > small.muted {
   color: var(--brand-accent);
 }
 
-.stat-card--success h3 {
+.stat-card--success .stat-value {
   color: var(--success-600);
 }
 
-.stat-card--warning h3 {
+.stat-card--warning .stat-value {
   color: var(--warning-800);
 }
 
-.stat-card--danger h3 {
+.stat-card--danger .stat-value {
   color: var(--danger-600);
 }
 
-/* Flat: inside .card, no chrome. tone still colors h3. */
+/* Flat: inside .card, no chrome. */
 .stat-card.stat-card--flat {
   background: transparent;
   border: 0;
@@ -1870,14 +1977,6 @@ input.recurrence-chip-input {
   gap: 1rem;
 }
 
-.metering-toolbar-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
 .metering-summary {
   display: flex;
   flex-wrap: wrap;
@@ -2025,14 +2124,6 @@ input.recurrence-chip-input {
   gap: 1rem;
 }
 
-.participant-toolbar-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
 .participant-summary {
   display: flex;
   flex-wrap: wrap;
@@ -2063,14 +2154,6 @@ input.recurrence-chip-input {
 .tariff-toolbar {
   display: grid;
   gap: 1rem;
-}
-
-.tariff-toolbar-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
 }
 
 .tariff-summary {

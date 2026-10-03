@@ -9,6 +9,8 @@ import { formatChf } from '../lib/numbers'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useAuth } from '../lib/auth'
 import { soleCommunityName } from '../lib/membership'
+import { PageHeader } from '../components/PageHeader'
+import { Notice } from '../components/Notice'
 
 /**
  * Participant's own invoices (`/me/invoices`, nav-regroup phase 2): a
@@ -30,22 +32,19 @@ export function MyInvoicesPage() {
     // A multi-membership participant needs to know which community issued each
     // invoice; with a single membership the page header already names it.
     const showCommunity = (user?.memberships?.length ?? 0) > 1
-    const communityName = soleCommunityName(user)
 
     return (
         <div className="page-stack">
-            <header>
-                {/* Single membership: the community name is page context, like
-                    every other participant page (spec §6). */}
-                {communityName ? <p className="eyebrow">{communityName}</p> : null}
-                <h2>{t('pages.myInvoices.title')}</h2>
-                <p className="muted">{t('pages.myInvoices.description')}</p>
-            </header>
+            <PageHeader
+                eyebrow={soleCommunityName(user)}
+                title={t('pages.myInvoices.title')}
+                description={t('pages.myInvoices.description')}
+            />
 
             {invoicesQuery.isLoading ? (
                 <PageSkeleton variant="tableRows" />
             ) : invoicesQuery.isError ? (
-                <div className="card error-banner">{t('pages.myInvoices.failed')}</div>
+                <Notice tone="error" onRetry={() => void invoicesQuery.refetch()} isRetrying={invoicesQuery.isFetching}>{t('pages.myInvoices.failed')}</Notice>
             ) : invoices.length === 0 ? (
                 <div className="card">
                     <h3 style={{ marginTop: 0 }}>{t('pages.myInvoices.empty.title')}</h3>

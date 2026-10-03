@@ -97,11 +97,10 @@ test('settings general tab matches native and Mantine geometry', async ({ page }
 
 test('billing tab keeps checkbox intrinsic sizing', async ({ page }) => {
   await navigateTo(page, '/zev-settings/billing')
-  const boxW = await page.evaluate(() => {
-    const box = document.querySelector('.checkbox-row input[type="checkbox"]') as HTMLElement | null
-    return box ? Math.round(box.getBoundingClientRect().width) : -1
-  })
-  expect(boxW, 'checkbox not found').toBeGreaterThan(0)
+  const checkbox = page.locator('.checkbox-row input[type="checkbox"]').first()
+  await expect(checkbox).toBeVisible()
+  const boxW = await checkbox.evaluate(box => Math.round(box.getBoundingClientRect().width))
+  expect(boxW).toBeGreaterThan(0)
   expect(boxW, 'checkbox stretched to field width').toBeLessThan(40)
 })
 
@@ -118,7 +117,7 @@ test('tariff modal fields match', async ({ page }) => {
   const { natives, mantine } = await heights(panel)
   expectUniform('tariff modal', natives, mantine)
   await panel.locator('button[data-dates-input]').first().click()
-  const calendar = page.getByRole('dialog')
+  const calendar = page.getByRole('dialog').filter({ has: page.locator('table') })
   await expect(calendar).toBeVisible()
   await calendar.locator('td button:not([data-outside]):not([disabled])').first().click()
   await expect(calendar).toBeHidden()

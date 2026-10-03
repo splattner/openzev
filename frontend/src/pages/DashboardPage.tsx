@@ -8,10 +8,13 @@ import { formatKwh, formatPercent } from '../lib/numbers'
 import { dashboardKwhStat, hourlyKwhTick, hourlyKwhTooltipValue, fromZevRate, kwhTick } from '../lib/dashboardFormatting'
 import { formatMeteringBucketLabel } from '../lib/meteringLabels'
 import { useAppSettings } from '../lib/appSettings'
+import { useCommunityAccess } from '../lib/communityAccess'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
-import { useCommunityAccess } from '../lib/communityAccess'
 import { PageSkeleton } from '../components/PageSkeleton'
+import { ScopeGuard } from '../components/ScopeGuard'
+import { Notice } from '../components/Notice'
+import { PageHeader } from '../components/PageHeader'
 import { StatCard } from '../components/StatCard'
 import { PeriodSelector } from '../components/PeriodSelector'
 import { BalanceChart } from '../components/dashboard/BalanceChart'
@@ -26,17 +29,14 @@ export function DashboardPage() {
     const { t } = useTranslation()
     const { user } = useAuth()
     const { settings } = useAppSettings()
-    const { managedZevs, entries, selectedZevId, selectedZev, isLoading: managedZevLoading } = useManagedZev()
-    const { isZevScope, isParticipantScope } = useCommunityAccess()
+    const { entries, selectedZevId, selectedZev } = useManagedZev()
+    const { isZevScope: isZevScopedRole, isParticipantScope } = useCommunityAccess()
 
     const interval: BillingInterval = (selectedZev?.billing_interval as BillingInterval) ?? 'monthly'
     const [period, setPeriod] = useState<{ from: string; to: string }>(() => getCurrentBillingPeriod(interval))
     const [bucket, setBucket] = useState<'day' | 'hour' | 'month'>('day')
     const [selectedParticipantId, setSelectedParticipantId] = useState('')
 
-    const isZevScopedRole = isZevScope
-    // A participant of several communities sees the selected one (#761); with a
-    // single membership the request stays as it always was.
     const participantZevId = isParticipantScope && (entries?.length ?? 0) > 1 ? selectedZevId : undefined
     const formatBucketLabel = (value: string) => formatMeteringBucketLabel(value, bucket, settings)
     const formatBucketTooltipLabel = (label: unknown) => formatBucketLabel(String(label ?? ''))
@@ -88,7 +88,6 @@ export function DashboardPage() {
 
     const summary = summaryQuery.data
     const selectedZevName = selectedZev?.name
-    // A participant's dashboard is about the selected community (or its only one).
     const participantScopeName = isParticipantScope ? entries?.find((entry) => entry.id === selectedZevId)?.name : undefined
     const selectedParticipantName = summary?.summary_kind === 'zev' ? summary.selected_participant_name : undefined
     const ownerTimeline = useMemo(() => (summary?.summary_kind === 'zev' ? summary.timeline : []), [summary])
@@ -157,177 +156,174 @@ export function DashboardPage() {
 
     return (
         <div className="page-stack">
-            <header>
-                {(selectedZevName || participantScopeName) ? <p className="eyebrow">{selectedZevName ?? participantScopeName}</p> : null}
-                <h2>{t(isZevScopedRole ? 'pages.energyBalancePage.title' : 'dashboard.title')}</h2>
-                <p className="muted">{t(isZevScopedRole ? 'pages.energyBalancePage.description' : 'dashboard.description')}</p>
-            </header>
+            <PageHeader
+                eyebrow={selectedZevName ?? participantScopeName}
+                title={t(isZevScopedRole ? 'pages.energyBalancePage.title' : 'dashboard.title')}
+                description={t(isZevScopedRole ? 'pages.energyBalancePage.description' : 'dashboard.description')}
+            />
 
-            {isZevScope && (
-                <section className="card">
-                    <div className="grid">
-                        <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={setPeriod} />
-                        <div className="inline-form grid grid-2">
-                            <label>
-                                <span>{t('pages.dashboard.participant')}</span>
-                                <select value={selectedParticipantId} onChange={(e) => setSelectedParticipantId(e.target.value)}>
-                                    <option value="">{t('pages.dashboard.allParticipants')}</option>
-                                    {summary?.summary_kind === 'zev' &&
-                                        summary.participant_stats.map((participant) => (
-                                            <option key={participant.participant_id} value={participant.participant_id}>
-                                                {participant.participant_name || participant.participant_id}
-                                            </option>
-                                        ))}
-                                </select>
-                            </label>
-                            <label>
-                                <span>{t('pages.dashboard.resolution')}</span>
-                                <select value={bucket} onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}>
-                                    <option value="hour">{t('pages.dashboard.hourly')}</option>
-                                    <option value="day">{t('pages.dashboard.daily')}</option>
-                                    <option value="month">{t('pages.dashboard.monthly')}</option>
-                                </select>
-                            </label>
+            <ScopeGuard skeleton="kpiRow">
+                {isZevScopedRole && (
+                    <section className="card">
+                        <div className="grid">
+                            <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={setPeriod} />
+                            <div className="inline-form grid grid-2">
+                                <label>
+                                    <span>{t('pages.dashboard.participant')}</span>
+                                    <select value={selectedParticipantId} onChange={(e) => setSelectedParticipantId(e.target.value)}>
+                                        <option value="">{t('pages.dashboard.allParticipants')}</option>
+                                        {summary?.summary_kind === 'zev' &&
+                                            summary.participant_stats.map((participant) => (
+                                                <option key={participant.participant_id} value={participant.participant_id}>
+                                                    {participant.participant_name || participant.participant_id}
+                                                </option>
+                                            ))}
+                                    </select>
+                                </label>
+                                <label>
+                                    <span>{t('pages.dashboard.resolution')}</span>
+                                    <select value={bucket} onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}>
+                                        <option value="hour">{t('pages.dashboard.hourly')}</option>
+                                        <option value="day">{t('pages.dashboard.daily')}</option>
+                                        <option value="month">{t('pages.dashboard.monthly')}</option>
+                                    </select>
+                                </label>
+                            </div>
                         </div>
-                    </div>
-                </section>
-            )}
-
-            {isParticipantScope && (
-                <section className="card">
-                    <div className="grid">
-                        <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={setPeriod} />
-                        <div className="inline-form" style={{ maxWidth: '320px' }}>
-                            <label>
-                                <span>{t('pages.dashboard.resolution')}</span>
-                                <select value={bucket} onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}>
-                                    <option value="hour">{t('pages.dashboard.hourly')}</option>
-                                    <option value="day">{t('pages.dashboard.daily')}</option>
-                                    <option value="month">{t('pages.dashboard.monthly')}</option>
-                                </select>
-                            </label>
-                        </div>
-                    </div>
-                </section>
-            )}
-
-            {isZevScopedRole && !selectedZevId && !managedZevLoading && <div className="card">{t('pages.dashboard.noZev')}</div>}
-            {isZevScopedRole && selectedZevId && !selectedZev && !managedZevLoading && managedZevs.length > 0 && (
-                <div className="card">{t('pages.dashboard.selectZev')}</div>
-            )}
-
-            {summaryQuery.isLoading && <PageSkeleton variant="kpiRow" />}
-            {summaryQuery.isError && <div className="card error-banner">{t('pages.dashboard.failedAnalytics')}</div>}
-
-            {summary && summary.summary_kind === 'zev' && (
-                <>
-                    {/* Hero + KPI row (spec §5.1): always ZEV-wide, even when a
-                        participant drill-down filters the charts below. */}
-                    <section className="kpi-row">
-                        <StatCard
-                            accent
-                            label={t('pages.dashboard.stats.selfConsumptionRate')}
-                            value={ownerSelfConsumption ? formatPercent(ownerSelfConsumption.pct) : '—'}
-                            hint={
-                                ownerSelfConsumption
-                                    ? t('pages.dashboard.hints.selfConsumption', {
-                                          local: formatKwh(ownerSelfConsumption.localKwh, { maxDecimals: 0 }),
-                                          total: formatKwh(ownerSelfConsumption.producedKwh, { maxDecimals: 0 }),
-                                      })
-                                    : undefined
-                            }
-                        />
-                        <StatCard label={t('pages.dashboard.stats.producedInZev')} value={dashboardKwhStat(summary.zev_totals.produced_kwh)} />
-                        <StatCard label={t('pages.dashboard.stats.consumedInZev')} value={dashboardKwhStat(summary.zev_totals.consumed_kwh)} />
-                        <StatCard label={t('pages.dashboard.stats.importedFromGrid')} value={dashboardKwhStat(summary.zev_totals.imported_kwh)} />
-                        <StatCard label={t('pages.dashboard.stats.exportedToGrid')} value={dashboardKwhStat(summary.zev_totals.exported_kwh)} />
                     </section>
-                    {summary.zev_has_behind_meter_generation && <p className="muted">{t('behindMeter.zevNote')}</p>}
-                    {summary.participant_stats.length > 0 && (
-                        <EnergyFlowCard
-                            totals={summary.zev_totals}
-                            participantStats={summary.participant_stats}
-                            highlightParticipantId={selectedParticipantId || undefined}
+                )}
+
+                {isParticipantScope && (
+                    <section className="card">
+                        <div className="grid">
+                            <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={setPeriod} />
+                            <div className="inline-form" style={{ maxWidth: '320px' }}>
+                                <label>
+                                    <span>{t('pages.dashboard.resolution')}</span>
+                                    <select value={bucket} onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}>
+                                        <option value="hour">{t('pages.dashboard.hourly')}</option>
+                                        <option value="day">{t('pages.dashboard.daily')}</option>
+                                        <option value="month">{t('pages.dashboard.monthly')}</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+                    </section>
+                )}
+
+                {summaryQuery.isLoading && <PageSkeleton variant="kpiRow" />}
+                {summaryQuery.isError && <Notice tone="error" onRetry={() => void summaryQuery.refetch()} isRetrying={summaryQuery.isFetching}>{t('pages.dashboard.failedAnalytics')}</Notice>}
+                {summary && summary.summary_kind === 'zev' && (
+                    <>
+                        {/* Hero + KPI row (spec §5.1): always ZEV-wide, even when a
+                            participant drill-down filters the charts below. */}
+                        <section className="kpi-row">
+                            <StatCard
+                                accent
+                                label={t('pages.dashboard.stats.selfConsumptionRate')}
+                                value={ownerSelfConsumption ? formatPercent(ownerSelfConsumption.pct) : '—'}
+                                hint={
+                                    ownerSelfConsumption
+                                        ? t('pages.dashboard.hints.selfConsumption', {
+                                              local: formatKwh(ownerSelfConsumption.localKwh, { maxDecimals: 0 }),
+                                              total: formatKwh(ownerSelfConsumption.producedKwh, { maxDecimals: 0 }),
+                                          })
+                                        : undefined
+                                }
+                            />
+                            <StatCard label={t('pages.dashboard.stats.producedInZev')} value={dashboardKwhStat(summary.zev_totals.produced_kwh)} />
+                            <StatCard label={t('pages.dashboard.stats.consumedInZev')} value={dashboardKwhStat(summary.zev_totals.consumed_kwh)} />
+                            <StatCard label={t('pages.dashboard.stats.importedFromGrid')} value={dashboardKwhStat(summary.zev_totals.imported_kwh)} />
+                            <StatCard label={t('pages.dashboard.stats.exportedToGrid')} value={dashboardKwhStat(summary.zev_totals.exported_kwh)} />
+                        </section>
+                        {summary.zev_has_behind_meter_generation && <p className="muted">{t('behindMeter.zevNote')}</p>}
+                        {summary.participant_stats.length > 0 && (
+                            <EnergyFlowCard
+                                totals={summary.zev_totals}
+                                participantStats={summary.participant_stats}
+                                highlightParticipantId={selectedParticipantId || undefined}
+                                zevName={selectedZevName}
+                            />
+                        )}
+                        <BalanceChart
+                            data={ownerChartData}
                             zevName={selectedZevName}
-                        />
-                    )}
-                    <BalanceChart
-                        data={ownerChartData}
-                        zevName={selectedZevName}
-                        participantName={selectedParticipantName ?? undefined}
-                        formatBucketLabel={formatBucketLabel}
-                        formatBucketTooltipLabel={formatBucketTooltipLabel}
-                        kwhTick={kwhTick}
-                    />
-                    <ParticipantTableCard
-                        participantStats={summary.participant_stats}
-                        selectedParticipantId={selectedParticipantId}
-                        onSelect={setSelectedParticipantId}
-                    />
-                    {selectedParticipantId && hourlyProfileData.length > 0 && (
-                        <HourlyProfileCard
-                            data={hourlyProfileData}
-                            hourlyKwhTick={hourlyKwhTick}
-                            hourlyKwhTooltipValue={hourlyKwhTooltipValue}
                             participantName={selectedParticipantName ?? undefined}
+                            formatBucketLabel={formatBucketLabel}
+                            formatBucketTooltipLabel={formatBucketTooltipLabel}
+                            kwhTick={kwhTick}
                         />
-                    )}
-                </>
-            )}
+                        <ParticipantTableCard
+                            participantStats={summary.participant_stats}
+                            selectedParticipantId={selectedParticipantId}
+                            onSelect={setSelectedParticipantId}
+                        />
+                        {selectedParticipantId && hourlyProfileData.length > 0 && (
+                            <HourlyProfileCard
+                                data={hourlyProfileData}
+                                hourlyKwhTick={hourlyKwhTick}
+                                hourlyKwhTooltipValue={hourlyKwhTooltipValue}
+                                participantName={selectedParticipantName ?? undefined}
+                            />
+                        )}
+                    </>
+                )}
 
-            {summary && summary.summary_kind === 'participant' && (
-                <>
-                    <section style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-                        <StatCard label={t('pages.dashboard.participantStats.consumedFromZev')} value={dashboardKwhStat(summary.totals.consumed_from_zev_kwh)} />
-                        <StatCard label={t('pages.dashboard.participantStats.importedFromGrid')} value={dashboardKwhStat(summary.totals.imported_from_grid_kwh)} />
-                        <StatCard
-                            label={t('pages.dashboard.participantStats.totalConsumption')}
-                            value={dashboardKwhStat(summary.totals.total_consumed_kwh)}
-                            hint={summary.has_behind_meter_generation ? t('behindMeter.ownHint') : undefined}
+                {summary && summary.summary_kind === 'participant' && (
+                    <>
+                        <section className="stat-grid stat-grid--wide">
+                            <StatCard label={t('pages.dashboard.participantStats.consumedFromZev')} value={dashboardKwhStat(summary.totals.consumed_from_zev_kwh)} />
+                            <StatCard label={t('pages.dashboard.participantStats.importedFromGrid')} value={dashboardKwhStat(summary.totals.imported_from_grid_kwh)} />
+                            <StatCard
+                                label={t('pages.dashboard.participantStats.totalConsumption')}
+                                value={dashboardKwhStat(summary.totals.total_consumed_kwh)}
+                                hint={summary.has_behind_meter_generation ? t('behindMeter.ownHint') : undefined}
+                            />
+                            <StatCard
+                                label={t('pages.dashboard.participantStats.fromZevShare')}
+                                value={participantFromZev ? formatPercent(participantFromZev.pct) : '—'}
+                                hint={
+                                    summary.has_behind_meter_generation
+                                        ? t('behindMeter.ownHint')
+                                        : participantFromZev
+                                          ? t('pages.dashboard.hints.fromZevShare', {
+                                                zev: formatKwh(participantFromZev.zevKwh, { maxDecimals: 0 }),
+                                                total: formatKwh(participantFromZev.totalKwh, { maxDecimals: 0 }),
+                                            })
+                                          : undefined
+                                }
+                            />
+                        </section>
+                        {summary.zev_has_behind_meter_generation && <p className="muted">{t('behindMeter.zevNote')}</p>}
+                        {summary.zev_participant_stats.length > 0 && summary.current_participant_id && (
+                            <EnergyFlowCard
+                                totals={summary.zev_totals}
+                                participantStats={summary.zev_participant_stats}
+                                highlightParticipantId={summary.current_participant_id}
+                            />
+                        )}
+                        <ConsumptionSplitCard
+                            data={participantTimeline}
+                            formatBucketLabel={formatBucketLabel}
+                            formatBucketTooltipLabel={formatBucketTooltipLabel}
+                            kwhTick={kwhTick}
                         />
-                        <StatCard
-                            label={t('pages.dashboard.participantStats.fromZevShare')}
-                            value={participantFromZev ? formatPercent(participantFromZev.pct) : '—'}
-                            hint={
-                                summary.has_behind_meter_generation
-                                    ? t('behindMeter.ownHint')
-                                    : participantFromZev
-                                      ? t('pages.dashboard.hints.fromZevShare', {
-                                            zev: formatKwh(participantFromZev.zevKwh, { maxDecimals: 0 }),
-                                            total: formatKwh(participantFromZev.totalKwh, { maxDecimals: 0 }),
-                                        })
-                                      : undefined
-                            }
+                        {hourlyProfileData.length > 0 && (
+                            <HourlyProfileCard
+                                data={hourlyProfileData}
+                                hourlyKwhTick={hourlyKwhTick}
+                                hourlyKwhTooltipValue={hourlyKwhTooltipValue}
+                            />
+                        )}
+                        <ParticipantInvoicesCard
+                            allCommunities={(entries?.length ?? 0) > 1}
+                            invoices={participantInvoicesWithPdf}
+                            isLoading={invoicesQuery.isLoading}
+                            isError={invoicesQuery.isError}
                         />
-                    </section>
-                    {summary.zev_has_behind_meter_generation && <p className="muted">{t('behindMeter.zevNote')}</p>}
-                    {summary.zev_participant_stats.length > 0 && summary.current_participant_id && (
-                        <EnergyFlowCard
-                            totals={summary.zev_totals}
-                            participantStats={summary.zev_participant_stats}
-                            highlightParticipantId={summary.current_participant_id}
-                        />
-                    )}
-                    <ConsumptionSplitCard
-                        data={participantTimeline}
-                        formatBucketLabel={formatBucketLabel}
-                        formatBucketTooltipLabel={formatBucketTooltipLabel}
-                        kwhTick={kwhTick}
-                    />
-                    {hourlyProfileData.length > 0 && (
-                        <HourlyProfileCard
-                            data={hourlyProfileData}
-                            hourlyKwhTick={hourlyKwhTick}
-                            hourlyKwhTooltipValue={hourlyKwhTooltipValue}
-                        />
-                    )}
-                    <ParticipantInvoicesCard
-                        invoices={participantInvoicesWithPdf}
-                        isLoading={invoicesQuery.isLoading}
-                        isError={invoicesQuery.isError}
-                    />
-                </>
-            )}
+                    </>
+                )}
+            </ScopeGuard>
         </div>
     )
 }

@@ -42,7 +42,7 @@ in the frontend.
 | Action hierarchy | Primary, secondary, overflow, destructive, modal footer actions |
 | Icon treatment | Font Awesome icon + label buttons, fixed-width icon alignment |
 | Page grouping patterns | When to use sections, nested cards, tables (`DataTable`), or tabs |
-| Shared primitives | `ActionMenu`, `ConfirmDialog`, `FormModal`, `BillingPeriodSelector`, `StatCard` |
+| Shared primitives | `PageHeader`, `Notice`, `PageState`, `ScopeGuard`, `Toolbar`, `ActionMenu`, `ConfirmDialog`, `FormModal`, `BillingPeriodSelector`, `StatCard` |
 | I18n constraints | User-facing text in locale files only; translated labels must not encode visual symbols |
 | Responsive behaviour | Management pages must remain usable on mobile and reduced-width layouts |
 | Reference pages | `ParticipantsPage`, `MeteringPointsPage`, `InvoicesPage`, `ImportsPage`, `TariffsPage` |
@@ -62,18 +62,19 @@ already rely on role-aware access and ZEV scoping.
 | Actor | Capability |
 |---|---|
 | `admin` | Can access all management pages and uses the global ZEV selector when applicable |
-| `zev_owner` | Can access owner-facing management pages scoped to owned ZEVs |
+| Community manager | Can read and manage communities with a manager grant |
+| Community viewer | Can read communities with a viewer grant; write actions are hidden |
 | `participant` | May see read-only or limited management surfaces such as metering data; CRUD-heavy pages remain hidden by route protection |
 
 **Route guards currently covered by this spec:**
 
 | Route | File | ProtectedRoute |
 |---|---|---|
-| `/participants` | `frontend/src/pages/ParticipantsPage.tsx` | `allowedRoles={['admin', 'zev_owner']}` |
-| `/metering-points` | `frontend/src/pages/MeteringPointsPage.tsx` | authenticated route; page logic further limits available actions |
-| `/tariffs` | `frontend/src/pages/TariffsPage.tsx` | `allowedRoles={['admin', 'zev_owner']}` |
-| `/billing/invoices` | `frontend/src/pages/InvoicesPage.tsx` | `allowedRoles={['admin', 'zev_owner']}` (`/invoices` stays as alias) |
-| `/metering/imports` | `frontend/src/pages/ImportsPage.tsx` | `allowedRoles={['admin', 'zev_owner']}` (`/imports` stays as alias) |
+| `/participants` | `frontend/src/pages/ParticipantsPage.tsx` | `allowedRoles={['admin', 'manager', 'viewer']}` |
+| `/metering/points` (`/metering-points` alias) | `frontend/src/pages/MeteringPointsPage.tsx` | `allowedRoles={['admin', 'manager', 'viewer', 'participant']}`; page logic further limits available actions |
+| `/tariffs` | `frontend/src/pages/TariffsPage.tsx` | `allowedRoles={['admin', 'manager', 'viewer']}` |
+| `/billing/invoices` | `frontend/src/pages/InvoicesPage.tsx` | `allowedRoles={['admin', 'manager', 'viewer']}` (`/invoices` stays as alias) |
+| `/metering/imports` | `frontend/src/pages/ImportsPage.tsx` | `allowedRoles={['admin', 'manager', 'viewer']}` (`/imports` stays as alias) |
 
 **ZEV scoping rule:** when a page works on tenant-owned data, it must render
 from already-scoped data in query results and additionally narrow to
@@ -93,10 +94,45 @@ defined by shared frontend primitives and CSS contracts.
 | `frontend/src/components/ConfirmDialog.tsx` | `useConfirmDialog`, `ConfirmDialog` | Required wrapper for destructive or high-impact actions. Supports `title`, `message`, `isDangerous`, and async confirm handlers. `confirmText` and `cancelText` are optional and default to `common.confirm` / `common.cancel` i18n keys. Async errors surface via a toast (uses `useToast` internally). |
 | `frontend/src/components/FormModal.tsx` | `FormModal` | Generic modal shell for CRUD forms and small workflow dialogs. |
 | `frontend/src/components/BillingPeriodSelector.tsx` | `BillingPeriodSelector` | Specialized period-navigation control for invoice workflows; uses the same button language as management-page actions. |
-| `frontend/src/components/StatCard.tsx` | `StatCard` | Summary-stat card for page-level counts and metrics. Renders a `stat-label`, an `h3` value, and an optional muted `hint`. Variants: `tone` (`success`/`warning`/`danger`, colors the `h3`), `flat` (no card chrome, for tiles nested inside a `.card`), and `accent` (dark hero variant — at most one per view and mutually exclusive with `tone`/`flat`). Pages must use `StatCard` instead of hand-rolled `.stat-card` markup or local KPI-tile patterns. Kept exceptions (not KPI tiles): `.status-tile-*` (status-color legend) and the compact pill counters `.metering-summary-*`/`.participant-summary-*`. |
+| `frontend/src/components/PageHeader.tsx` | `PageHeader` | Page title (`h1`), optional `eyebrow`, `description`, and `actions`. Keep it outside data/scope state branches. Embedded pages use the host page title. |
+| `frontend/src/components/Notice.tsx` | `Notice` | Errors use `alert`, warnings use `status`; optional role override and retry with busy feedback. |
+| `frontend/src/components/PageState.tsx` | `PageState` | Blocking error → skeleton → content, with translated fallback error text and optional retry. |
+| `frontend/src/components/ScopeGuard.tsx` | `ScopeGuard` | Community state handling for management views; see the scope rules below. |
+| `frontend/src/components/Toolbar.tsx` | `Toolbar` | Context and optional action row. `children` supplies the context; `actions` supplies buttons. Wraps below 700px. |
+| `frontend/src/components/StatCard.tsx` | `StatCard` | Summary metric with label, value and optional hint. Supports semantic `tone`, nested `flat` and dark `accent` variants; `onPress` with required `pressed` renders a native toggle button. |
 | `@mantine/core` `Tabs` (`classNames` `app-tabs`/`app-tabs-list`/`app-tabs-tab`) | `Tabs`, `Tabs.List`, `Tabs.Tab`, `Tabs.Panel` | Mantine Tabs + the `app-tabs` classNames for mutually exclusive, document-like views. Mantine v9 emits hashed classes only, so the hooks must be passed via `classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}`. All tab content renders as `Tabs.Panel` inside the same `Tabs` root (root `keepMounted={false}` when inactive content must unmount; shared controls may sit between list and panels) so every tab's `aria-controls` resolves to a real `tabpanel`. No hand-rolled strips. |
 | `frontend/src/components/PageSkeleton.tsx` | `PageSkeleton` | Loading placeholder using Mantine `Skeleton`. Variants: `page` (eyebrow + title + KPI row + 2 cards for full-page `isLoading`), `kpiRow` (4 stat blocks for stats/fact rows), `table` (5 fading rows inside `.card` for `DataTable` pages), `tableRows` (same rows without outer `.card` for nested contexts), `cardList` (3 card blocks for card-list pages), `card` (single `.card` for inline sections). Every `isLoading` return must render a skeleton — no `t('common.loading')` text cards. Preserves page `header` on loading where possible (e.g. `AdminDashboardPage` pattern). Wraps Mantine shimmer via `useReducedMotion() → animate={false}` + `@media (prefers-reduced-motion: reduce) → .skeleton-block`. |
-| `frontend/src/components/EmptyState.tsx` | `EmptyState` | Factory for list empty states. Props `titleKey`, `descriptionKey`, `actions?: ({ labelKey, variant?: 'primary'\|'secondary', icon? } & ({ to: string } \| { onClick: () => void }))[]`. Renders `<section className="card empty-state" aria-labelledby aria-describedby>` with `h3`, muted `p`, `.actions-row.actions-row-wrap`. Every primary list page shows one with ≥1 next-step CTA when `!isLoading && results.length === 0` (viewers still get `participants` CTA). Thin wrappers `TariffEmptyState`, `InvoicesEmptyState`, `MeteringPointsEmptyState` (and participant no-results) delegate to it. |
+| `frontend/src/components/EmptyState.tsx` | `EmptyState` | Factory for list empty states. Props `titleKey`, `descriptionKey`, `actions?: ({ labelKey, variant?: 'primary'\|'secondary', icon? } & ({ to: string } \| { onClick: () => void }))[]`. Renders `<section className="card empty-state" aria-labelledby aria-describedby>` with `h3`, muted `p`, `.actions-row.actions-row-wrap`. CRUD lists offer a next-step CTA when results are empty and an action is available. Read-only inventories, filtered results and missing-access guidance may omit a CTA. Thin wrappers `TariffEmptyState`, `InvoicesEmptyState`, `MeteringPointsEmptyState` (and participant no-results) delegate to it. |
+
+Usage rules:
+
+- Keep page titles outside data/scope branches; embedded views use the host
+  title. Render tab roots below the header.
+- Repeatable content-query failures on migrated state surfaces offer retry. Scope retries reload the
+  community list; content retries reload their own query.
+- Callers decide whether `PageState` replaces content on failure or leaves
+  cached data visible alongside a warning.
+- `ScopeGuard` requires a matching selected ID and ZEV record. Initial
+  loading/failure and confirmed empty results replace management content;
+  failed refreshes retain usable cached scope with a retry warning.
+  Participants and former participants pass through. Admins without a ZEV
+  get a create link; other accounts get access guidance without a CTA
+  as described by the empty-state rule. Keep the guard mounted through
+  child-query states. The non-admin guidance reuses the `GuestHomePage`
+  copy (`pages.guest.*`) with the account link on purpose: the inner
+  `ProtectedRoute` redirects shell role `none` to `/` before guarded
+  pages mount, so the router owns the primary guest experience and the
+  guard branch is defense-in-depth for revoke races and routes mounted
+  outside the layout — one shared wording, no diverging explanations.
+  Dashboard, Overview, Reports, Invoices, BillingEmails,
+  ZevSettings, MeteringChart and MeteringPoints use this policy; BillingPeriods
+  inherits Overview's guard. Other pages retain their local query-state policy.
+- Parent queries still need scoped keys and `enabled` conditions; backend
+  permissions enforce access.
+- Use `StatCard` for KPI tiles. Interactive contents use phrasing elements;
+  other values remain `h3`. Tones color values and selection uses an outline.
+  Tile rows use `.stat-grid` plus optional `.stat-grid--wide`; form grids,
+  legends and compact pill counters retain their feature layouts.
 
 ### 4.2 CSS contracts
 
@@ -108,11 +144,15 @@ language and should be reused instead of ad hoc page-local CSS when possible:
 | Class / group | Purpose |
 |---|---|
 | `.page-stack` | Vertical page layout spacing |
+| `.page-header`, `.page-header-main`, `.page-header-text`, `.page-header-actions` (with `.page-header h1`) | Shrinking title/actions row with wrapping for long text; `.eyebrow` also serves card/section overlines |
+| `.stat-grid`, `.stat-grid--wide` | Auto-fit tiles with 1rem gap and 150px/220px minimums capped at container width; wide modifier requires the base class |
+| `.toolbar`, `.toolbar-main`, `.toolbar-actions` | Toolbar layout owned by `Toolbar` (space-between, wraps below 700px) |
 | `.card`, `.table-card`, `.stat-card` | Primary container surfaces |
-| `.stat-card--accent`, `.stat-card--success`, `.stat-card--warning`, `.stat-card--danger`, `.stat-card--flat` | `StatCard` variants — `accent` dark hero (`var(--brand-deep)`, white `h3`, ≤1 per view); tone colors the `h3` (`var(--success-600)`/`var(--warning-800)`/`var(--danger-600)`); `flat` strips border/shadow/hover-lift for tiles inside a `.card` |
+| `.stat-card--interactive` | `StatCard` with `onPress`: real button semantics, `[aria-pressed='true']` shows the selected state with `var(--interactive)`; focus styling comes from the global `:focus-visible` ring |
+| `.stat-card--accent`, `.stat-card--success`, `.stat-card--warning`, `.stat-card--danger`, `.stat-card--flat` | Dark accent (≤1 per view); semantic tones color the value (`h3` or span); `flat` removes card chrome for nested tiles |
 | `.button`, `.button-secondary`, `.button-danger`, `.button-compact` | Shared button system (flat `var(--interactive)` fill; see SPEC-2026-08-ui-redesign-pdf-style; hover `var(--interactive-hover)`) |
 | `.badge`, `.badge-neutral`, `.badge-info`, `.badge-success`, `.badge-danger`, `.badge-warning` (+ invoice workflow variants `.badge-draft/.badge-approved/.badge-sent/.badge-paid/.badge-cancelled`) | Small semantic status/category labels — filled desaturated fills from the generated `--status-*` semantics, never gold-on-white |
-| `.error-banner`, `.warning-banner` | Page-level error/warning callouts — error states render as `card error-banner`, warnings as `.warning-banner` (filled desaturated `--danger-100` / `--warning-100` fills; no inline gold borders) |
+| `.error-banner`, `.warning-banner`, `.info-banner` | Error/warning surfaces used by `Notice`; `.info-banner` remains for existing information callouts. |
 | `.actions-row`, `.actions-row-wrap`, `.actions-row-end` | Inline action layouts |
 | `.app-tabs`, `.app-tabs-list`, `.app-tabs-tab` | Token styling for Mantine `Tabs`: root grid rhythm (1.5rem gap), 1rem tab gap, muted labels with a 2px `--interactive` underline when active; applied via the `classNames` prop. |
 | `.empty-state` | Empty-state layout (`display:grid; gap:0.75rem` inside `.card`); retired inline-style version from `InvoicesEmptyState` |
@@ -208,8 +248,8 @@ Frontend interaction rules relevant to async work:
 
 Management pages should follow this high-level order:
 
-1. Page header with title and one-sentence description.
-2. Summary/action toolbar for counts, current context, and top-level create/import/export actions.
+1. Page header (`PageHeader`): eyebrow for the scope, `h1` title, one-sentence description, optional right-aligned page actions. Tab roots follow the header.
+2. Summary/action toolbar (`Toolbar`) for counts, current context, and top-level create/import/export actions.
 3. Filters when the page supports narrowing or searching records.
 4. Main content using either a structured table (shared `frontend/src/components/DataTable.tsx`) or a card list, depending on record complexity.
 5. Modals and confirm dialogs rendered at the end of the component tree.
@@ -390,8 +430,17 @@ These pages define the current management-page reference set.
   error/success/disabled states, icon insets, multiline height, and 400px layouts
   in English and German. The test-only `fixtures/field-states.tsx` mounts real
   Mantine components with state props; it adds no product route. Run via
-  `npm run test:browser` against the development stack.
+  `npm run test:browser` against the development stack. Browser checks are
+  local validation; `pr-quality.yml` runs lint, tokens, unit tests and build.
 - Locale parity: `npx vitest run tests/locale-parity.test.ts` — en/de/fr/it key-structure equality, no empty values, all leaves are strings, interpolation placeholders match
+- Dead i18n keys: `npx vitest run tests/dead-i18n-keys.test.ts` — every locale leaf is still referenced by source or tests
+- Retired scope copy: `npx vitest run tests/retired-scope-copy.test.ts` — prevents retired selection advice from returning.
+- Page primitives: `npx vitest run tests/page-primitives.test.ts` — notice roles, loading/error precedence and fallback text, initial/cached scope failures and retry, toolbar clusters, and toggle markup.
+- Browser behavior: `frontend/screenshots/page-anatomy.spec.ts`, via `npm run test:browser`, covers page states, scope transitions, retained drafts, keyboard filtering and narrow layouts. Fixtures validate scoped requests; removal scenarios explicitly allow old-scope requests during reconciliation, then require the remaining scope. Captured images are manual-review artifacts, not baseline comparisons.
+- Meter drafts: `frontend/tests/metering-draft-scope.test.ts` — dialog retention/reset and obsolete write completions across account, community and permission changes.
+- Email history/retry: `frontend/tests/billing-email-history.test.ts` — request ordering, close/reopen, and obsolete read/write completions across account/community changes.
+- Invoice states: `frontend/tests/invoices-page.test.ts` — standalone titles during scope loading/error/empty states, embedded heading ownership, and a skeleton before initial period/query resolution.
+- Retired CSS classes: `npx vitest run tests/retired-css-classes.test.ts` — classes with no rule must not survive in markup
 - Manual verification on the reference pages:
   - page header and description are present
   - top-level create/import/export actions use icon + label buttons
@@ -406,3 +455,7 @@ These pages define the current management-page reference set.
 - [ ] The tariff page uses category sections instead of tabs for the four tariff categories.
 - [ ] Billing mode and energy type badges render directly after the tariff name on tariff cards.
 - [ ] New page work can reference this spec to choose between sections, tabs, tables, and cards without inventing a new pattern.
+- [x] Shared management-page shells keep one `PageHeader` title across data and scope states; embedded views inherit the host title. Authentication gates and route suspense are outside this contract.
+- [x] Migrated state UI reuses `PageSkeleton`, `Notice`, `EmptyState`, and the `ScopeGuard` contract.
+- [x] Migrated context/action rows reuse `Toolbar`; tile rows combine the base `.stat-grid` with any modifier.
+- [x] Interactive tiles are keyboard-reachable and expose `aria-pressed`.

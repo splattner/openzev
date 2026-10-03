@@ -10,6 +10,9 @@ The Feasibility Calculator estimates whether forming a vZEV is financially worth
   under **Platform → Settings → Functions**
   (`feasibility_calculator_enabled`).
 
+If availability cannot be checked, choose **Retry**. A disabled message means
+the calculator is turned off on this instance.
+
 ## What it compares against (the baseline)
 
 The calculator answers the *incremental* question: is forming a vZEV better than the status quo, where the PV system sells everything to the grid at the feed-in tariff and every participant buys all their electricity from the grid at the retail price?

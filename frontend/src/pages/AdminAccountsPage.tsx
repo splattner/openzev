@@ -31,6 +31,9 @@ import { useAuth } from '../lib/auth'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { useToast } from '../lib/toast'
 import type { AdminUser, CreateUserInput, UserInput, UserRole } from '../types/api'
+import { PageHeader } from '../components/PageHeader'
+import { PageSkeleton } from '../components/PageSkeleton'
+import { Notice } from '../components/Notice'
 
 const defaultEditUserForm: UserInput = {
     username: '',
@@ -261,12 +264,28 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
         updateUserMutation.mutate({ userId: editingUserId, payload: editUserForm })
     }
 
+    const header = !embedded && (
+        <PageHeader
+            eyebrow={t('nav.platformScope')}
+            title={t('pages.accounts.title')}
+            description={t('pages.accounts.description')}
+        />
+    )
+
     if (usersQuery.isLoading || zevsQuery.isLoading) {
-        return <div className="card">{t('pages.accounts.loading')}</div>
+        return <div className="page-stack">{header}<PageSkeleton variant="table" /></div>
     }
 
     if (usersQuery.isError || zevsQuery.isError) {
-        return <div className="card error-banner">{t('pages.accounts.loadFailed')}</div>
+        return (
+            <div className="page-stack">
+                {header}
+                <Notice tone="error" onRetry={() => {
+                    if (usersQuery.isError) void usersQuery.refetch()
+                    if (zevsQuery.isError) void zevsQuery.refetch()
+                }} isRetrying={usersQuery.isFetching || zevsQuery.isFetching}>{t('pages.accounts.loadFailed')}</Notice>
+            </div>
+        )
     }
 
     const zevs = [...(zevsQuery.data ?? [])].sort((left, right) => left.name.localeCompare(right.name))
@@ -275,13 +294,7 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
 
     return (
         <div className="page-stack">
-            {!embedded && (
-            <header>
-                <p className="eyebrow">{t('nav.platformScope')}</p>
-                <h2>{t('pages.accounts.title')}</h2>
-                <p className="muted">{t('pages.accounts.description')}</p>
-            </header>
-            )}
+            {header}
 
             <div className="actions-row actions-row-end">
                 <button className="button button-primary" type="button" onClick={() => setShowCreateUserModal(true)}>
@@ -294,7 +307,7 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                 <AccountCreatedNotice notice={createdNotice} onDismiss={() => setCreatedNotice(null)} />
             )}
 
-            <section style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+            <section className="stat-grid">
                 <StatCard label={t('pages.accounts.stats.total')} value={stats.total} />
                 <StatCard label={t('pages.accounts.stats.withTwoFactor')} value={stats.withTwoFactor} />
                 <StatCard label={t('pages.accounts.stats.guests')} value={stats.guests} />

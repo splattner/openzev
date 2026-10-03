@@ -1,6 +1,9 @@
 import { useTranslation } from 'react-i18next'
+import { PageHeader } from '../components/PageHeader'
+import { PageState } from '../components/PageState'
+import { Notice } from '../components/Notice'
+import { ScopeGuard } from '../components/ScopeGuard'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { PageSkeleton } from '../components/PageSkeleton'
 import { MeteringAssignmentFormModal } from '../features/meteringPoints/MeteringAssignmentFormModal'
 import { MeteringDeleteDataModal } from '../features/meteringPoints/MeteringDeleteDataModal'
 import { MeteringPointsEmptyState } from '../features/meteringPoints/MeteringPointsEmptyState'
@@ -14,18 +17,37 @@ import { useManagedZev } from '../lib/managedZev'
 import { useCommunityAccess } from '../lib/communityAccess'
 import { soleCommunityName } from '../lib/membership'
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export function MeteringPointsPage() {
     const { user } = useAuth()
-    const { selectedZevId, selectedZev } = useManagedZev()
-    const participantScopeName = soleCommunityName(user)
+    const { selectedZevId, selectedZev, entries } = useManagedZev()
+    const { canManage, isAdmin, isZevScope } = useCommunityAccess()
+    const { t } = useTranslation()
+    const canWrite = canManage && (isAdmin || !selectedZev?.disabled_at)
+    // Drafts survive a failed refresh, but never cross accounts, communities or write access.
+    return (
+        <div className="page-stack">
+            <PageHeader
+                eyebrow={selectedZev?.name ?? entries?.find(entry => entry.id === selectedZevId)?.name ?? soleCommunityName(user)}
+                title={t('pages.meteringPoints.title')}
+                description={t(isZevScope ? 'pages.meteringPoints.adminDescription' : 'pages.meteringPoints.participantDescription')}
+            />
+            <ScopeGuard>
+                <MeteringPointsView
+                    key={`${user?.id}:${selectedZevId}:${canWrite}:${isAdmin}`}
+                    canWrite={canWrite}
+                    canDeleteData={isAdmin}
+                />
+            </ScopeGuard>
+        </div>
+    )
+}
+
+function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; canDeleteData: boolean }) {
+    const { selectedZevId } = useManagedZev()
     const { settings } = useAppSettings()
     const { t } = useTranslation()
-    // The management view (scope) is open to viewers; writes need a manager (#761).
-    const { isZevScope, canManage } = useCommunityAccess()
-    const canManageMeteringPoints = isZevScope
-    const readOnly = !canManage
+    const { isZevScope: isManagedScope } = useCommunityAccess()
+    const readOnly = !canWrite
 
     const {
         meteringPointsQuery,
@@ -92,179 +114,138 @@ export function MeteringPointsPage() {
         handleCancel,
     } = useMeteringPointActions({
         selectedZevId,
-        canManageMeteringPoints,
+        isManagedScope,
+        canWrite,
+        canDeleteData,
     })
 
-    // ── Loading / error ───────────────────────────────────────────────────────────
-    if (meteringPointsQuery.isLoading) {
-        return (
-            <div className="page-stack">
-                <header>
-                    <h2>{t('pages.meteringPoints.title')}</h2>
-                    <p className="muted">
-                        {canManageMeteringPoints
-                            ? t('pages.meteringPoints.adminDescription')
-                            : t('pages.meteringPoints.participantDescription')}
-                    </p>
-                </header>
-                <PageSkeleton variant="cardList" />
-            </div>
-        )
-    }
-    if (meteringPointsQuery.isError) {
-        return (
-            <div className="page-stack">
-                <header>
-                    <h2>{t('pages.meteringPoints.title')}</h2>
-                    <p className="muted">
-                        {canManageMeteringPoints
-                            ? t('pages.meteringPoints.adminDescription')
-                            : t('pages.meteringPoints.participantDescription')}
-                    </p>
-                </header>
-                <div className="card error-banner">
-                    <p style={{ margin: '0 0 0.75rem' }}>{t('pages.meteringPoints.loadFailed')}</p>
-                    <button
-                        className="button button-secondary"
-                        type="button"
-                        onClick={() => meteringPointsQuery.refetch()}
-                    >
-                        {t('common.retry')}
-                    </button>
-                </div>
-            </div>
-        )
-    }
-
     return (
-        <div className="page-stack">
-            <header>
-                {(selectedZev?.name || participantScopeName) ? <p className="eyebrow">{selectedZev?.name ?? participantScopeName}</p> : null}
-                <h2>{t('pages.meteringPoints.title')}</h2>
-                <p className="muted">
-                    {canManageMeteringPoints
-                        ? t('pages.meteringPoints.adminDescription')
-                        : t('pages.meteringPoints.participantDescription')}
-                </p>
-            </header>
-
-            <MeteringPointsToolbar
-                canManageMeteringPoints={canManageMeteringPoints}
-                        readOnly={readOnly}
-                totalCount={scopedMeteringPoints.length}
-                activeCount={activeCount}
-                inactiveCount={inactiveCount}
-                assignedCount={assignedCount}
-                needsAttentionCount={needsAttentionCount}
-                searchTerm={searchTerm}
-                statusFilter={statusFilter}
-                typeFilter={typeFilter}
-                attentionFilter={attentionFilter}
-                assignmentFilter={assignmentFilter}
-                onChangeSearchTerm={setSearchTerm}
-                onChangeStatusFilter={setStatusFilter}
-                onChangeTypeFilter={setTypeFilter}
-                onChangeAttentionFilter={setAttentionFilter}
-                onChangeAssignmentFilter={setAssignmentFilter}
-                onClearFilters={clearFilters}
-                onOpenCreateModal={openCreateMpModal}
-            />
-
-            {/* ── Metering Point Create/Edit Modal ──────────────────────────────────── */}
-            <MeteringPointFormModal
-                isOpen={showMpModal}
-                title={editingMpId ? t('pages.meteringPoints.editTitle') : t('pages.meteringPoints.createTitle')}
-                submitLabel={editingMpId ? t('pages.meteringPoints.saveChanges') : t('pages.meteringPoints.createButton')}
-                form={mpForm}
-                isPending={saveMpMutation.isPending}
-                onClose={closeMpModal}
-                onSubmit={submitMpForm}
-                setForm={setMpForm}
-            />
-
-            {/* ── Assignment Create/Edit Modal ──────────────────────────────────────── */}
-            <MeteringAssignmentFormModal
-                isOpen={showAssignModal}
-                title={editingAssignId ? t('pages.meteringPoints.editAssignTitle') : t('pages.meteringPoints.assignTitle')}
-                form={assignForm}
-                participants={assignParticipants}
-                isPending={saveAssignMutation.isPending}
-                hasOpenEndedWarning={assignHasOpenEndedWarning}
-                onClose={closeAssignModal}
-                onSubmit={submitAssignForm}
-                setForm={setAssignForm}
-                submitLabel={editingAssignId ? t('pages.meteringPoints.saveAssignment') : t('pages.meteringPoints.assignParticipant')}
-            />
-
-            {hasFilters && meteringPoints.length > 0 && (
-                <p className="muted metering-filtered-count">
-                    {t('pages.meteringPoints.filteredCount', { shown: meteringPoints.length, total: scopedMeteringPoints.length })}
-                </p>
+        <>
+            {meteringPointsQuery.isError && meteringPointsQuery.data !== undefined && (
+                <Notice tone="warning" onRetry={() => void meteringPointsQuery.refetch()} isRetrying={meteringPointsQuery.isFetching}>
+                    {t('pages.meteringPoints.loadFailed')}
+                </Notice>
             )}
+            <PageState
+                isLoading={meteringPointsQuery.isLoading}
+                isError={meteringPointsQuery.isError && meteringPointsQuery.data === undefined}
+                skeleton="cardList"
+                error={t('pages.meteringPoints.loadFailed')}
+                onRetry={() => void meteringPointsQuery.refetch()}
+                isRetrying={meteringPointsQuery.isFetching}
+            >
+                <MeteringPointsToolbar
+                    isManagedScope={isManagedScope}
+                    readOnly={readOnly}
+                    totalCount={scopedMeteringPoints.length}
+                    activeCount={activeCount}
+                    inactiveCount={inactiveCount}
+                    assignedCount={assignedCount}
+                    needsAttentionCount={needsAttentionCount}
+                    searchTerm={searchTerm}
+                    statusFilter={statusFilter}
+                    typeFilter={typeFilter}
+                    attentionFilter={attentionFilter}
+                    assignmentFilter={assignmentFilter}
+                    onChangeSearchTerm={setSearchTerm}
+                    onChangeStatusFilter={setStatusFilter}
+                    onChangeTypeFilter={setTypeFilter}
+                    onChangeAttentionFilter={setAttentionFilter}
+                    onChangeAssignmentFilter={setAssignmentFilter}
+                    onClearFilters={clearFilters}
+                    onOpenCreateModal={openCreateMpModal}
+                />
+                <MeteringPointFormModal
+                    isOpen={showMpModal}
+                    title={editingMpId ? t('pages.meteringPoints.editTitle') : t('pages.meteringPoints.createTitle')}
+                    submitLabel={editingMpId ? t('pages.meteringPoints.saveChanges') : t('pages.meteringPoints.createButton')}
+                    form={mpForm}
+                    isPending={saveMpMutation.isPending}
+                    onClose={closeMpModal}
+                    onSubmit={submitMpForm}
+                    setForm={setMpForm}
+                />
+                <MeteringAssignmentFormModal
+                    isOpen={showAssignModal}
+                    title={editingAssignId ? t('pages.meteringPoints.editAssignTitle') : t('pages.meteringPoints.assignTitle')}
+                    form={assignForm}
+                    participants={assignParticipants}
+                    isPending={saveAssignMutation.isPending}
+                    hasOpenEndedWarning={assignHasOpenEndedWarning}
+                    onClose={closeAssignModal}
+                    onSubmit={submitAssignForm}
+                    setForm={setAssignForm}
+                    submitLabel={editingAssignId ? t('pages.meteringPoints.saveAssignment') : t('pages.meteringPoints.assignParticipant')}
+                />
 
-            {/* ── Metering Points List ──────────────────────────────────────────────── */}
-            <div className="table-card">
-                {scopedMeteringPoints.length === 0 ? (
-                    <MeteringPointsEmptyState
-                        canManageMeteringPoints={canManageMeteringPoints}
-                        readOnly={readOnly}
-                        hasFilters={false}
-                        onOpenCreateModal={openCreateMpModal}
-                        onClearFilters={() => undefined}
-                    />
-                ) : meteringPoints.length === 0 ? (
-                    <MeteringPointsEmptyState
-                        canManageMeteringPoints={canManageMeteringPoints}
-                        readOnly={readOnly}
-                        hasFilters={hasFilters}
-                        onOpenCreateModal={openCreateMpModal}
-                        onClearFilters={clearFilters}
-                    />
-                ) : (
-                    <MeteringPointsList
-                        settings={settings}
-                        meteringPoints={meteringPoints}
-                        assignmentsByMeteringPoint={filteredAssignmentsByMeteringPoint}
-                        participantNameById={participantNameById}
-                        healthByMeteringPoint={meteringPointHealthById}
-                        holderLessByMeteringPoint={meteringPointHolderLessById}
-                        canManageMeteringPoints={canManageMeteringPoints}
-                        readOnly={readOnly}
-                        canDeleteData={user?.role === 'admin'}
-                        deleteMeteringPointPending={deleteMpMutation.isPending}
-                        deleteAssignmentPending={deleteAssignMutation.isPending}
-                        dialogLoading={dialogLoading}
-                        confirm={confirm}
-                        onOpenCreateAssignModal={openCreateAssignModal}
-                        onOpenEditMeteringPoint={openEditMpModal}
-                        onOpenDeleteDataModal={openDeleteDataModal}
-                        onOpenEditAssignment={openEditAssignModal}
-                        onDeleteMeteringPoint={(id) => deleteMpMutation.mutate(id)}
-                        onDeleteAssignment={(id) => deleteAssignMutation.mutate(id)}
-                    />
+                {hasFilters && meteringPoints.length > 0 && (
+                    <p className="muted metering-filtered-count">
+                        {t('pages.meteringPoints.filteredCount', { shown: meteringPoints.length, total: scopedMeteringPoints.length })}
+                    </p>
                 )}
-            </div>
+                <div className="table-card">
+                    {scopedMeteringPoints.length === 0 ? (
+                        <MeteringPointsEmptyState
+                            isManagedScope={isManagedScope}
+                            readOnly={readOnly}
+                            hasFilters={false}
+                            onOpenCreateModal={openCreateMpModal}
+                            onClearFilters={() => undefined}
+                        />
+                    ) : meteringPoints.length === 0 ? (
+                        <MeteringPointsEmptyState
+                            isManagedScope={isManagedScope}
+                            readOnly={readOnly}
+                            hasFilters={hasFilters}
+                            onOpenCreateModal={openCreateMpModal}
+                            onClearFilters={clearFilters}
+                        />
+                    ) : (
+                        <MeteringPointsList
+                            settings={settings}
+                            meteringPoints={meteringPoints}
+                            assignmentsByMeteringPoint={filteredAssignmentsByMeteringPoint}
+                            participantNameById={participantNameById}
+                            healthByMeteringPoint={meteringPointHealthById}
+                            holderLessByMeteringPoint={meteringPointHolderLessById}
+                            isManagedScope={isManagedScope}
+                            readOnly={readOnly}
+                            canDeleteData={canDeleteData}
+                            deleteMeteringPointPending={deleteMpMutation.isPending}
+                            deleteAssignmentPending={deleteAssignMutation.isPending}
+                            dialogLoading={dialogLoading}
+                            confirm={confirm}
+                            onOpenCreateAssignModal={openCreateAssignModal}
+                            onOpenEditMeteringPoint={openEditMpModal}
+                            onOpenDeleteDataModal={openDeleteDataModal}
+                            onOpenEditAssignment={openEditAssignModal}
+                            onDeleteMeteringPoint={(id) => deleteMpMutation.mutate(id)}
+                            onDeleteAssignment={(id) => deleteAssignMutation.mutate(id)}
+                        />
+                    )}
+                </div>
 
-            <MeteringDeleteDataModal
-                settings={settings}
-                isOpen={showDeleteDataModal}
-                meterId={deleteDataTarget?.meter_id}
-                mode={deleteDataMode}
-                dateFrom={deleteDataFrom}
-                dateTo={deleteDataTo}
-                isPending={deleteMeteringDataMutation.isPending}
-                onClose={closeDeleteDataModal}
-                onConfirm={submitDeleteData}
-                onChangeMode={setDeleteDataMode}
-                onChangeRange={(nextFrom, nextTo) => {
-                    setDeleteDataFrom(nextFrom)
-                    setDeleteDataTo(nextTo)
-                }}
-            />
+                <MeteringDeleteDataModal
+                    settings={settings}
+                    isOpen={showDeleteDataModal}
+                    meterId={deleteDataTarget?.meter_id}
+                    mode={deleteDataMode}
+                    dateFrom={deleteDataFrom}
+                    dateTo={deleteDataTo}
+                    isPending={deleteMeteringDataMutation.isPending}
+                    onClose={closeDeleteDataModal}
+                    onConfirm={submitDeleteData}
+                    onChangeMode={setDeleteDataMode}
+                    onChangeRange={(nextFrom, nextTo) => {
+                        setDeleteDataFrom(nextFrom)
+                        setDeleteDataTo(nextTo)
+                    }}
+                />
 
-            {dialog && (
-                <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />
-            )}
-        </div>
+                {dialog && (
+                    <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />
+                )}
+            </PageState>
+        </>
     )
 }

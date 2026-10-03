@@ -19,6 +19,7 @@ vi.mock('../src/lib/auth', () => ({
 
 vi.mock('../src/lib/managedZev', () => ({
     useManagedZev: () => mockManagedZev(),
+    useOptionalManagedZev: () => mockManagedZev(),
 }))
 
 vi.mock('../src/lib/api/invoices', () => ({
@@ -101,7 +102,7 @@ function mockOwner({ selectedZevId, selectedZev, managedZevs }: {
     managedZevs: Array<{ id: string; name?: string }>
 }) {
     mockAuth.mockReturnValue({ user: { id: 1, role: 'admin' } })
-    mockManagedZev.mockReturnValue({ selectedZevId, selectedZev, managedZevs, isLoading: false })
+    mockManagedZev.mockReturnValue({ selectedZevId, selectedZev, managedZevs, isLoading: false, isError: false, refetch: vi.fn() })
 }
 
 async function changeYear(select: HTMLSelectElement, value: string) {
@@ -188,21 +189,37 @@ describe('ReportsPage annual-statements export', () => {
         unmount()
     })
 
-    it('cannot prepare for a stale ZEV selection', async () => {
-        mockOwner({ selectedZevId: 'stale', selectedZev: null, managedZevs: [{ id: 'zev-1' }] })
+    it('prepares an export for the community selected by the provider', async () => {
+        mockOwner({
+            selectedZevId: 'zev-7',
+            selectedZev: { id: 'zev-7', name: 'Demo' },
+            managedZevs: [{ id: 'zev-7' }],
+        })
+        vi.mocked(exportsApi.createAnnualStatementsExport).mockResolvedValue(
+            makeCompletedJob({ id: 'job-resolved' }),
+        )
+        // Earlier describes leave their own export list on the shared mock.
+        vi.mocked(exportsApi.fetchAnnualStatementExports).mockResolvedValue([])
         const { container, unmount } = renderReportsPage(ReportsPage)
+        // Two flushes: the card disables its prepare button until the
+        // "latest export" query has settled.
         await flush()
-        expect(container.textContent).toContain('pages.reports.selectZevTitle')
-        expect(container.querySelector('button')).toBeNull()
+        await flush()
+        await click(findButton(container, 'pages.reports.annualStatement.prepare')!)
+        expect(exportsApi.createAnnualStatementsExport).toHaveBeenCalledWith({
+            zev_id: 'zev-7',
+            year: expect.any(Number),
+        })
         unmount()
     })
 
-    it('shows the empty state without a ZEV', async () => {
+    it('renders no export controls while the account has no ZEV', async () => {
         mockOwner({ selectedZevId: null, selectedZev: null, managedZevs: [] })
         const { container, unmount } = renderReportsPage(ReportsPage)
         await flush()
-        expect(container.textContent).toContain('pages.reports.noZevTitle')
+        expect(container.textContent).toContain('pages.zevs.emptyState.title')
         expect(container.textContent).not.toContain('pages.reports.annualStatement.prepare')
+        expect(container.querySelector('select')).toBeNull()
         unmount()
     })
 })

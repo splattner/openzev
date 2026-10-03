@@ -21,6 +21,7 @@ const mockManaged = vi.fn(() => ({}))
 
 vi.mock('../src/lib/managedZev', () => ({
     useManagedZev: () => mockManaged(),
+    useOptionalManagedZev: () => mockManaged(),
 }))
 
 function mockUser(role: UserRole, extra: Record<string, unknown> = {}) {

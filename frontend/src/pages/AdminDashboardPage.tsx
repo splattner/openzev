@@ -5,6 +5,8 @@ import { fetchDashboardStats } from '../lib/api/invoices'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatChf } from '../lib/numbers'
+import { PageHeader } from '../components/PageHeader'
+import { Notice } from '../components/Notice'
 
 /**
  * `embedded` drops the page header (mounted as the Overview tab of the
@@ -12,17 +14,14 @@ import { formatChf } from '../lib/numbers'
  */
 export function AdminDashboardPage({ embedded = false }: { embedded?: boolean }) {
     const { t } = useTranslation()
-    const { data: stats, isLoading, error } = useQuery({
+    const { data: stats, isLoading, error, isFetching, refetch } = useQuery({
         queryKey: queryKeys.invoices.dashboard(),
         queryFn: fetchDashboardStats,
         refetchInterval: 30000,
     })
 
     const header = embedded ? null : (
-        <header>
-            <p className="eyebrow">{t('nav.platformScope')}</p>
-            <h2>{t('nav.adminOverview')}</h2>
-        </header>
+        <PageHeader eyebrow={t('nav.platformScope')} title={t('nav.adminOverview')} />
     )
 
     if (isLoading) {
@@ -40,7 +39,7 @@ export function AdminDashboardPage({ embedded = false }: { embedded?: boolean })
         return (
             <div className="page-stack">
                 {header}
-                <div className="card error-banner">{t('common.error')}</div>
+                <Notice tone="error" onRetry={() => void refetch()} isRetrying={isFetching}>{t('common.error')}</Notice>
             </div>
         )
     }
@@ -58,7 +57,7 @@ export function AdminDashboardPage({ embedded = false }: { embedded?: boolean })
         <div className="page-stack">
             {header}
 
-            {error && <div className="card error-banner">{t('common.error')}</div>}
+            {error && <Notice tone="error" onRetry={() => void refetch()} isRetrying={isFetching}>{t('common.error')}</Notice>}
 
             <div className="grid grid-3">
                 <StatCard label={t('entity.zevs')} value={stats.zevs.total} />
@@ -68,7 +67,7 @@ export function AdminDashboardPage({ embedded = false }: { embedded?: boolean })
 
             <div className="card">
                 <h2>{t('invoice.statusBreakdown')}</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
+                <div className="stat-grid">
                     {[
                         { key: 'draft', label: t('invoice.status.draft'), value: stats.invoices.draft },
                         { key: 'approved', label: t('invoice.status.approved'), value: stats.invoices.approved },

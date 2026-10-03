@@ -39,7 +39,7 @@ type MeteringPointsListProps = {
   /** Empty for a role that has no assignment data loaded (see the hook) — never render a false positive from a missing entry. */
   holderLessByMeteringPoint: Map<string, boolean>
   settings: AppSettings
-  canManageMeteringPoints: boolean
+  isManagedScope: boolean
   /** A viewer reads only (#761): no edit, assign, delete. */
   readOnly?: boolean
   canDeleteData: boolean
@@ -62,7 +62,7 @@ export function MeteringPointsList({
   healthByMeteringPoint,
   holderLessByMeteringPoint,
   settings,
-  canManageMeteringPoints,
+  isManagedScope,
   readOnly = false,
   canDeleteData,
   deleteMeteringPointPending,
@@ -125,7 +125,7 @@ export function MeteringPointsList({
           && getAssignmentState(sortedAssignments[0], todayIso) === 'current'
 
         const pointMenuItems: ActionMenuItem[] = []
-        if (canManageMeteringPoints && !readOnly) {
+        if (isManagedScope && !readOnly) {
           pointMenuItems.push({
             key: 'edit',
             label: t('common.edit'),
@@ -198,7 +198,7 @@ export function MeteringPointsList({
               </div>
 
               <div className="metering-point-actions">
-                {canManageMeteringPoints && !readOnly && (
+                {isManagedScope && !readOnly && (
                   <button
                     className="button button-primary button-compact"
                     type="button"
@@ -216,7 +216,7 @@ export function MeteringPointsList({
                   <FontAwesomeIcon icon={faChartLine} fixedWidth />
                   {t('pages.meteringPoints.chart')}
                 </Link>
-                {canManageMeteringPoints && !readOnly && (
+                {isManagedScope && !readOnly && (
                   <ActionMenu
                     label={t('pages.meteringPoints.moreActions')}
                     icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
@@ -226,7 +226,7 @@ export function MeteringPointsList({
               </div>
             </div>
 
-            {canManageMeteringPoints && (
+            {isManagedScope && (
               <div className="metering-point-body">
                 {isSingleCurrentHolder ? (
                   <div className="metering-assignment-compact">

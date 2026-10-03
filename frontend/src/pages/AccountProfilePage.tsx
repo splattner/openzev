@@ -14,6 +14,7 @@ import { PasswordCard } from '../features/account/PasswordCard'
 import { ProfileCard } from '../features/account/ProfileCard'
 import { SessionsCard } from '../features/account/SessionsCard'
 import { TwoFactorSection } from '../features/account/TwoFactorSection'
+import { PageHeader } from '../components/PageHeader'
 
 /**
  * The signed-in user's own account, in three tabs: Profile (who you are),
@@ -59,10 +60,7 @@ export function AccountProfilePage() {
 
     return (
         <div className="page-stack">
-            <header>
-                <h2>{t('account.title')}</h2>
-                <p className="muted">{t('account.titleDescription')}</p>
-            </header>
+            <PageHeader title={t('account.title')} description={t('account.titleDescription')} />
 
             {user?.must_change_password && (
                 <div className="warning-banner" role="alert" style={{ display: 'grid', gap: '0.35rem', maxWidth: '1000px' }}>

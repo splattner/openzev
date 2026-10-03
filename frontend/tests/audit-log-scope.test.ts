@@ -24,6 +24,7 @@ vi.mock('../src/lib/auth', () => ({
 vi.mock('../src/lib/managedZev', () => ({
     ManagedZevProvider: (props: { children: unknown }) => props.children,
     useManagedZev: () => mockManagedZev(),
+    useOptionalManagedZev: () => mockManagedZev(),
 }))
 
 vi.mock('../src/lib/appSettings', () => ({
@@ -134,7 +135,7 @@ function renderAuditLogs(scope: 'admin' | 'owner', initialEntries: string[] = ['
             await act(async () => {
                 root.render(ui())
             })
-            for (let i = 0; i < 100 && !container.querySelector('h2'); i += 1) {
+            for (let i = 0; i < 100 && !container.querySelector('h1'); i += 1) {
                 await act(async () => {
                     await new Promise((r) => setTimeout(r, 50))
                 })

@@ -18,7 +18,7 @@ export interface CommunityEntry {
 interface ManagedZevContextValue {
     /** Communities whose ZEV record the account may read: every one for an admin, else those it holds a grant for. */
     managedZevs: Zev[]
-    /** Every community the account relates to, sorted by name — what the switcher lists. */
+    /** Selectable communities, sorted by name; loaded records reconcile management memberships. */
     entries: CommunityEntry[]
     selectedZevId: string
     /** The selected community's ZEV record, when the account may read it (never for a participant-only entry). */
@@ -27,6 +27,10 @@ interface ManagedZevContextValue {
     relation?: CommunityRelation
     isSelectable: boolean
     isLoading: boolean
+    isFetching: boolean
+    /** The ZEV list request failed — distinct from "this account has none". */
+    isError: boolean
+    refetch: () => void
     setSelectedZevId: (zevId: string) => void
 }
 
@@ -51,7 +55,6 @@ interface CommunitySelectionInput {
  * Selection among the communities the account relates to (#761): explicit
  * pick if still listed → account preference if listed → first by name. An
  * admin may always switch; anyone else once there is more than one entry.
- * (No hooks, unit-testable.)
  */
 export function resolveCommunitySelection({
     isAdmin,
@@ -100,7 +103,16 @@ export function ManagedZevProvider({ children }: { children: ReactNode }) {
         enabled: mayReadZevs,
     })
 
-    const entries = useMemo(() => communityEntries(user, zevsQuery.data ?? []), [user, zevsQuery.data])
+    const entries = useMemo(() => {
+        const memberships = communityEntries(user, zevsQuery.data ?? [])
+        // Before the list arrives, memberships supply scope. Once loaded,
+        // a missing management record is no longer selectable; participants need no record.
+        if (zevsQuery.data === undefined) return memberships
+        const readableIds = new Set(zevsQuery.data.map((zev) => zev.id))
+        return memberships.filter((entry) =>
+            entry.relation === 'participant' || entry.relation === 'former' || readableIds.has(entry.id),
+        )
+    }, [user, zevsQuery.data])
     const managedZevs = useMemo(() => {
         const zevs = zevsQuery.data ?? []
         if (isAdmin) return zevs
@@ -134,6 +146,8 @@ export function ManagedZevProvider({ children }: { children: ReactNode }) {
     const selectedZev = managedZevs.find((zev) => zev.id === selectedZevId) ?? null
     const relation = entries.find((entry) => entry.id === selectedZevId)?.relation
 
+    const { isLoading: zevsLoading, isFetching: zevsFetching, isError: zevsError, refetch: refetchZevs } = zevsQuery
+
     const value = useMemo<ManagedZevContextValue>(
         () => ({
             managedZevs,
@@ -142,7 +156,12 @@ export function ManagedZevProvider({ children }: { children: ReactNode }) {
             selectedZev,
             relation,
             isSelectable: resolution.isSelectable,
-            isLoading: zevsQuery.isLoading,
+            isLoading: zevsLoading,
+            isFetching: zevsFetching,
+            isError: zevsError,
+            refetch: () => {
+                void refetchZevs()
+            },
             setSelectedZevId: (zevId: string) => {
                 if (!resolution.isAllowedId(zevId)) return
                 // Optimistic switch; the serialized account save follows. A
@@ -151,14 +170,18 @@ export function ManagedZevProvider({ children }: { children: ReactNode }) {
                 updatePreferredZev(zevId).catch(() => undefined)
             },
         }),
-        [managedZevs, entries, selectedZevId, selectedZev, relation, resolution, zevsQuery.isLoading, updatePreferredZev],
+        [managedZevs, entries, selectedZevId, selectedZev, relation, resolution, zevsLoading, zevsFetching, zevsError, refetchZevs, updatePreferredZev],
     )
 
     return <ManagedZevContext.Provider value={value}>{children}</ManagedZevContext.Provider>
 }
 
+export function useOptionalManagedZev() {
+    return useContext(ManagedZevContext)
+}
+
 export function useManagedZev() {
-    const context = useContext(ManagedZevContext)
+    const context = useOptionalManagedZev()
     if (!context) {
         throw new Error('useManagedZev must be used within ManagedZevProvider')
     }

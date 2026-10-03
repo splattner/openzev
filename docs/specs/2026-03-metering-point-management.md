@@ -401,11 +401,29 @@ rather than a provenance-dependent "active" helper.
 The invoice period-overview endpoint (see `SPEC-2026-invoice-lifecycle-comms`)
 uses assignment windows to compute metering completeness per participant.
 
+MeteringPointsPage mounts its management queries only after ScopeGuard resolves
+usable community scope; they are also disabled without a selection. Initial
+list failures offer retry. Failed list or scope refreshes keep cached content,
+filters and dialogs mounted with a warning. Participant meter lists use the
+selected membership's ID and name; health checks cover all accessible meters.
+
+Write controls and mutation dispatch require management access and an active
+community; admins may write to disabled communities. Account, community or
+effective write-access changes reset create/edit, assignment and deletion
+dialogs. Losing admin access also closes reading deletion. Meter submissions
+retain the draft's original ZEV and reject a selection mismatch. Writes already
+sent may complete on the server, but obsolete view callbacks neither notify
+nor invalidate the replacement view's queries.
+
 ### 8.3 Data quality
 
 The data-quality-status endpoint (see `SPEC-2026-metering-import-quality`)
 resolves current participant assignment to display participant names alongside
 gap detection results.
+
+The metering-point health indicators query today minus 30 days through today.
+Management views wait for a selected community and send its `zev_id`;
+participant views leave scoping to the endpoint.
 
 ### 8.4 Import pipeline
 

@@ -2,7 +2,7 @@ import { faPlus } from '@fortawesome/free-solid-svg-icons'
 import { EmptyState } from '../../components/EmptyState'
 
 type MeteringPointsEmptyStateProps = {
-  canManageMeteringPoints: boolean
+  isManagedScope: boolean
   /** A viewer reads only (#761): no create action. */
   readOnly?: boolean
   hasFilters: boolean
@@ -11,7 +11,7 @@ type MeteringPointsEmptyStateProps = {
 }
 
 export function MeteringPointsEmptyState({
-  canManageMeteringPoints,
+  isManagedScope,
   readOnly = false,
   hasFilters,
   onOpenCreateModal,
@@ -38,7 +38,7 @@ export function MeteringPointsEmptyState({
       titleKey="pages.meteringPoints.emptyState.title"
       descriptionKey="pages.meteringPoints.emptyState.description"
       actions={
-        canManageMeteringPoints && !readOnly
+        isManagedScope && !readOnly
           ? [
               {
                 labelKey: 'pages.meteringPoints.emptyState.createAction' as const,

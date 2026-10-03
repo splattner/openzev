@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useConfirmDialog } from '../../components/ConfirmDialog'
@@ -53,7 +53,7 @@ export function getScopedAndFilteredMeteringPoints(
     points: MeteringPoint[],
     {
         selectedZevId,
-        canManageMeteringPoints,
+        isManagedScope,
         searchTerm,
         statusFilter,
         typeFilter,
@@ -64,7 +64,7 @@ export function getScopedAndFilteredMeteringPoints(
         participantNamesByMeteringPoint,
     }: {
         selectedZevId: string | null
-        canManageMeteringPoints: boolean
+        isManagedScope: boolean
         searchTerm: string
         statusFilter: MeteringPointStatusFilter
         typeFilter: MeteringPointTypeFilter
@@ -79,7 +79,7 @@ export function getScopedAndFilteredMeteringPoints(
     },
 ) {
     const scopedMeteringPoints = points.filter(
-        (point) => !canManageMeteringPoints || !selectedZevId || point.zev === selectedZevId,
+        (point) => !isManagedScope || point.zev === selectedZevId,
     )
 
     const normalizedSearch = searchTerm.trim().toLowerCase()
@@ -132,10 +132,14 @@ export function getMeteringPointCounts(
 
 export function useMeteringPointActions({
     selectedZevId,
-    canManageMeteringPoints,
+    isManagedScope,
+    canWrite,
+    canDeleteData,
 }: {
     selectedZevId: string | null
-    canManageMeteringPoints: boolean
+    isManagedScope: boolean
+    canWrite: boolean
+    canDeleteData: boolean
 }) {
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
@@ -143,11 +147,19 @@ export function useMeteringPointActions({
     const { t } = useTranslation()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
-    // Plain value, not a hook — safe to compute once up front and reuse
-    // everywhere below (assignment prefill, counts, health).
-    const todayIso = todayBusinessIso()
+    // A remount changes operation ownership; old writes may finish on the server,
+    // but must not notify or invalidate queries in the new view.
+    const mounted = useRef(false)
+    useEffect(() => {
+        mounted.current = true
+        return () => { mounted.current = false }
+    }, [])
 
-    // ── Modal form state ──────────────────────────────────────────────────────────
+    function requireWriteAccess() {
+        if (!mounted.current || !canWrite) throw new Error(t('common.error'))
+    }
+
+    const todayIso = todayBusinessIso()
 
     // Metering point modal
     const [mpForm, setMpForm] = useState<MeteringPointInput>(defaultMeteringPointForm())
@@ -168,16 +180,7 @@ export function useMeteringPointActions({
     const [deleteDataFrom, setDeleteDataFrom] = useState('')
     const [deleteDataTo, setDeleteDataTo] = useState('')
 
-    // ── Filtering — mirrored into the URL (#625) ────────────────────────────────────
-    //
-    // Local state is still the source of truth React renders from (matches the
-    // metering_point/tab pattern MeteringChartPage already uses) — each setter
-    // below just also writes the corresponding query param, and the lazy
-    // useState initializers below read it back on mount. That round-trip is
-    // what makes a filtered view survive "click Chart, then Back": the click
-    // unmounts this page for a different route, and Back remounts it fresh
-    // with the URL (and therefore the filters) already restored, no separate
-    // rehydration effect required.
+    // Initialize filters from the URL; setters update state and replace query parameters.
     const [searchParams, setSearchParams] = useSearchParams()
     const FILTER = METERING_POINT_FILTER_KEYS
 
@@ -239,21 +242,20 @@ export function useMeteringPointActions({
         }, { replace: true })
     }
 
-    // ── Queries ──────────────────────────────────────────────────────────────────
-
     const participantsQuery = useQuery({
         queryKey: queryKeys.zev.participants(selectedZevId || undefined),
         queryFn: fetchParticipants,
-        enabled: canManageMeteringPoints,
+        enabled: isManagedScope && !!selectedZevId,
     })
     const meteringPointsQuery = useQuery({
         queryKey: queryKeys.metering.points(selectedZevId || undefined),
         queryFn: () => fetchMeteringPoints(selectedZevId || undefined),
+        enabled: !isManagedScope || !!selectedZevId,
     })
     const assignmentsQuery = useQuery({
         queryKey: queryKeys.metering.pointAssignments(),
         queryFn: () => fetchMeteringPointAssignments(),
-        enabled: canManageMeteringPoints,
+        enabled: isManagedScope && !!selectedZevId,
     })
     // Not role-gated: the endpoint scopes readings to what the caller may
     // see (a participant's own assigned meters), so the health indicator
@@ -263,23 +265,25 @@ export function useMeteringPointActions({
         queryKey: queryKeys.metering.qualityStatus(
             healthWindow.from,
             healthWindow.to,
-            canManageMeteringPoints ? (selectedZevId || undefined) : undefined,
+            isManagedScope ? (selectedZevId || undefined) : undefined,
             undefined,
         ),
         queryFn: () =>
             fetchMeteringDataQualityStatus({
                 dateFrom: healthWindow.from,
                 dateTo: healthWindow.to,
-                zevId: canManageMeteringPoints ? (selectedZevId || undefined) : undefined,
+                zevId: isManagedScope ? (selectedZevId || undefined) : undefined,
             }),
+        enabled: !isManagedScope || !!selectedZevId,
     })
 
-    // ── Mutations ──────────────────────────────────────────────────────────────────
-
     const saveMpMutation = useMutation({
-        mutationFn: ({ id, payload }: { id?: string; payload: MeteringPointInput }) =>
-            id ? updateMeteringPoint(id, payload) : createMeteringPoint(payload),
+        mutationFn: ({ id, payload }: { id?: string; payload: MeteringPointInput }) => {
+            requireWriteAccess()
+            return id ? updateMeteringPoint(id, payload) : createMeteringPoint(payload)
+        },
         onSuccess: (_, variables) => {
+            if (!mounted.current) return
             closeMpModal()
             pushToast(
                 variables.id ? t('pages.meteringPoints.messages.updated') : t('pages.meteringPoints.messages.created'),
@@ -287,12 +291,18 @@ export function useMeteringPointActions({
             )
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.points(selectedZevId || undefined) })
         },
-        onError: (error) => pushToast(formatApiError(error, t('pages.meteringPoints.messages.saveFailed')), 'error'),
+        onError: (error) => {
+            if (mounted.current && canWrite) pushToast(formatApiError(error, t('pages.meteringPoints.messages.saveFailed')), 'error')
+        },
     })
 
     const deleteMpMutation = useMutation({
-        mutationFn: deleteMeteringPoint,
+        mutationFn: (id: string) => {
+            requireWriteAccess()
+            return deleteMeteringPoint(id)
+        },
         onSuccess: () => {
+            if (!mounted.current) return
             pushToast(t('pages.meteringPoints.messages.deleted'), 'success')
             // Deleting a metering point cascades to its readings and assignment
             // history (MeterReading/MeteringPointAssignment both CASCADE on
@@ -300,13 +310,18 @@ export function useMeteringPointActions({
             // invalidate the whole metering namespace rather than enumerating keys.
             void queryClient.invalidateQueries({ queryKey: ['metering'] })
         },
-        onError: (error) => pushToast(formatApiError(error, t('pages.meteringPoints.messages.deleteFailed')), 'error'),
+        onError: (error) => {
+            if (mounted.current && canWrite) pushToast(formatApiError(error, t('pages.meteringPoints.messages.deleteFailed')), 'error')
+        },
     })
 
     const saveAssignMutation = useMutation({
-        mutationFn: ({ id, payload }: { id?: string; payload: MeteringPointAssignmentInput }) =>
-            id ? updateMeteringPointAssignment(id, payload) : createMeteringPointAssignment(payload),
+        mutationFn: ({ id, payload }: { id?: string; payload: MeteringPointAssignmentInput }) => {
+            requireWriteAccess()
+            return id ? updateMeteringPointAssignment(id, payload) : createMeteringPointAssignment(payload)
+        },
         onSuccess: (_, variables) => {
+            if (!mounted.current) return
             closeAssignModal()
             pushToast(
                 variables.id
@@ -320,18 +335,26 @@ export function useMeteringPointActions({
             // from these rows, so their readiness state changes too.
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants(selectedZevId || undefined) })
         },
-        onError: (error) => pushToast(formatApiError(error, t('pages.meteringPoints.messages.assignmentSaveFailed')), 'error'),
+        onError: (error) => {
+            if (mounted.current && canWrite) pushToast(formatApiError(error, t('pages.meteringPoints.messages.assignmentSaveFailed')), 'error')
+        },
     })
 
     const deleteAssignMutation = useMutation({
-        mutationFn: deleteMeteringPointAssignment,
+        mutationFn: (id: string) => {
+            requireWriteAccess()
+            return deleteMeteringPointAssignment(id)
+        },
         onSuccess: () => {
+            if (!mounted.current) return
             pushToast(t('pages.meteringPoints.messages.assignmentRemoved'), 'success')
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.pointAssignments() })
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.points(selectedZevId || undefined) })
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants(selectedZevId || undefined) })
         },
-        onError: (error) => pushToast(formatApiError(error, t('pages.meteringPoints.messages.assignmentRemoveFailed')), 'error'),
+        onError: (error) => {
+            if (mounted.current && canWrite) pushToast(formatApiError(error, t('pages.meteringPoints.messages.assignmentRemoveFailed')), 'error')
+        },
     })
 
     const deleteMeteringDataMutation = useMutation({
@@ -341,19 +364,24 @@ export function useMeteringPointActions({
         }: {
             meteringPointId: string
             payload: { delete_all: boolean; date_from?: string; date_to?: string }
-        }) => deleteMeteringPointReadings(meteringPointId, payload),
+        }) => {
+            requireWriteAccess()
+            if (!canDeleteData) throw new Error(t('common.error'))
+            return deleteMeteringPointReadings(meteringPointId, payload)
+        },
         onSuccess: (result) => {
+            if (!mounted.current) return
             pushToast(t('pages.meteringPoints.deleteData.success', { count: result.deleted_count }), 'success')
             closeDeleteDataModal()
             // Deleted readings affect every reading-derived view (chart, raw
             // data, dashboard summary, data-quality status).
             void queryClient.invalidateQueries({ queryKey: ['metering'] })
         },
-        onError: (error) => pushToast(formatApiError(error, t('pages.meteringPoints.deleteData.failed')), 'error'),
+        onError: (error) => {
+            if (mounted.current && canWrite) pushToast(formatApiError(error, t('pages.meteringPoints.deleteData.failed')), 'error')
+        },
     })
 
-    // Declared ahead of the form handlers below: openCreateAssignModal reads
-    // it to prefill the next assignment's valid_from (see #619).
     const assignmentsByMeteringPoint = useMemo(() => {
         const map = new Map<string, MeteringPointAssignment[]>()
         for (const a of assignmentsQuery.data ?? []) {
@@ -364,18 +392,18 @@ export function useMeteringPointActions({
         return map
     }, [assignmentsQuery.data])
 
-    // ── Form handlers ──────────────────────────────────────────────────────────────
-
     function openCreateMpModal() {
+        if (!mounted.current || !canWrite) return
         setEditingMpId(null)
         setMpForm((previous) => ({
             ...defaultMeteringPointForm(),
-            zev: canManageMeteringPoints ? (selectedZevId || '') : previous.zev,
+            zev: isManagedScope ? (selectedZevId || '') : previous.zev,
         }))
         setShowMpModal(true)
     }
 
     function openEditMpModal(point: MeteringPoint) {
+        if (!mounted.current || !canWrite) return
         setEditingMpId(point.id)
         setMpForm({
             zev: point.zev,
@@ -396,8 +424,9 @@ export function useMeteringPointActions({
 
     function submitMpForm(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
-        const zevForSubmit = canManageMeteringPoints ? selectedZevId : mpForm.zev
-        if (!zevForSubmit) {
+        if (!mounted.current || !canWrite) return
+        const zevForSubmit = mpForm.zev
+        if (!zevForSubmit || (isManagedScope && zevForSubmit !== selectedZevId)) {
             pushToast(t('pages.meteringPoints.messages.selectZev'), 'error')
             return
         }
@@ -409,6 +438,7 @@ export function useMeteringPointActions({
     }
 
     function openCreateAssignModal(meteringPointId: string) {
+        if (!mounted.current || !canWrite) return
         setSelectedMpId(meteringPointId)
         setEditingAssignId(null)
         const existingAssignments = assignmentsByMeteringPoint.get(meteringPointId) ?? []
@@ -419,6 +449,7 @@ export function useMeteringPointActions({
     }
 
     function openEditAssignModal(assignment: MeteringPointAssignment) {
+        if (!mounted.current || !canWrite) return
         setSelectedMpId(assignment.metering_point)
         setEditingAssignId(assignment.id)
         setAssignForm({
@@ -442,6 +473,7 @@ export function useMeteringPointActions({
 
     function submitAssignForm(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
+        if (!mounted.current || !canWrite) return
         if (!assignForm.participant) {
             pushToast(t('pages.meteringPoints.messages.selectParticipant'), 'error')
             return
@@ -458,6 +490,7 @@ export function useMeteringPointActions({
     }
 
     function openDeleteDataModal(point: MeteringPoint) {
+        if (!mounted.current || !canWrite || !canDeleteData) return
         setDeleteDataTarget(point)
         setDeleteDataMode('all')
         setDeleteDataFrom('')
@@ -474,7 +507,7 @@ export function useMeteringPointActions({
     }
 
     function submitDeleteData() {
-        if (!deleteDataTarget) return
+        if (!mounted.current || !canWrite || !canDeleteData || !deleteDataTarget) return
 
         let payload: { delete_all: boolean; date_from?: string; date_to?: string }
         let confirmMessage: string
@@ -511,15 +544,17 @@ export function useMeteringPointActions({
             confirmText: t('pages.meteringPoints.deleteData.confirm'),
             isDangerous: true,
             onConfirm: async () => {
-                await deleteMeteringDataMutation.mutateAsync({
-                    meteringPointId: deleteDataTarget.id,
-                    payload,
-                })
+                try {
+                    await deleteMeteringDataMutation.mutateAsync({
+                        meteringPointId: deleteDataTarget.id,
+                        payload,
+                    })
+                } catch (error) {
+                    if (mounted.current) throw error
+                }
             },
         })
     }
-
-    // ── Computed lookups ───────────────────────────────────────────────────────────
 
     const participantNameById = useMemo(
         () =>
@@ -535,8 +570,6 @@ export function useMeteringPointActions({
         if (!mp) return participantsQuery.data ?? []
         return (participantsQuery.data ?? []).filter((p) => p.zev === mp.zev)
     }, [selectedMpId, meteringPointsQuery.data, participantsQuery.data])
-
-    // ── Data health (#623) ────────────────────────────────────────────────────────
 
     const qualityByMeteringPoint = useMemo(() => {
         const map = new Map<string, MeteringPointDataQuality>()
@@ -559,12 +592,12 @@ export function useMeteringPointActions({
     // this role — see isMeteringPointHolderLess's contract.
     const meteringPointHolderLessById = useMemo(() => {
         const map = new Map<string, boolean>()
-        if (!canManageMeteringPoints) return map
+        if (!isManagedScope) return map
         for (const point of meteringPointsQuery.data ?? []) {
             map.set(point.id, isMeteringPointHolderLess(point, assignmentsByMeteringPoint.get(point.id) ?? [], todayIso))
         }
         return map
-    }, [canManageMeteringPoints, meteringPointsQuery.data, assignmentsByMeteringPoint, todayIso])
+    }, [isManagedScope, meteringPointsQuery.data, assignmentsByMeteringPoint, todayIso])
 
     const needsAttentionByMeteringPoint = useMemo(() => {
         const map = new Map<string, boolean>()
@@ -606,7 +639,7 @@ export function useMeteringPointActions({
 
     const { scopedMeteringPoints, meteringPoints } = getScopedAndFilteredMeteringPoints(meteringPointsQuery.data ?? [], {
         selectedZevId,
-        canManageMeteringPoints,
+        isManagedScope,
         searchTerm,
         statusFilter,
         typeFilter,

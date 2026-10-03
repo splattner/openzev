@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MantineProvider } from '@mantine/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { FeasibilityCalculatorPage } from '../src/pages/FeasibilityCalculatorPage'
@@ -93,7 +94,9 @@ function renderPage() {
   root = createRoot(container)
   act(() => {
     root!.render(
-      createElement(QueryClientProvider, { client: queryClient }, createElement(FeasibilityCalculatorPage)),
+      createElement(MantineProvider, null,
+        createElement(QueryClientProvider, { client: queryClient }, createElement(FeasibilityCalculatorPage)),
+      ),
     )
   })
   return root

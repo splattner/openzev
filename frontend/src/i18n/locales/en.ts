@@ -179,6 +179,10 @@ export const en = {
             previous: 'Previous page',
             next: 'Next page',
         },
+        scopeGuard: {
+            loadFailed: 'Could not load your ZEVs.',
+            refreshFailed: 'Could not refresh your ZEVs. Using the last loaded selection.',
+        },
         error: 'Something went wrong.',
         retry: 'Retry',
         language: 'Language',
@@ -992,6 +996,7 @@ export const en = {
             title: 'vZEV Feasibility Calculator',
             description: 'Estimate whether forming a vZEV is worth it, before any metering data exists — compared against selling all local production at the feed-in tariff.',
             disabled: 'The feasibility calculator is not enabled on this instance. An administrator can turn it on under Platform → Settings → Functions.',
+            checkFailed: 'Could not check calculator availability.',
             form: {
                 systemTitle: 'System & energy',
                 energyInputModeAggregate: 'Aggregate',
@@ -1092,11 +1097,9 @@ export const en = {
         invoices: {
             title: 'Invoices',
             description: 'Manage billing periods and invoices for the selected ZEV.',
-            selectZev: 'Select a ZEV to manage billing periods.',
             prevPeriod: 'Previous period',
             nextPeriod: 'Next period',
             billingInterval: 'Billing interval:',
-            loading: 'Loading period overview…',
             failed: 'Failed to load period overview.',
             col: {
                 participant: 'Participant',
@@ -1924,7 +1927,6 @@ export const en = {
         accounts: {
             title: 'Accounts',
             description: 'Every account on the platform, the communities it belongs to and how it signs in.',
-            loading: 'Loading accounts and participants…',
             loadFailed: 'Failed to load account management data.',
             col: {
                 account: 'Account',
@@ -2358,7 +2360,6 @@ export const en = {
             switchWithoutSaving: 'Switch without saving',
             unsavedGuardLeaveMessage: 'Leaving settings discards unsaved changes.',
             leaveWithoutSaving: 'Leave without saving',
-            selectZev: 'Select a ZEV from the global selector to edit settings.',
             emailTemplateTitle: 'Invoice Email Template',
             emailInheritanceOnSave: 'The platform default will apply after you save settings.',
             emailCustomize: 'Customize',
@@ -2522,8 +2523,6 @@ export const en = {
             hourly: 'Hourly',
             daily: 'Daily',
             monthly: 'Monthly',
-            noZev: 'No ZEV available for your account.',
-            selectZev: 'Please select a ZEV from the global selector in the sidebar.',
             failedAnalytics: 'Failed to load metering analytics.',
             stats: {
                 producedInZev: 'Produced in ZEV',
@@ -2571,6 +2570,7 @@ export const en = {
                 description: 'Average hourly energy draw over the billing period — split between local ZEV energy and grid import.',
             },
             invoicesSection: 'Invoices',
+            invoicesAllCommunitiesSection: 'Invoices from all communities',
             failedInvoices: 'Failed to load invoices.',
             cockpit: {
                 title: 'Billing cockpit',
@@ -2670,10 +2670,6 @@ export const en = {
             preparingDocument: 'Preparing {{document}} for {{year}}…',
             documentTitle: '{{document}} — {{year}}',
             documentTabs: 'Annual documents',
-            selectZevTitle: 'No ZEV selected',
-            selectZevDescription: 'Select a ZEV in the sidebar to generate reports.',
-            noZevTitle: 'No ZEV available',
-            noZevDescription: 'There is no ZEV for your account. Reports become available once your account is linked to a ZEV.',
             annualStatement: {
                 title: 'Annual Statement',
                 description: 'A yearly summary of your energy consumption, invoices, and savings.',
@@ -3115,7 +3111,8 @@ export const en = {
         dataCompleteness: 'Data Completeness',
         status: 'Status',
         gaps: 'Missing Days',
-        noData: 'No metering points available',
+        noData: 'No metering points for this selection',
+        noDataDescription: 'Quality checks are available when this selection includes metering points.',
         noGaps: 'Complete',
         severityGreen: 'Complete',
         severityYellow: 'Partial',

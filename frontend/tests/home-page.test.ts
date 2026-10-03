@@ -1,11 +1,12 @@
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 
 const auth = vi.hoisted(() => vi.fn())
 vi.mock('../src/lib/auth', () => ({ useAuth: () => auth() }))
 const managed = vi.hoisted(() => vi.fn())
-vi.mock('../src/lib/managedZev', () => ({ useManagedZev: () => managed() }))
+vi.mock('../src/lib/managedZev', () => ({ useManagedZev: () => managed(), useOptionalManagedZev: () => managed() }))
 vi.mock('../src/pages/OverviewPage', () => ({
     OverviewPage: () => createElement('div', { 'data-testid': 'overview' }),
 }))
@@ -28,7 +29,11 @@ function renderRole(persona: 'admin' | 'manager' | 'viewer' | 'participant' | 'f
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root = createRoot(container)
-    act(() => root.render(createElement(HomePage)))
+    function Location() {
+        return createElement('div', { 'data-testid': 'location' }, useLocation().pathname)
+    }
+    act(() => root.render(createElement(MemoryRouter, null,
+        createElement(HomePage), createElement(Location))))
     cleanups.push(() => {
         act(() => root.unmount())
         container.remove()
@@ -43,10 +48,17 @@ describe('role-aware home page', () => {
         expect(page.querySelector('[data-testid="dashboard"]')).toBeNull()
     })
 
-    it.each(['participant', 'former'] as const)('keeps the dashboard at the root route for %s', (role) => {
-        const page = renderRole(role)
+    it('keeps the dashboard at the root route for a current participant', () => {
+        const page = renderRole('participant')
         expect(page.querySelector('[data-testid="dashboard"]')).not.toBeNull()
         expect(page.querySelector('[data-testid="overview"]')).toBeNull()
+        expect(page.querySelector('[data-testid="guest"]')).toBeNull()
+    })
+
+    it('sends a former participant to their invoices', () => {
+        const page = renderRole('former')
+        expect(page.querySelector('[data-testid="location"]')?.textContent).toBe('/me/invoices')
+        expect(page.querySelector('[data-testid="dashboard"]')).toBeNull()
         expect(page.querySelector('[data-testid="guest"]')).toBeNull()
     })
 

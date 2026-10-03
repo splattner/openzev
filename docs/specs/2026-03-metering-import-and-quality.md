@@ -736,13 +736,16 @@ page never 400s wholesale. For a flagged meter, `unassigned_days` /
 severity are unaffected.
 
 **Frontend routes:** chart and quality are routes, not
-query state — `/metering/chart` (all roles) and `/metering/quality`
-(`admin`/`zev_owner`, same `MeteringChartPage` mounted with `tab`). Both
+query state — `/metering/chart` (management scope and current participants)
+and `/metering/quality` (`admin`/`manager`/`viewer`, same `MeteringChartPage` mounted with `tab`). Both
 share the `ProtectedRoute` shell so tab switches don't remount the page
 (period/resolution persist); legacy `/metering-data?tab=quality` redirects
 to the guarded quality route with `tab` stripped. The quality query only
-fires on the quality tab (`enabled: tab === 'quality'`) with
-`zev_id` for managed roles.
+fires on the quality tab with a selected management community and `zev_id`.
+`ScopeGuard` handles community loading, failures and empty scope before the
+tab controls and content. An empty filtered result links permitted readers
+to `/metering/points`; only admins and managers can add points. Points without
+readings appear as Missing.
 
 **URL period state:** `MeteringChartPage` initialises its selected period
 from canonical `?period_start` + `?period_end` parameters. Legacy metering

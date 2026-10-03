@@ -25,6 +25,7 @@ vi.mock('../src/lib/auth', () => ({
 
 vi.mock('../src/lib/managedZev', () => ({
     useManagedZev: () => mockManagedZev(),
+    useOptionalManagedZev: () => mockManagedZev(),
 }))
 
 vi.mock('../src/lib/api/auth', () => ({

@@ -32,6 +32,7 @@ const mockManaged = vi.fn(() => ({}))
 vi.mock('../src/lib/managedZev', () => ({
     ManagedZevProvider: (props: { children: unknown }) => props.children,
     useManagedZev: () => mockManaged(),
+    useOptionalManagedZev: () => mockManaged(),
 }))
 
 vi.mock('../src/components/Layout', () => ({
@@ -157,18 +158,18 @@ const MATRIX: Array<{ path: string; marker: string; allow: Record<ShellRole, boo
     { path: '/', marker: 'home', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: true } },
     { path: '/account/', marker: 'account', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: true } },
     { path: '/account?tab=security', marker: 'account', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: true } },
-    { path: '/metering-data', marker: 'metering-chart', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: false } },
+    { path: '/metering-data', marker: 'metering-chart', allow: { admin: true, manager: true, viewer: true, participant: true, former: false, none: false } },
     { path: '/verify-email?token=example', marker: 'verify-email', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: true } },
     { path: '/oauth/callback', marker: 'oauth', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: true } },
     { path: '/join/example?s=secret', marker: 'join', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: true } },
     { path: '/signin/example', marker: 'sign-in', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: true } },
     { path: '/i/example?s=secret', marker: 'public-invoice', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: true } },
-    { path: '/dashboard', marker: 'dashboard', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: false } },
-    { path: '/metering/chart', marker: 'metering-chart', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: false } },
+    { path: '/dashboard', marker: 'dashboard', allow: { admin: true, manager: true, viewer: true, participant: true, former: false, none: false } },
+    { path: '/metering/chart', marker: 'metering-chart', allow: { admin: true, manager: true, viewer: true, participant: true, former: false, none: false } },
     { path: '/metering/quality', marker: 'metering-chart', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },
     { path: '/metering/imports', marker: 'metering-chart', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },
-    { path: '/metering-points', marker: 'metering-points', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: false } },
-    { path: '/metering/points', marker: 'metering-points', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: false } },
+    { path: '/metering-points', marker: 'metering-points', allow: { admin: true, manager: true, viewer: true, participant: true, former: false, none: false } },
+    { path: '/metering/points', marker: 'metering-points', allow: { admin: true, manager: true, viewer: true, participant: true, former: false, none: false } },
     { path: '/billing/periods', marker: 'periods-alias', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },
     { path: '/billing/invoices', marker: 'billing-hub', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },
     { path: '/billing/emails', marker: 'billing-hub', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },
@@ -201,13 +202,13 @@ const MATRIX: Array<{ path: string; marker: string; allow: Record<ShellRole, boo
     { path: '/admin/pdf-templates', marker: 'admin-templates-hub', allow: { admin: true, manager: false, viewer: false, participant: false, former: false, none: false } },
     { path: '/admin/email-templates', marker: 'admin-templates-hub', allow: { admin: true, manager: false, viewer: false, participant: false, former: false, none: false } },
     { path: '/admin/system-settings', marker: 'admin-system-settings', allow: { admin: true, manager: false, viewer: false, participant: false, former: false, none: false } },
-    { path: '/metering', marker: 'metering-chart', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: false } },
+    { path: '/metering', marker: 'metering-chart', allow: { admin: true, manager: true, viewer: true, participant: true, former: false, none: false } },
     { path: '/billing', marker: 'billing-hub', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },
     { path: '/invoices', marker: 'billing-hub', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },
     { path: '/invoices/42', marker: 'invoice-detail', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: false } },
     { path: '/imports', marker: 'metering-chart', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },
     { path: '/metering-data?tab=quality', marker: 'metering-chart', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },
-    { path: '/metering-data?metering_point=7', marker: 'metering-chart', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: false } },
+    { path: '/metering-data?metering_point=7', marker: 'metering-chart', allow: { admin: true, manager: true, viewer: true, participant: true, former: false, none: false } },
 ]
 
 describe('route guard matrix (tests AppRoutes, not the guard in isolation)', () => {
@@ -289,6 +290,9 @@ describe('route guard by relation to the selected community', () => {
         { relation: 'former', path: '/me/invoices', marker: 'my-invoices', allow: true },
         { relation: 'former', path: '/me/statement', marker: 'reports', allow: false },
         { relation: 'former', path: '/participants', marker: 'participants', allow: false },
+        { relation: 'former', path: '/dashboard', marker: 'dashboard', allow: false },
+        { relation: 'former', path: '/metering/chart', marker: 'metering-chart', allow: false },
+        { relation: 'former', path: '/metering/points', marker: 'metering-points', allow: false },
     ]
 
     it.each(cases)('$relation → $path', async ({ relation, path, marker, allow }) => {

@@ -33,7 +33,7 @@ describe('metering point action helpers', () => {
   it('scopes metering points to the selected ZEV when management is restricted', () => {
     const { scopedMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
       selectedZevId: 'zev-1',
-      canManageMeteringPoints: true,
+      isManagedScope: true,
       searchTerm: '',
       statusFilter: 'all',
       typeFilter: 'all',
@@ -42,10 +42,17 @@ describe('metering point action helpers', () => {
     expect(scopedMeteringPoints.map((point) => point.id)).toEqual(['mp-1', 'mp-2'])
   })
 
+  it('does not show an unscoped management inventory without a selection', () => {
+    const { scopedMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+      selectedZevId: null, isManagedScope: true, searchTerm: '', statusFilter: 'all', typeFilter: 'all',
+    })
+    expect(scopedMeteringPoints).toEqual([])
+  })
+
   it('filters by search term, status, and type', () => {
     const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
       selectedZevId: null,
-      canManageMeteringPoints: false,
+      isManagedScope: false,
       searchTerm: 'solar',
       statusFilter: 'active',
       typeFilter: 'bidirectional',
@@ -63,7 +70,7 @@ describe('metering point action helpers', () => {
   it('leaves every meter in when the attention filter is "all", with or without a map', () => {
     const { meteringPoints: withoutMap } = getScopedAndFilteredMeteringPoints(meteringPoints, {
       selectedZevId: null,
-      canManageMeteringPoints: false,
+      isManagedScope: false,
       searchTerm: '',
       statusFilter: 'all',
       typeFilter: 'all',
@@ -72,7 +79,7 @@ describe('metering point action helpers', () => {
 
     const { meteringPoints: withMap } = getScopedAndFilteredMeteringPoints(meteringPoints, {
       selectedZevId: null,
-      canManageMeteringPoints: false,
+      isManagedScope: false,
       searchTerm: '',
       statusFilter: 'all',
       typeFilter: 'all',
@@ -85,7 +92,7 @@ describe('metering point action helpers', () => {
   it('narrows to flagged meters when the attention filter is "attention"', () => {
     const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
       selectedZevId: null,
-      canManageMeteringPoints: false,
+      isManagedScope: false,
       searchTerm: '',
       statusFilter: 'all',
       typeFilter: 'all',
@@ -103,7 +110,7 @@ describe('metering point action helpers', () => {
   it('matches search against an assigned participant\'s name, not just meter ID or location', () => {
     const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
       selectedZevId: null,
-      canManageMeteringPoints: false,
+      isManagedScope: false,
       searchTerm: 'anna',
       statusFilter: 'all',
       typeFilter: 'all',
@@ -116,7 +123,7 @@ describe('metering point action helpers', () => {
   it('leaves every meter in when the assignment filter is "all"', () => {
     const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
       selectedZevId: null,
-      canManageMeteringPoints: false,
+      isManagedScope: false,
       searchTerm: '',
       statusFilter: 'all',
       typeFilter: 'all',
@@ -129,7 +136,7 @@ describe('metering point action helpers', () => {
   it('narrows to meters with a current holder when the assignment filter is "assigned"', () => {
     const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
       selectedZevId: null,
-      canManageMeteringPoints: false,
+      isManagedScope: false,
       searchTerm: '',
       statusFilter: 'all',
       typeFilter: 'all',
@@ -147,7 +154,7 @@ describe('metering point action helpers', () => {
   it('narrows to meters without a current holder when the assignment filter is "unassigned"', () => {
     const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
       selectedZevId: null,
-      canManageMeteringPoints: false,
+      isManagedScope: false,
       searchTerm: '',
       statusFilter: 'all',
       typeFilter: 'all',

@@ -1406,8 +1406,8 @@ reaches every ZEV-scope route and sees its pages read-only
 
 | Route | Allowed roles | Page component |
 |---|---|---|
-| `/` | any authenticated | `HomePage`: `OverviewPage` in ZEV scope; `GuestHomePage` for shell role `none` (linking explanation + secondary account link); `DashboardPage` otherwise |
-| `/dashboard` | any authenticated | `DashboardPage` (manager title/navigation: Energy balance; participant root remains `/`) |
+| `/` | any authenticated | `HomePage`: `OverviewPage` in ZEV scope, `DashboardPage` for current participants, `/me/invoices` redirect for former participants, `GuestHomePage` for shell role `none` (linking explanation + secondary account link) |
+| `/dashboard` | ZEV scope, `participant` | `DashboardPage` (manager title/navigation: Energy balance; participant root remains `/`) |
 | `/account` | any authenticated | `AccountProfilePage` — tabs `profile` (default) · `security` (password, linked accounts, two-factor) · `api-keys`, chosen by `?tab=`; a forced password change and an OAuth link return open `security` (`resolveAccountTab`) |
 | `/admin` | `admin` | `AdminOverviewHubPage` (tabs = routes; default tab `overview`) |
 | `/admin/overview` · `/admin/zevs` · `/admin/invoices` · `/admin/dynamic-sources` · `/admin/audit` · `/admin/health` | `admin` | `AdminOverviewHubPage tab=…` (KPIs · ZEVs table · all invoices · dynamic price sources · platform audit log · System health) |
@@ -1424,9 +1424,9 @@ reaches every ZEV-scope route and sees its pages read-only
 | `/zev-settings` | ZEV scope | `ZevSettingsTabRoute` → `ZevSettingsPage` (General tab) |
 | `/zev-settings/:tab` (`general` · `people` · `billing` · `documents` · `audit` · `export`; `parties` and `access` redirect to `people`) | ZEV scope | `ZevSettingsTabRoute` → `ZevSettingsPage tab=…` (people tab: roles and people, each with its access on its row, SPEC-2026-10-zev-parties §8.3; audit tab embeds `AuditLogsPage scope="owner"`; export tab keeps the transfer archive) |
 | `/audit-logs` | ZEV scope | alias → `/zev-settings/audit` (owner-scoped log in the settings hub) |
-| `/metering/points` | any authenticated | `MeteringPointsPage` (read-only for participants, no nav entry) |
-| `/metering-points` | any authenticated | alias → `/metering/points` |
-| `/metering/chart` | any authenticated | `MeteringChartPage` (`tab="chart"`, wrapped in `ProtectedRoute` without a role list so tab switches don't remount) |
+| `/metering/points` | ZEV scope, `participant` | `MeteringPointsPage` (read-only for participants, no nav entry; former participants redirect home) |
+| `/metering-points` | ZEV scope, `participant` | alias → `/metering/points` |
+| `/metering/chart` | ZEV scope, `participant` | `MeteringChartPage` (`tab="chart"`, guarded against former participants; tab switches preserve state) |
 | `/metering/quality` | ZEV scope | `MeteringChartPage` (`tab="quality"`) — intentional participant restriction: quality shows whole-ZEV severity counts, participant names, and overlap warnings (operator view; backend role-scoping means no leak either way) |
 | `/metering/imports` | ZEV scope | `MeteringChartPage` (`tab="imports"`, embedding `ImportsPage embedded`) |
 | `/metering-data` | any authenticated | alias → `/metering/chart`, except `?tab=quality` → guarded `/metering/quality`; `tab` is always stripped, remaining params preserved |
@@ -1571,14 +1571,25 @@ every page (`lib/managedZev.tsx`; the names were kept through #761).
   and session transitions prevent queued saves from dispatching and ignore
   late in-flight responses. A failed save keeps the local selection
   for the rest of the session.
+- Before the community list loads, management memberships supply selection.
+  Loaded records remove missing management entries; participant/former entries
+  remain selectable without a readable ZEV record. Failed refreshes retain the
+  cached selection.
+- Exposes the ZEV query's loading/fetching/error state and a retry callback alongside
+  the reconciled selection. Page behavior follows the
+  [ScopeGuard contract](2026-04-frontend-management-page-design.md#41-shared-components).
 
 **`useCommunityAccess()`** (`lib/communityAccess.ts`) turns the selected
 relation into `{shellRole, isZevScope, canManage, isParticipantScope,
-isAdmin}`: `admin` and `manager` may read and write the management view,
-`viewer` only read it (pages hide their write controls), `participant` and
-`former` get the participant view; without a relation the shell role is
+isAdmin}`: `admin` and `manager` have management access; writes also require
+the selected community to permit them. `viewer` only reads it (pages hide write
+controls); `participant` and `former` get the participant view; without a relation the shell role is
 `none`. `shellRoleForZev(user, zevId)` answers for a record's own community
-(the invoice detail page). Details: SPEC-2026-10-zev-access-grants §9.
+(the invoice detail page). AuthProvider is required: provider errors propagate,
+and missing auth never grants manager access. The outer authentication route
+uses `useOptionalManagedZev()` before ManagedZevProvider mounts; without a
+community relation, a non-admin gets `none`. The required `useManagedZev()`
+hook still rejects a missing provider. Details: SPEC-2026-10-zev-access-grants §9.
 
 ---
 

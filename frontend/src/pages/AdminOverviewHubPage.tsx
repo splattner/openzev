@@ -7,6 +7,7 @@ import { AdminInvoicesPage } from './AdminInvoicesPage'
 import { AuditLogsPage } from './AdminAuditLogsPage'
 import { AdminSystemHealthPanel } from './AdminSystemHealthPanel'
 import { AdminDynamicSourcesPanel } from './AdminDynamicSourcesPanel'
+import { PageHeader } from '../components/PageHeader'
 
 /**
  * Admin Overview hub (nav-regroup phase 3, spec §6): the former admin landing
@@ -30,11 +31,11 @@ export function AdminOverviewHubPage({ tab = 'overview' }: { tab?: AdminOverview
 
     return (
         <div className="page-stack">
-            <header>
-                <p className="eyebrow">{t('nav.platformScope')}</p>
-                <h2>{t('nav.adminOverview')}</h2>
-                <p className="muted">{t('pages.adminOverview.description')}</p>
-            </header>
+            <PageHeader
+                eyebrow={t('nav.platformScope')}
+                title={t('nav.adminOverview')}
+                description={t('pages.adminOverview.description')}
+            />
 
             <Tabs
                 classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}

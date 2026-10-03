@@ -5,9 +5,12 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
-vi.mock('../src/lib/managedZev', () => ({
-    useManagedZev: () => ({ selectedZev: { id: 'z1', name: 'ZEV' } }),
-}))
+vi.mock('../src/lib/managedZev', () => {
+    const context = {
+        useManagedZev: () => ({ selectedZev: { id: 'z1', name: 'ZEV' } }),
+    }
+    return { ...context, useOptionalManagedZev: context.useManagedZev }
+})
 vi.mock('../src/pages/InvoicesPage', () => ({ InvoicesPage: () => createElement('div') }))
 vi.mock('../src/pages/BillingEmailsPage', () => ({ BillingEmailsPage: () => createElement('div') }))
 

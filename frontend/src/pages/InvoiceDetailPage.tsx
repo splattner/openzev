@@ -17,6 +17,8 @@ import { PdfPreview } from '../components/PdfPreview'
 import { InvoiceAccessLinkCard } from '../features/invoices/InvoiceAccessLinkCard'
 
 import { usePdfObjectUrl } from '../lib/usePdfObjectUrl'
+import { PageHeader } from '../components/PageHeader'
+import { Notice } from '../components/Notice'
 
 export function InvoiceDetailPage() {
     const { t } = useTranslation()
@@ -52,11 +54,12 @@ export function InvoiceDetailPage() {
     )
     const { url: pdfObjectUrl, loading: pdfLoading, error: pdfError } = usePdfObjectUrl(pdfFetcher, pdfExists)
 
+    const pendingHeader = <PageHeader title={t('pages.invoices.title')} />
     if (invoiceQuery.isLoading) {
-        return <PageSkeleton variant="page" />
+        return <div className="page-stack">{pendingHeader}<PageSkeleton variant="card" /></div>
     }
     if (invoiceQuery.isError || !invoiceQuery.data) {
-        return <div className="card error-banner">{t('common.error')}</div>
+        return <div className="page-stack">{pendingHeader}<Notice tone="error" onRetry={() => void invoiceQuery.refetch()} isRetrying={invoiceQuery.isFetching}>{t('common.error')}</Notice></div>
     }
 
     const inv = invoiceQuery.data
@@ -103,18 +106,16 @@ export function InvoiceDetailPage() {
 
     return (
         <div className="page-stack">
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                <div>
-                    {inv.zev_name ? <p className="eyebrow">{inv.zev_name}</p> : null}
-                    <h2 style={{ marginBottom: '0.2rem' }}>{t('pages.invoiceDetail.title', { number: inv.invoice_number })}</h2>
-                    <p className="muted" style={{ margin: 0 }}>
-                        {inv.participant_name} · {formatShortDate(inv.period_start, settings)} → {formatShortDate(inv.period_end, settings)}
-                    </p>
-                </div>
-                <Link to={backHref} className="button button-primary" style={{ textDecoration: 'none' }}>
-                    {backLabel}
-                </Link>
-            </header>
+            <PageHeader
+                eyebrow={inv.zev_name}
+                title={t('pages.invoiceDetail.title', { number: inv.invoice_number })}
+                description={`${inv.participant_name} · ${formatShortDate(inv.period_start, settings)} → ${formatShortDate(inv.period_end, settings)}`}
+                actions={
+                    <Link to={backHref} className="button button-primary" style={{ textDecoration: 'none' }}>
+                        {backLabel}
+                    </Link>
+                }
+            />
 
             <section className="grid grid-4">
                 <div className="card"><strong>{t('pages.invoiceDetail.status')}</strong><div><span className={`badge badge-${inv.status}`}>{t(`invoice.status.${inv.status}`)}</span></div></div>

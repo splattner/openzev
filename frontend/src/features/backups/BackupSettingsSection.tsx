@@ -63,13 +63,7 @@ export function BackupSettingsSection() {
                 </p>
             </section>
 
-            <section
-                style={{
-                    display: 'grid',
-                    gap: '1rem',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                }}
-            >
+            <section className="stat-grid stat-grid--wide">
                 <StatCard
                     label={t('pages.backups.status.lastSuccess')}
                     value={

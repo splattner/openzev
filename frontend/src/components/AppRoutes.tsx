@@ -11,6 +11,7 @@ import type { ShellRole } from '../lib/communityAccess'
 
 /** Management views of the selected community: readable by admins, managers and viewers (#761). */
 const ZEV_SCOPE: ShellRole[] = ['admin', 'manager', 'viewer']
+const ACTIVE_SCOPE: ShellRole[] = [...ZEV_SCOPE, 'participant']
 
 const AccountProfilePage = lazy(async () => ({ default: (await import('../pages/AccountProfilePage')).AccountProfilePage }))
 const AdminOverviewHubPage = lazy(async () => ({ default: (await import('../pages/AdminOverviewHubPage')).AdminOverviewHubPage }))
@@ -74,7 +75,7 @@ export function AppRoutes() {
           }
         >
           <Route index element={<HomePage />} />
-          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="dashboard" element={<ProtectedRoute allowedRoles={ACTIVE_SCOPE}><DashboardPage /></ProtectedRoute>} />
           <Route path="account" element={<AccountProfilePage />} />
           {/* Admin console (nav-regroup phase 3): four hub pages with
               tab-as-route. Legacy /admin/* URLs redirect into the matching
@@ -179,16 +180,14 @@ export function AppRoutes() {
               </ProtectedRoute>
             }
           />
-          {/* Phase-3 canonical route for metering points; legacy
-              /metering-points stays as an alias. Participants keep deep-link
-              access (default-allow, read-only, never gated on canManage). */}
-          <Route path="metering/points" element={<MeteringPointsPage />} />
+          {/* Current participants keep read-only deep links; former participants keep invoices only. */}
+          <Route path="metering/points" element={<ProtectedRoute allowedRoles={ACTIVE_SCOPE}><MeteringPointsPage /></ProtectedRoute>} />
           <Route path="metering-points" element={<AliasNavigate to="/metering/points" />} />
           {/* Keep identical wrappers so tab navigation preserves page state. */}
           <Route
             path="metering/chart"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={ACTIVE_SCOPE}>
                 <MeteringChartPage tab="chart" />
               </ProtectedRoute>
             }

@@ -1,15 +1,18 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faEnvelope, faRotate } from '@fortawesome/free-solid-svg-icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useCommunityAccess } from '../lib/communityAccess'
 import { EmailLogsModal } from '../components/EmailLogsModal'
-import { PageSkeleton } from '../components/PageSkeleton'
+import { ScopeGuard } from '../components/ScopeGuard'
+import { Notice } from '../components/Notice'
+import { PageState } from '../components/PageState'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { fetchEmailLogs, fetchInvoices, retryFailedEmail } from '../lib/api/invoices'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useManagedZev } from '../lib/managedZev'
+import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
 import type { EmailLog, Invoice } from '../types/api'
 
@@ -32,11 +35,17 @@ function badgeFor(status: string | null | undefined): string {
 }
 
 export function BillingEmailsPage() {
+    const { user } = useAuth()
+    const { selectedZevId } = useManagedZev()
+    return <BillingEmailsContent key={`${user?.id}:${selectedZevId}`} />
+}
+
+function BillingEmailsContent() {
     // Retrying a delivery is a write: a viewer sees the history only (#761).
     const { canManage } = useCommunityAccess()
     const { t } = useTranslation()
     const { settings } = useAppSettings()
-    const { selectedZevId, isLoading: managedZevLoading } = useManagedZev()
+    const { selectedZevId } = useManagedZev()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
     const [filter, setFilter] = useState<EmailFilter>('all')
@@ -44,6 +53,15 @@ export function BillingEmailsPage() {
     const [historyInvoice, setHistoryInvoice] = useState<Invoice | null>(null)
     const [historyLogs, setHistoryLogs] = useState<EmailLog[]>([])
     const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null)
+    const historyRequest = useRef(0)
+    const mounted = useRef(false)
+    useEffect(() => {
+        mounted.current = true
+        return () => {
+            mounted.current = false
+            historyRequest.current += 1
+        }
+    }, [])
 
     const statusFilter = 'approved,sent,paid'
     const invoicesQuery = useQuery({
@@ -74,8 +92,12 @@ export function BillingEmailsPage() {
     const failedCount = deliveryInvoices.filter((invoice) => invoice.last_email_status === 'failed').length
 
     const retryMutation = useMutation({
-        mutationFn: ({ invoice, emailLogId }: RetryRequest) => retryFailedEmail(invoice.id, emailLogId),
+        mutationFn: ({ invoice, emailLogId }: RetryRequest) => {
+            if (!mounted.current || !canManage) throw new Error(t('common.error'))
+            return retryFailedEmail(invoice.id, emailLogId)
+        },
         onSuccess: (_data, { invoice, emailLogId }) => {
+            if (!mounted.current) return
             setQueuedLogIds((previous) => new Set([...previous, emailLogId]))
             setHistoryLogs((previous) => previous.map((log) =>
                 log.id === emailLogId ? { ...log, status: 'pending' } : log,
@@ -84,37 +106,30 @@ export function BillingEmailsPage() {
             void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.lists() })
             void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.detail(invoice.id) })
         },
-        onError: () => pushToast(t('pages.billingEmails.retryFailed'), 'error'),
+        onError: () => {
+            if (mounted.current) pushToast(t('pages.billingEmails.retryFailed'), 'error')
+        },
     })
 
     async function openHistory(invoice: Invoice) {
+        const request = ++historyRequest.current
         setHistoryLoadingId(invoice.id)
         try {
             const logs = await fetchEmailLogs(invoice.id)
+            if (request !== historyRequest.current) return
             setHistoryInvoice(invoice)
             setHistoryLogs(logs)
         } catch {
-            pushToast(t('pages.billingEmails.historyFailed'), 'error')
+            if (request === historyRequest.current) pushToast(t('pages.billingEmails.historyFailed'), 'error')
         } finally {
-            setHistoryLoadingId(null)
+            if (request === historyRequest.current) setHistoryLoadingId(null)
         }
     }
 
-    if (managedZevLoading) return <PageSkeleton variant="tableRows" />
-    if (!selectedZevId) {
-        return <div className="card">{t('pages.dashboard.selectZev')}</div>
-    }
-    if (invoicesQuery.isLoading) return <PageSkeleton variant="tableRows" />
-    if (invoicesQuery.isError) {
-        return <div className="card error-banner">{t('pages.billingEmails.failed')}</div>
-    }
-
-    return (
+    const content = (
         <div className="page-stack">
             {failedCount > 0 && (
-                <div className="card error-banner" role="status">
-                    {t('pages.billingEmails.failedBanner', { count: failedCount })}
-                </div>
+                <Notice tone="error" role="status">{t('pages.billingEmails.failedBanner', { count: failedCount })}</Notice>
             )}
 
             <div className="actions-row">
@@ -202,12 +217,32 @@ export function BillingEmailsPage() {
                 invoiceNumber={historyInvoice?.invoice_number ?? ''}
                 emailLogs={historyLogs}
                 isOpen={historyInvoice !== null}
-                onClose={() => setHistoryInvoice(null)}
+                onClose={() => {
+                    historyRequest.current += 1
+                    setHistoryInvoice(null)
+                    setHistoryLogs([])
+                    setHistoryLoadingId(null)
+                }}
                 onRetry={canManage ? (emailLogId) => {
                     if (historyInvoice) retryMutation.mutate({ invoice: historyInvoice, emailLogId })
                 } : undefined}
                 isRetrying={retryMutation.isPending}
             />
         </div>
+    )
+
+    return (
+        <ScopeGuard skeleton="tableRows">
+            <PageState
+                isLoading={invoicesQuery.isLoading}
+                isError={invoicesQuery.isError}
+                skeleton="tableRows"
+                error={t('pages.billingEmails.failed')}
+                onRetry={() => void invoicesQuery.refetch()}
+                isRetrying={invoicesQuery.isFetching}
+            >
+                {content}
+            </PageState>
+        </ScopeGuard>
     )
 }

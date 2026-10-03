@@ -75,7 +75,7 @@ const GREEN_READINESS = {
 describe('SetupGuidance (manager start page)', () => {
     it('renders the loading skeleton', () => {
         const page = render(createElement(SetupGuidance, {
-            readinessQuery: { isLoading: true, isError: false },
+            readinessQuery: { refetch: vi.fn(), isLoading: true, isError: false },
         }), true)
         expect(page.container.querySelector('.skeleton-block')).not.toBeNull()
         page.unmount()
@@ -84,7 +84,7 @@ describe('SetupGuidance (manager start page)', () => {
     it('keeps setup and billing-settings guidance beside period work', () => {
         const page = render(
             createElement(SetupGuidance, {
-                readinessQuery: {
+                readinessQuery: { refetch: vi.fn(),
                     isLoading: false,
                     isError: false,
                     data: {
@@ -138,7 +138,7 @@ describe('SetupGuidance (manager start page)', () => {
     it('shows setup guidance while awaiting the first period', () => {
         const page = render(
             createElement(SetupGuidance, {
-                readinessQuery: {
+                readinessQuery: { refetch: vi.fn(),
                     isLoading: false,
                     isError: false,
                     data: {
@@ -166,7 +166,7 @@ describe('SetupGuidance (manager start page)', () => {
     it('shows the first-run setup checklist when period is null', () => {
         const page = render(
             createElement(SetupGuidance, {
-                readinessQuery: {
+                readinessQuery: { refetch: vi.fn(),
                     isLoading: false,
                     isError: false,
                     data: {
@@ -189,7 +189,7 @@ describe('SetupGuidance (manager start page)', () => {
 
     it('shows the waiting message when setup is complete but no period has ended', () => {
         const page = render(createElement(SetupGuidance, {
-            readinessQuery: { isLoading: false, isError: false, data: {
+            readinessQuery: { refetch: vi.fn(), isLoading: false, isError: false, data: {
                 zev_id: '1', period: null, setup: null, steps: [], next_action: 'none', awaiting_first_period: true,
             } },
         }))
@@ -198,19 +198,23 @@ describe('SetupGuidance (manager start page)', () => {
         page.unmount()
     })
 
-    it('renders the failure state without throwing', () => {
+    it('offers retry for a failed readiness request', () => {
+        const refetch = vi.fn()
         const page = render(
             createElement(SetupGuidance, {
-                readinessQuery: { isLoading: false, isError: true, data: undefined },
+                readinessQuery: { refetch, isLoading: false, isError: true, data: undefined },
             }),
         )
         expect(page.text()).toContain('pages.dashboard.cockpit.failed')
+        expect(page.container.querySelector('.error-banner')?.getAttribute('role')).toBe('alert')
+        act(() => page.container.querySelector<HTMLButtonElement>('button')!.click())
+        expect(refetch).toHaveBeenCalledOnce()
         page.unmount()
     })
 
     it('renders no setup guidance for a fully configured period', () => {
         const page = render(createElement(SetupGuidance, {
-            readinessQuery: {
+            readinessQuery: { refetch: vi.fn(),
                 isLoading: false,
                 isError: false,
                 data: {

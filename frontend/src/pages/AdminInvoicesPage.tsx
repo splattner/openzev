@@ -11,6 +11,7 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { useToast } from '../lib/toast'
 import { invoiceStatusBadgeClass } from '../features/invoices/invoiceStatus'
 import type { Invoice } from '../types/api'
+import { PageHeader } from '../components/PageHeader'
 
 // Stable empty array so the useMemo below keeps a consistent dependency reference.
 const EMPTY_INVOICES: Invoice[] = []
@@ -143,11 +144,11 @@ export function AdminInvoicesPage({ embedded = false }: { embedded?: boolean }) 
     return (
         <div className="page-stack">
             {!embedded && (
-            <header>
-                <p className="eyebrow">{t('nav.platformScope')}</p>
-                <h2>{t('adminInvoices.title')}</h2>
-                <p className="muted">{t('adminInvoices.description')}</p>
-            </header>
+            <PageHeader
+                eyebrow={t('nav.platformScope')}
+                title={t('adminInvoices.title')}
+                description={t('adminInvoices.description')}
+            />
             )}
 
             <section className="card">

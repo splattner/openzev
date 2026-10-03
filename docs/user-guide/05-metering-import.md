@@ -63,7 +63,7 @@ alike. Delimiter may be any single character (for example `,`, `;`, `|`, or tab)
 
 ### Step-by-Step Import
 
-1. **Go to Import history** (sidebar **Metering** → tab **Import history**, or `/metering/imports` directly). Select the target ZEV in the page header — CSV preview and import require it (`zev_id`, API 400 without it) and only meters in that ZEV are imported; other meters are reported as missing.
+1. **Go to Import history** (sidebar **Metering** → tab **Import history**, or `/metering/imports` directly). Select the target ZEV in the sidebar switcher — CSV preview and import require it (`zev_id`, API 400 without it) and only meters in that ZEV are imported; other meters are reported as missing.
 
 2. **Upload File**
    - Click **New Import**

@@ -1,3 +1,4 @@
+import { waitForCondition } from './helpers/waitForCondition'
 import { act, createElement, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -77,13 +78,16 @@ vi.mock('../src/components/MfaEnrolmentGate', () => ({
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
 vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ isAuthenticated: true, user: { role: state.role, id: 7 } }) }))
 vi.mock('../src/components/Layout', () => ({ Layout: () => createElement(Outlet) }))
-vi.mock('../src/lib/managedZev', () => ({
-    ManagedZevProvider: ({ children }: { children: ReactNode }) => children,
-    useManagedZev: () => ({
-        selectedZevId: state.zev?.id ?? '', selectedZev: state.zev ?? null, isLoading: false,
-        relation: state.role === 'admin' ? 'admin' : 'manager',
-    }),
-}))
+vi.mock('../src/lib/managedZev', () => {
+    const context = {
+        ManagedZevProvider: ({ children }: { children: ReactNode }) => children,
+        useManagedZev: () => ({
+            selectedZevId: state.zev?.id ?? '', selectedZev: state.zev ?? null, isLoading: false,
+            relation: state.role === 'admin' ? 'admin' : 'manager',
+        }),
+    }
+    return { ...context, useOptionalManagedZev: context.useManagedZev }
+})
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: toastSpy }) }))
 vi.mock('../src/lib/appSettings', () => ({
     useAppSettings: () => ({ settings: { date_format_short: 'dd.MM.yyyy' } }),
@@ -149,7 +153,7 @@ async function renderAt(route: string) {
             : route === '/zev-settings' || route.endsWith('/general') ? 'name' : null
     await waitForCondition(() => field
         ? container.querySelector(`[data-zev-field="${field}"] input`) !== null
-        : container.querySelector('[role="tab"]') !== null, 'settings panel')
+        : container.querySelector('[role="tab"]') !== null, 'settings panel', 5000)
     await act(async () => {})
     return { container, root, client, router: routers.get(client)! }
 }
@@ -183,15 +187,6 @@ async function submitForm(container: ParentNode) {
         container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     })
     await act(async () => {})
-}
-
-async function waitForCondition(predicate: () => boolean, label: string) {
-    for (let i = 0; i < 40 && !predicate(); i++) {
-        await act(async () => { await new Promise((resolve) => setTimeout(resolve, 25)) })
-    }
-    if (!predicate()) {
-        throw new Error(`timed out waiting for ${label}`)
-    }
 }
 
 async function waitForText(container: ParentNode, text: string) {
@@ -484,6 +479,7 @@ describe('ZEV settings routed form', () => {
     it('locks every control for disabled-ZEV owners but not for admins', async () => {
         state.zev = fixtureZev({ disabled_at: '2026-01-01T00:00:00Z' })
         const { container } = await renderAt('/zev-settings/general')
+        expect(container.querySelector('.warning-banner')?.getAttribute('role')).toBe('status')
         expect(generalInput(container)?.disabled).toBe(true)
         expect(saveButton(container)).toBeUndefined()
         await clickTab(container, 'documentsEmails')

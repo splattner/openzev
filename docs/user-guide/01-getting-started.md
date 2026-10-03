@@ -311,6 +311,13 @@ contract PDFs use the community's own **Invoice language** instead.
 
 ![Login page](screenshots/01-login.png)
 
+Overview, Energy balance, Reports, Billing, community Settings and Metering
+offer **Retry** if the community list fails to load. A failed refresh keeps
+the previous community and its content visible with a warning.
+
+If no community is available, an admin can open **ZEVs** to create one; an
+account without community access should ask an administrator to grant it.
+
 ### 2. Explore as Admin
 
 If logged in as admin:
@@ -343,7 +350,7 @@ charts; swipe the table horizontally on narrow screens to see every column.
 ### 4. View as Participant
 
 Login as a participant (Anna or Ben):
-- **Dashboard** shows your energy consumption/production overview
+- **Dashboard** shows your selected community's energy overview; its invoice card includes invoices from all your communities
 - **My invoices** lists the invoices issued to you (details + PDF)
 - **Annual statement** shows your yearly statement and financial summary
 

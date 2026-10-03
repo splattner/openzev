@@ -30,16 +30,19 @@ vi.mock('../src/lib/auth', () => ({
     }),
 }))
 
-vi.mock('../src/lib/managedZev', () => ({
-    useManagedZev: () => ({
-        managedZevs: [{ id: 'z1', name: 'Z1' }],
-        selectedZevId: 'z1',
-        selectedZev: { id: 'z1', name: 'Z1', billing_interval: 'monthly' },
-        relation: mockState.relation,
-        entries: [{ id: 'z1', name: 'Z1', relation: mockState.relation }],
-        isLoading: false,
-    }),
-}))
+vi.mock('../src/lib/managedZev', () => {
+    const context = {
+        useManagedZev: () => ({
+            managedZevs: [{ id: 'z1', name: 'Z1' }],
+            selectedZevId: 'z1',
+            selectedZev: { id: 'z1', name: 'Z1', billing_interval: 'monthly' },
+            relation: mockState.relation,
+            entries: [{ id: 'z1', name: 'Z1', relation: mockState.relation }],
+            isLoading: false,
+        }),
+    }
+    return { ...context, useOptionalManagedZev: context.useManagedZev }
+})
 
 vi.mock('../src/lib/appSettings', () => ({
     useAppSettings: () => ({ settings: {} }),

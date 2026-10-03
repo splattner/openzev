@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AdminPdfTemplatesPage, type PdfTemplateTab } from './AdminPdfTemplatesPage'
 import { AdminEmailTemplatesPage } from './AdminEmailTemplatesPage'
 import { EMAIL_TEMPLATE_KEYS, type EmailTemplateKey } from '../lib/emailTemplateFields'
+import { PageHeader } from '../components/PageHeader'
 
 export type AdminTemplatesTab = 'pdf' | 'email'
 
@@ -39,10 +40,7 @@ export function AdminTemplatesHubPage({ tab = 'pdf' }: { tab?: AdminTemplatesTab
 
     return (
         <div className="page-stack">
-            <header>
-                <p className="eyebrow">{t('nav.platformScope')}</p>
-                <h2>{t('pages.adminTemplates.title')}</h2>
-            </header>
+            <PageHeader eyebrow={t('nav.platformScope')} title={t('pages.adminTemplates.title')} />
 
             <Tabs
                 classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}

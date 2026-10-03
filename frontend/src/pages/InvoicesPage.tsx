@@ -14,7 +14,6 @@ import {
     usePdfWatch,
 } from '../features/invoices/pdfWatch'
 import { PeriodSelector } from '../components/PeriodSelector'
-import { PageSkeleton } from '../components/PageSkeleton'
 import {
     firstAlignedBillingPeriod,
     getPreviousBillingPeriod,
@@ -26,6 +25,10 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { useCommunityAccess } from '../lib/communityAccess'
+import { PageHeader } from '../components/PageHeader'
+import { Notice } from '../components/Notice'
+import { PageSkeleton } from '../components/PageSkeleton'
+import { ScopeGuard } from '../components/ScopeGuard'
 
 /**
  * The period-scoped invoice table (Billing hub → Invoices tab since phase 3).
@@ -33,7 +36,7 @@ import { useCommunityAccess } from '../lib/communityAccess'
  */
 export function InvoicesPage({ embedded = false }: { embedded?: boolean }) {
     const { t } = useTranslation()
-    const { selectedZevId, selectedZev, isLoading: managedZevLoading } = useManagedZev()
+    const { selectedZevId, selectedZev } = useManagedZev()
     const { user } = useAuth()
     const [searchParams, setSearchParams] = useSearchParams()
 
@@ -153,7 +156,7 @@ export function InvoicesPage({ embedded = false }: { embedded?: boolean }) {
         return row.invoice.pdf_status === 'pending'
     }
 
-    const { isZevScope: isOwnerOrAdmin, canManage } = useCommunityAccess()
+    const { isZevScope: isManagedScope, canManage } = useCommunityAccess()
     // A viewer sees the period and may download the PDFs, but generates,
     // approves, sends and deletes nothing (#761): only navigation stays.
     const READ_ONLY_ROW_ITEMS = new Set(['review-conflict'])
@@ -169,23 +172,8 @@ export function InvoicesPage({ embedded = false }: { embedded?: boolean }) {
         { key: 'pdfs', label: t('pages.invoices.batch.summaryPdfs'), value: stats.pdfCount },
     ]
 
-    if (managedZevLoading) return <PageSkeleton variant="tableRows" />
-    if (!selectedZevId) {
-        return (
-            <div className="card">{t('pages.invoices.selectZev')}</div>
-        )
-    }
-
-    return (
-        <div className="page-stack">
-            {!embedded && (
-                <header>
-                    {selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
-                    <h2>{t('pages.invoices.title')}</h2>
-                    <p className="muted">{t('pages.invoices.description')}</p>
-                </header>
-            )}
-
+    const content = (
+        <>
             <section className="card">
                 <PeriodSelector
                     interval={interval}
@@ -198,10 +186,10 @@ export function InvoicesPage({ embedded = false }: { embedded?: boolean }) {
                 />
             </section>
 
-            {periodOverviewQuery.isLoading ? (
-                <div className="card">{t('pages.invoices.loading')}</div>
+            {!period.period_start || !period.period_end || periodOverviewQuery.isLoading ? (
+                <PageSkeleton variant="table" />
             ) : periodOverviewQuery.isError ? (
-                <div className="card error-banner">{t('pages.invoices.failed')}</div>
+                <Notice tone="error" onRetry={() => void periodOverviewQuery.refetch()} isRetrying={periodOverviewQuery.isFetching}>{t('pages.invoices.failed')}</Notice>
             ) : rows.length === 0 ? (
                 <InvoicesEmptyState />
             ) : (
@@ -209,7 +197,7 @@ export function InvoicesPage({ embedded = false }: { embedded?: boolean }) {
                     {/* Defense-in-depth: the /invoices route is already
                         owner/admin-only, but keep batch actions hidden from
                         participant/guest roles even if routing changes. */}
-                    {isOwnerOrAdmin && (
+                    {isManagedScope && (
                         <InvoiceBatchToolbar
                             stats={batchStats}
                             recommendedAction={canManage ? recommendedBatchAction : null}
@@ -248,6 +236,19 @@ export function InvoicesPage({ embedded = false }: { embedded?: boolean }) {
                 }}
             />
 
+        </>
+    )
+
+    return (
+        <div className="page-stack">
+            {!embedded && (
+                <PageHeader
+                    eyebrow={selectedZev?.name}
+                    title={t('pages.invoices.title')}
+                    description={t('pages.invoices.description')}
+                />
+            )}
+            <ScopeGuard skeleton="tableRows">{content}</ScopeGuard>
         </div>
     )
 }

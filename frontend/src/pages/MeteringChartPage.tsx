@@ -41,6 +41,9 @@ import type { AppSettings, ChartDataPoint, DataQualitySeverity, MeteringPoint, M
 import { AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CONS_COLORS, NEGATIVE_COLOR, PROD_COLORS } from '../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../lib/chartTheme'
 import { soleCommunityName } from '../lib/membership'
+import { PageHeader } from '../components/PageHeader'
+import { ScopeGuard } from '../components/ScopeGuard'
+import { Notice } from '../components/Notice'
 
 // ── Custom Tooltip ────────────────────────────────────────────────────────────
 
@@ -237,6 +240,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
     const mpQuery = useQuery({
         queryKey: queryKeys.metering.points(selectedZevId || undefined),
         queryFn: () => fetchMeteringPoints(selectedZevId || undefined),
+        enabled: !isManagedScope || !!selectedZevId,
     })
 
     const isZevTotal = selectedMpId === ALL_METERING_POINTS_VALUE
@@ -276,7 +280,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
         // Expensive (one query per visible metering point server-side) and
         // only shown on the Data Quality tab — don't run it just because the
         // Chart tab happened to be open (#638).
-        enabled: tab === 'quality',
+        enabled: tab === 'quality' && (!isManagedScope || !!selectedZevId),
     })
 
     const meteringPoints = (mpQuery.data ?? []).filter(
@@ -340,6 +344,12 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
         }, { replace: true })
     }, [setSearchParams])
 
+    const toggleSeverity = useCallback(
+        (severity: DataQualitySeverity) =>
+            handleSeverityFilterChange(severityFilter === severity ? 'all' : severity),
+        [handleSeverityFilterChange, severityFilter],
+    )
+
     // Data Quality: which rows have their full gap list expanded in place,
     // instead of the "+N more" dead end (#648).
     const [expandedGapsIds, setExpandedGapsIds] = useState<ReadonlySet<string>>(new Set())
@@ -386,6 +396,15 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
         () => filterAndRankQualityRows(qualityQuery.data?.metering_points ?? [], severityFilter),
         [qualityQuery.data, severityFilter],
     )
+
+    const severityCounts = useMemo(() => {
+        const points = qualityQuery.data?.metering_points ?? []
+        return {
+            green: points.filter((mp) => mp.severity === 'green').length,
+            yellow: points.filter((mp) => mp.severity === 'yellow').length,
+            red: points.filter((mp) => mp.severity === 'red').length,
+        }
+    }, [qualityQuery.data])
 
     const qualityColumns = useMemo<ColumnDef<(typeof qualityRows)[number], unknown>[]>(() => [
         {
@@ -492,12 +511,13 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
 
     return (
         <div className="page-stack">
-            <header>
-                {(selectedZev?.name || participantScopeName) ? <p className="eyebrow">{selectedZev?.name ?? participantScopeName}</p> : null}
-                <h2>{t('pages.meteringData.title')}</h2>
-                <p className="muted">{t('pages.meteringData.description')}</p>
-            </header>
+            <PageHeader
+                eyebrow={selectedZev?.name ?? participantScopeName}
+                title={t('pages.meteringData.title')}
+                description={t('pages.meteringData.description')}
+            />
 
+            <ScopeGuard skeleton="table">
             <Tabs
                 classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
                 value={tab}
@@ -635,20 +655,12 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
 
                         {selectedMpId && chartQuery.isLoading && <PageSkeleton variant="card" />}
                         {selectedMpId && chartQuery.isError && (
-                            <div className="card error-banner">{formatApiError(chartQuery.error)}</div>
+                            <Notice tone="error" onRetry={() => void chartQuery.refetch()} isRetrying={chartQuery.isFetching}>{formatApiError(chartQuery.error)}</Notice>
                         )}
 
                         {selectedMpId && chartQuery.isSuccess && (
                             <>
-                                {/* Matches the inline grid the other stat rows use; there is no
-                                    shared `.stat-grid` class in the stylesheet. */}
-                                <div
-                                    style={{
-                                        display: 'grid',
-                                        gap: '1rem',
-                                        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-                                    }}
-                                >
+                                <div className="stat-grid">
                                     <StatCard
                                         label={t('pages.meteringData.stats.totalConsumption')}
                                         value={`${formatKwh(totalIn, { maxDecimals: 2 })} kWh`}
@@ -762,79 +774,42 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                     <div className="page-stack">
                         {qualityQuery.isLoading && <PageSkeleton variant="table" />}
                         {qualityQuery.isError && (
-                            <div className="card error-banner">{formatApiError(qualityQuery.error as any)}</div>
+                            <Notice tone="error" onRetry={() => void qualityQuery.refetch()} isRetrying={qualityQuery.isFetching}>{formatApiError(qualityQuery.error)}</Notice>
                         )}
                         {qualityQuery.isSuccess && qualityQuery.data && (
                             <>
                                 {qualityQuery.data.metering_points.length === 0 ? (
-                                    <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                                        {t('meteringDataQuality.noData')}
-                                    </div>
+                                    <EmptyState
+                                        titleKey="meteringDataQuality.noData"
+                                        descriptionKey="meteringDataQuality.noDataDescription"
+                                        actions={[{ labelKey: 'nav.meteringPoints', to: '/metering/points' }]}
+                                    />
                                 ) : (
                                     <>
                                         {/* Clickable filters (#648): click a card to narrow the table to
                                             that severity, click the active one again to clear. */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-                                            <button
-                                                type="button"
-                                                aria-pressed={severityFilter === 'green'}
-                                                onClick={() => handleSeverityFilterChange(severityFilter === 'green' ? 'all' : 'green')}
-                                                style={{
-                                                    background: 'var(--success-100)',
-                                                    border: `1px solid ${severityFilter === 'green' ? 'var(--success-700)' : 'var(--success-200)'}`,
-                                                    boxShadow: severityFilter === 'green' ? '0 0 0 2px var(--success-700)' : 'none',
-                                                    borderRadius: '8px',
-                                                    padding: '1rem',
-                                                    textAlign: 'center',
-                                                    cursor: 'pointer',
-                                                    font: 'inherit',
-                                                }}
-                                            >
-                                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--success-700)' }}>
-                                                    {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'green').length}
-                                                </div>
-                                                <div style={{ fontSize: '0.875rem', color: 'var(--brand-mid)' }}>{t('meteringDataQuality.severityGreen')}</div>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                aria-pressed={severityFilter === 'yellow'}
-                                                onClick={() => handleSeverityFilterChange(severityFilter === 'yellow' ? 'all' : 'yellow')}
-                                                style={{
-                                                    background: 'var(--warning-100)',
-                                                    border: `1px solid ${severityFilter === 'yellow' ? 'var(--warning-800)' : 'var(--warning-200)'}`,
-                                                    boxShadow: severityFilter === 'yellow' ? '0 0 0 2px var(--warning-800)' : 'none',
-                                                    borderRadius: '8px',
-                                                    padding: '1rem',
-                                                    textAlign: 'center',
-                                                    cursor: 'pointer',
-                                                    font: 'inherit',
-                                                }}
-                                            >
-                                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--warning-800)' }}>
-                                                    {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'yellow').length}
-                                                </div>
-                                                <div style={{ fontSize: '0.875rem', color: 'var(--warning-800)' }}>{t('meteringDataQuality.severityYellow')}</div>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                aria-pressed={severityFilter === 'red'}
-                                                onClick={() => handleSeverityFilterChange(severityFilter === 'red' ? 'all' : 'red')}
-                                                style={{
-                                                    background: 'var(--danger-100)',
-                                                    border: `1px solid ${severityFilter === 'red' ? 'var(--danger-700)' : 'var(--danger-300)'}`,
-                                                    boxShadow: severityFilter === 'red' ? '0 0 0 2px var(--danger-700)' : 'none',
-                                                    borderRadius: '8px',
-                                                    padding: '1rem',
-                                                    textAlign: 'center',
-                                                    cursor: 'pointer',
-                                                    font: 'inherit',
-                                                }}
-                                            >
-                                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--danger-700)' }}>
-                                                    {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'red').length}
-                                                </div>
-                                                <div style={{ fontSize: '0.875rem', color: 'var(--danger-600)' }}>{t('meteringDataQuality.severityRed')}</div>
-                                            </button>
+                                        <div className="stat-grid">
+                                            <StatCard
+                                                label={t('meteringDataQuality.severityGreen')}
+                                                value={severityCounts.green}
+                                                tone="success"
+                                                onPress={() => toggleSeverity('green')}
+                                                pressed={severityFilter === 'green'}
+                                            />
+                                            <StatCard
+                                                label={t('meteringDataQuality.severityYellow')}
+                                                value={severityCounts.yellow}
+                                                tone="warning"
+                                                onPress={() => toggleSeverity('yellow')}
+                                                pressed={severityFilter === 'yellow'}
+                                            />
+                                            <StatCard
+                                                label={t('meteringDataQuality.severityRed')}
+                                                value={severityCounts.red}
+                                                tone="danger"
+                                                onPress={() => toggleSeverity('red')}
+                                                pressed={severityFilter === 'red'}
+                                            />
                                         </div>
 
                                         <div className="table-card">
@@ -864,6 +839,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                     </Tabs.Panel>
                 )}
             </Tabs>
+            </ScopeGuard>
         </div>
     )
 }

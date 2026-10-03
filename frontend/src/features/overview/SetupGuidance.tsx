@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { ReadinessResponse, ReadinessSetupBlock } from '../../types/api'
+import { Notice } from '../../components/Notice'
 import { PageSkeleton } from '../../components/PageSkeleton'
 
 /** Assignment, billing-settings and issuer warnings, rendered beside period work. */
@@ -71,14 +72,14 @@ function SetupChecklist({ setup }: { setup: NonNullable<ReadinessResponse['setup
 export function SetupGuidance({
     readinessQuery,
 }: {
-    readinessQuery: { isLoading: boolean; isError: boolean; data?: ReadinessResponse }
+    readinessQuery: { isLoading: boolean; isError: boolean; data?: ReadinessResponse; isFetching?: boolean; refetch: () => unknown }
 }) {
     const { t } = useTranslation()
     const readiness = readinessQuery.data
 
     if (readinessQuery.isLoading) return <PageSkeleton variant="card" />
     if (readinessQuery.isError || !readiness) {
-        return <p className="card error-banner" role="status">{t('pages.dashboard.cockpit.failed')}</p>
+        return <Notice tone="error" onRetry={() => void readinessQuery.refetch()} isRetrying={readinessQuery.isFetching}>{t('pages.dashboard.cockpit.failed')}</Notice>
     }
 
     if (readiness.period) return <SetupWarnings setup={readiness.setup} />

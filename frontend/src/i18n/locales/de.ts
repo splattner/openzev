@@ -170,6 +170,10 @@ export const de = {
             previous: 'Vorherige Seite',
             next: 'Nächste Seite',
         },
+        scopeGuard: {
+            loadFailed: 'Ihre ZEVs konnten nicht geladen werden.',
+            refreshFailed: 'Ihre ZEVs konnten nicht aktualisiert werden. Die zuletzt geladene Auswahl wird angezeigt.',
+        },
         error: 'Etwas ist schief gelaufen.',
         retry: 'Erneut versuchen',
         language: 'Sprache',
@@ -983,6 +987,7 @@ export const de = {
             title: 'vZEV-Wirtschaftlichkeitsrechner',
             description: 'Schätzen Sie ab, ob sich die Gründung eines vZEV lohnt — noch bevor Messdaten vorliegen, im Vergleich zur vollständigen Einspeisung ins Netz.',
             disabled: 'Der Wirtschaftlichkeitsrechner ist auf dieser Instanz nicht aktiviert. Ein Administrator kann ihn unter Plattform → Einstellungen → Funktionen einschalten.',
+            checkFailed: 'Die Verfügbarkeit des Rechners konnte nicht geprüft werden.',
             form: {
                 systemTitle: 'Anlage & Energie',
                 energyInputModeAggregate: 'Gesamt',
@@ -1083,11 +1088,9 @@ export const de = {
         invoices: {
             title: 'Rechnungen',
             description: 'Abrechnungsperioden und Rechnungen für den ausgewählten ZEV verwalten.',
-            selectZev: 'Bitte wählen Sie einen ZEV aus, um Abrechnungsperioden zu verwalten.',
             prevPeriod: 'Vorherige Periode',
             nextPeriod: 'Nächste Periode',
             billingInterval: 'Abrechnungsintervall:',
-            loading: 'Periodenübersicht wird geladen…',
             failed: 'Periodenübersicht konnte nicht geladen werden.',
             col: {
                 participant: 'Teilnehmer',
@@ -1913,7 +1916,6 @@ export const de = {
         accounts: {
             title: 'Konten',
             description: 'Alle Konten der Plattform, die Gemeinschaften, denen sie angehören, und wie sie sich anmelden.',
-            loading: 'Konten und Teilnehmer werden geladen…',
             loadFailed: 'Kontoverwaltungsdaten konnten nicht geladen werden.',
             col: {
                 account: 'Konto',
@@ -2347,7 +2349,6 @@ export const de = {
             switchWithoutSaving: 'Ohne Speichern wechseln',
             unsavedGuardLeaveMessage: 'Beim Verlassen der Einstellungen gehen ungespeicherte Änderungen verloren.',
             leaveWithoutSaving: 'Ohne Speichern verlassen',
-            selectZev: 'Wählen Sie einen ZEV aus dem globalen Selektor, um die Einstellungen zu bearbeiten.',
             emailTemplateTitle: 'Rechnungs-E-Mail-Vorlage',
             emailInheritanceOnSave: 'Nach dem Speichern der Einstellungen gilt der Plattformstandard.',
             emailCustomize: 'Anpassen',
@@ -2511,8 +2512,6 @@ export const de = {
             hourly: 'Stündlich',
             daily: 'Täglich',
             monthly: 'Monatlich',
-            noZev: 'Kein ZEV für Ihr Konto verfügbar.',
-            selectZev: 'Bitte wählen Sie einen ZEV aus dem globalen Selektor in der Seitenleiste.',
             failedAnalytics: 'Messdaten konnten nicht geladen werden.',
             stats: {
                 producedInZev: 'Im ZEV produziert',
@@ -2560,6 +2559,7 @@ export const de = {
                 description: 'Durchschnittlicher stündlicher Energiebezug über die Abrechnungsperiode — aufgeteilt in lokale ZEV-Energie und Netzbezug.',
             },
             invoicesSection: 'Rechnungen',
+            invoicesAllCommunitiesSection: 'Rechnungen aller ZEVs',
             failedInvoices: 'Rechnungen konnten nicht geladen werden.',
             cockpit: {
                 title: 'Abrechnungs-Cockpit',
@@ -2659,10 +2659,6 @@ export const de = {
             preparingDocument: '{{document}} für {{year}} wird erstellt…',
             documentTitle: '{{document}} — {{year}}',
             documentTabs: 'Jahresdokumente',
-            selectZevTitle: 'Kein ZEV ausgewählt',
-            selectZevDescription: 'Wählen Sie in der Seitenleiste einen ZEV aus, um Berichte zu erstellen.',
-            noZevTitle: 'Kein ZEV verfügbar',
-            noZevDescription: 'Für Ihr Konto ist kein ZEV vorhanden. Berichte sind verfügbar, sobald Ihr Konto einem ZEV zugeordnet ist.',
             annualStatement: {
                 title: 'Jahresabrechnung',
                 description: 'Eine Jahresübersicht über Ihren Energieverbrauch, Rechnungen und Einsparungen.',
@@ -3104,7 +3100,8 @@ export const de = {
         dataCompleteness: 'Datenquote',
         status: 'Status',
         gaps: 'Fehlende Tage',
-        noData: 'Keine Messstellen verfügbar',
+        noData: 'Keine Messstellen für diese Auswahl',
+        noDataDescription: 'Qualitätsprüfungen sind verfügbar, wenn diese Auswahl Messstellen enthält.',
         noGaps: 'Vollständig',
         severityGreen: 'Vollständig',
         severityYellow: 'Teilweise',

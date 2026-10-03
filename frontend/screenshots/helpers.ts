@@ -2,6 +2,7 @@
 import { expect, type Page } from '@playwright/test'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import type { User } from '../src/types/api'
 
 export const BASE = process.env.SCREENSHOT_BASE_URL ?? 'http://localhost:8080'
 // The default compose stack reaches the API same-origin through nginx; the dev
@@ -133,8 +134,10 @@ export async function impersonateDemoParticipant(page: Page): Promise<boolean> {
 
   const usersResp = await page.request.get(`${API_BASE}/auth/users/`, { headers })
   expect(usersResp.ok(), `Fetching users failed (${usersResp.status()})`).toBeTruthy()
-  const usersBody = await usersResp.json() as { results: Array<{ id: number; role: string }> }
-  const participant = usersBody.results.find(u => u.role === 'participant' && demoUserIds.has(u.id))
+  const usersBody = await usersResp.json() as { results: User[] }
+  const participant = usersBody.results.find(user => user.role === 'user' && demoUserIds.has(user.id) &&
+    user.memberships?.every(entry => entry.access === null) &&
+    user.memberships.some(entry => entry.zev === zevId && entry.participants.some(row => row.live)))
   if (!participant) return false
 
   // Call the impersonate endpoint — the server rotates the cookies automatically.
@@ -239,7 +242,7 @@ export async function screenshotFull(page: Page, dir: string, name: string) {
       fullPage: false,
     })
   } finally {
-    await styleHandle.evaluate((el) => el.remove()).catch(() => {})
+    await styleHandle.evaluate((el) => el.parentNode?.removeChild(el)).catch(() => {})
   }
 }
 

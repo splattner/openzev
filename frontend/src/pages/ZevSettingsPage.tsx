@@ -33,6 +33,8 @@ import { useToast } from '../lib/toast'
 import { AuditLogsPage } from './AdminAuditLogsPage'
 import { NotFoundPage } from './NotFoundPage'
 import type { Zev, ZevInput } from '../types/api'
+import { PageHeader } from '../components/PageHeader'
+import { ScopeGuard } from '../components/ScopeGuard'
 
 /**
  * ZEV settings hub (nav-regroup phase 3, spec §5): one draft feeds the three
@@ -85,7 +87,7 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
     const { pushToast } = useToast()
     const { user } = useAuth()
     const { settings } = useAppSettings()
-    const { selectedZev, selectedZevId, isLoading } = useManagedZev()
+    const { selectedZev, selectedZevId } = useManagedZev()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
     const [draft, setDraft] = useState<ZevDraft>(() => {
@@ -334,28 +336,12 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
         })
     }
 
-    if (isLoading) {
-        return <PageSkeleton variant="page" />
-    }
-
-    if (!selectedZevId || !selectedZev) {
-        return <div className="card">{t('pages.zevSettings.selectZev')}</div>
-    }
-
-    if (!draftIsSelected) {
-        return <PageSkeleton variant="page" />
-    }
-
-    return (
+    const content = !draftIsSelected ? (
+        <PageSkeleton variant="card" />
+    ) : (
         <div className="page-stack zev-settings-page">
-            <header>
-                {selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
-                <h2>{t('pages.zevSettings.title')}</h2>
-                <p className="muted">{t('pages.zevSettings.description')}</p>
-            </header>
-
             {isDisabled && (
-                <div className="warning-banner" role="alert" style={{ display: 'grid', gap: '0.35rem', maxWidth: '1000px' }}>
+                <div className="warning-banner" role="status" style={{ display: 'grid', gap: '0.35rem', maxWidth: '1000px' }}>
                     <strong>
                         <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth style={{ marginRight: '0.4rem' }} />
                         {t('pages.zevSettings.lifecycle.bannerTitle')}
@@ -578,6 +564,17 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                 zevName={selectedZev.name}
                 onClose={() => setShowExportModal(false)}
             />
+        </div>
+    )
+
+    return (
+        <div className="page-stack">
+            <PageHeader
+                eyebrow={selectedZev?.name}
+                title={t('pages.zevSettings.title')}
+                description={t('pages.zevSettings.description')}
+            />
+            <ScopeGuard skeleton="card">{content}</ScopeGuard>
         </div>
     )
 }

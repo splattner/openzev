@@ -1,6 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
+import { Toolbar } from '../../components/Toolbar'
 
 export type ParticipantReadinessFilter = 'all' | 'attention' | 'ready'
 
@@ -13,7 +14,6 @@ type ParticipantToolbarProps = {
   onSearchTermChange: (value: string) => void
   onReadinessFilterChange: (value: ParticipantReadinessFilter) => void
   onOpenCreateModal: () => void
-  /** A viewer reads only (#761): no "New participant". */
   readOnly?: boolean
 }
 
@@ -32,7 +32,14 @@ export function ParticipantToolbar({
 
   return (
     <section className="card participant-toolbar">
-      <div className="participant-toolbar-header">
+      <Toolbar
+        actions={!readOnly ? (
+          <button className="button button-primary" type="button" onClick={onOpenCreateModal}>
+            <FontAwesomeIcon icon={faPlus} fixedWidth />
+            {t('pages.participants.newParticipant')}
+          </button>
+        ) : null}
+      >
         <div className="participant-summary" aria-label={t('pages.participants.summaryLabel')}>
           <span className="participant-summary-stat">
             <span className="participant-summary-label">{t('pages.participants.summary.total')}</span>
@@ -47,14 +54,7 @@ export function ParticipantToolbar({
             <span className="participant-summary-value">{noMeteringCount}</span>
           </span>
         </div>
-
-        {!readOnly && (
-          <button className="button button-primary" type="button" onClick={onOpenCreateModal}>
-            <FontAwesomeIcon icon={faPlus} fixedWidth />
-            {t('pages.participants.newParticipant')}
-          </button>
-        )}
-      </div>
+      </Toolbar>
 
       <div className="participant-filter-grid">
         <label>

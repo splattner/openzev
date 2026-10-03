@@ -47,12 +47,17 @@ vi.mock('../src/components/CivilDateInput', () => ({
     CivilDateInput: ({ value, onChange }: { value: string; onChange: (value: string) => void }) =>
         createElement('input', { type: 'date', value, onChange: (event: React.ChangeEvent<HTMLInputElement>) => onChange(event.target.value) }),
 }))
-vi.mock('../src/lib/managedZev', () => ({
-    useManagedZev: () => ({
-        selectedZevId,
-        selectedZev: selectedZevId ? { id: selectedZevId, name: 'ZEV 1' } : null,
-    }),
-}))
+vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ user: { id: 1, role: 'admin' } }) }))
+
+vi.mock('../src/lib/managedZev', () => {
+    const context = {
+        useManagedZev: () => ({
+            selectedZevId,
+            selectedZev: selectedZevId ? { id: selectedZevId, name: 'ZEV 1' } : null,
+        }),
+    }
+    return { ...context, useOptionalManagedZev: context.useManagedZev }
+})
 vi.mock('../src/lib/appSettings', () => ({
     useAppSettings: () => ({ settings: {} }),
     formatDateTime: (value: string) => value,

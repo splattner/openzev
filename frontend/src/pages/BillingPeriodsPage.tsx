@@ -10,22 +10,20 @@ import { fetchReadinessList } from '../lib/api/readiness'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useManagedZev } from '../lib/managedZev'
 import type { AttentionItem } from '../types/api'
+import { Notice } from '../components/Notice'
 
-type AttentionQuery = { data?: AttentionItem[]; isLoading: boolean; isError: boolean }
+type AttentionQuery = { data?: AttentionItem[]; isLoading: boolean; isError: boolean; isFetching?: boolean; refetch: () => unknown }
 
 /** A single home for each period's work, including cross-period exceptions. */
 export function BillingPeriodsPage({ attentionQuery }: { attentionQuery?: AttentionQuery } = {}) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
-    const { selectedZevId, isLoading: managedZevLoading } = useManagedZev()
+    const { selectedZevId } = useManagedZev()
     const periodsQuery = useQuery({
         queryKey: queryKeys.invoices.readinessList(selectedZevId || undefined),
         queryFn: () => fetchReadinessList(selectedZevId!),
         enabled: !!selectedZevId,
     })
-
-    if (managedZevLoading) return <PageSkeleton variant="cardList" />
-    if (!selectedZevId) return <div className="card">{t('pages.dashboard.selectZev')}</div>
 
     const { open, current, completed, community } = groupPeriodCards(
         periodsQuery.data ?? [], attentionQuery?.data ?? [],
@@ -38,9 +36,9 @@ export function BillingPeriodsPage({ attentionQuery }: { attentionQuery?: Attent
     return (
         <section className="billing-periods page-stack" id="billing-periods">
             {periodsQuery.isLoading && <PageSkeleton variant="cardList" />}
-            {periodsQuery.isError && <p className="card error-banner" role="status">{t('pages.billingPeriods.failed')}</p>}
+            {periodsQuery.isError && <Notice tone="error" onRetry={() => void periodsQuery.refetch()} isRetrying={periodsQuery.isFetching}>{t('pages.billingPeriods.failed')}</Notice>}
             {attentionQuery?.isLoading && <PageSkeleton variant="card" />}
-            {attentionQuery?.isError && <p className="card error-banner" role="status">{t('pages.dashboard.attention.failed')}</p>}
+            {attentionQuery?.isError && <Notice tone="error" onRetry={() => void attentionQuery.refetch()} isRetrying={attentionQuery.isFetching}>{t('pages.dashboard.attention.failed')}</Notice>}
             {community.length > 0 && (
                 <section className="card overview-community-notices">
                     <h3>{t('pages.overview.cards.communityNotices')}</h3>

@@ -9,15 +9,16 @@ interface ParticipantInvoicesCardProps {
     invoices: Invoice[]
     isLoading: boolean
     isError: boolean
+    allCommunities: boolean
 }
 
-export function ParticipantInvoicesCard({ invoices, isLoading, isError }: ParticipantInvoicesCardProps) {
+export function ParticipantInvoicesCard({ invoices, isLoading, isError, allCommunities }: ParticipantInvoicesCardProps) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
 
     return (
         <section className="card">
-            <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.invoicesSection')}</h3>
+            <h3 style={{ marginTop: 0 }}>{t(allCommunities ? 'pages.dashboard.invoicesAllCommunitiesSection' : 'pages.dashboard.invoicesSection')}</h3>
             {isLoading ? (
                 <PageSkeleton variant="tableRows" />
             ) : isError ? (

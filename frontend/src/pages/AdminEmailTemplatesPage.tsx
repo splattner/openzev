@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
+import { PageHeader } from '../components/PageHeader'
 import {
     fetchEmailTemplate,
     resetEmailTemplate,
@@ -220,13 +221,11 @@ export function AdminEmailTemplatesPage({ embedded = false, template }: {
     return (
         <div className="page-stack">
             {!embedded && (
-            <header>
-                <p className="eyebrow">{t('nav.platformScope')}</p>
-                <h2>{t('admin.emailTemplates.title')}</h2>
-                <p className="muted">
-                    {t('admin.emailTemplates.description')}
-                </p>
-            </header>
+            <PageHeader
+                eyebrow={t('nav.platformScope')}
+                title={t('admin.emailTemplates.title')}
+                description={t('admin.emailTemplates.description')}
+            />
             )}
 
             {!embedded && (

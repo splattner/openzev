@@ -39,18 +39,21 @@ vi.mock('../src/lib/auth', () => ({
     }),
 }))
 
-vi.mock('../src/lib/managedZev', () => ({
-    ManagedZevProvider: (props: { children: unknown }) => props.children,
-    useManagedZev: () => ({
-        managedZevs: [{ id: 'z1', name: 'Z1' }],
-        selectedZevId: 'z1',
-        selectedZev: { id: 'z1', name: 'Z1', billing_interval: 'monthly' },
-        relation: 'manager',
-        isSelectable: false,
-        isLoading: false,
-        setSelectedZevId: vi.fn(),
-    }),
-}))
+vi.mock('../src/lib/managedZev', () => {
+    const context = {
+        ManagedZevProvider: (props: { children: unknown }) => props.children,
+        useManagedZev: () => ({
+            managedZevs: [{ id: 'z1', name: 'Z1' }],
+            selectedZevId: 'z1',
+            selectedZev: { id: 'z1', name: 'Z1', billing_interval: 'monthly' },
+            relation: 'manager',
+            isSelectable: false,
+            isLoading: false,
+            setSelectedZevId: vi.fn(),
+        }),
+    }
+    return { ...context, useOptionalManagedZev: context.useManagedZev }
+})
 
 vi.mock('../src/lib/appSettings', () => ({
     useAppSettings: () => ({ settings: {} }),
@@ -209,6 +212,37 @@ describe('metering tab state', () => {
         expect(back?.value).toBe('month')
         unmount()
         // Real page behind lazy() plus full AppRoutes render: needs headroom.
+    }, 30000)
+
+    it('exposes the Data Quality severity tiles as pressed-state filter buttons', async () => {
+        const { container, unmount } = await renderChart('/metering/quality?period_start=2025-02-01&period_end=2025-02-28')
+
+        const tiles = () => Array.from(container.querySelectorAll('.stat-card--interactive'))
+        for (let i = 0; i < 100 && tiles().length !== 3; i += 1) {
+            await act(async () => {
+                await new Promise((resolve) => setTimeout(resolve, 50))
+            })
+        }
+
+        const severityTile = (key: string) =>
+            tiles().find((tile) => tile.textContent?.includes(`meteringDataQuality.${key}`))
+        expect(tiles().map((tile) => tile.tagName)).toEqual(['BUTTON', 'BUTTON', 'BUTTON'])
+        expect(tiles().map((tile) => tile.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'false'])
+
+        // Clicking applies the filter; keyboard activation has browser coverage.
+        await act(async () => {
+            severityTile('severityRed')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        })
+        expect(tiles().map((tile) => tile.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'true'])
+        expect(container.querySelector('[data-testid="location"]')?.textContent).toContain('quality_severity=red')
+
+        // Toggling the active tile off clears the filter again.
+        await act(async () => {
+            tiles().find((tile) => tile.getAttribute('aria-pressed') === 'true')!.click()
+        })
+        expect(tiles().map((tile) => tile.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'false'])
+        expect(container.querySelector('[data-testid="location"]')?.textContent).not.toContain('quality_severity=')
+        unmount()
     }, 30000)
 
     it('routes a Data Quality meter link to its chart without losing the period', async () => {

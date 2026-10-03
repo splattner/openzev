@@ -27,23 +27,13 @@ import { calculateFeasibility, fetchFeasibilityCalculatorEnabled } from '../lib/
 import { formatApiError } from '../lib/api/errors'
 import { formatChf, formatKwh, formatNumber, formatPercent } from '../lib/numbers'
 import { queryKeys } from '../lib/api/queryKeys'
+import { PageHeader } from '../components/PageHeader'
+import { PageSkeleton } from '../components/PageSkeleton'
+import { Notice } from '../components/Notice'
 
 const DEBOUNCE_MS = 400
 
-/**
- * Gates the calculator behind `FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED`.
- * Split from the calculator itself (`FeasibilityCalculator` below) rather
- * than an early `return` inside one component: the calculator mounts several
- * hooks (`useForm`, `useMutation`, the debounce `useEffect`) that must not
- * run — and, worse, must not submit a request with default values — before
- * the flag is known to be on. A conditional early return before those hooks
- * would violate the rules of hooks the moment the query resolves; a
- * separate child component sidesteps that by mounting cleanly instead.
- *
- * Fails closed: loading, disabled, and error all render the same "not
- * available" state, matching the flag's off-by-default stance rather than
- * assuming enabled when the check itself couldn't be confirmed.
- */
+/** Keep form/submission hooks unmounted until enablement is confirmed. */
 export function FeasibilityCalculatorPage() {
     const { t } = useTranslation()
     const enabledQuery = useQuery({
@@ -54,15 +44,20 @@ export function FeasibilityCalculatorPage() {
     if (enabledQuery.data !== true) {
         return (
             <div className="page-stack">
-                <header>
-                    <p className="eyebrow">{t('pages.feasibility.eyebrow')}</p>
-                    <h2>{t('pages.feasibility.title')}</h2>
-                </header>
-                <div className="card">
+                <PageHeader
+                    eyebrow={t('pages.feasibility.eyebrow')}
+                    title={t('pages.feasibility.title')}
+                    description={t('pages.feasibility.description')}
+                />
+                {enabledQuery.isLoading ? <PageSkeleton variant="card" /> : enabledQuery.isError ? (
+                    <Notice tone="error" onRetry={() => void enabledQuery.refetch()} isRetrying={enabledQuery.isFetching}>
+                        {t('pages.feasibility.checkFailed')}
+                    </Notice>
+                ) : <div className="card">
                     <p className="muted">
-                        {enabledQuery.isLoading ? t('common.loading') : t('pages.feasibility.disabled')}
+                        {t('pages.feasibility.disabled')}
                     </p>
-                </div>
+                </div>}
             </div>
         )
     }
@@ -105,11 +100,11 @@ function FeasibilityCalculator() {
 
     return (
         <div className="page-stack feasibility-page">
-            <header>
-                <p className="eyebrow">{t('pages.feasibility.eyebrow')}</p>
-                <h2>{t('pages.feasibility.title')}</h2>
-                <p className="muted">{t('pages.feasibility.description')}</p>
-            </header>
+            <PageHeader
+                eyebrow={t('pages.feasibility.eyebrow')}
+                title={t('pages.feasibility.title')}
+                description={t('pages.feasibility.description')}
+            />
 
             <PrefillFromZevCard
                 onPrefillLoaded={(prefill) => form.reset(applyPrefillToFormValues(prefill, form.getValues()))}
@@ -268,13 +263,8 @@ function FeasibilityCalculator() {
                     {result && (
                         <>
                             <section
-                                style={{
-                                    display: 'grid',
-                                    gap: '1rem',
-                                    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-                                    opacity: mutation.isPending ? 0.6 : 1,
-                                    transition: 'opacity 0.15s',
-                                }}
+                                className="stat-grid"
+                                style={{ opacity: mutation.isPending ? 0.6 : 1, transition: 'opacity 0.15s' }}
                             >
                                 <StatCard label={t('pages.feasibility.results.annualNetBenefit')} value={formatChf(Number(result.annual_net_benefit_chf))} />
                                 <StatCard

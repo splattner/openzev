@@ -31,6 +31,7 @@ vi.mock('../src/lib/auth', () => ({
 vi.mock('../src/lib/managedZev', () => ({
     ManagedZevProvider: (props: { children: unknown }) => props.children,
     useManagedZev: () => mockManagedZev(),
+    useOptionalManagedZev: () => mockManagedZev(),
 }))
 
 vi.mock('../src/lib/appSettings', () => ({
@@ -212,10 +213,8 @@ async function renderAt(path: string) {
             ),
         )
     })
-    // Wait for the page shell (h2) and for any loading skeleton to clear:
-    // since the metering-points redesign the loading branch already renders
-    // an h2, so waiting for h2 alone can assert against the loading state.
-    for (let i = 0; i < 100 && (!container.querySelector('h2') || container.querySelector('.mantine-Skeleton-root')); i += 1) {
+    // The title renders during loading; wait for the page body too.
+    for (let i = 0; i < 100 && (!container.querySelector('h1') || container.querySelector('.skeleton-block')); i += 1) {
         await act(async () => {
             await new Promise((r) => setTimeout(r, 50))
         })
@@ -268,10 +267,10 @@ describe('community eyebrow', { timeout: 30000 }, () => {
         unmount()
     })
 
-    it('metering points shows no community with several memberships', async () => {
+    it('metering points shows the selected community with several memberships', async () => {
         mockParticipant(2)
         const { container, unmount } = await renderAt('/metering-points')
-        expect(container.querySelector('.page-stack .eyebrow')).toBeNull()
+        expect(container.querySelector('.page-stack .eyebrow')?.textContent).toBe('Member ZEV')
         unmount()
     })
 

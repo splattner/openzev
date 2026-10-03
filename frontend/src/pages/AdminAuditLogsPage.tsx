@@ -10,6 +10,7 @@ import { useManagedZev } from '../lib/managedZev'
 import { CivilDateInput } from '../components/CivilDateInput'
 import { AuditEventDrawer } from '../features/audit/AuditEventDrawer'
 import type { AuditActionCategory, AuditEvent, AuditEventFilters, AuditEventStatus } from '../types/api'
+import { PageHeader } from '../components/PageHeader'
 
 type AuditLogsScope = 'admin' | 'owner'
 
@@ -174,11 +175,11 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
     return (
         <div className="page-stack">
             {!embedded && (
-                <header>
-                    <p className="eyebrow">{t(isAdminView ? 'pages.auditLogs.eyebrowAdmin' : 'pages.auditLogs.eyebrowOwner')}</p>
-                    <h2>{t('pages.auditLogs.title')}</h2>
-                    <p className="muted">{t('pages.auditLogs.description')}</p>
-                </header>
+                <PageHeader
+                    eyebrow={t(isAdminView ? 'pages.auditLogs.eyebrowAdmin' : 'pages.auditLogs.eyebrowOwner')}
+                    title={t('pages.auditLogs.title')}
+                    description={t('pages.auditLogs.description')}
+                />
             )}
 
             <section className="card page-stack">

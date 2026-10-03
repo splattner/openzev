@@ -23,6 +23,7 @@ import { PdfPreview } from '../components/PdfPreview'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { TemplateSourceStatus } from '../components/TemplateSourceStatus'
 import { useTemplateDraft } from '../lib/useTemplateDraft'
+import { PageHeader } from '../components/PageHeader'
 
 const PDF_TEMPLATE_TABS = ['invoice', 'contract', 'annual_statement'] as const
 
@@ -540,13 +541,11 @@ export function AdminPdfTemplatesPage({ embedded = false, template }: {
     return (
         <div className="page-stack">
             {!embedded && (
-                <header>
-                    <p className="eyebrow">{t('nav.platformScope')}</p>
-                    <h2>{t('admin.pdfTemplates')}</h2>
-                    <p className="muted">
-                        {t('admin.pdfTemplatesDescription')}
-                    </p>
-                </header>
+                <PageHeader
+                    eyebrow={t('nav.platformScope')}
+                    title={t('admin.pdfTemplates')}
+                    description={t('admin.pdfTemplatesDescription')}
+                />
             )}
 
             {!embedded && (

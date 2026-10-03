@@ -11,6 +11,8 @@ import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { StatCard } from '../components/StatCard'
 import { apiKeyStatus } from '../features/account/apiKeyStatus'
 import type { AdminApiKey } from '../types/api'
+import { PageHeader } from '../components/PageHeader'
+import { Notice } from '../components/Notice'
 
 type StatusFilter = '' | 'active' | 'revoked'
 
@@ -82,22 +84,14 @@ export function AdminApiKeysPage({ embedded = false }: { embedded?: boolean }) {
     return (
         <div className="page-stack">
             {!embedded && (
-            <header>
-                <p className="eyebrow">{t('nav.platformScope')}</p>
-                <h2>{t('pages.adminApiKeys.title')}</h2>
-                <p className="muted">{t('pages.adminApiKeys.description')}</p>
-            </header>
+            <PageHeader
+                eyebrow={t('nav.platformScope')}
+                title={t('pages.adminApiKeys.title')}
+                description={t('pages.adminApiKeys.description')}
+            />
             )}
 
-            {/* Matches the inline grid the other stat rows use; there is no
-                shared `.stat-grid` class in the stylesheet. */}
-            <div
-                style={{
-                    display: 'grid',
-                    gap: '1rem',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-                }}
-            >
+            <div className="stat-grid">
                 <StatCard label={t('pages.adminApiKeys.statActive')} value={activeCount} />
                 <StatCard label={t('pages.adminApiKeys.statExpiring')} value={expiringCount} />
                 <StatCard label={t('pages.adminApiKeys.statRevoked')} value={revokedCount} />
@@ -139,7 +133,7 @@ export function AdminApiKeysPage({ embedded = false }: { embedded?: boolean }) {
             {keysQuery.isLoading ? (
                 <PageSkeleton variant="table" />
             ) : keysQuery.isError ? (
-                <div className="card error-banner">{t('common.error')}</div>
+                <Notice tone="error" onRetry={() => void keysQuery.refetch()} isRetrying={keysQuery.isFetching}>{t('common.error')}</Notice>
             ) : keys.length === 0 ? (
                 <div className="card muted">{t('pages.adminApiKeys.empty')}</div>
             ) : (

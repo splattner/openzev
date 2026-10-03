@@ -39,6 +39,8 @@ import { TITLE_KEYS } from '../lib/participantTitle'
 import type { OwnerMeteringPointInput, Zev, ZevInput, ZevWizardInput, ZevWizardResult } from '../types/api'
 import { GridOperatorField } from '../features/zev/GridOperatorField'
 import { GridOperatorSuggestion } from '../features/zev/GridOperatorSuggestion'
+import { PageHeader } from '../components/PageHeader'
+import { Notice } from '../components/Notice'
 
 const defaultCreateForm = (): ZevWizardInput => ({
     name: '',
@@ -97,7 +99,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
     const queryClient = useQueryClient()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
-    const { data, isLoading, isError } = useQuery({ queryKey: queryKeys.zev.list(), queryFn: fetchZevs })
+    const { data, isLoading, isError, isFetching, refetch } = useQuery({ queryKey: queryKeys.zev.list(), queryFn: fetchZevs })
 
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editForm, setEditForm] = useState<ZevInput>(getDefaultZevForm())
@@ -396,20 +398,27 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
         if (editingMeteringPointKey === key) closeEditMeteringPoint()
     }
 
+    const header = !embedded ? (
+        <PageHeader
+            eyebrow={t('nav.platformScope')}
+            title={t('pages.zevs.title')}
+            description={t('pages.zevs.description')}
+        />
+    ) : null
+
     if (isLoading)
         return (
             <div className="page-stack">
-                {!embedded && (
-                <header>
-                    <p className="eyebrow">{t('nav.platformScope')}</p>
-                    <h2>{t('pages.zevs.title')}</h2>
-                    <p className="muted">{t('pages.zevs.description')}</p>
-                </header>
-                )}
+                {header}
                 <PageSkeleton variant="table" />
             </div>
         )
-    if (isError) return <div className="card error-banner">{t('common.error')}</div>
+    if (isError) return (
+        <div className="page-stack">
+            {header}
+            <Notice tone="error" onRetry={() => void refetch()} isRetrying={isFetching}>{t('common.error')}</Notice>
+        </div>
+    )
 
     const reviewIban = createForm.bank_iban?.trim() || '–'
     const reviewBankName = createForm.bank_name?.trim()
@@ -422,12 +431,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
 
     return (
         <div className="page-stack">
-{!embedded && (
-            <header>
-                <p className="eyebrow">{t('nav.platformScope')}</p>
-                <h2>{t('pages.zevs.title')}</h2>
-                <p className="muted">{t('pages.zevs.description')}</p>
-            </header>)}
+            {header}
 
             <div className="actions-row actions-row-gap-lg mb-1">
                 {isAdmin ? (

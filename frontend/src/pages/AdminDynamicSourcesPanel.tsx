@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowsRotate, faChartLine, faClockRotateLeft, faEllipsis, faEraser, faMagnifyingGlass, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu } from '../components/ActionMenu'
+import { Toolbar } from '../components/Toolbar'
 import { DataTable, type ColumnDef } from '../components/DataTable'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState'
@@ -264,16 +265,19 @@ export function AdminDynamicSourcesPanel() {
   return (
     <div className="page-stack">
       <section className="card tariff-toolbar">
-        <div className="tariff-toolbar-header">
+        <Toolbar
+          actions={
+            <button className="button button-primary" type="button" onClick={() => setFormSource(null)}>
+              <FontAwesomeIcon icon={faPlus} fixedWidth />
+              {t('pages.dynamicSources.createAction')}
+            </button>
+          }
+        >
           <div>
             <h3>{t('pages.dynamicSources.title')}</h3>
             <p className="muted">{t('pages.dynamicSources.description')}</p>
           </div>
-          <button className="button button-primary" type="button" onClick={() => setFormSource(null)}>
-            <FontAwesomeIcon icon={faPlus} fixedWidth />
-            {t('pages.dynamicSources.createAction')}
-          </button>
-        </div>
+        </Toolbar>
       </section>
 
       {sourcesQuery.isLoading ? <PageSkeleton variant="kpiRow" /> : (

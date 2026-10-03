@@ -29,6 +29,8 @@ import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 import type { Tariff, TariffPeriod, TariffSeries } from '../types/api'
+import { PageHeader } from '../components/PageHeader'
+import { Notice } from '../components/Notice'
 
 const TARIFF_PARAM = 'tariff'
 const VERSION_PARAM = 'version'
@@ -237,29 +239,35 @@ export function TariffsPage() {
         onError: (error) => pushToast(formatApiError(error, t('pages.tariffs.overviewPdf.error')), 'error'),
     })
 
+    const header = (
+        <PageHeader
+            eyebrow={selectedZev?.name}
+            title={t('pages.tariffs.title')}
+            description={t('pages.tariffs.description')}
+        />
+    )
+
     if (seriesQuery.isLoading) {
         return (
             <div className="page-stack">
-                <header>
-                    <h2>{t('pages.tariffs.title')}</h2>
-                    <p className="muted">{t('pages.tariffs.description')}</p>
-                </header>
+                {header}
                 <PageSkeleton variant="table" />
             </div>
         )
     }
 
     if (seriesQuery.isError) {
-        return <div className="card error-banner">{t('common.error')}</div>
+        return (
+            <div className="page-stack">
+                {header}
+                <Notice tone="error" onRetry={() => void seriesQuery.refetch()} isRetrying={seriesQuery.isFetching}>{t('common.error')}</Notice>
+            </div>
+        )
     }
 
     return (
         <div className="page-stack">
-            <header>
-                {selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
-                <h2>{t('pages.tariffs.title')}</h2>
-                <p className="muted">{t('pages.tariffs.description')}</p>
-            </header>
+            {header}
 
             <TariffToolbar
                 tariffCount={tariffs.length}

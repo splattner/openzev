@@ -103,13 +103,7 @@ export function VatSettingsSection() {
 
     return (
         <div className="page-stack">
-            <section
-                style={{
-                    display: 'grid',
-                    gap: '1rem',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                }}
-            >
+            <section className="stat-grid">
                 <StatCard label={t('adminVatSettings.stats.total')} value={vatRates.length} />
                 <StatCard
                     label={t('adminVatSettings.stats.active')}

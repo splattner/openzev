@@ -51,6 +51,8 @@ import {
 import { formatBytes } from '../lib/numbers'
 import { copyToClipboard } from '../lib/clipboard'
 import { downloadBlob } from '../lib/downloadBlob'
+import { PageHeader } from '../components/PageHeader'
+import { Notice } from '../components/Notice'
 
 /**
  * Metering import wizard + history log.
@@ -70,7 +72,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     const { canManage } = useCommunityAccess()
     const { t } = useTranslation()
 
-    const { data, isLoading, isError, error: logsError, refetch: refetchLogs } = useQuery({ queryKey: queryKeys.metering.importLogs(), queryFn: fetchImportLogs })
+    const { data, isLoading, isError, isFetching, error: logsError, refetch: refetchLogs } = useQuery({ queryKey: queryKeys.metering.importLogs(), queryFn: fetchImportLogs })
     const logsErrorDetail = (logsError as { response?: { data?: { error?: string; detail?: string } } } | null)?.response?.data
     const logsErrorMessage = logsErrorDetail?.error || logsErrorDetail?.detail || null
 
@@ -779,40 +781,37 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         })
     }
 
+    const header = !embedded && (
+        <PageHeader
+            eyebrow={selectedZev?.name}
+            title={t('pages.imports.title')}
+            description={t('pages.imports.description')}
+        />
+    )
+
     if (isLoading)
         return embedded ? (
             <PageSkeleton variant="table" />
         ) : (
             <div className="page-stack">
-                <header>
-                    <h2>{t('pages.imports.title')}</h2>
-                    <p className="muted">{t('pages.imports.description')}</p>
-                </header>
+                {header}
                 <PageSkeleton variant="table" />
             </div>
         )
     if (isError)
         return (
-            <div className="card error-banner">
-                <p style={{ margin: '0 0 0.75rem' }}>
+            <div className="page-stack">
+                {header}
+                <Notice tone="error" onRetry={() => void refetchLogs()} isRetrying={isFetching}>
                     {t('pages.imports.loadFailed')}
                     {logsErrorMessage ? ` — ${logsErrorMessage}` : ''}
-                </p>
-                <button className="button button-secondary" type="button" onClick={() => refetchLogs()}>
-                    {t('common.retry')}
-                </button>
+                </Notice>
             </div>
         )
 
     return (
         <div className="page-stack">
-            {!embedded && (
-                <header>
-                    {selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
-                    <h2>{t('pages.imports.title')}</h2>
-                    <p className="muted">{t('pages.imports.description')}</p>
-                </header>
-            )}
+            {header}
 
             {canManage && (
             <section className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
@@ -821,7 +820,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                     <p className="muted" style={{ margin: 0 }}>{t('pages.imports.startDescription')}</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                    <button className="button button-primary" onClick={() => setWizardOpen(true)}>
+                    <button type="button" className="button button-primary" onClick={() => setWizardOpen(true)}>
                         <FontAwesomeIcon icon={faPlus} fixedWidth />
                         {t('pages.imports.actions.newImport')}
                     </button>

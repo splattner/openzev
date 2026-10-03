@@ -1,6 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
+import { Toolbar } from '../../components/Toolbar'
 import { METER_TYPE_OPTIONS } from '../../lib/options'
 import type {
   MeteringPointAssignmentFilter,
@@ -10,8 +11,7 @@ import type {
 } from './useMeteringPointForms'
 
 type MeteringPointsToolbarProps = {
-  canManageMeteringPoints: boolean
-  /** A viewer reads only (#761): no "New metering point". */
+  isManagedScope: boolean
   readOnly?: boolean
   totalCount: number
   activeCount: number
@@ -33,7 +33,7 @@ type MeteringPointsToolbarProps = {
 }
 
 export function MeteringPointsToolbar({
-  canManageMeteringPoints,
+  isManagedScope,
   readOnly = false,
   totalCount,
   activeCount,
@@ -57,7 +57,16 @@ export function MeteringPointsToolbar({
 
   return (
     <section className="card metering-toolbar">
-      <div className="metering-toolbar-header">
+      <Toolbar
+        actions={
+          isManagedScope && !readOnly ? (
+            <button className="button button-primary" type="button" onClick={onOpenCreateModal}>
+              <FontAwesomeIcon icon={faPlus} fixedWidth />
+              {t('pages.meteringPoints.newMeteringPoint')}
+            </button>
+          ) : null
+        }
+      >
         {/* Each chip both reports a count and toggles the matching filter — clicking an
             already-active chip clears just that dimension, so this doubles as "Clear filters"
             when Total is clicked (every dimension reset at once). */}
@@ -82,7 +91,7 @@ export function MeteringPointsToolbar({
             <span className="metering-summary-label">{t('pages.meteringPoints.summary.inactive')}</span>
             <span className="metering-summary-value">{inactiveCount}</span>
           </button>
-          {canManageMeteringPoints && (
+          {isManagedScope && (
             <>
               <button
                 type="button"
@@ -111,14 +120,7 @@ export function MeteringPointsToolbar({
             <span className="metering-summary-value">{needsAttentionCount}</span>
           </button>
         </div>
-
-        {canManageMeteringPoints && !readOnly && (
-          <button className="button button-primary" type="button" onClick={onOpenCreateModal}>
-            <FontAwesomeIcon icon={faPlus} fixedWidth />
-            {t('pages.meteringPoints.newMeteringPoint')}
-          </button>
-        )}
-      </div>
+      </Toolbar>
 
       <div className="metering-filter-grid">
         <label>

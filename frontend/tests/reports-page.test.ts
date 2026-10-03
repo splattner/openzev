@@ -20,6 +20,7 @@ vi.mock('../src/lib/auth', () => ({
 
 vi.mock('../src/lib/managedZev', () => ({
     useManagedZev: () => mockManagedZev(),
+    useOptionalManagedZev: () => mockManagedZev(),
 }))
 
 vi.mock('../src/lib/api/invoices', () => ({
@@ -80,7 +81,7 @@ function mockOwner({ selectedZevId, selectedZev, managedZevs }: {
     managedZevs: Array<{ id: string; name?: string }>
 }) {
     mockAuth.mockReturnValue({ user: { id: 1, role: 'admin' } })
-    mockManagedZev.mockReturnValue({ selectedZevId, selectedZev, managedZevs, isLoading: false })
+    mockManagedZev.mockReturnValue({ selectedZevId, selectedZev, managedZevs, isLoading: false, isError: false, refetch: vi.fn() })
 }
 
 async function click(button: HTMLButtonElement) {
@@ -181,8 +182,11 @@ describe('ReportsPage role branches', () => {
         expect(container.textContent).toContain('pages.reports.documentsTitle')
         expect(container.textContent).toContain('pages.reports.annualStatement.ownerDescription')
         expect(findButton(container, 'pages.reports.annualStatement.prepare')).toBeTruthy()
+        expect(container.querySelector('a[href="/billing/statements"]')).toBeNull()
         expect(container.textContent).not.toContain('pages.reports.selectZevTitle')
         expect(container.textContent).not.toContain('pages.reports.noZevTitle')
+        expect(container.textContent).not.toContain('pages.guest.title')
+        expect(container.textContent).not.toContain('pages.zevs.emptyState.title')
         expect(findButton(container, 'pages.reports.financialSummary.download')).toBeTruthy()
         expect(container.querySelector('#yearly-documents-preview')).toBeNull()
         expect(invoicesApi.downloadAnnualStatement).not.toHaveBeenCalled()
@@ -226,27 +230,34 @@ describe('ReportsPage role branches', () => {
 
 
 
-    it('owner without ZEV shows empty state and no cards', async () => {
+    it('an admin without a ZEV is pointed at ZEV creation instead of cards', async () => {
         mockOwner({ selectedZevId: null, selectedZev: null, managedZevs: [] })
 
         const { container, unmount } = renderReportsPage()
         await flush()
-        expect(container.textContent).toContain('pages.reports.noZevTitle')
+        expect(container.textContent).toContain('pages.zevs.emptyState.title')
+        expect(container.querySelector('a[href="/admin/zevs"]')).toBeTruthy()
+        expect(container.textContent).not.toContain('pages.reports.financialSummary.ownerDescription')
         expect(container.textContent).not.toContain('pages.reports.annualStatement.prepare')
         unmount()
     })
 
-    it('stale ZEV selection shows select-guard and no cards (prevents 403)', async () => {
-        mockOwner({
-            selectedZevId: 'stale-id',
-            selectedZev: undefined,
-            managedZevs: [{ id: 'other-id', name: 'Other' }],
+    it('an owner without a ZEV is told the account is not linked', async () => {
+        mockAuth.mockReturnValue({ user: { id: 1, role: 'user' } })
+        mockManagedZev.mockReturnValue({
+            selectedZevId: '',
+            selectedZev: null,
+            managedZevs: [],
+            isLoading: false,
+            isError: false,
+            refetch: vi.fn(),
         })
 
         const { container, unmount } = renderReportsPage()
         await flush()
-        expect(container.textContent).toContain('pages.reports.selectZevTitle')
-        expect(container.textContent).not.toContain('pages.reports.annualStatement.prepare')
+        expect(container.textContent).toContain('pages.guest.title')
+        expect(container.textContent).toContain('pages.guest.description')
+        expect(container.textContent).not.toContain('pages.reports.financialSummary.ownerDescription')
         unmount()
     })
 })

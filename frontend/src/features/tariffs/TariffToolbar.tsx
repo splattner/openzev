@@ -1,6 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faDownload, faFilePdf, faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
+import { Toolbar } from '../../components/Toolbar'
 
 export type TariffValidityFilter = 'valid' | 'all'
 
@@ -12,7 +13,6 @@ type TariffToolbarProps = {
   validityFilter: TariffValidityFilter
   onValidityFilterChange: (value: TariffValidityFilter) => void
   onOpenCreateTariffModal: () => void
-  /** A viewer reads only (#761): no "New tariff". */
   readOnly?: boolean
   /** Absent when no single ZEV is selected — an import needs one target. */
   onOpenImportModal?: () => void
@@ -38,7 +38,35 @@ export function TariffToolbar({
 
   return (
     <section className="card tariff-toolbar">
-      <div className="tariff-toolbar-header">
+      <Toolbar
+        actions={!readOnly || onOpenImportModal || onDownloadOverview ? (
+          <>
+            {onOpenImportModal && (
+              <button type="button" className="button button-secondary" onClick={onOpenImportModal}>
+                <FontAwesomeIcon icon={faDownload} fixedWidth />
+                {t('pages.tariffs.import.action')}
+              </button>
+            )}
+            {onDownloadOverview && (
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={onDownloadOverview}
+                disabled={overviewBusy}
+              >
+                <FontAwesomeIcon icon={faFilePdf} fixedWidth />
+                {overviewBusy ? t('pages.tariffs.overviewPdf.busy') : t('pages.tariffs.overviewPdf.action')}
+              </button>
+            )}
+            {!readOnly && (
+              <button className="button button-primary" type="button" onClick={onOpenCreateTariffModal}>
+                <FontAwesomeIcon icon={faPlus} fixedWidth />
+                {t('pages.tariffs.newTariff')}
+              </button>
+            )}
+          </>
+        ) : null}
+      >
         <div className="tariff-summary" aria-label={t('pages.tariffs.summaryLabel')}>
           <span className="tariff-summary-stat">
             <span className="tariff-summary-label">{t('pages.tariffs.summary.total')}</span>
@@ -57,32 +85,7 @@ export function TariffToolbar({
             <span className="tariff-summary-value">{periodCount}</span>
           </span>
         </div>
-
-        <div className="actions-row actions-row-wrap">
-          {onOpenImportModal && (
-            <button className="button button-secondary" onClick={onOpenImportModal}>
-              <FontAwesomeIcon icon={faDownload} fixedWidth />
-              {t('pages.tariffs.import.action')}
-            </button>
-          )}
-          {onDownloadOverview && (
-            <button
-              className="button button-secondary"
-              onClick={onDownloadOverview}
-              disabled={overviewBusy}
-            >
-              <FontAwesomeIcon icon={faFilePdf} fixedWidth />
-              {overviewBusy ? t('pages.tariffs.overviewPdf.busy') : t('pages.tariffs.overviewPdf.action')}
-            </button>
-          )}
-          {!readOnly && (
-            <button className="button button-primary" onClick={onOpenCreateTariffModal}>
-              <FontAwesomeIcon icon={faPlus} fixedWidth />
-              {t('pages.tariffs.newTariff')}
-            </button>
-          )}
-        </div>
-      </div>
+      </Toolbar>
 
       <div className="tariff-filter-grid">
         <label>

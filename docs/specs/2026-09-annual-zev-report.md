@@ -77,9 +77,9 @@ agrees with both.
   unknown or malformed id → `404 {"error": "ZEV not found."}`, a ZEV owned by
   someone else → `403 {"error": "Permission denied."}`.
 - Frontend: `/reports` stays open to any authenticated user. The report and
-  both document cards render only on the `admin`/`zev_owner` branch with a
-  valid selected ZEV (`hasValidZev`). Otherwise `ReportsEmptyState` shows, as
-  before.
+  both document cards render on the admin/manager/viewer branch, gated by
+  the [ScopeGuard contract](2026-04-frontend-management-page-design.md#41-shared-components).
+  Participant views render their own document tabs.
 - `/billing/statements` is now `<AliasNavigate to="/reports" />` without a
   `ProtectedRoute`. A participant following an old link lands on their own
   Reports branch.

@@ -170,6 +170,10 @@ export const it = {
             previous: 'Pagina precedente',
             next: 'Pagina successiva',
         },
+        scopeGuard: {
+            loadFailed: 'Impossibile caricare i tuoi RCP.',
+            refreshFailed: 'Impossibile aggiornare i tuoi RCP. Viene mostrata l\'ultima selezione caricata.',
+        },
         error: 'Qualcosa è andato storto.',
         retry: 'Riprova',
         language: 'Lingua',
@@ -983,6 +987,7 @@ export const it = {
             title: 'Calcolatore di fattibilità CEL',
             description: 'Stima se la costituzione di un CEL ne vale la pena, ancora prima di disporre di dati di misurazione — confrontato con l’immissione totale in rete.',
             disabled: 'Il calcolatore di fattibilità non è attivo su questa istanza. Un amministratore può attivarlo in Piattaforma → Impostazioni → Funzioni.',
+            checkFailed: 'Impossibile verificare la disponibilità del calcolatore.',
             form: {
                 systemTitle: 'Impianto & energia',
                 energyInputModeAggregate: 'Aggregato',
@@ -1083,11 +1088,9 @@ export const it = {
         invoices: {
             title: 'Fatture',
             description: 'Gestisci i periodi di fatturazione e le fatture per il RCP selezionato.',
-            selectZev: 'Seleziona un RCP per gestire i periodi di fatturazione.',
             prevPeriod: 'Periodo precedente',
             nextPeriod: 'Periodo successivo',
             billingInterval: 'Intervallo di fatturazione:',
-            loading: 'Caricamento del riepilogo del periodo…',
             failed: 'Caricamento del riepilogo del periodo non riuscito.',
             col: {
                 participant: 'Partecipante',
@@ -1913,7 +1916,6 @@ export const it = {
         accounts: {
             title: 'Account',
             description: 'Tutti gli account della piattaforma, le comunità a cui appartengono e come accedono.',
-            loading: 'Caricamento di account e partecipanti…',
             loadFailed: 'Impossibile caricare i dati di gestione degli account.',
             col: {
                 account: 'Account',
@@ -2347,7 +2349,6 @@ export const it = {
             switchWithoutSaving: 'Cambia senza salvare',
             unsavedGuardLeaveMessage: 'Uscendo dalle impostazioni si perdono le modifiche non salvate.',
             leaveWithoutSaving: 'Esci senza salvare',
-            selectZev: 'Seleziona un RCP dal selettore globale per modificare le impostazioni.',
             emailTemplateTitle: 'Modello e-mail fattura',
             emailInheritanceOnSave: 'Il predefinito della piattaforma verrà applicato dopo il salvataggio delle impostazioni.',
             emailCustomize: 'Personalizza',
@@ -2511,8 +2512,6 @@ export const it = {
             hourly: 'Oraria',
             daily: 'Giornaliera',
             monthly: 'Mensile',
-            noZev: 'Nessun RCP disponibile per il tuo account.',
-            selectZev: 'Seleziona un RCP dal selettore globale nella barra laterale.',
             failedAnalytics: 'Impossibile caricare i dati di misurazione.',
             stats: {
                 producedInZev: 'Prodotto nel RCP',
@@ -2560,6 +2559,7 @@ export const it = {
                 description: 'Consumo orario medio nel periodo di fatturazione — suddiviso tra energia locale CEE e importazione dalla rete.',
             },
             invoicesSection: 'Fatture',
+            invoicesAllCommunitiesSection: 'Fatture di tutti i RCP',
             failedInvoices: 'Impossibile caricare le fatture.',
             cockpit: {
                 title: 'Cockpit di fatturazione',
@@ -2659,10 +2659,6 @@ export const it = {
             preparingDocument: 'Preparazione di {{document}} per {{year}}…',
             documentTitle: '{{document}} — {{year}}',
             documentTabs: 'Documenti annuali',
-            selectZevTitle: 'Nessun RCP selezionato',
-            selectZevDescription: 'Seleziona un RCP nella barra laterale per generare i rapporti.',
-            noZevTitle: 'Nessun RCP disponibile',
-            noZevDescription: 'Non c\'è nessun RCP per il tuo account. I rapporti saranno disponibili non appena il tuo account sarà collegato a un RCP.',
             annualStatement: {
                 title: 'Rendiconto annuale',
                 description: 'Un riepilogo annuale del tuo consumo energetico, fatture e risparmi.',
@@ -3104,7 +3100,8 @@ export const it = {
         dataCompleteness: 'Completezza dei dati',
         status: 'Stato',
         gaps: 'Giorni mancanti',
-        noData: 'Nessun punto di misurazione disponibile',
+        noData: 'Nessun punto di misurazione per questa selezione',
+        noDataDescription: 'I controlli di qualità sono disponibili quando questa selezione include punti di misurazione.',
         noGaps: 'Completo',
         severityGreen: 'Completo',
         severityYellow: 'Parziale',

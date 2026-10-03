@@ -120,7 +120,13 @@ resolution or how many readings were expected. A meter that has never
 received a single reading still appears here — as Missing at 0%.
 
 Each card is also a filter: click one to narrow the table below to only that
-severity, and click the active card again to clear the filter.
+severity, and click the active card again to clear the filter. The number's
+color indicates severity; an outline marks the selected filter. Use **Tab** to
+reach a card and **Enter** or **Space** to toggle it.
+
+If the selection contains no metering points, use the **Metering Points** link
+to inspect them. Managers can add points there; viewers can ask a manager to
+add them. A point with no readings appears in the **Missing** group.
 
 ### Status Table
 

@@ -32,6 +32,7 @@ import { FormModal } from '../components/FormModal'
 import { BackupSettingsSection } from '../features/backups/BackupSettingsSection'
 import { MfaPolicySection } from '../features/settings/MfaPolicySection'
 import { VatSettingsSection } from '../features/settings/VatSettingsSection'
+import { PageHeader } from '../components/PageHeader'
 
 type SystemSettingsTab = 'regional' | 'features' | 'oauth' | 'security' | 'vat' | 'backup'
 
@@ -227,11 +228,11 @@ export function AdminSystemSettingsPage() {
 
     return (
         <div className="page-stack">
-            <header>
-                <p className="eyebrow">{t('nav.platformScope')}</p>
-                <h2>{t('adminSystemSettings.title')}</h2>
-                <p className="muted">{t('adminSystemSettings.description')}</p>
-            </header>
+            <PageHeader
+                eyebrow={t('nav.platformScope')}
+                title={t('adminSystemSettings.title')}
+                description={t('adminSystemSettings.description')}
+            />
 
             <Tabs
                 classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}

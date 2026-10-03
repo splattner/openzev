@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { InvoicesPage } from './InvoicesPage'
 import { BillingEmailsPage } from './BillingEmailsPage'
+import { PageHeader } from '../components/PageHeader'
 
 /**
  * Billing hub: tabs are routes — Invoices · Email delivery — each with its
@@ -32,11 +33,11 @@ export function BillingHubPage({ tab }: { tab: BillingTab }) {
 
     return (
         <div className="page-stack">
-            <header>
-                {selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
-                <h2>{t('nav.billing')}</h2>
-                <p className="muted">{t('pages.billingHub.description')}</p>
-            </header>
+            <PageHeader
+                eyebrow={selectedZev?.name}
+                title={t('nav.billing')}
+                description={t('pages.billingHub.description')}
+            />
 
             <Tabs
                 classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}

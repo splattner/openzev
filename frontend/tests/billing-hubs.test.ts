@@ -12,10 +12,13 @@ const api = vi.hoisted(() => ({
     history: vi.fn(),
 }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
-vi.mock('../src/lib/managedZev', () => ({ useManagedZev: () => ({
-    selectedZevId: 'z1', selectedZev: { id: 'z1', name: 'ZEV', start_date: '2025-01-01', billing_interval: 'monthly' },
-    relation: 'manager',
-}) }))
+vi.mock('../src/lib/managedZev', () => {
+    const context = { useManagedZev: () => ({
+        selectedZevId: 'z1', selectedZev: { id: 'z1', name: 'ZEV', start_date: '2025-01-01', billing_interval: 'monthly' },
+        relation: 'manager',
+    }) }
+    return { ...context, useOptionalManagedZev: context.useManagedZev }
+})
 vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ user: { role: 'user' } }) }))
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: vi.fn() }) }))
 vi.mock('../src/lib/appSettings', () => ({
@@ -95,7 +98,7 @@ describe('Billing hub interactions', () => {
     it('keeps invoice alerts visible when period readiness fails', async () => {
         api.readiness.mockRejectedValue(new Error('Unavailable'))
         const { container } = await mount(() => createElement(BillingPeriodsPage, {
-            attentionQuery: { isLoading: false, isError: false, data: [{
+            attentionQuery: { refetch: vi.fn(), isLoading: false, isError: false, data: [{
                 id: 'overdue:1', type: 'invoice_overdue', label: 'API fallback',
                 invoice_id: '1', invoice_number: 'INV-1',
                 period: { start: '2026-06-01', end: '2026-06-30' },
@@ -103,21 +106,31 @@ describe('Billing hub interactions', () => {
             }] },
         }))
         expect(container.textContent).toContain('pages.billingPeriods.failed')
+        expect(container.querySelector('.error-banner')?.getAttribute('role')).toBe('alert')
         expect(container.querySelectorAll('.overview-period-card')).toHaveLength(1)
         expect(container.querySelector('.overview-period-card > a')?.getAttribute('href'))
             .toBe('/billing/invoices?period_start=2026-06-01&period_end=2026-06-30')
         expect(container.textContent).not.toContain('pages.overview.cards.upToDate')
+        api.readiness.mockResolvedValue([])
+        await act(async () => container.querySelector<HTMLButtonElement>('.error-banner button')!.click())
+        await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+        expect(api.readiness).toHaveBeenCalledTimes(2)
+        expect(container.querySelector('.error-banner')).toBeNull()
     })
 
     it('does not declare periods completed when the alert query failed', async () => {
+        const refetch = vi.fn()
         api.readiness.mockResolvedValue([{
             period: { start: '2026-06-01', end: '2026-06-30', ended: true },
             steps: [], next_action: 'none',
         }])
         const { container } = await mount(() => createElement(BillingPeriodsPage, {
-            attentionQuery: { isLoading: false, isError: true },
+            attentionQuery: { refetch, isLoading: false, isError: true },
         }))
         expect(container.textContent).toContain('pages.dashboard.attention.failed')
+        expect(container.querySelector('.error-banner')?.getAttribute('role')).toBe('alert')
+        act(() => container.querySelector<HTMLButtonElement>('.error-banner button')!.click())
+        expect(refetch).toHaveBeenCalledOnce()
         expect(container.querySelector('.overview-period-history')).toBeNull()
         expect(container.querySelector('.overview-caught-up')).toBeNull()
     })
@@ -128,7 +141,7 @@ describe('Billing hub interactions', () => {
             steps: [], next_action: 'none',
         }])
         const { container } = await mount(() => createElement(BillingPeriodsPage, {
-            attentionQuery: { isLoading: false, isError: false, data: [] },
+            attentionQuery: { refetch: vi.fn(), isLoading: false, isError: false, data: [] },
         }))
         expect(container.querySelector('.overview-caught-up')).not.toBeNull()
         expect(container.querySelector('details')?.open).toBe(false)

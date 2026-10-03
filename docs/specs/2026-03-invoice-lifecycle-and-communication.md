@@ -1005,12 +1005,22 @@ historical alerts, ordering, running periods, independent community notices,
 invoice deduplication, backend-selected actions and delivery count deduplication.
 The former `/billing/periods` route still redirects to Overview.
 
+InvoicesPage keeps its standalone title outside ScopeGuard; embedded billing
+content inherits the hub title. Unresolved period dates and initial overview
+queries render a table skeleton, before any confirmed empty result.
+BillingEmailsPage keeps ScopeGuard mounted while its invoice query loads or
+fails, so cached-scope warnings and retry remain available.
+
 `BillingEmailsPage` requests the selected ZEV's `approved,sent,paid` invoice
 list with one local filter (`all`, `failed`, `pending`, `sent`). It is the
 canonical email-history surface: **View history** loads `fetchEmailLogs` on
-demand into `EmailLogsModal`; the invoice table itself shows only the latest
-delivery-state badge. Failed latest attempts with `last_email_log_id` expose
-Retry. Buttons are disabled during the request; success invalidates invoice
+demand into `EmailLogsModal`; only the latest history request may update
+the modal. Changing account/community clears history and invalidates pending
+history requests. Pending delivery retries keep their original invoice/log IDs;
+completion after an account/community change does not notify or invalidate the
+new view. This does not cancel a retry accepted by the server. The invoice table
+shows the latest delivery-state badge.
+Failed latest attempts with `last_email_log_id` expose Retry. Buttons are disabled during the request; success invalidates invoice
 queries. While the tab stays mounted, an accepted retry is displayed as
 pending until the worker creates a new latest log, preventing repeat clicks on
 the old failed attempt. Polling runs every 3 seconds while a log or an accepted

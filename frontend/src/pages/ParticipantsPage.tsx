@@ -37,6 +37,8 @@ import { todayBusinessIso } from '../lib/dates'
 import { formatParticipantName } from '../lib/participantFormat'
 import { getTitleLabelMap } from '../lib/participantTitle'
 import type { Participant, ParticipantInput } from '../types/api'
+import { PageHeader } from '../components/PageHeader'
+import { Notice } from '../components/Notice'
 
 function getParticipantValidityState(participant: Participant, todayIso: string): ParticipantValidityState {
     if (participant.valid_from > todayIso) return 'upcoming'
@@ -59,7 +61,7 @@ export function ParticipantsPage() {
     const { isZevScope, canManage } = useCommunityAccess()
     const isManagedScope = isZevScope
     const accountLinking = useParticipantAccountLinking({ isAdmin: user?.role === 'admin', confirm })
-    const { data, isLoading, isError } = useQuery({
+    const { data, isLoading, isError, isFetching, refetch } = useQuery({
         queryKey: queryKeys.zev.participants(selectedZevId || undefined),
         queryFn: fetchParticipants,
     })
@@ -262,17 +264,27 @@ export function ParticipantsPage() {
         ].filter(Boolean).join(', ')
     }
 
+    const header = (
+        <PageHeader
+            eyebrow={selectedZev?.name}
+            title={t('pages.participants.title')}
+            description={t('pages.participants.description')}
+        />
+    )
+
     if (isLoading)
         return (
             <div className="page-stack">
-                <header>
-                    <h2>{t('pages.participants.title')}</h2>
-                    <p className="muted">{t('pages.participants.description')}</p>
-                </header>
+                {header}
                 <PageSkeleton variant="cardList" />
             </div>
         )
-    if (isError) return <div className="card error-banner">{t('common.error')}</div>
+    if (isError) return (
+        <div className="page-stack">
+            {header}
+            <Notice tone="error" onRetry={() => void refetch()} isRetrying={isFetching}>{t('common.error')}</Notice>
+        </div>
+    )
 
     const participants = (data ?? []).filter((participant) => !isManagedScope || !selectedZevId || participant.zev === selectedZevId)
     const editingParticipant = participants.find((participant) => participant.id === editingId)
@@ -343,11 +355,7 @@ export function ParticipantsPage() {
 
     return (
         <div className="page-stack">
-            <header>
-                {selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
-                <h2>{t('pages.participants.title')}</h2>
-                <p className="muted">{t('pages.participants.description')}</p>
-            </header>
+            {header}
 
             {onboardingNotice && <ParticipantOnboardingNotice notice={onboardingNotice} onDismiss={() => setOnboardingNotice(null)} />}
 

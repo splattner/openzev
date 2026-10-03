@@ -23,9 +23,12 @@ vi.mock('../src/lib/auth', () => ({
 }))
 
 const mockSetSelectedZevId = vi.fn()
-vi.mock('../src/lib/managedZev', () => ({
-    useManagedZev: () => ({ selectedZevId: '', setSelectedZevId: mockSetSelectedZevId }),
-}))
+vi.mock('../src/lib/managedZev', () => {
+    const context = {
+        useManagedZev: () => ({ selectedZevId: '', setSelectedZevId: mockSetSelectedZevId }),
+    }
+    return { ...context, useOptionalManagedZev: context.useManagedZev }
+})
 
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async (importOriginal) => ({

@@ -1,5 +1,5 @@
 import { useAuth } from './auth'
-import { useManagedZev } from './managedZev'
+import { useOptionalManagedZev } from './managedZev'
 import { relationOf, type CommunityRelation } from './membership'
 import type { User } from '../types/api'
 
@@ -41,34 +41,13 @@ export function accessFor(shellRole: ShellRole): CommunityAccess {
     }
 }
 
-// Both providers always wrap the app shell. A page rendered outside them (an
-// isolated component test) gets no answer from the throwing hooks; reading
-// them through these keeps the hook order fixed and lets the fallbacks apply.
-function useAuthIfProvided() {
-    try {
-        return useAuth()
-    } catch {
-        return undefined
-    }
-}
-
-function useManagedZevIfProvided() {
-    try {
-        return useManagedZev()
-    } catch {
-        return undefined
-    }
-}
-
 /**
- * The signed-in account's access to the selected community. Outside the auth
- * provider (nothing to restrict against) it answers as for a manager — the
- * old behaviour of every management page; the backend enforces access anyway.
+ * The signed-in account's access to the selected community.
  */
 export function useCommunityAccess(): CommunityAccess {
-    const auth = useAuthIfProvided()
-    const managed = useManagedZevIfProvided()
-    if (!auth) return accessFor('manager')
+    const auth = useAuth()
+    // The outer authentication route runs before ManagedZevProvider mounts.
+    const managed = useOptionalManagedZev()
     return accessFor(shellRoleFor(auth.user, managed?.relation))
 }
 

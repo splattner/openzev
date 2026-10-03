@@ -1,5 +1,6 @@
+import { waitForCondition } from './helpers/waitForCondition'
 import { createRoot } from 'react-dom/client'
-import { act, createElement, useEffect } from 'react'
+import { act, createElement, StrictMode, useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchZevs } from '../src/lib/api/zev'
@@ -249,7 +250,7 @@ describe('ManagedZevProvider selection persistence', () => {
                     createElement(
                         QueryClientProvider,
                         { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
-                        createElement(ManagedZevProvider, null, createElement(Harness)),
+                        createElement(StrictMode, null, createElement(ManagedZevProvider, null, createElement(Harness))),
                     ),
                 )
             })
@@ -302,6 +303,48 @@ describe('ManagedZevProvider selection persistence', () => {
         await resolveTwoZevs()
 
         expect(latest.current?.selectedZevId).toBe('own1')
+    })
+
+    it('reconciles a stale management membership to a remaining readable community', async () => {
+        authState.current = { ...account(), preferred_zev: 'own1' }
+        deferFetch()
+        const { latest } = renderProvider()
+        await resolveTwoZevs()
+        act(() => latest.current?.setSelectedZevId('own1'))
+        vi.mocked(fetchZevs).mockResolvedValue([fullZev('own2', 1)])
+        act(() => latest.current?.refetch())
+        await waitForCondition(() => latest.current?.selectedZevId === 'own2', 'remaining community')
+        expect(latest.current?.selectedZevId).toBe('own2')
+        expect(latest.current?.entries.map(entry => entry.id)).toEqual(['own2'])
+        expect(authState.current.memberships).toHaveLength(2)
+    })
+
+    it('keeps cached management memberships on a failed refetch', async () => {
+        authState.current = { ...account(), preferred_zev: 'own1' }
+        deferFetch()
+        const { latest } = renderProvider()
+        await resolveTwoZevs()
+        vi.mocked(fetchZevs).mockRejectedValue(new Error('Refresh failed'))
+        act(() => latest.current?.refetch())
+        await waitForCondition(() => latest.current?.isError === true, 'scope refresh failure')
+        expect(latest.current?.isError).toBe(true)
+        expect(latest.current?.selectedZevId).toBe('own1')
+        expect(latest.current?.entries.map(entry => entry.id)).toEqual(['own1', 'own2'])
+    })
+
+    it('retains participant scope without a readable management record', async () => {
+        authState.current = { ...account([
+            managing('own1'),
+            { zev: 'own2', zev_name: 'own2', zev_disabled: false, access: null,
+                participants: [{ id: 'p2', valid_from: '2026-01-01', valid_to: null, live: true }] },
+        ]), preferred_zev: 'own2' }
+        vi.mocked(fetchZevs).mockResolvedValue([fullZev('own1', 1)])
+        const { latest } = renderProvider()
+        await waitForCondition(() => latest.current?.relation === 'participant', 'participant scope')
+        expect(latest.current?.selectedZevId).toBe('own2')
+        expect(latest.current?.relation).toBe('participant')
+        expect(latest.current?.selectedZev).toBeNull()
+        expect(latest.current?.entries.map(entry => entry.id)).toEqual(['own1', 'own2'])
     })
 
     it('ignores an account preference for a ZEV that is no longer managed', async () => {
