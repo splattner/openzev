@@ -509,15 +509,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#managers-zev-owners" class="md-nav__link">
+  <a href="#managers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Managers (ZEV Owners)
+        Managers
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Managers (ZEV Owners)">
+    <nav class="md-nav" aria-label="Managers">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1956,15 +1956,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#managers-zev-owners" class="md-nav__link">
+  <a href="#managers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Managers (ZEV Owners)
+        Managers
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Managers (ZEV Owners)">
+    <nav class="md-nav" aria-label="Managers">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2465,7 +2465,7 @@ rent a flat in another, or be a tenant in two communities.</p>
 <tbody>
 <tr>
 <td><strong>Manager</strong></td>
-<td>Everything a ZEV owner can do: participants, metering, tariffs, invoices, settings, and giving others access</td>
+<td>Everything in the community: participants, metering, tariffs, invoices, settings, and giving others access</td>
 </tr>
 <tr>
 <td><strong>Issuer</strong> or <strong>representative</strong></td>
@@ -2522,10 +2522,10 @@ role. Participants get theirs by being linked to a participant entry.</p>
 <blockquote>
 <p><strong>Important:</strong> Give admin access sparingly. It grants unrestricted power.</p>
 </blockquote>
-<h2 id="managers-zev-owners">Managers (ZEV Owners)<a class="headerlink" href="#managers-zev-owners" title="Permanent link">&para;</a></h2>
-<p>A <strong>manager</strong> runs a community. The ZEV's owner is always a manager; other
-managers — a property management company, a co-owner — get access under
-<strong>ZEV settings → People &amp; access</strong>.</p>
+<h2 id="managers">Managers<a class="headerlink" href="#managers" title="Permanent link">&para;</a></h2>
+<p>A <strong>manager</strong> runs a community. Its issuer and its representative are
+managers through their role; anyone else — a co-owner, a bookkeeper — gets
+manager access under <strong>ZEV settings → People &amp; access</strong>.</p>
 <h3 id="manager-capabilities">Manager Capabilities<a class="headerlink" href="#manager-capabilities" title="Permanent link">&para;</a></h3>
 <p><strong>Per managed ZEV:</strong></p>
 <ul>
@@ -2603,7 +2603,7 @@ file, which does start a normal participant session with the ordinary
 participant scoping above. The requester never names the destination address —
 the invoice identifies who they are — so there is no way to use it to find out
 whether an address has an account.</p>
-<p>A ZEV owner or admin can revoke any printed link; see
+<p>A manager or admin can revoke any printed link; see
 <a href="../09-invoice-management/#participant-access-links">Invoice Management → Participant access links</a>.</p>
 <h2 id="accounts-without-a-community">Accounts Without a Community<a class="headerlink" href="#accounts-without-a-community" title="Permanent link">&para;</a></h2>
 <p>An account that is neither a manager, a viewer nor a participant anywhere has
@@ -2619,7 +2619,7 @@ admin.</p>
 <tr>
 <th>Feature</th>
 <th>Admin</th>
-<th>Manager (ZEV Owner)</th>
+<th>Manager</th>
 <th>Viewer</th>
 <th>Participant</th>
 </tr>
@@ -2696,7 +2696,9 @@ each:</p>
 <ul>
 <li><strong>Account</strong> — name, username, email and the account's <strong>platform role</strong>.</li>
 <li><strong>Communities</strong> — one chip per community the account belongs to, marked
-  <em>Manager</em>, <em>Viewer</em>, <em>Participant</em> or <em>Former participant</em>. An account that belongs to several communities
+  <em>Manager</em>, <em>Viewer</em>, <em>Participant</em> or <em>Former participant</em>. A manager through a
+  role says which: <em>Manager · Issuer</em> or <em>Manager · Representative</em>. An account
+  that belongs to several communities
   still has a single row. Click a chip to open that community's Participants
   page.</li>
 <li><strong>Security</strong> — which second factors the account has (authenticator app,
@@ -2767,8 +2769,9 @@ belongs to:</p>
   let you deactivate yourself, since it would sign you out with no way back in
   except another administrator.</li>
 <li><strong>Delete</strong> — only available for accounts that do not belong to a community.
-  Unlink the account from its participant first; an owner's account cannot be
-  deleted while it owns a community.</li>
+  Unlink the account from its participant first. An account that is a
+  community's last manager cannot be deleted either: give someone else manager
+  access first.</li>
 </ul>
 <h2 id="data-privacy-and-scoping">Data Privacy and Scoping<a class="headerlink" href="#data-privacy-and-scoping" title="Permanent link">&para;</a></h2>
 <p>OpenZEV enforces data boundaries:</p>
@@ -2792,7 +2795,7 @@ belongs to:</p>
 <li>What changed (old → new values)</li>
 </ul>
 <p>Audit logs are visible to <strong>admins</strong> (all events, <strong>Platform → Overview →
-Audit log</strong>) and to <strong>ZEV owners</strong> for their own communities (scoped events,
+Audit log</strong>) and to <strong>managers</strong> for their own communities (scoped events,
 <strong>Setup → Settings → Audit log</strong>).</p>
 <h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
 <p><strong>Principle of Least Privilege:</strong></p>
@@ -2888,7 +2891,7 @@ it takes a few extra steps. Under <strong>My Account → Profile → Email addre
 link works once, and stops working if your password or address changes before you use it.</p>
 <p>Accounts that have no password — participants, who sign in with emailed links, and accounts that
 only use an external identity provider — cannot do this themselves. For participants the address is
-maintained by the community owner on the participant record; an administrator can change any
+maintained by the community's managers on the participant record; an administrator can change any
 account's address under <strong>Platform → Accounts → Edit</strong>.</p>
 <h3 id="signing-out-other-devices">Signing out other devices<a class="headerlink" href="#signing-out-other-devices" title="Permanent link">&para;</a></h3>
 <p>Under <strong>My Account → Security → Sessions</strong>, <strong>Sign out other devices</strong> ends every session except the
@@ -2949,11 +2952,11 @@ access under <strong>ZEV settings → People &amp; access</strong>.</p>
 <ol>
 <li>Check the account under <strong>Platform → Accounts → Users</strong>: is it active, and
    has it ever signed in?</li>
-<li><strong>Participant:</strong> the community owner sends or copies the onboarding link
+<li><strong>Participant:</strong> a manager of the community sends or copies the onboarding link
    again from the participant's card (<strong>More</strong>). It signs them in, and they
    choose a new password.</li>
 <li>
-<p><strong>Owner or admin who forgot their password:</strong> someone with server access
+<p><strong>Manager or admin who forgot their password:</strong> someone with server access
    sets a new one on the command line (the user then signs in with it):</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>backend<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>changepassword<span class="w"> </span>&lt;username&gt;
 </code></pre></div>

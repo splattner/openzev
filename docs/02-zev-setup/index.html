@@ -628,10 +628,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#option-a-self-registration-zev-owner" class="md-nav__link">
+  <a href="#option-a-self-registration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option A: Self-Registration (ZEV Owner)
+        Option A: Self-Registration
       
     </span>
   </a>
@@ -1690,10 +1690,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#option-a-self-registration-zev-owner" class="md-nav__link">
+  <a href="#option-a-self-registration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option A: Self-Registration (ZEV Owner)
+        Option A: Self-Registration
       
     </span>
   </a>
@@ -2019,8 +2019,8 @@
 </ul>
 <h2 id="creating-a-zev">Creating a ZEV<a class="headerlink" href="#creating-a-zev" title="Permanent link">&para;</a></h2>
 <p>There are two ways to create a ZEV:</p>
-<h3 id="option-a-self-registration-zev-owner">Option A: Self-Registration (ZEV Owner)<a class="headerlink" href="#option-a-self-registration-zev-owner" title="Permanent link">&para;</a></h3>
-<p>New ZEV owners can register themselves and create their ZEV without admin involvement.</p>
+<h3 id="option-a-self-registration">Option A: Self-Registration<a class="headerlink" href="#option-a-self-registration" title="Permanent link">&para;</a></h3>
+<p>New users can register themselves and create their ZEV without admin involvement.</p>
 <p><strong>Step 1: Register on the login page</strong></p>
 <ol>
 <li>Go to the login page</li>
@@ -2058,7 +2058,7 @@ it off under <strong>Platform → System Settings → Functions</strong>).</p>
 </ul>
 </li>
 <li>Click <strong>Create ZEV &amp; finish</strong></li>
-<li>You are redirected to the dashboard as the owner of your new ZEV</li>
+<li>You are redirected to the dashboard as the issuer and manager of your new ZEV</li>
 </ol>
 <blockquote>
 <p><strong>Note:</strong> A self-registered account may set up a ZEV of its own, and becomes its manager. It can create one ZEV this way; to run more, an admin creates them or another manager gives access.</p>
@@ -2067,7 +2067,7 @@ it off under <strong>Platform → System Settings → Functions</strong>).</p>
 <h3 id="option-b-admin-created-zev-with-responsible-person-wizard">Option B: Admin-Created ZEV (with Responsible Person Wizard)<a class="headerlink" href="#option-b-admin-created-zev-with-responsible-person-wizard" title="Permanent link">&para;</a></h3>
 <p>Admins can create a ZEV together with a new responsible-person account in a single wizard. See <a href="../14-admin-console/#zev-management">Platform → Overview → ZEVs</a> for details.</p>
 <h2 id="zev-settings">ZEV Settings<a class="headerlink" href="#zev-settings" title="Permanent link">&para;</a></h2>
-<p><strong>ZEV Owners</strong> configure their community in <strong>ZEV Settings</strong> (sidebar entry
+<p><strong>Managers</strong> configure their community in <strong>ZEV Settings</strong> (sidebar entry
 <strong>Setup → Settings</strong>, <code>/zev-settings</code>). The settings are organized into tabs:</p>
 <ul>
 <li><strong>General</strong> — name, start date, ZEV type, grid connection</li>
@@ -2211,8 +2211,10 @@ always name whoever held a role on their own date:</p>
   so until one is set.</li>
 <li><strong>Add landowner</strong> adds a party from a date; <strong>End</strong> sets a landowner's last
   day. Ending a role before it started removes it.</li>
-<li>The owner of a ZEV created through self-registration or the admin wizard is
-  its issuer and a landowner from the start date.</li>
+<li>Whoever a ZEV is created for — through self-registration or the admin
+  wizard — is its issuer and a landowner from the start date, and manages it
+  through the issuer role. A ZEV that starts later gives them manager access
+  until the start date, so they can set it up beforehand.</li>
 </ul>
 <h4 id="access-on-each-row">Access on each row<a class="headerlink" href="#access-on-each-row" title="Permanent link">&para;</a></h4>
 <p>Every person on the tab shows its access to OpenZEV on its own row:</p>
@@ -2431,7 +2433,7 @@ is still a draft) if you want it in the new shape.</p>
 <p>The QR sits on the insights page and never on a sheet carrying the QR-Rechnung, so the two codes cannot be confused; it is smaller and captioned "this is not a payment code" in all four languages. An invoice with no consumption gets no QR, because there would be nothing to show.</p>
 <p>From the page, <strong>Send me a sign-in link</strong> emails a one-time link to the address you have on file for that participant, which opens the ordinary participant portal. The requester never gets to say where it goes — the invoice identifies them — and nobody sets a password at any point.</p>
 <h3 id="email-templates">Email Templates<a class="headerlink" href="#email-templates" title="Permanent link">&para;</a></h3>
-<p><strong>ZEV Owners</strong> can customize invoice email templates in <strong>ZEV Settings → Documents &amp; emails</strong>:</p>
+<p><strong>Managers</strong> can customize invoice email templates in <strong>ZEV Settings → Documents &amp; emails</strong>:</p>
 <p><img alt="Document and email settings" src="../screenshots/06c-zev-documents-settings.png" /></p>
 <ul>
 <li><strong>Subject line</strong> — Email subject sent with invoices</li>
@@ -2479,7 +2481,7 @@ staged edit. <strong>Use platform default</strong> takes effect after <strong>Sa
 <h2 id="data-ownership-and-privacy">Data Ownership and Privacy<a class="headerlink" href="#data-ownership-and-privacy" title="Permanent link">&para;</a></h2>
 <ul>
 <li>All metering data is scoped to the ZEV — participants cannot see other participants' readings</li>
-<li>Invoices are private to their recipient and ZEV owners</li>
+<li>Invoices are private to their recipient and the community's managers and viewers</li>
 <li>Admins have global read access for monitoring and compliance</li>
 </ul>
 <h2 id="multi-zev-operations">Multi-ZEV Operations<a class="headerlink" href="#multi-zev-operations" title="Permanent link">&para;</a></h2>

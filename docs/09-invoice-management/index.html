@@ -2362,7 +2362,7 @@ regenerated.</p>
 </table>
 <p><strong>The invoice document</strong> — the stored PDF itself is embedded below the summary cards in a full document viewer (the same file the participant receives by email). It contains the line items, grouped by <strong>tariff category</strong> (e.g. Energy, Fee),
 with each line's type, description, quantity (kWh), unit price (CHF), and
-total, plus a subtotal per group. If no PDF has been generated yet, the page shows a <strong>Generate PDF</strong> button instead (owners/admins only — a participant sees a plain document-unavailable message, since the API rejects their generation attempt); the viewer appears once the document exists.</p>
+total, plus a subtotal per group. If no PDF has been generated yet, the page shows a <strong>Generate PDF</strong> button instead (managers and admins only — a participant sees a plain document-unavailable message, since the API rejects their generation attempt); the viewer appears once the document exists.</p>
 <blockquote>
 <p><strong>Note:</strong> Invoices cannot be edited directly. If a correction is needed on a
 draft, fix the underlying data (metering readings or tariff prices) and
@@ -2429,14 +2429,14 @@ history</strong>, where a failed latest attempt also has a <strong>Retry</strong
 </ol>
 <p><strong>Delete visibility rules:</strong></p>
 <ul>
-<li><strong>Draft</strong> or <strong>Cancelled</strong> invoices — <strong>More → Delete</strong> is available to ZEV owners.</li>
+<li><strong>Draft</strong> or <strong>Cancelled</strong> invoices — <strong>More → Delete</strong> is available to managers.</li>
 <li><strong>Any status</strong> — admins can always delete.</li>
 </ul>
 <p>Deletion is permanent; the invoice is removed from the database.</p>
 <h2 id="reports-annual-report-statements-and-tax-overviews">Reports: Annual Report, Statements and Tax Overviews<a class="headerlink" href="#reports-annual-report-statements-and-tax-overviews" title="Permanent link">&para;</a></h2>
 <p>Open <strong>Reports</strong> (<code>/reports</code>) and select a year at the top of the page. The
 default is the last completed year.</p>
-<p><strong>Admins and ZEV owners</strong> see the selected ZEV's annual report first:</p>
+<p><strong>Admins and managers</strong> see the selected ZEV's annual report first:</p>
 <ul>
 <li><strong>Key figures</strong> — the year's <strong>self-consumption rate</strong> (share of the ZEV's
   production used inside the ZEV), <strong>self-sufficiency rate</strong> (share of the

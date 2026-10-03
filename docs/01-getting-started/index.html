@@ -614,10 +614,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-explore-as-zev-owner" class="md-nav__link">
+  <a href="#3-explore-as-a-manager" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Explore as ZEV Owner
+        3. Explore as a Manager
       
     </span>
   </a>
@@ -1933,10 +1933,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-explore-as-zev-owner" class="md-nav__link">
+  <a href="#3-explore-as-a-manager" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Explore as ZEV Owner
+        3. Explore as a Manager
       
     </span>
   </a>
@@ -2410,11 +2410,11 @@ password through the environment:</p>
 <li>Under <strong>Account → Security</strong>, turn on two-factor authentication or add a
    passkey for the admin account.</li>
 <li>Create the other people's accounts in <strong>Platform → Accounts → Users</strong>, or
-   create a community and its owner with the wizard in <strong>Platform → ZEVs</strong> —
+   create a community and its first manager with the wizard in <strong>Platform → ZEVs</strong> —
    see <a href="../14-admin-console/">Platform Administration</a>.</li>
-<li>Decide whether strangers may sign up. <strong>ZEV owner self-registration is on by
-   default</strong>: anyone who can reach the login page can register an owner
-   account and create a community. On a public instance you run only for your
+<li>Decide whether strangers may sign up. <strong>Self-registration is on by
+   default</strong>: anyone who can reach the login page can register an account
+   and create a community, which makes them its issuer and manager. On a public instance you run only for your
    own community, turn it off under <strong>Platform → System Settings → Functions</strong>,
    or set <code>FEATURE_ZEV_SELF_REGISTRATION_ENABLED=false</code> in <code>backend/.env</code>.</li>
 </ol>
@@ -2423,8 +2423,8 @@ password through the environment:</p>
 <h2 id="demo-accounts">Demo Accounts<a class="headerlink" href="#demo-accounts" title="Permanent link">&para;</a></h2>
 <p>A demo dataset is available for testing. It is loaded by starting the stack
 with <code>scripts/start-demo-environment.sh</code>, or by running <code>seed_demo</code> on an
-already-running stack (see below). It contains two communities owned by the
-same owner — the flagship <strong>ZEV STWEG Sonnenhof</strong> and the smaller
+already-running stack (see below). It contains two communities with the
+same issuer — the flagship <strong>ZEV STWEG Sonnenhof</strong> and the smaller
 <strong>ZEV Sonnenfirma AG</strong> — so both sides of the community switcher have real
 data to show. It also has a viewer of the flagship community and a property
 manager who manages both, to show per-community access. Credentials and the full list of what the seed creates are in
@@ -2442,7 +2442,7 @@ pages look the same, just without data.</p>
 <h3 id="1-login">1. Login<a class="headerlink" href="#1-login" title="Permanent link">&para;</a></h3>
 <ol>
 <li>Navigate to http://localhost:8080 (or your instance's <code>https://</code> URL)</li>
-<li>Login with admin credentials (or ZEV owner to manage a community)</li>
+<li>Login with admin credentials (or a manager's account to manage a community)</li>
 <li>Managers land on <strong>Overview</strong>; participants land on their personal dashboard</li>
 </ol>
 <p>The interface follows your browser's language (German, French, Italian or
@@ -2459,12 +2459,12 @@ contract PDFs use the community's own <strong>Invoice language</strong> instead.
 <li>The sidebar ZEV switcher (top-left) selects the working community anywhere else; the selected community is shown above the page title on every page, so it stays visible even when the navigation scrolls, the sidebar is collapsed, or you are on mobile</li>
 <li>For keyboard access, open the switcher or account button with Enter or Space, use Tab to move through its options, and press Escape to close it. After selecting a community, focus returns to the switcher. On mobile, Escape closes the navigation drawer and returns focus to its menu button.</li>
 </ul>
-<h3 id="3-explore-as-zev-owner">3. Explore as ZEV Owner<a class="headerlink" href="#3-explore-as-zev-owner" title="Permanent link">&para;</a></h3>
-<p>If logged in as a ZEV owner:</p>
+<h3 id="3-explore-as-a-manager">3. Explore as a Manager<a class="headerlink" href="#3-explore-as-a-manager" title="Permanent link">&para;</a></h3>
+<p>If logged in as a community's manager:</p>
 <ul>
 <li>Go to <strong>Overview</strong> for setup guidance and billing work grouped by period</li>
 <li>Go to <strong>Energy balance</strong> to analyse production, consumption, self-consumption, and grid exchange for a period</li>
-<li>Go to <strong>Settings</strong> to configure your community parameters (General · Billing &amp; payment · Documents &amp; emails · Audit log · Export/transfer)</li>
+<li>Go to <strong>Settings</strong> to configure your community parameters (General · People &amp; access · Billing &amp; payment · Documents &amp; emails · Audit log · Export/transfer)</li>
 <li>Go to <strong>Participants</strong> to view member list</li>
 <li>Go to <strong>Metering Points</strong> to see participant meters</li>
 <li>Go to <strong>Metering</strong> for consumption charts, data quality, and import history</li>
