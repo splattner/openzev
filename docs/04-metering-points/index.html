@@ -1808,6 +1808,8 @@
 </ul>
 <p>A single participant can be assigned multiple metering points (e.g., PV on roof + home consumption).</p>
 <p><img alt="Metering points page" src="../screenshots/04-metering-points.png" /></p>
+<p>If a refresh fails, the last loaded list and any open form stay available.
+Use <strong>Retry</strong> in the warning to refresh the list.</p>
 <h2 id="metering-point-types">Metering Point Types<a class="headerlink" href="#metering-point-types" title="Permanent link">&para;</a></h2>
 <p>OpenZEV supports three metering point types:</p>
 <table>
@@ -1837,7 +1839,10 @@
 </tbody>
 </table>
 <h2 id="creating-a-metering-point">Creating a Metering Point<a class="headerlink" href="#creating-a-metering-point" title="Permanent link">&para;</a></h2>
-<p><strong>Managers</strong> create metering points in <strong>Metering Points</strong>.</p>
+<p><strong>Managers</strong> create metering points in <strong>Metering Points</strong> for the selected
+community. A disabled community is read-only for managers; admins retain write
+access. If the community list cannot load, use <strong>Retry</strong> before working with
+its meters.</p>
 <ol>
 <li>Click <strong>New Metering Point</strong></li>
 <li>
@@ -1911,6 +1916,11 @@ Date validity is defined on the <strong>metering point assignment</strong> to a 
 <li>Whether imported readings can be attributed for billing</li>
 <li>Invoicing — only active assignment windows in the billing period are used</li>
 </ul>
+<p>Unsaved metering and assignment forms close if your account, selected
+community or write access changes. A failed refresh of the same community
+keeps your draft open. Disabling the community also closes managers' dialogs.
+A save already sent may finish even if you switch communities; check its
+original community for the result.</p>
 <p><img alt="Assign participant modal" src="../screenshots/04b-metering-points-assign.png" /></p>
 <h3 id="example-validity-scenarios">Example Validity Scenarios<a class="headerlink" href="#example-validity-scenarios" title="Permanent link">&para;</a></h3>
 <p><strong>Scenario 1: New solar installation mid-year</strong></p>
