@@ -228,11 +228,15 @@ describe('metering write ownership', () => {
                 expect(state.write.mock.calls).toEqual([submitted])
                 expect(state.toast).not.toHaveBeenCalled()
                 if (change === 'community' && outcome === 'success') {
+                    // Building counts and the map's current participants follow
+                    // metering points and assignments (#890); readings do not.
                     const keys = name.includes('assignment')
-                        ? [queryKeys.metering.pointAssignments(), queryKeys.metering.points('42'), queryKeys.zev.participants('42')]
-                        : name === 'meter delete' || name === 'reading delete'
-                            ? [['metering']]
-                            : [queryKeys.metering.points('42')]
+                        ? [queryKeys.metering.pointAssignments(), queryKeys.metering.points('42'), queryKeys.zev.participants('42'), queryKeys.zev.buildings('42')]
+                        : name === 'meter delete'
+                            ? [['metering'], queryKeys.zev.buildings('42')]
+                            : name === 'reading delete'
+                                ? [['metering']]
+                                : [queryKeys.metering.points('42'), queryKeys.zev.buildings('42')]
                     expect(invalidate.mock.calls.map(([filters]) => filters?.queryKey)).toEqual(keys)
                 } else {
                     expect(invalidate).not.toHaveBeenCalled()
