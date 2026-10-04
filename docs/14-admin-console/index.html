@@ -2626,6 +2626,11 @@ active for an invoice period, VAT defaults to <strong>0%</strong> in every mode.
   unchanged until <strong>regenerated</strong> — individual invoices can be regenerated, and
   administrators can regenerate PDFs for an entire billing period.</li>
 </ul>
+<p>The default invoice PDF includes the recipient's optional second address line.
+For custom templates, insert this after the first address line, or reset the
+template to the default:</p>
+<div class="highlight"><pre><span></span><code>{% if participant.address_line2 %}{{ participant.address_line2 }}<span class="p">&lt;</span><span class="nt">br</span><span class="p">&gt;</span>{% endif %}
+</code></pre></div>
 <h2 id="email-templates">Email Templates<a class="headerlink" href="#email-templates" title="Permanent link">&para;</a></h2>
 <p>Admins manage system-wide default email templates in <strong>Platform → Templates → Email templates</strong> (<code>/admin/templates/email</code>).</p>
 <blockquote>
