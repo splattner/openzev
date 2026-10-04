@@ -612,9 +612,10 @@ function Landowners({ rows, parties, canManage, busy, buildings, onAssign, onSet
                                     {row.valid_to && ` · ${t('pages.zevSettings.access.until', { date: formatShortDate(row.valid_to, settings) })}`}
                                 </span>
                             </div>
-                            {canManage && row.valid_to === null && buildings.length > 0 && (
+                            {/* One actions cell: the row's grid places every actions block in the same column. */}
+                            {canManage && row.valid_to === null && (
                                 <div className="zev-access-actions actions-row actions-row-wrap">
-                                    {settingBuilding === row.id ? (
+                                    {buildings.length > 0 && (settingBuilding === row.id ? (
                                         <label className="zev-parties-inline-date">
                                             <span>{t('pages.zevSettings.parties.landownerBuilding')}</span>
                                             <select
@@ -637,11 +638,7 @@ function Landowners({ rows, parties, canManage, busy, buildings, onAssign, onSet
                                         <button type="button" className="button button-secondary button-compact" onClick={() => setSettingBuilding(row.id)}>
                                             {t(row.building ? 'pages.zevSettings.parties.changeBuilding' : 'pages.zevSettings.parties.setBuilding')}
                                         </button>
-                                    )}
-                                </div>
-                            )}
-                            {canManage && row.valid_to === null && (
-                                <div className="zev-access-actions actions-row actions-row-wrap">
+                                    ))}
                                     {ending === row.id ? (
                                         <form
                                             className="actions-row actions-row-wrap"

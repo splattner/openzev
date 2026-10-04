@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MantineProvider } from '@mantine/core'
-import type { Party, ZevPartyRole } from '../src/types/api'
+import type { Building, Party, ZevPartyRole } from '../src/types/api'
 
 // ZEV settings → Parties (#761, SPEC-2026-10-zev-parties §8.3).
 
@@ -30,9 +30,11 @@ vi.mock('../src/lib/api/zev', () => ({
     assignPartyRole: vi.fn(),
     endPartyRole: vi.fn(),
     fetchZevAccess: vi.fn(() => Promise.resolve([])),
+    fetchBuildings: vi.fn(() => Promise.resolve([])),
+    setPartyRoleBuilding: vi.fn(),
 }))
 
-import { assignPartyRole, endPartyRole, fetchParties, fetchPartyRoles } from '../src/lib/api/zev'
+import { assignPartyRole, endPartyRole, fetchBuildings, fetchParties, fetchPartyRoles } from '../src/lib/api/zev'
 import { ZevPartiesSection } from '../src/features/zev/ZevPartiesSection'
 
 const party = (id: string, name: string, over: Partial<Party> = {}): Party => ({
@@ -124,6 +126,17 @@ describe('ZevPartiesSection', () => {
             .at(-1)!
         await click(confirmButton)
         expect(assignPartyRole).toHaveBeenCalledWith({ zev: 'z1', party: 'v', role: 'representative', valid_from: '2026-06-15' })
+    })
+
+    it('keeps a landowner\'s building and end actions in one actions cell', async () => {
+        // The wide row grid puts every actions block in the same cell (#890).
+        vi.mocked(fetchBuildings).mockResolvedValue([{ id: 'b1', zev: 'z1', name: 'Haus A' } as Building])
+        const container = await render(true)
+        const setBuilding = buttons(container, 'pages.zevSettings.parties.setBuilding')[0]
+        const row = setBuilding.closest('.zev-access-row')!
+        expect(row.querySelectorAll('.zev-access-actions')).toHaveLength(1)
+        expect(buttons(row, 'pages.zevSettings.parties.end')[0].closest('.zev-access-actions'))
+            .toBe(setBuilding.closest('.zev-access-actions'))
     })
 
     it('ends a landowner on a chosen day', async () => {
