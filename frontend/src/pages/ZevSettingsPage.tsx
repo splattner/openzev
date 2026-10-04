@@ -17,7 +17,6 @@ import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { useCommunityAccess } from '../lib/communityAccess'
-import { ZevBuildingsSection } from '../features/zev/ZevBuildingsSection'
 import { ZevPeopleSection } from '../features/zev/ZevPeopleSection'
 import {
     ZEV_FIELD_TABS,
@@ -43,11 +42,11 @@ import { usePageNavigation } from '../lib/usePageNavigation'
  * editing tabs and a single sticky save bar persists the whole form (one PATCH).
  */
 
-const TABS: ZevSettingsTab[] = ['general', 'people', 'buildings', 'billing', 'documents', 'audit', 'export']
+const TABS: ZevSettingsTab[] = ['general', 'people', 'billing', 'documents', 'audit', 'export']
 // Tabs merged into People & access (#761); old links keep working.
 const MERGED_INTO_PEOPLE = new Set(['parties', 'access'])
 // Tabs that save on their own: the sticky bar saves the draft without submitting a form there.
-const OUTSIDE_THE_FORM = new Set<ZevSettingsTab>(['people', 'buildings', 'audit', 'export'])
+const OUTSIDE_THE_FORM = new Set<ZevSettingsTab>(['people', 'audit', 'export'])
 
 type ZevDraft = {
     zevId: string | null
@@ -380,7 +379,6 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                 <Tabs.List aria-label={t('pages.zevSettings.title')}>
                     <Tabs.Tab value="general">{t('pages.zevSettings.tabs.general')}</Tabs.Tab>
                     <Tabs.Tab value="people">{t('pages.zevSettings.tabs.people')}</Tabs.Tab>
-                    <Tabs.Tab value="buildings">{t('pages.zevSettings.tabs.buildings')}</Tabs.Tab>
                     <Tabs.Tab value="billing">{t('pages.zevSettings.tabs.billingPayment')}</Tabs.Tab>
                     <Tabs.Tab value="documents">{t('pages.zevSettings.tabs.documentsEmails')}</Tabs.Tab>
                     <Tabs.Tab value="audit">{t('pages.zevSettings.tabs.auditLog')}</Tabs.Tab>
@@ -451,10 +449,6 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
 
                 <Tabs.Panel value="people">
                     <ZevPeopleSection zevId={selectedZevId} canManage={canWriteSelectedCommunity} />
-                </Tabs.Panel>
-
-                <Tabs.Panel value="buildings">
-                    <ZevBuildingsSection zevId={selectedZevId} canManage={canManage && !disabledForMe} />
                 </Tabs.Panel>
 
 

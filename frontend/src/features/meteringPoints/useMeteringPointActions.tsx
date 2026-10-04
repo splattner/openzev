@@ -4,15 +4,19 @@ import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useConfirmDialog } from '../../components/ConfirmDialog'
 import {
+    createBuilding,
     createMeteringPoint,
     createMeteringPointAssignment,
+    deleteBuilding,
     deleteMeteringPoint,
     deleteMeteringPointReadings,
     deleteMeteringPointAssignment,
     fetchBuildings,
     fetchMeteringPointAssignments,
     fetchMeteringPoints,
+    fetchPartyRoles,
     fetchParticipants,
+    updateBuilding,
     updateMeteringPoint,
     updateMeteringPointAssignment,
 } from '../../lib/api/zev'
@@ -47,6 +51,8 @@ import {
     type MeteringPointTypeFilter,
 } from './useMeteringPointForms'
 import type {
+    Building,
+    BuildingInput,
     MeteringPoint,
     MeteringPointAssignment,
     MeteringPointAssignmentInput,
@@ -275,6 +281,80 @@ export function useMeteringPointActions({
         enabled: isManagedScope && !!selectedZevId,
     })
     const buildings = buildingsQuery.data ?? []
+    // Which landowners own which building (their role row names it).
+    const partyRolesQuery = useQuery({
+        queryKey: queryKeys.zev.partyRoles(selectedZevId || '', false),
+        queryFn: () => fetchPartyRoles(selectedZevId || ''),
+        enabled: isManagedScope && !!selectedZevId,
+    })
+    const landownersOf = (building: Building): string[] => [
+        ...new Set(
+            (partyRolesQuery.data ?? [])
+                .filter((row) => row.role === 'landowner' && row.building === building.id && (row.valid_to === null || row.valid_to >= todayIso))
+                .map((row) => row.party_display_name),
+        ),
+    ]
+
+    // Building modal
+    const [editingBuilding, setEditingBuilding] = useState<Building | null>(null)
+    const [showBuildingModal, setShowBuildingModal] = useState(false)
+    function openCreateBuildingModal() {
+        if (!mounted.current || !canWrite) return
+        setEditingBuilding(null)
+        setShowBuildingModal(true)
+    }
+    function openEditBuildingModal(building: Building) {
+        if (!mounted.current || !canWrite) return
+        setEditingBuilding(building)
+        setShowBuildingModal(true)
+    }
+    function closeBuildingModal() {
+        setShowBuildingModal(false)
+        setEditingBuilding(null)
+    }
+    function afterBuildingChange() {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.zev.buildings(selectedZevId || '') })
+        void queryClient.invalidateQueries({ queryKey: ['zev', 'partyRoles'] })
+        void queryClient.invalidateQueries({ queryKey: queryKeys.metering.points(selectedZevId || undefined) })
+    }
+    const saveBuildingMutation = useMutation({
+        mutationFn: (input: BuildingInput) => {
+            requireWriteAccess()
+            return editingBuilding ? updateBuilding(editingBuilding.id, input) : createBuilding({ ...input, zev: selectedZevId || '' })
+        },
+        onSuccess: () => {
+            if (!mounted.current) return
+            closeBuildingModal()
+            afterBuildingChange()
+            pushToast(t('pages.meteringPoints.buildings.saved'), 'success')
+        },
+        onError: (error) => {
+            if (mounted.current && canWrite) pushToast(formatApiError(error, t('pages.meteringPoints.buildings.saveFailed')), 'error')
+        },
+    })
+    const deleteBuildingMutation = useMutation({
+        mutationFn: (id: string) => {
+            requireWriteAccess()
+            return deleteBuilding(id)
+        },
+        onSuccess: () => {
+            if (!mounted.current) return
+            afterBuildingChange()
+            pushToast(t('pages.meteringPoints.buildings.deleted'), 'success')
+        },
+        onError: (error) => {
+            if (mounted.current && canWrite) pushToast(formatApiError(error, t('pages.meteringPoints.buildings.saveFailed')), 'error')
+        },
+    })
+    function confirmDeleteBuilding(building: Building) {
+        confirm({
+            title: t('pages.meteringPoints.buildings.deleteTitle'),
+            message: t('pages.meteringPoints.buildings.deleteMessage', { name: building.name }),
+            confirmText: t('common.delete'),
+            isDangerous: true,
+            onConfirm: () => deleteBuildingMutation.mutateAsync(building.id).then(() => undefined),
+        })
+    }
     const meteringPointsQuery = useQuery({
         queryKey: queryKeys.metering.points(selectedZevId || undefined),
         queryFn: () => fetchMeteringPoints(selectedZevId || undefined),
@@ -439,6 +519,14 @@ export function useMeteringPointActions({
             ...defaultMeteringPointForm(),
             zev: isManagedScope ? (selectedZevId || '') : previous.zev,
         }))
+        setShowMpModal(true)
+    }
+
+    /** "Add metering point" from a building's header: that building is preselected. */
+    function openCreateMpModalInBuilding(buildingId: string) {
+        if (!mounted.current || !canWrite) return
+        setEditingMpId(null)
+        setMpForm({ ...defaultMeteringPointForm(), zev: selectedZevId || '', building: buildingId })
         setShowMpModal(true)
     }
 
@@ -757,6 +845,16 @@ export function useMeteringPointActions({
         buildingFilter,
         setBuildingFilter,
         buildings,
+        landownersOf,
+        editingBuilding,
+        showBuildingModal,
+        openCreateBuildingModal,
+        openEditBuildingModal,
+        closeBuildingModal,
+        saveBuildingMutation,
+        deleteBuildingMutation,
+        confirmDeleteBuilding,
+        openCreateMpModalInBuilding,
         clearFilters,
         // Form handlers
         openCreateMpModal,

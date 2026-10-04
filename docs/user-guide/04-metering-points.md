@@ -13,9 +13,9 @@ A **metering point** is a physical or logical energy meter:
 A single participant can be assigned multiple metering points (e.g., PV on roof + home consumption).
 
 Every metering point also belongs to a **building**, the site where it is — see
-[Buildings tab](02-zev-setup.md#buildings-tab). The metering point's own
+[Buildings](#buildings). The metering point's own
 location text says which unit within the building it measures. With several
-buildings, the toolbar offers a **Building** filter.
+buildings, the page groups the cards by building and the toolbar offers a **Building** filter.
 
 ![Metering points page](screenshots/04-metering-points.png)
 
@@ -32,6 +32,41 @@ OpenZEV supports three metering point types:
 | **Production** | Measures energy fed into grid/community | Solar panels |
 | **Bidirectional** | Combined meter (both consumption and production) | A household with its own PV on one meter |
 
+## Buildings { #buildings }
+
+A **building** is where metering points are: a name, an address and,
+optionally, the federal building ID (**EGID**). It is a site, not a billing
+address: a participant can be invoiced somewhere other than where its meters
+are, and both are recorded. Buildings are managed on this page.
+
+- A new ZEV starts with one building, taking the issuer's address when the
+  issuer lives at the grid connection's postal code. With a single building
+  the page shows it as one line above the list, with **Edit**, and the meter
+  form does not ask for a building.
+- **Add building** (next to **New Metering Point**) creates one; you can copy
+  the address of a participant or other contact. Landowners linked to a
+  building (see [People & access](02-zev-setup.md#people-and-access-tab)) are
+  named in its header.
+- With several buildings, the cards are **grouped by building**, ordered by
+  name. Each group's header shows the address, EGID, landowners and number of
+  metering points, with **Add metering point** (that building preselected),
+  **Edit** and **Delete**. A building without metering points shows "No
+  metering points in this building yet". Search and the other filters apply
+  within the groups; the **Building** filter shows one group.
+- A building that still has metering points cannot be deleted: move or delete
+  its meters first. Landowner rows that pointed at a deleted building are
+  kept, without a building.
+
+> **Check the buildings of an existing community.** When OpenZEV added
+> buildings, every existing community got some automatically. A ZEV got one
+> building holding all its metering points. A vZEV got one building per
+> distinct participant address, each metering point in the building of the
+> participant it is assigned to; meters without a clear holder went to the
+> issuer's building. That is a **guess** from billing addresses, which are not
+> always where the meters are (a landlord billed for an empty flat, a holiday
+> home). Review the groups and correct them: move the metering points, then
+> delete the empty building.
+
 ## Creating a Metering Point
 
 **Managers** create metering points in **Metering Points** for the selected
@@ -45,7 +80,7 @@ its meters.
    - **Meter type** — `Consumption`, `Production`, or `Bidirectional`
    - **Active** — inventory status (defaults to on)
    - **Building** — only asked when the community has more than one
-     [building](02-zev-setup.md#buildings-tab); with a single building the
+     [building](#buildings); with a single building the
      meter goes there
    - **Unit within the building** (optional, e.g., "Flat 3", "Common areas",
      "Roof solar panel")

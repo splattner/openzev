@@ -3,7 +3,8 @@ import { act, createElement, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import type { Building, MeteringPointInput } from '../src/types/api'
+import type { Building, MeteringPoint, MeteringPointInput } from '../src/types/api'
+import { groupMeteringPointsByBuilding } from '../src/features/meteringPoints/useMeteringPointForms'
 
 // Buildings (#890): the metering-point form shows a building select only for a
 // ZEV with several, and a participant can copy a building's address.
@@ -118,5 +119,33 @@ describe('buildings in forms', () => {
         expect([value('address_line1'), value('address_line2'), value('postal_code'), value('city')]).toEqual([
             'Weg 1', 'Hinterhaus', '3000', 'Bern',
         ])
+    })
+})
+
+const point = (id: string, buildingId: string): MeteringPoint => ({
+    id, zev: 'zev-1', meter_id: id, meter_type: 'consumption', is_active: true, building: buildingId, building_name: '',
+    has_behind_meter_generation: false, reading_count: 0, assignment_count: 0, first_reading_at: null, last_reading_at: null,
+})
+
+describe('groupMeteringPointsByBuilding', () => {
+    const house = (id: string, name: string, count: number) => building(id, name, { metering_point_count: count })
+    const buildings = [house('b2', 'Haus B', 1), house('b1', 'Haus A', 2), house('b3', 'Haus C', 0)]
+    const points = [point('m1', 'b1'), point('m2', 'b2'), point('m3', 'b1')]
+
+    it('groups by building, ordered by building name, keeping an empty building', () => {
+        const groups = groupMeteringPointsByBuilding(buildings, points, { filtersActive: false })
+        expect(groups.map((group) => [group.building.name, group.points.map((p) => p.id)])).toEqual([
+            ['Haus A', ['m1', 'm3']], ['Haus B', ['m2']], ['Haus C', []],
+        ])
+    })
+
+    it('hides groups without a matching card while a filter is active, empty buildings included', () => {
+        const groups = groupMeteringPointsByBuilding(buildings, [point('m2', 'b2')], { filtersActive: true })
+        expect(groups.map((group) => group.building.name)).toEqual(['Haus B'])
+    })
+
+    it('hides a building whose cards are all filtered out but keeps one that has none at all', () => {
+        const groups = groupMeteringPointsByBuilding(buildings, [], { filtersActive: false })
+        expect(groups.map((group) => group.building.name)).toEqual(['Haus C'])
     })
 })

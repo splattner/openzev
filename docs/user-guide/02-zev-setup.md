@@ -82,8 +82,6 @@ Admins can create a ZEV together with a new responsible-person account in a sing
 - **People & access** — who issues the invoices, who represents the ZEV toward
   the grid operator, the landowners, who may manage or view the ZEV, and other
   contacts (see [People & access tab](#people-and-access-tab))
-- **Buildings** — where the community's metering points are (see
-  [Buildings tab](#buildings-tab))
 - **Billing & payment** — billing interval, invoice language, payment term,
   invoice presentation, participant QR code, invoice prefix, bank details, VAT
 - **Documents & emails** — invoice email template, notes, contract notes
@@ -147,7 +145,7 @@ always name whoever held a role on their own date:
 |---|---|---|
 | **Issuer** | Invoices, contracts and annual statements are from this party: its name and address head the document, and it is the creditor on the QR bill. Its login manages the community | An invoice: the last day of its period. A contract: the day it is issued. An annual statement: 31 December |
 | **Representative toward the grid operator** | Who acts for the community toward the grid operator (VNB). Its login manages the community | — |
-| **Landowners** | The owners of the plots or buildings in the community — several when it spans several plots, as a vZEV usually does. Each landowner can be linked to the [building](#buildings-tab) it owns | — |
+| **Landowners** | The owners of the plots or buildings in the community — several when it spans several plots, as a vZEV usually does. Each landowner can be linked to the [building](04-metering-points.md#buildings) it owns | — |
 
 - **Change from…** on the issuer or the representative picks a party and a
   date. The current holder ends the day before. Invoices for earlier periods
@@ -213,35 +211,6 @@ deleted. In a role's party picker, **New contact…** creates one on the spot.
 OpenZEV login gets access straight away and a notice by email; anyone else
 gets an invitation email to set up their account — a party at its own email
 address, after which the new login belongs to that party.
-
-### Buildings tab { #buildings-tab }
-
-The **Buildings** tab lists the community's **buildings**: where its metering
-points are. A building has a name, an address and, optionally, the federal
-building ID (**EGID**). It is a site, not a billing address: a participant can
-be invoiced somewhere other than where its meters are, and both are recorded.
-
-- Every metering point belongs to one building. A new ZEV starts with one
-  building, taking the issuer's address when the issuer lives at the grid
-  connection's postal code. With a single building, nothing else in OpenZEV
-  shows the building level.
-- **Add building** creates one; for a new building you can copy the address
-  of a participant or other contact. **Edit** changes it.
-- A building that still has metering points cannot be deleted: move or delete
-  its meters first. Landowner rows that pointed at a deleted building are
-  kept, without a building.
-- A vZEV usually has several buildings. The **Metering Points** page then
-  asks which building a new meter is in and lets you filter by building.
-
-> **Check the buildings of an existing community.** When OpenZEV added
-> buildings, every existing community got some automatically. A ZEV got one
-> building holding all its metering points. A vZEV got one building per
-> distinct participant address, each metering point in the building of the
-> participant it is assigned to; meters without a clear holder went to the
-> issuer's building. That is a **guess** from billing addresses, which are not
-> always where the meters are (a landlord billed for an empty flat, a holiday
-> home). Review the Buildings tab and merge or correct them: move the metering
-> points, then delete the empty building.
 
 ### Billing & payment tab
 

@@ -2028,6 +2028,62 @@ input.recurrence-chip-input {
   gap: 1rem;
 }
 
+.building-groups {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.building-group {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.building-group-empty {
+  margin: 0;
+}
+
+.building-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+}
+
+.building-header-line {
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.building-header-group {
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--border-default);
+}
+
+.building-header-main {
+  display: grid;
+  gap: 0.2rem;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.building-header-name {
+  overflow-wrap: anywhere;
+}
+
+.building-header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.9rem;
+  font-size: 0.85rem;
+}
+
+.building-header-actions {
+  flex: 0 0 auto;
+}
+
 .metering-point-card {
   border: 1px solid var(--border-default);
   border-radius: 1rem;

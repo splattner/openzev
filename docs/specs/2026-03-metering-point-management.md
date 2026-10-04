@@ -546,7 +546,7 @@ python -m pytest -q
 - Form validation and error rendering for metering-point create/edit
 - Assignment date-range picker with overlap/containment feedback
 - List filtering by meter type, active/inactive status
-- Building select in the metering-point form, building filter and building line in the list: shown only for a ZEV with several buildings (`tests/buildings.test.ts`; the full test plan is in SPEC-2026-10-buildings-and-sites §11)
+- Buildings on the metering points page (SPEC-2026-10-buildings-and-sites §7.3): "Add building" next to "New Metering Point"; a one-building ZEV shows a `BuildingHeader` line above the flat list; several buildings group the cards by building (`groupMeteringPointsByBuilding`, ordered by name, each group headed by a `BuildingHeader` with add-meter / edit / delete), with a building filter and a building select in the form (`tests/buildings.test.ts`; the full test plan is in SPEC-2026-10-buildings-and-sites §11)
 - Build and type checks: `npm run build`
 
 ### Manual verification

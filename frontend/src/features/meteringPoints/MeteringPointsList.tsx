@@ -8,6 +8,7 @@ import {
   faTriangleExclamation,
   faUserPlus,
 } from '@fortawesome/free-solid-svg-icons'
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
@@ -20,6 +21,7 @@ import {
   assignmentStateSortOrder,
   getAssignmentState,
   meteringPointHealthBadgeClass,
+  type BuildingGroup,
   type MeteringPointHealth,
 } from './useMeteringPointForms'
 
@@ -42,6 +44,9 @@ type MeteringPointsListProps = {
   isManagedScope: boolean
   /** Name the building on each card; only for a ZEV with several buildings (#890). */
   showBuilding?: boolean
+  /** Several buildings: the cards grouped by building, each group headed by `renderGroupHeader`. */
+  groups?: BuildingGroup[] | null
+  renderGroupHeader?: (group: BuildingGroup) => ReactNode
   /** A viewer reads only (#761): no edit, assign, delete. */
   readOnly?: boolean
   canDeleteData: boolean
@@ -66,6 +71,8 @@ export function MeteringPointsList({
   settings,
   isManagedScope,
   showBuilding = false,
+  groups = null,
+  renderGroupHeader,
   readOnly = false,
   canDeleteData,
   deleteMeteringPointPending,
@@ -107,9 +114,7 @@ export function MeteringPointsList({
     ]
   }
 
-  return (
-    <div className="metering-point-list">
-      {meteringPoints.map((point) => {
+  const renderCard = (point: MeteringPoint) => {
         const assignments = assignmentsByMeteringPoint.get(point.id) ?? []
         const sortedAssignments = [...assignments].sort((left, right) => {
           const leftState = getAssignmentState(left, todayIso)
@@ -171,7 +176,7 @@ export function MeteringPointsList({
             <div className="metering-point-card-header">
               <div className="metering-point-title">
                 <strong>{point.meter_id}</strong>
-                {showBuilding && <span className="muted">{point.building_name}</span>}
+                {showBuilding && !groups && <span className="muted">{point.building_name}</span>}
                 <span className="muted">{point.location_description || t('pages.meteringPoints.noLocation')}</span>
                 <div className="metering-point-badges">
                   <span className={point.is_active ? 'badge badge-success' : 'badge badge-danger'}>
@@ -315,7 +320,24 @@ export function MeteringPointsList({
             )}
           </article>
         )
-      })}
-    </div>
-  )
+  }
+
+  if (groups) {
+    return (
+      <div className="building-groups">
+        {groups.map((group) => (
+          <section key={group.building.id} className="building-group">
+            {renderGroupHeader?.(group)}
+            {group.points.length === 0 ? (
+              <p className="muted building-group-empty">{t('pages.meteringPoints.buildings.emptyGroup')}</p>
+            ) : (
+              <div className="metering-point-list">{group.points.map(renderCard)}</div>
+            )}
+          </section>
+        ))}
+      </div>
+    )
+  }
+
+  return <div className="metering-point-list">{meteringPoints.map(renderCard)}</div>
 }

@@ -37,7 +37,7 @@ the original community; its completion leaves a new draft in another community o
    - **Address** — address lines, postal code and city (needed on the invoice
      and for the [map](#map)). It is the billing address, not necessarily where
      the participant's meters are: that is the metering point's
-     [building](02-zev-setup.md#buildings-tab). When the community has a
+     [building](04-metering-points.md#buildings). When the community has a
      building with an address, **Copy address from building** fills the
      fields from it.
    - **Notes** (optional, internal)

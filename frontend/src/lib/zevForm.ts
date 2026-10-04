@@ -2,7 +2,7 @@ import { todayBusinessIso } from './dates'
 import { isValidIban } from './iban'
 import type { Zev, ZevInput } from '../types/api'
 
-export type ZevSettingsTab = 'general' | 'people' | 'buildings' | 'billing' | 'documents' | 'audit' | 'export'
+export type ZevSettingsTab = 'general' | 'people' | 'billing' | 'documents' | 'audit' | 'export'
 
 export function getDefaultZevForm(): ZevInput {
     return {

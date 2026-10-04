@@ -1,5 +1,6 @@
 import { todayBusinessIso } from '../../lib/dates'
 import type {
+  Building,
   MeteringPoint,
   MeteringPointAssignment,
   MeteringPointAssignmentInput,
@@ -30,6 +31,24 @@ export type MeteringPointTypeFilter = 'all' | MeteringPoint['meter_type']
 export type MeteringPointAssignmentFilter = 'all' | 'assigned' | 'unassigned'
 /** `'all'`, or the id of one building (#890). */
 export type MeteringPointBuildingFilter = string
+export type BuildingGroup = { building: Building; points: MeteringPoint[] }
+
+/**
+ * Groups already-filtered metering points by building, ordered by building
+ * name. A group with no matching card is hidden, except a building that has no
+ * metering points at all, which stays visible while no filter is active.
+ */
+export function groupMeteringPointsByBuilding(
+  buildings: Building[],
+  points: MeteringPoint[],
+  { filtersActive }: { filtersActive: boolean },
+): BuildingGroup[] {
+  return [...buildings]
+    .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id))
+    .map((building) => ({ building, points: points.filter((point) => point.building === building.id) }))
+    .filter((group) => group.points.length > 0 || (!filtersActive && group.building.metering_point_count === 0))
+}
+
 export type AssignmentState = 'current' | 'upcoming' | 'ended'
 
 export function getAssignmentState(assignment: MeteringPointAssignment, todayIso: string): AssignmentState {

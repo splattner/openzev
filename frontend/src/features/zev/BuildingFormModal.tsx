@@ -76,12 +76,12 @@ export function BuildingFormModal({ isOpen, zevId, building, isPending, onClose,
     function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
         if (!values.name.trim()) {
-            setError(t('pages.zevSettings.buildings.nameRequired'))
+            setError(t('pages.meteringPoints.buildings.nameRequired'))
             return
         }
         const egid = egidText.trim() === '' ? null : Number(egidText)
         if (egid !== null && (!Number.isInteger(egid) || egid < 0 || egid > 999_999_999)) {
-            setError(t('pages.zevSettings.buildings.egidInvalid'))
+            setError(t('pages.meteringPoints.buildings.egidInvalid'))
             return
         }
         onSubmit({ ...values, name: values.name.trim(), egid })
@@ -90,14 +90,14 @@ export function BuildingFormModal({ isOpen, zevId, building, isPending, onClose,
     return (
         <FormModal
             isOpen={isOpen}
-            title={t(building ? 'pages.zevSettings.buildings.edit' : 'pages.zevSettings.buildings.add')}
+            title={t(building ? 'pages.meteringPoints.buildings.edit' : 'pages.meteringPoints.buildings.add')}
             onClose={onClose}
             maxWidth="640px"
         >
             <form className="form-grid" onSubmit={submit}>
                 {!building && withAddress.length > 0 && (
                     <label style={{ gridColumn: '1 / -1' }}>
-                        <span>{t('pages.zevSettings.buildings.copyFromParticipant')}</span>
+                        <span>{t('pages.meteringPoints.buildings.copyFromParticipant')}</span>
                         <select
                             value=""
                             onChange={(event) => {
@@ -105,7 +105,7 @@ export function BuildingFormModal({ isOpen, zevId, building, isPending, onClose,
                                 if (party) copyFromParty(party)
                             }}
                         >
-                            <option value="">{t('pages.zevSettings.buildings.copyFromParticipantPlaceholder')}</option>
+                            <option value="">{t('pages.meteringPoints.buildings.copyFromParticipantPlaceholder')}</option>
                             {withAddress.map((party) => (
                                 <option key={party.id} value={party.id}>
                                     {`${party.display_name} – ${party.address_line1}`}
@@ -114,10 +114,11 @@ export function BuildingFormModal({ isOpen, zevId, building, isPending, onClose,
                         </select>
                     </label>
                 )}
+                <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>{t('pages.meteringPoints.buildings.hint')}</p>
                 <label style={{ gridColumn: '1 / -1' }}>
-                    <span>{t('pages.zevSettings.buildings.name')}</span>
+                    <span>{t('pages.meteringPoints.buildings.name')}</span>
                     <input value={values.name} onChange={(event) => set('name', event.target.value)} maxLength={200} required />
-                    <small className="muted">{t('pages.zevSettings.buildings.nameHint')}</small>
+                    <small className="muted">{t('pages.meteringPoints.buildings.nameHint')}</small>
                 </label>
                 <label style={{ gridColumn: '1 / -1' }}>
                     <span>{t('pages.participants.form.addressLine1')}</span>
@@ -136,7 +137,7 @@ export function BuildingFormModal({ isOpen, zevId, building, isPending, onClose,
                     <input value={values.city} onChange={(event) => set('city', event.target.value)} />
                 </label>
                 <label>
-                    <span>{t('pages.zevSettings.buildings.egid')}</span>
+                    <span>{t('pages.meteringPoints.buildings.egid')}</span>
                     <input
                         type="number"
                         inputMode="numeric"
@@ -145,7 +146,7 @@ export function BuildingFormModal({ isOpen, zevId, building, isPending, onClose,
                         value={egidText}
                         onChange={(event) => setEgidText(event.target.value)}
                     />
-                    <small className="muted">{t('pages.zevSettings.buildings.egidHint')}</small>
+                    <small className="muted">{t('pages.meteringPoints.buildings.egidHint')}</small>
                 </label>
                 <label style={{ gridColumn: '1 / -1' }}>
                     <span>{t('pages.participants.form.notes')}</span>

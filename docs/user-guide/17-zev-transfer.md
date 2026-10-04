@@ -163,7 +163,7 @@ Upgrade the target instance and try again.
 OpenZEV placed existing communities when it added buildings: a ZEV gets one
 building, a vZEV one building per distinct participant address. That is a
 **guess** from billing addresses; check the
-[Buildings tab](02-zev-setup.md#buildings-tab) after importing. If you import
+[buildings](04-metering-points.md#buildings) after importing. If you import
 without the metering-points section, the new community gets a single building.
 
 ### Corrupt or inconsistent archives

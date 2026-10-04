@@ -531,9 +531,7 @@ retain their existing trailing currency format (`114.94 CHF`).
 **File:** `frontend/src/pages/ZevSettingsPage.tsx`
 
 Accessible to `admin` and `zev_owner` at `/zev-settings` (General) and
-`/zev-settings/:tab`. The tabs are `general`, `people`, `buildings`, `billing`, `documents`, `audit`
-and `export`; `buildings` (`ZevBuildingsSection`, #890, SPEC-2026-10-buildings-and-sites §7.3) saves
-on its own like `people`. `ZevSettingsTabRoute` rejects unknown tabs. Uses the
+`/zev-settings/:tab`. `ZevSettingsTabRoute` rejects unknown tabs. Uses the
 globally selected ZEV from `useManagedZev()`; the three editing tabs share one
 draft and saved baseline tied to a ZEV id and selection epoch, with derived dirty
 state, persisted through a single save bar (one PATCH). Tab switches preserve
