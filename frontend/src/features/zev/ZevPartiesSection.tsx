@@ -10,9 +10,11 @@ import {
     createParty,
     deleteParty,
     endPartyRole,
+    fetchBuildings,
     fetchParties,
     fetchPartyRoles,
     fetchZevAccess,
+    setPartyRoleBuilding,
     updateParty,
 } from '../../lib/api/zev'
 import { formatApiError } from '../../lib/api/errors'
@@ -20,7 +22,7 @@ import { queryKeys } from '../../lib/api/queryKeys'
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { todayBusinessIso } from '../../lib/dates'
 import { useToast } from '../../lib/toast'
-import type { Party, PartyInput, PartyRoleName, ZevPartyRole } from '../../types/api'
+import type { Building, Party, PartyInput, PartyRoleName, ZevPartyRole } from '../../types/api'
 import { AccessControls, GiveAccessForm, useAccessActions } from './PartyAccess'
 import { PartyFormModal } from './PartyFormModal'
 
@@ -69,6 +71,12 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
         enabled: Boolean(zevId),
     })
 
+    const buildingsQuery = useQuery({
+        queryKey: queryKeys.zev.buildings(zevId),
+        queryFn: () => fetchBuildings(zevId),
+        enabled: Boolean(zevId),
+    })
+
     // Which contacts can already sign in to this ZEV, and how (the access list's rows).
     const accessQuery = useQuery({
         queryKey: queryKeys.zev.access(zevId, false),
@@ -107,10 +115,20 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
     })
 
     const assign = useMutation({
-        mutationFn: (input: { party: string; role: PartyRoleName; valid_from: string }) => assignPartyRole({ ...input, zev: zevId }),
+        mutationFn: (input: { party: string; role: PartyRoleName; valid_from: string; building?: string | null }) => assignPartyRole({ ...input, zev: zevId }),
         onSuccess: () => {
             afterChange()
             pushToast(t('pages.zevSettings.parties.roleAssigned'), 'success')
+        },
+        onError: (error) => pushToast(formatApiError(error, t('pages.zevSettings.parties.saveFailed')), 'error'),
+    })
+
+    const setBuilding = useMutation({
+        mutationFn: ({ row, building }: { row: ZevPartyRole; building: string | null }) => setPartyRoleBuilding(row.id, building),
+        onSuccess: () => {
+            afterChange()
+            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.buildings(zevId) })
+            pushToast(t('pages.zevSettings.parties.landownerBuildingSaved'), 'success')
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.zevSettings.parties.saveFailed')), 'error'),
     })
@@ -164,7 +182,7 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
 
     const parties = partiesQuery.data ?? []
     const roles = rolesQuery.data ?? []
-    const busy = assign.isPending || end.isPending
+    const busy = assign.isPending || end.isPending || setBuilding.isPending
     const contacts = parties.filter((party) => party.participations.length === 0)
     const entries = accessQuery.data ?? []
     const today = todayBusinessIso()
@@ -230,7 +248,9 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
                         parties={parties}
                         canManage={canManage}
                         busy={busy}
-                        onAssign={(party, validFrom) => assign.mutateAsync({ party, role: 'landowner', valid_from: validFrom })}
+                        buildings={buildingsQuery.data ?? []}
+                        onAssign={(party, validFrom, building) => assign.mutateAsync({ party, role: 'landowner', valid_from: validFrom, building })}
+                        onSetBuilding={(row, building) => setBuilding.mutateAsync({ row, building })}
                         onEnd={(row, lastDay) => end.mutateAsync({ row, lastDay })}
                         onNewContact={openNewContact}
                         renderAccess={renderAccess}
@@ -384,20 +404,23 @@ interface AssignFormProps {
     parties: Party[]
     busy: boolean
     submitLabel: string
-    onAssign: (party: string, validFrom: string) => Promise<unknown>
+    onAssign: (party: string, validFrom: string, building?: string | null) => Promise<unknown>
     onNewContact: (onCreated: (id: string) => void) => void
     onDone: () => void
+    /** Offer "which building does it own?" (landowners only, #890). */
+    buildings?: Building[]
 }
 
-function AssignForm({ parties, busy, submitLabel, onAssign, onNewContact, onDone }: AssignFormProps) {
+function AssignForm({ parties, busy, submitLabel, onAssign, onNewContact, onDone, buildings }: AssignFormProps) {
     const { t } = useTranslation()
     const [party, setParty] = useState('')
     const [validFrom, setValidFrom] = useState(todayBusinessIso())
+    const [building, setBuilding] = useState('')
 
     function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
         if (!party || !validFrom) return
-        void onAssign(party, validFrom).then(onDone, () => undefined)
+        void onAssign(party, validFrom, buildings ? building || null : undefined).then(onDone, () => undefined)
     }
 
     return (
@@ -407,6 +430,17 @@ function AssignForm({ parties, busy, submitLabel, onAssign, onNewContact, onDone
                 <span>{t('pages.zevSettings.parties.validFrom')}</span>
                 <CivilDateInput value={validFrom || null} onChange={(iso) => setValidFrom(iso ?? '')} clearable={false} />
             </label>
+            {buildings && buildings.length > 0 && (
+                <label>
+                    <span>{t('pages.zevSettings.parties.landownerBuilding')}</span>
+                    <select value={building} onChange={(event) => setBuilding(event.target.value)}>
+                        <option value="">{t('pages.zevSettings.parties.buildingNotSpecified')}</option>
+                        {buildings.map((candidate) => (
+                            <option key={candidate.id} value={candidate.id}>{candidate.name}</option>
+                        ))}
+                    </select>
+                </label>
+            )}
             <div className="actions-row actions-row-wrap">
                 <button type="submit" className="button button-primary" disabled={busy || !party || !validFrom}>{submitLabel}</button>
                 <button type="button" className="button button-secondary" onClick={onDone}>{t('common.cancel')}</button>
@@ -513,18 +547,21 @@ interface LandownersProps {
     parties: Party[]
     canManage: boolean
     busy: boolean
-    onAssign: (party: string, validFrom: string) => Promise<unknown>
+    buildings: Building[]
+    onAssign: (party: string, validFrom: string, building?: string | null) => Promise<unknown>
+    onSetBuilding: (row: ZevPartyRole, building: string | null) => Promise<unknown>
     onEnd: (row: ZevPartyRole, lastDay: string) => Promise<unknown>
     onNewContact: (onCreated: (id: string) => void) => void
     /** The landowner's access in OpenZEV, shown on its row (a landowner gets none by its role). */
     renderAccess: (partyId: string) => ReactNode
 }
 
-function Landowners({ rows, parties, canManage, busy, onAssign, onEnd, onNewContact, renderAccess }: LandownersProps) {
+function Landowners({ rows, parties, canManage, busy, buildings, onAssign, onSetBuilding, onEnd, onNewContact, renderAccess }: LandownersProps) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
     const [adding, setAdding] = useState(false)
     const [ending, setEnding] = useState<string | null>(null)
+    const [settingBuilding, setSettingBuilding] = useState<string | null>(null)
     const [lastDay, setLastDay] = useState(todayBusinessIso())
     const today = todayBusinessIso()
     const listed = rows
@@ -550,6 +587,7 @@ function Landowners({ rows, parties, canManage, busy, onAssign, onEnd, onNewCont
                     parties={parties}
                     busy={busy}
                     submitLabel={t('pages.zevSettings.parties.addLandowner')}
+                    buildings={buildings}
                     onAssign={onAssign}
                     onNewContact={onNewContact}
                     onDone={() => setAdding(false)}
@@ -562,6 +600,11 @@ function Landowners({ rows, parties, canManage, busy, onAssign, onEnd, onNewCont
                         <li key={row.id} className="zev-access-row">
                             <div className="zev-access-who">
                                 <strong>{row.party_display_name}</strong>
+                                {row.building_name && (
+                                    <span className="zev-access-badges">
+                                        <span className="badge badge-neutral">{row.building_name}</span>
+                                    </span>
+                                )}
                             </div>
                             <div className="zev-access-meta muted">
                                 <span>
@@ -569,6 +612,34 @@ function Landowners({ rows, parties, canManage, busy, onAssign, onEnd, onNewCont
                                     {row.valid_to && ` · ${t('pages.zevSettings.access.until', { date: formatShortDate(row.valid_to, settings) })}`}
                                 </span>
                             </div>
+                            {canManage && row.valid_to === null && buildings.length > 0 && (
+                                <div className="zev-access-actions actions-row actions-row-wrap">
+                                    {settingBuilding === row.id ? (
+                                        <label className="zev-parties-inline-date">
+                                            <span>{t('pages.zevSettings.parties.landownerBuilding')}</span>
+                                            <select
+                                                value={row.building ?? ''}
+                                                disabled={busy}
+                                                onChange={(event) => {
+                                                    void onSetBuilding(row, event.target.value || null).then(
+                                                        () => setSettingBuilding(null),
+                                                        () => undefined,
+                                                    )
+                                                }}
+                                            >
+                                                <option value="">{t('pages.zevSettings.parties.buildingNotSpecified')}</option>
+                                                {buildings.map((candidate) => (
+                                                    <option key={candidate.id} value={candidate.id}>{candidate.name}</option>
+                                                ))}
+                                            </select>
+                                        </label>
+                                    ) : (
+                                        <button type="button" className="button button-secondary button-compact" onClick={() => setSettingBuilding(row.id)}>
+                                            {t(row.building ? 'pages.zevSettings.parties.changeBuilding' : 'pages.zevSettings.parties.setBuilding')}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                             {canManage && row.valid_to === null && (
                                 <div className="zev-access-actions actions-row actions-row-wrap">
                                     {ending === row.id ? (

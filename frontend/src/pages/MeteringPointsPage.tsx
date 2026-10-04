@@ -83,6 +83,9 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
         setAttentionFilter,
         assignmentFilter,
         setAssignmentFilter,
+        buildingFilter,
+        setBuildingFilter,
+        buildings,
         clearFilters,
         openCreateMpModal,
         openEditMpModal,
@@ -147,6 +150,9 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                     typeFilter={typeFilter}
                     attentionFilter={attentionFilter}
                     assignmentFilter={assignmentFilter}
+                    buildings={buildings}
+                    buildingFilter={buildingFilter}
+                    onChangeBuildingFilter={setBuildingFilter}
                     onChangeSearchTerm={setSearchTerm}
                     onChangeStatusFilter={setStatusFilter}
                     onChangeTypeFilter={setTypeFilter}
@@ -164,6 +170,7 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                     onClose={closeMpModal}
                     onSubmit={submitMpForm}
                     setForm={setMpForm}
+                    buildings={buildings}
                 />
                 <MeteringAssignmentFormModal
                     isOpen={showAssignModal}
@@ -209,6 +216,7 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                             healthByMeteringPoint={meteringPointHealthById}
                             holderLessByMeteringPoint={meteringPointHolderLessById}
                             isManagedScope={isManagedScope}
+                            showBuilding={buildings.length > 1}
                             readOnly={readOnly}
                             canDeleteData={canDeleteData}
                             deleteMeteringPointPending={deleteMpMutation.isPending}

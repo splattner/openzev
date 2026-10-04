@@ -40,6 +40,8 @@ type MeteringPointsListProps = {
   holderLessByMeteringPoint: Map<string, boolean>
   settings: AppSettings
   isManagedScope: boolean
+  /** Name the building on each card; only for a ZEV with several buildings (#890). */
+  showBuilding?: boolean
   /** A viewer reads only (#761): no edit, assign, delete. */
   readOnly?: boolean
   canDeleteData: boolean
@@ -63,6 +65,7 @@ export function MeteringPointsList({
   holderLessByMeteringPoint,
   settings,
   isManagedScope,
+  showBuilding = false,
   readOnly = false,
   canDeleteData,
   deleteMeteringPointPending,
@@ -168,6 +171,7 @@ export function MeteringPointsList({
             <div className="metering-point-card-header">
               <div className="metering-point-title">
                 <strong>{point.meter_id}</strong>
+                {showBuilding && <span className="muted">{point.building_name}</span>}
                 <span className="muted">{point.location_description || t('pages.meteringPoints.noLocation')}</span>
                 <div className="metering-point-badges">
                   <span className={point.is_active ? 'badge badge-success' : 'badge badge-danger'}>

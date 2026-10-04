@@ -28,6 +28,8 @@ export type MeteringPointStatusFilter = 'all' | 'active' | 'inactive'
 export type MeteringPointTypeFilter = 'all' | MeteringPoint['meter_type']
 /** Whether the meter has a holder *today* — mirrors `getMeteringPointCounts`' `assignedCount`. */
 export type MeteringPointAssignmentFilter = 'all' | 'assigned' | 'unassigned'
+/** `'all'`, or the id of one building (#890). */
+export type MeteringPointBuildingFilter = string
 export type AssignmentState = 'current' | 'upcoming' | 'ended'
 
 export function getAssignmentState(assignment: MeteringPointAssignment, todayIso: string): AssignmentState {
@@ -165,7 +167,12 @@ export const METERING_POINT_FILTER_KEYS = {
   type: 'type',
   attention: 'attention',
   assignment: 'assignment',
+  building: 'building',
 } as const
+
+export function readMeteringPointBuildingFilter(value: string | null): MeteringPointBuildingFilter {
+  return value || 'all'
+}
 
 export function readMeteringPointStatusFilter(value: string | null): MeteringPointStatusFilter {
   return value === 'active' || value === 'inactive' ? value : 'all'

@@ -1,4 +1,6 @@
 import type {
+  Building,
+  BuildingInput,
   GridOperatorList,
   Party,
   PartyInput,
@@ -284,6 +286,7 @@ export async function assignPartyRole(input: {
   role: PartyRoleName
   valid_from: string
   valid_to?: string | null
+  building?: string | null
 }): Promise<ZevPartyRole> {
   const { data } = await api.post<ZevPartyRole>('/zev/party-roles/', input)
   return data
@@ -293,4 +296,30 @@ export async function assignPartyRole(input: {
 export async function endPartyRole(id: string, lastDay: string): Promise<ZevPartyRole | null> {
   const response = await api.post<ZevPartyRole>(`/zev/party-roles/${id}/end/`, { last_day: lastDay })
   return response.status === 204 ? null : response.data
+}
+
+/** Points a landowner role at the building it owns; ``null`` clears it. */
+export async function setPartyRoleBuilding(id: string, building: string | null): Promise<ZevPartyRole> {
+  const { data } = await api.post<ZevPartyRole>(`/zev/party-roles/${id}/building/`, { building })
+  return data
+}
+
+// ── Buildings (#890, SPEC-2026-10-buildings-and-sites §5.1) ──
+
+export async function fetchBuildings(zevId: string): Promise<Building[]> {
+  return fetchAllPages<Building>('/zev/buildings/', { zev_id: zevId })
+}
+
+export async function createBuilding(input: BuildingInput): Promise<Building> {
+  const { data } = await api.post<Building>('/zev/buildings/', input)
+  return data
+}
+
+export async function updateBuilding(id: string, input: Partial<BuildingInput>): Promise<Building> {
+  const { data } = await api.patch<Building>(`/zev/buildings/${id}/`, input)
+  return data
+}
+
+export async function deleteBuilding(id: string): Promise<void> {
+  await api.delete(`/zev/buildings/${id}/`)
 }

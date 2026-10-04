@@ -24,6 +24,7 @@ export const queryKeys = {
     participantGeocodingEnabled: () => ['zev', 'participant-geocoding-enabled'] as const,
     access: (zevId: string, includeEnded = false) => ['zev', 'access', zevId, includeEnded] as const,
     parties: (zevId: string) => ['zev', 'parties', zevId] as const,
+    buildings: (zevId: string) => ['zev', 'buildings', zevId] as const,
     partyRoles: (zevId: string, includeEnded = false) => ['zev', 'partyRoles', zevId, includeEnded] as const,
   },
   tariffs: {

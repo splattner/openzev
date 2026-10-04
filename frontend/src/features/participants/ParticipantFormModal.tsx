@@ -6,10 +6,10 @@ import { useTranslation } from 'react-i18next'
 import { CivilDateInput } from '../../components/CivilDateInput'
 import { FormModal } from '../../components/FormModal'
 import { FormModalFooter } from '../../components/FormModalFooter'
-import { fetchParties } from '../../lib/api/zev'
+import { fetchBuildings, fetchParties } from '../../lib/api/zev'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { TITLE_KEYS } from '../../lib/participantTitle'
-import type { Participant, ParticipantInput, Party } from '../../types/api'
+import type { Building, Participant, ParticipantInput, Party } from '../../types/api'
 import {
   defaultParticipantFormValues,
   mapParticipantFormValuesToInput,
@@ -53,6 +53,13 @@ export function ParticipantFormModal({
     queryFn: () => fetchParties(selectedZevId),
     enabled: isOpen && isCreate && Boolean(selectedZevId),
   })
+  // "Copy address from building" (#890): a participant often lives where the meters are.
+  const buildingsQuery = useQuery({
+    queryKey: queryKeys.zev.buildings(selectedZevId),
+    queryFn: () => fetchBuildings(selectedZevId),
+    enabled: isOpen && isCreate && Boolean(selectedZevId),
+  })
+  const addressBuildings = (buildingsQuery.data ?? []).filter((building) => building.address_line1.trim())
   const kind = useWatch({ control: form.control, name: 'kind' })
   const partyId = useWatch({ control: form.control, name: 'party' })
   const shared = Boolean(partyId)
@@ -76,6 +83,12 @@ export function ParticipantFormModal({
       'email', 'phone', 'address_line1', 'address_line2', 'postal_code', 'city',
     ] as const) {
       form.setValue(field, (party[field] ?? '') as never)
+    }
+  }
+
+  function copyBuildingAddress(building: Building) {
+    for (const field of ['address_line1', 'address_line2', 'postal_code', 'city'] as const) {
+      form.setValue(field, building[field] ?? '', { shouldDirty: true })
     }
   }
 
@@ -156,6 +169,34 @@ export function ParticipantFormModal({
           <span>{t('pages.participants.form.phone')}</span>
           <input {...form.register('phone')} />
         </label>
+        {isCreate && addressBuildings.length === 1 && (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <button
+              type="button"
+              className="button button-secondary button-compact"
+              onClick={() => copyBuildingAddress(addressBuildings[0])}
+            >
+              {t('pages.participants.form.copyFromBuildingNamed', { name: addressBuildings[0].name })}
+            </button>
+          </div>
+        )}
+        {isCreate && addressBuildings.length > 1 && (
+          <label style={{ gridColumn: '1 / -1' }}>
+            <span>{t('pages.participants.form.copyFromBuilding')}</span>
+            <select
+              value=""
+              onChange={(event) => {
+                const building = addressBuildings.find((candidate) => candidate.id === event.target.value)
+                if (building) copyBuildingAddress(building)
+              }}
+            >
+              <option value="">{t('pages.participants.form.copyFromBuildingPlaceholder')}</option>
+              {addressBuildings.map((building) => (
+                <option key={building.id} value={building.id}>{building.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <label style={{ gridColumn: '1 / -1' }}>
           <span>{t('pages.participants.form.addressLine1')}</span>
           <input {...form.register('address_line1')} />

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
 import { FormModalFooter } from '../../components/FormModalFooter'
 import { METER_TYPE_OPTIONS } from '../../lib/options'
-import type { MeteringPointInput } from '../../types/api'
+import type { Building, MeteringPointInput } from '../../types/api'
 
 type MeteringPointFormModalProps = {
   isOpen: boolean
@@ -15,6 +15,8 @@ type MeteringPointFormModalProps = {
   onClose: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   setForm: Dispatch<SetStateAction<MeteringPointInput>>
+  /** The ZEV's buildings; the select shows only when there is more than one (#890). */
+  buildings?: Building[]
 }
 
 export function MeteringPointFormModal({
@@ -26,6 +28,7 @@ export function MeteringPointFormModal({
   onClose,
   onSubmit,
   setForm,
+  buildings = [],
 }: MeteringPointFormModalProps) {
   const { t } = useTranslation()
 
@@ -90,6 +93,25 @@ export function MeteringPointFormModal({
               description={t('pages.meteringPoints.form.behindMeterGenerationHelp')}
             />
           </div>
+        )}
+
+        {buildings.length > 1 && (
+          <label style={{ gridColumn: '1 / -1' }}>
+            <span>{t('pages.meteringPoints.form.building')}</span>
+            <select
+              value={form.building ?? ''}
+              onChange={(event) => {
+                const value = event.target.value
+                setForm((previous) => ({ ...previous, building: value || undefined }))
+              }}
+              required
+            >
+              <option value="">{t('pages.meteringPoints.form.buildingPlaceholder')}</option>
+              {buildings.map((building) => (
+                <option key={building.id} value={building.id}>{building.name}</option>
+              ))}
+            </select>
+          </label>
         )}
 
         <label style={{ gridColumn: '1 / -1' }}>

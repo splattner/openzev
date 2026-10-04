@@ -9,6 +9,7 @@ import {
     deleteMeteringPoint,
     deleteMeteringPointReadings,
     deleteMeteringPointAssignment,
+    fetchBuildings,
     fetchMeteringPointAssignments,
     fetchMeteringPoints,
     fetchParticipants,
@@ -34,10 +35,12 @@ import {
     METERING_POINT_FILTER_KEYS,
     meteringPointNeedsAttention,
     readMeteringPointAssignmentFilter,
+    readMeteringPointBuildingFilter,
     readMeteringPointAttentionFilter,
     readMeteringPointStatusFilter,
     readMeteringPointTypeFilter,
     type MeteringPointAssignmentFilter,
+    type MeteringPointBuildingFilter,
     type MeteringPointAttentionFilter,
     type MeteringPointHealth,
     type MeteringPointStatusFilter,
@@ -62,6 +65,7 @@ export function getScopedAndFilteredMeteringPoints(
         attentionFilter = 'all',
         needsAttentionByMeteringPoint,
         assignmentFilter = 'all',
+        buildingFilter = 'all',
         isAssignedByMeteringPoint,
         participantNamesByMeteringPoint,
     }: {
@@ -74,6 +78,8 @@ export function getScopedAndFilteredMeteringPoints(
         /** Only consulted when `attentionFilter` is `'attention'`; a missing entry does not match. */
         needsAttentionByMeteringPoint?: Map<string, boolean>
         assignmentFilter?: MeteringPointAssignmentFilter
+        /** `'all'`, or a building id (#890). */
+        buildingFilter?: MeteringPointBuildingFilter
         /** Only consulted when `assignmentFilter` isn't `'all'`; a missing entry counts as unassigned. */
         isAssignedByMeteringPoint?: Map<string, boolean>
         /** Space-joined names of every participant ever assigned to the meter, so search can match "which meter is Anna's?". */
@@ -93,7 +99,9 @@ export function getScopedAndFilteredMeteringPoints(
         const matchesSearch = !normalizedSearch
             || point.meter_id.toLowerCase().includes(normalizedSearch)
             || (point.location_description ?? '').toLowerCase().includes(normalizedSearch)
+            || (point.building_name ?? '').toLowerCase().includes(normalizedSearch)
             || (participantNamesByMeteringPoint?.get(point.id) ?? '').toLowerCase().includes(normalizedSearch)
+        const matchesBuilding = buildingFilter === 'all' || point.building === buildingFilter
         const matchesAttention = attentionFilter === 'all'
             || !!needsAttentionByMeteringPoint?.get(point.id)
         const isAssigned = !!isAssignedByMeteringPoint?.get(point.id)
@@ -101,7 +109,7 @@ export function getScopedAndFilteredMeteringPoints(
             || (assignmentFilter === 'assigned' && isAssigned)
             || (assignmentFilter === 'unassigned' && !isAssigned)
 
-        return matchesStatus && matchesType && matchesSearch && matchesAttention && matchesAssignment
+        return matchesStatus && matchesType && matchesSearch && matchesAttention && matchesAssignment && matchesBuilding
     })
 
     return { scopedMeteringPoints, meteringPoints }
@@ -201,6 +209,10 @@ export function useMeteringPointActions({
         () => readMeteringPointAssignmentFilter(searchParams.get(FILTER.assignment)),
     )
 
+    const [buildingFilter, setBuildingFilterState] = useState<MeteringPointBuildingFilter>(
+        () => readMeteringPointBuildingFilter(searchParams.get(FILTER.building)),
+    )
+
     /** Sets or removes one query param, without touching the others already there. */
     function writeFilterParam(key: string, value: string, isDefault: boolean) {
         setSearchParams((previous) => {
@@ -232,12 +244,18 @@ export function useMeteringPointActions({
         writeFilterParam(FILTER.assignment, value, value === 'all')
     }
 
+    function setBuildingFilter(value: MeteringPointBuildingFilter) {
+        setBuildingFilterState(value)
+        writeFilterParam(FILTER.building, value, value === 'all')
+    }
+
     function clearFilters() {
         setSearchTermState('')
         setStatusFilterState('all')
         setTypeFilterState('all')
         setAttentionFilterState('all')
         setAssignmentFilterState('all')
+        setBuildingFilterState('all')
         setSearchParams((previous) => {
             const next = new URLSearchParams(previous)
             Object.values(FILTER).forEach((key) => next.delete(key))
@@ -250,6 +268,13 @@ export function useMeteringPointActions({
         queryFn: fetchParticipants,
         enabled: isManagedScope && !!selectedZevId,
     })
+    // The building select and filter only exist for a ZEV with several (#890).
+    const buildingsQuery = useQuery({
+        queryKey: queryKeys.zev.buildings(selectedZevId || ''),
+        queryFn: () => fetchBuildings(selectedZevId || ''),
+        enabled: isManagedScope && !!selectedZevId,
+    })
+    const buildings = buildingsQuery.data ?? []
     const meteringPointsQuery = useQuery({
         queryKey: queryKeys.metering.points(selectedZevId || undefined),
         queryFn: () => fetchMeteringPoints(selectedZevId || undefined),
@@ -427,6 +452,7 @@ export function useMeteringPointActions({
             is_active: point.is_active,
             location_description: point.location_description ?? '',
             has_behind_meter_generation: point.has_behind_meter_generation,
+            building: point.building,
         })
         setShowMpModal(true)
     }
@@ -662,6 +688,7 @@ export function useMeteringPointActions({
         attentionFilter,
         needsAttentionByMeteringPoint,
         assignmentFilter,
+        buildingFilter,
         isAssignedByMeteringPoint,
         participantNamesByMeteringPoint,
     })
@@ -683,6 +710,7 @@ export function useMeteringPointActions({
         || typeFilter !== 'all'
         || attentionFilter !== 'all'
         || assignmentFilter !== 'all'
+        || buildingFilter !== 'all'
 
     return {
         // Queries
@@ -726,6 +754,9 @@ export function useMeteringPointActions({
         setAttentionFilter,
         assignmentFilter,
         setAssignmentFilter,
+        buildingFilter,
+        setBuildingFilter,
+        buildings,
         clearFilters,
         // Form handlers
         openCreateMpModal,
