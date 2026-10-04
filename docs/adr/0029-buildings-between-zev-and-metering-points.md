@@ -72,6 +72,11 @@ billing address.
 `metering_points` section, and metering points and landowner roles point at an archive building
 id. Archives of format 5 and older import with the migration's rule (decision 6).
 
+**9. The map shows buildings.** The optional map (ADR 0012) draws each building's footprint
+with the participants whose meters are in it, geocoded from the building address. Participant
+billing addresses are no longer sent to Nominatim: the map's question is where the energy is
+used, and the building now answers it.
+
 ## Consequences
 
 - Metering points can be listed by location, as the grid operator's registration of a vZEV

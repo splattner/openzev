@@ -40,6 +40,7 @@ location, and a vZEV with several landowners cannot say who owns which building.
 | Creation flows | Wizard, self-setup, admin create, transfer import create the default building |
 | Transfer / backups | Archive format 6 (`buildings.json` in the `metering_points` section); backups registry |
 | Frontend | Buildings managed on the metering points page (list grouped by building, building form); building select in the metering-point form; building filter; building on landowner rows; "copy address from building" in the participant form; "copy address from participant" in the building form |
+| Map | The participants map draws buildings (geocoded from the building address) instead of participants' billing addresses; participant addresses are no longer geocoded (§7.7) |
 | Demo | `seed_demo`: the vZEV demo gets more than one building (three houses, the owner's landowner role names its house) |
 | Docs | User guide (ZEV setup, metering points, participants, transfer), baseline specs |
 
@@ -48,7 +49,6 @@ location, and a vZEV with several landowners cannot say who owns which building.
 - Using the building in generated documents (invoices, contracts, annual statement) or template
   variables. Follow-up once the data exists.
 - Dated buildings (ADR 0029 decision 1).
-- Geocoding buildings or showing them on the participants map.
 - Looking up EGIDs in the federal register (GWR); the EGID is typed.
 - LEG (#515).
 - MCP tools.
@@ -301,6 +301,43 @@ ZEV settings.
 
 When the ZEV has a building with an address, the create form shows "Copy address from building"
 (select of buildings; one building → a button) that fills the billing address fields.
+
+### 7.7 Map (participants page, ADR 0012 amended)
+
+The optional map (flag `PARTICIPANT_GEOCODING_ENABLED`, key unchanged) shows where the meters
+are, not where invoices go.
+
+**Backend:**
+
+- `BuildingSerializer` gains `building_footprint` (read-only) =
+  `get_cached_building_footprint(address_line1, postal_code, city)` (cache read only, never calls
+  Nominatim), and `current_participants` (read-only): `[{"id", "display_name"}]` of the
+  participants with an assignment active today on one of the building's metering points,
+  de-duplicated, ordered by display name. The viewset prefetches what this needs (no N+1).
+- New task `zev.tasks.warm_building_geocode_cache_task(building_id)` and
+  `trigger_building_geocode_if_address_present(building)` (same rules as the participant one:
+  no-op while the flag is off, needs `address_line1` and `city`, enqueued `on_commit`). Called on
+  building create and update (`BuildingViewSet.perform_create` / `perform_update`), by
+  `ensure_initial_building`, and for each building created by the transfer importer. The data
+  migration triggers nothing: its buildings come from participant or issuer addresses that are
+  already cached under the same key when the flag was on.
+- Participant addresses are no longer geocoded: `trigger_geocode_if_address_present` /
+  `warm_participant_geocode_cache_task` and their calls (participant serializer create/update,
+  wizard) are removed, and `ParticipantSerializer.building_footprint` is dropped. Sending billing
+  addresses to Nominatim is no longer needed for anything.
+- The flag description reads "…building addresses… for the map".
+
+**Frontend:**
+
+- `Building` gains `building_footprint: ParticipantBuildingFootprint | null` (rename the type
+  `BuildingFootprint`) and `current_participants: { id: string; display_name: string }[]`.
+  `Participant.building_footprint` is removed.
+- `ParticipantsMap` → `BuildingsMap` (`features/participants/BuildingsMap.tsx`), still on the
+  participants page under the same flag check, fed from `fetchBuildings(zevId)`. One footprint
+  per building (buildings sharing a footprint are grouped as today); the popup shows the
+  building name, its address, and its current participants (or "No participant has meters
+  here"). The note below the map counts buildings that could not be located.
+- Title "Buildings" / "Gebäude" etc.; user guide 03 "Map" section rewritten accordingly.
 
 ### 7.6 i18n
 

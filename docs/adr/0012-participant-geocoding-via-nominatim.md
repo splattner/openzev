@@ -1,6 +1,6 @@
 # ADR 0012: Participant address geocoding via public Nominatim, cached not persisted
 
-- Status: Accepted
+- Status: Accepted (amended 2026-10-04 by ADR 0029: building addresses are geocoded instead of participant addresses)
 - Date: 2026-07-25
 
 ## Context
@@ -57,3 +57,10 @@ Nominatim's public server also disallows bulk/heavy automated use. The chosen tr
 ### Addendum (2026-09): opt-in via feature flag
 
 This decision shipped with geocoding always on for every instance with participant addresses, which sends those addresses to a public third-party API with no way for an operator to opt out (#796). `FeatureFlag.PARTICIPANT_GEOCODING_ENABLED` now gates it, **default off** — an operator turns it on explicitly (Admin → System Settings → Features) once they've decided that transfer is acceptable for their deployment. The flag is checked in `zev/geocoding.py::warm_geocode_cache`, the single choke point both the Celery task and the `geocode_participants` backfill command go through, and (redundantly, to avoid enqueuing dead work) in `zev/tasks.py::trigger_geocode_if_address_present`. `get_cached_building_footprint` (the read path used at API serialization time) stays ungated — it never calls Nominatim regardless of the flag, so there's nothing there to disable.
+
+## Amendment (2026-10-04, ADR 0029)
+
+The map shows buildings, not participants: what is geocoded is a building's address
+(`zev.Building`), and participant billing addresses are no longer sent to Nominatim. The
+caching, the flag (`PARTICIPANT_GEOCODING_ENABLED`, key kept) and the Swiss-only assumption are
+unchanged. See `docs/specs/2026-10-buildings-and-sites.md` §7.7.
