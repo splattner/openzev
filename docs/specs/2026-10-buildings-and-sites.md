@@ -24,8 +24,8 @@ location, and a vZEV with several landowners cannot say who owns which building.
 - A ZEV has one or more **buildings** (address, optional EGID).
 - Every metering point belongs to one building; `location_description` is the unit within it.
 - A landowner role can name the building it owns.
-- Buildings are managed in ZEV settings → Buildings; the simple one-building ZEV shows no new
-  field anywhere else.
+- Buildings are managed on the metering points page, which groups metering points by building;
+  the simple one-building ZEV shows one compact building line and no new form field.
 - Existing data migrates: one building per ZEV, one per distinct participant address in a vZEV.
 
 ## 2. Scope
@@ -39,7 +39,7 @@ location, and a vZEV with several landowners cannot say who owns which building.
 | API | `/api/v1/zev/buildings/` CRUD (`?zev_id=` like the other scoped endpoints); `building` on metering points; `building` on party-role assign and a building change on landowner rows |
 | Creation flows | Wizard, self-setup, admin create, transfer import create the default building |
 | Transfer / backups | Archive format 6 (`buildings.json` in the `metering_points` section); backups registry |
-| Frontend | ZEV settings → Buildings tab; building select in the metering-point form; building column and filter in the metering-point list; building on landowner rows; "copy address from building" in the participant form; "copy address from participant" in the building form |
+| Frontend | Buildings managed on the metering points page (list grouped by building, building form); building select in the metering-point form; building filter; building on landowner rows; "copy address from building" in the participant form; "copy address from participant" in the building form |
 | Demo | `seed_demo`: the vZEV demo gets more than one building (three houses, the owner's landowner role names its house) |
 | Docs | User guide (ZEV setup, metering points, participants, transfer), baseline specs |
 
@@ -67,7 +67,8 @@ Backend: `BuildingViewSet` uses `ZevScopedQuerySetMixin` with `zev_lookup = "zev
 `scope_parent_path = ("zev",)`, no participant path, and `BaseZevScopedPermission`
 (`allow_participant_safe_methods = False`, as `PartyViewSet`). Unsafe methods
 require `can_manage`; a disabled ZEV is read-only for non-admins (existing rule). Frontend: the
-Buildings tab follows `useCommunityAccess().canManage` for its write controls.
+building actions on the metering points page follow the page's existing manage check
+(`isManagedScope` and not read-only), like the metering-point actions.
 
 ## 4. Data model
 
@@ -253,7 +254,6 @@ export type BuildingInput = Pick<Building, 'zev' | 'name' | 'address_line1' | 'a
 
 `MeteringPoint` gains `building: string`, `building_name: string`; `MeteringPointInput` gains
 `building?: string`. `ZevPartyRole` gains `building: string | null`, `building_name: string | null`.
-`ZevSettingsTab` gains `'buildings'`.
 
 ### 7.2 API client (`lib/api/zev.ts`, `queryKeys.ts`)
 
@@ -261,28 +261,35 @@ export type BuildingInput = Pick<Building, 'zev' | 'name' | 'address_line1' | 'a
 `setPartyRoleBuilding(roleId, building)`; `assignPartyRole` accepts `building`. Query key
 `zev.buildings(zevId)`; building mutations invalidate it and the metering-point list.
 
-### 7.3 ZEV settings → Buildings (`features/zev/ZevBuildingsSection.tsx`, `BuildingFormModal.tsx`)
+### 7.3 Buildings on the metering points page (`features/meteringPoints/*`, `features/zev/BuildingFormModal.tsx`)
 
-- New tab `buildings` between `people` and `billing`; route `/zev-settings/buildings`; in
-  `OUTSIDE_THE_FORM` (saves on its own).
-- A list of buildings (name, address lines, EGID, metering-point count, landowners whose role
-  names it), following `2026-04-frontend-management-page-design.md` (card list, "Add building"
-  primary action, row actions edit / delete with icons).
-- Delete is disabled with a tooltip when `metering_point_count > 0`.
-- `BuildingFormModal`: name, address (line 1, line 2, postal code, city), EGID (number input),
-  notes; on create, a "Copy address from participant" select (participants' parties with an
-  address) that fills the address and, when the name is empty, the name.
-- Intro text explains the building is where the meters are, as opposed to the billing address.
+Buildings are managed where their meters are (ADR 0029 decision 7). There is no Buildings tab in
+ZEV settings.
 
-### 7.4 Metering points (`features/meteringPoints/*`)
-
-- `MeteringPointFormModal`: a "Building" select, shown when the ZEV has more than one building
-  (with one, the field is hidden and the building is sent implicitly by the backend default).
+- **Toolbar** (`MeteringPointsToolbar`): "Add building" as a secondary action next to the primary
+  "Add metering point" (managers only); a building filter when the ZEV has more than one building.
+- **One building:** a compact building line above the metering-point list (`BuildingHeader`):
+  name, address on one line, EGID when set, landowners whose role names it, and an edit action
+  for managers. The cards are otherwise unchanged.
+- **Several buildings:** `MeteringPointsList` groups the cards by building (ordered by building
+  name). Each group starts with a `BuildingHeader` (name, address, EGID, landowners, metering-point
+  count) with edit and delete actions for managers; delete is disabled with a tooltip while the
+  building has metering points. A building with no metering points still shows its header with
+  "No metering points in this building yet". Filtering by building shows only that group; search
+  and the other filters apply within groups, and a group with no matching card is hidden unless
+  it has no metering points at all and no filter is active.
+- **Building form** (`BuildingFormModal`): name, address (line 1, line 2, postal code, city),
+  EGID (number input), notes; on create, a "Copy address from participant" select (participants'
+  parties with an address) that fills the address and, when the name is empty, the name. A short
+  hint says a building is where the meters are, not where invoices go.
+- **Metering-point form** (`MeteringPointFormModal`): a "Building" select, shown when the ZEV has
+  more than one building (with one, the field is hidden and the backend default applies). Opening
+  "Add metering point" from a building group's header preselects that building.
   `location_description` label becomes "Unit within the building".
-- `MeteringPointsList`: a building column/line when the ZEV has more than one building.
-- `MeteringPointsToolbar`: a building filter when the ZEV has more than one building.
+- Building mutations invalidate `zev.buildings(zevId)`, the party roles and the metering-point
+  list; participants' scope (not managed) does not load buildings and shows no headers.
 
-### 7.5 People & access (`features/zev/ZevPartiesSection.tsx`)
+### 7.4 People & access (`features/zev/ZevPartiesSection.tsx`)
 
 - Landowner rows show their building's name, and an action to set or change it (select of the
   ZEV's buildings, plus "Not specified").
@@ -290,12 +297,12 @@ export type BuildingInput = Pick<Building, 'zev' | 'name' | 'address_line1' | 'a
 - `landownersHint` text: the owners of the plots or buildings; with several buildings, link each
   landowner to the one it owns.
 
-### 7.6 Participants (`features/participants/ParticipantFormModal.tsx`)
+### 7.5 Participants (`features/participants/ParticipantFormModal.tsx`)
 
 When the ZEV has a building with an address, the create form shows "Copy address from building"
 (select of buildings; one building → a button) that fills the billing address fields.
 
-### 7.7 i18n
+### 7.6 i18n
 
 All new strings in `de`, `en`, `fr`, `it` (`pages.zevSettings.tabs.buildings`,
 `pages.zevSettings.buildings.*`, `pages.meteringPoints.form.building`,
@@ -335,7 +342,7 @@ covered by the existing metering-point update event. Landowner building changes:
 
 | Risk | Mitigation |
 |---|---|
-| A migrated vZEV has a building per participant even where a participant's billing address is not its meter's location | The rule is documented as a guess; the Buildings tab shows the metering-point count, and merging is moving points then deleting the empty building |
+| A migrated vZEV has a building per participant even where a participant's billing address is not its meter's location | The rule is documented as a guess; the metering points page groups points by building, and merging is moving points then deleting the empty building |
 | A metering-point creation path forgets the building | `MeteringPoint.save()` default; the column is not null |
 | Restore from backup: FK order | Registry order test |
 | Constraint swap on `ZevPartyRole` fails on duplicate open rows | The old constraint was stricter, so no existing data violates the new one |

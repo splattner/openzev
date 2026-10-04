@@ -60,9 +60,13 @@ The address guess is a starting point to be checked, not a fact: the migration c
 whether a participant's billing address is where its meter is. The cases this ADR exists for
 (a landlord, a holiday home) are exactly the ones it guesses wrong, and the user guide says so.
 
-**7. Buildings are managed in ZEV settings.** A new **Buildings** tab sits next to People &
-access. The metering-point form picks a building, and the participant form can copy a building's
-address as the billing address.
+**7. Buildings are managed on the metering points page.** A building only matters as where
+its meters are, and that page is where meters are added: a vZEV operator onboarding a new
+participant's house adds the building and its meters in one place. With several buildings the
+list is grouped by building, each group headed by the building with its actions; with one, a
+compact building line sits above the list. Only the landowner link stays in People & access,
+because it belongs to the role. The participant form can copy a building's address as the
+billing address.
 
 **8. The transfer archive carries buildings (format 6).** `buildings.json` travels in the
 `metering_points` section, and metering points and landowner roles point at an archive building
@@ -91,6 +95,9 @@ id. Archives of format 5 and older import with the migration's rule (decision 6)
   while its grid connection has one; the field means the connection, not a building.
 - **Landowner link per party (many-to-many).** Simpler, but cannot record that a building was
   sold on a date while the seller keeps another.
+- **A Buildings tab in ZEV settings.** Keeps structure next to the parties, but separates a
+  building from the meters it holds and puts it on a page visited rarely, so adding a house to a
+  vZEV would take two places.
 - **Dated buildings.** Adds windows to every location question for no case that needs them;
   the metering-point assignments already carry time.
 
