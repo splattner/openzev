@@ -402,6 +402,8 @@ export function useMeteringPointActions({
         onSuccess: (_, variables, submittedScope) => {
             if (!ownsCurrentSession(submittedScope)) return
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.points(submittedScope.selectedZevId || undefined) })
+            // A building's metering-point count (and whether it can be deleted) follows its points.
+            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.buildings(submittedScope.selectedZevId || '') })
             if (!isCurrent(submittedScope.scope)) return
             closeMpModal()
             pushToast(
@@ -427,6 +429,7 @@ export function useMeteringPointActions({
             // metering_point), so every reading-derived view is stale too —
             // invalidate the whole metering namespace rather than enumerating keys.
             void queryClient.invalidateQueries({ queryKey: ['metering'] })
+            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.buildings(submittedScope.selectedZevId || '') })
             if (!isCurrent(submittedScope.scope)) return
             pushToast(t('pages.meteringPoints.messages.deleted'), 'success')
         },
@@ -448,6 +451,8 @@ export function useMeteringPointActions({
             // Participants derive has_metering_point_assignment / metering_points
             // from these rows, so their readiness state changes too.
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants(submittedScope.selectedZevId || undefined) })
+            // The map lists each building's current participants.
+            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.buildings(submittedScope.selectedZevId || '') })
             if (!isCurrent(submittedScope.scope)) return
             closeAssignModal()
             pushToast(
@@ -473,6 +478,8 @@ export function useMeteringPointActions({
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.pointAssignments() })
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.points(submittedScope.selectedZevId || undefined) })
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants(submittedScope.selectedZevId || undefined) })
+            // The map lists each building's current participants.
+            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.buildings(submittedScope.selectedZevId || '') })
             if (!isCurrent(submittedScope.scope)) return
             pushToast(t('pages.meteringPoints.messages.assignmentRemoved'), 'success')
         },
