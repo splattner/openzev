@@ -237,7 +237,7 @@ without the participant already having an invoice.
   `ParticipantSerializer.user is not None`; `onboarding_status` is passed through
   (`not_sent`/`sent`/`active`/`revoked`/`expired`); `meter_id`/`meter_type` come from the
   participant row's nested `metering_points`. **Deliberately omitted** although the REST
-  response carries them: `email`, `phone`, `title`, address fields, `building_footprint`,
+  response carries them: `email`, `phone`, `title`, address fields,
   `account_username`, onboarding link expiry — contact data the assistant does not need and that
   would otherwise be sent to the LLM provider (§1, privacy note in the user guide).
   `truncated`/`total` appear when `limit` cut the list or either sub-list hit its page cap.

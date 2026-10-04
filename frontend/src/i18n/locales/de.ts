@@ -1292,10 +1292,12 @@ export const de = {
                 validity: 'Gültigkeit',
             },
             map: {
-                title: 'Karte',
-                empty: 'Es konnten noch keine Teilnehmeradressen lokalisiert werden.',
-                notShown_one: '{{count}} Teilnehmer nicht angezeigt (Adresse konnte nicht lokalisiert werden).',
-                notShown_other: '{{count}} Teilnehmer nicht angezeigt (Adressen konnten nicht lokalisiert werden).',
+                title: 'Gebäude',
+                empty: 'Es konnten noch keine Gebäudeadressen lokalisiert werden.',
+                notShown_one: '{{count}} Gebäude nicht angezeigt (Adresse konnte nicht lokalisiert werden).',
+                notShown_other: '{{count}} Gebäude nicht angezeigt (Adressen konnten nicht lokalisiert werden).',
+                popupParticipants: 'Teilnehmer:',
+                popupNoParticipants: 'Kein Teilnehmer hat hier Zähler',
             },
             validity: {
                 current: 'Aktuell',

@@ -10,6 +10,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import FeatureFlag, UserRole
 from testing import factories
+from zev.models import Building
 from testing.helpers import make_user
 
 pytestmark = pytest.mark.django_db
@@ -23,7 +24,7 @@ def run(*args, **kwargs):
     return out.getvalue(), err.getvalue()
 
 
-class TestGeocodeParticipantsCommand:
+class TestGeocodeBuildingsCommand:
     def test_refuses_to_run_while_the_flag_is_off(self):
         FeatureFlag.objects.update_or_create(
             name=FeatureFlag.PARTICIPANT_GEOCODING_ENABLED, defaults={"enabled": False}
@@ -35,14 +36,15 @@ class TestGeocodeParticipantsCommand:
         FeatureFlag.objects.update_or_create(
             name=FeatureFlag.PARTICIPANT_GEOCODING_ENABLED, defaults={"enabled": True}
         )
-        factories.ParticipantFactory(address_line1="Main Street 1", postal_code="8000", city="Zurich")
-        factories.ParticipantFactory(address_line1="", postal_code="", city="")
+        zev = factories.ZevFactory()
+        Building.objects.create(zev=zev, name="A", address_line1="Main Street 1", postal_code="8000", city="Zurich")
+        Building.objects.create(zev=zev, name="B")
 
         with mock.patch("zev.management.commands.geocode_participants.warm_geocode_cache") as warm:
             out, _err = run("geocode_participants")
 
         warm.assert_called_once_with("Main Street 1", "8000", "Zurich")
-        assert "Warmed geocoding cache for 1 participant address(es)." in out
+        assert "Warmed geocoding cache for 1 building address(es)." in out
 
 
 class TestParticipantGeocodingEnabledEndpoint:

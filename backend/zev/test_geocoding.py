@@ -9,10 +9,15 @@ from django.db import transaction
 
 from accounts.models import FeatureFlag
 from zev import geocoding
-from zev.tasks import trigger_geocode_if_address_present, warm_participant_geocode_cache_task
+from zev.models import Building
+from zev.tasks import trigger_building_geocode_if_address_present, warm_building_geocode_cache_task
 from testing import factories
 
 pytestmark = pytest.mark.django_db
+
+
+def make_building(**fields):
+    return Building.objects.create(zev=factories.ZevFactory(), name="Haus", **fields)
 
 
 @pytest.fixture(autouse=True)
@@ -26,7 +31,7 @@ def clear_cache():
 def geocoding_enabled():
     # Off by default (#796) — this module is specifically about the geocoding
     # subsystem's behavior, so turn it on here and let
-    # TestParticipantGeocodingFeatureFlag below cover the off state.
+    # TestGeocodingFeatureFlag below cover the off state.
     FeatureFlag.objects.update_or_create(
         name=FeatureFlag.PARTICIPANT_GEOCODING_ENABLED, defaults={"enabled": True}
     )
@@ -153,64 +158,64 @@ class TestWarmGeocodeCache:
         assert geocoding.get_cached_building_footprint("", "8000", "Zurich") is None
 
 
-class TestWarmParticipantGeocodeCacheTask:
-    def test_missing_participant_returns_without_error(self):
-        warm_participant_geocode_cache_task.run("00000000-0000-0000-0000-000000000000")
+class TestWarmBuildingGeocodeCacheTask:
+    def test_missing_building_returns_without_error(self):
+        warm_building_geocode_cache_task.run("00000000-0000-0000-0000-000000000000")
 
-    def test_participant_without_address_is_skipped(self):
-        participant = factories.ParticipantFactory()
+    def test_building_without_address_is_skipped(self):
+        building = make_building()
         with mock.patch("zev.geocoding.warm_geocode_cache") as warm:
-            warm_participant_geocode_cache_task.run(str(participant.pk))
+            warm_building_geocode_cache_task.run(str(building.pk))
         warm.assert_not_called()
 
-    def test_participant_with_address_triggers_cache_warm(self):
-        participant = factories.ParticipantFactory(
+    def test_building_with_address_triggers_cache_warm(self):
+        building = make_building(
             address_line1="Main Street 1", postal_code="8000", city="Zurich",
         )
         with mock.patch("zev.geocoding.warm_geocode_cache") as warm:
-            warm_participant_geocode_cache_task.run(str(participant.pk))
+            warm_building_geocode_cache_task.run(str(building.pk))
         warm.assert_called_once_with("Main Street 1", "8000", "Zurich")
 
 
-class TestTriggerGeocodeIfAddressPresent:
+class TestTriggerBuildingGeocodeIfAddressPresent:
     def test_enqueues_when_address_present(self, django_capture_on_commit_callbacks):
-        participant = factories.ParticipantFactory(
+        building = make_building(
             address_line1="Main Street 1", postal_code="8000", city="Zurich",
         )
         with (
-            mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay") as delay,
+            mock.patch("zev.tasks.warm_building_geocode_cache_task.delay") as delay,
             django_capture_on_commit_callbacks(execute=True),
         ):
-            trigger_geocode_if_address_present(participant)
-        delay.assert_called_once_with(str(participant.pk))
+            trigger_building_geocode_if_address_present(building)
+        delay.assert_called_once_with(str(building.pk))
 
     def test_enqueues_only_after_transaction_commits(self, django_capture_on_commit_callbacks):
-        participant = factories.ParticipantFactory(
+        building = make_building(
             address_line1="Main Street 1", postal_code="8000", city="Zurich",
         )
         with (
-            mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay") as delay,
+            mock.patch("zev.tasks.warm_building_geocode_cache_task.delay") as delay,
             django_capture_on_commit_callbacks(execute=True),
         ):
             with transaction.atomic():
-                trigger_geocode_if_address_present(participant)
+                trigger_building_geocode_if_address_present(building)
                 delay.assert_not_called()
             delay.assert_not_called()
-        delay.assert_called_once_with(str(participant.pk))
+        delay.assert_called_once_with(str(building.pk))
 
     def test_does_not_enqueue_without_an_address(self, django_capture_on_commit_callbacks):
-        participant = factories.ParticipantFactory()
+        building = make_building()
         with (
-            mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay") as delay,
+            mock.patch("zev.tasks.warm_building_geocode_cache_task.delay") as delay,
             django_capture_on_commit_callbacks(execute=True),
         ):
-            trigger_geocode_if_address_present(participant)
+            trigger_building_geocode_if_address_present(building)
         delay.assert_not_called()
 
 
-class TestParticipantGeocodingFeatureFlag:
+class TestGeocodingFeatureFlag:
     """``FeatureFlag.PARTICIPANT_GEOCODING_ENABLED`` is off by default (#796):
-    no participant address should reach Nominatim, and no cache warm-up
+    no building address should reach Nominatim, and no cache warm-up
     should be enqueued, until an admin turns it on.
     """
 
@@ -233,14 +238,14 @@ class TestParticipantGeocodingFeatureFlag:
         assert geocoding.get_cached_building_footprint("Main Street 1", "8000", "Zurich") is None
 
     def test_does_not_enqueue_even_with_an_address(self, django_capture_on_commit_callbacks):
-        participant = factories.ParticipantFactory(
+        building = make_building(
             address_line1="Main Street 1", postal_code="8000", city="Zurich",
         )
         with (
-            mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay") as delay,
+            mock.patch("zev.tasks.warm_building_geocode_cache_task.delay") as delay,
             django_capture_on_commit_callbacks(execute=True),
         ):
-            trigger_geocode_if_address_present(participant)
+            trigger_building_geocode_if_address_present(building)
         delay.assert_not_called()
 
     def test_enabling_the_flag_unblocks_new_lookups(self):

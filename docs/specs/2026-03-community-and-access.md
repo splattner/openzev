@@ -1332,10 +1332,11 @@ On update:
    cannot edit their own owner-linked participant record through this
    endpoint.
 
-When a participant has both `address_line1` and `city`, the geocode cache warm-up
-is dispatched with `transaction.on_commit()` after the participant write has
-committed. A rolled-back create or address update therefore cannot enqueue a
-task that reads uncommitted participant data.
+A participant's address is no longer geocoded: the participants map draws buildings, and the
+geocode cache warm-up is dispatched (`transaction.on_commit()`, so a rolled-back write cannot
+enqueue a task that reads uncommitted data) when a building with `address_line1` and `city`
+is saved (SPEC-2026-10-buildings-and-sites §7.7). `ParticipantSerializer` no longer carries
+`building_footprint`.
 
 ### 8.3 Participant actions
 
@@ -1990,7 +1991,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `test_purge.py` | 3 | 8 | ZEV lifecycle phase 4 (§7.1b): refuses an active ZEV; a full purge deletes the ZEV and every `CASCADE` child (including both `PROTECT` relations, `Invoice` and `ExportJob`) and removes their media files from storage; `SET_NULL` rows (`AuditEvent`, `ContractIssue`, `BackupJob`) survive with their ZEV link cleared; the endpoint is admin-only, requires the exact ZEV name, refuses an active ZEV, and is audited |
 | `test_zev_id_filter.py` | 5 | 15 | `?zev_id=` narrowing on list endpoints |
 | `test_transfer.py` | 6 | 66 | Whole-ZEV archive shape, round-trip, rejected archives, schema parity, transfer endpoints |
-| `test_geocoding.py` | 4 | 20 | Building footprint cache, warm tasks, trigger-on-save dispatches after the surrounding transaction commits |
+| `test_geocoding.py` | 4 | 20 | Building footprint cache, warm tasks for buildings, trigger-on-save dispatches after the surrounding transaction commits |
 | `test_iban.py` | 4 | 13 | `normalize_iban`/`is_valid_iban` vectors plus shared recipient-address validation: whitespace/case normalization, MOD-97 accept/reject, blank-means-absent, and required address completeness when an IBAN is configured |
 
 ### 16.2 Frontend

@@ -10,13 +10,14 @@ import {
 } from '../features/participants/ParticipantOnboardingNotice'
 import { ParticipantFormModal } from '../features/participants/ParticipantFormModal'
 import { useParticipantAccountLinking } from '../features/participants/useParticipantAccountLinking'
-import { ParticipantsMap } from '../features/participants/ParticipantsMap'
+import { BuildingsMap } from '../features/participants/BuildingsMap'
 import { ParticipantToolbar, type ParticipantReadinessFilter } from '../features/participants/ParticipantToolbar'
 import {
     createParticipant,
     deleteParticipant,
     downloadIssuedParticipantContractPdf,
     downloadParticipantContractPdf,
+    fetchBuildings,
     fetchParticipantGeocodingEnabled,
     fetchParticipants,
     getOnboardingLink,
@@ -77,6 +78,12 @@ export function ParticipantsPage() {
     const geocodingEnabledQuery = useQuery({
         queryKey: queryKeys.zev.participantGeocodingEnabled(),
         queryFn: fetchParticipantGeocodingEnabled,
+    })
+    // The map draws the community's buildings, not billing addresses (#890).
+    const buildingsQuery = useQuery({
+        queryKey: queryKeys.zev.buildings(selectedZevId || ''),
+        queryFn: () => fetchBuildings(selectedZevId || ''),
+        enabled: geocodingEnabledQuery.data === true && isManagedScope && !!selectedZevId,
     })
     const [editingId, setEditingId] = useState<string | null>(null)
     const [showModal, setShowModal] = useState(false)
@@ -428,17 +435,10 @@ export function ParticipantsPage() {
                 focusField={modalFocusField}
             />
 
-            {geocodingEnabledQuery.data === true && (
+            {geocodingEnabledQuery.data === true && isManagedScope && (
                 <section className="card">
                     <h3 style={{ marginTop: 0 }}>{t('pages.participants.map.title')}</h3>
-                    <ParticipantsMap
-                        participants={participantCards.map((entry) => ({
-                            id: entry.participant.id,
-                            displayName: entry.displayName,
-                            address: entry.address,
-                            buildingFootprint: entry.participant.building_footprint,
-                        }))}
-                    />
+                    <BuildingsMap buildings={buildingsQuery.data ?? []} />
                 </section>
             )}
 

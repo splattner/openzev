@@ -53,6 +53,7 @@ from zev.models import (
 logger = logging.getLogger(__name__)
 
 from ..access import grant_manager
+from ..tasks import trigger_building_geocode_if_address_present
 from ..buildings import assign_buildings_from_participants, default_building, ensure_initial_building
 from .export import pdf_member_name
 from .schema import (
@@ -1091,6 +1092,10 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
 
         if SECTION_INVOICE_PDFS in sections:
             summary["counts"][SECTION_INVOICE_PDFS] = _import_invoice_pdfs(archive, zev)
+
+    # Best-effort map lookups for every building the import ended up with.
+    for building in zev.buildings.all():
+        trigger_building_geocode_if_address_present(building)
 
     _verify_manifest_counts(manifest, summary, collector)
 

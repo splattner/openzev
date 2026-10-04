@@ -305,7 +305,7 @@ class ZevCreationWizardTests(TestCase):
 		self.assertIn("owner", resp.data)
 		self.assertFalse(Zev.objects.filter(name="Incomplete IBAN ZEV").exists())
 
-	@mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay")
+	@mock.patch("zev.tasks.warm_building_geocode_cache_task.delay")
 	def test_admin_can_create_zev_with_owner_and_metering_points(self, mock_geocode_delay):
 		auth(self.client, self.admin)
 		resp = self.client.post(
@@ -359,7 +359,7 @@ class ZevCreationWizardTests(TestCase):
 		assignments = MeteringPointAssignment.objects.filter(participant=owner_participant)
 		self.assertEqual(assignments.count(), 2)
 
-	@mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay")
+	@mock.patch("zev.tasks.warm_building_geocode_cache_task.delay")
 	def test_the_zevs_own_postal_code_is_kept_apart_from_the_owners(self, mock_geocode_delay):
 		"""The grid connection's postal code (top-level) and the owner's own
 		address (nested under owner) travel through the same request without
@@ -392,7 +392,7 @@ class ZevCreationWizardTests(TestCase):
 		owner_participant = Participant.objects.get(zev=created_zev, user=zev_manager(created_zev))
 		self.assertEqual(owner_participant.postal_code, "8000")
 
-	@mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay")
+	@mock.patch("zev.tasks.warm_building_geocode_cache_task.delay")
 	def test_admin_wizard_persists_bank_iban_and_bank_name(self, mock_geocode_delay):
 		auth(self.client, self.admin)
 		resp = self.client.post(
@@ -513,7 +513,7 @@ class ParticipantAccountLifecycleTests(TestCase):
 		)
 		auth(self.client, self.owner)
 
-	@mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay")
+	@mock.patch("zev.tasks.warm_building_geocode_cache_task.delay")
 	def test_create_participant_creates_a_passwordless_account(self, mock_geocode_delay):
 		resp = self.client.post(
 			"/api/v1/zev/participants/",
@@ -543,7 +543,7 @@ class ParticipantAccountLifecycleTests(TestCase):
 		self.assertEqual(resp.data["onboarding_status"], "not_sent")
 		self.assertEqual(resp.data["title"], "ms")
 
-	@mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay")
+	@mock.patch("zev.tasks.warm_building_geocode_cache_task.delay")
 	def test_update_participant_saves_contact_details(self, mock_geocode_delay):
 		participant = Participant.objects.create(
 			zev=self.zev,
@@ -627,7 +627,7 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 			valid_from=date(2026, 1, 1),
 		)
 
-	@mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay")
+	@mock.patch("zev.tasks.warm_building_geocode_cache_task.delay")
 	def test_admin_can_edit_the_owner_participant_address(self, mock_geocode_delay):
 		admin = make_user("admin_edit_owner", UserRole.ADMIN)
 		auth(self.client, admin)
@@ -647,7 +647,7 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 		auth(self.client, self.owner)
 		self.assertEqual(self.client.get(f"/api/v1/zev/zevs/{self.zev.id}/").status_code, 200)
 
-	@mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay")
+	@mock.patch("zev.tasks.warm_building_geocode_cache_task.delay")
 	def test_profile_sync_preserves_privileged_roles(self, mock_geocode_delay):
 		admin = make_user("admin_edit_privileged", UserRole.ADMIN)
 		for role in (UserRole.ADMIN, UserRole.USER):

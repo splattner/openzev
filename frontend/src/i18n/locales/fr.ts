@@ -1292,10 +1292,12 @@ export const fr = {
                 validity: 'Validité',
             },
             map: {
-                title: 'Carte',
-                empty: "Aucune adresse de participant n'a encore pu être localisée.",
-                notShown_one: "{{count}} participant non affiché (adresse introuvable).",
-                notShown_other: "{{count}} participants non affichés (adresses introuvables).",
+                title: 'Bâtiments',
+                empty: 'Aucune adresse de bâtiment n\'a encore pu être localisée.',
+                notShown_one: '{{count}} bâtiment non affiché (adresse introuvable).',
+                notShown_other: '{{count}} bâtiments non affichés (adresses introuvables).',
+                popupParticipants: 'Participants :',
+                popupNoParticipants: 'Aucun participant n\'a de compteur ici',
             },
             validity: {
                 current: 'Actuelle',

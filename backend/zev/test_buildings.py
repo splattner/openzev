@@ -556,7 +556,7 @@ class CreationFlowTests(TestCase):
         authenticate(self.client, self.admin)
 
     def test_the_admin_wizard_creates_one_building_with_the_issuer_address_and_attaches_the_points(self):
-        with mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay"):
+        with mock.patch("zev.tasks.warm_building_geocode_cache_task.delay"):
             response = self.client.post("/api/v1/zev/zevs/create-with-owner/", {
                 "name": "Wizard", "start_date": "2026-03-01", "zev_type": "vzev", "billing_interval": "monthly",
                 "postal_code": "8000",
@@ -617,3 +617,80 @@ class CreationFlowTests(TestCase):
     def test_the_default_building_helper_module_is_importable_by_the_migration_rule(self):
         # The data migration re-implements the rule on historical models; keep the file there.
         self.assertTrue(hasattr(import_module("zev.migrations.0041_buildings_from_existing_data"), "to_buildings"))
+
+
+class BuildingMapTests(TestCase):
+    """The participants map draws buildings (ADR 0012 amended, SPEC §7.7)."""
+
+    def setUp(self):
+        self.zev = make_zev()
+        self.admin = make_user("map_admin", UserRole.ADMIN)
+        self.client = APIClient()
+        authenticate(self.client, self.admin)
+        self.house = make_building(self.zev, "Haus A", address_line1="Weg 1", postal_code="3000", city="Bern")
+        self.empty = make_building(self.zev, "Haus B")
+
+    def rows(self):
+        results = self.client.get(BUILDINGS, {"zev_id": str(self.zev.pk)}).data["results"]
+        return {row["name"]: row for row in results}
+
+    def test_current_participants_are_those_assigned_today_to_its_points(self):
+        anna, ben, old = person(self.zev, "Anna"), person(self.zev, "Ben"), person(self.zev, "Alt")
+        p1 = MeteringPoint.objects.create(zev=self.zev, meter_id="MAP-1", building=self.house)
+        p2 = MeteringPoint.objects.create(zev=self.zev, meter_id="MAP-2", building=self.house)
+        MeteringPointAssignment.objects.create(metering_point=p1, participant=ben, valid_from=START)
+        MeteringPointAssignment.objects.create(metering_point=p2, participant=anna, valid_from=START)
+        MeteringPointAssignment.objects.create(
+            metering_point=p2, participant=old, valid_from=date(2025, 1, 1), valid_to=date(2025, 12, 31))
+        rows = self.rows()
+        self.assertEqual([p["display_name"] for p in rows["Haus A"]["current_participants"]], ["P Anna", "P Ben"])
+        self.assertEqual(rows["Haus B"]["current_participants"], [])
+
+    def test_no_n_plus_one_for_participants(self):
+        for i in range(4):
+            building = make_building(self.zev, f"X{i}")
+            point = MeteringPoint.objects.create(zev=self.zev, meter_id=f"N-{i}", building=building)
+            MeteringPointAssignment.objects.create(metering_point=point, participant=person(self.zev, f"N{i}"), valid_from=START)
+        with self.assertNumQueries(self.count_queries()):
+            self.rows()
+
+    def count_queries(self):
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as small:
+            self.rows()
+        for i in range(3):
+            building = make_building(self.zev, f"Y{i}")
+            point = MeteringPoint.objects.create(zev=self.zev, meter_id=f"Y-{i}", building=building)
+            MeteringPointAssignment.objects.create(metering_point=point, participant=person(self.zev, f"Y{i}"), valid_from=START)
+        return len(small)
+
+    def test_the_footprint_comes_from_the_cache_only(self):
+        polygon = {"type": "Polygon", "coordinates": [[[7, 46], [7.1, 46], [7.1, 46.1], [7, 46]]]}
+        with mock.patch("zev.serializers.get_cached_building_footprint", return_value=polygon) as cached:
+            self.assertEqual(self.rows()["Haus A"]["building_footprint"], polygon)
+        cached.assert_any_call("Weg 1", "3000", "Bern")
+
+    def test_creating_and_updating_a_building_enqueues_a_lookup(self):
+        from accounts.models import FeatureFlag
+
+        FeatureFlag.objects.update_or_create(name=FeatureFlag.PARTICIPANT_GEOCODING_ENABLED, defaults={"enabled": True})
+        with mock.patch("zev.tasks.warm_building_geocode_cache_task.delay") as delay, \
+                self.captureOnCommitCallbacks(execute=True):
+            created = self.client.post(BUILDINGS, {
+                "zev": str(self.zev.pk), "name": "Neu", "address_line1": "Gasse 2", "city": "Thun"}, format="json")
+            self.client.patch(f"{BUILDINGS}{created.data['id']}/", {"city": "Bern"}, format="json")
+            ensure_initial_building(make_zev("Fresh ZEV", postal_code="3000"))
+        self.assertEqual(delay.call_count, 2)  # the initial building has no street line
+
+    def test_participant_addresses_are_no_longer_geocoded(self):
+        from accounts.models import FeatureFlag
+
+        FeatureFlag.objects.update_or_create(name=FeatureFlag.PARTICIPANT_GEOCODING_ENABLED, defaults={"enabled": True})
+        with mock.patch("zev.tasks.warm_building_geocode_cache_task.delay") as delay, \
+                self.captureOnCommitCallbacks(execute=True):
+            self.client.post("/api/v1/zev/participants/", {
+                "zev": str(self.zev.pk), "first_name": "N", "last_name": "New", "email": "n@example.com",
+                "address_line1": "Weg 9", "postal_code": "3000", "city": "Bern", "valid_from": "2026-01-01"}, format="json")
+        delay.assert_not_called()
+        self.assertNotIn("building_footprint", self.client.get("/api/v1/zev/participants/").data["results"][0])

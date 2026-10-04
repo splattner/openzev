@@ -35,7 +35,7 @@ the original community; its completion leaves a new draft in another community o
    - **Email** (where onboarding links and invoice emails go)
    - **Phone** (optional)
    - **Address** — address lines, postal code and city (needed on the invoice
-     and for the [map](#map)). It is the billing address, not necessarily where
+     on the invoice). It is the billing address, not necessarily where
      the participant's meters are: that is the metering point's
      [building](04-metering-points.md#buildings). When the community has a
      building with an address, **Copy address from building** fills the
@@ -200,15 +200,18 @@ metering point is flagged **Needs attention**. See
 
 ## Map
 
-The map is **off by default**, because locating buildings sends participant
-addresses to the public OpenStreetMap Nominatim service. An admin turns it on
+The map shows the community's **buildings** — where the meters are, not where
+invoices go. It is **off by default**, because locating a building sends its
+address to the public OpenStreetMap Nominatim service. Participants' billing
+addresses are never sent. An admin turns it on
 under **Platform → Settings → Functions** (`participant_geocoding_enabled`).
 
-When it is on, the Participants page shows a small map with each participant's building outlined on OpenStreetMap. It's built from the address fields (street, postal code, city), assuming a Swiss address, and updates automatically whenever a participant's address is added or changed.
+When it is on, the Participants page shows a small map with each
+[building](04-metering-points.md#buildings) outlined on OpenStreetMap. It's built from the building's address fields (street, postal code, city), assuming a Swiss address, and updates automatically whenever a building's address is added or changed.
 
-- Participants at the same building share a single outline; its popup lists everyone there.
-- An address that can't be located (typo, incomplete, or simply not entered yet) is just left off the map — a note below it says how many participants aren't shown. There's no manual pin-placement in this iteration.
-- Locating a building can take a short while after saving a new or changed address, since it happens in the background — refresh the page if a just-added participant hasn't appeared yet.
+- Click an outline for the building's name, its address and the participants who currently hold its meters (or "No participant has meters here"). Two buildings at the same place share a single outline.
+- An address that can't be located (typo, incomplete, or simply not entered yet) is just left off the map — a note below it says how many buildings aren't shown. There's no manual pin-placement in this iteration.
+- Locating a building can take a short while after saving a new or changed building address, since it happens in the background — refresh the page if a just-added building hasn't appeared yet.
 
 ## Removing a Participant
 

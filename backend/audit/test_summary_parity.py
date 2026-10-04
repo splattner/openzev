@@ -49,7 +49,7 @@ class AuditSummaryParityTests(TestCase):
     def _latest(self, action_type, target_id):
         return AuditEvent.objects.filter(action_type=action_type, target_id=str(target_id)).latest("created_at")
 
-    @mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay")
+    @mock.patch("zev.tasks.warm_building_geocode_cache_task.delay")
     def test_participant_update_summary(self, _geocode):
         auth(self.client, self.admin)
         resp = self.client.patch(
@@ -137,7 +137,7 @@ class AuditSummaryParityTests(TestCase):
         self.assertEqual(event.summary, f"Updated user {target.email}.")
         self.assertEqual(event.target_display, target.email)
 
-    @mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay")
+    @mock.patch("zev.tasks.warm_building_geocode_cache_task.delay")
     def test_participant_create_summary(self, _geocode):
         auth(self.client, self.admin)
         resp = self.client.post(

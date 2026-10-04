@@ -243,9 +243,6 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
     # The issuer role is the creator's access; a grant only bridges a later start.
     grant_manager_until_role(zev, owner_user, zev.start_date)
 
-    from .tasks import trigger_geocode_if_address_present
-    trigger_geocode_if_address_present(owner_participant)
-
     created_metering_points: list[dict] = []
     for metering_point_data in metering_points_data:
         metering_point = MeteringPoint.objects.create(

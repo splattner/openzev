@@ -480,7 +480,7 @@ export interface ZevWizardResult {
 
 // The real OSM building footprint (its actual, possibly angled, outline) —
 // GeoJSON coordinate order is always [longitude, latitude].
-export interface ParticipantBuildingFootprint {
+export interface BuildingFootprint {
     type: 'Polygon' | 'MultiPolygon'
     coordinates: number[][][] | number[][][][]
 }
@@ -560,6 +560,10 @@ export interface Building {
     egid: number | null
     notes: string
     metering_point_count: number
+    /** Cached OSM outline of the building, for the participants map (null: not located). */
+    building_footprint: BuildingFootprint | null
+    /** Participants with an assignment active today on the building's meters. */
+    current_participants: { id: string; display_name: string }[]
     created_at: string
     updated_at: string
 }
@@ -600,7 +604,6 @@ export interface Participant {
     valid_to?: string | null
     metering_points?: MeteringPoint[]
     has_metering_point_assignment?: boolean
-    building_footprint?: ParticipantBuildingFootprint | null
     /** The party's roles active today or later. */
     roles?: PartyRoleWindow[]
     allocation_weight: string

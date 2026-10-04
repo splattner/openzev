@@ -87,7 +87,11 @@ def default_building(zev) -> Building:
 
 def ensure_initial_building(zev) -> Building:
     """Called by every creation flow once the issuer role exists."""
-    return default_building(zev)
+    from .tasks import trigger_building_geocode_if_address_present
+
+    building = default_building(zev)
+    trigger_building_geocode_if_address_present(building)
+    return building
 
 
 @transaction.atomic

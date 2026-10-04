@@ -118,9 +118,9 @@ their name among people sorted by last name.
 - `qr_name` — `display_name`, then `" " + name_addition` when set, cut at 70 characters (the
   QR-bill name limit).
 
-**Signals:** the geocode cache warm-up (`zev.tasks.trigger_geocode_if_address_present`) moves
-from participant saves to party saves (`transaction.on_commit`, unchanged rule: address line 1
-and city present).
+**Signals:** the geocode cache warm-up no longer follows participant or party saves: the map
+shows buildings, so `zev.tasks.trigger_building_geocode_if_address_present` runs on building
+saves (SPEC-2026-10-buildings-and-sites §7.7).
 
 ### 4.2 Participant
 

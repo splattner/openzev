@@ -1303,10 +1303,12 @@ export const en = {
                 validity: 'Validity',
             },
             map: {
-                title: 'Map',
-                empty: 'No participant addresses could be located yet.',
-                notShown_one: '{{count}} participant not shown (address could not be located).',
-                notShown_other: '{{count}} participants not shown (address could not be located).',
+                title: 'Buildings',
+                empty: 'No building addresses could be located yet.',
+                notShown_one: '{{count}} building not shown (address could not be located).',
+                notShown_other: '{{count}} buildings not shown (addresses could not be located).',
+                popupParticipants: 'Participants:',
+                popupNoParticipants: 'No participant has meters here',
             },
             validity: {
                 current: 'Current',

@@ -486,7 +486,7 @@ class AuditPhase3InstrumentationTests(TestCase):
         self.assertEqual(event.action_category, AuditActionCategory.PARTICIPANT)
         self.assertEqual(event.status, AuditEventStatus.SUCCESS)
 
-    @mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay")
+    @mock.patch("zev.tasks.warm_building_geocode_cache_task.delay")
     def test_participant_update_emits_audit_event_with_field_changes(self, mock_geocode_delay):
         auth(self.client, self.admin)
         response = self.client.patch(

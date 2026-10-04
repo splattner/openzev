@@ -1049,7 +1049,14 @@ class BuildingViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScopedQu
 
     def get_queryset(self):
         return self.scope_queryset(
-            Building.objects.select_related("zev").annotate(metering_point_count=Count("metering_points"))
+            Building.objects.select_related("zev")
+            .prefetch_related(
+                Prefetch(
+                    "metering_points__assignments",
+                    queryset=MeteringPointAssignment.objects.select_related("participant__party"),
+                )
+            )
+            .annotate(metering_point_count=Count("metering_points", distinct=True))
         ).order_by("name", "id")
 
     def get_audit_target_display(self, instance):

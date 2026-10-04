@@ -680,8 +680,8 @@ FeatureFlag.register(
     FeatureFlag.PARTICIPANT_GEOCODING_ENABLED,
     default=False,
     description=(
-        "Send participant addresses to the public OpenStreetMap Nominatim API to look up "
-        "building footprints for the participant map (ADR 0012). Off by default because it "
+        "Send building addresses to the public OpenStreetMap Nominatim API to look up "
+        "building footprints for the participants map (ADR 0012). Off by default because it "
         "transfers address data to a third-party service."
     ),
 )
