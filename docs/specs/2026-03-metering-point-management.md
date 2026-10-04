@@ -59,7 +59,8 @@ Defined in `zev.models`.
 | `meter_id` | `CharField(100)` | Swiss metering-point identifier (e.g. `CH9876543210987000000000044440859`) |
 | `meter_type` | `MeteringPointType` | `consumption`, `production`, or `bidirectional` |
 | `is_active` | `BooleanField` (default `True`) | Soft-deactivation flag; inactive meters are not deleted |
-| `location_description` | `CharField(200)` | Free-text location hint (blank allowed) |
+| `building` | FK → `Building` (`RESTRICT`, `related_name="metering_points"`) | The building the meter is in (required; [SPEC-2026-10-buildings-and-sites](2026-10-buildings-and-sites.md)). `save()` falls back to the ZEV's default building when unset; `clean()` rejects a building of another ZEV |
+| `location_description` | `CharField(200)` | Unit within the building: flat, floor, common areas (blank allowed) |
 | `has_behind_meter_generation` | `BooleanField` (default `False`) | Generation (e.g. PV) sits behind this meter, so it records only the surplus fed in and the residual grid draw (net / surplus metering). Only allowed when `meter_type` is `bidirectional` or `production` — see below. See `SPEC-2026-behind-the-meter-generation`. |
 | `created_at` | `DateTimeField` (auto) | Creation timestamp |
 | `updated_at` | `DateTimeField` (auto) | Last modification timestamp |
@@ -299,6 +300,10 @@ The `MeteringPointAssignmentViewSet` queryset uses `select_related("metering_poi
 |---|---|---|
 | All model fields | Read/write | `fields = "__all__"` |
 | `id`, `created_at`, `updated_at` | Read-only | Auto-generated |
+| `building` | Read/write, optional | `PrimaryKeyRelatedField`; `validate()` rejects a building of another ZEV and, on create without one, uses the ZEV's only building (several buildings: `"Choose the building of this metering point."`; none: the default building is created) |
+| `building_name` | Read-only | `building.name` |
+
+`GET /metering-points/` also filters by `?building=<uuid>`.
 
 ### 6.2 MeteringPointAssignmentSerializer
 
@@ -321,6 +326,8 @@ interface MeteringPoint {
   meter_type: 'consumption' | 'production' | 'bidirectional'
   is_active: boolean
   location_description?: string
+  building: string       // Building id (MeteringPointInput: optional)
+  building_name: string  // read-only
 }
 
 interface MeteringPointAssignment {
@@ -539,6 +546,7 @@ python -m pytest -q
 - Form validation and error rendering for metering-point create/edit
 - Assignment date-range picker with overlap/containment feedback
 - List filtering by meter type, active/inactive status
+- Building select in the metering-point form, building filter and building line in the list: shown only for a ZEV with several buildings (`tests/buildings.test.ts`; the full test plan is in SPEC-2026-10-buildings-and-sites §11)
 - Build and type checks: `npm run build`
 
 ### Manual verification

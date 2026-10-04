@@ -12,6 +12,11 @@ A **metering point** is a physical or logical energy meter:
 
 A single participant can be assigned multiple metering points (e.g., PV on roof + home consumption).
 
+Every metering point also belongs to a **building**, the site where it is — see
+[Buildings tab](02-zev-setup.md#buildings-tab). The metering point's own
+location text says which unit within the building it measures. With several
+buildings, the toolbar offers a **Building** filter.
+
 ![Metering points page](screenshots/04-metering-points.png)
 
 If a refresh fails, the last loaded list and any open form stay available.
@@ -39,7 +44,11 @@ its meters.
    - **Meter ID** — Equipment/MSID number (required, must be unique)
    - **Meter type** — `Consumption`, `Production`, or `Bidirectional`
    - **Active** — inventory status (defaults to on)
-   - **Location** (optional, e.g., "Roof solar panel")
+   - **Building** — only asked when the community has more than one
+     [building](02-zev-setup.md#buildings-tab); with a single building the
+     meter goes there
+   - **Unit within the building** (optional, e.g., "Flat 3", "Common areas",
+     "Roof solar panel")
    - **Generation behind the meter** — only shown for `Bidirectional` or
      `Production` meters; see
      [Generation behind the meter](#generation-behind-the-meter) below
@@ -196,7 +205,8 @@ join date, and a leaver's share stops on their leave date.
 
 Each card on the **Metering Points** page shows, at a glance:
 
-- The **meter ID** and its **location** (or "No location set")
+- The **meter ID**, its **building** (when the community has several) and
+  its **location** within the building (or "No location set")
 - **Active**/**Inactive** and meter-**type** badges, plus a **Surplus
   metering** badge when [Generation behind the meter](#generation-behind-the-meter)
   is ticked

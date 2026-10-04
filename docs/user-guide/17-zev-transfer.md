@@ -48,7 +48,7 @@ You get a file named `openzev-export-<community>-<date>.zip`.
 |---|---|
 | **ZEV settings** | Name, type, grid operator, billing interval, invoice prefix and language, payment term, bank details, VAT number, notes, the invoice email template, and the contract-PDF notes |
 | **Participants** | Names, addresses, contact details and validity windows |
-| **Metering points & assignments** | Meters and which participant held each one over which period |
+| **Metering points & assignments** | The community's buildings, meters (each in its building) and which participant held each one over which period |
 | **Tariffs** | Every tariff, all its versions, and their price bands |
 | **Meter readings** | Every reading, as one CSV per meter |
 | **Invoices** | Invoices and their line items |
@@ -158,6 +158,14 @@ Unsupported archive format version 2. This instance reads version(s): 1.
 
 Upgrade the target instance and try again.
 
+**Archives without buildings.** Archives written before buildings existed
+(format 5 and older) import fine. Their metering points are placed the way
+OpenZEV placed existing communities when it added buildings: a ZEV gets one
+building, a vZEV one building per distinct participant address. That is a
+**guess** from billing addresses; check the
+[Buildings tab](02-zev-setup.md#buildings-tab) after importing. If you import
+without the metering-points section, the new community gets a single building.
+
 ### Corrupt or inconsistent archives
 
 An archive that cannot be read — a file that is not really a ZIP, a manifest
@@ -183,7 +191,8 @@ openzev-export-demo-community-2026-08-04.zip
   manifest.json          format version, export time, sections, row counts
   zev.json               community settings
   participants.json
-  metering_points.json   including assignments
+  buildings.json         the community's buildings
+  metering_points.json   including assignments and each meter's building
   tariffs.json           versions and price bands
   invoices.json          invoices and line items
   readings/<meter>.csv   one file per meter (name includes a short checksum)

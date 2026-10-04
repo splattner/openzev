@@ -35,7 +35,11 @@ the original community; its completion leaves a new draft in another community o
    - **Email** (where onboarding links and invoice emails go)
    - **Phone** (optional)
    - **Address** — address lines, postal code and city (needed on the invoice
-     and for the [map](#map))
+     and for the [map](#map)). It is the billing address, not necessarily where
+     the participant's meters are: that is the metering point's
+     [building](02-zev-setup.md#buildings-tab). When the community has a
+     building with an address, **Copy address from building** fills the
+     fields from it.
    - **Notes** (optional, internal)
 
 3. Set **Validity Period**:

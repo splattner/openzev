@@ -1,7 +1,7 @@
 # Feature Spec: Buildings and sites — where a ZEV's metering points are (#761 phase 3)
 
 - Spec ID: SPEC-2026-10-buildings-and-sites
-- Status: Approved
+- Status: Completed
 - Scope: Major
 - Type: Feature
 - Owners: Sebastian Plattner
@@ -36,11 +36,11 @@ location, and a vZEV with several landowners cannot say who owns which building.
 |---|---|
 | Model | `zev.Building`; `MeteringPoint.building` (required); `ZevPartyRole.building` (optional, landowner only); data migration |
 | Service | `zev/buildings.py`: default building, migration rule shared with the importer |
-| API | `/api/v1/zev/buildings/` CRUD; `building` on metering points; `building` on party-role assign and a building change on landowner rows |
+| API | `/api/v1/zev/buildings/` CRUD (`?zev_id=` like the other scoped endpoints); `building` on metering points; `building` on party-role assign and a building change on landowner rows |
 | Creation flows | Wizard, self-setup, admin create, transfer import create the default building |
 | Transfer / backups | Archive format 6 (`buildings.json` in the `metering_points` section); backups registry |
 | Frontend | ZEV settings → Buildings tab; building select in the metering-point form; building column and filter in the metering-point list; building on landowner rows; "copy address from building" in the participant form; "copy address from participant" in the building form |
-| Demo | `seed_demo`: the vZEV demo gets more than one building |
+| Demo | `seed_demo`: the vZEV demo gets more than one building (three houses, the owner's landowner role names its house) |
 | Docs | User guide (ZEV setup, metering points, participants, transfer), baseline specs |
 
 ### Out of scope
@@ -113,7 +113,7 @@ with blanks dropped.
 |---|---|
 | `building` | New FK → `Building`, null, `SET_NULL`, `related_name="landowner_roles"` |
 | `clean()` | `building` set on a non-landowner row → `{"building": "Only a landowner role names a building."}`; building in another ZEV → `{"building": "The building belongs to another ZEV."}` |
-| Constraint | `one_open_role_per_party` is replaced by `UniqueConstraint(fields=["zev", "party", "role", "building"], condition=Q(valid_to__isnull=True), nulls_distinct=False, name="one_open_role_per_party_building")`: a party may hold several open landowner rows, one per building |
+| Constraint | `one_open_role_per_party` is replaced by two partial `UniqueConstraint`s: `one_open_role_per_party_building` (`zev, party, role, building`, `valid_to IS NULL AND building IS NOT NULL`) and `one_open_role_per_party_without_building` (`zev, party, role`, `valid_to IS NULL AND building IS NULL`): a party may hold several open landowner rows, one per building, and one without. Two constraints rather than one with `nulls_distinct=False`, which SQLite and PostgreSQL before 15 silently skip |
 
 ### 4.4 Service `zev/buildings.py`
 
@@ -176,7 +176,7 @@ Landowner rows keep `building = NULL` (nothing records the link today).
 ### 5.1 Buildings (`/api/v1/zev/buildings/`, new; `BuildingViewSet`)
 
 `GET` list / retrieve, `POST`, `PATCH`, `DELETE` (`http_method_names` without `put`). Filter
-`?zev=<uuid>`. Audited with `AuditedCreateDestroyMixin` + `AuditedUpdateMixin`:
+`?zev_id=<uuid>` (the scoping mixin's narrowing, as on every other endpoint of the app). Audited with `AuditedCreateDestroyMixin` + `AuditedUpdateMixin`:
 `audit_action_category = GOVERNANCE`, `audit_action_type = "building.update"`,
 `audit_target_type = "zev.Building"`, target display `name`, create/destroy metadata
 `{"zev_id": …}`.
@@ -307,8 +307,10 @@ All new strings in `de`, `en`, `fr`, `it` (`pages.zevSettings.tabs.buildings`,
 - `BUILDINGS_FILE = "buildings.json"`, written with the `metering_points` section:
   `[{"id": <archive id>, **BUILDING_FIELDS}]`, `BUILDING_FIELDS = ("name", "address_line1",
   "address_line2", "postal_code", "city", "egid", "notes")`.
-- `METERING_POINT_FIELDS` export also `"building_id"` (archive id); `PARTY_ROLE_FIELDS` export
-  `"building_id"` (archive id or null).
+- Each metering-point entry and each party-role entry carries `"building_id"` (archive id; null
+  on a role without one). It sits beside the field lists like `party_id`, not in
+  `METERING_POINT_FIELDS` / `PARTY_ROLE_FIELDS`: the schema parity test excludes the `building`
+  foreign key from both, and `BUILDING_FIELDS` is checked against `Building`.
 - `SUBCOUNT_SECTIONS["buildings"] = SECTION_METERING_POINTS`; manifest counts include
   `buildings`.
 - **Import order:** when `metering_points` is selected and the archive is format ≥ 6, buildings
@@ -316,7 +318,9 @@ All new strings in `de`, `en`, `fr`, `it` (`pages.zevSettings.tabs.buildings`,
   resolve their building. A landowner role whose building is absent (metering points not
   selected) imports without one.
 - **Archives < 6, or metering points selected without buildings:** metering points import
-  without a building, then `assign_buildings_from_participants` applies the §4.5 rule.
+  without a building (`MeteringPoint.save()` places them in a provisional default building), then
+  `assign_buildings_from_participants` applies the §4.5 rule and the importer deletes the
+  provisional building if nothing ended up in it.
 - **No metering-points section:** the importer calls `ensure_initial_building(zev)` after the
   participants section.
 - Backups: `Building` added to `backups/registry.py` before `MeteringPoint` (FK order).

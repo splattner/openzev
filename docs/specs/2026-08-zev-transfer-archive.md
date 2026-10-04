@@ -108,7 +108,17 @@ commit — a failed audit must not cause a duplicate import on client retry).
 
 ## 6. Archive format (`backend/zev/transfer/schema.py`)
 
-`FORMAT_VERSION = 5`, `SUPPORTED_FORMAT_VERSIONS = {1, 2, 3, 4, 5}`. Version 5
+`FORMAT_VERSION = 6`, `SUPPORTED_FORMAT_VERSIONS = {1, 2, 3, 4, 5, 6}`. Version 6
+(#890, SPEC-2026-10-buildings-and-sites §8) carries the ZEV's buildings in the `metering_points`
+section: `buildings.json` (`{"id", <BUILDING_FIELDS>}`, `BUILDING_FIELDS = (name, address_line1,
+address_line2, postal_code, city, egid, notes)`), each metering-point entry names its building by
+archive `building_id`, and each party-role entry carries `building_id` (null without one). The
+manifest counts `buildings` (`SUBCOUNT_SECTIONS` maps it to `metering_points`). Buildings are
+imported right after the ZEV, before the participants, so landowner roles resolve theirs; a role
+whose building is not in the import has none. An archive older than 6, or one whose metering
+points are imported without buildings, gets the participant-address rule of the data migration
+(`zev.buildings.assign_buildings_from_participants`); an import without the metering-points
+section ends with `ensure_initial_building`. Version 5
 (#761, SPEC-2026-10-zev-parties §9) carries the ZEV's parties and their dated
 roles inside the `participants` section: `parties.json` (`{"id", <PARTY_FIELDS>}`,
 every party of the ZEV, also those that are not participants) and
@@ -164,9 +174,10 @@ openzev-export-<community>-<date>.zip
   manifest.json          format_version, exported_at, instance_name, sections, counts
   zev.json               {"id", <ZEV_FIELDS>}  (a single object, not a list)
   parties.json           [{"id", <PARTY_FIELDS>}]                    (format 5)
-  party_roles.json       [{"party_id", <PARTY_ROLE_FIELDS>}]         (format 5)
+  party_roles.json       [{"party_id", "building_id", <PARTY_ROLE_FIELDS>}] (format 5; building_id from 6)
   participants.json      [{"id", "party_id", <PARTICIPANT_FIELDS>}]  (format 1–4: {"id", <LEGACY_PARTICIPANT_FIELDS>})
-  metering_points.json   [{"id", <METERING_POINT_FIELDS>,
+  buildings.json         [{"id", <BUILDING_FIELDS>}]                   (format 6)
+  metering_points.json   [{"id", "building_id" (format 6), <METERING_POINT_FIELDS>,
                            "assignments": [{"id", "participant_id", <ASSIGNMENT_FIELDS>}]}]
   tariffs.json           [{"id", <TARIFF_FIELDS>,
                            "dynamic_source": {<DYNAMIC_SOURCE_FIELDS>} | null,
@@ -335,8 +346,8 @@ way readings require.
   `{"party_id": ["Unknown party."]}`; issuer and representative windows that
   share a day → `{"valid_from": ["Overlaps another holder of this role."]}` (the
   database only guards open-ended rows); a second open landowner row for one
-  party (the `one_open_role_per_party` constraint) → "The party already holds
-  this role." All reported under the `participants` section.
+  party and building (the `one_open_role_per_party_building` / `_without_building` constraints) →
+  "The party already holds this role." All reported under the `participants` section.
 - Duplicate invoice numbers — invisible to `full_clean(exclude=["zev", ...])`
   because the `(zev, invoice_number)` constraint spans the excluded `zev` — are
   caught at `save()` as an `IntegrityError` and reported per entry.
@@ -467,6 +478,12 @@ refused; manifest with a non-integer count refused; manifest missing a count
 for a declared section refused; manifest with a non-object
 `source_zev` refused; duplicate participant source ids rejected.
 
+**`BuildingTransferTests`** (format 6, `test_transfer.py`): buildings, the points' buildings and a
+landowner's building survive a round trip; a format-5 rewrite applies the participant-address rule;
+metering points not selected leave one default building; a landowner keeps no building when
+buildings are not imported; a point naming an unknown building falls back to the default.
+`SchemaParityTests` also checks `BUILDING_FIELDS` against `Building`.
+
 **`PartyTransferTests`** (format 5): parties (a two-participation household with
 a name addition, an organisation, a non-participant agency with notes) and five
 dated roles survive a round trip, and the copy's issuer on a date is the
@@ -498,10 +515,10 @@ collector warning that any archived periods on it were dropped; a
 format-version-3 percentage tariff with no `percentage` at all imports with no
 band.
 
-### Backend — `backend/zev/test_transfer_invoice_pdfs.py` (format version 5)
+### Backend — `backend/zev/test_transfer_invoice_pdfs.py` (format version 6)
 
-`FormatVersionTests`: `FORMAT_VERSION == 5`; `SUPPORTED_FORMAT_VERSIONS ==
-{1, 2, 3, 4, 5}`; `invoice_pdfs` is a known section depending on `invoices`.
+`FormatVersionTests`: `FORMAT_VERSION == 6`; `SUPPORTED_FORMAT_VERSIONS ==
+{1, 2, 3, 4, 5, 6}`; `invoice_pdfs` is a known section depending on `invoices`.
 `MemberNamingTests`: `pdf_member_name` is deterministic and collision-safe
 (same construction as reading member names), stays under `invoices/pdf/`.
 `RoundTripTests`: a PDF travels when `invoice_pdfs` is selected and does not

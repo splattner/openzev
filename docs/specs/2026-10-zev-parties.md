@@ -50,7 +50,7 @@ first and is a prerequisite.
 
 ### Out of scope
 
-- Buildings and metering-point locations (#761 phase 3).
+- Buildings and metering-point locations: shipped as [SPEC-2026-10-buildings-and-sites](2026-10-buildings-and-sites.md) (#761 phase 3, #890).
 - IBAN / VAT number per issuer (stay on the ZEV, ADR 0028 decision 6).
 - Parties shared across ZEVs; organisations of accounts.
 - Using the representative in any generated document (recorded and exposed as template
@@ -183,8 +183,16 @@ participant search in `zev/views.py`, `Meta.ordering`), and querysets that read 
   `party_role_window_order`.
 - `UniqueConstraint(fields=["zev", "role"], condition=Q(valid_to__isnull=True,
   role__in=["issuer", "representative"]), name="one_open_single_holder_role")`.
-- `UniqueConstraint(fields=["zev", "party", "role"], condition=Q(valid_to__isnull=True),
-  name="one_open_role_per_party")`.
+- Landowner rows may name a building ([SPEC-2026-10-buildings-and-sites](2026-10-buildings-and-sites.md)
+  §4.3), so `one_open_role_per_party` was replaced by two partial constraints:
+  `UniqueConstraint(fields=["zev", "party", "role", "building"], condition=Q(valid_to__isnull=True,
+  building__isnull=False), name="one_open_role_per_party_building")` and
+  `UniqueConstraint(fields=["zev", "party", "role"], condition=Q(valid_to__isnull=True,
+  building__isnull=True), name="one_open_role_per_party_without_building")`.
+- `ZevPartyRole.building` (FK → `Building`, null, `SET_NULL`, `related_name="landowner_roles"`):
+  the building a landowner owns; only landowner rows may set it (`clean()`), assigned with
+  `assign_role(..., building=)` or changed with `POST /zev/party-roles/{id}/building/`
+  (`set_landowner_building`). The role serializer returns `building` and `building_name`.
 
 **Overlap rule** (service, §4.5): for `issuer` and `representative`, no two rows of one ZEV may
 share a day.
@@ -525,7 +533,7 @@ derives today's holder, upcoming rows ("From" badge) and the history client-side
 (`todayBusinessIso`). Issuer and representative (`SingleHolderRole`): "Set" when nobody holds
 the role, else "Change from…", opening an inline `AssignForm` (picker + date, default today)
 with a hint that the previous holder ends the day before; no issuer → `warning-banner`.
-Landowners (for a ZEV and a vZEV alike; the hint says a community spanning several plots has several, and #761 phase 3 links each landowner to its plot or building): current and future rows; "End" opens an inline last-day form (default today);
+Landowners (for a ZEV and a vZEV alike; the hint says a community spanning several plots has several; a landowner row shows the building it owns and offers "Set building" / "Change building", and the add form an optional building select, SPEC-2026-10-buildings-and-sites §7.5): current and future rows; "End" opens an inline last-day form (default today);
 "Add landowner" the same `AssignForm`. Other contacts: parties without participations, with
 their role badges; edit in `PartyFormModal` (`features/zev/PartyFormModal.tsx`: kind,
 organisation name, title, first/last name — "contact" labels for an organisation —, name
