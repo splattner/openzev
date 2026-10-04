@@ -1953,7 +1953,7 @@
 <h1 id="backups">Backups<a class="headerlink" href="#backups" title="Permanent link">&para;</a></h1>
 <p>Back up the whole instance, or a single community, to a local directory or to
 S3-compatible storage. Administrators manage backups under
-<strong>Platform → Settings → Backup</strong>.</p>
+<strong>Platform → Settings → Backup</strong> (<code>/admin/system-settings?tab=backup</code>).</p>
 <blockquote>
 <p><strong>Two kinds of restore.</strong> One <strong>community</strong> can be brought back to the state of a
 backup from this page — see <a href="#restoring-one-community">Restoring one community</a>.
@@ -1962,6 +1962,12 @@ A <strong>whole instance</strong> is restored from the server's command line —
 regularly (see <a href="#verifying-a-backup">Verifying a backup</a>), and let them run by
 themselves (see <a href="#scheduling-and-keeping-backups">Scheduling and keeping backups</a>).</p>
 </blockquote>
+<p>The Backup tab links to <strong>System health</strong> and <strong>System activity</strong>.
+The activity link opens the platform Audit tab filtered to system events;
+these include other system operations as well as backup and restore events.
+If backup status cannot load, use <strong>Retry</strong>. Destinations, Schedule, Jobs and
+Restore load independently and remain available. A failed status refresh
+keeps the last loaded status visible with a warning.</p>
 <h2 id="what-a-backup-contains">What a backup contains<a class="headerlink" href="#what-a-backup-contains" title="Permanent link">&para;</a></h2>
 <p>A backup holds everything needed to rebuild what it covers:</p>
 <table>

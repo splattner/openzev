@@ -2397,10 +2397,13 @@ anchor links; the product term is now <strong>Platform</strong>.</p>
 <li><strong>Templates</strong> (<code>/admin/templates</code>) — PDF templates · Email templates</li>
 <li><strong>Settings</strong> (<code>/admin/system-settings</code>) — Regional Settings · Functions · OAuth · Security · VAT · Backup</li>
 </ul>
-<p>Legacy routes (<code>/admin/zevs</code>, <code>/admin/invoices</code>, <code>/admin/audit-logs</code>,
-<code>/admin/api-keys</code>, <code>/admin/pdf-templates</code>, <code>/admin/email-templates</code>) redirect
-to the matching hub tab.</p>
+<p>The existing <code>/admin/zevs</code> and <code>/admin/invoices</code> addresses open their matching
+Overview tabs. Legacy routes (<code>/admin/audit-logs</code>, <code>/admin/api-keys</code>,
+<code>/admin/pdf-templates</code>, <code>/admin/email-templates</code>) redirect to the matching hub tab.</p>
 <p>For general role information, see <a href="../11-roles-and-permissions/">Roles and Permissions</a>.</p>
+<p>Each Overview tab describes its platform-wide scope. The invoice-status
+summary links to <strong>All invoices</strong>, and email statistics links to <strong>System
+health</strong>. Your selected community is preserved when you open these views.</p>
 <h2 id="zev-management">ZEV Management<a class="headerlink" href="#zev-management" title="Permanent link">&para;</a></h2>
 <p>Admins can view and manage all ZEVs in the system.</p>
 <ol>
@@ -2448,6 +2451,17 @@ ZEV, and how many currently have a failed fetch. The table lists every
 source with its protocol version, billed component/product, current fetch
 status, last fetch time, stored point count, and how many tariffs/ZEVs
 reuse it.</p>
+<p>From a tariff's details, <strong>Manage source in platform admin</strong>
+opens this tab filtered to that source. <strong>Show all sources</strong> returns to the
+complete list. The filter survives reload. A missing source has an explanation
+and the same control to return to all sources. Usage counts are platform-wide,
+not counts for the selected community.</p>
+<p>The <strong>View fetch log</strong> dialog links to <strong>View source activity</strong>,
+which opens the platform Audit tab with the source's Target type and
+Target ID filled in. Those filters survive reload; <strong>Clear filters</strong> removes
+them while keeping other bookmark context.
+If activity cannot load, use <strong>Retry</strong>. A failed refresh keeps the last loaded
+events visible with a warning.</p>
 <p>Each row's menu offers:</p>
 <ul>
 <li><strong>View prices</strong> — the fetched interval history: a date-range chart,
@@ -2530,17 +2544,22 @@ billing-relevant, and destructive actions.</p>
 <ul>
 <li><strong>Platform → Overview → Audit log</strong> (<code>/admin/audit</code>) — admins can view <strong>all</strong>
   events across the platform.</li>
-<li><strong>Setup → Settings → Audit log</strong> (<code>/zev-settings/audit</code>) — admins <strong>and
-  managers</strong> see the events of the currently selected community. Managers only
-  see events for ZEVs they manage; they cannot see global or other-ZEV events.
+<li><strong>Setup → Settings → Audit log</strong> (<code>/zev-settings/audit</code>) — admins, managers
+  and viewers see the events of the currently selected community.
+  Managers and viewers only see events for communities they can access;
+  they cannot see global or other-community events.
   There is no community selector here (it follows the sidebar switcher) and no
-  text search; the filters are date range, actor, category, action type, and
-  status. (The legacy route <code>/audit-logs</code> redirects here.)</li>
+  text search; the filters are date range, actor, category, action type,
+  target type, target ID, and status. (The legacy route <code>/audit-logs</code> redirects here.)</li>
 </ul>
 <p><strong>Platform → Overview → Audit log</strong> supports the full filter set: date range,
-community (ZEV) selector, actor, category, action type, status, and text
+community (ZEV) selector, actor, category, action type, target type, target ID,
+status, and text
 search. Text search is available only to admin users. Events are
-read-only — there is no public write endpoint.</p>
+read-only — there is no public write endpoint.
+Action type, target type and target ID apply when you press <strong>Enter</strong> or leave
+the field. Open an event by clicking its summary or focusing it and pressing
+<strong>Enter</strong> or <strong>Space</strong>.</p>
 <p>The quickest way in is from the account itself: <strong>View activity</strong> on a row
 under <strong>Platform → Accounts → Users</strong> opens the audit log already filtered to
 what that account has done.</p>
