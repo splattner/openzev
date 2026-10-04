@@ -1811,7 +1811,7 @@ the audit log with the sections that left the instance.</p>
 </tr>
 <tr>
 <td><strong>Metering points &amp; assignments</strong></td>
-<td>Meters and which participant held each one over which period</td>
+<td>The community's buildings, meters (each in its building) and which participant held each one over which period</td>
 </tr>
 <tr>
 <td><strong>Tariffs</strong></td>
@@ -1915,6 +1915,13 @@ than partially understood:</p>
 <div class="highlight"><pre><span></span><code>Unsupported archive format version 2. This instance reads version(s): 1.
 </code></pre></div>
 <p>Upgrade the target instance and try again.</p>
+<p><strong>Archives without buildings.</strong> Archives written before buildings existed
+(format 5 and older) import fine. Their metering points are placed the way
+OpenZEV placed existing communities when it added buildings: a ZEV gets one
+building, a vZEV one building per distinct participant address. That is a
+<strong>guess</strong> from billing addresses; check the
+<a href="../04-metering-points/#buildings">buildings</a> after importing. If you import
+without the metering-points section, the new community gets a single building.</p>
 <h3 id="corrupt-or-inconsistent-archives">Corrupt or inconsistent archives<a class="headerlink" href="#corrupt-or-inconsistent-archives" title="Permanent link">&para;</a></h3>
 <p>An archive that cannot be read — a file that is not really a ZIP, a manifest
 that is damaged, a readings file that is unreadable — is refused with a clear
@@ -1933,7 +1940,8 @@ move.</p>
   manifest.json          format version, export time, sections, row counts
   zev.json               community settings
   participants.json
-  metering_points.json   including assignments
+  buildings.json         the community's buildings
+  metering_points.json   including assignments and each meter's building
   tariffs.json           versions and price bands
   invoices.json          invoices and line items
   readings/&lt;meter&gt;.csv   one file per meter (name includes a short checksum)

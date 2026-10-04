@@ -683,6 +683,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#buildings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Buildings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#creating-a-metering-point" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1589,6 +1600,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#buildings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Buildings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#creating-a-metering-point" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1807,6 +1829,10 @@
 <li>Forms the basis for invoice calculations</li>
 </ul>
 <p>A single participant can be assigned multiple metering points (e.g., PV on roof + home consumption).</p>
+<p>Every metering point also belongs to a <strong>building</strong>, the site where it is — see
+<a href="#buildings">Buildings</a>. The metering point's own
+location text says which unit within the building it measures. With several
+buildings, the page groups the cards by building and the toolbar offers a <strong>Building</strong> filter.</p>
 <p><img alt="Metering points page" src="../screenshots/04-metering-points.png" /></p>
 <p>If a refresh fails, the last loaded list and any open form stay available.
 Use <strong>Retry</strong> in the warning to refresh the list.</p>
@@ -1838,6 +1864,41 @@ Use <strong>Retry</strong> in the warning to refresh the list.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="buildings">Buildings<a class="headerlink" href="#buildings" title="Permanent link">&para;</a></h2>
+<p>A <strong>building</strong> is where metering points are: a name, an address and,
+optionally, the federal building ID (<strong>EGID</strong>). It is a site, not a billing
+address: a participant can be invoiced somewhere other than where its meters
+are, and both are recorded. Buildings are managed on this page.</p>
+<ul>
+<li>A new ZEV starts with one building, taking the issuer's address when the
+  issuer lives at the grid connection's postal code. With a single building
+  the page shows it as one line above the list, with <strong>Edit</strong>, and the meter
+  form does not ask for a building.</li>
+<li><strong>Add building</strong> (next to <strong>New Metering Point</strong>) creates one; you can copy
+  the address of a participant or other contact. Landowners linked to a
+  building (see <a href="../02-zev-setup/#people-and-access-tab">People &amp; access</a>) are
+  named in its header.</li>
+<li>With several buildings, the cards are <strong>grouped by building</strong>, ordered by
+  name. Each group's header shows the address, EGID, landowners and number of
+  metering points, with <strong>Add metering point</strong> (that building preselected)
+  and <strong>Edit</strong>. A building without metering points shows "No
+  metering points in this building yet". Search and the other filters apply
+  within the groups; the <strong>Building</strong> filter shows one group.</li>
+<li>A building can be deleted only once it is empty: move or delete its meters
+  first, then <strong>More → Delete building</strong> appears in its header. Landowner rows that pointed at a deleted building are
+  kept, without a building.</li>
+</ul>
+<blockquote>
+<p><strong>Check the buildings of an existing community.</strong> When OpenZEV added
+buildings, every existing community got some automatically. A ZEV got one
+building holding all its metering points. A vZEV got one building per
+distinct participant address, each metering point in the building of the
+participant it is assigned to; meters without a clear holder went to the
+issuer's building. That is a <strong>guess</strong> from billing addresses, which are not
+always where the meters are (a landlord billed for an empty flat, a holiday
+home). Review the groups and correct them: move the metering points, then
+delete the empty building.</p>
+</blockquote>
 <h2 id="creating-a-metering-point">Creating a Metering Point<a class="headerlink" href="#creating-a-metering-point" title="Permanent link">&para;</a></h2>
 <p><strong>Managers</strong> create metering points in <strong>Metering Points</strong> for the selected
 community. A disabled community is read-only for managers; admins retain write
@@ -1851,7 +1912,11 @@ its meters.</p>
 <li><strong>Meter ID</strong> — Equipment/MSID number (required, must be unique)</li>
 <li><strong>Meter type</strong> — <code>Consumption</code>, <code>Production</code>, or <code>Bidirectional</code></li>
 <li><strong>Active</strong> — inventory status (defaults to on)</li>
-<li><strong>Location</strong> (optional, e.g., "Roof solar panel")</li>
+<li><strong>Building</strong> — only asked when the community has more than one
+   <a href="#buildings">building</a>; with a single building the
+   meter goes there</li>
+<li><strong>Unit within the building</strong> (optional, e.g., "Flat 3", "Common areas",
+   "Roof solar panel")</li>
 <li><strong>Generation behind the meter</strong> — only shown for <code>Bidirectional</code> or
    <code>Production</code> meters; see
    <a href="#generation-behind-the-meter">Generation behind the meter</a> below</li>
@@ -2012,7 +2077,8 @@ historical readings still count towards the community energy pool.</p>
 <h2 id="what-a-metering-point-card-shows">What a Metering Point Card Shows<a class="headerlink" href="#what-a-metering-point-card-shows" title="Permanent link">&para;</a></h2>
 <p>Each card on the <strong>Metering Points</strong> page shows, at a glance:</p>
 <ul>
-<li>The <strong>meter ID</strong> and its <strong>location</strong> (or "No location set")</li>
+<li>The <strong>meter ID</strong>, its <strong>building</strong> (when the community has several) and
+  its <strong>location</strong> within the building (or "No location set")</li>
 <li><strong>Active</strong>/<strong>Inactive</strong> and meter-<strong>type</strong> badges, plus a <strong>Surplus
   metering</strong> badge when <a href="#generation-behind-the-meter">Generation behind the meter</a>
   is ticked</li>
