@@ -320,6 +320,13 @@ class CoverageTests(SimpleTestCase):
             "Decide which, in backups/registry.py.",
         )
 
+    def test_buildings_are_written_before_the_metering_points_that_point_at_them(self):
+        from backups.registry import zev_labels
+
+        labels = zev_labels()
+        self.assertIn("zev.Building", labels)
+        self.assertLess(labels.index("zev.Building"), labels.index("zev.MeteringPoint"))
+
     def test_no_stale_entries(self):
         installed = {model._meta.label for model in apps.get_models()}
         self.assertEqual(sorted((backed_up_labels() | set(EXCLUDED_MODELS)) - installed), [])
