@@ -4439,3 +4439,41 @@ input.recurrence-chip-input {
     grid-row: 1 / span 2;
   }
 }
+
+/* ZEV creation wizard, step 3: every metering point is edited in place. */
+.wizard-metering-points {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wizard-metering-point {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.wizard-metering-point-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.wizard-metering-point-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) minmax(0, 3fr);
+  gap: 0.75rem;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .wizard-metering-point-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

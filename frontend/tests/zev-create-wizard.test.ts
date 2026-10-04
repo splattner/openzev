@@ -149,6 +149,10 @@ async function fillMeterId(container: HTMLElement) {
     await flush()
 }
 
+function meterIdInputs(container: HTMLElement): HTMLInputElement[] {
+    return Array.from(container.querySelectorAll<HTMLInputElement>('[data-testid="wizard-metering-point-row"] input[name="meter_id"]'))
+}
+
 async function walkToReview(container: HTMLElement) {
     await act(async () => {
         clickButton(container, 'pages.zevs.wizard.next').click()
@@ -319,11 +323,10 @@ describe('ZevListPage creation wizard — bank fields', () => {
             await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
             await fillRequiredOwnerInputs(container)
             await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
-            // Step 3 auto-opens the metering point editor. Enter an ID then click Weiter
-            // immediately — without an explicit save — to expose stale-draft bugs.
+            // Step 3 starts with one empty row that is edited in place.
             const meterIdInput = container.querySelector<HTMLInputElement>('input[name="meter_id"]')!
             setInputValue(meterIdInput, 'METER-NEW')
-            // No explicit "save": Weiter should fold the editor draft into the payload.
+            await flush()
             await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
             const review = Array.from(container.querySelectorAll('.card')).find((card) =>
                 card.textContent?.includes('pages.zevs.wizard.reviewMeteringPoints'),
@@ -350,10 +353,10 @@ describe('ZevListPage creation wizard — bank fields', () => {
             await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
             await fillRequiredOwnerInputs(container)
             await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
-            const meterIdInput = container.querySelector<HTMLInputElement>('input[name="meter_id"]')!
-            setInputValue(meterIdInput, 'METER-A')
+            setInputValue(meterIdInputs(container)[0], 'METER-A')
             await act(async () => { clickButton(container, 'pages.zevs.wizard.addMeteringPoint').click() })
-            setInputValue(container.querySelector<HTMLInputElement>('input[name="meter_id"]')!, 'METER-B')
+            setInputValue(meterIdInputs(container)[1], 'METER-B')
+            await flush()
             await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
             const review = Array.from(container.querySelectorAll('.card')).find((card) =>
                 card.textContent?.includes('pages.zevs.wizard.reviewMeteringPoints'),
@@ -362,17 +365,74 @@ describe('ZevListPage creation wizard — bank fields', () => {
             expect(review?.textContent).toContain('METER-B')
             await act(async () => { clickButton(container, 'pages.zevs.wizard.back').click() })
             await flush()
-            const meterRows = container.querySelectorAll('[data-testid="wizard-metering-points-table"] table tbody tr')
-            expect(meterRows.length).toBe(2)
-            const meterTableDeleteButtons = Array.from(container.querySelectorAll('[data-testid="wizard-metering-points-table"] tbody button')).filter((b) =>
+            expect(meterIdInputs(container).map((input) => input.value)).toEqual(['METER-A', 'METER-B'])
+            const deleteButtons = Array.from(container.querySelectorAll<HTMLButtonElement>('[data-testid="wizard-metering-point-row"] button')).filter((b) =>
                 b.textContent?.includes('common.delete'),
             )
-            expect(meterTableDeleteButtons.length).toBe(2)
-            await act(async () => { meterTableDeleteButtons[0].click() })
+            expect(deleteButtons.length).toBe(2)
+            await act(async () => { deleteButtons[0].click() })
             await flush()
-            const rowsAfterDelete = container.querySelectorAll('[data-testid="wizard-metering-points-table"] table tbody tr')
-            expect(rowsAfterDelete.length).toBe(1)
-            expect(rowsAfterDelete[0].textContent).toContain('METER-B')
+            expect(meterIdInputs(container).map((input) => input.value)).toEqual(['METER-B'])
+        } finally {
+            act(() => root.unmount())
+            container.remove()
+        }
+    })
+
+    it('keeps every row visible and flags only the row without a meter ID', async () => {
+        const { container, root } = await renderZevListPage()
+        try {
+            await act(async () => { clickButton(container, 'pages.zevs.newZev').click() })
+            await fillRequiredStepOneInputs(container)
+            await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
+            await fillRequiredOwnerInputs(container)
+            await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
+            // The prefilled first row stays empty; the ID goes into an added row.
+            await act(async () => { clickButton(container, 'pages.zevs.wizard.addMeteringPoint').click() })
+            setInputValue(meterIdInputs(container)[1], 'METER-2')
+            await flush()
+            await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
+            await flush()
+
+            expect(container.textContent).toContain('pages.zevs.validation.meterIdRequired')
+            const inputs = meterIdInputs(container)
+            expect(inputs.map((input) => input.value)).toEqual(['', 'METER-2'])
+            expect(inputs[0].getAttribute('aria-invalid')).toBe('true')
+            expect(inputs[1].getAttribute('aria-invalid')).toBe(null)
+
+            setInputValue(inputs[0], 'METER-1')
+            await flush()
+            await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
+            const review = Array.from(container.querySelectorAll('.card')).find((card) =>
+                card.textContent?.includes('pages.zevs.wizard.reviewMeteringPoints'),
+            )
+            expect(review?.textContent).toContain('METER-1')
+            expect(review?.textContent).toContain('METER-2')
+        } finally {
+            act(() => root.unmount())
+            container.remove()
+        }
+    })
+
+    it('rejects the same meter ID twice', async () => {
+        const { container, root } = await renderZevListPage()
+        try {
+            await act(async () => { clickButton(container, 'pages.zevs.newZev').click() })
+            await fillRequiredStepOneInputs(container)
+            await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
+            await fillRequiredOwnerInputs(container)
+            await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
+            setInputValue(meterIdInputs(container)[0], 'METER-1')
+            await act(async () => { clickButton(container, 'pages.zevs.wizard.addMeteringPoint').click() })
+            setInputValue(meterIdInputs(container)[1], ' METER-1 ')
+            await flush()
+            await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
+            await flush()
+
+            expect(container.textContent).toContain('pages.zevs.validation.meterIdDuplicate')
+            const inputs = meterIdInputs(container)
+            expect(inputs[0].getAttribute('aria-invalid')).toBe(null)
+            expect(inputs[1].getAttribute('aria-invalid')).toBe('true')
         } finally {
             act(() => root.unmount())
             container.remove()

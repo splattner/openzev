@@ -74,6 +74,8 @@ const defaultCreateForm = (): ZevWizardInput => ({
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
 
+type MeteringPointError = 'missing' | 'duplicate'
+
 let meteringPointKeySeed = 0
 
 /**
@@ -83,6 +85,25 @@ let meteringPointKeySeed = 0
 function createMeteringPointKey(): string {
     meteringPointKeySeed += 1
     return `metering-point-${meteringPointKeySeed}`
+}
+
+/**
+ * Per-row problems on the metering point step: a missing meter ID, or one
+ * already used by an earlier row. Keyed by row index.
+ */
+function getMeteringPointErrors(points: OwnerMeteringPointInput[]): Record<number, MeteringPointError> {
+    const errors: Record<number, MeteringPointError> = {}
+    const seen = new Set<string>()
+    points.forEach((point, index) => {
+        const meterId = point.meter_id.trim()
+        if (!meterId) {
+            errors[index] = 'missing'
+        } else if (seen.has(meterId)) {
+            errors[index] = 'duplicate'
+        }
+        seen.add(meterId)
+    })
+    return errors
 }
 
 /**
@@ -115,8 +136,8 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
     const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
     const copyFeedbackTimeoutRef = useRef<number | null>(null)
     const [meteringPointKeys, setMeteringPointKeys] = useState<string[]>(() => [createMeteringPointKey()])
-    const [editingMeteringPointKey, setEditingMeteringPointKey] = useState<string | null>(null)
-    const [editingMeteringPointData, setEditingMeteringPointData] = useState<OwnerMeteringPointInput | null>(null)
+    const [showMeteringPointErrors, setShowMeteringPointErrors] = useState(false)
+    const [focusMeteringPointKey, setFocusMeteringPointKey] = useState<string | null>(null)
     const createSubmittedRef = useRef(false)
     const [purgeTarget, setPurgeTarget] = useState<Zev | null>(null)
     const [purgeConfirmation, setPurgeConfirmation] = useState('')
@@ -190,8 +211,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
         }
         setCreateForm(defaultCreateForm())
         setMeteringPointKeys([createMeteringPointKey()])
-        setEditingMeteringPointKey(null)
-        setEditingMeteringPointData(null)
+        setShowMeteringPointErrors(false)
         setWizardStep(1)
         setCreateError(null)
         setShowCreateModal(true)
@@ -208,9 +228,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
         setShowCreateModal(false)
         setCreateError(null)
         setWizardStep(1)
-        setMeteringPointKeys([createMeteringPointKey()])
-        setEditingMeteringPointKey(null)
-        setEditingMeteringPointData(null)
+        setShowMeteringPointErrors(false)
         setCreatedCredentials(null)
         setCreatedZevName('')
         if (copyFeedbackTimeoutRef.current) window.clearTimeout(copyFeedbackTimeoutRef.current)
@@ -238,30 +256,6 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
         updateMutation.mutate({ id: editingId, payload: editForm })
     }
 
-    /**
-     * Fold the open editor into the wizard form. The draft is matched by key, so
-     * deleting or reordering other rows can never redirect the edit.
-     */
-    function applyEditingMeteringPoint(form: ZevWizardInput, keys: string[]): { form: ZevWizardInput; keys: string[] } {
-        if (!editingMeteringPointData || editingMeteringPointKey === null) return { form, keys }
-        const existingIndex = keys.indexOf(editingMeteringPointKey)
-        if (existingIndex === -1) {
-            return {
-                form: { ...form, metering_points: [...form.metering_points, editingMeteringPointData] },
-                keys: [...keys, editingMeteringPointKey],
-            }
-        }
-        return {
-            form: {
-                ...form,
-                metering_points: form.metering_points.map((point, pointIndex) => (
-                    pointIndex === existingIndex ? editingMeteringPointData : point
-                )),
-            },
-            keys,
-        }
-    }
-
     function validateWizardStep(step: WizardStep, form: ZevWizardInput = createForm): string | null {
         if (step === 1) {
             if (!form.name.trim()) return t('pages.zevs.validation.zevNameRequired')
@@ -286,52 +280,27 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
 
         if (step === 3) {
             if (!form.metering_points.length) return t('pages.zevs.validation.meteringPointRequired')
-            if (form.metering_points.some((point) => !point.meter_id.trim())) {
-                return t('pages.zevs.validation.meterIdRequired')
-            }
+            const errors = Object.values(getMeteringPointErrors(form.metering_points))
+            if (errors.includes('missing')) return t('pages.zevs.validation.meterIdRequired')
+            if (errors.includes('duplicate')) return t('pages.zevs.validation.meterIdDuplicate')
         }
 
         return null
     }
 
     function goToNextStep() {
-        let formForStep = createForm
-        if (wizardStep === 3) {
-            const applied = applyEditingMeteringPoint(createForm, meteringPointKeys)
-            if (applied.form !== createForm) {
-                formForStep = applied.form
-                setCreateForm(applied.form)
-                setMeteringPointKeys(applied.keys)
-            }
-        }
-        const validationError = validateWizardStep(wizardStep, formForStep)
+        const validationError = validateWizardStep(wizardStep)
         if (validationError) {
+            if (wizardStep === 3) setShowMeteringPointErrors(true)
             setCreateError(validationError)
             return
         }
         setCreateError(null)
-        if (formForStep !== createForm) {
-            closeEditMeteringPoint()
-        }
-        const nextStep = (wizardStep < 4 ? wizardStep + 1 : wizardStep) as WizardStep
-        setWizardStep(nextStep)
-        // Auto-open the first metering point for editing when entering step 3
-        if (nextStep === 3 && formForStep.metering_points.length > 0 && editingMeteringPointKey === null) {
-            setEditingMeteringPointKey(meteringPointKeys[0] ?? null)
-            setEditingMeteringPointData({ ...formForStep.metering_points[0] })
-        }
+        setWizardStep((wizardStep < 4 ? wizardStep + 1 : wizardStep) as WizardStep)
     }
 
     function goToPreviousStep() {
         setCreateError(null)
-        if (wizardStep === 3) {
-            const applied = applyEditingMeteringPoint(createForm, meteringPointKeys)
-            if (applied.form !== createForm) {
-                setCreateForm(applied.form)
-                setMeteringPointKeys(applied.keys)
-                closeEditMeteringPoint()
-            }
-        }
         setWizardStep((previous) => (previous > 1 ? (previous - 1) as WizardStep : previous))
     }
 
@@ -349,54 +318,45 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
     }
 
     function addMeteringPoint() {
-        commitEditingMeteringPoint()
-        setEditingMeteringPointKey(createMeteringPointKey())
-        setEditingMeteringPointData({
-            meter_id: '',
-            meter_type: 'consumption',
-            is_active: true,
-            location_description: '',
-        })
+        const key = createMeteringPointKey()
+        setCreateForm((previous) => ({
+            ...previous,
+            metering_points: [
+                ...previous.metering_points,
+                { meter_id: '', meter_type: 'consumption', is_active: true, location_description: '' },
+            ],
+        }))
+        setMeteringPointKeys((previous) => [...previous, key])
+        setFocusMeteringPointKey(key)
     }
 
-    function openEditMeteringPoint(key: string) {
-        commitEditingMeteringPoint()
+    function updateMeteringPoint(key: string, updates: Partial<OwnerMeteringPointInput>) {
         const index = meteringPointKeys.indexOf(key)
         if (index === -1) return
-        setEditingMeteringPointKey(key)
-        setEditingMeteringPointData({ ...createForm.metering_points[index] })
-    }
-
-    function closeEditMeteringPoint() {
-        setEditingMeteringPointKey(null)
-        setEditingMeteringPointData(null)
-    }
-
-    function updateEditingMeteringPoint(updates: Partial<OwnerMeteringPointInput>) {
-        if (!editingMeteringPointData) return
-        setEditingMeteringPointData({ ...editingMeteringPointData, ...updates })
-    }
-
-    function commitEditingMeteringPoint() {
-        if (!editingMeteringPointData || editingMeteringPointKey === null) return
-        const applied = applyEditingMeteringPoint(createForm, meteringPointKeys)
-        if (applied.form !== createForm) {
-            setCreateForm(applied.form)
-            setMeteringPointKeys(applied.keys)
-        }
+        setCreateForm((previous) => ({
+            ...previous,
+            metering_points: previous.metering_points.map((point, pointIndex) => (
+                pointIndex === index ? { ...point, ...updates } : point
+            )),
+        }))
     }
 
     function removeMeteringPoint(key: string) {
-        const applied = applyEditingMeteringPoint(createForm, meteringPointKeys)
-        const index = applied.keys.indexOf(key)
-        if (index === -1 || applied.form.metering_points.length <= 1) return
-        setCreateForm({
-            ...applied.form,
-            metering_points: applied.form.metering_points.filter((_, pointIndex) => pointIndex !== index),
-        })
-        setMeteringPointKeys(applied.keys.filter((existingKey) => existingKey !== key))
-        if (editingMeteringPointKey === key) closeEditMeteringPoint()
+        const index = meteringPointKeys.indexOf(key)
+        if (index === -1 || createForm.metering_points.length <= 1) return
+        setCreateForm((previous) => ({
+            ...previous,
+            metering_points: previous.metering_points.filter((_, pointIndex) => pointIndex !== index),
+        }))
+        setMeteringPointKeys((previous) => previous.filter((existingKey) => existingKey !== key))
     }
+
+    // Move the cursor into a freshly added row so it can be typed into right away.
+    useEffect(() => {
+        if (!focusMeteringPointKey) return
+        document.getElementById(`wizard-meter-id-${focusMeteringPointKey}`)?.focus()
+        setFocusMeteringPointKey(null)
+    }, [focusMeteringPointKey])
 
     const header = !embedded ? (
         <PageHeader
@@ -427,6 +387,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
         createForm.owner.address_line2,
         [createForm.owner.postal_code, createForm.owner.city].filter((part) => part && part.trim()).join(' '),
     ].filter((part) => part && part.trim()).join(', ')
+    const meteringPointErrors = getMeteringPointErrors(createForm.metering_points)
     const reviewBillingInterval = BILLING_INTERVAL_OPTIONS.find((option) => option.value === createForm.billing_interval)
 
     return (
@@ -622,107 +583,80 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                 <p className="muted" style={{ margin: '0.35rem 0 0' }}>{t('pages.zevs.wizard.step3Description')}</p>
                             </div>
 
+                            <ol className="wizard-metering-points" data-testid="wizard-metering-points">
+                                {meteringPointKeys.map((key, index) => {
+                                    const meteringPoint = createForm.metering_points[index]
+                                    if (!meteringPoint) return null
+                                    const rowError = showMeteringPointErrors ? meteringPointErrors[index] : undefined
+                                    const errorId = `wizard-meter-id-${key}-error`
+                                    return (
+                                        <li key={key} className="wizard-metering-point" data-testid="wizard-metering-point-row">
+                                            <div className="wizard-metering-point-header">
+                                                <strong>{t('pages.zevs.wizard.meteringPointNumber', { number: index + 1 })}</strong>
+                                                <button
+                                                    className="button button-ghost button-compact"
+                                                    type="button"
+                                                    onClick={() => removeMeteringPoint(key)}
+                                                    disabled={createForm.metering_points.length === 1}
+                                                    aria-label={t('pages.zevs.wizard.removeMeteringPoint', { number: index + 1 })}
+                                                    title={t('pages.zevs.wizard.removeMeteringPoint', { number: index + 1 })}
+                                                >
+                                                    <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                                    {t('common.delete')}
+                                                </button>
+                                            </div>
+                                            <div className="wizard-metering-point-fields">
+                                                <label>
+                                                    <span>{t('pages.zevs.form.meterId')}</span>
+                                                    <input
+                                                        id={`wizard-meter-id-${key}`}
+                                                        name="meter_id"
+                                                        value={meteringPoint.meter_id}
+                                                        onChange={(event) => updateMeteringPoint(key, { meter_id: event.target.value })}
+                                                        aria-invalid={rowError ? true : undefined}
+                                                        aria-describedby={rowError ? errorId : undefined}
+                                                        required
+                                                    />
+                                                    {rowError && (
+                                                        <small className="field-error" id={errorId} role="alert">
+                                                            {t(rowError === 'missing' ? 'pages.zevs.wizard.meterIdMissing' : 'pages.zevs.wizard.meterIdDuplicate')}
+                                                        </small>
+                                                    )}
+                                                </label>
+                                                <label>
+                                                    <span>{t('pages.zevs.form.meterType')}</span>
+                                                    <select
+                                                        name="meter_type"
+                                                        value={meteringPoint.meter_type}
+                                                        onChange={(event) => updateMeteringPoint(key, { meter_type: event.target.value as OwnerMeteringPointInput['meter_type'] })}
+                                                    >
+                                                        {METER_TYPE_OPTIONS.map((option) => (
+                                                            <option key={option.value} value={option.value}>
+                                                                {t(option.labelKey)}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </label>
+                                                <label>
+                                                    <span>{t('pages.zevs.form.locationDescription')}</span>
+                                                    <input
+                                                        name="location_description"
+                                                        value={meteringPoint.location_description ?? ''}
+                                                        onChange={(event) => updateMeteringPoint(key, { location_description: event.target.value })}
+                                                    />
+                                                </label>
+                                            </div>
+                                        </li>
+                                    )
+                                })}
+                            </ol>
+
                             <div>
                                 <button className="button button-secondary" type="button" onClick={addMeteringPoint}>
                                     <FontAwesomeIcon icon={faPlus} fixedWidth />
                                     {t('pages.zevs.wizard.addMeteringPoint')}
                                 </button>
                             </div>
-
-                            {editingMeteringPointKey !== null && editingMeteringPointData && (
-                                <div className="card" style={{ padding: '1rem', border: '1px solid var(--border-color)' }}>
-                                    <h4 style={{ marginTop: 0, marginBottom: '1rem' }}>
-                                        {meteringPointKeys.includes(editingMeteringPointKey) ? t('pages.zevs.wizard.editMeteringPointTitle') : t('pages.zevs.wizard.newMeteringPointTitle')}
-                                    </h4>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-                                        <label>
-                                            <span>{t('pages.zevs.form.meterId')}</span>
-                                            <input
-                                                name="meter_id"
-                                                value={editingMeteringPointData.meter_id}
-                                                onChange={(event) => updateEditingMeteringPoint({ meter_id: event.target.value })}
-                                                required
-                                            />
-                                        </label>
-                                        <label>
-                                            <span>{t('pages.zevs.form.meterType')}</span>
-                                            <select
-                                                value={editingMeteringPointData.meter_type}
-                                                onChange={(event) => updateEditingMeteringPoint({ meter_type: event.target.value as OwnerMeteringPointInput['meter_type'] })}
-                                            >
-                                                {METER_TYPE_OPTIONS.map((option) => (
-                                                    <option key={option.value} value={option.value}>
-                                                        {t(option.labelKey)}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </label>
-                                        <label className="grid-span-full">
-                                            <span>{t('pages.zevs.form.locationDescription')}</span>
-                                            <input
-                                                value={editingMeteringPointData.location_description ?? ''}
-                                                onChange={(event) => updateEditingMeteringPoint({ location_description: event.target.value })}
-                                            />
-                                        </label>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '0.75rem' }}>
-                                        <button className="button button-secondary" type="button" onClick={closeEditMeteringPoint}>
-                                            <FontAwesomeIcon icon={faXmark} fixedWidth />
-                                            {t('common.cancel')}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {createForm.metering_points.length > 0 && (
-                                <div className="table-card" data-testid="wizard-metering-points-table" style={{ padding: '0.5rem' }}>
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th>{t('pages.zevs.meterCol.meterId')}</th>
-                                                <th>{t('pages.zevs.meterCol.type')}</th>
-                                                <th>{t('pages.zevs.meterCol.location')}</th>
-                                                <th>{t('pages.zevs.meterCol.actions')}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {meteringPointKeys.map((key, index) => {
-                                                const meteringPoint = createForm.metering_points[index]
-                                                if (!meteringPoint) return null
-                                                const meterTypeOption = METER_TYPE_OPTIONS.find((option) => option.value === meteringPoint.meter_type)
-                                                return (
-                                                    <tr key={key}>
-                                                        <td>{meteringPoint.meter_id}</td>
-                                                        <td>{t(meterTypeOption?.labelKey ?? (meteringPoint.meter_type as `pages.meteringPoints.meterTypes.${string}`))}</td>
-                                                        <td>{meteringPoint.location_description || '-'}</td>
-                                                        <td>
-                                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                                <button
-                                                                    className="button button-secondary button-compact"
-                                                                    type="button"
-                                                                    onClick={() => openEditMeteringPoint(key)}
-                                                                >
-                                                                    <FontAwesomeIcon icon={faPen} fixedWidth />
-                                                                    {t('common.edit')}
-                                                                </button>
-                                                                <button
-                                                                    className="button button-danger button-compact"
-                                                                    type="button"
-                                                                    onClick={() => removeMeteringPoint(key)}
-                                                                    disabled={createForm.metering_points.length === 1}
-                                                                >
-                                                                    <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                                                    {t('common.delete')}
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
                         </div>
                     )}
 

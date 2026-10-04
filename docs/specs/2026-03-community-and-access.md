@@ -1214,6 +1214,16 @@ archive or run `openzev_backup` before purging. No frontend UI yet either.
 
 ### 7.2 Create-with-owner wizard
 
+**Frontend:** `ZevListPage` runs a four-step modal (ZEV details, responsible
+person + payment details, metering points, review). Step 3 lists every
+metering point as an inline-editable row (meter ID, meter type, location
+description) — there is no separate editor or draft, so what is on screen is
+exactly what gets sent. It starts with one empty row; "Add metering point"
+appends a row and focuses its meter ID; a row can be deleted while more than
+one remains. "Next" requires a non-blank, unique (after trimming) meter ID on
+every row; on failure the banner names the problem and each offending row
+shows its own error.
+
 **Endpoint:** `POST /api/v1/zev/zevs/create-with-owner/` (admin only)
 
 **Payload:** `ZevCreateWithOwnerSerializer`:
@@ -2025,10 +2035,13 @@ lists the test classes per module (test counts are the `test_*` methods).
   each impersonation edge, plus a delayed-response race: a query already in
   flight for the outgoing account must not repopulate the cache after the
   switch.
-- `frontend/tests/zev-create-wizard.test.ts` — the admin creation wizard
-  commits an edited meter when advancing, sends `bank_iban` + `bank_name` to
-  `createZevWithOwner` (echoed on the step-4 review), and sends `""` for both
-  when left blank (review shows `–`).
+- `frontend/tests/zev-create-wizard.test.ts` (8 tests) — the admin creation
+  wizard sends `bank_iban` + `bank_name` to `createZevWithOwner` (echoed on the
+  step-4 review) and `""` for both when left blank (review shows `–`); rejects
+  an invalid IBAN and an IBAN without recipient address on step 2; on step 3
+  keeps typed meter IDs when advancing, deletes the right row, flags only the
+  row without a meter ID (all rows stay visible), and rejects a duplicate
+  meter ID.
 - `frontend/tests/verify-email-self-setup.test.ts` — the verify-email
   self-setup card sends `bank_iban` + `bank_name` with `createSelfSetupZev`
   and sends `""` when left blank (no client-side required).
