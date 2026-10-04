@@ -96,6 +96,7 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
         openEditBuildingModal,
         closeBuildingModal,
         saveBuildingMutation,
+        submitBuilding,
         deleteBuildingMutation,
         confirmDeleteBuilding,
         openCreateMpModalInBuilding,
@@ -189,7 +190,7 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                         building={editingBuilding}
                         isPending={saveBuildingMutation.isPending}
                         onClose={closeBuildingModal}
-                        onSubmit={(input) => saveBuildingMutation.mutate(input)}
+                        onSubmit={submitBuilding}
                     />
                 )}
                 <MeteringPointFormModal
