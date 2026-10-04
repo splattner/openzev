@@ -2132,7 +2132,12 @@ the details. An invoice appears here once it has been sent: drafts and
 approved invoices that haven't gone out yet stay with the operator, and the
 participant's annual statement counts only sent invoices too. A sent invoice
 that is cancelled later stays listed, marked as cancelled. The PDF button
-appears only on rows that have a document.
+appears only on rows that have a document. This sent-only list also applies
+when you manage another community where you are a participant.
+Click the invoice number or <strong>View details</strong> to open the invoice. <strong>Open PDF</strong>
+has a text label; invoices without a document show whether the PDF is being
+prepared, failed, or missing. A failed refresh keeps the last loaded invoices
+visible with a warning and <strong>Retry</strong>.
 Participants with several communities see which community issued each invoice.
 The list is read-only; the deep link <code>/billing/invoices/{id}</code> shows a
 participant only their own invoice (enforced by the backend), and its return
@@ -2212,6 +2217,10 @@ attempts and errors are kept in the Emails tab's history panel.</p>
   offering Generate, while partly overlapping locked invoices surface as a
   generation conflict with a link to the blocking invoices.</li>
 </ul>
+<p>Choosing a period updates the URL without changing other filters. Reload and browser Back read the period from that URL. Switching
+community checks the same range against the new community's start date before
+loading its invoices. A failed refresh retains the loaded period rows with
+<strong>Retry</strong>.</p>
 <p><img alt="Invoice period overview" src="../screenshots/08-invoices.png" /></p>
 <h3 id="period-overview-table">Period Overview Table<a class="headerlink" href="#period-overview-table" title="Permanent link">&para;</a></h3>
 <p>Each row in the table represents one <strong>participant</strong> who had active metering-point assignments during the period. A participant whose assignment has since ended keeps their row while they still hold an invoice for the period, so email/payment actions on that invoice stay reachable. Columns:</p>
@@ -2233,11 +2242,7 @@ attempts and errors are kept in the Emails tab's history panel.</p>
 </tr>
 <tr>
 <td><strong>Invoice</strong></td>
-<td>The invoice number, or "Not created" if no invoice exists yet.</td>
-</tr>
-<tr>
-<td><strong>Status</strong></td>
-<td>Badge showing the invoice status (<code>Draft</code>, <code>Approved</code>, <code>Sent</code>, <code>Paid</code>, <code>Cancelled</code>), or a neutral "Not created" badge.</td>
+<td>Linked invoice number and its status badge (<code>Draft</code>, <code>Approved</code>, <code>Sent</code>, <code>Paid</code>, <code>Cancelled</code>), or "Not created"/"Already billed" for a row without an invoice. Opening details retains the period for the return link.</td>
 </tr>
 <tr>
 <td><strong>Email</strong></td>
@@ -2249,7 +2254,7 @@ attempts and errors are kept in the Emails tab's history panel.</p>
 </tr>
 <tr>
 <td><strong>PDF</strong></td>
-<td><strong>Generate PDF</strong> button (or <strong>Open PDF</strong> + <strong>Regenerate</strong> if a PDF already exists).</td>
+<td>Preparing, failed, missing or ready state; <strong>Open PDF</strong> when ready. Generation/regeneration actions remain in the row actions.</td>
 </tr>
 <tr>
 <td><strong>Actions</strong></td>

@@ -1848,6 +1848,13 @@ data. The <strong>Whole ZEV total</strong> option is only offered when managing 
 (admin or manager) — a participant selects among their own metering
 points instead. Selecting it hides the Raw Readings Table below, since raw
 readings only make sense for one physical meter.</p>
+<p>Bookmark or share the chart URL to retain its exact date range and selected
+meter, including <strong>Whole ZEV total</strong> while the community is loading. Links use
+<code>period_start</code> and <code>period_end</code>; older <code>from</code>/<code>to</code> links still
+open, and choosing a new period updates them to the current format. Custom
+ranges survive reload, browser Back, and changes between Chart and Data
+Quality. Switching community keeps the dates and clears a meter that is not
+available in the new community after its meter list loads.</p>
 <p>If the selected metering point has no readings at all in the chosen period
 but does have data elsewhere, the empty state offers a button to jump
 straight to the period it actually covers instead of a dead end.</p>
