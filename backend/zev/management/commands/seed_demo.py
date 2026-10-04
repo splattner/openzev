@@ -38,6 +38,7 @@ from zev.models import (
     AllocationMode,
     BillingInterval,
     InvoiceLanguage,
+    Building,
     MeteringPoint,
     MeteringPointAssignment,
     MeteringPointType,
@@ -52,7 +53,8 @@ from zev.models import (
     ZevPartyRole,
     ZevType,
 )
-from zev.parties import assign_role, ensure_initial_roles
+from zev.buildings import ensure_initial_building
+from zev.parties import assign_role, ensure_initial_roles, set_landowner_building
 
 
 
@@ -462,6 +464,8 @@ class Command(BaseCommand):
             valid_from=main_valid_from,
         )
         ensure_initial_roles(zev, owner_participant.party, main_valid_from)
+        # One property: its single building takes the issuer's address.
+        main_building = ensure_initial_building(zev)
         self._drop_grant_covered_by_role(zev, owner)
         participant_one = self._upsert_participant(
             zev=zev,
@@ -524,18 +528,21 @@ class Command(BaseCommand):
             meter_id="CH-DEMO-PROD-0001",
             meter_type=MeteringPointType.PRODUCTION,
             location_description="Rooftop PV production meter",
+            building=main_building,
         )
         participant_one_cons = self._upsert_metering_point(
             zev=zev,
             meter_id="CH-DEMO-CONS-0001",
             meter_type=MeteringPointType.CONSUMPTION,
             location_description="Apartment 1 consumption meter",
+            building=main_building,
         )
         participant_two_cons = self._upsert_metering_point(
             zev=zev,
             meter_id="CH-DEMO-CONS-0002",
             meter_type=MeteringPointType.CONSUMPTION,
             location_description="Apartment 2 consumption meter",
+            building=main_building,
         )
         # Intentionally unassigned: exercises the "no assignment yet" UI state
         # (Ohne Zuweisung filter, Teilnehmer zuweisen action) in demos and lets
@@ -548,6 +555,7 @@ class Command(BaseCommand):
             meter_id="CH-DEMO-CONS-0003",
             meter_type=MeteringPointType.CONSUMPTION,
             location_description="Spare consumption meter (unassigned)",
+            building=main_building,
         )
         MeteringPointAssignment.objects.filter(metering_point=spare_cons).delete()
         # Allgemeinstrom: the shared draw nobody uses alone. Held by the owner
@@ -558,6 +566,7 @@ class Command(BaseCommand):
             meter_id="CH-DEMO-COMMON-0001",
             meter_type=MeteringPointType.CONSUMPTION,
             location_description="Common area: stairwell, lift, laundry",
+            building=main_building,
         )
 
         self._ensure_assignment(owner_prod, owner_participant, main_valid_from)
@@ -939,6 +948,22 @@ class Command(BaseCommand):
         )
         ensure_initial_roles(zev, owner_participant.party, start_date)
         self._drop_grant_covered_by_role(zev, owner)
+        # A vZEV of three houses, one building each (#890); the owner's
+        # landowner role names the house it owns.
+        owner_house = self._upsert_building(
+            zev=zev, address_line1="Solarweg 1", name="Solarweg 1", postal_code="3000", city="Bern",
+        )
+        clara_house = self._upsert_building(
+            zev=zev, address_line1="Kirchenfeldstrasse 42", name="Kirchenfeldstrasse 42",
+            postal_code="3005", city="Bern",
+        )
+        lukas_house = self._upsert_building(
+            zev=zev, address_line1="Monbijoustrasse 88", name="Monbijoustrasse 88",
+            postal_code="3007", city="Bern",
+        )
+        landowner = ZevPartyRole.objects.filter(zev=zev, role=PartyRole.LANDOWNER, party=owner_participant.party).first()
+        if landowner is not None and landowner.building_id is None:
+            set_landowner_building(landowner, owner_house)
         participant_one = self._upsert_participant(
             zev=zev,
             user=clara_user,
@@ -971,24 +996,28 @@ class Command(BaseCommand):
             meter_id="CH-DEMO2-PROD-0001",
             meter_type=MeteringPointType.PRODUCTION,
             location_description="Rooftop PV production meter",
+            building=owner_house,
         )
         participant_one_cons = self._upsert_metering_point(
             zev=zev,
             meter_id="CH-DEMO2-CONS-0001",
             meter_type=MeteringPointType.CONSUMPTION,
             location_description="Apartment 1 consumption meter",
+            building=clara_house,
         )
         participant_two_cons = self._upsert_metering_point(
             zev=zev,
             meter_id="CH-DEMO2-CONS-0002",
             meter_type=MeteringPointType.CONSUMPTION,
             location_description="Apartment 2 consumption meter",
+            building=lukas_house,
         )
         common_area_cons = self._upsert_metering_point(
             zev=zev,
             meter_id="CH-DEMO2-COMMON-0001",
             meter_type=MeteringPointType.CONSUMPTION,
             location_description="Common area: stairwell, lift, laundry",
+            building=owner_house,
         )
 
         self._ensure_assignment(owner_prod, owner_participant, start_date)
@@ -1493,6 +1522,16 @@ class Command(BaseCommand):
         party.save()
         return party
 
+    def _upsert_building(self, *, zev: Zev, address_line1: str, **fields) -> Building:
+        """A demo building, found by its street line within the ZEV."""
+        building = Building.objects.filter(zev=zev, address_line1=address_line1).first() or Building(
+            zev=zev, address_line1=address_line1
+        )
+        for name, value in fields.items():
+            setattr(building, name, value)
+        building.save()
+        return building
+
     def _upsert_metering_point(
         self,
         *,
@@ -1500,16 +1539,17 @@ class Command(BaseCommand):
         meter_id: str,
         meter_type: str,
         location_description: str,
+        building: Building | None = None,
     ) -> MeteringPoint:
-        meter, _ = MeteringPoint.objects.update_or_create(
-            meter_id=meter_id,
-            defaults={
-                "zev": zev,
-                "meter_type": meter_type,
-                "is_active": True,
-                "location_description": location_description,
-            },
-        )
+        defaults = {
+            "zev": zev,
+            "meter_type": meter_type,
+            "is_active": True,
+            "location_description": location_description,
+        }
+        if building is not None:
+            defaults["building"] = building
+        meter, _ = MeteringPoint.objects.update_or_create(meter_id=meter_id, defaults=defaults)
         return meter
 
     def _ensure_assignment(

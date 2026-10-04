@@ -7,6 +7,7 @@ from .views import (
     ParticipantGeocodingEnabledView,
     ZevViewSet,
     ParticipantViewSet,
+    BuildingViewSet,
     PartyViewSet,
     ZevPartyRoleViewSet,
     MeteringPointViewSet,
@@ -16,6 +17,7 @@ from .views import (
 router = DefaultRouter()
 router.register("zevs", ZevViewSet, basename="zev")
 router.register("participants", ParticipantViewSet, basename="participant")
+router.register("buildings", BuildingViewSet, basename="building")
 router.register("parties", PartyViewSet, basename="party")
 router.register("party-roles", ZevPartyRoleViewSet, basename="partyrole")
 router.register("metering-points", MeteringPointViewSet, basename="meteringpoint")

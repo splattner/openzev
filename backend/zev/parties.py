@@ -47,8 +47,8 @@ def representative_on(zev, day: date) -> Party | None:
     return holder_on(zev, PartyRole.REPRESENTATIVE, day)
 
 
-def _create(zev, party, role, valid_from, valid_to) -> ZevPartyRole:
-    row = ZevPartyRole(zev=zev, party=party, role=role, valid_from=valid_from, valid_to=valid_to)
+def _create(zev, party, role, valid_from, valid_to, building=None) -> ZevPartyRole:
+    row = ZevPartyRole(zev=zev, party=party, role=role, valid_from=valid_from, valid_to=valid_to, building=building)
     row.full_clean()
     row.save()
     return row
@@ -69,18 +69,26 @@ def _keeps_a_manager(zev, had_manager: bool) -> None:
 
 
 @transaction.atomic
-def assign_role(zev, party, role: str, valid_from: date, *, valid_to: date | None = None) -> ZevPartyRole:
+def assign_role(
+    zev, party, role: str, valid_from: date, *, valid_to: date | None = None, building=None
+) -> ZevPartyRole:
     """Give ``party`` ``role`` from ``valid_from``.
 
     For the issuer and the representative, the holder on ``valid_from`` is
     ended the day before (a window that would become empty is deleted); a
     holder starting after ``valid_from`` must be ended first. A landowner is
-    simply added, once per party.
+    simply added, once per party and building (``building`` names the one it
+    owns and is accepted for landowners only).
     """
     if party.zev_id != zev.pk:
         raise ValidationError({"party": "The party belongs to another ZEV."})
     if valid_to is not None and valid_to < valid_from:
         raise ValidationError({"valid_to": "The role cannot end before it starts."})
+    if building is not None:
+        if role != PartyRole.LANDOWNER:
+            raise ValidationError({"building": "Only a landowner role names a building."})
+        if building.zev_id != zev.pk:
+            raise ValidationError({"building": "The building belongs to another ZEV."})
     rows = list(ZevPartyRole.objects.select_for_update().filter(zev=zev, role=role).order_by("valid_from"))
 
     if role in MANAGING_ROLES:
@@ -89,9 +97,12 @@ def assign_role(zev, party, role: str, valid_from: date, *, valid_to: date | Non
         had_manager = has_manager(zev)
 
     if role not in SINGLE_HOLDER_ROLES:
-        if any(row.party_id == party.pk and row.valid_to is None for row in rows):
+        building_id = building.pk if building is not None else None
+        if any(row.party_id == party.pk and row.valid_to is None and row.building_id == building_id for row in rows):
+            if building is not None:
+                raise ValidationError({"party": "The party already owns this building."})
             raise ValidationError({"party": "The party already holds this role."})
-        return _create(zev, party, role, valid_from, valid_to)
+        return _create(zev, party, role, valid_from, valid_to, building)
 
     if any(row.valid_from > valid_from for row in rows):
         raise ValidationError({"valid_from": "A later holder exists; end it first."})
@@ -105,6 +116,25 @@ def assign_role(zev, party, role: str, valid_from: date, *, valid_to: date | Non
     if role in MANAGING_ROLES:
         _keeps_a_manager(zev, had_manager)
     return created
+
+
+@transaction.atomic
+def set_landowner_building(row: ZevPartyRole, building) -> ZevPartyRole:
+    """Point a landowner row at the building it owns (``None``: not specified).
+
+    The row's dates are unchanged. Refuses other roles and a building the
+    party already owns through another open row."""
+    if row.role != PartyRole.LANDOWNER:
+        raise ValidationError({"building": "Only a landowner role names a building."})
+    if building is not None and building.zev_id != row.zev_id:
+        raise ValidationError({"building": "The building belongs to another ZEV."})
+    if row.valid_to is None and ZevPartyRole.objects.filter(
+        zev_id=row.zev_id, party_id=row.party_id, role=row.role, valid_to__isnull=True, building=building
+    ).exclude(pk=row.pk).exists():
+        raise ValidationError({"party": "The party already owns this building." if building else "The party already holds this role."})
+    row.building = building
+    row.save(update_fields=["building", "updated_at"])
+    return row
 
 
 def _end(row: ZevPartyRole, last_day: date) -> ZevPartyRole | None:

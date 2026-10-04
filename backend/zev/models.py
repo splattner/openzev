@@ -590,6 +590,52 @@ class ParticipantOnboardingToken(models.Model):
         return self.revoked_at is None and not self.is_expired
 
 
+class Building(models.Model):
+    """A site of a ZEV: where its metering points are (#890, ADR 0029).
+
+    A participant's address is where its invoice goes; a building is where the
+    meters are. Every metering point belongs to one building and a landowner
+    role can name the building it owns. Not dated: a metering point's
+    assignments already carry time. ``Zev.postal_code`` stays the grid
+    connection's own postal code.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    zev = models.ForeignKey(Zev, on_delete=models.CASCADE, related_name="buildings")
+    name = models.CharField(max_length=200)
+    address_line1 = models.CharField(max_length=200, blank=True)
+    address_line2 = models.CharField(max_length=200, blank=True)
+    postal_code = models.CharField(max_length=10, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    egid = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        validators=[MaxValueValidator(999_999_999)],
+        help_text="Federal building ID (EGID)",
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["zev", "egid"],
+                condition=models.Q(egid__isnull=False),
+                name="unique_building_egid_per_zev",
+            ),
+        ]
+
+    @property
+    def address_lines(self) -> list[str]:
+        lines = [self.address_line1, self.address_line2, f"{self.postal_code} {self.city}".strip()]
+        return [line for line in lines if line.strip()]
+
+    def __str__(self):
+        return self.name
+
+
 class MeteringPointType(models.TextChoices):
     CONSUMPTION = "consumption", "Consumption"
     PRODUCTION = "production", "Production"
@@ -606,7 +652,12 @@ class MeteringPoint(models.Model):
         max_length=20, choices=MeteringPointType.choices, default=MeteringPointType.CONSUMPTION
     )
     is_active = models.BooleanField(default=True)
-    location_description = models.CharField(max_length=200, blank=True)
+    building = models.ForeignKey(Building, on_delete=models.RESTRICT, related_name="metering_points")
+    location_description = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Unit within the building (flat, floor, common areas)",
+    )
     has_behind_meter_generation = models.BooleanField(
         default=False,
         help_text=(
@@ -623,7 +674,19 @@ class MeteringPoint(models.Model):
     def __str__(self):
         return self.meter_id
 
+    def save(self, *args, **kwargs):
+        if self.building_id is None and self.zev_id is not None:
+            from .buildings import default_building
+
+            self.building = default_building(self.zev)
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None and "building" not in update_fields:
+                kwargs["update_fields"] = [*update_fields, "building"]
+        super().save(*args, **kwargs)
+
     def clean(self):
+        if self.building_id and self.zev_id and self.building.zev_id != self.zev_id:
+            raise ValidationError({"building": "The building belongs to another ZEV."})
         if self.has_behind_meter_generation and self.meter_type not in (
             MeteringPointType.BIDIRECTIONAL,
             MeteringPointType.PRODUCTION,
@@ -838,6 +901,10 @@ class ZevPartyRole(models.Model):
     role = models.CharField(max_length=20, choices=PartyRole.choices)
     valid_from = models.DateField()
     valid_to = models.DateField(null=True, blank=True)
+    # The building or plot a landowner owns (#890); null is "not specified".
+    building = models.ForeignKey(
+        Building, on_delete=models.SET_NULL, null=True, blank=True, related_name="landowner_roles"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -853,10 +920,19 @@ class ZevPartyRole(models.Model):
                 condition=models.Q(valid_to__isnull=True, role__in=["issuer", "representative"]),
                 name="one_open_single_holder_role",
             ),
+            # A party holds a role once while it is open, and a landowner once
+            # per building (#890). Two constraints rather than one with
+            # ``nulls_distinct=False``, which SQLite and PostgreSQL before 15
+            # silently skip.
+            models.UniqueConstraint(
+                fields=["zev", "party", "role", "building"],
+                condition=models.Q(valid_to__isnull=True, building__isnull=False),
+                name="one_open_role_per_party_building",
+            ),
             models.UniqueConstraint(
                 fields=["zev", "party", "role"],
-                condition=models.Q(valid_to__isnull=True),
-                name="one_open_role_per_party",
+                condition=models.Q(valid_to__isnull=True, building__isnull=True),
+                name="one_open_role_per_party_without_building",
             ),
         ]
 
@@ -864,6 +940,11 @@ class ZevPartyRole(models.Model):
         super().clean()
         if self.party_id and self.zev_id and self.party.zev_id != self.zev_id:
             raise ValidationError({"party": "The party belongs to another ZEV."})
+        if self.building_id:
+            if self.role != PartyRole.LANDOWNER:
+                raise ValidationError({"building": "Only a landowner role names a building."})
+            if self.zev_id and self.building.zev_id != self.zev_id:
+                raise ValidationError({"building": "The building belongs to another ZEV."})
 
     def __str__(self):
         return f"{self.party} {self.role} {self.valid_from}–{self.valid_to or ''}"

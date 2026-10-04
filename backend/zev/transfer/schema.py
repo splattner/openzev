@@ -11,7 +11,8 @@ break every archive already sitting on someone's disk.
 """
 
 # Bumped whenever the archive layout changes in a way an older importer cannot
-# read. Version 5 carries the ZEV's parties and their dated roles (#761):
+# read. Version 6 carries the ZEV's buildings (#890): metering points and
+# landowner roles point at one. Version 5 carries the ZEV's parties and their dated roles (#761):
 # participants point at a party instead of carrying its name and address.
 # Version 4 moves the percentage of a percentage-of-energy tariff onto
 # its periods. Version 3 adds the invoice_pdfs section (issued invoice
@@ -20,8 +21,8 @@ break every archive already sitting on someone's disk.
 # provenance. Version 1 remains readable for static exports and legacy
 # adapter-based dynamic descriptors. An archive naming a version that is not
 # listed here is rejected outright rather than imported half-understood.
-FORMAT_VERSION = 5
-SUPPORTED_FORMAT_VERSIONS = frozenset({1, 2, 3, 4, 5})
+FORMAT_VERSION = 6
+SUPPORTED_FORMAT_VERSIONS = frozenset({1, 2, 3, 4, 5, 6})
 
 MANIFEST_NAME = "manifest.json"
 READINGS_DIR = "readings"
@@ -90,11 +91,15 @@ SECTION_FILES = {
 PARTIES_FILE = "parties.json"
 PARTY_ROLES_FILE = "party_roles.json"
 
+# Format 6: the buildings of the ZEV travel with the metering-point section.
+BUILDINGS_FILE = "buildings.json"
+
 # Manifest counts that belong to a section without being one.
 SUBCOUNT_SECTIONS = {
     "assignments": SECTION_METERING_POINTS,
     "parties": SECTION_PARTICIPANTS,
     "party_roles": SECTION_PARTICIPANTS,
+    "buildings": SECTION_METERING_POINTS,
 }
 
 # ── Field lists ────────────────────────────────────────────────────────────
@@ -166,6 +171,18 @@ PARTY_ROLE_FIELDS = (
     "role",
     "valid_from",
     "valid_to",
+)
+
+# A building of the ZEV (format 6), with an archive ``id`` that metering points
+# and landowner roles point at.
+BUILDING_FIELDS = (
+    "name",
+    "address_line1",
+    "address_line2",
+    "postal_code",
+    "city",
+    "egid",
+    "notes",
 )
 
 # A participant from format 5 on: the billing relationship, plus the archive

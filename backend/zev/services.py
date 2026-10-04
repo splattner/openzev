@@ -202,6 +202,7 @@ def get_participant_onboarding_link(participant) -> tuple[str, ParticipantOnboar
 def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_points_data: list[dict]) -> dict:
     from .models import MeteringPoint, MeteringPointAssignment, Participant, Zev
     from .access import grant_manager_until_role
+    from .buildings import ensure_initial_building
     from .parties import ensure_initial_roles
 
     first_name = owner_data['first_name']
@@ -238,6 +239,7 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
         valid_from=zev.start_date,
     )
     ensure_initial_roles(zev, owner_participant.party, zev.start_date)
+    building = ensure_initial_building(zev)
     # The issuer role is the creator's access; a grant only bridges a later start.
     grant_manager_until_role(zev, owner_user, zev.start_date)
 
@@ -252,6 +254,7 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
             meter_type=metering_point_data['meter_type'],
             is_active=metering_point_data.get('is_active', True),
             location_description=metering_point_data.get('location_description', ''),
+            building=building,
         )
         MeteringPointAssignment.objects.create(
             metering_point=metering_point,
@@ -289,6 +292,7 @@ def create_zev_for_existing_owner(*, owner_user, zev_data: dict, participant_dat
     """
     from .models import Participant, Zev
     from .access import grant_manager_until_role
+    from .buildings import ensure_initial_building
     from .parties import ensure_initial_roles
 
     zev = Zev.objects.create(**zev_data)
@@ -302,6 +306,7 @@ def create_zev_for_existing_owner(*, owner_user, zev_data: dict, participant_dat
         valid_from=zev.start_date,
     )
     ensure_initial_roles(zev, owner_participant.party, zev.start_date)
+    ensure_initial_building(zev)
     # The issuer role is the creator's access; a grant only bridges a later start.
     grant_manager_until_role(zev, owner_user, zev.start_date)
     return {

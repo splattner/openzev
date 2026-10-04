@@ -90,6 +90,10 @@ ZEV_SECTIONS: tuple[tuple[str, tuple[ZevPart, ...]], ...] = (
     (
         "metering_points",
         (
+            # Buildings first: every metering point points at one (#890). A
+            # landowner role in the participants section may too; foreign keys
+            # are checked once the restore has loaded everything.
+            ZevPart("zev.Building", "zev"),
             ZevPart("zev.MeteringPoint", "zev"),
             ZevPart("zev.MeteringPointAssignment", "metering_point__zev"),
         ),

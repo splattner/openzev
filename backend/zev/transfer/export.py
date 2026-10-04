@@ -24,7 +24,7 @@ from django.db.models import Prefetch
 from invoices.models import Invoice
 from metering.models import MeterReading
 from tariffs.models import Tariff, TariffPeriod
-from zev.models import MeteringPoint, MeteringPointAssignment, Participant, Party, ZevPartyRole
+from zev.models import Building, MeteringPoint, MeteringPointAssignment, Participant, Party, ZevPartyRole
 
 from .schema import (
     ASSIGNMENT_FIELDS,
@@ -34,6 +34,8 @@ from .schema import (
     INVOICE_ITEM_FIELDS,
     INVOICE_PDFS_DIR,
     MANIFEST_NAME,
+    BUILDING_FIELDS,
+    BUILDINGS_FILE,
     METERING_POINT_FIELDS,
     PARTICIPANT_FIELDS,
     PARTIES_FILE,
@@ -117,7 +119,11 @@ def _export_parties(zev):
 
 def _export_party_roles(zev):
     return [
-        {"party_id": str(row.party_id), **_fields(row, PARTY_ROLE_FIELDS)}
+        {
+            "party_id": str(row.party_id),
+            "building_id": str(row.building_id) if row.building_id else None,
+            **_fields(row, PARTY_ROLE_FIELDS),
+        }
         for row in ZevPartyRole.objects.filter(zev=zev).order_by("role", "valid_from", "id")
     ]
 
@@ -126,6 +132,13 @@ def _export_participants(zev):
     return [
         {"id": str(participant.id), "party_id": str(participant.party_id), **_fields(participant, PARTICIPANT_FIELDS)}
         for participant in Participant.objects.filter(zev=zev).order_by("party__sort_name", "party__first_name", "id")
+    ]
+
+
+def _export_buildings(zev):
+    return [
+        {"id": str(building.id), **_fields(building, BUILDING_FIELDS)}
+        for building in Building.objects.filter(zev=zev).order_by("name", "id")
     ]
 
 
@@ -141,6 +154,7 @@ def _export_metering_points(zev):
     return [
         {
             "id": str(point.id),
+            "building_id": str(point.building_id),
             **_fields(point, METERING_POINT_FIELDS),
             "assignments": [
                 {
@@ -327,6 +341,9 @@ def _write_archive(zev, sections, fileobj, *, instance_name=""):
             archive.writestr(SECTION_FILES[SECTION_PARTICIPANTS], _dump(participants))
 
         if SECTION_METERING_POINTS in sections:
+            buildings = _export_buildings(zev)
+            counts["buildings"] = len(buildings)
+            archive.writestr(BUILDINGS_FILE, _dump(buildings))
             points = _export_metering_points(zev)
             counts[SECTION_METERING_POINTS] = len(points)
             counts["assignments"] = sum(len(p["assignments"]) for p in points)

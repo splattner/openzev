@@ -20,8 +20,9 @@ from accounts.models import FeatureFlag, User
 from allocation.validity import period_window
 from metering.models import MeterReading
 from . import access, onboarding
-from .models import MANAGING_ROLES, Zev, Participant, Party, PartyRole, MeteringPoint, MeteringPointAssignment, ZevPartyRole
-from .parties import assign_role, end_role
+from .models import MANAGING_ROLES, Building, Zev, Participant, Party, PartyRole, MeteringPoint, MeteringPointAssignment, ZevPartyRole
+from .buildings import ensure_initial_building
+from .parties import assign_role, end_role, set_landowner_building
 from .purge import ZevPurgeError, purge_zev
 from .scoping import ZevScopedQuerySetMixin
 from .serializers import (
@@ -33,7 +34,9 @@ from .serializers import (
     SelfSetupOwnerAddressSerializer,
     ParticipantSerializer,
     PartySerializer,
+    BuildingSerializer,
     ZevPartyRoleAssignSerializer,
+    ZevPartyRoleBuildingSerializer,
     ZevPartyRoleEndSerializer,
     ZevPartyRoleSerializer,
     MeteringPointSerializer,
@@ -136,6 +139,11 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         if not request.user.is_admin:
             return Response({"detail": "Only admins can create a new ZEV."}, status=status.HTTP_403_FORBIDDEN)
         return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            zev = serializer.save()
+            ensure_initial_building(zev)
 
     @action(detail=False, methods=["post"], url_path="create-with-owner")
     def create_with_owner(self, request):
@@ -866,7 +874,11 @@ class MeteringPointViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevSco
         # Annotating drops the model's Meta.ordering (Django does not carry
         # it into a GROUP BY query), so it has to be requested explicitly
         # again or list responses come back in undefined order.
-        return self.scope_queryset(MeteringPoint.objects.select_related("zev")).annotate(
+        qs = self.scope_queryset(MeteringPoint.objects.select_related("zev", "building"))
+        building = self.request.query_params.get("building")
+        if building:
+            qs = qs.filter(building_id=building)
+        return qs.annotate(
             reading_count=Count("readings", distinct=True),
             assignment_count=Count("assignments", distinct=True),
             first_reading_at=Min("readings__timestamp"),
@@ -1020,6 +1032,46 @@ class PartyViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScopedQuery
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class BuildingViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
+    """The sites of a ZEV (#890, ADR 0029). Managers write, viewers read. A
+    building that still has metering points cannot be deleted."""
+
+    serializer_class = BuildingSerializer
+    permission_classes = [IsAuthenticated, BaseZevScopedPermission]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+    zev_lookup = "zev"
+    scope_parent_path = ("zev",)
+
+    audit_action_category = AuditActionCategory.GOVERNANCE
+    audit_action_type = "building.update"
+    audit_target_type = "zev.Building"
+    audit_target_label = "building"
+
+    def get_queryset(self):
+        return self.scope_queryset(
+            Building.objects.select_related("zev").annotate(metering_point_count=Count("metering_points"))
+        ).order_by("name", "id")
+
+    def get_audit_target_display(self, instance):
+        return instance.name
+
+    def get_audit_create_metadata(self, instance):
+        return {"zev_id": str(instance.zev_id)}
+
+    def get_audit_destroy_metadata(self, instance):
+        return {"zev_id": str(instance.zev_id)}
+
+    def destroy(self, request, *args, **kwargs):
+        building = self.get_object()
+        if building.metering_points.exists():
+            return Response(
+                {"detail": "This building still has metering points."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        self.perform_destroy(building)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class ZevPartyRoleViewSet(ZevScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet):
     """Who is a ZEV's issuer, representative and landowners, and since when
     (#761). Active and future roles; ``?include_ended=true`` adds the history.
@@ -1034,7 +1086,7 @@ class ZevPartyRoleViewSet(ZevScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet)
     scope_parent_path = ("zev",)
 
     def get_queryset(self):
-        qs = ZevPartyRole.objects.select_related("zev", "party")
+        qs = ZevPartyRole.objects.select_related("zev", "party", "building")
         if self.action == "list" and self.request.query_params.get("include_ended", "").lower() not in ("1", "true"):
             today = dj_timezone.localdate()
             qs = qs.filter(Q(valid_to__isnull=True) | Q(valid_to__gte=today))
@@ -1060,6 +1112,7 @@ class ZevPartyRoleViewSet(ZevScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet)
                 "valid_from": row.valid_from.isoformat(),
                 "valid_to": row.valid_to.isoformat() if row.valid_to else None,
                 "manager_accounts": accounts,
+                "building": str(row.building_id) if row.building_id else None,
             },
         )
 
@@ -1075,11 +1128,47 @@ class ZevPartyRoleViewSet(ZevScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet)
         self.assert_within_scope(data)
         try:
             with transaction.atomic():
-                row = assign_role(data["zev"], data["party"], data["role"], data["valid_from"], valid_to=data.get("valid_to"))
+                row = assign_role(
+                    data["zev"], data["party"], data["role"], data["valid_from"],
+                    valid_to=data.get("valid_to"), building=data.get("building"),
+                )
                 self._audit(request, "party_role.assign", row, f"{row.party.display_name} is {row.role} from {row.valid_from}.")
         except DjangoValidationError as exc:
             raise self._invalid(exc)
         return Response(ZevPartyRoleSerializer(row).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(request=ZevPartyRoleBuildingSerializer, responses=ZevPartyRoleSerializer)
+    @action(detail=True, methods=["post"])
+    def building(self, request, pk=None):
+        row = self.get_object()
+        self.assert_target_not_disabled(row)
+        payload = ZevPartyRoleBuildingSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        building = payload.validated_data["building"]
+        try:
+            with transaction.atomic():
+                row = set_landowner_building(row, building)
+                record_audit_event(
+                    request=request,
+                    action_category=AuditActionCategory.GOVERNANCE,
+                    action_type="party_role.building",
+                    target_type="zev.ZevPartyRole",
+                    target_id=str(row.pk),
+                    target_display=f"{row.party.display_name} ({row.role})",
+                    zev=row.zev,
+                    summary=(
+                        f"{row.party.display_name} owns {building.name}." if building
+                        else f"{row.party.display_name} no longer owns a specific building."
+                    ),
+                    metadata={
+                        "role": row.role,
+                        "party": str(row.party_id),
+                        "building": str(building.pk) if building else None,
+                    },
+                )
+        except DjangoValidationError as exc:
+            raise self._invalid(exc)
+        return Response(ZevPartyRoleSerializer(row).data)
 
     @extend_schema(request=ZevPartyRoleEndSerializer, responses=ZevPartyRoleSerializer)
     @action(detail=True, methods=["post"])

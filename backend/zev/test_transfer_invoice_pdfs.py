@@ -37,11 +37,11 @@ def _attach_pdf(invoice, content=b"%PDF-1.4 fake invoice"):
 
 
 class FormatVersionTests(TestCase):
-    def test_format_version_is_5(self):
-        self.assertEqual(FORMAT_VERSION, 5)
+    def test_format_version_is_6(self):
+        self.assertEqual(FORMAT_VERSION, 6)
 
-    def test_versions_1_through_4_remain_supported(self):
-        self.assertEqual(SUPPORTED_FORMAT_VERSIONS, frozenset({1, 2, 3, 4, 5}))
+    def test_versions_1_through_6_remain_supported(self):
+        self.assertEqual(SUPPORTED_FORMAT_VERSIONS, frozenset({1, 2, 3, 4, 5, 6}))
 
     def test_invoice_pdfs_is_a_known_section_depending_on_invoices(self):
         from zev.transfer.schema import SECTION_DEPENDENCIES, SECTION_INVOICE_PDFS, SECTION_INVOICES

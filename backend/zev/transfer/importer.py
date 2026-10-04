@@ -46,16 +46,19 @@ from tariffs.dynamic.models import DynamicTariffSource, FetchStatus
 from tariffs.dynamic.protocol import V2_PRODUCT_REQUIRED
 from tariffs.models import BillingMode, PeriodType, Tariff, TariffPeriod
 from zev.models import (
-    PARTY_FACADE_FIELDS, SINGLE_HOLDER_ROLES, MeteringPoint, MeteringPointAssignment, Participant, Party,
+    PARTY_FACADE_FIELDS, SINGLE_HOLDER_ROLES, Building, MeteringPoint, MeteringPointAssignment, Participant, Party,
     VatMode, Zev, ZevPartyRole,
 )
 
 logger = logging.getLogger(__name__)
 
 from ..access import grant_manager
+from ..buildings import assign_buildings_from_participants, default_building, ensure_initial_building
 from .export import pdf_member_name
 from .schema import (
     ASSIGNMENT_FIELDS,
+    BUILDING_FIELDS,
+    BUILDINGS_FILE,
     DYNAMIC_SOURCE_FIELDS,
     INVOICE_FIELDS,
     INVOICE_ITEM_FIELDS,
@@ -326,7 +329,7 @@ def _import_parties(archive, zev, collector):
     return id_map
 
 
-def _import_party_roles(archive, zev, parties_by_archive_id, collector):
+def _import_party_roles(archive, zev, parties_by_archive_id, collector, buildings_by_archive_id=None):
     """Create the dated roles of a format-5 archive; returns how many."""
     entries = []
     for position, raw in enumerate(_load_json(archive, PARTY_ROLES_FILE), start=1):
@@ -336,7 +339,10 @@ def _import_party_roles(archive, zev, parties_by_archive_id, collector):
         if party is None:
             collector.add(SECTION_PARTICIPANTS, position, label, {"party_id": ["Unknown party."]})
             continue
-        row = ZevPartyRole(zev=zev, party=party, **fields)
+        # A building travels with the metering-point section; without it the
+        # landowner is imported without one.
+        building = (buildings_by_archive_id or {}).get(str(raw.get("building_id") or ""))
+        row = ZevPartyRole(zev=zev, party=party, building=building, **fields)
         try:
             row.full_clean(exclude=["zev"])
         except (DjangoValidationError, ValueError, TypeError) as exc:
@@ -370,6 +376,28 @@ def _import_party_roles(archive, zev, parties_by_archive_id, collector):
             continue
         count += 1
     return count
+
+
+def _import_buildings(archive, zev, collector):
+    """Create the buildings of a format-6 archive, returning ``archive id -> building``."""
+    id_map = {}
+    for position, raw in enumerate(_load_json(archive, BUILDINGS_FILE), start=1):
+        fields = _pick(raw, BUILDING_FIELDS, position, "buildings")
+        label = str(fields.get("name") or f"#{position}")
+        source_id = str(raw["id"]) if raw.get("id") else None
+        if source_id is None or source_id in id_map:
+            collector.add(SECTION_METERING_POINTS, position, label, {"id": [f"Missing or duplicate building id '{source_id or ''}'."]})
+            continue
+        building = Building(zev=zev, **fields)
+        try:
+            with transaction.atomic():
+                building.full_clean(exclude=["zev"], validate_constraints=False)
+                building.save()
+        except (DjangoValidationError, ValueError, TypeError, IntegrityError) as exc:
+            collector.add(SECTION_METERING_POINTS, position, label, exc if not isinstance(exc, IntegrityError) else {"egid": ["Another building of this ZEV has this EGID."]})
+            continue
+        id_map[source_id] = building
+    return id_map
 
 
 def _import_participants(archive, zev, collector, *, parties_by_archive_id=None):
@@ -449,7 +477,7 @@ def _preflight_meter_ids(entries):
     return sorted(taken)
 
 
-def _import_metering_points(archive, zev, participants_by_archive_id, collector):
+def _import_metering_points(archive, zev, participants_by_archive_id, collector, buildings_by_archive_id=None):
     entries = _load_json(archive, SECTION_FILES[SECTION_METERING_POINTS])
 
     clashes = _preflight_meter_ids(entries)
@@ -477,10 +505,15 @@ def _import_metering_points(archive, zev, participants_by_archive_id, collector)
     for position, raw in enumerate(entries, start=1):
         fields = _pick(raw, METERING_POINT_FIELDS, position, SECTION_METERING_POINTS)
         label = str(fields.get("meter_id") or f"#{position}")
-        point = MeteringPoint(zev=zev, **fields)
+        # Without a building (older archive, or buildings that failed) the
+        # point falls back to the ZEV's default building; the caller then
+        # applies the participant-address rule.
+        building = (buildings_by_archive_id or {}).get(str(raw.get("building_id") or ""))
+        point = MeteringPoint(zev=zev, building=building, **fields)
         try:
             with transaction.atomic():
-                point.full_clean(exclude=["zev"])
+                # ``save()`` places a point without a building in the default one.
+                point.full_clean(exclude=["zev"] if building else ["zev", "building"])
                 point.save()
         except (DjangoValidationError, ValueError, TypeError) as exc:
             collector.add(SECTION_METERING_POINTS, position, label, exc)
@@ -994,13 +1027,22 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
         "warnings": collector.warnings,
     }
 
+    # Format 6 carries the buildings; they come before the participants section
+    # so landowner roles can resolve theirs.
+    buildings_by_archive_id = None
+    if SECTION_METERING_POINTS in sections and (manifest.get("format_version") or 0) >= 6:
+        buildings_by_archive_id = _import_buildings(archive, zev, collector)
+        summary["counts"]["buildings"] = len(buildings_by_archive_id)
+
     participants_by_archive_id = {}
     if SECTION_PARTICIPANTS in sections:
         parties_by_archive_id = None
         if (manifest.get("format_version") or 0) >= 5:
             parties_by_archive_id = _import_parties(archive, zev, collector)
             summary["counts"]["parties"] = len(parties_by_archive_id)
-            summary["counts"]["party_roles"] = _import_party_roles(archive, zev, parties_by_archive_id, collector)
+            summary["counts"]["party_roles"] = _import_party_roles(
+                archive, zev, parties_by_archive_id, collector, buildings_by_archive_id
+            )
         participants_by_archive_id = _import_participants(
             archive, zev, collector, parties_by_archive_id=parties_by_archive_id,
         )
@@ -1009,10 +1051,14 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
     points_by_meter_id = {}
     if SECTION_METERING_POINTS in sections:
         points_by_meter_id, assignment_count = _import_metering_points(
-            archive, zev, participants_by_archive_id, collector
+            archive, zev, participants_by_archive_id, collector, buildings_by_archive_id
         )
+        if buildings_by_archive_id is None:
+            _assign_buildings(zev, points_by_meter_id.values())
         summary["counts"][SECTION_METERING_POINTS] = len(points_by_meter_id)
         summary["counts"]["assignments"] = assignment_count
+    else:
+        ensure_initial_building(zev)
 
     if SECTION_TARIFFS in sections:
         summary["counts"][SECTION_TARIFFS] = _import_tariffs(
@@ -1051,6 +1097,14 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
     return summary
 
 
+def _assign_buildings(zev, points):
+    """Place points imported without buildings by the participant-address rule,
+    then drop the provisional default building when nothing ended up in it."""
+    assign_buildings_from_participants(zev, points)
+    Building.objects.filter(zev=zev, metering_points__isnull=True, landowner_roles__isnull=True).delete()
+    default_building(zev)
+
+
 def _verify_manifest_counts(manifest, summary, collector):
     """Where the manifest and what the importer produced disagree, the archive
     is corrupt or tampered (a readings member dropped out of a truncated ZIP,
@@ -1059,7 +1113,7 @@ def _verify_manifest_counts(manifest, summary, collector):
     for key, expected in declared.items():
         if key not in summary["counts"]:
             continue  # a section the user chose not to import
-        # ``assignments``, ``parties`` and ``party_roles`` count within a section.
+        # ``assignments``, ``parties``, ``party_roles`` and ``buildings`` count within a section.
         section = SUBCOUNT_SECTIONS.get(key, key)
         # Entry-level failures already explain a shortfall for that section —
         # re-reporting it as an integrity problem would just be noise. The

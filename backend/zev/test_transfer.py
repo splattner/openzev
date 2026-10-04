@@ -25,6 +25,7 @@ from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
 from testing.helpers import authenticate as auth, make_user, create_managed_zev
 from zev.models import (
+    Building,
     MeteringPoint,
     MeteringPointAssignment,
     MeteringPointType,
@@ -168,7 +169,7 @@ def rewrite_archive(raw, *, replace=None, drop=()):
 def as_format_version(raw, version, *, replace=None):
     """``raw`` rewritten as an archive of an older ``version``.
 
-    Before format 5 a participant carried its party's fields flat and there were
+    Before format 6 there is no buildings file. Before format 5 a participant carried its party's fields flat and there were
     no parties or roles files, so those are folded back into the participants.
     ``replace`` rewrites further members on top.
     """
@@ -191,6 +192,9 @@ def as_format_version(raw, version, *, replace=None):
                 party = {key: value for key, value in by_id[participant.pop("party_id")].items() if key not in ("id", "notes")}
                 flat.append({**party, **participant})
             members["participants.json"] = flat
+    if version < 6:
+        manifest["counts"].pop("buildings", None)
+        drop = (*drop, "buildings.json")
     members.update(replace or {})
     return rewrite_archive(raw, replace=members, drop=drop)
 
@@ -278,7 +282,7 @@ class ArchiveShapeTests(TestCase):
         )
         with zipfile.ZipFile(io.BytesIO(export_to_bytes(self.zev))) as archive:
             names = archive.namelist()
-        self.assertTrue(all(name.startswith(("readings/", "manifest", "zev.", "participants", "parties", "party_roles", "metering", "tariffs", "invoices")) for name in names))
+        self.assertTrue(all(name.startswith(("readings/", "manifest", "zev.", "participants", "parties", "party_roles", "buildings", "metering", "tariffs", "invoices")) for name in names))
         self.assertNotIn("../../etc/passwd.csv", names)
         self.assertTrue(any(name.startswith("readings/.._.._etc_passwd-") for name in names))
 
@@ -1134,6 +1138,7 @@ class SchemaParityTests(TestCase):
         "ZEV_FIELDS": Zev,
         "PARTY_FIELDS": Party,
         "PARTY_ROLE_FIELDS": ZevPartyRole,
+        "BUILDING_FIELDS": Building,
         "PARTICIPANT_FIELDS": Participant,
         "METERING_POINT_FIELDS": MeteringPoint,
         "ASSIGNMENT_FIELDS": MeteringPointAssignment,
@@ -1178,9 +1183,12 @@ class SchemaParityTests(TestCase):
         # point at each other through archive ids (``id``, ``party_id``).
         # ``user`` is an account reference: accounts never travel.
         "PARTY_FIELDS": {"id", "zev", "user", "sort_name", "created_at", "updated_at"},
-        "PARTY_ROLE_FIELDS": {"id", "zev", "party", "created_at", "updated_at"},
+        # A role and a metering point point at their building through the
+        # archive id ``building_id`` (format 6).
+        "PARTY_ROLE_FIELDS": {"id", "zev", "party", "building", "created_at", "updated_at"},
+        "BUILDING_FIELDS": {"id", "zev", "created_at", "updated_at"},
         "PARTICIPANT_FIELDS": {"id", "zev", "user", "party", "created_at", "updated_at"},
-        "METERING_POINT_FIELDS": {"id", "zev", "created_at", "updated_at"},
+        "METERING_POINT_FIELDS": {"id", "zev", "building", "created_at", "updated_at"},
         "ASSIGNMENT_FIELDS": {"id", "metering_point", "participant", "created_at", "updated_at"},
         # dynamic_source travels as a nested natural key, not as its FK id,
         # because the source row is shared across communities and instances.
@@ -1463,3 +1471,94 @@ class PartyTransferTests(TestCase):
             self._import(rewrite_archive(raw, replace={"party_roles.json": roles}))
         self.assertIn("Overlaps another holder of this role.", str(ctx.exception.errors))
         self.assertFalse(Zev.objects.filter(name="Copy").exists())
+
+
+class BuildingTransferTests(TestCase):
+    """Format 6 carries a ZEV's buildings (#890)."""
+
+    def setUp(self):
+        self.owner = make_user("bt_owner", UserRole.USER)
+        self.importer = make_user("bt_importer", UserRole.ADMIN)
+        self.zev = create_managed_zev(name="Sites", owner=self.owner, invoice_prefix="BT", zev_type="vzev")
+        self.anna = Participant.objects.create(
+            zev=self.zev, first_name="Anna", last_name="Eins", email="anna@example.com",
+            address_line1="Weg 1", postal_code="3000", city="Bern", valid_from=date(2026, 1, 1),
+        )
+        self.ben = Participant.objects.create(
+            zev=self.zev, first_name="Ben", last_name="Zwei", email="ben@example.com",
+            address_line1="Weg 2", postal_code="3000", city="Bern", valid_from=date(2026, 1, 1),
+        )
+        self.house_a = Building.objects.create(zev=self.zev, name="Haus A", address_line1="Weg 1", postal_code="3000", city="Bern", egid=101)
+        self.house_b = Building.objects.create(zev=self.zev, name="Haus B", address_line1="Weg 2", postal_code="3000", city="Bern", notes="Hinten")
+        self.point_a = MeteringPoint.objects.create(zev=self.zev, meter_id="BT-A", building=self.house_a)
+        self.point_b = MeteringPoint.objects.create(zev=self.zev, meter_id="BT-B", building=self.house_b)
+        # Holders are the other way round from the addresses: only the stored
+        # building decides after a format 6 round trip.
+        MeteringPointAssignment.objects.create(metering_point=self.point_a, participant=self.ben, valid_from=date(2026, 1, 1))
+        MeteringPointAssignment.objects.create(metering_point=self.point_b, participant=self.anna, valid_from=date(2026, 1, 1))
+        assign_role(self.zev, self.anna.party, PartyRole.ISSUER, date(2026, 1, 1))
+        assign_role(self.zev, self.anna.party, PartyRole.LANDOWNER, date(2026, 1, 1), building=self.house_b)
+        assign_role(self.zev, self.ben.party, PartyRole.LANDOWNER, date(2026, 1, 1))
+
+    def _import(self, raw, sections=None):
+        return import_archive(io.BytesIO(raw), owner=self.importer, name_override="Copy", sections=sections)
+
+    def test_buildings_points_and_landowner_buildings_survive_a_round_trip(self):
+        raw = export_and_clear(self.zev, ["zev", "participants", "metering_points"])
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            self.assertIn("buildings.json", archive.namelist())
+            self.assertEqual(json.loads(archive.read(MANIFEST_NAME))["counts"]["buildings"], 2)
+        result = self._import(raw)
+        copy = Zev.objects.get(pk=result["zev_id"])
+        self.assertEqual(result["counts"]["buildings"], 2)
+        self.assertEqual(
+            sorted(copy.buildings.values_list("name", "address_line1", "egid", "notes")),
+            [("Haus A", "Weg 1", 101, ""), ("Haus B", "Weg 2", None, "Hinten")],
+        )
+        self.assertEqual(
+            sorted(copy.metering_points.values_list("meter_id", "building__name")), [("BT-A", "Haus A"), ("BT-B", "Haus B")],
+        )
+        self.assertEqual(
+            sorted(copy.party_roles.filter(role="landowner").values_list("party__sort_name", "building__name"),
+                   key=lambda row: row[0]),
+            [("Eins", "Haus B"), ("Zwei", None)],
+        )
+
+    def test_a_format_5_archive_applies_the_participant_address_rule(self):
+        raw = as_format_version(export_and_clear(self.zev), 5)
+        result = self._import(raw)
+        copy = Zev.objects.get(pk=result["zev_id"])
+        # Rewritten as format 5, so the archive's buildings are not read: the
+        # rule builds one per participant address instead, and the points go to
+        # the building of their holder.
+        self.assertNotIn("buildings", result["counts"])
+        self.assertEqual(sorted(copy.buildings.values_list("address_line1", flat=True)), ["Weg 1", "Weg 2"])
+        self.assertEqual(
+            sorted(copy.metering_points.values_list("meter_id", "building__address_line1")),
+            [("BT-A", "Weg 2"), ("BT-B", "Weg 1")],
+        )
+        self.assertFalse(copy.party_roles.filter(building__isnull=False).exists())
+
+    def test_metering_points_not_selected_leaves_a_default_building(self):
+        raw = export_to_bytes(self.zev, ["zev", "participants"])
+        result = self._import(raw)
+        copy = Zev.objects.get(pk=result["zev_id"])
+        self.assertEqual(copy.buildings.count(), 1)
+        self.assertEqual(copy.buildings.get().address_line1, "Weg 1")  # the issuer's
+
+    def test_a_landowner_keeps_no_building_when_buildings_are_not_imported(self):
+        raw = export_to_bytes(self.zev, ["zev", "participants"])
+        result = self._import(raw)
+        copy = Zev.objects.get(pk=result["zev_id"])
+        self.assertEqual(copy.party_roles.filter(role="landowner").count(), 2)
+        self.assertFalse(copy.party_roles.filter(building__isnull=False).exists())
+
+    def test_a_point_naming_an_unknown_building_falls_back_to_the_default(self):
+        raw = export_and_clear(self.zev, ["zev", "participants", "metering_points"])
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            points = json.loads(archive.read("metering_points.json"))
+        points[0]["building_id"] = "not-a-building"
+        result = self._import(rewrite_archive(raw, replace={"metering_points.json": points}))
+        copy = Zev.objects.get(pk=result["zev_id"])
+        self.assertEqual(copy.metering_points.count(), 2)
+        self.assertEqual(copy.buildings.count(), 2)

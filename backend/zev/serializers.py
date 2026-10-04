@@ -4,7 +4,7 @@ from .geocoding import get_cached_building_footprint
 from .grid_operators import grid_operator_ids
 from django.utils import timezone
 
-from .models import Zev, Participant, Party, PartyKind, PartyTitle, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode, PartyRole, ZevPartyRole
+from .models import Building, Zev, Participant, Party, PartyKind, PartyTitle, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode, PartyRole, ZevPartyRole
 from .services import create_zev_with_owner_setup, ensure_participant_account, has_its_own_login
 from .tasks import trigger_geocode_if_address_present
 from .iban import (
@@ -47,6 +47,8 @@ class MeteringPointSerializer(serializers.ModelSerializer):
     assignment_count = serializers.SerializerMethodField()
     first_reading_at = serializers.SerializerMethodField()
     last_reading_at = serializers.SerializerMethodField()
+    building = serializers.PrimaryKeyRelatedField(queryset=Building.objects.all(), required=False)
+    building_name = serializers.CharField(source="building.name", read_only=True)
 
     class Meta:
         model = MeteringPoint
@@ -95,6 +97,20 @@ class MeteringPointSerializer(serializers.ModelSerializer):
                     )
                 }
             )
+        building = attrs.get("building")
+        zev = attrs.get("zev") or (self.instance.zev if self.instance is not None else None)
+        if building is not None and zev is not None and building.zev_id != zev.pk:
+            raise serializers.ValidationError({"building": "The building belongs to another ZEV."})
+        if self.instance is None and building is None and zev is not None:
+            count = Building.objects.filter(zev=zev).count()
+            if count > 1:
+                raise serializers.ValidationError({"building": "Choose the building of this metering point."})
+            if count == 0:
+                from .buildings import default_building
+
+                attrs["building"] = default_building(zev)
+            else:
+                attrs["building"] = Building.objects.get(zev=zev)
         return attrs
 
 
@@ -392,6 +408,40 @@ class PartySerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "display_name", "participations", "roles", "accounts", "created_at", "updated_at"]
 
 
+class BuildingSerializer(serializers.ModelSerializer):
+    """A site of a ZEV: where its metering points are (#890)."""
+
+    metering_point_count = serializers.SerializerMethodField()
+
+    def get_metering_point_count(self, obj):
+        if hasattr(obj, "metering_point_count"):
+            return obj.metering_point_count
+        return obj.metering_points.count()
+
+    def validate(self, attrs):
+        if self.instance is not None and "zev" in attrs and attrs["zev"].pk != self.instance.zev_id:
+            raise serializers.ValidationError({"zev": "A building cannot move to another ZEV."})
+        egid = attrs.get("egid")
+        if egid is not None:
+            zev_id = attrs["zev"].pk if "zev" in attrs else self.instance.zev_id
+            clash = Building.objects.filter(zev_id=zev_id, egid=egid)
+            if self.instance is not None:
+                clash = clash.exclude(pk=self.instance.pk)
+            if clash.exists():
+                raise serializers.ValidationError({"egid": "Another building of this ZEV has this EGID."})
+        return attrs
+
+    class Meta:
+        model = Building
+        fields = [
+            "id", "zev", "name", "address_line1", "address_line2", "postal_code", "city", "egid", "notes",
+            "metering_point_count", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "metering_point_count", "created_at", "updated_at"]
+        # The EGID rule is checked in ``validate`` with a message on the field.
+        validators = []
+
+
 class ZevPartyRoleAssignSerializer(serializers.Serializer):
     """``POST /zev/party-roles/``: give a party a role from a date (#761)."""
 
@@ -400,11 +450,24 @@ class ZevPartyRoleAssignSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=PartyRole.choices)
     valid_from = serializers.DateField()
     valid_to = serializers.DateField(required=False, allow_null=True)
+    building = serializers.PrimaryKeyRelatedField(queryset=Building.objects.all(), required=False, allow_null=True)
 
     def validate(self, attrs):
         if attrs["party"].zev_id != attrs["zev"].pk:
             raise serializers.ValidationError({"party": "The party belongs to another ZEV."})
+        building = attrs.get("building")
+        if building is not None:
+            if attrs["role"] != PartyRole.LANDOWNER:
+                raise serializers.ValidationError({"building": "Only a landowner role names a building."})
+            if building.zev_id != attrs["zev"].pk:
+                raise serializers.ValidationError({"building": "The building belongs to another ZEV."})
         return attrs
+
+
+class ZevPartyRoleBuildingSerializer(serializers.Serializer):
+    """``POST /zev/party-roles/{id}/building/``: the building a landowner owns."""
+
+    building = serializers.PrimaryKeyRelatedField(queryset=Building.objects.all(), allow_null=True)
 
 
 class ZevPartyRoleEndSerializer(serializers.Serializer):
@@ -417,10 +480,14 @@ class ZevPartyRoleSerializer(serializers.ModelSerializer):
     """A party's dated role in a ZEV: issuer, representative or landowner (#761)."""
 
     party_display_name = serializers.CharField(source="party.display_name", read_only=True)
+    building_name = serializers.CharField(source="building.name", read_only=True, default=None)
 
     class Meta:
         model = ZevPartyRole
-        fields = ["id", "zev", "party", "party_display_name", "role", "valid_from", "valid_to", "created_at", "updated_at"]
+        fields = [
+            "id", "zev", "party", "party_display_name", "role", "valid_from", "valid_to",
+            "building", "building_name", "created_at", "updated_at",
+        ]
         read_only_fields = fields
 
 
