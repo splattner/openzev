@@ -273,8 +273,9 @@ ZEV settings.
   for managers. The cards are otherwise unchanged.
 - **Several buildings:** `MeteringPointsList` groups the cards by building (ordered by building
   name). Each group starts with a `BuildingHeader` (name, address, EGID, landowners, metering-point
-  count) with edit and delete actions for managers; delete is disabled with a tooltip while the
-  building has metering points. A building with no metering points still shows its header with
+  count) with "Add metering point" and edit actions for managers; delete sits in an
+  `ActionMenu` ("More" → "Delete building", confirm) that appears only while the building has
+  no metering points. A building with no metering points still shows its header with
   "No metering points in this building yet". Filtering by building shows only that group; search
   and the other filters apply within groups, and a group with no matching card is hidden unless
   it has no metering points at all and no filter is active.

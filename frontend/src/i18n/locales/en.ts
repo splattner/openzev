@@ -1861,7 +1861,6 @@ export const en = {
                 deleted: 'Building deleted.',
                 deleteTitle: 'Delete building',
                 deleteMessage: 'Delete the building "{{name}}"?',
-                deleteBlocked: 'Move or delete this building\'s metering points first.',
                 hint: 'A building is where the meters are, not where invoices go: a participant can be billed at another address.',
                 addMeteringPoint: 'Add metering point',
                 emptyGroup: 'No metering points in this building yet.',

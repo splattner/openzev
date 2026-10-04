@@ -1850,7 +1850,6 @@ export const it = {
                 deleted: 'Edificio eliminato.',
                 deleteTitle: 'Elimina edificio',
                 deleteMessage: 'Eliminare l\'edificio «{{name}}»?',
-                deleteBlocked: 'Sposta o elimina prima i punti di misura di questo edificio.',
                 hint: 'Un edificio è il luogo dei contatori, non l\'indirizzo di fatturazione: un partecipante può essere fatturato a un altro indirizzo.',
                 addMeteringPoint: 'Aggiungi punto di misura',
                 emptyGroup: 'Ancora nessun punto di misura in questo edificio.',

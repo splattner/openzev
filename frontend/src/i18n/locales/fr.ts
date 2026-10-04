@@ -1850,7 +1850,6 @@ export const fr = {
                 deleted: 'Bâtiment supprimé.',
                 deleteTitle: 'Supprimer le bâtiment',
                 deleteMessage: 'Supprimer le bâtiment « {{name}} » ?',
-                deleteBlocked: 'Déplacez ou supprimez d\'abord les points de mesure de ce bâtiment.',
                 hint: 'Un bâtiment est l\'endroit où se trouvent les compteurs, pas l\'adresse de facturation : un participant peut être facturé à une autre adresse.',
                 addMeteringPoint: 'Ajouter un point de mesure',
                 emptyGroup: 'Pas encore de point de mesure dans ce bâtiment.',

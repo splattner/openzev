@@ -1,6 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faEllipsis, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
+import { ActionMenu } from '../../components/ActionMenu'
 import type { Building } from '../../types/api'
 
 type BuildingHeaderProps = {
@@ -66,17 +67,20 @@ export function BuildingHeader({
             <FontAwesomeIcon icon={faPen} fixedWidth />
             {t('common.edit')}
           </button>
-          {isGroup && onDelete && (
-            <button
-              type="button"
-              className="button button-danger button-compact"
-              disabled={deletePending || hasMeters}
-              title={hasMeters ? t('pages.meteringPoints.buildings.deleteBlocked') : undefined}
-              onClick={() => onDelete(building)}
-            >
-              <FontAwesomeIcon icon={faTrash} fixedWidth />
-              {t('common.delete')}
-            </button>
+          {/* Rare and destructive: overflow + confirm, and only once nothing is left in it. */}
+          {isGroup && onDelete && !hasMeters && (
+            <ActionMenu
+              label={t('pages.meteringPoints.moreActions')}
+              icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+              items={[{
+                key: 'delete',
+                label: t('pages.meteringPoints.buildings.deleteTitle'),
+                icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
+                danger: true,
+                disabled: deletePending,
+                onClick: () => onDelete(building),
+              }]}
+            />
           )}
         </div>
       )}

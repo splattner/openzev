@@ -49,12 +49,12 @@ are, and both are recorded. Buildings are managed on this page.
   named in its header.
 - With several buildings, the cards are **grouped by building**, ordered by
   name. Each group's header shows the address, EGID, landowners and number of
-  metering points, with **Add metering point** (that building preselected),
-  **Edit** and **Delete**. A building without metering points shows "No
+  metering points, with **Add metering point** (that building preselected)
+  and **Edit**. A building without metering points shows "No
   metering points in this building yet". Search and the other filters apply
   within the groups; the **Building** filter shows one group.
-- A building that still has metering points cannot be deleted: move or delete
-  its meters first. Landowner rows that pointed at a deleted building are
+- A building can be deleted only once it is empty: move or delete its meters
+  first, then **More → Delete building** appears in its header. Landowner rows that pointed at a deleted building are
   kept, without a building.
 
 > **Check the buildings of an existing community.** When OpenZEV added

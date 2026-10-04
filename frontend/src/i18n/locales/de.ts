@@ -1850,7 +1850,6 @@ export const de = {
                 deleted: 'Gebäude gelöscht.',
                 deleteTitle: 'Gebäude löschen',
                 deleteMessage: 'Gebäude «{{name}}» löschen?',
-                deleteBlocked: 'Verschieben oder löschen Sie zuerst die Zählpunkte dieses Gebäudes.',
                 hint: 'Ein Gebäude ist der Ort der Zähler, nicht die Rechnungsadresse: Ein Teilnehmer kann an einer anderen Adresse bedient werden.',
                 addMeteringPoint: 'Zählpunkt hinzufügen',
                 emptyGroup: 'In diesem Gebäude gibt es noch keine Zählpunkte.',
