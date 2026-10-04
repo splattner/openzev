@@ -102,15 +102,13 @@ class MeteringPointSerializer(serializers.ModelSerializer):
         if building is not None and zev is not None and building.zev_id != zev.pk:
             raise serializers.ValidationError({"building": "The building belongs to another ZEV."})
         if self.instance is None and building is None and zev is not None:
-            count = Building.objects.filter(zev=zev).count()
-            if count > 1:
+            buildings = list(Building.objects.filter(zev=zev)[:2])
+            if len(buildings) > 1:
                 raise serializers.ValidationError({"building": "Choose the building of this metering point."})
-            if count == 0:
-                from .buildings import default_building
-
-                attrs["building"] = default_building(zev)
-            else:
-                attrs["building"] = Building.objects.get(zev=zev)
+            if buildings:
+                attrs["building"] = buildings[0]
+            # With none, ``MeteringPoint.save()`` creates the default building:
+            # only once the view's scope check has passed, never in validation.
         return attrs
 
 

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Zev, Participant, Party, MeteringPoint, MeteringPointAssignment, ZevAccessGrant
+from .models import Building, Zev, Participant, Party, MeteringPoint, MeteringPointAssignment, ZevAccessGrant
 
 
 class ParticipantInline(admin.TabularInline):
@@ -41,11 +41,20 @@ class ParticipantAdmin(admin.ModelAdmin):
     inlines = [MeteringPointAssignmentInline]
 
 
+@admin.register(Building)
+class BuildingAdmin(admin.ModelAdmin):
+    list_display = ("name", "zev", "postal_code", "city", "egid")
+    list_filter = ("zev",)
+    search_fields = ("name", "address_line1", "city")
+
+
 @admin.register(MeteringPoint)
 class MeteringPointAdmin(admin.ModelAdmin):
-    list_display = ("meter_id", "zev", "meter_type", "is_active")
+    list_display = ("meter_id", "zev", "building", "meter_type", "is_active")
     list_filter = ("meter_type", "is_active")
     search_fields = ("meter_id",)
+    # Every ZEV's buildings in one select would invite picking another ZEV's.
+    raw_id_fields = ("building",)
 
 
 @admin.register(ZevAccessGrant)

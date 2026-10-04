@@ -437,6 +437,19 @@ class MeteringPointBuildingApiTests(TestCase):
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(Building.objects.filter(zev=self.zev).count(), 1)
 
+    def test_a_refused_write_creates_no_building_in_a_foreign_zev(self):
+        # Validation runs before the scope check: it must not write into a ZEV
+        # the caller cannot manage, even one with no building yet.
+        manager = make_user("mp_other_manager", UserRole.USER)
+        create_managed_zev(
+            name="Manager ZEV", owner=manager, invoice_prefix="M", start_date=START,
+        )
+        client = APIClient()
+        authenticate(client, manager)
+        response = client.post(POINTS, self.body(), format="json")
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertFalse(Building.objects.filter(zev=self.zev).exists())
+
     def test_several_buildings_require_a_choice(self):
         first, second = make_building(self.zev, "Haus A"), make_building(self.zev, "Haus B")
         refused = self.client.post(POINTS, self.body(), format="json")
