@@ -2169,9 +2169,6 @@ billing hub. Its tabs are routes — each is directly linkable:</p>
   failed-email banner, <strong>View history</strong> for the actual attempt log, and an
   inline <strong>Retry</strong> per failed latest attempt.</li>
 </ul>
-<p>Use the <strong>Reports</strong> link in the Billing header to open annual documents for
-the selected community, then choose the year. Viewers can download the available
-documents.</p>
 <p>The yearly whole-ZEV annual-statement ZIP is on <strong>Reports</strong> (see
 <a href="#reports-annual-report-statements-and-tax-overviews">Reports: Annual Report, Statements and Tax Overviews</a>).
 The former <code>/billing/statements</code> address redirects there.</p>
@@ -2190,17 +2187,31 @@ quality or tariffs. <strong>Open invoices</strong> opens that period's invoices.
 <p><img alt="Email delivery and retries" src="../screenshots/08e-billing-emails.png" /></p>
 <p>After a retry is accepted, the tab shows it as pending while the worker
 starts. It updates automatically when the next delivery attempt is recorded.
-Invoice rows themselves keep only the latest delivery-state badge; detailed
-attempts and errors are kept in the Emails tab's history panel.</p>
+Invoice rows themselves show only the latest delivery state (the <strong>Sent</strong> step
+of their progress); detailed attempts and errors are kept in the Emails tab's
+history panel.</p>
 <h2 id="period-based-invoice-view">Period-Based Invoice View<a class="headerlink" href="#period-based-invoice-view" title="Permanent link">&para;</a></h2>
-<p>The <strong>Invoices</strong> tab shows one billing period at a time. There are no status filters — you navigate between periods instead.</p>
+<p>The <strong>Invoices</strong> tab shows one billing period at a time. You move between
+periods, and within a period you can narrow the list to one workflow stage or
+to the rows that need attention.</p>
 <h3 id="period-navigation">Period Navigation<a class="headerlink" href="#period-navigation" title="Permanent link">&para;</a></h3>
-<p>The toolbar at the top of the page displays:</p>
+<p>The command bar at the top of the tab shows:</p>
 <ul>
-<li>The <strong>ZEV name</strong> and the <strong>period date range</strong> (e.g. <code>01.01.2026 → 31.01.2026</code>).</li>
-<li>The ZEV's <strong>billing interval</strong> (<code>monthly</code>, <code>quarterly</code>, <code>semi_annual</code>, or <code>annual</code>).</li>
-<li><strong>← Prev Period</strong> and <strong>Next Period →</strong> buttons to step through periods.</li>
+<li>The <strong>period name</strong> — <code>September 2026</code> for a monthly period,
+  <code>July – September 2026</code> for a quarter. Hover it to see the exact dates; click
+  it to pick one of the recent periods, each listed with its dates.</li>
+<li><strong>‹</strong> and <strong>›</strong> buttons on either side to step to the previous and next
+  period.</li>
+<li>On the right, the period's <strong>batch actions</strong> (see
+  <a href="#row-and-batch-actions">Row and Batch Actions</a>).</li>
 </ul>
+<p>A range that is not one whole billing period of the community (for example
+from an old bookmark, or an invoice's month after the community switched to
+quarterly billing) shows its dates with a warning badge, <strong>Not a billing
+period</strong>, and a notice above the table. Its invoices can still be approved,
+sent and paid, and their PDFs regenerated, but this page creates no invoices for such a range: the notice's button
+(for example <strong>Show July – September 2026</strong>) opens the whole billing period
+around it, and <strong>‹</strong> / <strong>›</strong> step to the nearest whole periods.</p>
 <p>The period is automatically set based on the selected ZEV's billing interval.</p>
 <p><strong>How the period is chosen and kept consistent:</strong></p>
 <ul>
@@ -2212,7 +2223,8 @@ attempts and errors are kept in the Emails tab's history panel.</p>
   period_end=…</code> — from an Overview period card, an attention item, or your own
   bookmark) shows that <strong>exact period</strong>, including historical periods from an
   earlier billing interval after a switch. Ranges that would start before the
-  community existed are ignored and fall back to the default.</li>
+  community existed are ignored: the page opens the default period and puts
+  it in the address bar.</li>
 <li><strong>Boundary:</strong> <strong>Prev</strong> stops at the community's earliest billable period;
   the preset menu offers nothing older. After switching billing intervals,
   already settled periods (fully paid under the previous interval) stay
@@ -2220,9 +2232,12 @@ attempts and errors are kept in the Emails tab's history panel.</p>
   offering Generate, while partly overlapping locked invoices surface as a
   generation conflict with a link to the blocking invoices.</li>
 </ul>
-<p>Choosing a period updates the URL without changing other filters. Reload and browser Back read the period from that URL. Switching
-community checks the same range against the new community's start date before
-loading its invoices. A failed refresh retains the loaded period rows with
+<p>Choosing a period preserves unrelated URL parameters and clears the row filter. Reload and browser Back read the period from that URL. Switching
+community keeps the period you were looking at where it can: when the other
+community bills in a different interval, you land on its billing period that
+contains the end of the previous one (September in a monthly community becomes
+July – September in a quarterly one, and back), and a period before the
+community's start falls back to the default. A failed refresh retains the loaded period rows with
 <strong>Retry</strong>.</p>
 <p><img alt="Invoice period overview" src="../screenshots/08-invoices.png" /></p>
 <h3 id="period-overview-table">Period Overview Table<a class="headerlink" href="#period-overview-table" title="Permanent link">&para;</a></h3>
@@ -2237,34 +2252,39 @@ loading its invoices. A failed refresh retains the loaded period rows with
 <tbody>
 <tr>
 <td><strong>Participant</strong></td>
-<td>Name and email address.</td>
+<td>Current participant name, invoice link and relevant participation dates. Meter locations distinguish several participations held by the same party. Problems appear below the name.</td>
 </tr>
 <tr>
-<td><strong>Metering Data</strong></td>
-<td>Green "complete" badge if all assigned metering points have daily readings for the full period. Red "missing" badge otherwise, with a count of points with data vs. total and a list of missing meter IDs with the number of missing days each.</td>
+<td><strong>Progress</strong></td>
+<td>Metering data → Invoice → Approved → Sent → Paid. Checks show completed steps, spinners show pending work, and warning marks show problems. The legend explains the icons.</td>
 </tr>
 <tr>
-<td><strong>Invoice</strong></td>
-<td>Linked invoice number and its status badge (<code>Draft</code>, <code>Approved</code>, <code>Sent</code>, <code>Paid</code>, <code>Cancelled</code>), or "Not created"/"Already billed" for a row without an invoice. Opening details retains the period for the return link.</td>
-</tr>
-<tr>
-<td><strong>Email</strong></td>
-<td>Latest email delivery status badge (<code>pending</code>, <code>sent</code>, <code>failed</code>). Open <strong>Billing → Emails</strong> for attempt history, errors, and retry.</td>
-</tr>
-<tr>
-<td><strong>Total</strong></td>
-<td>Invoice total in CHF.</td>
-</tr>
-<tr>
-<td><strong>PDF</strong></td>
-<td>Preparing, failed, missing or ready state; <strong>Open PDF</strong> when ready. Generation/regeneration actions remain in the row actions.</td>
+<td><strong>Amount (CHF)</strong></td>
+<td>The invoice amount; <em>-</em> without a live invoice.</td>
 </tr>
 <tr>
 <td><strong>Actions</strong></td>
-<td>Per-invoice action buttons (see below).</td>
+<td>The next step and <strong>More</strong>. Viewers and managers of disabled communities retain <strong>Review conflict</strong> and <strong>Open PDF</strong>.</td>
 </tr>
 </tbody>
 </table>
+<ul>
+<li>Organisations have a building icon; a household's second name line follows
+  the name. Names come from the current participant data; the invoice PDF keeps the
+  recipient as billed. <strong>Joined</strong>/<strong>Left</strong> dates explain participation inside the period.</li>
+<li>The invoice number opens details and retains the period for return navigation.
+  Rows without an invoice show <strong>Not created</strong> or <strong>Creating invoice…</strong>;
+  cancelled invoices retain their link and show no billed amount.</li>
+<li>Problems name missing meters and days, an overlapping locked invoice,
+  a failed PDF, a failed email, or an approved invoice whose participant has no
+  email address (deliver it yourself, then <strong>Mark as Sent</strong>). A settled invoice
+  whose meters were removed shows no missing-data warning.</li>
+<li><strong>Already billed</strong> means one or more sent/paid invoices cover the period,
+  for example monthly invoices collectively covering a quarter. No new invoice
+  is needed. The link opens one related invoice.</li>
+</ul>
+<p>On narrow screens each row becomes a card: name and amount (with <em>CHF</em>)
+first, then the progress and the actions.</p>
 <h3 id="empty-state">Empty State<a class="headerlink" href="#empty-state" title="Permanent link">&para;</a></h3>
 <p>If no participants with active assignments exist for the period, the page shows links to:</p>
 <ul>
@@ -2273,9 +2293,9 @@ loading its invoices. A failed refresh retains the loaded period rows with
 <li><strong>Tariffs</strong> — to configure pricing.</li>
 </ul>
 <h2 id="row-and-batch-actions">Row and Batch Actions<a class="headerlink" href="#row-and-batch-actions" title="Permanent link">&para;</a></h2>
-<p>Each row shows its next step as a button — <strong>Generate invoice</strong>, <strong>Approve</strong>,
-<strong>Send Email</strong> or <strong>Mark Paid</strong>, depending on the status — and puts the rest
-under <strong>More</strong>:</p>
+<p>Each row shows its next step as an outlined button — <strong>Generate invoice</strong>,
+<strong>Approve</strong>, <strong>Send Email</strong> or <strong>Mark Paid</strong>, depending on the status — and puts
+the rest under <strong>More</strong>:</p>
 <table>
 <thead>
 <tr>
@@ -2288,43 +2308,65 @@ under <strong>More</strong>:</p>
 <tr>
 <td><em>(none)</em> / Cancelled</td>
 <td><strong>Generate invoice</strong> / <strong>Generate again</strong></td>
-<td>Delete (cancelled)</td>
+<td>Delete invoice (cancelled), Open PDF, Generate/Regenerate PDF</td>
 </tr>
 <tr>
 <td>Draft</td>
 <td><strong>Approve</strong></td>
-<td>Regenerate invoice, Generate/Regenerate PDF, Delete</td>
+<td>Regenerate invoice, Delete invoice, Open PDF, Generate/Regenerate PDF</td>
 </tr>
 <tr>
 <td>Approved</td>
 <td><strong>Send Email</strong></td>
-<td>Mark as Sent, Generate/Regenerate PDF</td>
+<td>Mark as Sent, Open PDF, Generate/Regenerate PDF</td>
 </tr>
 <tr>
 <td>Sent</td>
 <td><strong>Mark Paid</strong></td>
-<td>Resend Email, Generate/Regenerate PDF</td>
+<td>Open PDF, Generate/Regenerate PDF, Resend Email</td>
 </tr>
 <tr>
 <td>Paid</td>
 <td>—</td>
-<td>Generate/Regenerate PDF</td>
+<td>Open PDF, Generate/Regenerate PDF</td>
 </tr>
 </tbody>
 </table>
-<p>Admins also see <strong>Delete</strong> for approved, sent and paid invoices.</p>
-<p>The <strong>Batch actions</strong> toolbar above the table acts on the whole period at once:
-<strong>Generate all</strong>, <strong>Approve all</strong>, <strong>Send all</strong>, <strong>Regenerate all PDFs</strong> and
-<strong>Download all PDFs</strong>. The recommended next batch step names how many
-invoices it touches (for example <em>Approve 4 invoices</em>).</p>
+<p><strong>More</strong> groups invoice actions first, then PDF and email actions. <strong>Open PDF</strong>
+appears once the invoice has a stored document.</p>
+<p>Admins also see <strong>Delete invoice</strong> for approved, sent and paid invoices.</p>
+<p>The filter above the table counts the period's rows: <strong>All</strong>, <strong>Drafts</strong>,
+<strong>Approved</strong>, <strong>Sent</strong> and <strong>Issues</strong> (rows with missing metering data, a
+generation conflict, a failed PDF, a failed email or no email address). Select one to show just
+those rows; select it again, <strong>All</strong> or <strong>Show all rows</strong> to clear it. A
+category with no rows cannot be selected. If the selected category empties,
+the page explains why and offers <strong>Show all rows</strong>. Paid invoices appear
+under <strong>All</strong> only. Changing period or community clears the filter.</p>
+<p>The <strong>batch actions</strong> in the command bar always act on the whole period,
+including rows hidden by a filter. The recommended next step is the page's one
+filled button and names how many invoices it touches (for example <em>Approve 4
+invoices</em>); <strong>Download all PDFs</strong> sits beside it, and <strong>More batch actions</strong>
+holds <strong>Generate all</strong>, <strong>Approve all</strong>, <strong>Send all</strong> and <strong>Regenerate all
+PDFs</strong>. Operations with no eligible invoices are omitted from the menu. While a
+batch request runs, its controls are disabled. Generation remains disabled
+for queued targets until their invoices arrive. <strong>Send all</strong> counts only
+approved invoices with an email address, and stays disabled while any email
+is being sent or its delivery checked; a row's <strong>Send Email</strong> is disabled
+while that invoice's delivery is checked.</p>
 <h2 id="generating-invoices">Generating Invoices<a class="headerlink" href="#generating-invoices" title="Permanent link">&para;</a></h2>
 <ol>
 <li>Navigate to the desired billing period.</li>
-<li>Review the <strong>Metering Data</strong> column — ensure data is complete for the participants you want to invoice.</li>
-<li>Click <strong>Generate invoice</strong> on a participant's row, or <strong>Generate all</strong> in the
-   batch toolbar. Generating all runs in the background; the table fills in as
-   the invoices are created.</li>
+<li>Check the <strong>Issues</strong> filter — ensure metering data is complete for the participants you want to invoice.</li>
+<li>Click <strong>Generate invoice</strong> on a participant's row, or the recommended batch
+   action (<em>Generate n invoices</em>) in the command bar. Generating all runs in
+   the background: each row shows <em>Creating invoice…</em> until its invoice
+   arrives.</li>
 </ol>
+<p>The page watches for queued invoices and their PDFs for up to 90 seconds,
+including while the worker has not created any invoices yet. If processing
+takes longer, a warning says it has not finished: reload the page to check the
+result before generating again. Changing period or
+community stops watching the previous period.</p>
 <p>The system calculates energy allocation and applies tariffs, creating a <strong>Draft</strong> invoice.</p>
 <h3 id="regenerating-an-existing-invoice">Regenerating an Existing Invoice<a class="headerlink" href="#regenerating-an-existing-invoice" title="Permanent link">&para;</a></h3>
 <p>While an invoice is a <strong>Draft</strong>, <strong>More → Regenerate invoice</strong> replaces it with a
@@ -2335,7 +2377,7 @@ regenerated.</p>
 <p><strong>Tip:</strong> You can generate invoices even when metering data is incomplete, but totals may be inaccurate. It is best to resolve missing data first.</p>
 </blockquote>
 <h2 id="reviewing-invoices">Reviewing Invoices<a class="headerlink" href="#reviewing-invoices" title="Permanent link">&para;</a></h2>
-<p>Click <strong>Open details</strong> on a row to view a read-only invoice detail page.</p>
+<p>Click the invoice number in the <strong>Participant</strong> column to view the invoice detail page.</p>
 <h3 id="invoice-detail-page">Invoice Detail Page<a class="headerlink" href="#invoice-detail-page" title="Permanent link">&para;</a></h3>
 <p><img alt="Invoice detail page" src="../screenshots/08b-invoice-detail.png" /></p>
 <p>The detail page shows:</p>
@@ -2390,9 +2432,9 @@ regenerate it.</p>
 <li><strong>Regenerate</strong> — replaces an existing PDF (e.g. after the HTML template was updated).</li>
 <li><strong>Open PDF</strong> — opens the generated PDF in a new browser tab.</li>
 </ul>
-<p>These actions appear in the <strong>PDF</strong> column and under <strong>More</strong> for any invoice
-that exists. <strong>Download all PDFs</strong> in the batch toolbar downloads the period's
-documents together.</p>
+<p><strong>More → Open PDF</strong> opens the document. Generation and regeneration are also
+under <strong>More</strong> for any invoice that exists. <strong>Download all
+PDFs</strong> in the command bar downloads the period's documents together.</p>
 <p>For custom templates that omit the second address line, ask an admin to
 <a href="../14-admin-console/#invoice-pdf-templates">update the PDF template</a>, then regenerate the affected PDFs.</p>
 <h2 id="participant-access-links">Participant Access Links<a class="headerlink" href="#participant-access-links" title="Permanent link">&para;</a></h2>
@@ -2412,16 +2454,18 @@ documents together.</p>
 <p>Once an invoice is approved, you can email it to the participant.</p>
 <ol>
 <li>Click <strong>Send Email</strong> on an approved invoice's row (or <strong>Send all</strong>).</li>
-<li>The system queues the email and watches for the delivery result.</li>
+<li>The system queues the email and watches for the delivery result. <strong>Send all</strong>
+   checks the period until deliveries succeed or fail, for up to 90 seconds.</li>
 <li>While it waits, the button shows <strong>Sending…</strong> and is disabled.</li>
-<li>The <strong>Email</strong> column updates automatically when the email is delivered or fails.</li>
+<li>The row's <strong>Sent</strong> step updates automatically when the email is delivered or
+   fails; a failure also appears in red under the participant.</li>
 </ol>
 <p>For a <code>Sent</code> invoice, <strong>More → Resend Email</strong> sends another copy.</p>
 <p>If you delivered the invoice some other way (printed, handed over), use
 <strong>More → Mark as Sent</strong> on the approved invoice instead: it moves to <code>Sent</code>
 without an email.</p>
 <h3 id="email-history">Email History<a class="headerlink" href="#email-history" title="Permanent link">&para;</a></h3>
-<p>The <strong>Email</strong> column shows only the latest delivery status. Every attempt, with
+<p>The <strong>Sent</strong> step shows only the latest delivery status. Every attempt, with
 recipient, status and error, is in <strong>Billing → Emails</strong> under <strong>View
 history</strong>, where a failed latest attempt also has a <strong>Retry</strong> button.</p>
 <p>Email sending is asynchronous via Celery with automatic retries. For delivery mechanics, retry behavior, and troubleshooting failed emails, see <a href="../10-email-configuration/">Email Configuration</a>.</p>
@@ -2434,12 +2478,12 @@ history</strong>, where a failed latest attempt also has a <strong>Retry</strong
 <h2 id="deleting-invoices">Deleting Invoices<a class="headerlink" href="#deleting-invoices" title="Permanent link">&para;</a></h2>
 <p>Invoices can be deleted to clean up incorrect or test data.</p>
 <ol>
-<li>Open <strong>More</strong> on the row and click <strong>Delete</strong>.</li>
+<li>Open <strong>More</strong> on the row and click <strong>Delete invoice</strong>.</li>
 <li>Confirm in the deletion dialog.</li>
 </ol>
 <p><strong>Delete visibility rules:</strong></p>
 <ul>
-<li><strong>Draft</strong> or <strong>Cancelled</strong> invoices — <strong>More → Delete</strong> is available to managers.</li>
+<li><strong>Draft</strong> or <strong>Cancelled</strong> invoices — <strong>More → Delete invoice</strong> is available to managers.</li>
 <li><strong>Any status</strong> — admins can always delete.</li>
 </ul>
 <p>Deletion is permanent; the invoice is removed from the database.</p>
@@ -2520,7 +2564,7 @@ available after billing. The selected community appears above the page title.</p
 </ol>
 <h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Check metering completeness</strong> before generating invoices — the Metering Data column shows exactly which meters are missing data and how many days are affected.</li>
+<li><strong>Check metering completeness</strong> before generating invoices — the <strong>Issues</strong> filter lists every participant with missing data, and each row names the affected meters and how many days are missing.</li>
 <li><strong>Approve after review</strong> — open the invoice detail page and check the embedded invoice document (line items and totals) before approving.</li>
 <li><strong>Generate PDFs before sending</strong> — while not strictly required, generating the PDF first lets you review the document before emailing.</li>
 <li><strong>Approve only when final</strong> — once approved, an invoice can no longer be
