@@ -1828,8 +1828,8 @@
 <tbody>
 <tr>
 <td><strong>Metering Point</strong></td>
-<td>Single meter, or (admins and managers only) <strong>Whole ZEV total</strong> to sum every meter in the selected ZEV into one series — <strong>required</strong> to see a chart</td>
-<td>None selected</td>
+<td>Single meter, or (admins, managers and viewers) <strong>Whole ZEV total</strong> to sum every meter in the selected ZEV into one series</td>
+<td><strong>Whole ZEV total</strong> for admins, managers and viewers; a participant's only meter; none when a participant has several</td>
 </tr>
 <tr>
 <td><strong>Date Range</strong></td>
@@ -1843,11 +1843,14 @@
 </tr>
 </tbody>
 </table>
-<p>Until a metering point is selected, the chart area shows a prompt instead of
-data. The <strong>Whole ZEV total</strong> option is only offered when managing a ZEV
-(admin or manager) — a participant selects among their own metering
-points instead. Selecting it hides the Raw Readings Table below, since raw
-readings only make sense for one physical meter.</p>
+<p>The chart selects a default automatically: admins, managers and viewers see
+the <strong>Whole ZEV total</strong>, and a participant with one metering point sees that
+meter. A participant with several metering points picks one from the
+selector; until then the chart area shows a prompt. If the community has no
+metering points yet, the page says so instead of showing a chart — admins,
+managers and viewers get a link to <strong>Metering points</strong>. Selecting the <strong>Whole
+ZEV total</strong> hides the Raw Readings Table below, since raw readings only make
+sense for one physical meter.</p>
 <p>Bookmark or share the chart URL to retain its exact date range and selected
 meter, including <strong>Whole ZEV total</strong> while the community is loading. Links use
 <code>period_start</code> and <code>period_end</code>; older <code>from</code>/<code>to</code> links still
@@ -1908,7 +1911,8 @@ out without reading every value. Long periods are paginated a month
 <ul>
 <li><strong>Zero consumption</strong> — the day has an assignment holder but recorded no
   energy at all, which usually means a meter or import problem rather than
-  genuinely nothing used.</li>
+  genuinely nothing used. Only admins, managers and viewers see this flag:
+  assignment holders are not shown to participants.</li>
 <li><strong>Negative total</strong> — the day's consumption or feed-in total is below zero,
   which should not happen for a normal reading.</li>
 </ul>
