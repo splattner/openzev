@@ -1687,16 +1687,6 @@ label > small.muted {
   letter-spacing: 0.1em;
 }
 
-/* The brand mark of the document header, at kicker size. */
-.page-header > .eyebrow::before {
-  content: '';
-  width: 0.5rem;
-  height: 0.5rem;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--accent-rule);
-}
-
 .page-header .eyebrow-note {
   color: var(--text-muted);
 }
@@ -1792,9 +1782,9 @@ label > small.muted {
   padding: 1.25rem 1.5rem;
 }
 
-/* A sheet's title: the documents' section heading, a forest dot before it
-   (invoice page 3 `.section-title`). Also when a toolbar or a card header
-   carries the title beside the sheet's controls. */
+/* A sheet's title: the documents' section heading (invoice page 3
+   `.section-title`). Also when a toolbar or a card header carries the title
+   beside the sheet's controls. */
 .section-title,
 :is(.card, .table-card) > :is(h2, h3):first-child,
 :is(.card, .table-card) > div:first-child:not([class]) > :is(h2, h3):first-child,
@@ -1807,19 +1797,6 @@ label > small.muted {
   font-size: 1rem;
   font-weight: 650;
   line-height: 1.35;
-}
-
-.section-title::before,
-:is(.card, .table-card) > :is(h2, h3):first-child::before,
-:is(.card, .table-card) > div:first-child:not([class]) > :is(h2, h3):first-child::before,
-:is(.card, .table-card) > .toolbar:first-child > .toolbar-main > :is(h2, h3)::before,
-.card-header > :is(h2, h3)::before {
-  content: '';
-  width: 0.5rem;
-  height: 0.5rem;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--accent-rule);
 }
 
 .section-title + p.muted {
@@ -1856,11 +1833,6 @@ select.select-compact {
   height: 2rem;
   padding: 0 1.75rem 0 0.625rem;
   font-size: 0.8125rem;
-}
-
-/* A title that carries its own status dot (health probes) shows only that. */
-:is(.card, .table-card) > :is(h2, h3):first-child:has(.dot)::before {
-  content: none;
 }
 
 :is(.card, .table-card) > .toolbar:first-child {
@@ -3073,20 +3045,10 @@ input.recurrence-chip-input {
   color: var(--text-heading);
 }
 
-.building-header-name::before {
-  content: '';
-  width: 0.5rem;
-  height: 0.5rem;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--accent-rule);
-}
-
 .building-header-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 0.15rem 0.9rem;
-  padding-left: 1rem;
   font-size: 0.8125rem;
 }
 
@@ -3246,15 +3208,6 @@ input.recurrence-chip-input {
   gap: 0.5rem;
   font-size: 1rem;
   font-weight: 650;
-}
-
-.tariff-category-title-row h3::before {
-  content: '';
-  width: 0.5rem;
-  height: 0.5rem;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--accent-rule);
 }
 
 .tariff-card-list {

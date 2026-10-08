@@ -236,7 +236,7 @@ language and should be reused instead of ad hoc page-local CSS when possible:
 | `.page-header`, `.page-header-main`, `.page-header-text`, `.page-header-actions` (with `.page-header h1`) | Shrinking title/actions row with wrapping for long text; `.eyebrow` also serves card/section overlines |
 | `.stat-grid`, `.stat-grid--wide` | Auto-fit tiles with 1rem gap and 150px/220px minimums capped at container width; wide modifier requires the base class |
 | `.toolbar`, `.toolbar-main`, `.toolbar-actions` | Toolbar layout owned by `Toolbar` (space-between, wraps below 700px) |
-| `.card`, `.table-card`, `.stat-card` | Primary container surfaces (white sheet, hairline, `--shadow-sheet`); sheet titles get the forest dot (`.section-title`, `.card-header`) — SPEC-2026-08 §15 |
+| `.card`, `.table-card`, `.stat-card` | Primary container surfaces (white sheet, hairline, `--shadow-sheet`); sheet titles are plain forest headings (`.section-title`, `.card-header`) — SPEC-2026-08 §15 |
 | `.filter-bar`, `.filter-bar-fields`, `.filter-bar-note` | Period selector and view filters on one line, set on the page without a sheet; the fields wrap below the period as one group, never split around it |
 | `.stat-card--interactive` | `StatCard` with `onPress`: real button semantics, `[aria-pressed='true']` shows the selected state with `var(--interactive)`; focus styling comes from the global `:focus-visible` ring |
 | `.stat-card--accent`, `.stat-card--success`, `.stat-card--warning`, `.stat-card--danger`, `.stat-card--flat` | Dark accent (≤1 per view); semantic tones color the value (`h3` or span); `flat` removes card chrome for nested tiles |

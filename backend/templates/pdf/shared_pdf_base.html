@@ -78,19 +78,18 @@ How to use:
         border-radius: 1pt;
     }
 
-    .brand-row {
-        display: flex;
-        align-items: center;
-        gap: 2.5mm;
-        margin-bottom: 2mm;
+    /* The issuer column takes all the width the document number leaves,
+       and the name is a block inside it. Sized to its own max-content (as
+       a bare flex item, or inside a flex row), WeasyPrint makes a name with
+       negative letter-spacing about 0.1mm too narrow for itself, and it
+       breaks onto two lines with half the header empty. */
+    .document-header > div:first-child {
+        flex: 1 1 auto;
+        min-width: 0;
     }
 
-    .brand-mark {
-        width: 6mm;
-        height: 6mm;
-        background: var(--brand-deep);
-        border-radius: 50%;
-        flex-shrink: 0;
+    .brand-row {
+        margin-bottom: 2mm;
     }
 
     .company-name {
@@ -251,18 +250,6 @@ How to use:
         border-bottom: 0.5pt solid var(--line);
     }
 
-    .page-meta .meta-left::before {
-        content: "";
-        display: inline-block;
-        width: 2.5mm;
-        height: 2.5mm;
-        background: var(--brand-mid);
-        border-radius: 50%;
-        margin-right: 2mm;
-        vertical-align: middle;
-        position: relative;
-        top: -0.2mm;
-    }
     .page-meta .meta-center { text-align: center; flex: 0 0 auto; }
     .page-meta .meta-left { text-align: left; flex: 1; }
     .page-meta .meta-right { text-align: right; flex: 1; }
@@ -271,7 +258,7 @@ How to use:
        Used by every OpenZEV document, and mirrored on screen by the app's
        KPI tiles and section titles (frontend/src/index.css): a page heading
        with one intro line; figure tiles (kicker label, figure, small unit,
-       hint; one dark accent tile at most); sections opened by a forest dot;
+       hint; one dark accent tile at most); sections opened by a title;
        dark-header tables with zebra rows; a pale summary box. */
     .page-heading {
         color: var(--brand-deep);
@@ -373,19 +360,6 @@ How to use:
         font-weight: 700;
         margin-bottom: 1.5mm;
         letter-spacing: -0.01em;
-    }
-
-    .chart-section h3::before {
-        content: "";
-        display: inline-block;
-        width: 2.2mm;
-        height: 2.2mm;
-        background: var(--brand-mid);
-        border-radius: 50%;
-        margin-right: 2mm;
-        vertical-align: middle;
-        position: relative;
-        top: -0.3mm;
     }
 
     .chart-description {

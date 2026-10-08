@@ -15,7 +15,7 @@ metric clone), with chart labels falling back to Noto Sans. The two surfaces
 read as relatives rather than as one product:
 
 - The invoice's most recognisable elements — the document header with its
-  hairline and short forest rule, sections opened by a forest dot, figure tiles
+  hairline and short forest rule, forest section headings, figure tiles
   (kicker label, figure, small unit, one dark accent tile), the sage status pill
   — appeared nowhere in the app.
 - The app's own chrome had drifted toward a generic dashboard: floating cards
@@ -43,9 +43,9 @@ read as relatives rather than as one product:
    app's elements, and the remaining documents adopt them too:
    - *Header signature* — page headers (and dialog headers) end in a hairline
      with a short forest rule at its start, the documents' `.document-header`
-     rule; the scope kicker carries the brand dot.
-   - *Section heading* — sheet titles carry the forest dot of the invoice's
-     section headings.
+     rule; the scope kicker is set in forest.
+   - *Section heading* — sheet titles are set like the invoice's section
+     headings: forest, bold, without decoration.
    - *Figure tiles* — KPI tiles use the documents' tile: uppercase kicker
      label, the figure with its unit set small and muted, an optional hint,
      at most one dark accent tile per view. Tiles in a row share label/figure/
@@ -60,7 +60,7 @@ read as relatives rather than as one product:
      (no teal, violet or blue ramps).
    - The annual statement and the tax overview move onto
      `pdf/shared_pdf_base.html`, which now also holds the summary band
-     (recipient + facts), figure tiles, dotted sections, dark-header
+     (recipient + facts), figure tiles, sections, dark-header
      `doc-table`, `summary-box` and the running footer used by all documents.
 3. **A quieter shell.** The sidebar is a white sheet with a hairline beside
    the paper workspace: a horizontal logo lockup, compact navigation that fits
@@ -125,8 +125,8 @@ Trade-offs:
    are white paper with forest accents.
 5. **Copy the PDF layout 1:1 onto screens (a "document" app).** Rejected for the
    reasons in ADR 0014: dense operational screens need sentence-case labels in
-   forms, light table bands, and no gradient chrome — the shared elements are
-   the ones that carry meaning (rules, dots, tiles, pills, type), not the page
+   forms and no gradient chrome — the shared elements are
+   the ones that carry meaning (rules, tiles, pills, type), not the page
    geometry.
 
 ## Notes

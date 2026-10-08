@@ -250,13 +250,14 @@ harm.
 
 Template: `backend/templates/invoices/tariff_overview_pdf.html`, opening with
 `{% include "pdf/shared_pdf_base.html" %}` — the first *new* document on that
-base (the financial summary predates it and keeps its own styles). From it the
-overview inherits `document-header`, `.brand-mark`, `.eyebrow`,
-`.document-status`, and the running `.page-meta` furniture.
+base (the financial summary and annual statement moved onto it later, ADR 0032).
+From it the overview inherits `document-header`, `.eyebrow`,
+`.document-status`, and the running `.page-meta` furniture; the issuer's name
+stands alone (ADR 0032).
 
 ```
                                                   TARIFÜBERSICHT
-● ZEV Sonnenhof                                       01.01.2026
+ZEV Sonnenhof                                         01.01.2026
   Anna Muster, Dorfstrasse 12, 8000 Zürich       [ GÜLTIG AM … ]
 ════════════════════════════════════════════════════════════▂▂
 

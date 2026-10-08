@@ -223,7 +223,7 @@ The PDF language is an excellent print system and a mediocre spec for a dense bi
 
 > **Amended by ADR 0032 (§15).** The typeface is now shared (Inter on screen
 > and in every document), and so are the documents' meaning-carrying elements:
-> the header rule, the forest section dot, the figure tile, the sage status
+> the header rule, the forest headings, the figure tile, the sage status
 > pill and the kicker table labels. Page geometry, `@page` machinery and
 > gradient chrome stay print-only; gold stays on dark surfaces only. The table
 > below is kept as the historical baseline; where it disagrees, §15 wins.
@@ -249,7 +249,7 @@ The PDF language is an excellent print system and a mediocre spec for a dense bi
 
 - Page title + description; toolbar = filters left, primary action right, no second card wrapper.
 - Sidebar: a white sheet (`var(--sidebar-bg)`) with a hairline; active item = pale forest row (`--sidebar-active`, `--text-heading`, 600) with a 3px `var(--sidebar-indicator)` mark at its start (§15).
-- Page header ends in the documents' rule (hairline + short `--accent-rule` segment) unless the page has tabs, whose strip carries it; sheet titles carry the forest dot.
+- Page header ends in the documents' rule (hairline + short `--accent-rule` segment) unless the page has tabs, whose strip carries it; sheet titles are plain forest headings (no dot).
 - Focus: `2px solid var(--focus-ring)` / `2px` offset, everywhere — including Mantine widgets (`DatePickerInput`, `Menu`, `Switch`) via global `:focus-visible` + Mantine `focusRing`. Exception: programmatic focus targets that are not tab stops (the shell's `main` and the page `h1`, focused by the skip link and after navigation) show no outline.
 - Readability > "premium": for a Swiss billing tool, clear > ornamental.
 
@@ -347,7 +347,7 @@ A `rg --pcre2 '#[0-9a-fA-F]{3,8}\b' frontend/src` inventory is committed as a Ph
 ### 7.3 Typography
 
 - One typeface (ADR 0032): the app sets `var(--font-sans)` (`'Inter Variable'`, loaded from `@fontsource-variable/inter/opsz.css` so display sizes use Inter's optical-size axis); every document sets `var(--font-print)` (Inter, installed in the backend images as Debian `fonts-inter`, falling back to the former Helvetica/Arial chain). The Swiss QR payment part keeps its standard's fonts (Liberation Sans via `qrbill`).
-- Hierarchy: page title `1.75rem / 700 / -0.025em` in `--text-heading` (1.5rem at ≤640px) + one-line description (`0.9375rem`, muted, ≤90ch); page kicker `0.6875rem / 650 / 0.1em / uppercase` in `--accent-rule` with the brand dot; sheet titles `1rem / 650` with the forest dot; body `0.9375rem / 400` (`body`); field labels `0.875rem / 500` in `--text-body` (field tokens); KPI and table labels `0.6875rem / 650 / uppercase` via `text-transform`. `tabular-nums` only on CHF/kWh/money/quantities (`td.numeric`, `stat-value`, `kpi-value`, `raw-metering-num`) — not on identifiers: Inter's tabular forms widen the hyphen.
+- Hierarchy: page title `1.75rem / 700 / -0.025em` in `--text-heading` (1.5rem at ≤640px) + one-line description (`0.9375rem`, muted, ≤90ch); page kicker `0.6875rem / 650 / 0.1em / uppercase` in `--accent-rule`; sheet titles `1rem / 650` in `--text-heading`; body `0.9375rem / 400` (`body`); field labels `0.875rem / 500` in `--text-body` (field tokens); KPI and table labels `0.6875rem / 650 / uppercase` via `text-transform`. `tabular-nums` only on CHF/kWh/money/quantities (`td.numeric`, `stat-value`, `kpi-value`, `raw-metering-num`) — not on identifiers: Inter's tabular forms widen the hyphen.
 - Management page titles use `PageHeader` (`h1`), outside data/scope state
   branches. Embedded views inherit the host title; see the management-page
   reference spec for the shell contract.
@@ -559,9 +559,9 @@ This is the anchor the UI shares, not a spec to copy verbatim (see §5.1). The P
 
 1. Tokens & base — `_tokens.css`, `body { font-family: var(--font-print); font-size: 9.5pt }`.
 2. Utilities — `.eyebrow`, `.visually-hidden`.
-3. Document header (page 1) — `.document-header` flex + hairline + `brand-mid` 40mm rule (`::after`), `.brand-row`/`.brand-mark`/`.company-name`/`.company-address`, `.document-label`/`.document-number` (light prefix, bold suffix)/`.document-status`. On screen the same rule closes `PageHeader` and dialog headers, and the brand dot leads the page kicker. Then the summary band: `.doc-summary` (flex), `.recipient-block` (`.eyebrow` in brand-mid, `.recipient-name`, `.recipient-address`, `.recipient-email`) and `.facts` (`.facts .fact dt/dd`, right-aligned; scoped so the contract's own `.facts-grid .fact` keeps its layout). The invoice keeps `.invoice-summary` as its band container (layout tests measure `recipient-block`, `facts`, `amount-card`).
-4. Page furniture — `.page-meta` running header/footer (`position: running(footer-meta)` + `@page @bottom-center {content: element(footer-meta)}`), brand dot at the start. PDF-only.
-5. Shared document components — `.page-heading`, `.page-intro`; figure tiles `.kpi-row`/`.kpi-card` (`.kpi-label`, `.kpi-value`, `.kpi-unit`, `.kpi-hint`, `--accent`); `.chart-section` (top rule, `h3` with the forest dot), `.chart-description`, `.chart`; `.doc-table` (dark header with rounded top corners, zebra rows, `td.numeric` nowrap, headers wrap, `tr.total-row` in the grand-total treatment); `.summary-box` (the invoice's totals box at full width: rows, `.quantity`, `.grand-total`) and `.summary-note`. On screen: `StatCard` (figure tiles), `.section-title` and sheet titles (dot), status pills.
+3. Document header (page 1) — `.document-header` flex + hairline + `brand-mid` 40mm rule (`::after`), `.brand-row`/`.company-name`/`.company-address` (the issuer's name stands alone and wraps when long; the `.facts` values wrap too). The issuer column (`.document-header > div:first-child`, `flex: 1 1 auto`) takes all the width the document number leaves, and `.brand-row` is a plain block: sized to its own max-content, WeasyPrint makes a name with negative letter-spacing ~0.1mm too narrow for itself and breaks it with half the header empty, `.document-label`/`.document-number` (light prefix, bold suffix)/`.document-status`. On screen the same rule closes `PageHeader` and dialog headers. Then the summary band: `.doc-summary` (flex), `.recipient-block` (`.eyebrow` in brand-mid, `.recipient-name`, `.recipient-address`, `.recipient-email`) and `.facts` (`.facts .fact dt/dd`, right-aligned; scoped so the contract's own `.facts-grid .fact` keeps its layout). The invoice keeps `.invoice-summary` as its band container (layout tests measure `recipient-block`, `facts`, `amount-card`).
+4. Page furniture — `.page-meta` running header/footer (`position: running(footer-meta)` + `@page @bottom-center {content: element(footer-meta)}`). PDF-only.
+5. Shared document components — `.page-heading`, `.page-intro`; figure tiles `.kpi-row`/`.kpi-card` (`.kpi-label`, `.kpi-value`, `.kpi-unit`, `.kpi-hint`, `--accent`); `.chart-section` (top rule, forest `h3`), `.chart-description`, `.chart`; `.doc-table` (dark header with rounded top corners, zebra rows, `td.numeric` nowrap, headers wrap, `tr.total-row` in the grand-total treatment); `.summary-box` (the invoice's totals box at full width: rows, `.quantity`, `.grand-total`) and `.summary-note`. On screen: `StatCard` (figure tiles), `.section-title` and sheet titles (forest, no decoration), status pills.
 
 Kept document-only: the invoice `amount-card` itself (at most one dark KPI tile per screen view instead — the same flat forest — never a button skin), the contract `section-heading` masked rule, the line-items category panel, `@page` geometry and the QR slip.
 
@@ -919,7 +919,7 @@ Existing suites stay green (contract: 59 tests in `test_contract_context.py`; te
 
 The first redesign shared tokens; this pass shares the language. Screens and
 documents now use one typeface and the same meaning-carrying elements (header
-rule, forest dot, figure tile, sage status pill, kicker labels), and the shell
+rule, forest headings, figure tile, sage status pill, kicker labels), and the shell
 was made quieter so the content leads. Behaviour, routes, permissions and API
 contracts are unchanged.
 
@@ -985,7 +985,7 @@ contracts are unchanged.
 ### 15.3 Page anatomy
 
 - `PageHeader` (markup unchanged): `.page-header > .eyebrow` is the scope
-  kicker with the brand dot (`::before`) in `--accent-rule`; `h1` per §7.3;
+  kicker in `--accent-rule`; `h1` per §7.3;
   description `p.muted`; actions bottom-aligned. The header closes with the
   documents' rule: `border-bottom: 1px var(--border-default)` and a
   `3.5rem × 2px` `--accent-rule` segment (`::after`). On a tabbed page — any
@@ -997,8 +997,8 @@ contracts are unchanged.
   `--shadow-sheet`, padding `1.25rem 1.5rem`. Sheet titles — the first `h2/h3`
   of a sheet, the `h2/h3` of a sheet-leading unclassed `div` title block or of a
   leading `.toolbar`, `.card-header > h2/h3`, and `.section-title` — get
-  `1rem/650` with the forest dot (suppressed when the title carries its own
-  `.dot`, e.g. health probes). `.card-header` lays out a title and a control on
+  `1rem/650` in `--text-heading`, without decoration (a title may still carry
+  its own status `.dot`, e.g. health probes). `.card-header` lays out a title and a control on
   one line. A `form` directly in a sheet stacks its fields with `1rem` gaps.
   Empty states are dashed blank sheets with centred text.
 - Filter bar (`.filter-bar`, `.filter-bar-fields`, `.filter-bar-note`): the
@@ -1022,7 +1022,7 @@ contracts are unchanged.
   name (`.participant-card-heading`), then badges, then five labelled detail
   columns; Edit is a secondary action (SPEC-2026-04 §7.3). Metering points
   nest their assignments under a left rule; Assign is `button-outline`.
-  Tariff categories are sheets with a dotted kicker heading (the coloured
+  Tariff categories are sheets with a plain heading and a count (the coloured
   category gradients are gone); Details is `button-outline`.
 - Row actions: see §7.4. `.button-secondary.button-destructive` and compact
   danger buttons are the quiet destructive style (imports' "Delete imports",
@@ -1065,10 +1065,10 @@ contracts are unchanged.
 
 - `annual_statement_pdf.html` and `financial_summary_pdf.html` include
   `pdf/shared_pdf_base.html` and follow the invoice's anatomy: document header
-  (brand dot + ZEV name, issuer address, document label + the year as
+  (ZEV name, issuer address, document label + the year as
   `document-number`), summary band (recipient left; facts right), figure tiles
   (annual statement: consumption, from ZEV, from grid, self-sufficiency as the
-  accent tile), dotted sections, `.doc-table` tables with a total row,
+  accent tile), sections with forest headings, `.doc-table` tables with a total row,
   `.summary-box` for savings and taxable income, and the running footer
   (`N / M`). The annual statement keeps its page break before the ledger
   (invoices and savings). Both use exactly the translation keys and output
