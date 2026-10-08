@@ -1862,8 +1862,8 @@ the original community; its completion leaves a new draft in another community o
    bill.</li>
 <li><strong>Email</strong> (where onboarding links and invoice emails go)</li>
 <li><strong>Phone</strong> (optional)</li>
-<li><strong>Address</strong> — address lines, postal code and city (needed on the invoice
-   on the invoice). It is the billing address, not necessarily where
+<li><strong>Address</strong> — address lines, postal code and city (needed on the invoice).
+   It is the billing address, not necessarily where
    the participant's meters are: that is the metering point's
    <a href="../04-metering-points/#buildings">building</a>. When the community has a
    building with an address, <strong>Copy address from building</strong> fills the
@@ -1958,7 +1958,9 @@ several participations, the change shows on all of them.</p>
 <li><strong>End membership:</strong> Set <strong>Valid To</strong> to the last day of their invoice period</li>
 </ul>
 <blockquote>
-<p><strong>Important:</strong> Changing validity dates affects future invoices only—past invoices remain unchanged.</p>
+<p><strong>Important:</strong> Changing validity dates does not change existing invoices on its
+own. Regenerating a <strong>draft</strong> invoice recalculates it with the new dates;
+invoices that have been approved, sent or paid stay as they are.</p>
 </blockquote>
 <h2 id="allocation-weight">Allocation Weight<a class="headerlink" href="#allocation-weight" title="Permanent link">&para;</a></h2>
 <p><strong>Allocation weight</strong> decides how much of a shared cost a participant carries.
@@ -1984,12 +1986,17 @@ number.</p>
 member shares common costs equally — the behaviour you get if you never touch
 this setting at all.</p>
 <p><img alt="Allocation weight on the participant form" src="../screenshots/03b-participant-allocation-weight.png" /></p>
-<p>Each participant card shows the resulting share, for example:</p>
+<p>Current participants' cards show today's allocation-weight share. For example,
+with three current participants weighted <code>1</code>, <code>1</code>, and <code>2</code>, each of the first two
+cards shows:</p>
 <div class="highlight"><pre><span></span><code>ALLOCATION WEIGHT
-25.0000 % — 1.0000 of 4.0000 weights
+25 % — 1 of 4 weights
 </code></pre></div>
-<p>The percentage is informational and recomputed from current membership. It
-changes on its own when somebody joins or leaves, because the total changes.</p>
+<p>Shares use memberships valid today in Swiss time, including their first and
+last day. Ended and upcoming memberships show only their configured weight.
+Search and filters do not affect the total.</p>
+<p>Invoice shares may differ: common-area energy uses membership on each reading's
+date, while shared fixed fees use eligibility for each billed month.</p>
 <h3 id="choosing-weights">Choosing weights<a class="headerlink" href="#choosing-weights" title="Permanent link">&para;</a></h3>
 <p>Common bases a community might agree on:</p>
 <table>
