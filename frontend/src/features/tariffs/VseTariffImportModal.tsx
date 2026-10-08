@@ -498,7 +498,7 @@ function CandidatePrice({ candidate }: { candidate: VseTariffCandidate }) {
         // document. See docs/specs/2026-09-dynamic-tariffs.md.
         return (
             <span>
-                <span className="badge badge-info">{t('pages.tariffs.import.dynamicBadge')}</span>
+                <span className="badge badge-tag">{t('pages.tariffs.import.dynamicBadge')}</span>
                 <small className="muted" style={{ display: 'block' }}>{candidate.dynamic_url}</small>
             </span>
         )

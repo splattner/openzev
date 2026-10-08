@@ -166,11 +166,11 @@ export function TariffDetailDrawer({
                     <div className="tariff-drawer-heading">
                         <h3>{displaySeries.name}</h3>
                         <div className="tariff-name-badges">
-                            <span className="badge badge-info">
+                            <span className="badge badge-tag">
                                 {t(`pages.tariffs.billingModes.${displaySeries.billing_mode}` as Parameters<typeof t>[0], { defaultValue: displaySeries.billing_mode })}
                             </span>
                             {displaySeries.energy_type && (
-                                <span className="badge badge-success">
+                                <span className="badge badge-tag">
                                     {t(`pages.tariffs.energyTypes.${displaySeries.energy_type}` as Parameters<typeof t>[0])}
                                 </span>
                             )}
@@ -179,7 +179,7 @@ export function TariffDetailDrawer({
                                     className={
                                         dynamicSource?.last_fetch_status === 'failed'
                                             ? 'badge badge-danger'
-                                            : 'badge badge-info'
+                                            : 'badge badge-tag'
                                     }
                                     title={dynamicSource?.last_fetch_status === 'failed'
                                         ? t('pages.tariffs.dynamicFetchFailedTooltip', { error: dynamicSource.last_fetch_error })
@@ -193,7 +193,7 @@ export function TariffDetailDrawer({
                                 {badge.label}
                             </span>
                             {displaySeries.version_count > 1 && (
-                                <span className="badge badge-neutral" title={t('pages.tariffs.versions.countTooltip')}>
+                                <span className="badge badge-tag" title={t('pages.tariffs.versions.countTooltip')}>
                                     <FontAwesomeIcon icon={faLayerGroup} fixedWidth />{' '}
                                     {t('pages.tariffs.versions.count', { count: displaySeries.version_count })}
                                 </span>
@@ -252,7 +252,7 @@ export function TariffDetailDrawer({
                             </div>
                         )}
                         {usesPeriods && (
-                            <span className="badge badge-neutral">
+                            <span className="badge badge-tag">
                                 {t('pages.tariffs.periodCountSummary', { count: shown.periods.length })}
                             </span>
                         )}

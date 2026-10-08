@@ -18,7 +18,7 @@ type BehindMeterBadgeProps = {
  * generation behind the meter (surplus / net metering) — see
  * docs/specs/2026-09-behind-the-meter-generation.md §7.5.
  */
-export function BehindMeterBadge({ hintKey, className = 'badge badge-neutral' }: BehindMeterBadgeProps) {
+export function BehindMeterBadge({ hintKey, className = 'badge badge-tag' }: BehindMeterBadgeProps) {
     const { t } = useTranslation()
     const label = t('behindMeter.badge')
 

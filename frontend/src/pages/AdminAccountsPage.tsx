@@ -436,7 +436,7 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
                                             <strong>{accountDisplayName(account)}</strong>
-                                            <span className="badge badge-neutral">{roleLabel(account.role)}</span>
+                                            <span className="badge badge-tag">{roleLabel(account.role)}</span>
                                             {!account.is_active && <span className="badge badge-warning">{t('pages.accounts.inactive')}</span>}
                                         </div>
                                         <div className="muted">{account.username} · {account.email || '-'}</div>

@@ -2316,6 +2316,16 @@ button.badge-button:focus-visible {
   color: var(--brand-mid);
 }
 
+/* Attributes, not states: what a record is (billing mode, energy type, meter
+   type, role, kind), set quiet and outlined, so the coloured pills beside
+   them can say what is going on (current, scheduled, needs attention). */
+.badge-tag {
+  background: var(--surface-card);
+  border-color: var(--border-strong);
+  color: var(--text-body);
+  font-weight: 500;
+}
+
 /* Status dot — small filled circle for one-glance health/readiness
    indicators (billing periods table, admin system health). Uses the same
    status tokens as the badges; size adapts to its context's font. */

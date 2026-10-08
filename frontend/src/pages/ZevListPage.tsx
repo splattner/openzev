@@ -872,7 +872,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                 <td>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                         <span>{zev.name}</span>
-                                        <span className="badge badge-info">
+                                        <span className="badge badge-tag">
                                             {zev.zev_type.toUpperCase()}
                                         </span>
                                         {!isValidIban(zev.bank_iban ?? '') && (

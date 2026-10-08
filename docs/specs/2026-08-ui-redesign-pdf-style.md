@@ -1010,8 +1010,11 @@ contracts are unchanged.
 - Row actions: see §7.4. `.button-secondary.button-destructive` and compact
   danger buttons are the quiet destructive style (imports' "Delete imports",
   admin invoice/ZEV rows); confirm dialogs keep the solid red.
-- Status pills: fill + hairline of the next tone, `0.75rem/600`, sentence
-  case. `.badge-brand` (brand-pale, brand-glow border, brand-mid text) is the
+- Status pills: fill + hairline of the next tone, sentence case. Colour is reserved for state; attributes (billing mode, energy type,
+  meter type, roles, counts) are outlined `.badge-tag`s (white, `--border-strong`
+  hairline, `--text-body`), so a row shows one coloured pill — its
+  state — among quiet tags. Tariff validity `scheduled` is info (the blue of
+  "upcoming" elsewhere); an inactive metering point is neutral, not danger. `.badge-brand` (brand-pale, brand-glow border, brand-mid text) is the
   invoice document's pill; `invoiceStatusBadgeClass('approved')` uses it, so
   "approved" looks the same in the app and on the PDF. The invoice detail page
   renders the same `InvoiceStatusBadge` as the tables, so the former

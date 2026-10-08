@@ -297,10 +297,10 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
                                         {party.name_addition && <span className="muted">{party.name_addition}</span>}
                                         <span className="zev-access-badges">
                                             {party.participations.length > 0 && (
-                                                <span className="badge badge-neutral">{t('pages.zevSettings.parties.participant')}</span>
+                                                <span className="badge badge-tag">{t('pages.zevSettings.parties.participant')}</span>
                                             )}
                                             {[...new Set(party.roles.map((row) => row.role))].map((role) => (
-                                                <span key={role} className="badge badge-info">{t(`pages.participants.roles.${role}`)}</span>
+                                                <span key={role} className="badge badge-tag">{t(`pages.participants.roles.${role}`)}</span>
                                             ))}
                                         </span>
                                     </div>
@@ -341,7 +341,7 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
                                     <div className="zev-access-who">
                                         <strong>{`${entry.user.first_name} ${entry.user.last_name}`.trim() || entry.user.email}</strong>
                                         <span className="zev-access-badges">
-                                            <span className="badge badge-neutral">{t('pages.zevSettings.parties.loginOnly')}</span>
+                                            <span className="badge badge-tag">{t('pages.zevSettings.parties.loginOnly')}</span>
                                         </span>
                                     </div>
                                     <AccessControls
@@ -504,7 +504,7 @@ function SingleHolderRole({ role, rows, parties, canManage, busy, onAssign, onNe
             )}
             {upcoming.map((row) => (
                 <p key={row.id} className="zev-parties-holder">
-                    <span className="badge badge-neutral">{t('pages.zevSettings.parties.upcoming')}</span>
+                    <span className="badge badge-info">{t('pages.zevSettings.parties.upcoming')}</span>
                     <strong>{row.party_display_name}</strong>
                     <span className="muted">{windowText(row)}</span>
                 </p>
@@ -602,7 +602,7 @@ function Landowners({ rows, parties, canManage, busy, buildings, onAssign, onSet
                                 <strong>{row.party_display_name}</strong>
                                 {row.building_name && (
                                     <span className="zev-access-badges">
-                                        <span className="badge badge-neutral">{row.building_name}</span>
+                                        <span className="badge badge-tag">{row.building_name}</span>
                                     </span>
                                 )}
                             </div>

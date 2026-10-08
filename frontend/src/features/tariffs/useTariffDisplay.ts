@@ -6,11 +6,11 @@ import { formatShortDate } from '../../lib/appSettings'
 import type { AppSettings, DynamicTariffSource, Tariff, TariffSeries, TariffVersion } from '../../types/api'
 import { validityState, type ValidityState } from './validity'
 
-// Amber rather than blue for scheduled: blue is already the billing-mode badge
-// sitting right next to it, and two adjacent blue badges read as one group.
+// Validity is a state, so it keeps the status colours — scheduled is the blue
+// of "upcoming" everywhere else; the attributes beside it are neutral tags.
 const VALIDITY_BADGE_CLASS: Record<ValidityState, string> = {
     active: 'badge badge-success',
-    scheduled: 'badge badge-warning',
+    scheduled: 'badge badge-info',
     expired: 'badge badge-neutral',
 }
 

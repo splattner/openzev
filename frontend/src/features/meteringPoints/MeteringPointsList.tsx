@@ -180,10 +180,10 @@ export function MeteringPointsList({
                 {showBuilding && !groups && <span className="muted">{point.building_name}</span>}
                 <span className="muted">{point.location_description || t('pages.meteringPoints.noLocation')}</span>
                 <div className="metering-point-badges">
-                  <span className={point.is_active ? 'badge badge-success' : 'badge badge-danger'}>
+                  <span className={point.is_active ? 'badge badge-success' : 'badge badge-neutral'}>
                     {point.is_active ? t('pages.meteringPoints.active') : t('pages.meteringPoints.inactive')}
                   </span>
-                  <span className="badge badge-neutral">{t(`pages.meteringPoints.meterTypes.${point.meter_type}`)}</span>
+                  <span className="badge badge-tag">{t(`pages.meteringPoints.meterTypes.${point.meter_type}`)}</span>
                   {point.has_behind_meter_generation && <BehindMeterBadge />}
                   {isManagedScope && (
                     <SupplementarySourceStatus point={point} canManage={!readOnly} confirm={confirm} />
@@ -249,7 +249,7 @@ export function MeteringPointsList({
                         date: formatShortDate(sortedAssignments[0].valid_from, settings),
                       })}
                       {sortedAssignments[0].allocation_mode === 'community' && (
-                        <span className="badge badge-info metering-assignment-compact-badge">
+                        <span className="badge badge-tag metering-assignment-compact-badge">
                           {t('pages.meteringPoints.communityBadge')}
                         </span>
                       )}
@@ -285,7 +285,7 @@ export function MeteringPointsList({
                                 {t(`pages.meteringPoints.assignmentState.${assignmentState}`)}
                               </span>
                               {assignment.allocation_mode === 'community' && (
-                                <span className="badge badge-info">
+                                <span className="badge badge-tag">
                                   {t('pages.meteringPoints.communityBadge')}
                                 </span>
                               )}

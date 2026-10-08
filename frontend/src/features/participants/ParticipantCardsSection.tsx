@@ -206,7 +206,7 @@ export function ParticipantCardsSection({
                                 </div>
                                 <div className="participant-card-badges">
                                     {roles.map((role) => (
-                                        <span key={role} className="badge badge-info">{t(`pages.participants.roles.${role}`)}</span>
+                                        <span key={role} className="badge badge-tag">{t(`pages.participants.roles.${role}`)}</span>
                                     ))}
                                     <span className={participantValidityBadgeClass(validityState)}>
                                         {t(`pages.participants.validity.${validityState}`)}
