@@ -2333,7 +2333,8 @@ button.badge-button:focus-visible {
 }
 
 /* ── Buttons ────────────────────────────────────────────────────────────────
-   Primary = forest, secondary = paper with a hairline; one height scale. */
+   Primary = flat deep forest; secondary = paper with a hairline; one
+   height scale. */
 .button {
   display: inline-flex;
   align-items: center;
@@ -2343,7 +2344,8 @@ button.badge-button:focus-visible {
   min-height: 2.5rem;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background: var(--interactive);
+  background: var(--brand-deep);
+  box-shadow: 0 1px 2px rgba(13, 43, 29, 0.3);
   color: var(--white);
   font: inherit;
   font-weight: 600;
@@ -2359,7 +2361,7 @@ button.badge-button:focus-visible {
    hovered secondary button got the deep brand background while keeping its
    dark ink text (unreadable). */
 :where(.button):hover:not(:disabled) {
-  background: var(--interactive-hover);
+  background: var(--brand);
 }
 
 .button:disabled {
@@ -2604,6 +2606,7 @@ input.recurrence-chip-input {
 :is(td, .actions-cell-content) > .button:not(.button-secondary, .button-ghost, .button-danger, .danger, .button-outline) {
   background: transparent;
   border-color: var(--interactive);
+  box-shadow: none;
   color: var(--interactive);
 }
 
@@ -4596,6 +4599,7 @@ fieldset.form-grid {
 .button-outline {
   background: transparent;
   border: 1px solid var(--interactive);
+  box-shadow: none;
   color: var(--interactive);
 }
 
@@ -4607,6 +4611,7 @@ fieldset.form-grid {
 .button-ghost {
   background: transparent;
   border: 1px solid transparent;
+  box-shadow: none;
   color: var(--text-body);
 }
 

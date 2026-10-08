@@ -1056,6 +1056,11 @@ contracts are unchanged.
   nest their assignments under a left rule; Assign is `button-outline`.
   Tariff categories are sheets with a plain heading and a count (the coloured
   category gradients are gone); Details is `button-outline`.
+- Buttons: the primary `.button` is flat `--brand-deep` with a small forest
+  drop shadow, no gradient or inner highlight; hover lightens it to
+  `--brand`.
+  Secondary, outline, ghost and row-level buttons replace the background and
+  draw no shadow of their own except the secondary's `--shadow-sheet`.
 - Row actions: see §7.4. `.button-secondary.button-destructive` and compact
   danger buttons are the quiet destructive style (imports' "Delete imports",
   admin invoice/ZEV rows); confirm dialogs keep the solid red.
