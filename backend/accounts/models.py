@@ -475,6 +475,7 @@ class FeatureFlag(models.Model):
     FEASIBILITY_CALCULATOR_ENABLED = "feasibility_calculator_enabled"
     PARTICIPANT_GEOCODING_ENABLED = "participant_geocoding_enabled"
     MCP_SERVER_ENABLED = "mcp_server_enabled"
+    SUPPLEMENTARY_ENERGY_DATA_ENABLED = "supplementary_energy_data_enabled"
 
     name = models.CharField(max_length=100, unique=True)
     description = models.CharField(max_length=255, blank=True, default="")
@@ -692,5 +693,15 @@ FeatureFlag.register(
         "Allow AI assistants to read OpenZEV data through the MCP endpoint (/api/v1/mcp/) "
         "using a user's API key. Answers are sent to the assistant's LLM provider, "
         "which may be a third party outside Switzerland."
+    ),
+)
+FeatureFlag.register(
+    FeatureFlag.SUPPLEMENTARY_ENERGY_DATA_ENABLED,
+    default=False,
+    description=(
+        "Let participants with generation behind the meter connect their own energy data source "
+        "(Solar Manager, or a push/file feed) so statistics can show their real production and "
+        "self-sufficiency. Statistics only, never billing (ADR 0030). A Solar Manager source sends "
+        "requests to the vendor's cloud with the participant's API key."
     ),
 )

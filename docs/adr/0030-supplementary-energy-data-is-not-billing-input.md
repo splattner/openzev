@@ -50,7 +50,7 @@ Supplementary energy data is stored in its own models and is **never an input to
   supplementary data present.
 - **Read only by statistics.** The only consumers are the statistics surfaces named in the
   spec: participant and owner dashboards, the annual report, the annual statement, and MCP's
-  `consumption_summary`. They read it through one selector module, `metering/supplementary.py`,
+  `consumption_summary`. They read it through one selector module, `metering/supplementary/stats.py`,
   never the model directly.
 - **The official meter stays authoritative.** Supplementary values never overwrite, fill or
   correct a `MeterReading`. Where both describe the same flow (the source's export against the

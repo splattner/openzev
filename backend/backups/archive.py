@@ -312,6 +312,9 @@ def _applied_migrations() -> dict[str, list[str]]:
 def _secret_fingerprints() -> dict:
     return {
         "mfa_encryption_keys": [crypto.key_fingerprint(key) for key in settings.MFA_ENCRYPTION_KEYS if key],
+        "integration_encryption_keys": [
+            crypto.key_fingerprint(key) for key in settings.INTEGRATION_ENCRYPTION_KEYS if key
+        ],
         "secret_key": crypto.key_fingerprint(settings.SECRET_KEY),
     }
 

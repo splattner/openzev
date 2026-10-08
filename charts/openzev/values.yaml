@@ -36,6 +36,18 @@ backupEncryptionKeys:
     name: ""
     key: BACKUP_ENCRYPTION_KEYS
 
+# Key(s) that encrypt third-party integration credentials at rest (a participant's
+# Solar Manager API key), comma-separated newest-first (first encrypts, all
+# decrypt). Independent of secretKey, mfaEncryptionKeys and backupEncryptionKeys
+# (ADR 0031). Needed by the backend and the worker. Empty means pull sources
+# cannot be connected; push and file import keep working. Generate one with:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+integrationEncryptionKeys:
+  value: ""
+  existingSecret:
+    name: ""
+    key: INTEGRATION_ENCRYPTION_KEYS
+
 # Passkeys (WebAuthn) relying-party identity. It must match what the browser
 # sees: rpId is the bare domain users open OpenZEV on (no scheme, no port),
 # origin the full origin the frontend is served from. Leave empty for local

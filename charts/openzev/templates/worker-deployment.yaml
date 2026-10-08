@@ -50,6 +50,16 @@ spec:
             - name: BACKUP_ENCRYPTION_KEYS
               value: {{ .Values.backupEncryptionKeys.value | quote }}
             {{- end }}
+            {{- if .Values.integrationEncryptionKeys.existingSecret.name }}
+            - name: INTEGRATION_ENCRYPTION_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.integrationEncryptionKeys.existingSecret.name }}
+                  key: {{ .Values.integrationEncryptionKeys.existingSecret.key }}
+            {{- else if .Values.integrationEncryptionKeys.value }}
+            - name: INTEGRATION_ENCRYPTION_KEYS
+              value: {{ .Values.integrationEncryptionKeys.value | quote }}
+            {{- end }}
             - name: DATABASE_URL
               {{- if .Values.database.existingSecret.name }}
               valueFrom:

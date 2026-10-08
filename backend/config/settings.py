@@ -248,6 +248,25 @@ API_KEY_LAST_USED_RESOLUTION = timedelta(
 # than falling back to a weaker guarantee. See accounts.checks.mfa_key_configured.
 MFA_ENCRYPTION_KEYS = env.list("MFA_ENCRYPTION_KEYS", default=[])
 
+# Fernet keys for third-party integration credentials at rest
+# (metering.supplementary.crypto, ADR 0031): the participant's Solar Manager API
+# key. Independent of SECRET_KEY, MFA_ENCRYPTION_KEYS and BACKUP_ENCRYPTION_KEYS.
+# The FIRST key encrypts; every key is tried on decrypt. Rotation: prepend the
+# new key, run `manage.py rotate_integration_key`, then drop the old one.
+# Empty by default: pull sources cannot be connected (503) until it is set; the
+# push endpoint and file import store no reversible secret and keep working.
+INTEGRATION_ENCRYPTION_KEYS = env.list("INTEGRATION_ENCRYPTION_KEYS", default=[])
+
+# Supplementary energy data (SPEC-2026-supplementary-energy-data).
+SUPPLEMENTARY_SYNC_INTERVAL_S = env.int("SUPPLEMENTARY_SYNC_INTERVAL_S", default=3600)
+# A rate is shown only when at least this share of the expected 15-minute
+# intervals carries data; below it the rate is withheld rather than misleading.
+SUPPLEMENTARY_MIN_COVERAGE = env.float("SUPPLEMENTARY_MIN_COVERAGE", default=0.95)
+SUPPLEMENTARY_BACKFILL_MAX_DAYS = env.int("SUPPLEMENTARY_BACKFILL_MAX_DAYS", default=400)
+SUPPLEMENTARY_RECONCILE_TOLERANCE = env.float("SUPPLEMENTARY_RECONCILE_TOLERANCE", default=0.10)
+# Overridable only so tests can point at a stub; the client contacts no other host.
+SOLAR_MANAGER_BASE_URL = env("SOLAR_MANAGER_BASE_URL", default="https://cloud.solar-manager.ch")
+
 # WebAuthn relying-party identity. RP_ID must be the domain the browser sees
 # (e.g. "zev.example.ch") and ORIGIN the full origin the SPA is served from;
 # a mismatch makes every passkey ceremony fail with an opaque browser error,

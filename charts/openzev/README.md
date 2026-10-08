@@ -88,6 +88,33 @@ encrypted with the first, and all are tried on decrypt, so a key can be rotated
 without locking anyone out. Losing every key makes enrolled authenticator apps
 unusable — back it up like `SECRET_KEY`. The key is only needed by the backend.
 
+## Integration encryption key
+
+Credentials for third-party integrations, today a participant's Solar Manager
+API key, are encrypted at rest with keys that are independent of `SECRET_KEY`,
+the two-factor key and the backup key (ADR 0031). Until one is set, pull sources
+cannot be connected (push and file import keep working). Both the backend and
+the worker need it.
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Set it as `integrationEncryptionKeys.value`, or load it from an existing secret:
+
+```yaml
+integrationEncryptionKeys:
+  existingSecret:
+    name: openzev-integration-secret
+    key: INTEGRATION_ENCRYPTION_KEYS
+```
+
+The value may hold several comma-separated keys, newest first: new credentials
+are encrypted with the first and all are tried on decrypt. Rotate by prepending
+the new key, running `python manage.py rotate_integration_key`, then dropping the
+old one. A lost key costs a re-connect per participant, not an outage. Backups
+carry the ciphertext, never the key.
+
 ## Backup encryption key
 
 Backup archives and stored backup-destination secrets are encrypted with keys

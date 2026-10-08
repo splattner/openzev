@@ -699,6 +699,14 @@ class MeteringPoint(models.Model):
                     )
                 }
             )
+        if not self.has_behind_meter_generation and self.pk and self._has_supplementary_source():
+            raise ValidationError(
+                {"has_behind_meter_generation": "Disconnect the energy data source first."}
+            )
+
+    def _has_supplementary_source(self) -> bool:
+        # The reverse one-to-one raises a subclass of AttributeError when absent.
+        return getattr(self, "supplementary_source", None) is not None
 
 
 class AllocationMode(models.TextChoices):

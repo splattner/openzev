@@ -97,6 +97,14 @@ class MeteringPointSerializer(serializers.ModelSerializer):
                     )
                 }
             )
+        if (
+            not has_behind_meter_generation
+            and self.instance is not None
+            and getattr(self.instance, "supplementary_source", None) is not None
+        ):
+            raise serializers.ValidationError(
+                {"has_behind_meter_generation": "Disconnect the energy data source first."}
+            )
         building = attrs.get("building")
         zev = attrs.get("zev") or (self.instance.zev if self.instance is not None else None)
         if building is not None and zev is not None and building.zev_id != zev.pk:

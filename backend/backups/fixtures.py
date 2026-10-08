@@ -10,23 +10,28 @@ a deleted community.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
 
+from cryptography.fernet import Fernet
 from django.core.files.base import ContentFile
+from django.test import override_settings
 from django.utils import timezone
 
 from accounts.models import FeatureFlag, OAuthProvider, UserRole, VatRate
 from audit.models import AuditActionCategory, AuditEvent
 from audit.services import record_audit_event
 from invoices.models import ContractIssue, EmailLog, Invoice, InvoiceAccessToken
-from metering.models import ImportLog
+from metering.models import ImportLog, SupplementaryReading, SupplementarySource
 from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
 from testing.helpers import make_user
-from zev.models import Participant, ParticipantOnboardingToken
+from zev.models import MeteringPoint, Participant, ParticipantOnboardingToken
 from zev.test_transfer import build_populated_zev
 
 PDF_BYTES = b"%PDF-1.4 fake invoice pdf \x00\xff binary tail"
+# What the fixture's Solar Manager source "holds"; tests assert it never appears in clear.
+SUPPLEMENTARY_SECRET = "sm-refresh-token-not-in-clear"
+SUPPLEMENTARY_KEY = Fernet.generate_key().decode()
 
 
 @dataclass
@@ -52,6 +57,27 @@ def build_world() -> World:
     alice = Participant.objects.get(zev=alpha, party__first_name="Alice")
     alice.user = member
     alice.save()
+
+    # Alice holds Alpha's production meter personally; mark it as having PV behind
+    # it and give it an energy data source with a stored (encrypted) credential.
+    point = MeteringPoint.objects.get(zev=alpha, meter_id="ALPHA-PROD-1")
+    point.has_behind_meter_generation = True
+    point.save()
+    supplementary = SupplementarySource(
+        metering_point=point, participant=alice, provider="solar_manager", external_id="ABC123",
+        covers_from=datetime(2026, 1, 1, tzinfo=dt_timezone.utc),
+        synced_through=datetime(2026, 1, 1, 0, 30, tzinfo=dt_timezone.utc),
+    )
+    with override_settings(INTEGRATION_ENCRYPTION_KEYS=[SUPPLEMENTARY_KEY]):
+        supplementary.set_credential(SUPPLEMENTARY_SECRET)
+    supplementary.save()
+    for minutes in (0, 15):
+        SupplementaryReading.objects.create(
+            source=supplementary, metering_point=point,
+            timestamp=datetime(2026, 1, 1, 0, minutes, tzinfo=dt_timezone.utc),
+            consumption_kwh=Decimal("0.3000"), production_kwh=Decimal("0.0000"),
+            import_kwh=Decimal("0.3000"), export_kwh=Decimal("0.0000"),
+        )
 
     invoice = Invoice.objects.get(zev=alpha)
     invoice.pdf_file.save("alpha-invoice.pdf", ContentFile(PDF_BYTES), save=True)

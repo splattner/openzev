@@ -109,6 +109,15 @@ ZEV_SECTIONS: tuple[tuple[str, tuple[ZevPart, ...]], ...] = (
         "readings",
         (ZevPart("metering.MeterReading", "metering_point__zev", ("metering_point_id", "timestamp", "direction")),),
     ),
+    (
+        # Sources before readings: every reading points at one. The credential
+        # travels as ciphertext only (ADR 0031).
+        "supplementary",
+        (
+            ZevPart("metering.SupplementarySource", "metering_point__zev"),
+            ZevPart("metering.SupplementaryReading", "metering_point__zev", ("metering_point_id", "timestamp")),
+        ),
+    ),
     ("import_logs", (ZevPart("metering.ImportLog", "zev"),)),
     (
         "invoices",

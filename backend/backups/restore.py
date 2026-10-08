@@ -161,6 +161,19 @@ def key_warnings(manifest: dict) -> list[str]:
             "will not be able to pass the authenticator step. Configure the original MFA_ENCRYPTION_KEYS to "
             "keep them working, or plan to reset their MFA (recovery codes and an administrator reset still work)."
         )
+    sources = sum(
+        member.get("models", {}).get("metering.SupplementarySource", 0)
+        for member in manifest["members"].values()
+    )
+    theirs = set(manifest.get("secret_fingerprints", {}).get("integration_encryption_keys", []))
+    ours = {crypto.key_fingerprint(key) for key in settings.INTEGRATION_ENCRYPTION_KEYS if key}
+    if sources and theirs and not (theirs & ours):
+        warnings.append(
+            f"This backup holds {sources} energy data source(s) whose stored credentials were encrypted under "
+            f"INTEGRATION_ENCRYPTION_KEYS fingerprint {', '.join(sorted(theirs))}, and none of this instance's "
+            "integration keys match. Pull sources (Solar Manager) will stop syncing and ask the participant to "
+            "enter their API key again. Configure the original INTEGRATION_ENCRYPTION_KEYS to keep them working."
+        )
     return warnings
 
 

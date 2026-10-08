@@ -1,7 +1,7 @@
 # Feature Spec: Supplementary energy data for metering points with generation behind the meter
 
 - Spec ID: SPEC-2026-supplementary-energy-data
-- Status: Draft
+- Status: In Progress
 - Scope: Major
 - Type: Feature
 - Owners: Sebastian Plattner
@@ -173,9 +173,11 @@ tick); `ok` after a completed sync; `pending` until the first one.
 
 **Methods:** `credential` property decrypts on access and is never cached on the instance;
 `set_credential(refresh_token)` encrypts and raises `ValidationError` when
-`INTEGRATION_ENCRYPTION_KEYS` is empty; `clear_credential()`; `issue_push_token()` returns the
-full token once and stores prefix and hash; `mark_ok()`, `mark_error(safe_text)`,
-`mark_reconnect_required(safe_text)`.
+`INTEGRATION_ENCRYPTION_KEYS` is empty; `clear_credential()` drops the credential and push
+token; `disconnect()` also disables the source; `mark_ok()`, `mark_error(safe_text)`,
+`mark_reconnect_required(safe_text)` (none of these save). `issue_push_token()` returns the full
+token once and stores prefix and hash; it arrives with the push endpoint (PR 2). `save()` keeps
+`status` consistent with `enabled`: disabling sets `disabled`, re-enabling returns to `pending`.
 
 **Serializer:** `SupplementarySourceSerializer`. Read: `id`, `metering_point`,
 `metering_point_meter_id`, `participant`, `participant_name`, `provider`, `label`,
@@ -203,7 +205,7 @@ own measurements, in kWh.
 | `export_kwh` | `DecimalField(12,4)` | — | Fed into the grid |
 | `created_at` / `updated_at` | `DateTimeField` | auto | |
 
-**Meta:** `ordering = ["metering_point", "timestamp"]`;
+**Meta:** `ordering = ["metering_point", "timestamp", "id"]`;
 `UniqueConstraint(fields=["metering_point", "timestamp"], name="uniq_supplementary_reading_mp_ts")`;
 `CheckConstraint` that all four energies are `>= 0` (`supplementary_reading_non_negative`).
 Re-delivery of an interval is an **upsert** (vendors revise recent values). There is deliberately
@@ -216,7 +218,7 @@ non-zero in the same interval.
 
 ### 4.3 Derived figures (the one definition)
 
-Implemented once in `metering/supplementary.py` (`gross_energy_totals(...)`), used by every
+Implemented once in `metering/supplementary/stats.py` (`gross_energy(...)`), used by every
 surface. Per interval *i*:
 
 ```
@@ -463,13 +465,15 @@ Result stored in `SupplementarySource.reconciliation`:
 
 - **System health:** `AdminSystemHealthPanel` reports whether `INTEGRATION_ENCRYPTION_KEYS` is
   configured, how many sources exist per status, and the oldest `last_success_at`.
-- **System check:** `metering.W001` warns when the feature flag is on, pull sources exist and no
-  key is configured.
+- **System check:** `metering.W001` warns when the feature flag is forced on through the
+  environment (`FEATURE_SUPPLEMENTARY_ENERGY_DATA_ENABLED`) and no key is configured. Environment
+  only, because system checks run without a database; the health panel reports the case where the
+  flag is switched on in the admin UI.
 - **Backups:** `backups/registry.py` lists both models in a new ZEV section `supplementary`
   (sources before readings); the registry's coverage test enforces it. The manifest's
   `secret_fingerprints` gains `integration_encryption_keys`, and restore warns when a source's
-  credential was encrypted under a key this instance lacks
-  (those sources come back `reconnect_required`).
+  credential was encrypted under a key this instance lacks. Those sources come back as they were
+  and become `reconnect_required` at their first sync, when decryption fails.
 - **Key rotation:** `manage.py rotate_integration_key`, idempotent, one transaction.
 - **Deletion cascades:** deleting a participant, a metering point or a ZEV removes their
   sources and readings (`CASCADE`); the ZEV purge (`zev/purge.py`) needs no change beyond the models being covered by the backup registry.
@@ -613,12 +617,12 @@ participant row and `MeteringPoint` gain `gross_energy: GrossEnergy | null` /
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Supplementary data reaches billing | High | Separate tables; import-isolation test; invoice-amount-invariance test; only `metering/supplementary.py` reads it (ADR 0030) |
+| Supplementary data reaches billing | High | Separate tables; import-isolation test; invoice-amount-invariance test; only `metering/supplementary/stats.py` reads it (ADR 0030) |
 | Interval timestamp convention differs from `MeterReading` | High (a silent 15-minute shift, wrong curves) | Verified as interval start against a real meter day (§6.2); provider constant; reconciliation detects shifts continuously |
 | Rotated refresh token lost → participant locked out of their own key | High | Persist before use; row lock; `reconnect_required` state and re-entry flow; failure to save = failed refresh |
 | Two workers refresh concurrently and invalidate each other | Medium | `select_for_update` plus per-source lease |
 | A rate shown from partial data reads as a real figure | Medium | Coverage threshold, `covered_from/to` shown, rates `null` below it |
-| Vendor changes or removes the API (v1 already deprecated) | Medium | One provider module, fixed v3 contract, `error` state surfaces failures, tests against a recorded fixture of the real response |
+| Vendor changes or removes the API (v1 already deprecated) | Medium | One provider module, fixed v3 contract, `error` state surfaces failures, tests against a fixture shaped like the real response |
 | Privacy: household profile retained after the tenant leaves | High | Consent bound to the holder; daily orphan job disconnects at assignment end; purge and delete actions; participant delete cascades |
 | Credential leaked via logs, audit, errors, backups | High | Write-only field; redacted audit metadata; safe error text; dedicated key, ciphertext only in backups (ADR 0031) |
 | Push endpoint abused or token leaked | Medium | Hashed token, per-token throttle, one source per token, rotate action, strict validation, 2000-row cap |
@@ -631,32 +635,53 @@ participant row and `MeteringPoint` gain `gross_energy: GrossEnergy | null` /
 All counts are targets for the implementing PRs and are updated to the real numbers when
 each lands.
 
-### Backend — `metering/test_supplementary_models.py`
+### Backend — foundation (PR 1: 59 tests)
 
-**`SupplementaryModelTests`** (~9):
+**`metering/test_supplementary_models.py`: `SupplementaryModelTests`** (15):
 
 | Test | Asserts |
 |---|---|
-| `test_source_requires_flagged_metering_point` | `clean()` rejects an unflagged meter |
+| `test_source_requires_flagged_metering_point` | `full_clean()` rejects an unflagged meter |
 | `test_source_participant_must_share_zev` | cross-ZEV participant rejected |
+| `test_external_id_rules_per_provider` | Solar Manager id format; a push source must have none |
 | `test_one_source_per_metering_point` | second source violates the one-to-one |
-| `test_clearing_flag_blocked_while_source_exists` | `MeteringPointSerializer` and `clean()` both reject |
+| `test_clearing_flag_blocked_while_source_exists` | `MeteringPoint.clean()` rejects |
+| `test_clearing_flag_blocked_through_the_api` | `PATCH` answers 400 and the flag stays set |
+| `test_flag_can_be_cleared_once_the_source_is_gone` | the guard lifts with the source |
 | `test_reading_unique_per_metering_point_and_timestamp` | constraint |
-| `test_reading_rejects_negative_values` | check constraint |
-| `test_credential_roundtrip_and_never_serialized` | encrypt/decrypt; serializer exposes only `has_credential` |
-| `test_set_credential_without_key_raises` | `ValidationError`, setting named |
-| `test_status_derivation` | `disabled`, `reconnect_required`, `error`, `ok`, `pending` |
+| `test_reading_rejects_negative_values` | check constraint, each of the four columns |
+| `test_deleting_a_source_deletes_its_readings` | cascade |
+| `test_credential_roundtrip_stores_only_ciphertext` | encrypt/decrypt; plaintext absent from the column |
+| `test_set_credential_without_key_raises` | `ValidationError` naming the setting |
+| `test_status_transitions` | `pending`, `ok`, `error`, `reconnect_required`, `disabled`, back to `pending` |
+| `test_disconnect_disables_and_wipes_secrets_but_keeps_readings` | §6.3 consent boundary |
+| `test_last_error_is_truncated` | 500 characters |
 
-**`GrossEnergyMathTests`** (~8): `test_self_consumption_formula_clamped`,
-`test_self_sufficiency_from_import_and_consumption`, `test_rates_null_when_denominator_zero`,
-`test_sample_day_matches_issue_figures` (the real 2026-07-01 response as a fixture: ~55 % and
-~14 %), `test_coverage_counts_only_expected_intervals`, `test_rates_withheld_below_min_coverage`,
-`test_window_clipped_to_personal_assignments`, `test_community_assignment_excluded`.
+**`metering/test_supplementary_crypto.py`** (12): `CryptoTests` (4: round trip, no key refuses both
+directions, a prepended key keeps old tokens readable, an unknown key raises `IntegrationKeyError`),
+`RotateIntegrationKeyTests` (5: nothing to do, re-encrypt and idempotent, sources without a
+credential left alone, an unreadable credential rolls everything back, no key is a
+`CommandError`), `IntegrationKeyCheckTests` (3: silent unless forced on, warns without a key,
+silent with one).
 
-**`SupplementaryIsolationTests`** (~3): `test_billing_modules_do_not_import_supplementary`
-(walks the import graph of the packages named in ADR 0030),
-`test_invoice_amounts_identical_with_and_without_supplementary_data`,
-`test_meter_reading_untouched_by_ingest`.
+**`metering/test_supplementary_stats.py`** (20): `SelfConsumptionTests` (1) and
+`GrossEnergyTests` (19): hand-computed rates, zero denominators, clamped self-sufficiency, no
+source, a source that never ingested, 95 % coverage accepted, 90 % withheld, the minimum as a
+setting, no rows is `no_data`, only the synced range is expected, window clipped to the personal
+assignment, a later holder does not inherit the earlier holder's data, community assignments
+excluded, back-to-back assignments merge, a gap stays a gap, a disconnected source still counts,
+several flagged meters summed, timeline buckets, no timeline unless asked.
+
+**`metering/test_supplementary_isolation.py`** (4): `SupplementaryIsolationTests` (2: no billing
+module mentions supplementary data; the scanned file list covers the known modules) and
+`InvoiceInvariantTests` (2: identical invoice amounts and items with and without supplementary
+data, and ingest never touches `MeterReading`).
+
+**`backups/test_supplementary_backup.py`** (8): `SupplementaryArchiveTests` (3: the
+`supplementary` section holds the source before its readings, the credential travels as
+ciphertext and the key never does, the manifest records key fingerprints only) and
+`IntegrationKeyWarningTests` (5). `backups/fixtures.build_world` now includes a flagged meter
+with a source and two readings, so every existing backup and restore round trip covers them.
 
 ### Backend — `metering/test_supplementary_api.py`
 
@@ -731,8 +756,8 @@ of sources and readings; manifest fingerprint; restore warns on a missing key.
 - [ ] A rotated Solar Manager token is persisted before use and concurrent syncs never reuse it.
 - [ ] Reconciliation flags a source whose export deviates from the meter by more than 10 % or
       whose timestamps look shifted.
-- [ ] Backups round-trip both models; a restore on an instance without the key marks sources
-      `reconnect_required` and says why.
+- [ ] Backups round-trip both models; a restore on an instance without the key warns, naming the
+      key fingerprint, and the affected sources become `reconnect_required` at their first sync.
 - [ ] With the feature flag off the product behaves exactly as in 1.21.0.
 - [ ] All user-facing text is translated in de/fr/it/en; the user guide is updated.
 
@@ -746,13 +771,13 @@ against real meter data for the metering point behind the sample response (§6.2
 interval start, shift 0, day totals within 0.05 % (export) and 0.4 % (import). Still unmeasured,
 and to be observed during PR 3: rate limits and the maximum `from`/`to` range per call.
 
-**PR 1: Foundation** (backend, no user-visible change)
+**PR 1: Foundation** (backend, no user-visible change; implemented, see the test list in §9)
 - Models and migrations (`SupplementarySource`, `SupplementaryReading`), constraints, the
   `has_behind_meter_generation` guard.
 - `FeatureFlag.SUPPLEMENTARY_ENERGY_DATA_ENABLED`; settings (§4.5); `INTEGRATION_ENCRYPTION_KEYS`
   in `.env.example`, `.env.production.example`, Helm values.
 - `metering/supplementary/crypto.py`, `rotate_integration_key`, system check.
-- `metering/supplementary.py`: `gross_energy_totals`, coverage, assignment clipping.
+- `metering/supplementary/stats.py`: `gross_energy`, coverage, assignment clipping.
 - Backup registry section and manifest fingerprint; `SupplementaryIsolationTests`.
 - Tests: `SupplementaryModelTests`, `GrossEnergyMathTests`, `SupplementaryIsolationTests`.
 
@@ -766,9 +791,10 @@ and to be observed during PR 3: rate limits and the maximum `from`/`to` range pe
 - `providers.py`, `solar_manager.py`, the sync tasks, orphan job, beat entries, create-time
   key check, `test` and `sync` actions.
 - `reconcile.py`, system-health entry.
-- Tests: `SolarManagerProviderTests`, `SyncTaskTests`, `ReconciliationTests`, with the real
-  response (identifiers removed) as a fixture, plus the matching meter `out`/`in` series for
-  the reconciliation tests.
+- Tests: `SolarManagerProviderTests`, `SyncTaskTests`, `ReconciliationTests`, with a response
+  fixture shaped like the real one (96 intervals, same fields) and a matching meter `out`/`in`
+  series for the reconciliation tests. The values are synthetic: no household's real
+  consumption profile is committed to the repository.
 
 **PR 4: Statistics surfaces** (backend)
 - `gross_energy` on the participant and owner dashboards, annual report, annual statement
