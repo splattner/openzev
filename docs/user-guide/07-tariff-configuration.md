@@ -72,6 +72,10 @@ OpenZEV at that file and it will show you exactly what it would create.
 4. Tick what you want. **Select standard tariffs** ticks only what the operator
    itself flags as its standard product — a document can carry 35 rows when
    your community needs four, so nothing is pre-ticked wholesale.
+   If the document covers more than one year — operators often publish next
+   year's prices beside this year's — pick a year in the year filter to see
+   only the tariffs valid in it. Changing the year resets the ticks to that
+   year's standard tariffs.
 5. Click **Import N tariffs**.
 
 Leave **Remember this address for next year's tariffs** ticked and the URL is

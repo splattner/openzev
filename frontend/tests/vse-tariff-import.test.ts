@@ -3,8 +3,10 @@ import { api } from '../src/lib/api/client'
 import { applyVseTariffImport, previewVseTariffImport } from '../src/lib/api/tariffs'
 import {
     canChooseBillingMode,
+    candidateYears,
     defaultBillingModes,
     isSelectable,
+    isValidInYear,
     recommendedKeys,
     selectionFor,
     toggleKey,
@@ -143,6 +145,34 @@ describe('what the wizard pre-selects', () => {
 
         expect([...once]).toEqual(['a'])
         expect(twice.size).toBe(0)
+    })
+})
+
+describe('filtering a document by year', () => {
+    const current = candidate({ key: 'a@2026', valid_from: '2026-01-01', valid_to: '2026-12-31' })
+    const next = candidate({ key: 'a@2027', valid_from: '2027-01-01', valid_to: '2027-12-31' })
+
+    it('lists every year a candidate is valid in, ascending', () => {
+        const spanning = candidate({ valid_from: '2025-07-01', valid_to: '2026-06-30' })
+        expect(candidateYears([next, current, spanning])).toEqual([2025, 2026, 2027])
+    })
+
+    it('counts an open-ended candidate only in the year it starts', () => {
+        expect(candidateYears([candidate({ valid_from: '2026-04-01', valid_to: null })])).toEqual([2026])
+    })
+
+    it('keeps only the candidates valid in the chosen year', () => {
+        expect([current, next].filter((c) => isValidInYear(c, 2027))).toEqual([next])
+    })
+
+    it('keeps an open-ended candidate in every year from its start', () => {
+        const open = candidate({ valid_from: '2026-04-01', valid_to: null })
+        expect(isValidInYear(open, 2025)).toBe(false)
+        expect(isValidInYear(open, 2030)).toBe(true)
+    })
+
+    it('keeps everything when no year is chosen', () => {
+        expect([current, next].filter((c) => isValidInYear(c, null))).toEqual([current, next])
     })
 })
 

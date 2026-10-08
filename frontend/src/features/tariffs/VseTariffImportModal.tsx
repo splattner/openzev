@@ -10,9 +10,11 @@ import { invalidateTariffQueries } from './invalidate'
 import { bandName } from './bands'
 import { MONTH_KEYS, formatSeason } from './recurrence'
 import {
+    candidateYears,
     defaultBillingModes,
     canChooseBillingMode,
     isSelectable,
+    isValidInYear,
     recommendedKeys,
     selectionFor,
     toggleKey,
@@ -62,6 +64,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
     const [modeByKey, setModeByKey] = useState<Record<string, string>>({})
     const [productByKey, setProductByKey] = useState<Record<string, string>>({})
     const [rememberUrl, setRememberUrl] = useState(true)
+    const [year, setYear] = useState<number | null>(null)
 
     const previewMutation = useMutation({
         mutationFn: previewVseTariffImport,
@@ -70,6 +73,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
             setSelected(recommendedKeys(data.candidates))
             setModeByKey(defaultBillingModes(data.candidates))
             setProductByKey({})
+            setYear(null)
         },
         onError: (error) =>
             pushToast(errorDetail(error, t('pages.tariffs.import.errors.previewFailed')), 'error'),
@@ -88,24 +92,38 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
             pushToast(errorDetail(error, t('pages.tariffs.import.errors.applyFailed')), 'error'),
     })
 
+    const years = useMemo(() => candidateYears(preview?.candidates ?? []), [preview])
+
+    // Every candidate the year filter lets through. Selection never reaches
+    // past it, so what is ticked is always what is on screen.
+    const visible = useMemo(
+        () => (preview?.candidates ?? []).filter((candidate) => isValidInYear(candidate, year)),
+        [preview, year],
+    )
+
     const grouped = useMemo(() => {
-        const candidates = preview?.candidates ?? []
+        const candidates = visible
         return CATEGORY_ORDER.map((category) => ({
             category,
             candidates: candidates.filter((candidate) => candidate.category === category),
         })).filter((group) => group.candidates.length > 0)
-    }, [preview])
+    }, [visible])
 
-    const selectable = useMemo(
-        () => (preview?.candidates ?? []).filter(isSelectable),
-        [preview],
-    )
+    const selectable = useMemo(() => visible.filter(isSelectable), [visible])
+
+    function changeYear(next: number | null) {
+        setYear(next)
+        if (preview) {
+            setSelected(recommendedKeys(preview.candidates.filter((candidate) => isValidInYear(candidate, next))))
+        }
+    }
 
     function reset() {
         setPreview(null)
         setResult(null)
         setSelected(new Set())
         setModeByKey({})
+        setYear(null)
         previewMutation.reset()
         applyMutation.reset()
     }
@@ -203,6 +221,23 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                     )}
 
                     <div className="actions-row actions-row-wrap">
+                        {years.length > 1 && (
+                            <select
+                                value={year ?? ''}
+                                onChange={(event) =>
+                                    changeYear(event.target.value ? Number(event.target.value) : null)
+                                }
+                                aria-label={t('pages.tariffs.import.yearFilter')}
+                                style={{ width: 'auto' }}
+                            >
+                                <option value="">{t('pages.tariffs.import.allYears')}</option>
+                                {years.map((option) => (
+                                    <option key={option} value={option}>
+                                        {option}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
                         <span className="muted">
                             {t('pages.tariffs.import.selectedCount', {
                                 count: selected.size,
@@ -212,9 +247,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                         <button
                             className="button button-secondary"
                             type="button"
-                            onClick={() =>
-                                setSelected(recommendedKeys(preview.candidates))
-                            }
+                            onClick={() => setSelected(recommendedKeys(visible))}
                         >
                             {t('pages.tariffs.import.selectRecommended')}
                         </button>

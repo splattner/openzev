@@ -1495,6 +1495,8 @@ export const en = {
                 selectedCount: '{{count}} of {{total}} importable tariffs selected',
                 selectRecommended: 'Select standard tariffs',
                 selectNone: 'Clear selection',
+                yearFilter: 'Filter by year',
+                allYears: 'All years',
                 standardBadge: 'Standard',
                 dynamicBadge: 'Dynamic',
                 addedToSeries: 'Will be added to “{{name}}”',

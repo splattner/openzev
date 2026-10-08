@@ -1484,6 +1484,8 @@ export const it = {
                 selectedCount: '{{count}} di {{total}} tariffe importabili selezionate',
                 selectRecommended: 'Seleziona le tariffe standard',
                 selectNone: 'Annulla la selezione',
+                yearFilter: 'Filtra per anno',
+                allYears: 'Tutti gli anni',
                         standardBadge: 'Standard',
                 dynamicBadge: 'Dinamica',
                 addedToSeries: 'Verrà aggiunto a «{{name}}»',

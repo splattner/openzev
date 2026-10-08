@@ -1484,6 +1484,8 @@ export const fr = {
                 selectedCount: '{{count}} tarif(s) s\u00e9lectionn\u00e9(s) sur {{total}} importables',
                 selectRecommended: 'S\u00e9lectionner les tarifs standard',
                 selectNone: 'Effacer la s\u00e9lection',
+                yearFilter: 'Filtrer par ann\u00e9e',
+                allYears: 'Toutes les ann\u00e9es',
                         standardBadge: 'Standard',
                 dynamicBadge: 'Dynamique',
                 addedToSeries: 'Sera ajouté à « {{name}} »',

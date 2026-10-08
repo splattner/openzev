@@ -27,6 +27,34 @@ export function recommendedKeys(candidates: VseTariffCandidate[]): Set<string> {
     )
 }
 
+function yearOf(date: string): number {
+    return Number(date.slice(0, 4))
+}
+
+/**
+ * The calendar years a document's candidates are valid in, ascending.
+ *
+ * Operators publish next year's prices beside this year's in one file, so the
+ * wizard offers these as a filter. An open-ended candidate contributes only the
+ * year it starts in — it would otherwise stretch the list without bound.
+ */
+export function candidateYears(candidates: VseTariffCandidate[]): number[] {
+    const years = new Set<number>()
+    for (const candidate of candidates) {
+        const from = yearOf(candidate.valid_from)
+        const to = candidate.valid_to ? yearOf(candidate.valid_to) : from
+        for (let year = from; year <= to; year += 1) years.add(year)
+    }
+    return [...years].sort((a, b) => a - b)
+}
+
+/** Whether a candidate is valid at any point in `year`; `null` matches all. */
+export function isValidInYear(candidate: VseTariffCandidate, year: number | null): boolean {
+    if (year === null) return true
+    if (yearOf(candidate.valid_from) > year) return false
+    return !candidate.valid_to || yearOf(candidate.valid_to) >= year
+}
+
 /**
  * Whether this row's billing mode is still an open question.
  *

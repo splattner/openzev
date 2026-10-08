@@ -536,7 +536,12 @@ Three steps in one `FormModal` (`maxWidth="1000px"`):
    price (fee, or one line per band with its window), the validity window, and
    a status badge with its explanation. Non-applicable rows are disabled.
    "Select standard tariffs" / "Clear selection", and a "remember this address"
-   checkbox.
+   checkbox. When the candidates span more than one calendar year, a year
+   `<select>` ("All years" plus each year from `candidateYears`) narrows the
+   tables to the candidates `isValidInYear`. Choosing a year resets the ticks
+   to `recommendedKeys` of the visible rows, and "Select standard tariffs" and
+   the selectable total also count only visible rows, so nothing hidden is ever
+   imported. The filter resets to "All years" on every new preview.
 3. **Result** — created, skipped and failed, then Close. Created tariffs
    retain their apply-time dynamic-source warnings under the corresponding row.
 
@@ -546,7 +551,8 @@ cached — a preview is a point-in-time read of an external document.
 
 **File:** `frontend/src/features/tariffs/vseImportSelection.ts` —
 `isSelectable`, `canChooseBillingMode`, `recommendedKeys`,
-`defaultBillingModes`, `selectionFor`, `toggleKey`, `trimPrice`. Extracted from the component so the rules that decide
+`candidateYears` (years any candidate is valid in; an open-ended one counts only
+its start year), `isValidInYear` (`null` matches all), `defaultBillingModes`, `selectionFor`, `toggleKey`, `trimPrice`. Extracted from the component so the rules that decide
 what gets written are testable.
 
 The chosen modes live in their own `Record<string, string>` beside the tick
@@ -742,7 +748,8 @@ allowlist, and the message/log split were each disabled in turn).
 ### Frontend — `frontend/tests/vse-tariff-import.test.ts`
 
 Selection rules (`isSelectable` for all five statuses, `recommendedKeys`
-skipping a recommended-but-inapplicable candidate, `toggleKey`), billing-mode
+skipping a recommended-but-inapplicable candidate, `toggleKey`), the year
+filter (`candidateYears`, `isValidInYear` incl. open-ended and `null`), billing-mode
 state (`defaultBillingModes`; `selectionFor` omitting the mode when the row was
 left alone and sending it when it was changed), price trimming, and the two API
 call shapes — including that apply sends only selections and a digest.
