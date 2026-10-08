@@ -44,7 +44,7 @@ function expectUniform(label: string, natives: number[], mantine: number[]) {
   expect(natives.length, `${label}: no native fields found`).toBeGreaterThan(0)
   expect(mantine.length, `${label}: no Mantine fields found`).toBeGreaterThan(0)
   for (const h of [...natives, ...mantine]) {
-    expect(Math.abs(h - 44), `${label}: field height ${h}px, expected ~44px`).toBeLessThanOrEqual(1)
+    expect(Math.abs(h - 40), `${label}: field height ${h}px, expected ~40px (the button height)`).toBeLessThanOrEqual(1)
   }
 }
 

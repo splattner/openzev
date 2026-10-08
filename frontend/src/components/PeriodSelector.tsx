@@ -144,7 +144,7 @@ export function PeriodSelector({
             </span>
             {aligned ? (
                 <span className="muted period-selector-interval">
-                    {t('pages.invoices.billingInterval')}{' '}
+                    <span className="period-selector-interval-label">{t('pages.invoices.billingInterval')}{' '}</span>
                     {t(`pages.zevs.billingIntervals.${interval}`)}
                 </span>
             ) : compact ? (

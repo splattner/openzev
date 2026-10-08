@@ -1018,6 +1018,26 @@ label > small.muted {
   min-width: 0;
 }
 
+/* Beside other fields the range and its interval share one line, so the
+   trigger keeps the shared control height; the interval's label is left to
+   screen readers. Phones stack the fields, and the trigger its two lines. */
+@media (min-width: 769px) {
+  .period-selector:not(.period-selector--compact) .period-selector-text {
+    grid-auto-flow: column;
+    align-items: baseline;
+    gap: 0.625rem;
+  }
+
+  .period-selector-interval-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 .period-selector:not(.period-selector--compact) :is(.period-selector-range, .period-selector-interval) {
   max-width: 100%;
   overflow: hidden;

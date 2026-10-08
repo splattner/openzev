@@ -930,12 +930,12 @@ contracts are unchanged.
 
 - `design/tokens.json`: primitive `--line-strong`; semantics
   `--text-heading`, `--border-strong`, `--surface-sunken`, `--accent-rule`,
-  `--sidebar-text`, `--sidebar-hover`,
-  `--sidebar-line` (§4.1); field tokens
-  `--field-radius 0.5rem`, `--field-label-size 0.875rem`,
-  `--field-label-weight 500`, `--field-help-size 0.8125rem` (height stays
-  `2.75rem`); `type.fontFamily.print` leads with `Inter`.
-- Page tone: primitive `--canvas #f2f5f0` (screen only) and `--app-bg` →
+  `--sidebar-text`, `--sidebar-hover`, `--sidebar-line` (§4.1); field tokens
+  `--field-radius`, `--field-label-size`, `--field-label-weight`,
+  `--field-help-size` and `--field-height`, which is also the buttons'
+  `min-height`, so a field and a button on one line align;
+  `type.fontFamily.print` leads with `Inter`.
+- Page tone: primitive `--canvas` (screen only) and `--app-bg` →
   `var(--canvas)`. The page sits one step darker than the documents' paper
   (`--surface`, which stays for row hover and inset panels), so white sheets
   and fields stand off it without heavier borders.
@@ -1035,17 +1035,19 @@ contracts are unchanged.
   are dashed blank sheets with centred text.
 - Filter bar (`.filter-bar`, `.filter-bar-fields`, `.filter-bar-note`): the
   period selector and the view's filters on one line, set on the page (no
-  sheet). The fields wrap as one group: `.filter-bar-fields` has a flex basis
-  of room for all its fields side by side (`13rem` each plus `1rem` gaps,
-  chosen with `:has(> :nth-child(n))`; max width `24rem`/`50rem`/`75rem` for
-  one/two/three fields, pushed to the line's end), so it either shares the
-  period's line whole or moves below it whole, its fields sharing the width
-  equally — never split around the period. Used by `ManagementDashboardBody`, `ParticipantDashboardBody` and
-  `MeteringChartPage` (whose hourly-resolution hint moved below the row as
-  `.filter-bar-note`, linked with `aria-describedby`). `PeriodSelector` step
-  buttons show only their arrow in both variants; the label is a
-  visually-hidden span (non-compact) or `aria-label` (compact), plus `title`.
-  The group never wraps; the range text ellipsizes first.
+  sheet). The fields wrap as one group: it either shares the period's line
+  whole or moves below it whole, its fields sharing the width equally — never
+  split around the period. Used by `ManagementDashboardBody`,
+  `ParticipantDashboardBody` and `MeteringChartPage` (whose hourly-resolution
+  hint moved below the row as `.filter-bar-note`, linked with
+  `aria-describedby`). `PeriodSelector` step buttons show only their arrow in
+  both variants; the label is a visually-hidden span (non-compact) or
+  `aria-label` (compact), plus `title`. The group never wraps; the range text
+  ellipsizes first. From 769px the non-compact trigger sets the range and its
+  interval on one line at the shared control height; the interval shows only
+  its name (`Vierteljährlich`), its label (`.period-selector-interval-label`,
+  "Abrechnungsintervall:") stays for screen readers. Phones stack the
+  trigger's two lines with the label.
 - Management toolbars (`.participant-toolbar`, `.metering-toolbar`,
   `.tariff-toolbar`) lose their sheet: summary chips, the page's primary
   action (right-aligned, also when wrapped) and filters sit on the page.
@@ -1143,6 +1145,6 @@ contracts are unchanged.
   date-and-time tile, so a tile that spills fails the `.stat-grid` overflow
   check.
 - `screenshots/field-geometry.spec.ts`: the field contract is now 16px values,
-  14px/500 labels, 13px helpers, 8px radius (height still 44px).
+  14px/500 labels, 13px helpers, 8px radius, 40px height (the buttons').
 - Backend: the full suite passes against PostgreSQL with Inter installed
   (PDF layout, PDF/A, template-admin and field-catalog tests included).

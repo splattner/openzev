@@ -275,7 +275,8 @@ modals are migrated separately.
 Form controls: native text-like inputs and single-value selects share one
 default presentation with Mantine field controls (`TextInput`,
 `Autocomplete`, `DatePickerInput`). Both implementations consume the same
-field tokens (`design/tokens.json` → `fields`): 2.75rem (44px) height, 1rem value
+field tokens (`design/tokens.json` → `fields`): 2.5rem (40px) height — the
+buttons' height, so fields and buttons on one line align — 1rem value
 type at 1.5 line height (native selects retain platform line-height behavior),
 0.5rem radius, 0.95rem base inline padding, 0.875rem/500 labels in
 `--text-body`, 0.8125rem helpers, and 0.4rem label/control/helper gaps. Native rules live in `index.css`;
