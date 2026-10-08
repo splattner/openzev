@@ -62,8 +62,11 @@ existing party and stay shared: editing them on one entry changes them on every
 entry of that party.
 
 The participant is added to the list. An entry flagged **Needs attention** is
-missing an email address, a postal address or a metering point; the
-**Readiness** filter narrows the list to those entries.
+missing an email address, a postal address or a metering point. The tabs above
+the list count the entries and narrow the list: **All**, **Needs attention**
+and **No metering point**; a tab with nothing or everything in it is left out, and clicking
+the active tab again shows all. The search field beside them finds a name,
+email address or address.
 
 ## Participant Account Access
 

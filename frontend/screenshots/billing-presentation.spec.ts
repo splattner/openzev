@@ -70,7 +70,7 @@ for (const language of ['en', 'de', 'fr', 'it']) {
         elements.map(element => Math.round(element.getBoundingClientRect().top)))
       expect(new Set(tops).size).toBe(1)
     }
-    const filters = page.locator('.invoice-row-filter')
+    const filters = page.locator('.filter-tab')
     await expect(filters).toHaveCount(5)
     const positions = await filters.evaluateAll(elements => elements.map(element => element.getBoundingClientRect().top))
     expect(new Set(positions).size).toBe(1)
@@ -84,7 +84,7 @@ for (const language of ['en', 'de', 'fr', 'it']) {
     await page.setViewportSize({ width: 400, height: 850 })
     await expect.poll(() => page.locator('aside').evaluate(element => element.getBoundingClientRect().right)).toBeLessThanOrEqual(0)
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
-    for (const control of await page.locator('.invoice-command-bar button, .invoice-row-filter, .invoice-rows button').all()) {
+    for (const control of await page.locator('.invoice-command-bar button, .filter-tab, .invoice-rows button').all()) {
       const box = await control.boundingBox()
       expect(box!.x).toBeGreaterThanOrEqual(0)
       expect(box!.x + box!.width).toBeLessThanOrEqual(401)
@@ -168,7 +168,7 @@ test('row filtering leaves the whole-period batch payload and pending controls i
     await route.fulfill({ json: { approved: 1 } })
   })
   await page.goto('/billing/invoices')
-  const filters = page.locator('.invoice-row-filter')
+  const filters = page.locator('.filter-tab')
   await expect(filters).toHaveCount(5)
   // Show approved rows, while the recommended approval acts on the hidden draft.
   await filters.nth(2).click()
@@ -210,7 +210,8 @@ test('a PDF retry leaves the Issues filter and count together', async ({ page })
   finish()
   await page.getByRole('button', { name: 'All 2', exact: true }).click()
   await expect(page.locator('.invoice-row-issues')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Issues 0', exact: true })).toBeDisabled()
+  // Released, the empty Issues tab is left out.
+  await expect(page.getByRole('button', { name: /^Issues/ })).toHaveCount(0)
 })
 
 for (const leavePeriod of [false, true]) {

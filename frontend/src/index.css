@@ -2741,33 +2741,56 @@ input.recurrence-chip-input {
   visibility: hidden;
 }
 
-.invoice-filter-bar {
+/* ── List filters ───────────────────────────────────────────────────────────
+   Above a list: the main filter tabs share the toolbar row with the page's
+   actions; search and the narrowing filters take the line below. All keep
+   the shared control height. */
+.list-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 1rem;
 }
 
-.invoice-filter-bar > p {
+.list-filters > p {
   margin: 0;
 }
 
-.invoice-row-filters {
+.list-filters > input {
+  flex: 0 1 22rem;
+  width: auto;
+  min-width: 0;
+}
+
+.list-filters > select {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+@media (max-width: 700px) {
+  .list-filters > input {
+    flex-basis: 100%;
+  }
+}
+
+/* Filter tabs (FilterTabs): segments with counts, as tall as a field. */
+.filter-tabs {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 0.25rem;
   max-width: 100%;
-  padding: 0.25rem;
+  padding: calc((var(--field-height) - 2rem - 2px) / 2);
   border: 1px solid var(--border-default);
   border-radius: 0.8rem;
   background: var(--surface-card);
 }
 
-.invoice-row-filter {
+.filter-tab {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  min-height: 2.1rem;
+  min-height: 2rem;
   padding: 0.35rem 0.75rem;
   border: 0;
   border-radius: 0.6rem;
@@ -2779,22 +2802,16 @@ input.recurrence-chip-input {
   cursor: pointer;
 }
 
-.invoice-row-filter:hover:not(:disabled) {
+.filter-tab:hover {
   background: var(--surface);
 }
 
-/* An empty segment has nothing to show: it stays readable but inert. */
-.invoice-row-filter:disabled {
-  color: var(--muted);
-  cursor: default;
-}
-
-.invoice-row-filter[aria-pressed='true'] {
+.filter-tab[aria-pressed='true'] {
   background: var(--brand-pale);
   color: var(--brand-deep);
 }
 
-.invoice-row-filter-count {
+.filter-tab-count {
   min-width: 1.4rem;
   padding: 0.05rem 0.4rem;
   border-radius: 999px;
@@ -2805,23 +2822,23 @@ input.recurrence-chip-input {
   text-align: center;
 }
 
-.invoice-row-filter[aria-pressed='true'] .invoice-row-filter-count {
+.filter-tab[aria-pressed='true'] .filter-tab-count {
   background: var(--surface-card);
 }
 
-.invoice-row-filter--attention .invoice-row-filter-count {
+.filter-tab--attention .filter-tab-count {
   background: var(--danger-100);
   color: var(--danger-700);
 }
 
 /* ── Management toolbars: controls set directly on the page ────────────────
-   Summary figures, the page's primary action and the filters; no sheet
-   around them — the list below is the sheet. */
+   Filter tabs, the page's actions and the filters; no sheet around them —
+   the list below is the sheet. */
 .metering-toolbar,
 .participant-toolbar,
 .tariff-toolbar {
   display: grid;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 :is(.metering-toolbar, .participant-toolbar, .tariff-toolbar).card {
@@ -2832,70 +2849,9 @@ input.recurrence-chip-input {
   box-shadow: none;
 }
 
-.metering-summary,
-.participant-summary,
-.tariff-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-/* A summary figure: label and count on one chip. */
-.metering-summary-stat,
-.participant-summary-stat,
-.tariff-summary-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-height: 2rem;
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  font: inherit;
-}
-
-.metering-summary-stat {
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-.metering-summary-stat:hover {
-  border-color: var(--border-strong);
-}
-
-.metering-summary-stat.is-active {
-  background: var(--brand-pale);
-  border-color: var(--brand-glow);
-}
-
-.metering-summary-label,
-.participant-summary-label,
-.tariff-summary-label {
-  font-size: 0.8125rem;
-  color: var(--text-body);
-}
-
-.metering-summary-value,
-.participant-summary-value,
-.tariff-summary-value {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-}
-
-.metering-filter-grid,
 .participant-filter-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
-  gap: 0.75rem 1rem;
-  align-items: end;
-}
-
-.tariff-filter-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 22rem));
   gap: 0.75rem 1rem;
   align-items: end;
 }

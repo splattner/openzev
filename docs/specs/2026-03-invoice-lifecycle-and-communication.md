@@ -1241,8 +1241,9 @@ the cockpit readiness and attention caches.
   explicitly icon-only with translated accessible names.
 - Filters are **All**, **Drafts**, **Approved**, **Sent** and **Issues** with
   counts. Sent means the exact sent status, excluding paid. Pressing All or
-  the active segment clears filtering. A zero-count segment is disabled unless
-  active, so an emptied selection can still be released. Empty filtered results
+  the active segment clears filtering. A zero-count segment, or one counting
+  the whole period (the same rows as All), is left out unless active, so an
+  emptied selection can still be released. Empty filtered results
   have an explanation and clear action. Filtering changes visible rows only;
   batch counts and payloads always use the full period. Filters reset on
   account, community or period changes and remain available read-only.

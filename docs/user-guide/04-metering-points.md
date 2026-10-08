@@ -19,6 +19,14 @@ buildings, the page groups the metering points by building and the toolbar offer
 
 ![Metering points page](screenshots/04-metering-points.png)
 
+The tabs above the list count the metering points and show one view at a time:
+**All**, **Active**, **Inactive**, **Unassigned** (no participant today) and
+**Needs attention**; click the active tab again to show all. A tab with nothing
+in it, or with everything in it, is left out. Below them, the search finds a meter ID, location, building
+or participant, and, when the community has more than one metering point
+type, a second row of tabs narrows to one type. The filters are kept in the
+page address, so a bookmark or shared link opens the same view.
+
 If a refresh fails, the last loaded list and any open form stay available.
 Use **Retry** in the warning to refresh the list.
 

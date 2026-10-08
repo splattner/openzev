@@ -1,15 +1,17 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faDownload, faFilePdf, faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
+import { ActionMenu } from '../../components/ActionMenu'
+import { FilterTabs } from '../../components/FilterTabs'
 import { Toolbar } from '../../components/Toolbar'
 
 export type TariffValidityFilter = 'valid' | 'all'
 
 type TariffToolbarProps = {
-  tariffCount: number
-  energyTariffCount: number
-  tariffsWithPeriodsCount: number
-  periodCount: number
+  /** Tariff series with a version in force today. */
+  validCount: number
+  /** All tariff series. */
+  totalCount: number
   validityFilter: TariffValidityFilter
   onValidityFilterChange: (value: TariffValidityFilter) => void
   onOpenCreateTariffModal: () => void
@@ -17,15 +19,13 @@ type TariffToolbarProps = {
   /** Absent when no single ZEV is selected — an import needs one target. */
   onOpenImportModal?: () => void
   /** Absent when no single ZEV is selected — same reason as the import button. */
-  onDownloadOverview?: () => void
+  onDownloadOverview?: (scope: TariffValidityFilter) => void
   overviewBusy?: boolean
 }
 
 export function TariffToolbar({
-  tariffCount,
-  energyTariffCount,
-  tariffsWithPeriodsCount,
-  periodCount,
+  validCount,
+  totalCount,
   validityFilter,
   onValidityFilterChange,
   onOpenCreateTariffModal,
@@ -48,15 +48,17 @@ export function TariffToolbar({
               </button>
             )}
             {onDownloadOverview && (
-              <button
-                type="button"
-                className="button button-secondary"
-                onClick={onDownloadOverview}
-                disabled={overviewBusy}
-              >
-                <FontAwesomeIcon icon={faFilePdf} fixedWidth />
-                {overviewBusy ? t('pages.tariffs.overviewPdf.busy') : t('pages.tariffs.overviewPdf.action')}
-              </button>
+              <ActionMenu
+                compact={false}
+                label={overviewBusy ? t('pages.tariffs.overviewPdf.busy') : t('pages.tariffs.overviewPdf.action')}
+                icon={<FontAwesomeIcon icon={faFilePdf} fixedWidth />}
+                items={(['valid', 'all'] as const).map((scope) => ({
+                  key: scope,
+                  label: t(`pages.tariffs.overviewPdf.scope.${scope}`),
+                  onClick: () => onDownloadOverview(scope),
+                  disabled: overviewBusy,
+                }))}
+              />
             )}
             {!readOnly && (
               <button className="button button-primary" type="button" onClick={onOpenCreateTariffModal}>
@@ -67,38 +69,16 @@ export function TariffToolbar({
           </>
         ) : null}
       >
-        <div className="tariff-summary" aria-label={t('pages.tariffs.summaryLabel')}>
-          <span className="tariff-summary-stat">
-            <span className="tariff-summary-label">{t('pages.tariffs.summary.total')}</span>
-            <span className="tariff-summary-value">{tariffCount}</span>
-          </span>
-          <span className="tariff-summary-stat">
-            <span className="tariff-summary-label">{t('pages.tariffs.summary.energyBased')}</span>
-            <span className="tariff-summary-value">{energyTariffCount}</span>
-          </span>
-          <span className="tariff-summary-stat">
-            <span className="tariff-summary-label">{t('pages.tariffs.summary.withPeriods')}</span>
-            <span className="tariff-summary-value">{tariffsWithPeriodsCount}</span>
-          </span>
-          <span className="tariff-summary-stat">
-            <span className="tariff-summary-label">{t('pages.tariffs.summary.totalPeriods')}</span>
-            <span className="tariff-summary-value">{periodCount}</span>
-          </span>
-        </div>
+        <FilterTabs
+          label={t('pages.tariffs.filters.validity')}
+          tabs={[
+            { value: 'valid', label: t('pages.tariffs.filters.validOnly'), count: validCount },
+            { value: 'all', label: t('pages.tariffs.filters.all'), count: totalCount },
+          ]}
+          value={validityFilter}
+          onChange={onValidityFilterChange}
+        />
       </Toolbar>
-
-      <div className="tariff-filter-grid">
-        <label>
-          <span>{t('pages.tariffs.filters.validity')}</span>
-          <select
-            value={validityFilter}
-            onChange={(event) => onValidityFilterChange(event.target.value as TariffValidityFilter)}
-          >
-            <option value="valid">{t('pages.tariffs.filters.validOnly')}</option>
-            <option value="all">{t('pages.tariffs.filters.all')}</option>
-          </select>
-        </label>
-      </div>
     </section>
   )
 }

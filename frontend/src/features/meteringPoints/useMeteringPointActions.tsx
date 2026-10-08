@@ -38,17 +38,13 @@ import {
     isMeteringPointHolderLess,
     METERING_POINT_FILTER_KEYS,
     meteringPointNeedsAttention,
-    readMeteringPointAssignmentFilter,
     readMeteringPointBuildingFilter,
-    readMeteringPointAttentionFilter,
-    readMeteringPointStatusFilter,
     readMeteringPointTypeFilter,
-    type MeteringPointAssignmentFilter,
+    readMeteringPointView,
     type MeteringPointBuildingFilter,
-    type MeteringPointAttentionFilter,
     type MeteringPointHealth,
-    type MeteringPointStatusFilter,
     type MeteringPointTypeFilter,
+    type MeteringPointView,
 } from './useMeteringPointForms'
 import type {
     Building,
@@ -66,11 +62,9 @@ export function getScopedAndFilteredMeteringPoints(
         selectedZevId,
         isManagedScope,
         searchTerm,
-        statusFilter,
+        view = 'all',
         typeFilter,
-        attentionFilter = 'all',
         needsAttentionByMeteringPoint,
-        assignmentFilter = 'all',
         buildingFilter = 'all',
         isAssignedByMeteringPoint,
         participantNamesByMeteringPoint,
@@ -78,15 +72,13 @@ export function getScopedAndFilteredMeteringPoints(
         selectedZevId: string | null
         isManagedScope: boolean
         searchTerm: string
-        statusFilter: MeteringPointStatusFilter
+        view?: MeteringPointView
         typeFilter: MeteringPointTypeFilter
-        attentionFilter?: MeteringPointAttentionFilter
-        /** Only consulted when `attentionFilter` is `'attention'`; a missing entry does not match. */
+        /** Only consulted for the `'attention'` view; a missing entry does not match. */
         needsAttentionByMeteringPoint?: Map<string, boolean>
-        assignmentFilter?: MeteringPointAssignmentFilter
         /** `'all'`, or a building id (#890). */
         buildingFilter?: MeteringPointBuildingFilter
-        /** Only consulted when `assignmentFilter` isn't `'all'`; a missing entry counts as unassigned. */
+        /** Only consulted for the `'unassigned'` view; a missing entry counts as unassigned. */
         isAssignedByMeteringPoint?: Map<string, boolean>
         /** Space-joined names of every participant ever assigned to the meter, so search can match "which meter is Anna's?". */
         participantNamesByMeteringPoint?: Map<string, string>
@@ -98,9 +90,11 @@ export function getScopedAndFilteredMeteringPoints(
 
     const normalizedSearch = searchTerm.trim().toLowerCase()
     const meteringPoints = scopedMeteringPoints.filter((point) => {
-        const matchesStatus = statusFilter === 'all'
-            || (statusFilter === 'active' && point.is_active)
-            || (statusFilter === 'inactive' && !point.is_active)
+        const matchesView = view === 'all'
+            || (view === 'active' && point.is_active)
+            || (view === 'inactive' && !point.is_active)
+            || (view === 'unassigned' && !isAssignedByMeteringPoint?.get(point.id))
+            || (view === 'attention' && !!needsAttentionByMeteringPoint?.get(point.id))
         const matchesType = typeFilter === 'all' || point.meter_type === typeFilter
         const matchesSearch = !normalizedSearch
             || point.meter_id.toLowerCase().includes(normalizedSearch)
@@ -108,14 +102,8 @@ export function getScopedAndFilteredMeteringPoints(
             || (point.building_name ?? '').toLowerCase().includes(normalizedSearch)
             || (participantNamesByMeteringPoint?.get(point.id) ?? '').toLowerCase().includes(normalizedSearch)
         const matchesBuilding = buildingFilter === 'all' || point.building === buildingFilter
-        const matchesAttention = attentionFilter === 'all'
-            || !!needsAttentionByMeteringPoint?.get(point.id)
-        const isAssigned = !!isAssignedByMeteringPoint?.get(point.id)
-        const matchesAssignment = assignmentFilter === 'all'
-            || (assignmentFilter === 'assigned' && isAssigned)
-            || (assignmentFilter === 'unassigned' && !isAssigned)
 
-        return matchesStatus && matchesType && matchesSearch && matchesAttention && matchesAssignment && matchesBuilding
+        return matchesView && matchesType && matchesSearch && matchesBuilding
     })
 
     return { scopedMeteringPoints, meteringPoints }
@@ -202,17 +190,9 @@ export function useMeteringPointActions({
     const FILTER = METERING_POINT_FILTER_KEYS
 
     const [searchTerm, setSearchTermState] = useState(() => searchParams.get(FILTER.search) ?? '')
-    const [statusFilter, setStatusFilterState] = useState<MeteringPointStatusFilter>(
-        () => readMeteringPointStatusFilter(searchParams.get(FILTER.status)),
-    )
+    const [view, setViewState] = useState<MeteringPointView>(() => readMeteringPointView(searchParams.get(FILTER.view)))
     const [typeFilter, setTypeFilterState] = useState<MeteringPointTypeFilter>(
         () => readMeteringPointTypeFilter(searchParams.get(FILTER.type)),
-    )
-    const [attentionFilter, setAttentionFilterState] = useState<MeteringPointAttentionFilter>(
-        () => readMeteringPointAttentionFilter(searchParams.get(FILTER.attention)),
-    )
-    const [assignmentFilter, setAssignmentFilterState] = useState<MeteringPointAssignmentFilter>(
-        () => readMeteringPointAssignmentFilter(searchParams.get(FILTER.assignment)),
     )
 
     const [buildingFilter, setBuildingFilterState] = useState<MeteringPointBuildingFilter>(
@@ -233,21 +213,13 @@ export function useMeteringPointActions({
         setSearchTermState(value)
         writeFilterParam(FILTER.search, value, value === '')
     }
-    function setStatusFilter(value: MeteringPointStatusFilter) {
-        setStatusFilterState(value)
-        writeFilterParam(FILTER.status, value, value === 'all')
+    function setView(value: MeteringPointView) {
+        setViewState(value)
+        writeFilterParam(FILTER.view, value, value === 'all')
     }
     function setTypeFilter(value: MeteringPointTypeFilter) {
         setTypeFilterState(value)
         writeFilterParam(FILTER.type, value, value === 'all')
-    }
-    function setAttentionFilter(value: MeteringPointAttentionFilter) {
-        setAttentionFilterState(value)
-        writeFilterParam(FILTER.attention, value, value === 'all')
-    }
-    function setAssignmentFilter(value: MeteringPointAssignmentFilter) {
-        setAssignmentFilterState(value)
-        writeFilterParam(FILTER.assignment, value, value === 'all')
     }
 
     function setBuildingFilter(value: MeteringPointBuildingFilter) {
@@ -257,10 +229,8 @@ export function useMeteringPointActions({
 
     function clearFilters() {
         setSearchTermState('')
-        setStatusFilterState('all')
+        setViewState('all')
         setTypeFilterState('all')
-        setAttentionFilterState('all')
-        setAssignmentFilterState('all')
         setBuildingFilterState('all')
         setSearchParams((previous) => {
             const next = new URLSearchParams(previous)
@@ -786,11 +756,9 @@ export function useMeteringPointActions({
         selectedZevId,
         isManagedScope,
         searchTerm,
-        statusFilter,
+        view,
         typeFilter,
-        attentionFilter,
         needsAttentionByMeteringPoint,
-        assignmentFilter,
         buildingFilter,
         isAssignedByMeteringPoint,
         participantNamesByMeteringPoint,
@@ -809,10 +777,8 @@ export function useMeteringPointActions({
         needsAttentionByMeteringPoint,
     )
     const hasFilters = !!searchTerm.trim()
-        || statusFilter !== 'all'
+        || view !== 'all'
         || typeFilter !== 'all'
-        || attentionFilter !== 'all'
-        || assignmentFilter !== 'all'
         || buildingFilter !== 'all'
 
     return {
@@ -849,14 +815,10 @@ export function useMeteringPointActions({
         setDeleteDataTo,
         searchTerm,
         setSearchTerm,
-        statusFilter,
-        setStatusFilter,
+        view,
+        setView,
         typeFilter,
         setTypeFilter,
-        attentionFilter,
-        setAttentionFilter,
-        assignmentFilter,
-        setAssignmentFilter,
         buildingFilter,
         setBuildingFilter,
         buildings,

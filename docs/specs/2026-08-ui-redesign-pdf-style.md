@@ -1049,8 +1049,36 @@ contracts are unchanged.
   "Abrechnungsintervall:") stays for screen readers. Phones stack the
   trigger's two lines with the label.
 - Management toolbars (`.participant-toolbar`, `.metering-toolbar`,
-  `.tariff-toolbar`) lose their sheet: summary chips, the page's primary
-  action (right-aligned, also when wrapped) and filters sit on the page.
+  `.tariff-toolbar`) lose their sheet: a `.toolbar` row with the main filter
+  tabs on the left and the page's actions on the right (also when wrapped),
+  then, where the page has further filters, a `.list-filters` row with search
+  and those filters. The tariff summary chips are gone.
+- Filter tabs (`FilterTabs`, `frontend/src/components/FilterTabs.tsx`;
+  `.filter-tabs`, `.filter-tab`, `.filter-tab-count`,
+  `.filter-tab--attention`): one segmented group of counted, mutually
+  exclusive views of a list, used by invoices (`InvoiceRowFilterTabs`),
+  participants, metering points and tariffs. The first tab is the default
+  view; it always shows, and pressing an active tab returns to it. Any other
+  tab with a count of 0, or with the default tab's count (it would show the
+  same list), is left out unless it is the active one or an `attention` tab
+  with a count (it still warns), and a default tab left on its own renders no
+  group at all — tabs that cannot change the list would only add clutter. An
+  `attention` tab shows its count in the danger tone while it is above 0
+  (`frontend/tests/filter-tabs.test.ts`, 5 tests). The group is as tall as a field
+  (`--field-height`). `.list-filters` is one wrapping line: a search input
+  (full width on phones), further tab groups and compact selects, labelled by
+  `aria-label`.
+  Participants: All · Needs attention · No metering point, with the search
+  in the same `.list-filters` row (nothing else narrows them).
+  Metering points: All · Active · Inactive · Unassigned (managers only) ·
+  Needs attention; below, search, type tabs (All types · Consumption ·
+  Production · Bidirectional, shown when more than one type is present or a
+  type is selected) and, with more than one building, the building select.
+  The view is stored in the `view` query param (an unknown value reads as
+  All); the type keeps `type`. Tariffs: Valid (default) · All, counting tariff
+  series with a version in force today against all series; the tariff
+  overview PDF's scope is chosen at its download instead
+  (SPEC-2026-09-tariff-overview-pdf §11).
 - Ledger lists: participants, metering points and tariffs render as
   hairline-separated rows inside one sheet. Participant rows lead with the
   name (`.participant-card-heading`), then badges, then five labelled detail

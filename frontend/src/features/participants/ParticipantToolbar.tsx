@@ -1,9 +1,10 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
+import { FilterTabs } from '../../components/FilterTabs'
 import { Toolbar } from '../../components/Toolbar'
 
-export type ParticipantReadinessFilter = 'all' | 'attention' | 'ready'
+export type ParticipantReadinessFilter = 'all' | 'attention' | 'noMetering'
 
 type ParticipantToolbarProps = {
   totalCount: number
@@ -40,40 +41,26 @@ export function ParticipantToolbar({
           </button>
         ) : null}
       >
-        <div className="participant-summary" aria-label={t('pages.participants.summaryLabel')}>
-          <span className="participant-summary-stat">
-            <span className="participant-summary-label">{t('pages.participants.summary.total')}</span>
-            <span className="participant-summary-value">{totalCount}</span>
-          </span>
-          <span className="participant-summary-stat">
-            <span className="participant-summary-label">{t('pages.participants.summary.attention')}</span>
-            <span className="participant-summary-value">{warningCount}</span>
-          </span>
-          <span className="participant-summary-stat">
-            <span className="participant-summary-label">{t('pages.participants.summary.noMetering')}</span>
-            <span className="participant-summary-value">{noMeteringCount}</span>
-          </span>
-        </div>
-      </Toolbar>
-
-      <div className="participant-filter-grid">
-        <label>
-          <span>{t('pages.participants.filters.search')}</span>
+        <div className="list-filters">
+          <FilterTabs
+            label={t('pages.participants.summaryLabel')}
+            tabs={[
+              { value: 'all', label: t('pages.participants.summary.total'), count: totalCount },
+              { value: 'attention', label: t('pages.participants.summary.attention'), count: warningCount, attention: true },
+              { value: 'noMetering', label: t('pages.participants.summary.noMetering'), count: noMeteringCount },
+            ]}
+            value={readinessFilter}
+            onChange={onReadinessFilterChange}
+          />
+          {/* Nothing else narrows participants, so the search shares the row. */}
           <input
             value={searchTerm}
             onChange={(event) => onSearchTermChange(event.target.value)}
             placeholder={t('pages.participants.filters.searchPlaceholder')}
+            aria-label={t('pages.participants.filters.search')}
           />
-        </label>
-        <label>
-          <span>{t('pages.participants.filters.readiness')}</span>
-          <select value={readinessFilter} onChange={(event) => onReadinessFilterChange(event.target.value as ParticipantReadinessFilter)}>
-            <option value="all">{t('pages.participants.filters.all')}</option>
-            <option value="attention">{t('pages.participants.filters.attention')}</option>
-            <option value="ready">{t('pages.participants.filters.ready')}</option>
-          </select>
-        </label>
-      </div>
+        </div>
+      </Toolbar>
     </section>
   )
 }

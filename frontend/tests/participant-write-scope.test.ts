@@ -140,6 +140,17 @@ it('classifies membership inclusively using the Swiss civil date for card shares
     }
 })
 
+it('counts and lists the same participants under No metering point', async () => {
+    client.setQueryData(queryKeys.zev.participants('A'), [
+        { ...participants[0], id: 'metered', has_metering_point_assignment: true },
+        { ...participants[0], id: 'unmetered', has_metering_point_assignment: false },
+    ])
+    await render()
+    expect(state.toolbar!.noMeteringCount).toBe(1)
+    act(() => state.toolbar!.onReadinessFilterChange('noMetering'))
+    expect(state.cards!.filteredParticipants.map(({ participant }) => participant.id)).toEqual(['unmetered'])
+})
+
 const onboarding = [
     { name: 'send', run: () => state.cards!.onSendOnboardingLink('pA') },
     { name: 'copy', run: () => state.cards!.onCopyOnboardingLink('pA') },

@@ -368,7 +368,7 @@ export function ParticipantsPage() {
     const filteredParticipants = participantCards.filter((entry) => {
         const matchesReadiness = readinessFilter === 'all'
             || (readinessFilter === 'attention' && entry.warnings.length > 0)
-            || (readinessFilter === 'ready' && entry.warnings.length === 0)
+            || (readinessFilter === 'noMetering' && !entry.participant.has_metering_point_assignment)
         const matchesSearch = !normalizedSearch
             || entry.displayName.toLowerCase().includes(normalizedSearch)
             || (entry.participant.email || '').toLowerCase().includes(normalizedSearch)

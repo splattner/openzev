@@ -95,7 +95,7 @@ async function render(url = '/billing/invoices') {
 }
 
 const segment = (container: HTMLElement, label: string) =>
-    [...container.querySelectorAll<HTMLButtonElement>('.invoice-row-filter')]
+    [...container.querySelectorAll<HTMLButtonElement>('.filter-tab')]
         .find((element) => element.textContent?.includes(label))!
 const names = (container: HTMLElement) => [...container.querySelectorAll('tbody tr')]
     .map((row) => row.querySelector('td strong')?.textContent)
@@ -141,9 +141,9 @@ describe('invoices page filters', () => {
 
     it('offers no empty segment, and explains a pressed segment that empties once', async () => {
         const { container, client } = await render()
-        // Nothing is approved: the segment has nothing to show.
-        expect(segment(container, 'pages.invoices.filters.approved').disabled).toBe(true)
-        expect(segment(container, 'pages.invoices.filters.all').disabled).toBe(false)
+        // Nothing is approved: the segment has nothing to show and is left out.
+        expect(segment(container, 'pages.invoices.filters.approved')).toBeUndefined()
+        expect(segment(container, 'pages.invoices.filters.all')).toBeDefined()
 
         // The draft is approved while its segment is pressed: one explanation,
         // with its clear action, and the segment can still be released.
@@ -155,7 +155,7 @@ describe('invoices page filters', () => {
         await waitForCondition(() => container.querySelector('tbody') === null, 'the empty filter state')
         expect(container.textContent).toContain('pages.invoices.filters.noMatches')
         expect(container.textContent).not.toContain('pages.invoices.filters.showing')
-        expect(segment(container, 'pages.invoices.filters.drafts').disabled).toBe(false)
+        expect(segment(container, 'pages.invoices.filters.drafts').getAttribute('aria-pressed')).toBe('true')
         act(() => [...container.querySelectorAll('button')].find((button) =>
             button.textContent === 'pages.invoices.filters.clear')!.click())
         await waitForCondition(() => names(container).length === 3, 'the cleared rows')

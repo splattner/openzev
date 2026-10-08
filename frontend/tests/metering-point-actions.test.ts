@@ -35,7 +35,6 @@ describe('metering point action helpers', () => {
       selectedZevId: 'zev-1',
       isManagedScope: true,
       searchTerm: '',
-      statusFilter: 'all',
       typeFilter: 'all',
     })
 
@@ -44,17 +43,17 @@ describe('metering point action helpers', () => {
 
   it('does not show an unscoped management inventory without a selection', () => {
     const { scopedMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
-      selectedZevId: null, isManagedScope: true, searchTerm: '', statusFilter: 'all', typeFilter: 'all',
+      selectedZevId: null, isManagedScope: true, searchTerm: '', typeFilter: 'all',
     })
     expect(scopedMeteringPoints).toEqual([])
   })
 
-  it('filters by search term, status, and type', () => {
+  it('filters by search term, view, and type', () => {
     const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
       selectedZevId: null,
       isManagedScope: false,
       searchTerm: 'solar',
-      statusFilter: 'active',
+      view: 'active',
       typeFilter: 'bidirectional',
     })
 
@@ -67,12 +66,11 @@ describe('metering point action helpers', () => {
     })
   })
 
-  it('leaves every meter in when the attention filter is "all", with or without a map', () => {
+  it('leaves every meter in in the "all" view, with or without a map', () => {
     const { meteringPoints: withoutMap } = getScopedAndFilteredMeteringPoints(meteringPoints, {
       selectedZevId: null,
       isManagedScope: false,
       searchTerm: '',
-      statusFilter: 'all',
       typeFilter: 'all',
     })
     expect(withoutMap).toHaveLength(3)
@@ -81,22 +79,19 @@ describe('metering point action helpers', () => {
       selectedZevId: null,
       isManagedScope: false,
       searchTerm: '',
-      statusFilter: 'all',
       typeFilter: 'all',
-      attentionFilter: 'all',
       needsAttentionByMeteringPoint: new Map([['mp-1', true]]),
     })
     expect(withMap).toHaveLength(3)
   })
 
-  it('narrows to flagged meters when the attention filter is "attention"', () => {
+  it('narrows to flagged meters in the "attention" view', () => {
     const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
       selectedZevId: null,
       isManagedScope: false,
       searchTerm: '',
-      statusFilter: 'all',
       typeFilter: 'all',
-      attentionFilter: 'attention',
+      view: 'attention',
       needsAttentionByMeteringPoint: new Map([
         ['mp-1', true],
         ['mp-2', false],
@@ -112,7 +107,6 @@ describe('metering point action helpers', () => {
       selectedZevId: null,
       isManagedScope: false,
       searchTerm: 'anna',
-      statusFilter: 'all',
       typeFilter: 'all',
       participantNamesByMeteringPoint: new Map([['mp-1', 'Anna Consumer']]),
     })
@@ -120,45 +114,24 @@ describe('metering point action helpers', () => {
     expect(filteredMeteringPoints.map((point) => point.id)).toEqual(['mp-1'])
   })
 
-  it('leaves every meter in when the assignment filter is "all"', () => {
+  it('leaves every meter in in the "all" view, whatever the assignments', () => {
     const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
       selectedZevId: null,
       isManagedScope: false,
       searchTerm: '',
-      statusFilter: 'all',
       typeFilter: 'all',
-      assignmentFilter: 'all',
       isAssignedByMeteringPoint: new Map([['mp-1', true]]),
     })
     expect(filteredMeteringPoints).toHaveLength(3)
   })
 
-  it('narrows to meters with a current holder when the assignment filter is "assigned"', () => {
+  it('narrows to meters without a current holder in the "unassigned" view', () => {
     const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
       selectedZevId: null,
       isManagedScope: false,
       searchTerm: '',
-      statusFilter: 'all',
       typeFilter: 'all',
-      assignmentFilter: 'assigned',
-      isAssignedByMeteringPoint: new Map([
-        ['mp-1', true],
-        ['mp-2', false],
-      ]),
-    })
-
-    // mp-3 has no entry at all — absence counts as unassigned, so it's excluded too.
-    expect(filteredMeteringPoints.map((point) => point.id)).toEqual(['mp-1'])
-  })
-
-  it('narrows to meters without a current holder when the assignment filter is "unassigned"', () => {
-    const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
-      selectedZevId: null,
-      isManagedScope: false,
-      searchTerm: '',
-      statusFilter: 'all',
-      typeFilter: 'all',
-      assignmentFilter: 'unassigned',
+      view: 'unassigned',
       isAssignedByMeteringPoint: new Map([
         ['mp-1', true],
         ['mp-2', false],

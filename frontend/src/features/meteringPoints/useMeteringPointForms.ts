@@ -25,10 +25,7 @@ export const defaultAssignmentForm = (meteringPointId = ''): MeteringPointAssign
   allocation_mode: 'personal',
 })
 
-export type MeteringPointStatusFilter = 'all' | 'active' | 'inactive'
 export type MeteringPointTypeFilter = 'all' | MeteringPoint['meter_type']
-/** Whether the meter has a holder *today* — mirrors `getMeteringPointCounts`' `assignedCount`. */
-export type MeteringPointAssignmentFilter = 'all' | 'assigned' | 'unassigned'
 /** `'all'`, or the id of one building (#890). */
 export type MeteringPointBuildingFilter = string
 export type BuildingGroup = { building: Building; points: MeteringPoint[] }
@@ -164,7 +161,6 @@ export function meteringPointNeedsAttention(
   return point.is_active && (health !== 'green' || holderLess)
 }
 
-export type MeteringPointAttentionFilter = 'all' | 'attention'
 
 export function meteringPointHealthBadgeClass(health: MeteringPointHealth): string {
   if (health === 'green') return 'badge badge-success'
@@ -182,10 +178,8 @@ export function meteringPointHealthBadgeClass(health: MeteringPointHealth): stri
 
 export const METERING_POINT_FILTER_KEYS = {
   search: 'search',
-  status: 'status',
+  view: 'view',
   type: 'type',
-  attention: 'attention',
-  assignment: 'assignment',
   building: 'building',
 } as const
 
@@ -193,18 +187,17 @@ export function readMeteringPointBuildingFilter(value: string | null): MeteringP
   return value || 'all'
 }
 
-export function readMeteringPointStatusFilter(value: string | null): MeteringPointStatusFilter {
-  return value === 'active' || value === 'inactive' ? value : 'all'
-}
-
 export function readMeteringPointTypeFilter(value: string | null): MeteringPointTypeFilter {
   return value === 'consumption' || value === 'production' || value === 'bidirectional' ? value : 'all'
 }
 
-export function readMeteringPointAttentionFilter(value: string | null): MeteringPointAttentionFilter {
-  return value === 'attention' ? 'attention' : 'all'
-}
+/**
+ * The list's one counted view (`FilterTabs`): a status, the meters without a
+ * holder today (as `getMeteringPointCounts`' `assignedCount` counts them), or
+ * those needing attention.
+ */
+export type MeteringPointView = 'all' | 'active' | 'inactive' | 'unassigned' | 'attention'
 
-export function readMeteringPointAssignmentFilter(value: string | null): MeteringPointAssignmentFilter {
-  return value === 'assigned' || value === 'unassigned' ? value : 'all'
+export function readMeteringPointView(value: string | null): MeteringPointView {
+  return value === 'active' || value === 'inactive' || value === 'unassigned' || value === 'attention' ? value : 'all'
 }

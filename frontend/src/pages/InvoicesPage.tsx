@@ -233,7 +233,7 @@ export function InvoicesContent() {
                 <InvoicesEmptyState />
             ) : (
                 <>
-                    <div className="invoice-filter-bar">
+                    <div className="list-filters">
                         <InvoiceRowFilterTabs counts={rowCounts} activeFilter={rowFilter} onFilterChange={setRowFilter} />
                         {rowFilter !== null && visibleRows.length > 0 && (
                             <p className="muted" role="status">

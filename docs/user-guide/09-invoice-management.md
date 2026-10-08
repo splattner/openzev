@@ -252,7 +252,7 @@ The filter above the table counts the period's rows: **All**, **Drafts**,
 **Approved**, **Sent** and **Issues** (rows with missing metering data, a
 generation conflict, a failed PDF, a failed email or no email address). Select one to show just
 those rows; select it again, **All** or **Show all rows** to clear it. A
-category with no rows cannot be selected. If the selected category empties,
+category with no rows, or with all of them, is left out. If the selected category empties,
 the page explains why and offers **Show all rows**. Paid invoices appear
 under **All** only. Changing period or community clears the filter.
 
@@ -271,7 +271,7 @@ while that invoice's delivery is checked.
 ## Generating Invoices
 
 1. Navigate to the desired billing period.
-2. Check the **Issues** filter — ensure metering data is complete for the participants you want to invoice.
+2. Check the **Issues** filter (shown only while there are issues) — ensure metering data is complete for the participants you want to invoice.
 3. Click **Generate invoice** on a participant's row, or the recommended batch
    action (*Generate n invoices*) in the command bar. Generating all runs in
    the background: each row shows *Creating invoice…* until its invoice

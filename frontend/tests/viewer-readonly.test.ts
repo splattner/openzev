@@ -40,7 +40,7 @@ describe('viewer read-only controls', () => {
 
     it('tariffs: no "New tariff" or import, but the overview PDF stays', async () => {
         const props = {
-            tariffCount: 1, energyTariffCount: 1, tariffsWithPeriodsCount: 0, periodCount: 0,
+            validCount: 1, totalCount: 1, hasOutOfForceVersions: false,
             validityFilter: 'all' as const, onValidityFilterChange: vi.fn(), onOpenCreateTariffModal: vi.fn(),
             onDownloadOverview: vi.fn(),
         }
