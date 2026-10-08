@@ -612,22 +612,22 @@ the closing date it will use as you pick the start date.
 > for it. The energy still appears on the invoice but is **charged at nothing** —
 > a whole month can be given away without any warning. Letting OpenZEV compute
 > the end date removes the off-by-one that causes this. Any series that already
-> has a gap is flagged on the tariff card.
+> has a gap is flagged on the tariff entry.
 
 You can also insert a version *between* two existing ones; OpenZEV bounds it on
 both sides.
 
 ### Comparing Versions
 
-The Tariffs page shows **one card per tariff**, displaying what it costs *today*
-rather than a card per version. A badge tells you how many versions it has.
+The Tariffs page shows **one entry per tariff**, displaying what it costs *today*
+rather than one entry per version. A badge tells you how many versions it has.
 Click **View details** to open a panel on the right with everything else:
 version history, the price chart, price bands, and notes.
 
 **Version history** lists every version with its window and price. Click one
 to make the *panel* show that version — its price bands switch to the ones in
 force then, and a **Viewing an older version** badge appears so you can't
-mistake a historical rate for the current one. The card behind the panel keeps
+mistake a historical rate for the current one. The entry behind the panel keeps
 showing the active version throughout, so switching versions to look something
 up never changes what the list itself reports. Click the active version to go
 back.

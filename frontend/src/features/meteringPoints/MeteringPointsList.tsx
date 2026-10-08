@@ -213,7 +213,7 @@ export function MeteringPointsList({
               <div className="metering-point-actions">
                 {isManagedScope && !readOnly && (
                   <button
-                    className="button button-primary button-compact"
+                    className="button button-primary button-outline button-compact"
                     type="button"
                     onClick={() => onOpenCreateAssignModal(point.id)}
                   >

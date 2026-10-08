@@ -853,23 +853,24 @@ export function ImportsContent() {
     return (
         <div className="page-stack">
             {canWriteSelectedCommunity && (
-            <section className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                <div>
-                    <h3 style={{ marginBottom: '0.3rem' }}>{t('pages.imports.startTitle')}</h3>
-                    <p className="muted" style={{ margin: 0 }}>{t('pages.imports.startDescription')}</p>
-                </div>
-                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                    <button type="button" className="button button-primary" onClick={() => setWizardOpen(true)}>
-                        <FontAwesomeIcon icon={faPlus} fixedWidth />
-                        {t('pages.imports.actions.newImport')}
-                    </button>
-                    {importLogs.length > 0 && (
-                        <button className="button button-danger" type="button" onClick={() => setShowBulkDeleteModal(true)}>
-                            <FontAwesomeIcon icon={faTrash} fixedWidth />
-                            {t('pages.imports.actions.deleteImports')}
+            <section className="card">
+                <div className="card-header">
+                    <h3>{t('pages.imports.startTitle')}</h3>
+                    <div className="actions-row actions-row-wrap">
+                        <button type="button" className="button button-primary" onClick={() => setWizardOpen(true)}>
+                            <FontAwesomeIcon icon={faPlus} fixedWidth />
+                            {t('pages.imports.actions.newImport')}
                         </button>
-                    )}
+                        {/* Rare and destructive: last, and quiet — the confirm dialog carries the weight. */}
+                        {importLogs.length > 0 && (
+                            <button className="button button-secondary button-destructive" type="button" onClick={() => setShowBulkDeleteModal(true)}>
+                                <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                {t('pages.imports.actions.deleteImports')}
+                            </button>
+                        )}
+                    </div>
                 </div>
+                <p className="muted m-0">{t('pages.imports.startDescription')}</p>
             </section>
             )}
 

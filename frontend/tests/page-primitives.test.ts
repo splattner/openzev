@@ -300,6 +300,38 @@ describe('StatCard', () => {
         expect(onPress).toHaveBeenCalledTimes(1)
     })
 
+    it.each([
+        [{ value: '439.55', unit: 'kWh' }, '439.55\u00a0kWh', 'kWh'],
+        [{ value: '35.4', unit: '%' }, '35.4\u00a0%', '%'],
+        [{ value: '\u2212548.31', currency: 'CHF' }, 'CHF\u00a0\u2212548.31', 'CHF'],
+    ])('sets the unit of %j apart from the figure, as the documents do', (props, text, unit) => {
+        const page = render(createElement(StatCard, { label: 'Figure', ...props }))
+        const heading = page.container.querySelector('section.stat-card h3')!
+        // Assistive technology reads figure and unit as one phrase.
+        expect(heading.textContent).toBe(text)
+        expect(heading.querySelector('.stat-figure')?.textContent).toBe(props.value)
+        expect(heading.querySelector('.stat-unit')?.textContent).toBe(unit)
+        expect(heading.querySelector('.stat-figure--text')).toBeNull()
+    })
+
+    it('shows a dash without its unit when there is no figure', () => {
+        const page = render(createElement(StatCard, { label: 'Rate', value: null, unit: '%' }))
+        const heading = page.container.querySelector('section.stat-card h3')!
+        expect(heading.textContent).toBe('—')
+        expect(heading.querySelector('.stat-unit')).toBeNull()
+    })
+
+    it.each([
+        ['05.10.2026 14:32', true],
+        ['1 von 8', true],
+        [8, false],
+    ])('lets %j wrap: %s', (value, wraps) => {
+        // A figure stays on one line; text that is not one (a date and time) may wrap.
+        const page = render(createElement(StatCard, { label: 'Value', value }))
+        expect(page.container.querySelector('.stat-figure')?.textContent).toBe(String(value))
+        expect(page.container.querySelector('.stat-figure--text') !== null).toBe(wraps)
+    })
+
     it('uses phrasing content for an unpressed toggle with a hint', () => {
         const page = render(createElement(StatCard, { label: 'Red', value: 2, hint: 'Missing readings', onPress: vi.fn(), pressed: false }))
         const button = page.container.querySelector('button')!

@@ -1005,6 +1005,7 @@ export const fr = {
             checkFailed: 'Impossible de vérifier la disponibilité du calculateur.',
             form: {
                 systemTitle: 'Installation & énergie',
+                energyInputModeLabel: 'Saisie de l’énergie',
                 energyInputModeAggregate: 'Agrégé',
                 energyInputModeParticipants: 'Participants',
                 participantsHint: 'Ajoutez chaque producteur, consommateur ou prosommateur (les deux à la fois). Les totaux ci-dessous sont calculés automatiquement.',

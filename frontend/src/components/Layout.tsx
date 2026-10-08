@@ -266,11 +266,13 @@ export function Layout() {
                 {/* Persistent scope context (replaces switcher on platform routes). */}
                 <div className="sidebar-fixed">
                     <div className="sidebar-brand-row">
+                        {/* Horizontal lockup of the logo; the wordmark names the app. */}
                         <div className="sidebar-brand">
+                            <img src="/brand/openzev-mark.png" alt="" className="sidebar-brand-mark" />
                             <img
-                                src="/openzevlogo_darkbg.png"
+                                src="/brand/openzev-wordmark-dark.png"
                                 alt={t('app.title')}
-                                className="sidebar-logo"
+                                className="sidebar-brand-wordmark"
                             />
                         </div>
                         <button
@@ -446,6 +448,65 @@ export function Layout() {
                     </nav>
                 </div>
                 <div className="sidebar-footer">
+                    <div
+                        className="user-menu sidebar-user"
+                        ref={userMenuRef}
+                        onBlur={(event) => {
+                            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsUserMenuOpen(false)
+                        }}
+                    >
+                        <button
+                            ref={userMenuTriggerRef}
+                            type="button"
+                            className="user-menu-trigger"
+                            aria-expanded={isUserMenuOpen}
+                            aria-controls="user-menu-list"
+                            // Collapsed, the name is hidden: the label names the button, the title shows it.
+                            aria-label={isNavigationCollapsed ? displayName : undefined}
+                            title={isNavigationCollapsed ? displayName : undefined}
+                            onClick={() => {
+                                setIsZevMenuOpen(false)
+                                // The panel needs the full width: expand a collapsed sidebar first.
+                                if (isNavigationCollapsed) {
+                                    setIsSidebarCollapsed(false)
+                                    setIsUserMenuOpen(true)
+                                } else {
+                                    setIsUserMenuOpen((prev) => !prev)
+                                }
+                            }}
+                        >
+                            <span className="user-avatar" aria-hidden="true">{initialsOf(displayName)}</span>
+                            <span className="user-meta">
+                                <strong>{displayName}</strong>
+                                <small>{user?.email}</small>
+                            </span>
+                            <span className="user-menu-caret" aria-hidden="true"><SelectorIcon /></span>
+                        </button>
+                        {isUserMenuOpen && (
+                            <div className="user-menu-dropdown" id="user-menu-list">
+                                <NavLink
+                                    to="/account"
+                                    className="user-menu-item"
+                                    onClick={() => setIsUserMenuOpen(false)}
+                                >
+                                    <span className="user-menu-item-icon"><AccountIcon /></span>
+                                    {t('account.title')}
+                                </NavLink>
+                                <div className="user-menu-section">
+                                    <div className="user-menu-section-title">{t('common.language')}</div>
+                                    <LanguageSelector variant="menu" />
+                                </div>
+                                <button
+                                    type="button"
+                                    className="user-menu-item"
+                                    onClick={logout}
+                                >
+                                    <span className="user-menu-item-icon"><LogoutIcon /></span>
+                                    {t('nav.logout')}
+                                </button>
+                            </div>
+                        )}
+                    </div>
                     <a
                         className="sidebar-github-link"
                         href="https://github.com/splattner/openzev"
@@ -463,19 +524,25 @@ export function Layout() {
 
             <div className="content">
                 <header className="top-nav">
-                    <button
-                        ref={mobileMenuButtonRef}
-                        type="button"
-                        className="mobile-menu-button"
-                        onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-                        aria-label={t('nav.menu')}
-                        aria-expanded={isMobileMenuOpen}
-                        aria-controls="app-sidebar"
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d="M3 12h18M3 6h18M3 18h18" />
-                        </svg>
-                    </button>
+                    <div className="mobile-bar">
+                        <button
+                            ref={mobileMenuButtonRef}
+                            type="button"
+                            className="mobile-menu-button"
+                            onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+                            aria-label={t('nav.menu')}
+                            aria-expanded={isMobileMenuOpen}
+                            aria-controls="app-sidebar"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M3 12h18M3 6h18M3 18h18" />
+                            </svg>
+                        </button>
+                        <span className="mobile-bar-brand" aria-hidden="true">
+                            <img src="/brand/openzev-mark.png" alt="" />
+                            <img src="/brand/openzev-wordmark-dark.png" alt="" />
+                        </span>
+                    </div>
 
                     {isImpersonating && impersonator && (
                         <div className="impersonation-banner" role="status">
@@ -505,57 +572,6 @@ export function Layout() {
                             </button>
                         </div>
                     )}
-
-                    <div
-                        className="user-menu"
-                        ref={userMenuRef}
-                        onBlur={(event) => {
-                            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsUserMenuOpen(false)
-                        }}
-                    >
-                        <button
-                            ref={userMenuTriggerRef}
-                            type="button"
-                            className="user-menu-trigger"
-                            aria-expanded={isUserMenuOpen}
-                            aria-controls="user-menu-list"
-                            onClick={() => {
-                                setIsZevMenuOpen(false)
-                                setIsUserMenuOpen((prev) => !prev)
-                            }}
-                        >
-                            <span className="user-avatar" aria-hidden="true">{initialsOf(displayName)}</span>
-                            <span className="user-meta">
-                                <strong>{displayName}</strong>
-                                <small>{user?.email}</small>
-                            </span>
-                        </button>
-
-                        {isUserMenuOpen && (
-                            <div className="user-menu-dropdown" id="user-menu-list">
-                                <NavLink
-                                    to="/account"
-                                    className="user-menu-item"
-                                    onClick={() => setIsUserMenuOpen(false)}
-                                >
-                                    <span className="user-menu-item-icon"><AccountIcon /></span>
-                                    {t('account.title')}
-                                </NavLink>
-                                <div className="user-menu-section">
-                                    <div className="user-menu-section-title">{t('common.language')}</div>
-                                    <LanguageSelector variant="menu" />
-                                </div>
-                                <button
-                                    type="button"
-                                    className="user-menu-item"
-                                    onClick={logout}
-                                >
-                                    <span className="user-menu-item-icon"><LogoutIcon /></span>
-                                    {t('nav.logout')}
-                                </button>
-                            </div>
-                        )}
-                    </div>
                 </header>
                 <main id="main-content" ref={mainRef} className="content-main" tabIndex={-1}>
                     <Outlet />
@@ -673,6 +689,10 @@ function AccountIcon() {
 
 function LogoutIcon() {
     return <IconSvg path="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9" />
+}
+
+function SelectorIcon() {
+    return <IconSvg path="m7 15 5 5 5-5M7 9l5-5 5 5" />
 }
 
 function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {

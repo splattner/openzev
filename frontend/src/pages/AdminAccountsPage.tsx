@@ -314,7 +314,7 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                 <StatCard label={t('pages.accounts.stats.neverSignedIn')} value={stats.neverSignedIn} />
             </section>
 
-            <section className="card">
+            <section>
                 <div className="participant-filter-grid">
                     <label>
                         <span>{t('pages.accounts.filters.search')}</span>

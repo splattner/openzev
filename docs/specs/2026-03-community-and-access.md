@@ -1629,9 +1629,17 @@ the community disclosure and move focus from hidden controls to a visible
 navigation control. Focus elsewhere is preserved.
 The shell's skip link, `main` landmark and focus after navigation follow
 SPEC-2026-04 §7.1. Opening one disclosure closes the other. The account
-disclosure in the top bar follows the same focus and dismissal rules while
-keeping its language choices as ordinary buttons; selecting a language leaves
-it open.
+disclosure sits at the sidebar foot (`.sidebar-footer .sidebar-user`; trigger
+with avatar, name and email; panel `#user-menu-list` opens upward with
+Account, the language choices and Logout), above the source-code link, which
+stays the last sidebar control. It follows the same focus and dismissal rules
+while keeping its language choices as ordinary buttons; selecting a language
+leaves it open. In the collapsed rail the trigger shows only the avatar (the
+name as its tooltip) and, like the switcher, expands the sidebar before
+opening. There is no account control in the page header: `header.top-nav`
+holds only the mobile app bar (`.mobile-bar`, ≤768px: menu button plus the
+decorative logo lockup, sticky) and, during impersonation, the impersonation
+banner; on desktop it is empty otherwise.
 Every ZEV-scoped page header carries the selected ZEV name as an eyebrow
 above the page title. My invoices, the one participant page that lists across
 every membership, shows the community name only when the account has exactly

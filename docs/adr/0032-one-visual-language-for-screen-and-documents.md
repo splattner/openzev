@@ -1,0 +1,133 @@
+# ADR 0032: One visual language for screen and documents
+
+- Status: Proposed
+- Date: 2026-10-08
+- Amends: ADR 0014 (decision 1: separate screen and print typefaces; the "PDF-only" document anatomy)
+- Related specs: `2026-08-ui-redesign-pdf-style` (baseline), `2026-04-frontend-management-page-design` (reference)
+
+## Context
+
+ADR 0014 made the app and its documents share tokens, brand and chart palette,
+but deliberately not their layout grammar or typeface: the screen kept Inter,
+print kept "Helvetica Neue". On the server, neither Helvetica nor Helvetica
+Neue is installed, so every PDF actually rendered in Liberation Sans (an Arial
+metric clone), with chart labels falling back to Noto Sans. The two surfaces
+read as relatives rather than as one product:
+
+- The invoice's most recognisable elements — the document header with its
+  hairline and short forest rule, sections opened by a forest dot, figure tiles
+  (kicker label, figure, small unit, one dark accent tile), the sage status pill
+  — appeared nowhere in the app.
+- The app's own chrome had drifted toward a generic dashboard: floating cards
+  with large shadows, cards nested in cards for every list record, a solid
+  primary button in every row, a top-right account card that cost a band of
+  vertical space on every page, a sidebar whose 150px logo pushed navigation
+  below the fold at 900px height.
+- Two of the five document templates (annual statement, tax overview) predated
+  the shared PDF base and used their own header, centred tiles and a static
+  footer.
+
+## Decision
+
+1. **One typeface.** Inter is the face of the app and of every generated
+   document. The backend images install Debian's `fonts-inter` (static OTFs,
+   embedded as CFF subsets in PDF/A-3b); `design/tokens.json`
+   `type.fontFamily.print` leads with `Inter` and the generator emits it as
+   `--font-print` (`backend/templates/pdf/_tokens.css`) and
+   `_CHART_FONT_FAMILY` (chart SVG roots, which do not inherit the document
+   font). The screen face is emitted as `--font-sans`. The app loads Inter's
+   optical-size axis, so display sizes use the display cut. **Exception:** the
+   Swiss QR-bill payment part keeps the fonts its standard permits (the `qrbill`
+   SVG renders in Liberation Sans).
+2. **Shared anatomy, in both directions.** The document elements become the
+   app's elements, and the remaining documents adopt them too:
+   - *Header signature* — page headers (and dialog headers) end in a hairline
+     with a short forest rule at its start, the documents' `.document-header`
+     rule; the scope kicker carries the brand dot.
+   - *Section heading* — sheet titles carry the forest dot of the invoice's
+     section headings.
+   - *Figure tiles* — KPI tiles use the documents' tile: uppercase kicker
+     label, the figure with its unit set small and muted, an optional hint,
+     at most one dark accent tile per view. Tiles in a row share label/figure/
+     hint tracks (CSS subgrid), so figures align like a printed row.
+   - *Status pill* — approved invoices wear the sage pill printed on the
+     invoice; table and list pills follow its fill-plus-hairline grammar.
+   - *Tables* — column labels are small uppercase kickers on a sunken band;
+     money and quantities are tabular and right-aligned.
+   - The annual statement and the tax overview move onto
+     `pdf/shared_pdf_base.html`, which now also holds the summary band
+     (recipient + facts), figure tiles, dotted sections, dark-header
+     `doc-table`, `summary-box` and the running footer used by all documents.
+3. **A quieter shell.** The sidebar is a white sheet with a hairline beside
+   the paper workspace: a horizontal logo lockup, compact navigation that fits
+   a 900px viewport, the current page as a pale forest row with a short forest
+   mark, and the signed-in account at its foot (account, language, log out)
+   instead of a top bar. On phones a white app bar carries the menu button and
+   the lockup. Forest is kept for what matters — the current page, the primary
+   action, the one accent figure — as the documents keep it for their rule,
+   table headers and accent card. Sheets are white with a hairline and no
+   floating shadow; depth is reserved for menus, dialogs and toasts.
+4. **Lists are ledgers, actions have one weight per level.** Management lists
+   (participants, metering points, tariffs) are hairline-separated rows of one
+   sheet, not cards in a card. Toolbars sit on the page without a sheet. Inside
+   rows, the main action is a forest outline and destructive actions are quiet
+   until hovered; the page's own primary action is the only solid button, and
+   confirm dialogs keep the solid red.
+
+## Consequences
+
+Positive:
+- A participant who opens the app and then the PDF sees the same typeface,
+  figures, pills, headings and rules.
+- PDFs gain a typeface designed for screens and small sizes (tabular figures
+  where the templates ask for them), and chart labels no longer fall back to a
+  third face.
+- Every page gains vertical room (no top bar, compact sidebar, lists without
+  cards in cards); row actions no longer compete with the page's primary
+  action.
+- One set of document components in the PDF base instead of per-template
+  copies.
+
+Trade-offs:
+- The backend image grows by the Inter OTFs (~21 MB installed). Deployments that build
+  their own image must add `fonts-inter`; without it the stack falls back to
+  the previous Helvetica/Arial chain and documents still render. Both
+  Dockerfiles fail the build when `fc-match Inter` resolves to another face,
+  so a missing font cannot ship unnoticed.
+- Inter is wider than Liberation Sans: some long line-item descriptions wrap
+  one line earlier. Page geometry (QR slip, running furniture) is unchanged.
+- Stored `PdfTemplate` overrides keep their own markup. They are flagged stale
+  because every default template changed here: the `default_digest` check
+  hashes only the template file, so a later change to
+  `pdf/shared_pdf_base.html` alone flags no override.
+- The app's labels and table headers are uppercase kickers (via CSS
+  `text-transform`, never in translation strings), as on the documents; they
+  are kept short and set at 11px with tracking.
+
+## Alternatives considered
+
+1. **Keep two typefaces (ADR 0014 decision 1).** Rejected: the "print face" was
+   in practice whatever metric clone the container had, and it was the single
+   biggest visible difference between app and documents.
+2. **Helvetica-like face on screen.** Rejected: Inter is the better screen face
+   and is free to embed; moving the documents to it costs one package.
+3. **Ship the font inside the templates as a `data:` URI.** Rejected: every
+   render would carry ~300 KB of base64, and stored overrides would have to copy
+   it; a system font keeps templates small and the fetcher policy unchanged.
+4. **Keep a forest sidebar.** The first iteration of this decision made the
+   sidebar the app's one dark surface. Rejected in review: the large dark
+   area outweighed the content and competed with the forest accents that carry
+   meaning (current page, primary action, accent figure); the documents, too,
+   are white paper with forest accents.
+5. **Copy the PDF layout 1:1 onto screens (a "document" app).** Rejected for the
+   reasons in ADR 0014: dense operational screens need sentence-case labels in
+   forms, light table bands, and no gradient chrome — the shared elements are
+   the ones that carry meaning (rules, dots, tiles, pills, type), not the page
+   geometry.
+
+## Notes
+
+- Tokens: `design/tokens.json` (`--line-strong`; semantics `--text-heading`,
+  `--border-strong`, `--surface-sunken`, `--accent-rule`, `--sidebar-text`,
+  `--sidebar-indicator`; field tokens 14px/500 labels, 8px radius).
+- Specs: `2026-08-ui-redesign-pdf-style.md` §15, `2026-04-frontend-management-page-design.md`.

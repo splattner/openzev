@@ -131,7 +131,7 @@ for (const [path, endpoint, body] of [
   ['/admin/accounts/users', '/auth/users/', 'table'],
   ['/admin/zevs', '/zev/zevs/', 'table'],
   ['/billing/invoices', '/invoices/invoices/period-overview/', '.empty-state'],
-  ['/billing/invoices/1', '/invoices/invoices/1/', '.badge-sent'],
+  ['/billing/invoices/1', '/invoices/invoices/1/', '.invoice-detail-meta .badge'],
 ]) {
   test(`${path} keeps one title across loading, error and content states`, async ({ page }) => {
     let release!: () => void
@@ -336,10 +336,12 @@ test('long German headers and narrow tile containers fit at desktop and mobile w
     mountPageLayout()
   }, '/screenshots/fixtures/page-layout.tsx')
   const fixture = page.locator('#page-layout-fixture')
-  for (const width of [1440, 400]) {
+  // The page title is set like the documents' page heading: 700, 28px (24px on phones).
+  for (const [width, titleSize] of [[1440, '28px'], [400, '24px']] as const) {
     await page.setViewportSize({ width, height: 900 })
     await expect(fixture.locator('.page-header-text')).toHaveCSS('min-width', '0px')
-    await expect(fixture.locator('h1')).toHaveCSS('font-weight', '650')
+    await expect(fixture.locator('h1')).toHaveCSS('font-weight', '700')
+    await expect(fixture.locator('h1')).toHaveCSS('font-size', titleSize)
     for (const selector of ['.page-header', '.page-header-actions', '.toolbar', '.toolbar-actions', '.stat-grid']) {
       const overflow = await fixture.locator(selector).evaluate(element => element.scrollWidth - element.clientWidth)
       expect(overflow, `${selector} overflow at ${width}px`).toBeLessThanOrEqual(1)

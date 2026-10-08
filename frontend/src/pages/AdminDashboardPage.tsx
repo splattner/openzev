@@ -4,7 +4,7 @@ import { StatCard } from '../components/StatCard'
 import { fetchDashboardStats } from '../lib/api/invoices'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { queryKeys } from '../lib/api/queryKeys'
-import { formatChf } from '../lib/numbers'
+import { formatChfAmount } from '../lib/numbers'
 import { PageHeader } from '../components/PageHeader'
 import { Notice } from '../components/Notice'
 import { Link } from 'react-router-dom'
@@ -64,7 +64,7 @@ export function AdminDashboardPage({ embedded = false }: { embedded?: boolean })
             <div className="grid grid-3">
                 <StatCard label={t('entity.zevs')} value={stats.zevs.total} />
                 <StatCard label={t('entity.participants')} value={stats.participants.total} />
-                <StatCard label={t('invoice.totalRevenue')} value={formatChf(stats.invoices.total_revenue)} accent />
+                <StatCard label={t('invoice.totalRevenue')} value={formatChfAmount(stats.invoices.total_revenue)} currency="CHF" accent />
             </div>
 
             <div className="card">

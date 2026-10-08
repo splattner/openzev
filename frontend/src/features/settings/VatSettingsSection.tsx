@@ -107,7 +107,8 @@ export function VatSettingsSection() {
                 <StatCard label={t('adminVatSettings.stats.total')} value={vatRates.length} />
                 <StatCard
                     label={t('adminVatSettings.stats.active')}
-                    value={activeVatRate ? `${(Number(activeVatRate.rate) * 100).toFixed(2)}%` : t('adminVatSettings.stats.none')}
+                    value={activeVatRate ? (Number(activeVatRate.rate) * 100).toFixed(2) : t('adminVatSettings.stats.none')}
+                    unit={activeVatRate ? '%' : undefined}
                 />
                 <StatCard label={t('adminVatSettings.stats.scheduled')} value={futureVatRatesCount} />
             </section>

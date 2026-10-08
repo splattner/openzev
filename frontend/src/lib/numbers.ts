@@ -25,7 +25,16 @@ export function formatPercent(
     { maxDecimals = 1 }: { maxDecimals?: number } = {},
 ): string {
     if (!Number.isFinite(value)) return '–'
-    return `${formatNumber(value, { maxDecimals })}\u00a0%`
+    return `${formatPercentFigure(value, { maxDecimals })}\u00a0%`
+}
+
+/** A percentage without the sign, for a figure whose unit is set apart (`StatCard`). */
+export function formatPercentFigure(
+    value: number,
+    { maxDecimals = 1 }: { maxDecimals?: number } = {},
+): string {
+    if (!Number.isFinite(value)) return '–'
+    return formatNumber(value, { maxDecimals })
 }
 
 /**

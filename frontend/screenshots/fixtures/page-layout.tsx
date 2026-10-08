@@ -20,9 +20,11 @@ export function mountPageLayout() {
         <span>Teilnehmerzuordnungen und Abrechnungszeiträume</span>
       </Toolbar>
       <section className="stat-grid stat-grid--wide" style={{ width: 200 }}>
-        <StatCard label="Gesamter Stromverbrauch aus Netz und Gemeinschaft" value="1’234’567.9 kWh" />
-        <StatCard label="Abrechnungsbetrag" value="CHF 1’234’567.89" />
-        <StatCard label="Eigenverbrauchsanteil" value="37.5 %" />
+        <StatCard label="Gesamter Stromverbrauch aus Netz und Gemeinschaft" value="1’234’567.9" unit="kWh" />
+        <StatCard label="Abrechnungsbetrag" value="1’234’567.89" currency="CHF" />
+        <StatCard label="Eigenverbrauchsanteil" value="37.5" unit="%" />
+        {/* Text that is not a figure (a backup's date and time) wraps instead of spilling. */}
+        <StatCard label="Letzte erfolgreiche Sicherung" value="05.10.2026, 14:32:17" />
       </section>
     </div>,
   )

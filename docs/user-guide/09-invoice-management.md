@@ -302,10 +302,12 @@ Click the invoice number in the **Participant** column to view the invoice detai
 
 ![Invoice detail page](screenshots/08b-invoice-detail.png)
 
-The detail page shows:
+The page header names the invoice and, next to the recipient and the billing
+period, its current **status** — the same status pill the invoice document
+prints. Below it, two rows of figure tiles summarise the invoice the way its
+PDF does:
 
-- **Status card** — current invoice status as a badge.
-- **Total CHF** — the final invoiced amount.
+- **Total CHF** (the dark tile) — the final invoiced amount.
 - **Subtotal CHF** — amount before VAT.
 - **VAT CHF** — the VAT portion.
 
@@ -317,7 +319,7 @@ The detail page shows:
 | Grid kWh | Energy drawn from the external grid. |
 | Feed-in kWh | Energy fed back into the grid. |
 
-**The invoice document** — the stored PDF itself is embedded below the summary cards in a full document viewer (the same file the participant receives by email). It contains the line items, grouped by **tariff category** (e.g. Energy, Fee),
+**The invoice document** — the stored PDF itself is embedded below the figure tiles in a full document viewer (the same file the participant receives by email). It contains the line items, grouped by **tariff category** (e.g. Energy, Fee),
 with each line's type, description, quantity (kWh), unit price (CHF), and
 total, plus a subtotal per group. If no PDF has been generated yet, the page shows a **Generate PDF** button instead (managers and admins only — a participant sees a plain document-unavailable message, since the API rejects their generation attempt); the viewer appears once the document exists.
 

@@ -291,7 +291,7 @@ describe('ReportsPage annual report', () => {
         const kpis = container.querySelector('.kpi-row')!
         expect(kpis.textContent).toContain('40\u00a0%')
         expect(kpis.textContent).toContain('pages.reports.annualReport.hints.previousYear')
-        expect(kpis.textContent).toContain('CHF 0.40')
+        expect(kpis.textContent).toContain('CHF\u00a00.40')
         expect(container.textContent).toContain('pages.reports.annualReport.trend.title')
 
         const rows = Array.from(container.querySelectorAll('.participant-table tbody tr'))

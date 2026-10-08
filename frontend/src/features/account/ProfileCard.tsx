@@ -78,7 +78,7 @@ export function ProfileCard() {
                 </button>
             </form>
 
-            <hr style={{ margin: '1.25rem 0' }} />
+            <hr />
             <EmailChangeForm />
         </div>
     )

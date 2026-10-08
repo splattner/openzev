@@ -1005,6 +1005,7 @@ export const it = {
             checkFailed: 'Impossibile verificare la disponibilità del calcolatore.',
             form: {
                 systemTitle: 'Impianto & energia',
+                energyInputModeLabel: 'Inserimento dell’energia',
                 energyInputModeAggregate: 'Aggregato',
                 energyInputModeParticipants: 'Partecipanti',
                 participantsHint: 'Aggiungi ogni produttore, consumatore o prosumer (entrambi). I totali sottostanti vengono sommati automaticamente.',

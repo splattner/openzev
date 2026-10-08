@@ -56,7 +56,7 @@ test('settings general tab matches native and Mantine geometry', async ({ page }
   const { natives, mantine } = await heights(page.locator('main'))
   expectUniform('settings', natives, mantine)
 
-  // Shared contract: 16px values, 16px/400 labels, 14px helpers, 12px radius.
+  // Shared contract: 16px values, 14px/500 labels, 13px helpers, 8px radius.
   const css = await page.evaluate(() => {
     const cs = (sel: string, prop: keyof CSSStyleDeclaration) => {
       const el = document.querySelector(sel) as HTMLElement | null
@@ -71,11 +71,11 @@ test('settings general tab matches native and Mantine geometry', async ({ page }
     }
   })
   expect(css, 'field contract').toEqual({
-    labelFz: '16px',
-    labelFw: '400',
+    labelFz: '14px',
+    labelFw: '500',
     valueFz: '16px',
-    descFz: '14px',
-    radius: '12px',
+    descFz: '13px',
+    radius: '8px',
   })
 
   // Descriptions render below their input, never between label and input.
@@ -165,7 +165,7 @@ test('field states and icon spacing survive native CSS', async ({ page }) => {
       return getComputedStyle(probe).color
     }
     const result = {
-      border: resolve('--border-default'),
+      border: resolve('--border-strong'),
       focus: resolve('--mantine-primary-color-filled'),
       error: resolve('--mantine-color-error'),
       success: resolve('--mantine-color-success'),

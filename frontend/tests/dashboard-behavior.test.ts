@@ -416,10 +416,10 @@ describe('dashboard behavior preservation', () => {
 
         // Community KPIs stay ZEV-wide.
         const kpiRow = container.querySelector('.kpi-row')
-        expect(kpiRow?.textContent).toContain('100 kWh')
-        expect(kpiRow?.textContent).toContain('80 kWh')
-        expect(kpiRow?.textContent).toContain('20 kWh')
-        expect(kpiRow?.textContent).toContain('40 kWh')
+        expect(kpiRow?.textContent).toContain('100\u00a0kWh')
+        expect(kpiRow?.textContent).toContain('80\u00a0kWh')
+        expect(kpiRow?.textContent).toContain('20\u00a0kWh')
+        expect(kpiRow?.textContent).toContain('40\u00a0kWh')
 
         // Balance chart heading is filtered to the participant.
         const balanceHeading = Array.from(container.querySelectorAll('h3')).find((h) =>

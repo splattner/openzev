@@ -189,7 +189,7 @@ net-metered in the year:
 - every `monthly_data[].self_sufficiency_pct` and
   `totals.self_sufficiency_pct` becomes `None`, and the template renders `—`;
 - context gains `has_behind_meter_generation: True`, and the template renders
-  a note below the monthly table (new translation key `behind_meter_note` in
+  a note below the figure tiles (new translation key `behind_meter_note` in
   all four languages of `ANNUAL_TRANSLATIONS`):
   - de: "Ihre Photovoltaikanlage liegt hinter dem Zähler. Erfasst werden nur der eingespeiste Überschuss und der Netzbezug; Ihr Eigenverbrauch direkt ab Anlage ist nicht enthalten. Deshalb wird keine Autarkie ausgewiesen."
   - en: "Your PV system sits behind your meter. Only the surplus fed in and the energy drawn from the grid are recorded; what you use directly from your system is not included. No self-sufficiency rate is therefore shown."

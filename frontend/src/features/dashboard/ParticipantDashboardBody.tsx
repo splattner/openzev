@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchHourlyProfile, fetchMeteringDashboardSummary } from '../../lib/api/metering'
 import { fetchInvoices } from '../../lib/api/invoices'
 import { queryKeys } from '../../lib/api/queryKeys'
-import { formatKwh, formatPercent } from '../../lib/numbers'
-import { dashboardKwhStat, fromZevRate, kwhTick } from '../../lib/dashboardFormatting'
+import { formatKwh, formatPercentFigure } from '../../lib/numbers'
+import { dashboardKwhFigure, fromZevRate, kwhTick } from '../../lib/dashboardFormatting'
 import { useAuth } from '../../lib/auth'
 import { personalInvoiceFilter, selectedCommunityName } from '../../lib/membership'
 import { useManagedZev } from '../../lib/managedZev'
@@ -102,12 +102,10 @@ export function ParticipantDashboardBody({ interval, period, onPeriodChange, per
 
     return (
         <>
-            <section className="card">
-                <div className="grid">
-                    {interval && <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={onPeriodChange} />}
-                    <div className="inline-form inline-form--narrow">
-                        <ResolutionSelect value={bucket} onChange={setBucket} />
-                    </div>
+            <section className="filter-bar">
+                {interval && <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={onPeriodChange} />}
+                <div className="filter-bar-fields">
+                    <ResolutionSelect value={bucket} onChange={setBucket} />
                 </div>
             </section>
 
@@ -120,16 +118,17 @@ export function ParticipantDashboardBody({ interval, period, onPeriodChange, per
             {summary && summary.summary_kind === 'participant' && (
                 <>
                     <section className="stat-grid stat-grid--wide">
-                        <StatCard label={t('pages.dashboard.participantStats.consumedFromZev')} value={dashboardKwhStat(summary.totals.consumed_from_zev_kwh)} />
-                        <StatCard label={t('pages.dashboard.participantStats.importedFromGrid')} value={dashboardKwhStat(summary.totals.imported_from_grid_kwh)} />
+                        <StatCard label={t('pages.dashboard.participantStats.consumedFromZev')} value={dashboardKwhFigure(summary.totals.consumed_from_zev_kwh)} unit="kWh" />
+                        <StatCard label={t('pages.dashboard.participantStats.importedFromGrid')} value={dashboardKwhFigure(summary.totals.imported_from_grid_kwh)} unit="kWh" />
                         <StatCard
                             label={t('pages.dashboard.participantStats.totalConsumption')}
-                            value={dashboardKwhStat(summary.totals.total_consumed_kwh)}
+                            value={dashboardKwhFigure(summary.totals.total_consumed_kwh)} unit="kWh"
                             hint={summary.has_behind_meter_generation ? t(behindMeterHintKey('own', summary.gross_energy)) : undefined}
                         />
                         <StatCard
                             label={t('pages.dashboard.participantStats.fromZevShare')}
-                            value={participantFromZev ? formatPercent(participantFromZev.pct) : '—'}
+                            value={participantFromZev ? formatPercentFigure(participantFromZev.pct) : null}
+                            unit="%"
                             hint={
                                 summary.has_behind_meter_generation
                                     ? t(behindMeterHintKey('own', summary.gross_energy))

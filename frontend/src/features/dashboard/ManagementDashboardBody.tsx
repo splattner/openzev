@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { fetchHourlyProfile, fetchMeteringDashboardSummary } from '../../lib/api/metering'
 import { queryKeys } from '../../lib/api/queryKeys'
-import { formatKwh, formatPercent } from '../../lib/numbers'
-import { dashboardKwhStat, fromZevRate, kwhTick } from '../../lib/dashboardFormatting'
+import { formatKwh, formatPercentFigure } from '../../lib/numbers'
+import { dashboardKwhFigure, fromZevRate, kwhTick } from '../../lib/dashboardFormatting'
 import { useAuth } from '../../lib/auth'
 import { useManagedZev } from '../../lib/managedZev'
 import { useEnergyDataEligibility } from '../../lib/supplementary'
@@ -122,30 +122,28 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
 
     return (
         <>
-            <section className="card">
-                <div className="grid">
-                    {interval && <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={onPeriodChange} />}
-                    <div className="inline-form grid grid-2">
-                        <label>
-                            <span>{t('pages.dashboard.participant')}</span>
-                            <select value={selectedParticipantId} onChange={(e) => setSelectedParticipantId(e.target.value)}>
-                                <option value="">{t('pages.dashboard.allParticipants')}</option>
-                                {selectedParticipantId && !participantStats.some((participant) => participant.participant_id === selectedParticipantId) && (
-                                    <option value={selectedParticipantId}>
-                                        {selectedParticipantName}
-                                        {ownParticipantIds.includes(selectedParticipantId) ? ` (${t('pages.dashboard.youBadge')})` : ''}
-                                    </option>
-                                )}
-                                {participantStats.map((participant) => (
-                                    <option key={participant.participant_id} value={participant.participant_id}>
-                                        {participant.participant_name || participant.participant_id}
-                                        {ownParticipantIds.includes(participant.participant_id) ? ` (${t('pages.dashboard.youBadge')})` : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                        <ResolutionSelect value={bucket} onChange={setBucket} />
-                    </div>
+            <section className="filter-bar">
+                {interval && <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={onPeriodChange} />}
+                <div className="filter-bar-fields">
+                    <label>
+                        <span>{t('pages.dashboard.participant')}</span>
+                        <select value={selectedParticipantId} onChange={(e) => setSelectedParticipantId(e.target.value)}>
+                            <option value="">{t('pages.dashboard.allParticipants')}</option>
+                            {selectedParticipantId && !participantStats.some((participant) => participant.participant_id === selectedParticipantId) && (
+                                <option value={selectedParticipantId}>
+                                    {selectedParticipantName}
+                                    {ownParticipantIds.includes(selectedParticipantId) ? ` (${t('pages.dashboard.youBadge')})` : ''}
+                                </option>
+                            )}
+                            {participantStats.map((participant) => (
+                                <option key={participant.participant_id} value={participant.participant_id}>
+                                    {participant.participant_name || participant.participant_id}
+                                    {ownParticipantIds.includes(participant.participant_id) ? ` (${t('pages.dashboard.youBadge')})` : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                    <ResolutionSelect value={bucket} onChange={setBucket} />
                 </div>
             </section>
 
@@ -162,7 +160,8 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
                         <StatCard
                             accent
                             label={t('pages.dashboard.stats.selfConsumptionRate')}
-                            value={ownerSelfConsumption ? formatPercent(ownerSelfConsumption.pct) : '—'}
+                            value={ownerSelfConsumption ? formatPercentFigure(ownerSelfConsumption.pct) : null}
+                            unit="%"
                             hint={
                                 ownerSelfConsumption
                                     ? t('pages.dashboard.hints.selfConsumption', {
@@ -172,10 +171,10 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
                                     : undefined
                             }
                         />
-                        <StatCard label={t('pages.dashboard.stats.producedInZev')} value={dashboardKwhStat(summary.zev_totals.produced_kwh)} />
-                        <StatCard label={t('pages.dashboard.stats.consumedInZev')} value={dashboardKwhStat(summary.zev_totals.consumed_kwh)} />
-                        <StatCard label={t('pages.dashboard.stats.importedFromGrid')} value={dashboardKwhStat(summary.zev_totals.imported_kwh)} />
-                        <StatCard label={t('pages.dashboard.stats.exportedToGrid')} value={dashboardKwhStat(summary.zev_totals.exported_kwh)} />
+                        <StatCard label={t('pages.dashboard.stats.producedInZev')} value={dashboardKwhFigure(summary.zev_totals.produced_kwh)} unit="kWh" />
+                        <StatCard label={t('pages.dashboard.stats.consumedInZev')} value={dashboardKwhFigure(summary.zev_totals.consumed_kwh)} unit="kWh" />
+                        <StatCard label={t('pages.dashboard.stats.importedFromGrid')} value={dashboardKwhFigure(summary.zev_totals.imported_kwh)} unit="kWh" />
+                        <StatCard label={t('pages.dashboard.stats.exportedToGrid')} value={dashboardKwhFigure(summary.zev_totals.exported_kwh)} unit="kWh" />
                     </section>
                     {summary.zev_has_behind_meter_generation && <p className="muted">{t('behindMeter.zevNote')}</p>}
                     {showOwnBlock && summary.own_gross_energy && (

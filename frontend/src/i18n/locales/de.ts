@@ -1005,6 +1005,7 @@ export const de = {
             checkFailed: 'Die Verfügbarkeit des Rechners konnte nicht geprüft werden.',
             form: {
                 systemTitle: 'Anlage & Energie',
+                energyInputModeLabel: 'Energieeingabe',
                 energyInputModeAggregate: 'Gesamt',
                 energyInputModeParticipants: 'Teilnehmer',
                 participantsHint: 'Fügen Sie jeden Produzenten, Verbraucher oder Prosumer (mit beidem) hinzu. Die Summen unten werden automatisch berechnet.',

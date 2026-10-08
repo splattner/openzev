@@ -140,7 +140,7 @@ export function TariffCategorySections({
                                                 </button>
                                             )}
                                             <button
-                                                className="button button-primary button-compact"
+                                                className="button button-primary button-outline button-compact"
                                                 type="button"
                                                 aria-expanded={isOpen}
                                                 onClick={() => onOpenDetail(series)}

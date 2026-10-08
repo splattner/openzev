@@ -25,7 +25,7 @@ import {
 } from '../features/feasibility/useFeasibilityForm'
 import { calculateFeasibility, fetchFeasibilityCalculatorEnabled } from '../lib/api/feasibility'
 import { formatApiError } from '../lib/api/errors'
-import { formatChf, formatKwh, formatNumber, formatPercent } from '../lib/numbers'
+import { formatChf, formatChfAmount, formatKwh, formatNumber, formatPercentFigure } from '../lib/numbers'
 import { queryKeys } from '../lib/api/queryKeys'
 import { PageHeader } from '../components/PageHeader'
 import { PageSkeleton } from '../components/PageSkeleton'
@@ -118,16 +118,17 @@ function FeasibilityCalculator() {
                 }
             >
                 <form className="card page-stack" onSubmit={(event) => event.preventDefault()}>
-                    <h3 style={{ marginTop: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                        {t('pages.feasibility.form.systemTitle')}
+                    <div className="card-header">
+                        <h3>{t('pages.feasibility.form.systemTitle')}</h3>
                         <select
                             {...form.register('energy_input_mode')}
-                            style={{ width: 'auto', fontSize: '0.78rem', padding: '0.1rem 0.3rem' }}
+                            className="select-compact"
+                            aria-label={t('pages.feasibility.form.energyInputModeLabel')}
                         >
                             <option value="aggregate">{t('pages.feasibility.form.energyInputModeAggregate')}</option>
                             <option value="participants">{t('pages.feasibility.form.energyInputModeParticipants')}</option>
                         </select>
-                    </h3>
+                    </div>
 
                     {watchedValues.energy_input_mode === 'participants' ? (
                         <div>
@@ -266,18 +267,19 @@ function FeasibilityCalculator() {
                                 className="stat-grid"
                                 style={{ opacity: mutation.isPending ? 0.6 : 1, transition: 'opacity 0.15s' }}
                             >
-                                <StatCard label={t('pages.feasibility.results.annualNetBenefit')} value={formatChf(Number(result.annual_net_benefit_chf))} />
+                                <StatCard label={t('pages.feasibility.results.annualNetBenefit')} value={formatChfAmount(Number(result.annual_net_benefit_chf))} currency="CHF" />
                                 <StatCard
                                     label={t('pages.feasibility.results.payback')}
                                     value={result.payback_years !== null ? t('pages.feasibility.results.years', { count: formatNumber(Number(result.payback_years), { minDecimals: 1, maxDecimals: 1 }) }) : t('pages.feasibility.results.never')}
                                 />
                                 <StatCard
                                     label={t('pages.feasibility.results.roi')}
-                                    value={result.roi !== null ? formatPercent(Number(result.roi) * 100) : '—'}
+                                    value={result.roi !== null ? formatPercentFigure(Number(result.roi) * 100) : null}
+                                    unit="%"
                                 />
-                                <StatCard label={t('pages.feasibility.results.npv')} value={formatChf(Number(result.npv_chf))} hint={t('pages.feasibility.results.npvHint')} />
-                                <StatCard label={t('pages.feasibility.results.selfConsumed')} value={`${formatKwh(Number(result.self_consumed_kwh), { maxDecimals: 0 })} kWh`} />
-                                <StatCard label={t('pages.feasibility.results.autarky')} value={formatPercent(Number(result.autarky_rate) * 100, { maxDecimals: 0 })} />
+                                <StatCard label={t('pages.feasibility.results.npv')} value={formatChfAmount(Number(result.npv_chf))} currency="CHF" hint={t('pages.feasibility.results.npvHint')} />
+                                <StatCard label={t('pages.feasibility.results.selfConsumed')} value={formatKwh(Number(result.self_consumed_kwh), { maxDecimals: 0 })} unit="kWh" />
+                                <StatCard label={t('pages.feasibility.results.autarky')} value={formatPercentFigure(Number(result.autarky_rate) * 100, { maxDecimals: 0 })} unit="%" />
                             </section>
 
                             <section className="card page-stack">

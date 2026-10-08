@@ -321,8 +321,9 @@ pages look the same, just without data.
    Unlinked guest accounts see an explanation and a link to **Account settings**.
 
 The interface follows your browser's language (German, French, Italian or
-English). To change it, open the account menu at the top right
-and pick a **Language**; the choice is remembered in this browser. Invoice and
+English). To change it, open the account menu at the foot of the sidebar
+(your name) and pick a **Language**; the choice is remembered in this browser.
+The same menu leads to **Account** settings and **Log out**. Invoice and
 contract PDFs use the community's own **Invoice language** instead.
 
 ![Login page](screenshots/01-login.png)

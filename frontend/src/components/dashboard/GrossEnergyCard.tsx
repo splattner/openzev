@@ -5,8 +5,8 @@ import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, T
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { AXIS_COLOR, CHART_GRIDLINE, CHART_LOCAL, FLOW_GRID_EXP, FLOW_LOCAL_CONS } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
-import { dashboardKwhStat, kwhTick } from '../../lib/dashboardFormatting'
-import { formatKwh, formatPercent } from '../../lib/numbers'
+import { dashboardKwhFigure, kwhTick } from '../../lib/dashboardFormatting'
+import { formatKwh, formatPercent, formatPercentFigure } from '../../lib/numbers'
 import { grossRate, withheldReasonKey } from '../../lib/supplementary'
 import type { GrossEnergy } from '../../types/api'
 import { StatCard } from '../StatCard'
@@ -59,19 +59,21 @@ export function GrossEnergyCard({ gross, whose, participantName, formatBucketLab
             <div className="stat-grid stat-grid--wide">
                 <StatCard
                     label={t('supplementary.gross.selfSufficiency')}
-                    value={selfSufficiency === null ? '—' : formatPercent(selfSufficiency)}
+                    value={selfSufficiency === null ? null : formatPercentFigure(selfSufficiency)}
+                    unit="%"
                     hint={reasonKey ? t(reasonKey) : t('supplementary.gross.selfSufficiencyHint')}
                 />
                 <StatCard
                     label={t('supplementary.gross.selfConsumptionRate')}
-                    value={selfConsumption === null ? '—' : formatPercent(selfConsumption)}
+                    value={selfConsumption === null ? null : formatPercentFigure(selfConsumption)}
+                    unit="%"
                     hint={reasonKey ? t(reasonKey) : t('supplementary.gross.selfConsumptionRateHint')}
                 />
-                <StatCard label={t('supplementary.gross.production')} value={dashboardKwhStat(gross.production_kwh)} />
-                <StatCard label={t('supplementary.gross.consumption')} value={dashboardKwhStat(gross.consumption_kwh)} />
-                <StatCard label={t('supplementary.gross.selfConsumption')} value={dashboardKwhStat(gross.self_consumption_kwh)} />
-                <StatCard label={t('supplementary.gross.import')} value={dashboardKwhStat(gross.import_kwh)} />
-                <StatCard label={t('supplementary.gross.export')} value={dashboardKwhStat(gross.export_kwh)} />
+                <StatCard label={t('supplementary.gross.production')} value={dashboardKwhFigure(gross.production_kwh)} unit="kWh" />
+                <StatCard label={t('supplementary.gross.consumption')} value={dashboardKwhFigure(gross.consumption_kwh)} unit="kWh" />
+                <StatCard label={t('supplementary.gross.selfConsumption')} value={dashboardKwhFigure(gross.self_consumption_kwh)} unit="kWh" />
+                <StatCard label={t('supplementary.gross.import')} value={dashboardKwhFigure(gross.import_kwh)} unit="kWh" />
+                <StatCard label={t('supplementary.gross.export')} value={dashboardKwhFigure(gross.export_kwh)} unit="kWh" />
             </div>
 
             {timeline.length > 0 && (

@@ -351,7 +351,7 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         const zevAvatar = page.container.querySelector('.sidebar-zev-menu .user-avatar')
         expect(zevAvatar?.textContent).toBe('MZ')
         expect(zevAvatar?.getAttribute('aria-hidden')).toBe('true')
-        const userAvatar = page.container.querySelector('.top-nav .user-avatar')
+        const userAvatar = page.container.querySelector('.sidebar-user .user-avatar')
         expect(userAvatar?.textContent).toBe('TU')
         page.unmount()
     })
@@ -370,7 +370,7 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         Object.assign(mockAuth().user, { first_name: name, last_name: '', username: '' })
         const page = await renderLayout()
         try {
-            expect(page.container.querySelector('.top-nav .user-avatar')?.textContent).toBe(initials)
+            expect(page.container.querySelector('.sidebar-user .user-avatar')?.textContent).toBe(initials)
         } finally {
             page.unmount()
         }
@@ -380,7 +380,7 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         mockSession('participant')
         Object.assign(mockAuth().user, { first_name: '', last_name: '', username: 'marina' })
         const page = await renderLayout()
-        expect(page.container.querySelector('.top-nav .user-avatar')?.textContent).toBe('M')
+        expect(page.container.querySelector('.sidebar-user .user-avatar')?.textContent).toBe('M')
         page.unmount()
     })
 
@@ -630,7 +630,7 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
     it('closes the user menu on Escape', async () => {
         mockSession('admin')
         const page = await renderLayout()
-        const trigger = page.container.querySelector('.top-nav .user-menu-trigger') as HTMLElement
+        const trigger = page.container.querySelector('.sidebar-user .user-menu-trigger') as HTMLElement
         await act(async () => {
             trigger.dispatchEvent(new MouseEvent('click', { bubbles: true }))
         })
@@ -647,7 +647,7 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
     it('keeps language selection available and closes the account panel when focus leaves', async () => {
         mockSession('admin')
         const page = await renderLayout()
-        const trigger = page.container.querySelector('.top-nav .user-menu-trigger') as HTMLElement
+        const trigger = page.container.querySelector('.sidebar-user .user-menu-trigger') as HTMLElement
         await act(async () => trigger.click())
         const languageButtons = Array.from(
             page.container.querySelectorAll<HTMLButtonElement>('.language-selector-button'),
@@ -705,7 +705,7 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
     it('opening one disclosure closes the other', async () => {
         mockSession('admin')
         const page = await renderLayout()
-        const userTrigger = page.container.querySelector('.top-nav .user-menu-trigger') as HTMLElement
+        const userTrigger = page.container.querySelector('.sidebar-user .user-menu-trigger') as HTMLElement
         const zevTrigger = page.container.querySelector('.sidebar-zev-menu .user-menu-trigger') as HTMLElement
         await act(async () => zevTrigger.click())
         expect(page.container.querySelector('#zev-menu-list')).not.toBe(null)
@@ -732,6 +732,35 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         } finally {
             window.localStorage.removeItem('openzev.sidebarCollapsed')
         }
+    })
+
+    it('expands the collapsed sidebar before opening the account panel at its foot', async () => {
+        window.localStorage.setItem('openzev.sidebarCollapsed', 'true')
+        try {
+            mockSession('admin')
+            const page = await renderLayout()
+            const trigger = page.container.querySelector('.sidebar-footer .sidebar-user .user-menu-trigger') as HTMLElement
+            // Collapsed, the trigger is the avatar alone and names the account.
+            expect(trigger.getAttribute('title')).toBe('Test User')
+            await act(async () => trigger.click())
+            expect(page.container.querySelector('.shell.shell-collapsed')).toBe(null)
+            expect(page.container.querySelector('#user-menu-list')).not.toBe(null)
+            expect(document.activeElement?.getAttribute('href')).toBe('/account')
+            page.unmount()
+        } finally {
+            window.localStorage.removeItem('openzev.sidebarCollapsed')
+        }
+    })
+
+    it('keeps the source link the last control of the sidebar, after the account', async () => {
+        mockSession('admin')
+        const page = await renderLayout()
+        const footer = page.container.querySelector('.sidebar-footer') as HTMLElement
+        const controls = Array.from(footer.querySelectorAll<HTMLElement>('a[href], button'))
+        expect(controls[0].classList.contains('user-menu-trigger')).toBe(true)
+        expect(controls.at(-1)?.classList.contains('sidebar-github-link')).toBe(true)
+        expect(page.container.querySelector('.top-nav .user-menu')).toBeNull()
+        page.unmount()
     })
 
     it('focuses the empty community panel when no options are available', async () => {

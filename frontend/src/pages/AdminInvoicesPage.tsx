@@ -119,7 +119,7 @@ export function AdminInvoicesContent() {
                 enableSorting: false,
                 meta: { numeric: false },
                 cell: (ctx) => (
-                    <InvoiceActionButton compact={false} action={{
+                    <InvoiceActionButton action={{
                         label: t('adminInvoices.delete'),
                         onClick: () => handleDelete(ctx.row.original),
                         disabled: deleteMutation.isPending,

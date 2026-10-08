@@ -47,9 +47,9 @@
   --interactive: var(--brand-mid);
   --interactive-hover: var(--brand);
   --sidebar-active: var(--brand-pale);
-  --sidebar-bg: var(--brand-deep);
-  --sidebar-indicator: var(--gold);
-  --sidebar-text: var(--brand-accent);
+  --sidebar-bg: var(--white);
+  --sidebar-indicator: var(--brand-mid);
+  --sidebar-text: var(--ink-soft);
   --status-cancelled: var(--neutral-100);
   --status-danger: var(--danger-100);
   --status-draft: var(--neutral-100);

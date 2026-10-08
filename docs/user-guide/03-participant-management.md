@@ -58,12 +58,12 @@ the original community; its completion leaves a new draft in another community o
 **Same person or organisation as** (at the top of the form) adds a second
 participation of someone already in the community — for example after a move
 to another flat within it. Name, contact and address are then taken from the
-existing party and stay shared: editing them on one card changes them on every
-card of that party.
+existing party and stay shared: editing them on one entry changes them on every
+entry of that party.
 
-The participant is added to the list. A card flagged **Needs attention** is
+The participant is added to the list. An entry flagged **Needs attention** is
 missing an email address, a postal address or a metering point; the
-**Readiness** filter narrows the list to those cards.
+**Readiness** filter narrows the list to those entries.
 
 ## Participant Account Access
 
@@ -79,11 +79,11 @@ Participants **cannot**:
 - Manage ZEV settings
 - Create tariffs or invoices
 
-Each participant card shows the **Account** it is linked to, or *No account
+Each participant entry shows the **Account** it is linked to, or *No account
 yet*, plus an onboarding status badge (*Not invited*, *Invited*, *Active*,
 *Revoked*, *Expired*). While a link is live — or after it has expired — the
-card also shows its expiry date beside the badge, so you can see when a dead
-link died without resending it. Open **More** on a card to send or copy the participant's onboarding link
+entry also shows its expiry date beside the badge, so you can see when a dead
+link died without resending it. Open **More** on an entry to send or copy the participant's onboarding link
 (which creates the account), or to revoke it. The link stays usable for 30 days and can be
 reused within that time — copying or resending it hands out the same link,
 unless it has expired, in which case a fresh one is issued automatically. Once
@@ -95,21 +95,21 @@ it belongs to; see [Roles and Permissions](11-roles-and-permissions.md).
 If unlinking fails, an error notification appears even if you closed the
 confirmation while it was processing. Open **Unlink** again to retry.
 
-A card also shows the roles the participant holds in the community today:
+An entry also shows the roles the participant holds in the community today:
 **Issuer** (the invoices and contracts are from them), **Representative**
-(toward the grid operator) and **Landowner**. The issuer's card comes first.
+(toward the grid operator) and **Landowner**. The issuer's entry comes first.
 
 ### A Participant Forgot Their Password
 
 There is no "forgot password" link on the login page. Send or copy the
-participant's onboarding link again from **More** on their card: it signs
+participant's onboarding link again from **More** on their entry: it signs
 them in, and they then choose a new password. If their invoices carry the
 [participant QR code](02-zev-setup.md#participant-access-from-the-invoice),
 they can also request a sign-in link themselves from the page it opens.
 
 ## Participation Contract
 
-**Contract PDF** on a participant's card downloads their participation
+**Contract PDF** on a participant's entry downloads their participation
 contract, filled from the ZEV settings (including the contract notes on the
 **Documents & emails** tab), the participant's details and the tariffs.
 
@@ -121,7 +121,7 @@ issues a new numbered version, and the earlier ones stay on record.
 ## Editing Participant Details
 
 1. Go to **Participants**
-2. Click **Edit** on the participant's card
+2. Click **Edit** on the participant's entry
 3. Update fields as needed
 4. Click **Save Participant**
 
@@ -166,9 +166,9 @@ this setting at all.
 
 ![Allocation weight on the participant form](screenshots/03b-participant-allocation-weight.png)
 
-Current participants' cards show today's allocation-weight share. For example,
+Current participants' entries show today's allocation-weight share. For example,
 with three current participants weighted `1`, `1`, and `2`, each of the first two
-cards shows:
+entries shows:
 
 ```
 ALLOCATION WEIGHT
@@ -230,7 +230,7 @@ When someone leaves the community, **end their membership instead of deleting
 them**:
 
 1. Go to **Participants**
-2. Click **Edit** on the participant's card
+2. Click **Edit** on the participant's entry
 3. Set **Valid To** to the participant's last active date
 4. Click **Save Participant**
 
@@ -245,7 +245,7 @@ the participant.
 
 ### Onboarding Email
 
-**Send onboarding link** (under **More** on the card) emails the participant
+**Send onboarding link** (under **More** on the entry) emails the participant
 their onboarding link. Nothing is sent automatically when you add a
 participant. The email text is an admin-managed template — see
 [Email Configuration](10-email-configuration.md).
@@ -270,7 +270,7 @@ Participant records are kept permanently for:
 
 **Participant cannot login**
 - Check that the participant's email is correct — it is their sign-in name
-- Check the onboarding badge on their card: *Expired* or *Revoked* links no
+- Check the onboarding badge on their entry: *Expired* or *Revoked* links no
   longer work; send a new one
 - For a forgotten password, see [above](#a-participant-forgot-their-password)
 

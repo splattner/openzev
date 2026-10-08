@@ -172,15 +172,18 @@ export function PeriodSelector({
 
     return (
         <div className={compact ? 'period-selector period-selector--compact' : 'period-selector'}>
+            {/* Steppers show their arrow; the label names them (visually hidden
+                beside the range, which says what is being stepped). */}
             <button
-                className={compact ? 'button button-secondary period-selector-step' : 'button button-secondary'}
+                className="button button-secondary period-selector-step"
                 type="button"
                 onClick={() => previous && onChange(previous)}
                 disabled={!canGoPrevious}
-                {...(compact ? { 'aria-label': t('pages.invoices.prevPeriod'), title: t('pages.invoices.prevPeriod') } : {})}
+                title={t('pages.invoices.prevPeriod')}
+                {...(compact ? { 'aria-label': t('pages.invoices.prevPeriod') } : {})}
             >
                 <FontAwesomeIcon icon={compact ? faChevronLeft : faArrowLeft} fixedWidth />
-                {!compact && t('pages.invoices.prevPeriod')}
+                {!compact && <span className="visually-hidden">{t('pages.invoices.prevPeriod')}</span>}
             </button>
 
             <Popover
@@ -244,13 +247,14 @@ export function PeriodSelector({
             </Popover>
 
             <button
-                className={compact ? 'button button-secondary period-selector-step' : 'button button-secondary'}
+                className="button button-secondary period-selector-step"
                 type="button"
                 onClick={() => onChange(step(1))}
                 disabled={!canStep}
-                {...(compact ? { 'aria-label': t('pages.invoices.nextPeriod'), title: t('pages.invoices.nextPeriod') } : {})}
+                title={t('pages.invoices.nextPeriod')}
+                {...(compact ? { 'aria-label': t('pages.invoices.nextPeriod') } : {})}
             >
-                {!compact && t('pages.invoices.nextPeriod')}
+                {!compact && <span className="visually-hidden">{t('pages.invoices.nextPeriod')}</span>}
                 <FontAwesomeIcon icon={compact ? faChevronRight : faArrowRight} fixedWidth />
             </button>
         </div>

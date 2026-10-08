@@ -200,6 +200,10 @@ export function ParticipantCardsSection({
                     >
                         <div className="participant-card-header">
                             <div className="participant-card-title">
+                                <div className="participant-card-heading">
+                                    <strong>{displayName}</strong>
+                                    {participant.name_addition && <span className="muted">{participant.name_addition}</span>}
+                                </div>
                                 <div className="participant-card-badges">
                                     {roles.map((role) => (
                                         <span key={role} className="badge badge-info">{t(`pages.participants.roles.${role}`)}</span>
@@ -231,13 +235,11 @@ export function ParticipantCardsSection({
                                         </span>
                                     )}
                                 </div>
-                                <strong>{displayName}</strong>
-                                {participant.name_addition && <span className="muted">{participant.name_addition}</span>}
                             </div>
 
                             <div className="participant-card-actions">
                                 {!readOnly && (
-                                    <button className="button button-primary button-compact" type="button" onClick={() => onStartEdit(participant)}>
+                                    <button className="button button-secondary button-compact" type="button" onClick={() => onStartEdit(participant)}>
                                         <FontAwesomeIcon icon={faPen} fixedWidth />
                                         {t('common.edit')}
                                     </button>

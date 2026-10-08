@@ -1014,6 +1014,7 @@ export const en = {
             checkFailed: 'Could not check calculator availability.',
             form: {
                 systemTitle: 'System & energy',
+                energyInputModeLabel: 'Energy input',
                 energyInputModeAggregate: 'Aggregate',
                 energyInputModeParticipants: 'Participants',
                 participantsHint: 'Add each producer, consumer, or prosumer (a participant with both). Totals below are summed automatically.',

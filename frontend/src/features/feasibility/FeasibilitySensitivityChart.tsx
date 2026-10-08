@@ -52,7 +52,7 @@ export function FeasibilitySensitivityChart({ sensitivity, currentRatePct, curre
 
     return (
         <div>
-            <h4 style={{ margin: '0 0 0.2rem' }}>{t('pages.feasibility.chart.sensitivityTitle')}</h4>
+            <h4 className="section-title">{t('pages.feasibility.chart.sensitivityTitle')}</h4>
             <p className="muted" style={{ margin: '0 0 0.6rem', fontSize: '0.85rem' }}>
                 {t('pages.feasibility.chart.sensitivityDescription')}
             </p>

@@ -75,7 +75,7 @@ export function FeasibilityPriceSensitivityChart({
 
     return (
         <div>
-            <h4 style={{ margin: '0 0 0.2rem' }}>{t('pages.feasibility.chart.priceSensitivityTitle')}</h4>
+            <h4 className="section-title">{t('pages.feasibility.chart.priceSensitivityTitle')}</h4>
             <p className="muted" style={{ margin: '0 0 0.3rem', fontSize: '0.85rem' }}>
                 {t('pages.feasibility.chart.priceSensitivityDescription')}
             </p>

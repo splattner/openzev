@@ -25,7 +25,8 @@ for (const language of ['en', 'de']) {
     await expect(history.locator('.email-log-error')).toContainText('SMTP_error_')
     for (const width of [1440, 400]) {
       await page.setViewportSize({ width, height: 900 })
-      await expect(history).toHaveCSS('padding', width === 400 ? '16px' : '32px')
+      // The sheet's header runs edge to edge, so the sheet has no top inset.
+      await expect(history).toHaveCSS('padding', width === 400 ? '0px 16px 16px' : '0px 28px 28px')
       expect(await history.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
       await page.screenshot({ path: testInfo.outputPath(`email-history-${language}-${width}.png`) })
     }
