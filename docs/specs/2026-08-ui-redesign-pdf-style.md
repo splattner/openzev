@@ -1126,6 +1126,9 @@ contracts are unchanged.
   titles use `.section-title`.
 - Admin accounts: the filter panel is no longer a sheet. Admin invoices: the
   delete action is compact (quiet destructive).
+- Overview: period cards (`.overview-period-card`) are plain sheets like the
+  current-period row, without a coloured top edge; the status pill carries
+  the tone.
 - Login: §7.5.
 
 ### 15.5 Documents

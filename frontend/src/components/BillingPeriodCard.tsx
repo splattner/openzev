@@ -48,7 +48,7 @@ export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
     const completedSteps = detailSteps.filter((step) => !isOpenStep(step))
 
     return (
-        <article className={`card overview-period-card overview-period-card--${tone}`}>
+        <article className="card overview-period-card">
             <header>
                 <p className="eyebrow">{year}</p>
                 <h3>{sameMonth ? startMonth : `${startMonth} – ${endMonth}`}</h3>
