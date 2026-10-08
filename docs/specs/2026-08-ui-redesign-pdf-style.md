@@ -356,7 +356,7 @@ A `rg --pcre2 '#[0-9a-fA-F]{3,8}\b' frontend/src` inventory is committed as a Ph
 ### 7.4 Tables
 
 - Plain tables (`.page-stack table`) + the shared `frontend/src/components/DataTable.tsx` (TanStack) styled by the `.data-table` CSS contract (sticky header, `td.numeric`, hover). The planned bridging module `frontend/src/lib/dataGridTheme.ts` was never needed — MUI was retired in one sweep rather than re-themed first.
-- Sticky `thead` on the sunken band (`--surface-sunken`) with uppercase kicker labels (`0.6875rem / 650 / 0.05em`, `--text-body`), `44px` rows (`height: 2.75rem`) at `0.875rem`, `1px solid var(--border-default)` separators (none under the last row), `hover: var(--surface)`, `selected: var(--brand-pale)`; quantities/money `text-align:right` + `tabular-nums`; DataTable cells `0.75rem` horizontal padding; `td code` identifiers never wrap. The documents keep their dark `--brand-deep` header (`.line-items`, `.doc-table`); the app keeps light headers. Zebra `var(--zebra)` optional (documents keep it; UI uses it only where scans benefit).
+- Sticky `thead` on the documents' dark header band (`--brand-deep`, same-colour bottom border; outer corners `--radius-sm` for a table outside a sheet) with white uppercase kicker labels (`0.6875rem / 650 / 0.05em`; sort buttons inherit the colour); `44px` rows (`height: 2.75rem`) at `0.875rem`, `1px solid var(--border-default)` separators (none under the last row), `hover: var(--surface)`, `selected: var(--brand-pale)`; quantities/money `text-align:right` + `tabular-nums`; DataTable cells `0.75rem` horizontal padding; `td code` identifiers never wrap. The documents' `.line-items` and `.doc-table` use the same `--brand-deep` header. `.participant-table` uses the same band. Inside a sheet (`.card`, `.table-card`) a table fills it edge to edge: a table, `.table-scroll` or `.data-table` that is a direct child of the sheet, or of a classless `div` or `.page-stack` directly inside it, takes `margin-inline: calc(-1 * var(--sheet-pad-inline))` (a bare `table` also `width: calc(100% + 2 * var(--sheet-pad-inline))`), and its outer cells pad by `--sheet-pad-inline` so their text lines up with the sheet's title; the band's corners are square. When that table is the sheet's first child it also takes `margin-top: calc(-1 * var(--sheet-pad-block))` and the sheet's inner top corners (`calc(var(--radius-lg) - 1px)`). The rules sit behind `:where()` so a component layout can override them: the stacked invoice rows (`@container (max-width: 46rem)`, no visible band) keep the sheet's top inset and pad each row card by `--sheet-pad-inline`, with dividers still running edge to edge. Zebra `var(--zebra)` optional (documents keep it; UI uses it only where scans benefit).
 - Row actions (`td > .button`, `.actions-cell-content > .button`): a primary action renders as a forest outline, a destructive one quiet (paper, `--danger-700` text, red tint on hover); only the page's own primary action is solid (§15).
 
 ### 7.5 Cards and chrome
@@ -1020,13 +1020,14 @@ contracts are unchanged.
   `--text-heading` semibold plus an `--interactive` check. Otherwise the
   eyebrow is plain text (behaviour: `2026-03-community-and-access.md` §9.3).
 - Sheets (`.card`, `.table-card`): white, hairline, `--radius-lg`,
-  `--shadow-sheet`, padding `1.25rem 1.5rem`. Sheet titles — the first `h2/h3`
-  of a sheet, the `h2/h3` of a sheet-leading unclassed `div` title block or of a
-  leading `.toolbar`, `.card-header > h2/h3`, and `.section-title` — get
-  `1rem/650` in `--text-heading`, without decoration (a title may still carry
-  its own status `.dot`, e.g. health probes). `.card-header` lays out a title and a control on
-  one line. A `form` directly in a sheet stacks its fields with `1rem` gaps.
-  Empty states are dashed blank sheets with centred text.
+  `--shadow-sheet`, padding `var(--sheet-pad-block) var(--sheet-pad-inline)`
+  (smaller on phones). Sheet titles — the first `h2/h3` of a sheet, the
+  `h2/h3` of a sheet-leading unclassed `div` title block or of a leading
+  `.toolbar`, `.card-header > h2/h3`, and `.section-title` — are set in
+  `--text-heading`, without decoration (a title may still carry its own status
+  `.dot`, e.g. health probes). `.card-header` lays out a title and a control
+  on one line. A `form` directly in a sheet stacks its fields. Empty states
+  are dashed blank sheets with centred text.
 - Filter bar (`.filter-bar`, `.filter-bar-fields`, `.filter-bar-note`): the
   period selector and the view's filters on one line, set on the page (no
   sheet). The fields wrap as one group: `.filter-bar-fields` has a flex basis

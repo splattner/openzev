@@ -139,8 +139,8 @@ label > small.muted {
 }
 
 /* ── Tables — the documents' line items in screen form ──────────────────────
-   Kicker-style column labels on a sunken band, hairline rows, tabular
-   figures right-aligned. */
+   Kicker-style column labels in white on the documents' dark forest header
+   band, hairline rows, tabular figures right-aligned. */
 .page-stack table,
 .data-table table {
   width: 100%;
@@ -230,7 +230,7 @@ label > small.muted {
 .participant-table thead tr th {
   position: sticky;
   top: 0;
-  background: var(--surface-sunken);
+  background: var(--brand-deep);
   z-index: 3;
 }
 
@@ -303,12 +303,24 @@ label > small.muted {
   top: 0;
   z-index: 1;
   padding-block: 0.55rem;
+  border-bottom-color: var(--brand-deep);
   font-size: 0.6875rem;
   font-weight: 650;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--text-body);
-  background: var(--surface-sunken);
+  color: var(--white);
+  background: var(--brand-deep);
+}
+
+/* The band's outer corners follow the sheet's. */
+.page-stack thead th:first-child,
+.data-table thead th:first-child {
+  border-top-left-radius: var(--radius-sm);
+}
+
+.page-stack thead th:last-child,
+.data-table thead th:last-child {
+  border-top-right-radius: var(--radius-sm);
 }
 
 .data-table thead th {
@@ -1631,7 +1643,56 @@ label > small.muted {
 
 .card,
 .table-card {
-  padding: 1.25rem 1.5rem;
+  --sheet-pad-block: 1.25rem;
+  --sheet-pad-inline: 1.5rem;
+
+  padding: var(--sheet-pad-block) var(--sheet-pad-inline);
+}
+
+/* A table fills its sheet edge to edge, as the line items fill the
+   documents' measure: the dark band meets the sheet's sides, and its top
+   too when the table opens the sheet. The outer columns keep the sheet's
+   inset, so their text still lines up with the sheet's title. Kept at low
+   specificity (:where) so a component's own layout can override it. */
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table),
+:is(.card, .table-card) > :where(.page-stack, div:not([class])) > :where(table, .table-scroll, .data-table) {
+  margin-inline: calc(-1 * var(--sheet-pad-inline));
+}
+
+:is(.card, .table-card) > table,
+:is(.card, .table-card) > :where(.page-stack, div:not([class])) > table {
+  width: calc(100% + 2 * var(--sheet-pad-inline));
+  max-width: none;
+}
+
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table) :where(th, td):first-child,
+:is(.card, .table-card) > :where(.page-stack, div:not([class])) > :where(table, .table-scroll, .data-table) :where(th, td):first-child {
+  padding-inline-start: var(--sheet-pad-inline);
+}
+
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table) :where(th, td):last-child,
+:is(.card, .table-card) > :where(.page-stack, div:not([class])) > :where(table, .table-scroll, .data-table) :where(th, td):last-child {
+  padding-inline-end: var(--sheet-pad-inline);
+}
+
+/* Square band corners where it crosses the sheet; the sheet's own inner
+   corners where it opens it. */
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table) thead th:is(:first-child, :last-child),
+:is(.card, .table-card) > :where(.page-stack, div:not([class])) > :where(table, .table-scroll, .data-table) thead th:is(:first-child, :last-child) {
+  border-radius: 0;
+}
+
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table):first-child {
+  margin-top: calc(-1 * var(--sheet-pad-block));
+  border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
+}
+
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table):first-child thead th:first-child {
+  border-top-left-radius: calc(var(--radius-lg) - 1px);
+}
+
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table):first-child thead th:last-child {
+  border-top-right-radius: calc(var(--radius-lg) - 1px);
 }
 
 /* A sheet's title: the documents' section heading (invoice page 3
@@ -3638,6 +3699,17 @@ input.recurrence-chip-input {
     padding-top: 0.2rem;
   }
 
+  /* No band to meet the sheet's top: the cards start at its inset, their
+     dividers still run edge to edge. */
+  .table-card.invoice-rows > table:first-child {
+    margin-top: 0;
+  }
+
+  .table-card.invoice-rows tbody tr {
+    padding-inline: var(--sheet-pad-inline);
+  }
+
+  .table-card.invoice-rows tbody td,
   .invoice-rows tbody td,
   .invoice-rows tbody tr:hover > td {
     width: auto;
@@ -4364,7 +4436,10 @@ fieldset.form-grid {
   /* Cards: reduce padding */
   .card,
   .table-card {
-    padding: 1rem;
+    --sheet-pad-block: 1rem;
+    --sheet-pad-inline: 1rem;
+
+    padding: var(--sheet-pad-block) var(--sheet-pad-inline);
   }
 }
 

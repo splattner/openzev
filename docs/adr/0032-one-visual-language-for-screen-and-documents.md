@@ -52,8 +52,11 @@ read as relatives rather than as one product:
      hint tracks (CSS subgrid), so figures align like a printed row.
    - *Status pill* — approved invoices wear the sage pill printed on the
      invoice; table and list pills follow its fill-plus-hairline grammar.
-   - *Tables* — column labels are small uppercase kickers on a sunken band;
-     money and quantities are tabular and right-aligned.
+   - *Tables* — column labels are small white uppercase kickers on the
+     documents' dark forest header band (`--brand-deep`), sticky. A table
+     fills its sheet edge to edge, as line items fill a document's measure:
+     the band meets the sheet's sides, and its rounded top when the table
+     opens the sheet; money and quantities are tabular and right-aligned.
    - *Charts* — one energy palette from the brand, on screen and in the PDFs:
      forest for production and energy from the community, amber for the grid,
      sage for feed-in, slate for consumption, dark ink for percentage lines
@@ -127,7 +130,13 @@ Trade-offs:
    area outweighed the content and competed with the forest accents that carry
    meaning (current page, primary action, accent figure); the documents, too,
    are white paper with forest accents.
-5. **Copy the PDF layout 1:1 onto screens (a "document" app).** Rejected for the
+5. **A pale forest table header (the dark band at screen weight).** Shipped
+   first, out of concern that a dark band on every table would outweigh the
+   content and the primary action. Replaced in review: with the darker page
+   tone and the deep-forest primary button, the dark band ties each table to
+   the documents' line items without dominating, and the pale band read as a
+   tint rather than as the documents' header.
+6. **Copy the PDF layout 1:1 onto screens (a "document" app).** Rejected for the
    reasons in ADR 0014: dense operational screens need sentence-case labels in
    forms and no gradient chrome — the shared elements are
    the ones that carry meaning (rules, tiles, pills, type), not the page
