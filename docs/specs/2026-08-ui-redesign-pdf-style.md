@@ -124,6 +124,7 @@ The schema is purpose-built (no external token framework). DTCG 2025.10 (`.token
     "--success-600": "#15803d",
     "--success-700": "#166534",
     "--surface": "#f8faf7",
+    "--canvas": "#f2f5f0",
     "--violet-200": "#ddd6fe",
     "--warning-100": "#fef9c3",
     "--warning-200": "#fde68a",
@@ -137,7 +138,7 @@ The schema is purpose-built (no external token framework). DTCG 2025.10 (`.token
 
 Semantic examples (final map decided in Phase 0; names below are normative):
 
-- `--app-bg` → `var(--surface)` (replaces `index.css:4 #f8fafc` + sky radials `index.css:25-28`)
+- `--app-bg` → `var(--canvas)` (`#f2f5f0`, one step darker than the documents' `--surface` paper so white sheets and the white sidebar stand off the page; replaces `index.css:4 #f8fafc` + sky radials `index.css:25-28`)
 - `--surface-card` → `var(--white)` with `border: var(--line)` (replaces `card`/`table-card` `rgba(255,255,255,0.9)` / `rgba(148,163,184,0.2)`); semantics always alias primitives — never raw hex
 - `--text-primary` → `var(--ink)`; `--text-body` → `var(--ink-soft)`; `--text-muted` → `var(--muted)`
 - `--border-default` → `var(--line)`; `--border-subtle` → `var(--line-subtle)`
@@ -539,7 +540,8 @@ This is the anchor the UI shares, not a spec to copy verbatim (see §5.1). The P
 | `--muted` | `#64748b` | labels, eyebrows, meta | `--text-muted` |
 | `--line` | `#e2e8f0` | borders, row seps | `--border-default` |
 | `--line-subtle` | `#f1f5f9` | subtle seps | `--border-subtle` |
-| `--surface` | `#f8faf7` | warm paper | `--app-bg` (replaces `#f8fafc` + sky radials) |
+| `--surface` | `#f8faf7` | warm paper | row hover, sunken panels inside sheets |
+| `--canvas` | `#f2f5f0` | screen-only page tone | `--app-bg` (replaces `#f8fafc` + sky radials) |
 | `--brand` | `#143828` | forest mid-dark | `--interactive-hover` |
 | `--brand-deep` | `#0d2b1d` | darkest forest | dark table headers, accent tiles, headings |
 | `--brand-mid` | `#1f5c3a` | interactive green | `--interactive`, `--focus-ring`, selection accent |
@@ -931,6 +933,10 @@ contracts are unchanged.
   `--field-radius 0.5rem`, `--field-label-size 0.875rem`,
   `--field-label-weight 500`, `--field-help-size 0.8125rem` (height stays
   `2.75rem`); `type.fontFamily.print` leads with `Inter`.
+- Page tone: primitive `--canvas #f2f5f0` (screen only) and `--app-bg` →
+  `var(--canvas)`. The page sits one step darker than the documents' paper
+  (`--surface`, which stays for row hover and inset panels), so white sheets,
+  fields and the white sidebar stand off it without heavier borders.
 - `scripts/generate-tokens.mjs` validates both font stacks (non-empty, no
   `;{}<>`) and emits `--font-sans`, `--font-print` and `_CHART_FONT_FAMILY`
   (§4.2).
