@@ -54,6 +54,10 @@ read as relatives rather than as one product:
      invoice; table and list pills follow its fill-plus-hairline grammar.
    - *Tables* — column labels are small uppercase kickers on a sunken band;
      money and quantities are tabular and right-aligned.
+   - *Charts* — one energy palette from the brand, on screen and in the PDFs:
+     forest for production and energy from the community, amber for the grid,
+     sage for feed-in, slate for consumption, dark ink for percentage lines
+     (no teal, violet or blue ramps).
    - The annual statement and the tax overview move onto
      `pdf/shared_pdf_base.html`, which now also holds the summary band
      (recipient + facts), figure tiles, dotted sections, dark-header

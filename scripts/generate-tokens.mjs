@@ -95,7 +95,7 @@ function validate(tokens) {
   }
 
   // charts: required keys, hex literals or arrays of hex
-  const requiredCharts = ['local', 'grid', 'ink', 'muted', 'gridline', 'axis', 'bg', 'label', 'flowLocalCons', 'flowGridExp', 'prodColors', 'consColors', 'othersColor', 'axisColor', 'annotationColor', 'positiveColor', 'negativeColor', 'divergingPositive']
+  const requiredCharts = ['local', 'grid', 'ink', 'muted', 'gridline', 'axis', 'bg', 'label', 'ratio', 'flowLocalCons', 'flowGridExp', 'prodColors', 'consColors', 'othersColor', 'axisColor', 'annotationColor', 'positiveColor', 'negativeColor', 'divergingPositive']
   for (const k of requiredCharts) {
     assert(tokens.charts[k] !== undefined, `Missing charts key: ${k}`)
   }
@@ -255,6 +255,7 @@ function generateChartTokensTs(tokens) {
     CHART_GRIDLINE: c.gridline,
     CHART_AXIS: c.axis,
     CHART_LABEL: c.label,
+    CHART_RATIO: c.ratio,
     FLOW_LOCAL_CONS: c.flowLocalCons,
     FLOW_GRID_EXP: c.flowGridExp,
     OTHERS_COLOR: c.othersColor,

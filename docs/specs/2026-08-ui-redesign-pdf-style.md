@@ -175,12 +175,29 @@ _CHART_GRIDLINE = "#e8edeb"
 _CHART_AXIS  = "#94a3b8"
 _CHART_BG    = "#fbfcfb"   # = --chart-surface
 _CHART_LABEL = "#334155"   # = --ink-soft
-_FLOW_LOCAL_CONS = "#0e7490"
-_FLOW_GRID_EXP   = "#7c3aed"
-PROD_COLORS  = ["#1f5c3a", "#2f7a4d", "#15803d", "#0f766e", ...]
-CONS_COLORS  = ["#1d4ed8", "#2563eb", "#1e40af", ...]
+_FLOW_LOCAL_CONS = "#0e7490"   # teal: local consumption
+_FLOW_GRID_EXP   = "#6f9f82"   # sage: feed-in
+PROD_COLORS  = ["#1f5c3a", "#2f7a4d", "#3d8b5c", "#4d9b6a", "#15803d", "#5aa877"]
+CONS_COLORS  = ["#64748b", "#475569", "#7b8794", "#334155", "#8a96a8", "#56657a"]
+_DIVERGING_POSITIVE = "#1f5c3a"   # positive half of the forest/red diverging pair
 _CHART_LABEL_ON_FILL = "#fff"   # = charts.labelOnFill — on-bar white labels
 ```
+
+**One energy palette, from the brand (ADR 0032).** Every chart, on
+screen and in the PDFs, encodes the same meanings: forest (`local`,
+`prodColors`) is production and energy from the community; amber (`grid`) is
+the grid; sage (`flowGridExp`, ≥3:1 on white, lighter than forest) is feed-in
+— "your solar, sent out"; teal (`flowLocalCons`) is the community's local
+consumption node and the NT band, and the own-use and self-consumption lines.
+It stays off the forest ramp because it is drawn beside the producer nodes in
+the energy-flow chart and over `local` bars, where a second forest green does
+not read as a different series; slate (`consColors`, `[0]` =
+consumption) is demand — metering IN series, consumer nodes, price lines and
+self-sufficiency; dark ink (`ratio` #24352c, screen-only `CHART_RATIO`) draws
+percentage lines over bars. The earlier violet (`#7c3aed`)
+and blue/indigo consumer ramp are gone; the feasibility charts' positive half
+is forest, and the cash-flow legend swatch now uses the bars' own colour
+(`DIVERGING_POSITIVE`).
 
 `design/tokens.json:charts` mirrors this 1:1 (same hexes, same role names) and is the SSOT: the generator emits `backend/invoices/generated_chart_tokens.py`, and `pdf_charts.py` imports its constants from it — no duplicated color literals remain in Python, and drift between `pdf_charts.py` and `tokens.json` becomes a `--check`/idempotence failure. `frontend/src/lib/chartTokens.ts` currently holds only `AXIS_COLOR / ANNOTATION_COLOR`; after generation it re-exports the full map as **resolved literal strings** (`export const CHART_LOCAL = "#1f5c3a"` — Recharts props and SVG `fill="…"` do not resolve `var(…)`), so recharts and the PDF SVG share one map. Hand-written companion `frontend/src/lib/chartTheme.tsx` centralizes the recharts config *shapes* shared by the feasibility charts (axis tick typography, bottom-axis/CHF y-axis labels, tooltip card, legend swatch) on top of those literals — it is not generated and holds no colors of its own.
 
@@ -753,7 +770,7 @@ Existing suites stay green (contract: 59 tests in `test_contract_context.py`; te
   `design/tokens.test.mjs`, five committed generated outputs. The generator holds
   zero hex literals: the 10-step Mantine ramp derives from primitives plus
   `charts.prodColors[1]`; `--brand-ink` was added for the darkest step. Chart
-  tokens gained `positiveColor`/`negativeColor` during Phase 3, plus `divergingPositive` (validated blue half of the blue/red diverging pair) during review follow-up. The generator also asserts WCAG 2.1 relative-luminance monotonicity (strictly decreasing) across the 10-step ramp (`--brand-pale` → `--brand-ink`) in both generate and `--check` modes, failing on any `--brand-glow` ↔ `--brand-muted` inversion (CI gate via `pr-quality.yml` `--check`).
+  tokens gained `positiveColor`/`negativeColor` during Phase 3, plus `divergingPositive` (first a validated blue half of a blue/red diverging pair, forest since the ADR 0032 palette review, §4.3) during review follow-up. The generator also asserts WCAG 2.1 relative-luminance monotonicity (strictly decreasing) across the 10-step ramp (`--brand-pale` → `--brand-ink`) in both generate and `--check` modes, failing on any `--brand-glow` ↔ `--brand-muted` inversion (CI gate via `pr-quality.yml` `--check`).
 - **Phase 1** — full `index.css` token sweep (zero raw hex), sidebar/nav active
   pill + leading bar, flat `.button`, desaturated badges incl. invoice workflow
   variants, global `:focus-visible`. `preview-pdf-template` accepts body

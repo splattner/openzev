@@ -11,18 +11,16 @@ import {
     YAxis,
 } from 'recharts'
 import type { FeasibilityFairPriceRange, FeasibilityPriceSensitivityPoint } from '../../types/api'
-import { ANNOTATION_COLOR, AXIS_COLOR, CHART_GRIDLINE, CHART_MUTED, CONS_COLORS, PROD_COLORS } from '../../lib/chartTokens'
+import { ANNOTATION_COLOR, AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CONS_COLORS, PROD_COLORS } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE, CHF_Y_AXIS_LABEL, ChartLegendSwatch, chartAxisLabel } from '../../lib/chartTheme'
 import { formatChf, formatNumber, formatPercent } from '../../lib/numbers'
 
-// Categorical pair (two distinct parties, not a polarity) — validated
-// colorblind-safe (worst adjacent CVD deltaE 30.3, normal-vision 33.3).
-// Green already means "producer/local energy" throughout the app (PDF
-// invoices, dashboard); blue already means "consumer/self-consumption benefit"
-// in the other feasibility charts.
+// Categorical pair (two distinct parties, not a polarity).
+// Forest means "producer/local energy" throughout the app and the PDFs; slate
+// means consumption. The fair price range is a warm band behind both lines.
 const PRODUCER_COLOR = PROD_COLORS[0]
 const CONSUMER_COLOR = CONS_COLORS[0]
-const FAIR_RANGE_FILL = CHART_MUTED
+const FAIR_RANGE_FILL = CHART_GRID
 
 type Props = {
     priceSensitivity: FeasibilityPriceSensitivityPoint[]

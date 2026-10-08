@@ -9,7 +9,7 @@ import {
     XAxis,
     YAxis,
 } from 'recharts'
-import { ANNOTATION_COLOR, AXIS_COLOR, CHART_GRIDLINE, DIVERGING_POSITIVE, NEGATIVE_COLOR, POSITIVE_COLOR } from '../../lib/chartTokens'
+import { ANNOTATION_COLOR, AXIS_COLOR, CHART_GRIDLINE, DIVERGING_POSITIVE, NEGATIVE_COLOR } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE, CHF_Y_AXIS_LABEL, ChartLegendSwatch, chartAxisLabel } from '../../lib/chartTheme'
 import { formatChf, formatNumber } from '../../lib/numbers'
 
@@ -72,7 +72,7 @@ export function FeasibilityCashflowChart({ cashflowByYear, paybackYears }: Props
                 {t('pages.feasibility.chart.cashflowDescription')}
             </p>
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.4rem', fontSize: '0.78rem' }}>
-                <span><ChartLegendSwatch color={POSITIVE_COLOR} />{t('pages.feasibility.chart.cumulativeSurplus')}</span>
+                <span><ChartLegendSwatch color={DIVERGING_POSITIVE} />{t('pages.feasibility.chart.cumulativeSurplus')}</span>
                 <span><ChartLegendSwatch color={NEGATIVE_COLOR} />{t('pages.feasibility.chart.cumulativeDeficit')}</span>
             </div>
             <ResponsiveContainer width="100%" height={240}>
