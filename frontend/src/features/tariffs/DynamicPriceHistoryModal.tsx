@@ -305,7 +305,6 @@ export function DynamicPriceHistoryPanel({ source, tariff }: PanelProps) {
         columns={columns}
         getRowId={(point) => point.valid_from}
         loading={historyQuery.isLoading}
-        initialPageSize={25}
         emptyMessage={t('pages.dynamicSources.history.empty')}
       />
     </div>

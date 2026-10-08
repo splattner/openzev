@@ -169,7 +169,6 @@ export const de = {
         empty: 'Keine Daten vorhanden.',
         pagination: {
             range: '{{from}}–{{to}} von {{total}}',
-            rowsPerPage: 'Zeilen',
             previous: 'Vorherige Seite',
             next: 'Nächste Seite',
         },

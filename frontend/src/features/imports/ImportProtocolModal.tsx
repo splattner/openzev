@@ -71,7 +71,6 @@ export function ImportProtocolModal({ log, onClose }: { log: ImportLog | null; o
                     <DataTable
                         data={log.errors ?? []}
                         columns={columns}
-                        initialPageSize={10}
                         emptyMessage={t('pages.imports.protocol.noSkippedDetails')}
                     />
                 </div>

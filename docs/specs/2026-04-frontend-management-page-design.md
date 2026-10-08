@@ -421,10 +421,11 @@ their current state. The title is not reset on unmount; `index.html` keeps
 #### A. When to use tables (DataTable)
 
 Use a `DataTable` when records are flat and users scan across repeated dense
-columns. The `DataTable` footer (range label, page-size select, prev/next
-buttons) renders only when the rows span more than one page
-(`table.getPageCount() > 1`); single-page tables hide it entirely instead of
-showing permanently disabled pagination buttons.
+columns. Pages hold a fixed 100 rows (`PAGE_SIZE`; no rows-per-page
+choice). The `DataTable` footer (range label, prev/next buttons) renders only
+when the rows span more than one page (`table.getPageCount() > 1`);
+single-page tables hide it entirely instead of showing permanently disabled
+pagination buttons.
 
 Current examples:
 
