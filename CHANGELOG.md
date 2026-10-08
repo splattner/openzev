@@ -1,5 +1,61 @@
 # Changelog
 
+## [1.21.0](https://github.com/splattner/openzev/compare/v1.20.0...v1.21.0) (2026-10-08)
+
+
+### Features
+
+* **access:** collapse the platform role to admin or user ([#873](https://github.com/splattner/openzev/issues/873)) ([d81041f](https://github.com/splattner/openzev/commit/d81041fedfde625f30d8db64408c7398b89c9268))
+* **access:** community switcher, viewer read-only UI and ZEV access management ([#872](https://github.com/splattner/openzev/issues/872)) ([eb864b9](https://github.com/splattner/openzev/commit/eb864b951604bd6b64f45ce90cafef7a8782045c))
+* **access:** decide reads and writes per ZEV from grants and participant links ([#868](https://github.com/splattner/openzev/issues/868)) ([45e5354](https://github.com/splattner/openzev/commit/45e53543bdb204dc3f748528c58ec1bce1e90bef)), closes [#761](https://github.com/splattner/openzev/issues/761)
+* **access:** grant API, email invitations and account-level rules for per-ZEV access ([#869](https://github.com/splattner/openzev/issues/869)) ([2615dec](https://github.com/splattner/openzev/commit/2615dec4a895d0682e1653e46add54045875db18)), closes [#761](https://github.com/splattner/openzev/issues/761)
+* **billing:** answer calendar questions in Swiss civil time ([#852](https://github.com/splattner/openzev/issues/852)) ([53466f4](https://github.com/splattner/openzev/commit/53466f47415b26c9c57708c28655311419c015f1))
+* **demo:** seed the per-ZEV access and party scenarios of [#761](https://github.com/splattner/openzev/issues/761) ([#901](https://github.com/splattner/openzev/issues/901)) ([42357f1](https://github.com/splattner/openzev/commit/42357f12b5b25b817f526f14cccc63c40a3a7713))
+* **invoices:** keep a copy of who an invoice is from and to ([#875](https://github.com/splattner/openzev/issues/875)) ([4387566](https://github.com/splattner/openzev/commit/4387566fdf5f496ff3fc72e51763ec21a07f1d16))
+* **invoices:** redesign the billing period page around workflow progress ([#903](https://github.com/splattner/openzev/issues/903)) ([b9590bb](https://github.com/splattner/openzev/commit/b9590bb6e9cb3df5ef16f1154a4fed690b7f9e59))
+* **metering:** mark metering points with generation behind the meter ([#855](https://github.com/splattner/openzev/issues/855)) ([0bc7d87](https://github.com/splattner/openzev/commit/0bc7d87b257d5e2683e1c3006a920211213ae9c0))
+* **reports:** add annual ZEV report and move annual statements to Reports ([#854](https://github.com/splattner/openzev/issues/854)) ([ae3312a](https://github.com/splattner/openzev/commit/ae3312add0cb245c4c963a6c2dd8b86526cbf177))
+* **tariffs:** filter the tariff import preview by year ([#921](https://github.com/splattner/openzev/issues/921)) ([af8c566](https://github.com/splattner/openzev/commit/af8c566af13b1cf75d79467f4eb44d6875200b96))
+* **transfer:** carry parties and their roles in the ZEV archive ([#880](https://github.com/splattner/openzev/issues/880)) ([4fec2f9](https://github.com/splattner/openzev/commit/4fec2f9737deebc457bee3c45c7fb7dd7729d65d))
+* **ui:** accessible navigation, page scope and metering chart defaults ([#905](https://github.com/splattner/openzev/issues/905)) ([8e5da74](https://github.com/splattner/openzev/commit/8e5da74d7c6fa31c5ec9d945106196b6cd7115ce))
+* **ui:** clarify guest access and simplify sidebar navigation ([#870](https://github.com/splattner/openzev/issues/870)) ([c0f91c2](https://github.com/splattner/openzev/commit/c0f91c2b557de217b651b9c3facee3f68498ea22))
+* **ui:** connect workflows within existing hubs ([#896](https://github.com/splattner/openzev/issues/896)) ([54cb792](https://github.com/splattner/openzev/commit/54cb7921c498dfcdb3efd78de1787fe42452750e))
+* **zev:** a ZEV's creator manages it as issuer, without a grant ([#887](https://github.com/splattner/openzev/issues/887)) ([239902e](https://github.com/splattner/openzev/commit/239902edc0f2c8c67f8d9116f7fbc0132369378e)), closes [#761](https://github.com/splattner/openzev/issues/761)
+* **zev:** add per-ZEV access grants, read by nothing yet ([#866](https://github.com/splattner/openzev/issues/866)) ([2d537c1](https://github.com/splattner/openzev/commit/2d537c18043c4388d134567600b9cab8dc9d79aa)), closes [#761](https://github.com/splattner/openzev/issues/761)
+* **zev:** buildings and sites between a ZEV and its metering points ([#894](https://github.com/splattner/openzev/issues/894)) ([9b319ce](https://github.com/splattner/openzev/commit/9b319ce692ea7b596b170046893f9fb4fa59471d))
+* **zev:** dated issuer, representative and landowner roles ([#878](https://github.com/splattner/openzev/issues/878)) ([7f82106](https://github.com/splattner/openzev/commit/7f82106792c3326ba860374d70ba9471ca6a375c))
+* **zev:** drop Zev.owner ([#879](https://github.com/splattner/openzev/issues/879)) ([cd55e3c](https://github.com/splattner/openzev/commit/cd55e3c9e76f4fe04bff79d06bfada7e3aa3af37))
+* **zev:** every person or organisation of a ZEV is a party ([#877](https://github.com/splattner/openzev/issues/877)) ([d70b5ef](https://github.com/splattner/openzev/commit/d70b5eff526c452986f1d22424d743fc07dd4fbf))
+* **zev:** manage a ZEV's parties and their roles ([#881](https://github.com/splattner/openzev/issues/881)) ([686d445](https://github.com/splattner/openzev/commit/686d445f988fca46d35720389d011ab865464554))
+* **zev:** one People & access tab in ZEV settings ([#884](https://github.com/splattner/openzev/issues/884)) ([1d5cf9c](https://github.com/splattner/openzev/commit/1d5cf9c93de8707962623163af2ceeb31dadc033))
+* **zev:** the issuer and representative manage their ZEV ([#882](https://github.com/splattner/openzev/issues/882)) ([9b65365](https://github.com/splattner/openzev/commit/9b65365a765f1bad8cef15369da586cade8b432a))
+
+
+### Bug Fixes
+
+* **accounts:** show the MFA policy in app-settings to admins only ([#907](https://github.com/splattner/openzev/issues/907)) ([d3ceb87](https://github.com/splattner/openzev/commit/d3ceb870cb3a76102de997bd314b03c90b997729))
+* **backend:** make the test suite pass on PostgreSQL ([#915](https://github.com/splattner/openzev/issues/915)) ([164cd70](https://github.com/splattner/openzev/commit/164cd704916a5583b0914432d2a50675f1df9b2e))
+* **dashboard:** show participants their billing interval and invoices ([#912](https://github.com/splattner/openzev/issues/912)) ([76c6ecf](https://github.com/splattner/openzev/commit/76c6ecf37228412b320377d86f15339d2ceb51d7))
+* **demo:** seed dynamic tariff screenshot fixtures ([#918](https://github.com/splattner/openzev/issues/918)) ([4de285f](https://github.com/splattner/openzev/commit/4de285f278c8e56d0efe6a3aa9ed23791e2cbde7))
+* **invoices:** include recipient address line 2 in PDFs ([#898](https://github.com/splattner/openzev/issues/898)) ([254f60a](https://github.com/splattner/openzev/commit/254f60a01f2a2ed9c2cb74def47f9b5cb26406e4))
+* **invoices:** show participants only invoices that have been sent to them ([#863](https://github.com/splattner/openzev/issues/863)) ([c47f9be](https://github.com/splattner/openzev/commit/c47f9be20a872a775a6c24721e38036502b90d25)), closes [#861](https://github.com/splattner/openzev/issues/861)
+* **metering:** derive dashboard bounds from civil dates ([#906](https://github.com/splattner/openzev/issues/906)) ([ccc2b7c](https://github.com/splattner/openzev/commit/ccc2b7cb8785caca4125650f57f94606af4a9799))
+* **metering:** reconcile participant dashboard energy totals ([#922](https://github.com/splattner/openzev/issues/922)) ([f193977](https://github.com/splattner/openzev/commit/f193977c3a192dda50f1cb7106739db90fe6892b))
+* **participants:** calculate weight shares from current membership ([#916](https://github.com/splattner/openzev/issues/916)) ([bafdc08](https://github.com/splattner/openzev/commit/bafdc0821b71f8251fbd69f8fdd89c797ce00a29))
+* **screenshots:** pin participant captures to Anna and drop settle sleeps ([#910](https://github.com/splattner/openzev/issues/910)) ([8133391](https://github.com/splattner/openzev/commit/8133391b9c79fbc08850e8225616a8a58be29859))
+* **screenshots:** verify PDF loading and sidebar state ([#917](https://github.com/splattner/openzev/issues/917)) ([ab04aeb](https://github.com/splattner/openzev/commit/ab04aeb5ff10cf93ff25719d575111148c0622d0))
+* **settings:** show MFA policy load errors ([#914](https://github.com/splattner/openzev/issues/914)) ([8acf851](https://github.com/splattner/openzev/commit/8acf85151bc083cff06918e0647a42ce9d5cfb3b))
+* **ui:** edit wizard metering points in place ([#897](https://github.com/splattner/openzev/issues/897)) ([1234598](https://github.com/splattner/openzev/commit/12345989b01c12c16bdec0c9190b28ad322978ae))
+* **ui:** keep a landowner's building and end actions apart ([#895](https://github.com/splattner/openzev/issues/895)) ([6fe8540](https://github.com/splattner/openzev/commit/6fe8540caa835f74c2fd6e506519069d5ce6114a))
+* **ui:** preserve scoped state across navigation and async writes ([#892](https://github.com/splattner/openzev/issues/892)) ([54f8c97](https://github.com/splattner/openzev/commit/54f8c9794f2424c533c6c4b8c1bc5a2fd072eca9))
+* **ui:** standardize page layouts and preserve scoped state ([#891](https://github.com/splattner/openzev/issues/891)) ([80e1bc0](https://github.com/splattner/openzev/commit/80e1bc07dc43f3cde5410eacfd40d08dba9f6378))
+* **zev:** warn when invoices lose their QR bill, and keep a ZEV's last manager ([#885](https://github.com/splattner/openzev/issues/885)) ([0f7c1bb](https://github.com/splattner/openzev/commit/0f7c1bb762a9eac55e4447b2b03417895e4c1c1c)), closes [#761](https://github.com/splattner/openzev/issues/761)
+
+
+### Performance Improvements
+
+* **tests:** run browser specs in parallel ([#908](https://github.com/splattner/openzev/issues/908)) ([ebda272](https://github.com/splattner/openzev/commit/ebda272ff27994804ce0002f934e33f5c6a70fb3))
+
 ## [1.20.0](https://github.com/splattner/openzev/compare/v1.19.0...v1.20.0) (2026-09-29)
 
 
