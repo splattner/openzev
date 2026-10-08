@@ -143,7 +143,7 @@ Semantic examples (final map decided in Phase 0; names below are normative):
 - `--text-primary` → `var(--ink)`; `--text-body` → `var(--ink-soft)`; `--text-muted` → `var(--muted)`
 - `--border-default` → `var(--line)`; `--border-subtle` → `var(--line-subtle)`
 - `--interactive` → `var(--brand-mid)`; `--interactive-hover` → `var(--brand)`; `--focus-ring` → `var(--brand-mid)` 2px / 2px offset
-- `--status-draft/open/paid/overdue/cancelled` + `--status-neutral/info/success/warning/danger` for `.badge-*` remap (desaturated fills, never gold-on-white)
+- `--status-neutral/info/success/warning/danger` for the `.badge-*` remap (desaturated fills, never gold-on-white); the invoice-workflow `--status-draft/open/paid/overdue/cancelled` aliases went with the per-status badge classes (invoice statuses map through `invoiceStatusBadgeClass`, §15)
 - `--sidebar-bg` → `var(--white)` (§15.2; was `var(--brand-deep)` until ADR 0032's review); `--sidebar-active` → `var(--brand-pale)`
 - §15 additions: `--text-heading` → `var(--brand-deep)` (h1–h4, as the documents set headings), `--border-strong` → `var(--line-strong)` (control borders: inputs, secondary buttons), `--surface-sunken` → `var(--zebra)` (table header band, hover, segmented tracks), `--accent-rule` → `var(--brand-mid)` (the header rule, section dots, active tab), `--sidebar-text` → `var(--ink-soft)`, `--sidebar-indicator` → `var(--brand-mid)` (current-page mark)
 
@@ -772,7 +772,7 @@ Existing suites stay green (contract: 59 tests in `test_contract_context.py`; te
   `design/tokens.test.mjs`, five committed generated outputs. The generator holds
   zero hex literals: the 10-step Mantine ramp derives from primitives plus
   `charts.prodColors[1]`; `--brand-ink` was added for the darkest step. Chart
-  tokens gained `positiveColor`/`negativeColor` during Phase 3, plus `divergingPositive` (first a validated blue half of a blue/red diverging pair, forest since the ADR 0032 palette review, §4.3) during review follow-up. The generator also asserts WCAG 2.1 relative-luminance monotonicity (strictly decreasing) across the 10-step ramp (`--brand-pale` → `--brand-ink`) in both generate and `--check` modes, failing on any `--brand-glow` ↔ `--brand-muted` inversion (CI gate via `pr-quality.yml` `--check`).
+  tokens gained `positiveColor`/`negativeColor` during Phase 3 (`positiveColor` was later dropped: its only consumer was a legend swatch that did not match its bars), plus `divergingPositive` (forest since ADR 0032, §4.3) during review follow-up. The generator also asserts WCAG 2.1 relative-luminance monotonicity (strictly decreasing) across the 10-step ramp (`--brand-pale` → `--brand-ink`) in both generate and `--check` modes, failing on any `--brand-glow` ↔ `--brand-muted` inversion (CI gate via `pr-quality.yml` `--check`).
 - **Phase 1** — full `index.css` token sweep (zero raw hex), sidebar/nav active
   pill + leading bar, flat `.button`, desaturated badges incl. invoice workflow
   variants, global `:focus-visible`. `preview-pdf-template` accepts body

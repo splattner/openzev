@@ -234,7 +234,7 @@ export function Layout() {
 
     return (
         <div
-            className={`shell${isNavigationCollapsed ? ' shell-collapsed' : ''}${isPlatformScope ? ' shell-scope-platform' : ''}`}
+            className={`shell${isNavigationCollapsed ? ' shell-collapsed' : ''}`}
             onFocusCapture={(event) => {
                 lastNavigationFocusRef.current = sidebarRef.current?.contains(event.target) || mobileMenuButtonRef.current?.contains(event.target)
                     ? event.target : null

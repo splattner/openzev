@@ -1667,8 +1667,7 @@ Tooltips appear only in the collapsed desktop rail; visible labels wrap.
 Avatars show up to two letter or digit initials, ignoring symbols. Empty names
 show `·`; no selected community shows a decorative platform icon. Avatars do
 not shrink.
-Under `/admin/*` the shell adds
-`shell-scope-platform`: the switcher is unmounted in favour of a translated
+Under `/admin/*` the switcher is unmounted in favour of a translated
 "Platform administration" chip (`nav.platformScope`) in the sidebar context
 block. There is no header scope chip: every ZEV-scoped page header names the
 selected ZEV as an eyebrow, so the working context stays visible when the nav

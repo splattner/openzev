@@ -2541,10 +2541,6 @@ button.badge-button:focus-visible {
   align-items: start;
 }
 
-.inline-form--narrow {
-  max-width: 320px;
-}
-
 .field-error {
   color: var(--danger-600);
   font-size: 0.85rem;
@@ -4844,15 +4840,11 @@ fieldset.form-grid {
   width: fit-content;
 }
 
-/* Ensure footer sits below content in main layout */
+/* The workspace column: the banner (top-nav) above the page. */
 .content {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-}
-
-.content>.app-footer {
-  margin-top: auto;
 }
 
 /* Feature flags: the switch column, wide enough for the longest state label. */

@@ -95,7 +95,7 @@ function validate(tokens) {
   }
 
   // charts: required keys, hex literals or arrays of hex
-  const requiredCharts = ['local', 'grid', 'ink', 'muted', 'gridline', 'axis', 'bg', 'label', 'ratio', 'flowLocalCons', 'flowGridExp', 'prodColors', 'consColors', 'othersColor', 'axisColor', 'annotationColor', 'positiveColor', 'negativeColor', 'divergingPositive']
+  const requiredCharts = ['local', 'grid', 'ink', 'muted', 'gridline', 'axis', 'bg', 'label', 'ratio', 'flowLocalCons', 'flowGridExp', 'prodColors', 'consColors', 'othersColor', 'axisColor', 'annotationColor', 'negativeColor', 'divergingPositive']
   for (const k of requiredCharts) {
     assert(tokens.charts[k] !== undefined, `Missing charts key: ${k}`)
   }
@@ -261,7 +261,6 @@ function generateChartTokensTs(tokens) {
     OTHERS_COLOR: c.othersColor,
     AXIS_COLOR: c.axisColor,
     ANNOTATION_COLOR: c.annotationColor,
-    POSITIVE_COLOR: c.positiveColor,
     NEGATIVE_COLOR: c.negativeColor,
     DIVERGING_POSITIVE: c.divergingPositive,
   }
@@ -296,7 +295,6 @@ function generatePyTokens(tokens) {
   lines.push(`PROD_COLORS = ${JSON.stringify(c.prodColors)}`)
   lines.push(`CONS_COLORS = ${JSON.stringify(c.consColors)}`)
   lines.push(`_OTHERS_COLOR = ${JSON.stringify(c.othersColor)}`)
-  lines.push(`POSITIVE_COLOR = ${JSON.stringify(c.positiveColor)}`)
   lines.push(`NEGATIVE_COLOR = ${JSON.stringify(c.negativeColor)}`)
   lines.push(`_DIVERGING_POSITIVE = ${JSON.stringify(c.divergingPositive)}`)
   // On-bar label fill — Python-only: no screen chart currently paints on-bar labels.
