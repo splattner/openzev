@@ -28,28 +28,14 @@
         /* Recipient block and facts: shared summary-band parts
            (pdf/shared_pdf_base.html, section 3). */
 
+        /* Flat forest, no shadow or glow: paper has no elevation, and
+           transparency prints unevenly (a blurred shadow leaves seams). */
         .amount-card {
-            background-color: var(--brand-deep);
-            background-image: linear-gradient(160deg, var(--brand) 0%, var(--brand-deep) 100%);
+            background: var(--brand-deep);
             border-radius: 4mm;
             color: var(--white);
             flex: 0 0 48mm;
             padding: 3mm 4mm;
-            box-shadow: 0 4px 20px rgba(13, 43, 29, 0.2), inset 0 1px 0 rgba(255,255,255,0.08);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .amount-card-shine {
-            position: absolute;
-            top: -10mm;
-            right: -10mm;
-            width: 50mm;
-            height: 50mm;
-            background: var(--white);
-            opacity: 0.08;
-            border-radius: 50%;
-            pointer-events: none;
         }
 
         .amount-card .eyebrow {
@@ -567,7 +553,6 @@
                 </dl>
                 {% if savings_data %}
                 <aside class="amount-card" aria-label="{{ tr.savings_title }}">
-                    <div class="amount-card-shine" aria-hidden="true"></div>
                     <div class="eyebrow">
                         {{ tr.savings_from }}
                         <strong>{{ savings_data.local_kwh }} kWh</strong>
@@ -591,7 +576,6 @@
                 </aside>
                 {% else %}
                 <div class="amount-card">
-                    <div class="amount-card-shine" aria-hidden="true"></div>
                     <div class="eyebrow">{{ tr.total }}</div>
                     <span class="amount">CHF {{ invoice.total_chf|floatformat:2 }}</span>
                 </div>

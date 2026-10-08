@@ -119,28 +119,14 @@
             letter-spacing: -0.01em;
         }
 
+        /* Flat forest, no shadow or glow: paper has no elevation, and
+           transparency prints unevenly (a blurred shadow leaves seams). */
         .tariff-card {
-            background-color: var(--brand-deep);
-            background-image: linear-gradient(160deg, var(--brand) 0%, var(--brand-deep) 100%);
+            background: var(--brand-deep);
             border-radius: 4mm;
             color: var(--white);
             flex: 0 0 48mm;
             padding: 3mm 4mm;
-            box-shadow: 0 4px 20px rgba(13, 43, 29, 0.2), inset 0 1px 0 rgba(255,255,255,0.08);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .tariff-card-shine {
-            position: absolute;
-            top: -10mm;
-            right: -10mm;
-            width: 50mm;
-            height: 50mm;
-            background: var(--white);
-            opacity: 0.08;
-            border-radius: 50%;
-            pointer-events: none;
         }
 
         .tariff-card .eyebrow {
@@ -561,7 +547,6 @@
                     </div>
                 </dl>
                 <div class="tariff-card">
-                    <div class="tariff-card-shine" aria-hidden="true"></div>
                     <div class="eyebrow">{{ tr.local_tariff_label }}</div>
                     {% if local_tariff_rows %}
                     <span class="amount">{{ local_tariff_rows.0.rate_rp }}{% if local_tariff_rows.0.unit %} <span class="unit">{{ local_tariff_rows.0.unit }}</span>{% endif %}</span>
