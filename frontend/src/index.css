@@ -379,13 +379,11 @@ label > small.muted {
   font-size: 0.8125rem;
 }
 
-/* ── App shell: white sidebar + paper workspace ────────────────────────────
-   The sidebar is a white sheet beside the paper, like a document's margin.
-   Forest marks only what matters — the current page, the primary action,
-   the one accent figure — as on the documents. */
+/* ── App shell: forest sidebar + paper workspace ───────────────────────────
+   The sidebar is deep forest: sage text, white for what is current. */
 .shell {
   display: grid;
-  grid-template-columns: 16rem minmax(0, 1fr);
+  grid-template-columns: 14rem minmax(0, 1fr);
   min-height: 100vh;
   transition: grid-template-columns 0.2s ease;
 }
@@ -400,7 +398,6 @@ label > small.muted {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 1rem 0.75rem 0.75rem;
-  border-right: 1px solid var(--border-default);
   background: var(--sidebar-bg);
   color: var(--sidebar-text);
   transition: padding 0.2s ease;
@@ -410,7 +407,11 @@ label > small.muted {
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
+  scrollbar-color: var(--sidebar-line) transparent;
+
+  /* The forest ring would vanish on the forest; the account panel, a white
+     sheet, takes it back. */
+  --focus-ring: var(--white);
 }
 
 .sidebar.collapsed {
@@ -426,7 +427,7 @@ label > small.muted {
   overflow-y: auto;
   padding-bottom: 0.5rem;
   scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
+  scrollbar-color: var(--sidebar-line) transparent;
   align-content: start;
 }
 
@@ -439,7 +440,7 @@ label > small.muted {
   overflow-y: auto;
   grid-template-rows: auto minmax(0, auto);
   scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
+  scrollbar-color: var(--sidebar-line) transparent;
 }
 
 .sidebar-fixed::-webkit-scrollbar,
@@ -499,7 +500,7 @@ label > small.muted {
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--sidebar-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -508,8 +509,8 @@ label > small.muted {
 }
 
 .sidebar-collapse-button:hover {
-  background: var(--surface-sunken);
-  color: var(--text-primary);
+  background: var(--sidebar-hover);
+  color: var(--white);
 }
 
 .sidebar-collapse-button svg {
@@ -549,26 +550,15 @@ label > small.muted {
 }
 
 .nav-link:hover {
-  background: var(--surface-sunken);
-  color: var(--text-primary);
+  background: var(--sidebar-hover);
+  color: var(--white);
 }
 
-/* Current page: a pale forest row and a short forest mark at its start. */
+/* Current page: a pale row in deep forest. */
 .nav-link.active {
   background: var(--sidebar-active);
-  color: var(--text-heading);
+  color: var(--brand-deep);
   font-weight: 600;
-}
-
-.nav-link.active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0.5rem;
-  bottom: 0.5rem;
-  width: 3px;
-  border-radius: 0 2px 2px 0;
-  background: var(--sidebar-indicator);
 }
 
 .nav-section {
@@ -584,15 +574,6 @@ label > small.muted {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-}
-
-.nav-link .nav-icon {
-  color: var(--text-muted);
-}
-
-.nav-link:hover .nav-icon,
-.nav-link.active .nav-icon {
-  color: inherit;
 }
 
 .nav-icon svg {
@@ -614,7 +595,7 @@ label > small.muted {
 .nav-section-end {
   margin-top: 0.75rem;
   padding-top: 0.5rem;
-  border-top: 1px solid var(--border-default);
+  border-top: 1px solid var(--sidebar-line);
 }
 
 .nav-standalone {
@@ -646,15 +627,16 @@ label > small.muted {
   font-weight: 650;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--sidebar-text);
+  opacity: 0.8;
 }
 
 /* ── Account: the signed-in person at the foot ──────────────────────────────
-   A plain row on the sidebar's sheet, set off by the footer's hairline:
-   avatar, name over email and the up/down selector mark. */
+   A plain row on the sidebar, set off by the footer's hairline: avatar,
+   name over email and the up/down selector mark. */
 .sidebar-footer {
   padding-top: 0.75rem;
-  border-top: 1px solid var(--border-default);
+  border-top: 1px solid var(--sidebar-line);
 }
 
 .sidebar-user .user-menu-trigger {
@@ -665,13 +647,13 @@ label > small.muted {
   border-color: transparent;
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--text-primary);
+  color: var(--white);
   transition: background-color 0.15s ease;
 }
 
 .sidebar-user .user-menu-trigger:hover,
 .sidebar-user .user-menu-trigger[aria-expanded='true'] {
-  background: var(--surface-sunken);
+  background: var(--sidebar-hover);
 }
 
 /* On the account page the account row is the current place, marked like
@@ -680,11 +662,9 @@ label > small.muted {
   background: var(--sidebar-active);
 }
 
+/* A lighter green than the current row, so it stands off every state. */
 .sidebar-user .user-avatar {
-  background-color: var(--brand-deep);
-  background-image:
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--white) 18%, transparent), transparent 70%),
-    linear-gradient(160deg, var(--brand) 0%, var(--brand-deep) 100%);
+  background: var(--brand-step-5);
   font-size: 0.6875rem;
   letter-spacing: 0.02em;
 }
@@ -702,20 +682,20 @@ label > small.muted {
 }
 
 .sidebar-user .user-meta strong {
-  color: var(--text-heading);
+  color: var(--white);
   font-size: 0.8125rem;
   font-weight: 600;
 }
 
 .sidebar-user .user-meta small {
-  color: var(--text-muted);
+  color: var(--sidebar-text);
   font-size: 0.75rem;
 }
 
 .user-menu-caret {
   display: inline-flex;
   flex-shrink: 0;
-  color: var(--text-muted);
+  color: var(--sidebar-text);
 }
 
 .user-menu-caret svg {
@@ -741,6 +721,7 @@ label > small.muted {
   bottom: calc(100% + 0.375rem);
   left: 0;
   min-width: 0;
+  --focus-ring: var(--brand-mid);
 }
 
 /* The panel's last line: what runs here and where its source lives. */
@@ -794,7 +775,7 @@ label > small.muted {
 }
 
 .content {
-  padding: 2rem 2.5rem 2.5rem;
+  padding: 2rem 2rem 2.5rem;
 }
 
 /* Page content only; the top bar is a separate banner. Programmatic focus
@@ -4414,7 +4395,7 @@ fieldset.form-grid {
     min-height: 3.5rem;
     padding: 0.375rem 0.75rem 0.375rem 0.375rem;
     border-bottom: 1px solid var(--border-default);
-    background: var(--sidebar-bg);
+    background: var(--surface-card);
     color: var(--text-primary);
   }
 

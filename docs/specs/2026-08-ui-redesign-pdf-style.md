@@ -138,14 +138,14 @@ The schema is purpose-built (no external token framework). DTCG 2025.10 (`.token
 
 Semantic examples (final map decided in Phase 0; names below are normative):
 
-- `--app-bg` → `var(--canvas)` (`#f2f5f0`, one step darker than the documents' `--surface` paper so white sheets and the white sidebar stand off the page; replaces `index.css:4 #f8fafc` + sky radials `index.css:25-28`)
+- `--app-bg` → `var(--canvas)` (`#f2f5f0`, one step darker than the documents' `--surface` paper so white sheets stand off the page; replaces `index.css:4 #f8fafc` + sky radials `index.css:25-28`)
 - `--surface-card` → `var(--white)` with `border: var(--line)` (replaces `card`/`table-card` `rgba(255,255,255,0.9)` / `rgba(148,163,184,0.2)`); semantics always alias primitives — never raw hex
 - `--text-primary` → `var(--ink)`; `--text-body` → `var(--ink-soft)`; `--text-muted` → `var(--muted)`
 - `--border-default` → `var(--line)`; `--border-subtle` → `var(--line-subtle)`
 - `--interactive` → `var(--brand-mid)`; `--interactive-hover` → `var(--brand)`; `--focus-ring` → `var(--brand-mid)` 2px / 2px offset
 - `--status-neutral/info/success/warning/danger` for the `.badge-*` remap (desaturated fills, never gold-on-white); the invoice-workflow `--status-draft/open/paid/overdue/cancelled` aliases went with the per-status badge classes (invoice statuses map through `invoiceStatusBadgeClass`, §15)
-- `--sidebar-bg` → `var(--white)` (§15.2; was `var(--brand-deep)` until ADR 0032's review); `--sidebar-active` → `var(--brand-pale)`
-- §15 additions: `--text-heading` → `var(--brand-deep)` (h1–h4, as the documents set headings), `--border-strong` → `var(--line-strong)` (control borders: inputs, secondary buttons), `--surface-sunken` → `var(--zebra)` (table header band, hover, segmented tracks), `--accent-rule` → `var(--brand-mid)` (the header rule, section dots, active tab), `--sidebar-text` → `var(--ink-soft)`, `--sidebar-indicator` → `var(--brand-mid)` (current-page mark)
+- `--sidebar-bg` → `var(--brand-deep)` (§15.2); `--sidebar-active` → `var(--brand-pale)`; `--sidebar-hover` → `var(--brand)`; `--sidebar-line` → `var(--brand-mid)` (hairlines and scrollbar on the sidebar)
+- §15 additions: `--text-heading` → `var(--brand-deep)` (h1–h4, as the documents set headings), `--border-strong` → `var(--line-strong)` (control borders: inputs, secondary buttons), `--surface-sunken` → `var(--zebra)` (table header band, hover, segmented tracks), `--accent-rule` → `var(--brand-mid)` (the header rule, active tab), `--sidebar-text` → `var(--brand-accent)` (sage, 7.9:1 on `--brand-deep`)
 
 No raw hex may appear outside `design/tokens.json` and its generated outputs, and neither may raw `rgb()/rgba()/hsl()/hsla()` function literals — the original hex-only sweep missed an `rgba(0, 102, 204, …)` legacy sky-blue in the template editor, so the sweep now covers color functions too. Enforcement is split by surface: `stylelint` `color-no-hex` covers `frontend/src/**/*.css` (only the generated `frontend/src/styles/tokens.css` is allowlisted); hand-written TSX is enforced by the `scripts/check-frontend-hex.mjs` color sweep, which also walks the backend PDF/HTML templates and `invoices` Python (generated outputs, tests, and migrations exempt). The sweep's allowlist (`scripts/hex-migration-allowlist.json`) supports per-file `"path@alpha"` entries that sanction *neutral alpha scrims/shadows only* (`rgba()`/`hsla()` white/black/slate fades in `index.css`, the overlay modals, and the invoice/contract dark headers); hex and opaque `rgb()`/`hsl()` are never allowlistable. The JSON source is enforced by `node scripts/generate-tokens.mjs --check` + the idempotence test — JSON is not CSS and never sits in a stylelint allowlist.
 
@@ -226,7 +226,8 @@ The PDF language is an excellent print system and a mediocre spec for a dense bi
 > and in every document), and so are the documents' meaning-carrying elements:
 > the header rule, the forest headings, the figure tile, the sage status
 > pill and the kicker table labels. Page geometry, `@page` machinery and
-> gradient chrome stay print-only; gold stays on dark surfaces only. The table
+> gradient chrome stay print-only; gold stays on dark surfaces, except the
+> sidebar's current-page mark (§15.2). The table
 > below is kept as the historical baseline; where it disagrees, §15 wins.
 
 | Keep from the PDF | Do NOT copy to screen | Improve on both |
@@ -242,14 +243,14 @@ The PDF language is an excellent print system and a mediocre spec for a dense bi
 
 `--gold #bfa05a` on white `#fff` is contrast `~2.8:1`. WCAG AA requires `4.5:1` for normal text (`3:1` for large/bold ≥18pt/14pt-bold) — gold-on-white **fails** and would block the Phase 4 contrast audit. The PDF already obeys this: gold is only `savings-row.highlight .savings-value` on `var(--brand-deep)` at `9pt/900` inside `.amount-card` (`invoice_pdf.html:180-184`). Binding rule:
 
-- `--gold` is decorative/display only. Permitted on `var(--brand-deep)` / `var(--brand)` at `≥16pt` or `≥14pt/700`, or as 1–2px accent bars/dots that are not text.
+- `--gold` is decorative/display only. Permitted on `var(--brand-deep)` / `var(--brand)` at `≥16pt` or `≥14pt/700`, or as thin accent bars/dots that are not text and never carry a state alone. The sidebar has no gold mark: its current page is the pale `--sidebar-active` row with `--brand-deep` `600` text.
 - Never as text color on `#fff` / `var(--surface)` / `var(--brand-pale)` / `var(--zebra)`. Status pills in dense tables use desaturated fills (`--brand-pale`, `var(--success-100)`, `var(--danger-100)`, etc. — status hexes live in `primitives`, §4.1) with `--ink-soft` text — the same rule the PDF follows.
 - Manual axe-core / browser contrast check in Phase 4 must pass at AA+ (see §9).
 
 ### 5.3 Screen quality bar (review checklist on every PR)
 
 - Page title + description; toolbar = filters left, primary action right, no second card wrapper.
-- Sidebar: a white sheet (`var(--sidebar-bg)`) with a hairline; active item = pale forest row (`--sidebar-active`, `--text-heading`, 600) with a 3px `var(--sidebar-indicator)` mark at its start (§15).
+- Sidebar: deep forest (`var(--sidebar-bg)`), sage text; active item = pale row (`--sidebar-active`, `--brand-deep`, 600) (§15).
 - Page header ends in the documents' rule (hairline + short `--accent-rule` segment) unless the page has tabs, whose strip carries it; sheet titles are plain forest headings (no dot).
 - Focus: `2px solid var(--focus-ring)` / `2px` offset, everywhere — including Mantine widgets (`DatePickerInput`, `Menu`, `Switch`) via global `:focus-visible` + Mantine `focusRing`. Exception: programmatic focus targets that are not tab stops (the shell's `main` and the page `h1`, focused by the skip link and after navigation) show no outline.
 - Readability > "premium": for a Swiss billing tool, clear > ornamental.
@@ -929,14 +930,15 @@ contracts are unchanged.
 
 - `design/tokens.json`: primitive `--line-strong`; semantics
   `--text-heading`, `--border-strong`, `--surface-sunken`, `--accent-rule`,
-  `--sidebar-text`, `--sidebar-indicator` (§4.1); field tokens
+  `--sidebar-text`, `--sidebar-hover`,
+  `--sidebar-line` (§4.1); field tokens
   `--field-radius 0.5rem`, `--field-label-size 0.875rem`,
   `--field-label-weight 500`, `--field-help-size 0.8125rem` (height stays
   `2.75rem`); `type.fontFamily.print` leads with `Inter`.
 - Page tone: primitive `--canvas #f2f5f0` (screen only) and `--app-bg` →
   `var(--canvas)`. The page sits one step darker than the documents' paper
-  (`--surface`, which stays for row hover and inset panels), so white sheets,
-  fields and the white sidebar stand off it without heavier borders.
+  (`--surface`, which stays for row hover and inset panels), so white sheets
+  and fields stand off it without heavier borders.
 - `scripts/generate-tokens.mjs` validates both font stacks (non-empty, no
   `;{}<>`) and emits `--font-sans`, `--font-print` and `_CHART_FONT_FAMILY`
   (§4.2).
@@ -954,31 +956,35 @@ contracts are unchanged.
 
 ### 15.2 Shell (`frontend/src/components/Layout.tsx`)
 
-- Sidebar `16rem` (collapsed `4.5rem`), padding `1rem 0.75rem`: a white sheet
-  (`--sidebar-bg`) with a hairline (`--border-default`) towards the paper
-  workspace. Forest marks only what matters — the current page, the primary
-  action, the one accent figure — as on the documents. Brand row: a horizontal
-  lockup of the logo — `public/brand/openzev-mark.png` (mark, `alt=""`) and
-  `public/brand/openzev-wordmark-dark.png` (wordmark, `alt` = `app.title`),
-  cropped from `openzevlogo_whitebg.png`; collapsed, the mark stacks above the
-  expand button and the wordmark hides. The stacked logo files stay for the
+- Sidebar: deep forest (`--sidebar-bg`, no border), like the documents' dark
+  header band, wide enough for the longest navigation label in any language
+  (Italian "Punti di misurazione"); it collapses to an icon rail. Hairlines
+  and the scrollbar use `--sidebar-line`. The sidebar sets `--focus-ring` to
+  white, so the global ring shows on the forest; its account panel, a white
+  sheet, sets it back to `--brand-mid`. Brand row: a horizontal lockup of the
+  logo for dark backgrounds — `public/brand/openzev-mark-light.png` (the mark
+  with its white halo, `alt=""`) and `public/brand/openzev-wordmark-light.png`
+  (white wordmark, `alt` = `app.title`); collapsed, the mark stacks above the
+  expand button and the wordmark hides. The phone app bar keeps the
+  light-background lockup (`openzev-mark.png`, `openzev-wordmark-dark.png`,
+  cropped from `openzevlogo_whitebg.png`). The stacked logo files stay for the
   login page.
-- Navigation: `2.25rem` rows (`2rem` below 50rem viewport height),
-  `0.875rem/500` in `--sidebar-text` with `--text-muted` icons, `0.5rem`
-  radius, group labels as muted kickers; hover `--surface-sunken`. Current
-  page: `--sidebar-active` row, `--text-heading` `600` text and a 3px
-  `--sidebar-indicator` mark at its start (`.nav-link.active::before`). Focus
-  uses the global ring. The whole platform group fits a 1440×900 viewport.
+- Navigation: compact rows (tighter on short viewports) in `--sidebar-text`
+  (sage) with icons in the same colour, group labels as muted sage kickers;
+  hover `--sidebar-hover` with white text. Current page: pale
+  `--sidebar-active` row, `--brand-deep` semibold text. The collapse button is
+  sage, white on a `--sidebar-hover` fill when hovered. The whole platform
+  group fits a 1440×900 viewport.
 - The sidebar names no scope: no community switcher, no platform chip. The
   community is named and chosen in the page's scope line (§15.3).
 - Account: the trigger (`.sidebar-footer .sidebar-user .user-menu-trigger`)
-  is the sidebar's last control, a plain row on the sheet below the footer's
-  hairline (`--border-default`, `0.75rem` above): no border or card fill,
-  `--radius-md`, padding `0.5rem`; hover/open `--surface-sunken`; on
+  is the sidebar's last control, a plain row below the footer's hairline
+  (`--sidebar-line`, `0.75rem` above): no border or card fill,
+  `--radius-md`, padding `0.5rem`; hover/open `--sidebar-hover`; on
   `/account` `.is-current` (`--sidebar-active`). It holds a `2rem` round
-  avatar in deep forest with the documents' top-right light (the button's
-  recipe), the name (`0.8125rem/600`, `--text-heading`) over the email
-  (`0.75rem`, muted), both ellipsized, and the muted up/down selector mark
+  avatar in `--brand-step-5` (lighter than the current row, so it stands off
+  every state), the name (`0.8125rem/600`, white) over the email
+  (`0.75rem`, sage), both ellipsized, and the sage up/down selector mark
   (`.user-menu-caret`, `SelectorIcon`). Its panel (`#user-menu-list`:
   Account, Language, Log out) opens upwards over the navigation and ends with
   the source link (`.user-menu-about`: hairline above, GitHub mark,
@@ -988,11 +994,10 @@ contracts are unchanged.
   behave as before.
 - `header.top-nav` (outside `main`) holds `.mobile-bar` and the impersonation
   banner. On phones (≤768px) `.mobile-bar` is a sticky white app bar with a
-  hairline, the menu button and the lockup; on desktop it is hidden, so an ordinary session
-  has no top band. The impersonation banner is a full-width warning strip with
-  its stop button at the right.
-- `.content` padding `2rem 2.5rem 2.5rem` (phones `0 1rem 1.5rem`);
-  `.content-main` max-width `88rem`, centred. Language selection is a
+  hairline, the menu button and the lockup; on desktop it is hidden, so an
+  ordinary session has no top band. The impersonation banner is a full-width
+  warning strip with its stop button at the right.
+- `.content-main` has a maximum width and is centred. Language selection is a
   segmented control (`.language-selector-options`).
 
 ### 15.3 Page anatomy

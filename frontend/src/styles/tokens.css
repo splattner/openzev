@@ -48,9 +48,10 @@
   --interactive: var(--brand-mid);
   --interactive-hover: var(--brand);
   --sidebar-active: var(--brand-pale);
-  --sidebar-bg: var(--white);
-  --sidebar-indicator: var(--brand-mid);
-  --sidebar-text: var(--ink-soft);
+  --sidebar-bg: var(--brand-deep);
+  --sidebar-hover: var(--brand);
+  --sidebar-line: var(--brand-mid);
+  --sidebar-text: var(--brand-accent);
   --status-danger: var(--danger-100);
   --status-info: var(--info-100);
   --status-neutral: var(--neutral-100);

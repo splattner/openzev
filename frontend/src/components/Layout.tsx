@@ -207,9 +207,9 @@ export function Layout() {
                     <div className="sidebar-brand-row">
                         {/* Horizontal lockup of the logo; the wordmark names the app. */}
                         <div className="sidebar-brand">
-                            <img src="/brand/openzev-mark.png" alt="" className="sidebar-brand-mark" />
+                            <img src="/brand/openzev-mark-light.png" alt="" className="sidebar-brand-mark" />
                             <img
-                                src="/brand/openzev-wordmark-dark.png"
+                                src="/brand/openzev-wordmark-light.png"
                                 alt={t('app.title')}
                                 className="sidebar-brand-wordmark"
                             />
