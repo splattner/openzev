@@ -172,6 +172,8 @@ REST_FRAMEWORK = {
         # null cache key and are not throttled.
         "api_key": env("API_KEY_THROTTLE_RATE", default="600/hour"),
         # Per-IP budgets for the public auth endpoints (accounts.throttling).
+        # Per push token (supplementary energy data); a 15-minute feed needs 4/hour.
+        "supplementary_push": env("SUPPLEMENTARY_PUSH_THROTTLE_RATE", default="120/hour"),
         "auth_login": env("AUTH_LOGIN_THROTTLE_RATE", default="40/hour"),
         "auth_refresh": env("AUTH_REFRESH_THROTTLE_RATE", default="60/hour"),
         "auth_register": env("AUTH_REGISTER_THROTTLE_RATE", default="10/hour"),
@@ -264,6 +266,9 @@ SUPPLEMENTARY_SYNC_INTERVAL_S = env.int("SUPPLEMENTARY_SYNC_INTERVAL_S", default
 SUPPLEMENTARY_MIN_COVERAGE = env.float("SUPPLEMENTARY_MIN_COVERAGE", default=0.95)
 SUPPLEMENTARY_BACKFILL_MAX_DAYS = env.int("SUPPLEMENTARY_BACKFILL_MAX_DAYS", default=400)
 SUPPLEMENTARY_RECONCILE_TOLERANCE = env.float("SUPPLEMENTARY_RECONCILE_TOLERANCE", default=0.10)
+# Rows accepted per push request (about 20 days at 15 minutes) and per CSV upload.
+SUPPLEMENTARY_INGEST_MAX_ROWS = env.int("SUPPLEMENTARY_INGEST_MAX_ROWS", default=2000)
+SUPPLEMENTARY_CSV_MAX_ROWS = env.int("SUPPLEMENTARY_CSV_MAX_ROWS", default=50_000)
 # Overridable only so tests can point at a stub; the client contacts no other host.
 SOLAR_MANAGER_BASE_URL = env("SOLAR_MANAGER_BASE_URL", default="https://cloud.solar-manager.ch")
 

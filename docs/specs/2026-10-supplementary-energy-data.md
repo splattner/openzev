@@ -258,6 +258,8 @@ silently extrapolated.
 | `SUPPLEMENTARY_BACKFILL_MAX_DAYS` | `env.int` | `400` | Oldest history ever pulled for a new source |
 | `SUPPLEMENTARY_RECONCILE_TOLERANCE` | `env.float` | `0.10` | Deviation above which reconciliation warns |
 | `SOLAR_MANAGER_BASE_URL` | `env` | `https://cloud.solar-manager.ch` | Overridable only so tests can point at a stub; the production value is the only host the client contacts |
+| `SUPPLEMENTARY_INGEST_MAX_ROWS` | `env.int` | `2000` | Rows per push request |
+| `SUPPLEMENTARY_CSV_MAX_ROWS` | `env.int` | `50000` | Rows per CSV upload (the file is also capped at 8 MB) |
 | `DEFAULT_THROTTLE_RATES["supplementary_push"]` | rate | `120/hour` | Per push token |
 
 ## 5. API contracts
@@ -267,33 +269,39 @@ All answer `404` while the feature flag is off.
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
-| `/sources/` | GET | `SupplementarySourcePermission` | Scoped list (admin all; manager/viewer their ZEVs; participant their own). Filter `?zev=`, `?metering_point=` |
-| `/sources/` | POST | holder or admin | Create. Requires `consent: true`, a flagged metering point, a free metering point (one source each). `solar_manager`: needs `external_id` and `api_key`; the key is exchanged and one interval fetched **before** anything is saved, so a wrong key is a `400` with a safe message, not a broken row. Without a configured `INTEGRATION_ENCRYPTION_KEYS`: `503` naming the setting. `push`: returns the push token **once** in `push_token`. Queues a backfill. Audited `supplementary_source.create` |
+| `/sources/` | GET | `SupplementarySourcePermission` | Scoped list (admin all; manager/viewer their ZEVs; participant their own). Filter `?zev_id=` (as on every ZEV-scoped list), `?metering_point=` |
+| `/sources/` | POST | holder or admin | Create. Requires `consent: true`, a flagged metering point, a free metering point (one source each). `solar_manager`: needs `external_id` and `api_key`; the key is exchanged and one interval fetched **before** anything is saved, so a wrong key is a `400` with a safe message, not a broken row. Without a configured `INTEGRATION_ENCRYPTION_KEYS`: `503` naming the setting. `push`: returns the push token **once** in `push_token`. A provider that is not registered yet (`solar_manager` until PR 3) is refused with `400`. PR 3 additionally queues a backfill. A manager gets `403`; someone who cannot see the metering point gets `400 Invalid pk`, so its existence is not revealed. Audited `supplementary_source.create` |
 | `/sources/{id}/` | GET | scoped | Detail |
 | `/sources/{id}/` | PATCH | holder or admin; manager only for `enabled` | `label`, `enabled`, `external_id`, write-only `api_key`. An absent `api_key` keeps the stored one. Audited `supplementary_source.update` with a diff over the tracked fields and `credential_changed` in metadata, never the value |
 | `/sources/{id}/` | DELETE | holder, manager, admin | Deletes the source **and all its readings**. Audited `supplementary_source.delete` |
 | `/sources/{id}/disconnect/` | POST | holder, manager, admin | Sets `enabled = false`, wipes the credential or push token, **keeps the readings**. Audited `supplementary_source.disconnect` |
 | `/sources/{id}/purge/` | POST | holder, manager, admin | Body `{date_from?, date_to?}` (civil dates; both absent = everything). Deletes readings only. Audited `supplementary_source.purge` with the count |
-| `/sources/{id}/test/` | POST | holder or admin | `solar_manager`: refresh + one interval; `{"ok": true}` or `400 {"detail"}` with a safe message. Never echoes credentials or a raw vendor response |
-| `/sources/{id}/sync/` | POST | holder or admin | Queues a sync now, `202`. At most one per source per 5 minutes (`429` otherwise) |
+| `/sources/{id}/test/` | POST | holder or admin (PR 3) | `solar_manager`: refresh + one interval; `{"ok": true}` or `400 {"detail"}` with a safe message. Never echoes credentials or a raw vendor response |
+| `/sources/{id}/sync/` | POST | holder or admin (PR 3) | Queues a sync now, `202`. At most one per source per 5 minutes (`429` otherwise) |
 | `/sources/{id}/rotate-push-token/` | POST | holder or admin | `push` only. Issues a new token, returned once; the old one stops working at once |
-| `/sources/{id}/reconciliation/` | GET | scoped | Day-by-day comparison for the last 14 days (§6.5), computed on demand |
+| `/sources/{id}/reconciliation/` | GET | scoped (PR 3) | Day-by-day comparison for the last 14 days (§6.5), computed on demand |
 | `/sources/{id}/import-csv/` | POST | holder or admin | Multipart `file`; `?dry_run=true` validates only. Columns `timestamp,consumption_kwh,production_kwh,import_kwh,export_kwh`. All-or-nothing: one invalid row rejects the file with per-row errors. Same response as ingest |
 | `/ingest/` | POST | `SupplementaryPushAuthentication` (token `ozs_<prefix>_<secret>` as `Authorization: Bearer`) | Body `{"readings": [{timestamp, consumption_kwh, production_kwh, import_kwh, export_kwh}, ...]}`, at most 2000 per request. Throttled per token (`supplementary_push`) |
 
 **Ingest/CSV validation and response.** A reading is rejected, not coerced, if: the timestamp
 is naive, not aligned to a 15-minute boundary, in the future, or older than
-`SUPPLEMENTARY_BACKFILL_MAX_DAYS`; any value is negative, non-numeric or has more than four
-decimals; or the interval lies outside the participant's personal assignment windows (counted
-separately as `dropped_outside_assignment`, not an error). Valid rows are upserted in one
-transaction per request.
+`SUPPLEMENTARY_BACKFILL_MAX_DAYS`; any value is missing, negative, non-numeric, not finite or
+implausibly large; or the same timestamp appears twice in the request. Values are **rounded
+half-up to four decimals** rather than refused: a Home Assistant sensor reports `0.0933500001`,
+and a Solar Manager Wh value divided by 1000 has five. Offsets are normalised to UTC. A reading is
+dropped (counted separately as `dropped_outside_assignment`, not an error) when its interval lies
+outside the participant's personal assignment windows. Valid rows are upserted in one transaction
+per request; a successful store advances `covers_from` / `synced_through` (never backwards) and
+marks the source `ok`. Pushes are not audited one by one (a 15-minute feed would flood the log);
+the source's `last_sync_at` is their trace. The ingest endpoint answers `401` (one message for
+every bad token), `403` for a disabled source and `429` past the per-token throttle.
 
 ```json
 { "accepted": 96, "updated": 4, "rejected": [{"index": 17, "reason": "timestamp not aligned to 15 minutes"}],
   "dropped_outside_assignment": 0 }
 ```
 
-A disabled or `reconnect_required` source answers `403 {"detail": "Source is disabled."}`.
+A disabled source answers `403 {"detail": "Source is disabled."}`; a disconnected one has no token left and answers `401`.
 
 ### 5.1 Additive changes to existing payloads
 
@@ -683,19 +691,36 @@ ciphertext and the key never does, the manifest records key fingerprints only) a
 `IntegrationKeyWarningTests` (5). `backups/fixtures.build_world` now includes a flagged meter
 with a source and two readings, so every existing backup and restore round trip covers them.
 
-### Backend — `metering/test_supplementary_api.py`
+### Backend — sources, push and CSV (PR 2: 70 tests)
 
-**`SupplementarySourceApiTests`** (~16): holder creates; non-holder and community holder get
-403; manager cannot create or set `api_key`; manager can disable, disconnect, purge, delete;
-viewer read-only; other participants see nothing; consent required; flag-off `404`; missing
-`INTEGRATION_ENCRYPTION_KEYS` `503`; bad Solar Manager key `400` with nothing saved; credential
-never in any response or audit metadata; disabled ZEV is read-only for non-admins; disconnect
-keeps readings and wipes the credential; delete cascades; scoped list; sync rate-limit `429`.
+**`metering/test_supplementary_api.py`** (41): `FeatureFlagTests` (1: everything is `404` while
+the flag is off), `CreatePushSourceTests` (13: holder creates and gets the token once; consent
+required; unflagged meter refused; one source per meter; a manager gets `403`; a participant who
+does not hold it gets `400`; a community holder `403`; a stranger cannot even name the meter; an
+admin creates on behalf of the holder and must name one who holds it; a push source takes no id or
+key; a disabled ZEV refuses; the audit event never carries the token),
+`CreateSolarManagerSourceTests` (7, against a fake provider: key verified and the rotated
+credential stored encrypted; `503` naming the setting without a key; a rejected key and an
+unreachable vendor save nothing; id and key required; an unregistered provider refused; the key
+never reaches the audit log), `ReadScopingTests` (5: owner, manager, viewer and admin see it;
+other participants, strangers and other ZEVs' managers do not; no secret is serialized; filter by
+metering point), `UpdateAndRemoveTests` (14: owner edits and the diff is audited; a manager may only
+switch it on or off; viewers and other participants cannot write; participant and provider are
+immutable; disconnect wipes the token and keeps readings; purge all or by civil-date range and
+rejects a backwards range; delete cascades; rotate is owner-only; a disabled ZEV is read-only;
+replacing the key verifies it, resets the status and is audited; a new Solar Manager id needs the
+key again) and `ClearingTheFlagTests` (1).
 
-**`SupplementaryIngestTests`** (~12): valid batch; upsert updates; naive, unaligned, future and
-negative values rejected per row; over 2000 rows `400`; outside-assignment rows counted and
-dropped; wrong, rotated and disabled tokens; throttle; CSV `dry_run`; CSV all-or-nothing;
-DST-day timestamps accepted.
+**`metering/test_supplementary_ingest.py`** (29): `PushIngestTests` (12: stored and coverage
+advanced; redelivery updates; coverage never shrinks; four-decimal rounding; offsets to UTC;
+eleven kinds of bad row rejected individually with their reasons; row limit; empty or malformed
+body; tenancy clipping with the dropped count; community holders drop everything; `MeterReading`
+untouched; no per-push audit), `PushAuthenticationTests` (9: no token `401`; wrong secret, prefix
+and garbage are one message; rotation takes effect at once; disabled `403`; disconnected `401`; a
+user session and a push token each cannot use the other's endpoints; flag off `404`; per-token
+throttle) and `CsvImportTests` (8: valid and audited; semicolons, BOM and decimal commas;
+`dry_run`; all-or-nothing; missing columns, empty and too many rows; not UTF-8; owner or admin
+only; disabled source).
 
 ### Backend — `metering/test_supplementary_sync.py`
 
@@ -781,11 +806,16 @@ and to be observed during PR 3: rate limits and the maximum `from`/`to` range pe
 - Backup registry section and manifest fingerprint; `SupplementaryIsolationTests`.
 - Tests: `SupplementaryModelTests`, `GrossEnergyMathTests`, `SupplementaryIsolationTests`.
 
-**PR 2: Sources, push and CSV** (backend)
-- `SupplementarySourcePermission`, serializers, viewset and the actions in §5, audit events.
+**PR 2: Sources, push and CSV** (backend; implemented, see the test list in §9)
+- Permissions, serializers, the source viewset and the actions of §5 that need no provider
+  (create, edit, delete, disconnect, purge, rotate token, CSV import), audit events. `test`, `sync`
+  and `reconciliation` come with the provider in PR 3.
 - `SupplementaryPushAuthentication`, `ozs_` tokens (a namespace parameter on
-  `accounts.api_keys.generate_key`), throttle scope, ingest and CSV validation.
-- Tests: `SupplementarySourceApiTests`, `SupplementaryIngestTests`.
+  `accounts.api_keys.generate_key` and `split_key`), the per-token throttle, and the shared ingest
+  and CSV validation in `metering/supplementary/ingest.py`.
+- A provider registry (`metering/supplementary/providers.py`), empty until PR 3 registers
+  Solar Manager, so a half-built integration cannot be connected.
+- Tests: `test_supplementary_api.py`, `test_supplementary_ingest.py`.
 
 **PR 3: Solar Manager and reconciliation** (backend, async)
 - `providers.py`, `solar_manager.py`, the sync tasks, orphan job, beat entries, create-time

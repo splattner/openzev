@@ -25,15 +25,17 @@ SECRET_BYTES = 32
 SEPARATOR = "_"
 
 
-def generate_key() -> tuple[str, str, str]:
+def generate_key(namespace: str = KEY_NAMESPACE) -> tuple[str, str, str]:
     """Return ``(full_key, prefix, hashed_secret)``.
 
     ``full_key`` is the only time the secret exists in plain text; the caller
-    shows it once and must not persist it.
+    shows it once and must not persist it. ``namespace`` marks what the key is
+    for (``ozv`` for API keys, ``ozs`` for supplementary-data push tokens), so a
+    leaked one is recognisable and one kind never parses as the other.
     """
     prefix = secrets.token_hex(PREFIX_BYTES)
     secret = secrets.token_urlsafe(SECRET_BYTES)
-    full_key = f"{KEY_NAMESPACE}{SEPARATOR}{prefix}{SEPARATOR}{secret}"
+    full_key = f"{namespace}{SEPARATOR}{prefix}{SEPARATOR}{secret}"
     return full_key, prefix, hash_secret(secret)
 
 
@@ -60,8 +62,8 @@ def verify_secret(secret: str, hashed: str) -> bool:
     return hmac.compare_digest(hash_secret(secret), hashed)
 
 
-def split_key(raw_key: str) -> tuple[str, str] | None:
-    """Split ``ozv_<prefix>_<secret>`` into ``(prefix, secret)``.
+def split_key(raw_key: str, namespace: str = KEY_NAMESPACE) -> tuple[str, str] | None:
+    """Split ``<namespace>_<prefix>_<secret>`` into ``(prefix, secret)``.
 
     Returns ``None`` for anything that is not shaped like one of our keys, so
     callers can reject without a database round-trip.
@@ -73,8 +75,8 @@ def split_key(raw_key: str) -> tuple[str, str] | None:
     parts = raw_key.split(SEPARATOR, 2)
     if len(parts) != 3:
         return None
-    namespace, prefix, secret = parts
-    if namespace != KEY_NAMESPACE or not prefix or not secret:
+    found, prefix, secret = parts
+    if found != namespace or not prefix or not secret:
         return None
     return prefix, secret
 

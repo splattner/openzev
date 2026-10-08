@@ -19,6 +19,9 @@ SENSITIVE_KEYS = {
     "secret_key",
     "email_host_password",
     "authorization",
+    "api_key",
+    "push_token",
+    "refresh_token",
 }
 
 MAX_AUDIT_STRING_LENGTH = 500

@@ -109,6 +109,7 @@ class ImportLog(models.Model):
 # ---------------------------------------------------------------------------
 
 SOLAR_MANAGER_ID_RE = re.compile(r"^[A-Za-z0-9]{3,24}$")
+PUSH_TOKEN_NAMESPACE = "ozs"
 
 
 class SupplementaryProvider(models.TextChoices):
@@ -236,6 +237,18 @@ class SupplementarySource(models.Model):
             self.credential_encrypted = encrypt_secret(refresh_token)
         except IntegrationNotConfigured as exc:
             raise ValidationError({"api_key": str(exc)}) from exc
+
+    def issue_push_token(self) -> str:
+        """Create a push token (not saved) and return it; it is shown once and not recoverable.
+
+        Replaces any earlier token at once: the old prefix no longer resolves.
+        """
+        from accounts.api_keys import generate_key
+
+        full_key, prefix, hashed = generate_key(PUSH_TOKEN_NAMESPACE)
+        self.push_token_prefix = prefix
+        self.push_token_hash = hashed
+        return full_key
 
     def clear_credential(self) -> None:
         """Drop the credential and any push token (not saved)."""
