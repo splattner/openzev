@@ -78,7 +78,9 @@ excluded. The flows are real, and billing depends on them.
 
 - Importing gross production data (an inverter export or a separate production
   meter) to compute the producer's true Eigenverbrauchsquote / Autarkiegrad.
-  This is a possible follow-up. The flag introduced here is its natural anchor.
+  This is the follow-up specified in
+  [2026-10-supplementary-energy-data.md](2026-10-supplementary-energy-data.md). The flag
+  introduced here is its anchor.
 - Any change to billing, allocation (`split_consumption` /
   `split_production`), invoices, or invoice PDFs. Invoice line items stay
   exactly as they are.

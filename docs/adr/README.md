@@ -33,6 +33,8 @@ This directory captures key architectural decisions for OpenZEV.
 - [0027: Access is granted per ZEV; the platform role only says "admin or not"](0027-per-zev-access-grants.md) (supersedes 0003)
 - [0028: Every person or organisation of a ZEV is a party; issuer, representative and landowner are dated roles](0028-zev-parties-and-dated-roles.md) (amends 0027)
 - [0029: Buildings sit between a ZEV and its metering points](0029-buildings-between-zev-and-metering-points.md)
+- [0030: Supplementary energy data lives in its own table and never reaches billing](0030-supplementary-energy-data-is-not-billing-input.md)
+- [0031: Third-party integration credentials are encrypted under a dedicated, rotatable key](0031-integration-credentials-encrypted-under-a-dedicated-key.md)
 
 ## Conventions
 

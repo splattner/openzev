@@ -1,0 +1,830 @@
+# Feature Spec: Supplementary energy data for metering points with generation behind the meter
+
+- Spec ID: SPEC-2026-supplementary-energy-data
+- Status: Draft
+- Scope: Major
+- Type: Feature
+- Owners: Sebastian Plattner
+- Created: 2026-10-08
+- Target Release: TBD
+- Related Issues: [#925](https://github.com/splattner/openzev/issues/925)
+- Related ADRs: [0030](../adr/0030-supplementary-energy-data-is-not-billing-input.md) (never billing input), [0031](../adr/0031-integration-credentials-encrypted-under-a-dedicated-key.md) (connector credentials); builds on [0013](../adr/0013-shared-allocation-service.md), [0021](../adr/0021-mfa-secret-encryption-key.md), [0024](../adr/0024-backup-encryption-key.md), [0026](../adr/0026-swiss-civil-time-for-billing.md), [0027](../adr/0027-per-zev-access-grants.md)
+- Related specs: [behind-the-meter generation](2026-09-behind-the-meter-generation.md) (the flag this feature hangs off)
+- Impacted Areas: backend | frontend | async jobs | docs
+
+---
+
+## 1. Problem and outcome
+
+A participant whose PV system sits **behind** their grid meter has a metering point that
+records only the surplus fed in (`out`) and the residual grid draw (`in`). Their real
+production and consumption never reach OpenZEV, so every statistic about them is misleading.
+[SPEC-2026-behind-the-meter-generation](2026-09-behind-the-meter-generation.md) (1.21.0) stopped
+the platform from *showing* a wrong self-sufficiency rate for such participants (they see `—`
+and a note). It did not supply the right one. Its out-of-scope list names this feature.
+
+Many such participants already own a system that measures the missing numbers: Solar Manager,
+Home Assistant, an inverter portal. One real day from a Solar Manager installation (2026-07-01):
+
+| Quantity | Value | Visible in OpenZEV today |
+|---|---|---|
+| Gross production | 48.2 kWh | no |
+| Gross consumption | 12.5 kWh | no |
+| Export (meter `out`) | 41.3 kWh | yes |
+| Import (meter `in`) | 5.6 kWh | yes |
+| Self-consumed directly | ~6.9 kWh | no |
+| Self-sufficiency | ~55 % | shown as `—` |
+| Self-consumption rate | ~14 % | not computable |
+
+**Outcome:**
+
+1. A participant who personally holds a metering point flagged `has_behind_meter_generation`
+   can connect an external data source for it, with their explicit consent. Solar Manager is
+   pulled from its cloud API; anything else (Home Assistant, n8n, an inverter export) delivers
+   the same data through a token-authenticated push endpoint or a CSV upload.
+2. The platform stores that data per 15-minute interval in its own table, separate from
+   `MeterReading` and **never read by billing** ([ADR 0030](../adr/0030-supplementary-energy-data-is-not-billing-input.md)).
+3. Statistics surfaces show the participant's real production, consumption, self-consumption
+   rate and self-sufficiency, labelled as reported by their own system, wherever the data
+   covers the period well enough. Where it does not, the `—` and note from the previous spec
+   remain.
+4. The source is reconciled against the official meter, so a wrong mapping, a unit error or a
+   shifted timestamp is visible instead of silently producing a plausible-looking number.
+
+Billing, allocation, invoices and invoice PDFs are unchanged and byte-identical in amounts with
+or without this data.
+
+## 2. Scope
+
+### In scope
+
+| Area | Details |
+|---|---|
+| Data model | `metering.SupplementarySource`, `metering.SupplementaryReading`, migrations |
+| Credentials | `INTEGRATION_ENCRYPTION_KEYS`, `metering/supplementary/crypto.py`, `rotate_integration_key` command ([ADR 0031](../adr/0031-integration-credentials-encrypted-under-a-dedicated-key.md)) |
+| Providers | Solar Manager pull (v3 API); push endpoint; CSV upload |
+| Async | Beat-driven sync, per-source lease, backfill, retries, reconnect handling, orphan clean-up |
+| Reconciliation | Source vs official meter: deviation, timestamp-shift detection |
+| API | Source CRUD and actions, push ingest, CSV import, additive `gross_energy` blocks on existing payloads |
+| Statistics | Participant dashboard, owner dashboard, annual report, annual statement PDF, MCP `consumption_summary` |
+| Frontend | Account "Energy data" tab (participant), source status on the metering-point list (owner), gross cards and rates, i18n (de/fr/it/en) |
+| Operations | Feature flag, system-health entry, system check, backup registry + manifest fingerprint, audit events |
+| Transfer archive | Sources (without secrets) and readings (last phase) |
+| Docs | User guide, baseline specs (see §11), `.env.example`, Helm values |
+
+### Out of scope
+
+- Any change to billing, allocation (`split_consumption` / `split_production`), invoices, invoice
+  PDFs, tariffs or the data-quality checks on `MeterReading` (ADR 0030).
+- Using supplementary values to fill, correct or replace official meter readings.
+- Recomputing or excluding ZEV-wide totals and rates: they keep describing energy exchanged at
+  the connection points.
+- A Home Assistant **pull** connector. HA is usually LAN-only and entity ids are arbitrary; it
+  is served by the push endpoint (documented recipe) in v1.
+- Battery- and EV-specific figures. The rates below only need `import`, `export`, `production`
+  and `consumption`, and are correct with a battery present because battery flows are internal
+  to the site. Battery columns can be added later without breaking the model.
+- Storing resolutions other than 15 minutes. The push endpoint and CSV reject anything else.
+- Device control through the Solar Manager API (the key is used for reading only).
+- The ZEV owner entering or holding a participant's credentials (open decision 12.1).
+- Auto-detecting the timestamp convention of arbitrary providers.
+
+## 3. Actors, permissions, and ZEV scope
+
+All access follows the per-ZEV model of [ADR 0027](../adr/0027-per-zev-access-grants.md).
+
+| Actor | Capability |
+|---|---|
+| `admin` | Everything below for any ZEV, including creating a source on a participant's behalf (support). |
+| Manager of the ZEV (`zev_owner`, or a party holding a managing role) | Read sources and status in their ZEVs. `PATCH enabled`, `disconnect`, `purge`, `DELETE`. **Cannot** create a source, set or replace a credential, or rotate a push token. Cannot read any credential. |
+| Viewer of the ZEV | Read-only: source list and status. |
+| `participant` who personally holds the metering point today | Create, test, sync, edit, disconnect, purge and delete **their own** source; rotate their push token; read the gross figures about themselves. |
+| Any other participant | No access to the source. They see the anonymised ZEV-wide figures only, as today. |
+| Push client (token) | `POST /ingest/` for exactly one source. No other endpoint. |
+
+"Personally holds today" means an active `MeteringPointAssignment` with
+`allocation_mode = PERSONAL` whose `participant.user` is the requesting user, evaluated on the
+Swiss civil date ([ADR 0026](../adr/0026-swiss-civil-time-for-billing.md)). Community-mode
+holders cannot connect a source: their readings are split by weight and no single person's
+household is described.
+
+**Backend permission class:** `SupplementarySourcePermission` (new, in
+`metering/permissions.py`), built on `BaseZevScopedPermission` semantics for scoping, with the
+per-action rules above enforced in the view (`create`, `rotate_push_token`, credential writes
+require the holder-or-admin check). Disabled ZEVs follow the existing rule: read-only for
+non-admins.
+
+**Frontend routes:** the participant UI lives on the existing `/account` page (all roles, tab
+visible only to users who hold a flagged metering point); the owner view lives on
+`/metering-points`. No new top-level route.
+
+**Feature flag:** `FeatureFlag.SUPPLEMENTARY_ENERGY_DATA_ENABLED`
+(`"supplementary_energy_data_enabled"`, default `False`, registered with a description, env
+override `FEATURE_SUPPLEMENTARY_ENERGY_DATA_ENABLED`). While off: source and ingest endpoints
+answer `404`, beat tasks skip, and every statistics surface behaves exactly as in 1.21.0
+(`gross_energy` is `null`). Existing data is kept, not deleted.
+
+## 4. Data model
+
+### 4.1 SupplementarySource
+
+**Model:** `metering.models.SupplementarySource`. One connection between one metering point and
+one external system.
+
+| Field | Type | Default | Constraints / Notes |
+|---|---|---|---|
+| `id` | `UUIDField` pk | `uuid4` | |
+| `metering_point` | `OneToOneField(zev.MeteringPoint, CASCADE)` | — | `related_name="supplementary_source"`. One source per metering point in v1 |
+| `participant` | `ForeignKey(zev.Participant, CASCADE)` | — | `related_name="supplementary_sources"`. The consenting holder; ingestion is clipped to their personal assignment windows |
+| `provider` | `CharField(20)` | — | `SupplementaryProvider`: `solar_manager`, `push` ("push or file") |
+| `label` | `CharField(100)` | `""` | Free text, e.g. "Solar Manager at home" |
+| `external_id` | `CharField(64)` | `""` | Solar Manager `smId`; validated `^[A-Za-z0-9]{3,24}$`; required for `solar_manager`, empty for `push` |
+| `credential_encrypted` | `BinaryField` | `b""` | Fernet ciphertext under `INTEGRATION_ENCRYPTION_KEYS` of `{"refresh_token": "..."}`. Never serialized. `solar_manager` only |
+| `push_token_prefix` | `CharField(16, unique, null)` | `None` | `push` only. Identifies the token; stored in clear |
+| `push_token_hash` | `CharField(64)` | `""` | `push` only. SHA-256 of the secret part, as `accounts.api_keys.hash_secret` |
+| `enabled` | `BooleanField` | `True` | A disabled source is never pulled and rejects pushes |
+| `status` | `CharField(20)` | `pending` | `SupplementaryStatus`: `pending`, `ok`, `error`, `reconnect_required`, `disabled` (see below) |
+| `consented_at` | `DateTimeField` | — | Set at creation from the explicit consent in the request |
+| `last_sync_at` | `DateTimeField(null)` | `None` | Last attempt |
+| `last_success_at` | `DateTimeField(null)` | `None` | Last attempt that completed |
+| `last_error` | `CharField(500)` | `""` | User-safe text only, never a raw exception or response body |
+| `synced_through` | `DateTimeField(null)` | `None` | End of the last interval ingested (the pull high-water mark) |
+| `covers_from` | `DateTimeField(null)` | `None` | Start of the earliest stored interval |
+| `reconciliation` | `JSONField` | `dict` | Result of the last reconciliation (§6.5) |
+| `created_by` | `ForeignKey(accounts.User, SET_NULL, null)` | `None` | |
+| `created_at` / `updated_at` | `DateTimeField` | auto | |
+
+**Status** is derived, not free-form: `disabled` when `enabled` is false; `reconnect_required`
+when the vendor rejected the credential or it can no longer be decrypted (sync stops until the
+participant enters a key again); `error` after a transient failure (sync is retried on the next
+tick); `ok` after a completed sync; `pending` until the first one.
+
+**Validation (`clean()`):**
+- `metering_point.has_behind_meter_generation` must be true.
+- `participant.zev_id == metering_point.zev_id`.
+- `solar_manager` requires `external_id`; `push` requires it empty.
+- At creation the participant must hold the metering point personally on the civil date
+  (enforced in the serializer, not `clean()`, so a later assignment change does not invalidate
+  existing rows).
+
+**Cross-model rule:** `MeteringPointSerializer.validate()` rejects clearing
+`has_behind_meter_generation` (and `MeteringPoint.clean()` the same) while a source exists:
+`{"has_behind_meter_generation": ["Disconnect the energy data source first."]}`.
+
+**Methods:** `credential` property decrypts on access and is never cached on the instance;
+`set_credential(refresh_token)` encrypts and raises `ValidationError` when
+`INTEGRATION_ENCRYPTION_KEYS` is empty; `clear_credential()`; `issue_push_token()` returns the
+full token once and stores prefix and hash; `mark_ok()`, `mark_error(safe_text)`,
+`mark_reconnect_required(safe_text)`.
+
+**Serializer:** `SupplementarySourceSerializer`. Read: `id`, `metering_point`,
+`metering_point_meter_id`, `participant`, `participant_name`, `provider`, `label`,
+`external_id`, `enabled`, `status`, `consented_at`, `last_sync_at`, `last_success_at`,
+`last_error`, `synced_through`, `covers_from`, `reconciliation`, `has_credential`
+(`SerializerMethodField`), `push_token_prefix`, `created_at`, `updated_at`. Write: `label`,
+`enabled`, `external_id`, and the write-only `api_key` (replaces the credential) and `consent`
+(must be `true` on create). Read-only: all others. `participant` is set from the request, not
+accepted, except for admins.
+
+### 4.2 SupplementaryReading
+
+**Model:** `metering.models.SupplementaryReading`. One 15-minute interval of the participant's
+own measurements, in kWh.
+
+| Field | Type | Default | Constraints / Notes |
+|---|---|---|---|
+| `id` | `UUIDField` pk | `uuid4` | |
+| `source` | `ForeignKey(SupplementarySource, CASCADE)` | — | `related_name="readings"`. Deleting a source deletes its data |
+| `metering_point` | `ForeignKey(zev.MeteringPoint, CASCADE)` | — | `related_name="supplementary_readings"`. Denormalised from `source` for the unique constraint and range queries |
+| `timestamp` | `DateTimeField` | — | **UTC start of the interval**, aligned to :00/:15/:30/:45, same convention as `MeterReading.timestamp` |
+| `consumption_kwh` | `DecimalField(12,4)` | — | Gross consumption of the site |
+| `production_kwh` | `DecimalField(12,4)` | — | Gross production of the site |
+| `import_kwh` | `DecimalField(12,4)` | — | Drawn from the grid |
+| `export_kwh` | `DecimalField(12,4)` | — | Fed into the grid |
+| `created_at` / `updated_at` | `DateTimeField` | auto | |
+
+**Meta:** `ordering = ["metering_point", "timestamp"]`;
+`UniqueConstraint(fields=["metering_point", "timestamp"], name="uniq_supplementary_reading_mp_ts")`;
+`CheckConstraint` that all four energies are `>= 0` (`supplementary_reading_non_negative`).
+Re-delivery of an interval is an **upsert** (vendors revise recent values). There is deliberately
+no `direction` and no `import_source`: the row is one interval with all four flows.
+
+**Values are stored as delivered.** Derived quantities (self-consumption) are computed at read
+time (§4.3), because vendors disagree with themselves on the derived fields: in the sample day
+Solar Manager's `cPvWh` and `scWh` differ without a battery and import and export are both
+non-zero in the same interval.
+
+### 4.3 Derived figures (the one definition)
+
+Implemented once in `metering/supplementary.py` (`gross_energy_totals(...)`), used by every
+surface. Per interval *i*:
+
+```
+self_consumption_i = min( max(production_i - export_i, 0), production_i, consumption_i )
+```
+
+Over a window:
+
+```
+self_consumption_kwh   = Σ self_consumption_i
+self_sufficiency_rate  = clamp( 1 - Σ import_i / Σ consumption_i , 0, 1 )   # null if Σ consumption = 0
+self_consumption_rate  = Σ self_consumption_i / Σ production_i               # null if Σ production = 0
+```
+
+Percent rounding follows `invoices.annual_report._rate`. All four inputs come from the
+supplementary data alone, so numerator and denominator are one consistent measurement. The
+official meter is used only for reconciliation (§6.5).
+
+### 4.4 Coverage
+
+An interval counts as *expected* when it lies inside a window during which the source's
+participant held the metering point personally, falls between `covers_from` and `synced_through`,
+and lies in the requested window. `coverage_pct = present / expected`. Rates are computed when
+`coverage_pct >= SUPPLEMENTARY_MIN_COVERAGE` (default `0.95`) and `present > 0`; otherwise they
+are `null` and `rates_withheld_reason` is `"low_coverage"` or `"no_data"`. The payload also
+reports `covered_from` / `covered_to`, and a window the source only partly spans (the participant
+connected in March; the report is for the year) is shown as "based on data from 3 March", never
+silently extrapolated.
+
+### 4.5 Settings
+
+| Setting | Type | Default | Meaning |
+|---|---|---|---|
+| `INTEGRATION_ENCRYPTION_KEYS` | `env.list` | `[]` | Fernet keys for connector credentials (ADR 0031) |
+| `SUPPLEMENTARY_SYNC_INTERVAL_S` | `env.int` | `3600` | Beat period of `refresh_supplementary_sources` |
+| `SUPPLEMENTARY_MIN_COVERAGE` | `env.float` | `0.95` | §4.4 |
+| `SUPPLEMENTARY_BACKFILL_MAX_DAYS` | `env.int` | `400` | Oldest history ever pulled for a new source |
+| `SUPPLEMENTARY_RECONCILE_TOLERANCE` | `env.float` | `0.10` | Deviation above which reconciliation warns |
+| `SOLAR_MANAGER_BASE_URL` | `env` | `https://cloud.solar-manager.ch` | Overridable only so tests can point at a stub; the production value is the only host the client contacts |
+| `DEFAULT_THROTTLE_RATES["supplementary_push"]` | rate | `120/hour` | Per push token |
+
+## 5. API contracts
+
+New endpoints sit under `/api/v1/metering/supplementary/` (registered in `metering/urls.py`).
+All answer `404` while the feature flag is off.
+
+| Endpoint | Method | Permission | Behaviour |
+|---|---|---|---|
+| `/sources/` | GET | `SupplementarySourcePermission` | Scoped list (admin all; manager/viewer their ZEVs; participant their own). Filter `?zev=`, `?metering_point=` |
+| `/sources/` | POST | holder or admin | Create. Requires `consent: true`, a flagged metering point, a free metering point (one source each). `solar_manager`: needs `external_id` and `api_key`; the key is exchanged and one interval fetched **before** anything is saved, so a wrong key is a `400` with a safe message, not a broken row. Without a configured `INTEGRATION_ENCRYPTION_KEYS`: `503` naming the setting. `push`: returns the push token **once** in `push_token`. Queues a backfill. Audited `supplementary_source.create` |
+| `/sources/{id}/` | GET | scoped | Detail |
+| `/sources/{id}/` | PATCH | holder or admin; manager only for `enabled` | `label`, `enabled`, `external_id`, write-only `api_key`. An absent `api_key` keeps the stored one. Audited `supplementary_source.update` with a diff over the tracked fields and `credential_changed` in metadata, never the value |
+| `/sources/{id}/` | DELETE | holder, manager, admin | Deletes the source **and all its readings**. Audited `supplementary_source.delete` |
+| `/sources/{id}/disconnect/` | POST | holder, manager, admin | Sets `enabled = false`, wipes the credential or push token, **keeps the readings**. Audited `supplementary_source.disconnect` |
+| `/sources/{id}/purge/` | POST | holder, manager, admin | Body `{date_from?, date_to?}` (civil dates; both absent = everything). Deletes readings only. Audited `supplementary_source.purge` with the count |
+| `/sources/{id}/test/` | POST | holder or admin | `solar_manager`: refresh + one interval; `{"ok": true}` or `400 {"detail"}` with a safe message. Never echoes credentials or a raw vendor response |
+| `/sources/{id}/sync/` | POST | holder or admin | Queues a sync now, `202`. At most one per source per 5 minutes (`429` otherwise) |
+| `/sources/{id}/rotate-push-token/` | POST | holder or admin | `push` only. Issues a new token, returned once; the old one stops working at once |
+| `/sources/{id}/reconciliation/` | GET | scoped | Day-by-day comparison for the last 14 days (§6.5), computed on demand |
+| `/sources/{id}/import-csv/` | POST | holder or admin | Multipart `file`; `?dry_run=true` validates only. Columns `timestamp,consumption_kwh,production_kwh,import_kwh,export_kwh`. All-or-nothing: one invalid row rejects the file with per-row errors. Same response as ingest |
+| `/ingest/` | POST | `SupplementaryPushAuthentication` (token `ozs_<prefix>_<secret>` as `Authorization: Bearer`) | Body `{"readings": [{timestamp, consumption_kwh, production_kwh, import_kwh, export_kwh}, ...]}`, at most 2000 per request. Throttled per token (`supplementary_push`) |
+
+**Ingest/CSV validation and response.** A reading is rejected, not coerced, if: the timestamp
+is naive, not aligned to a 15-minute boundary, in the future, or older than
+`SUPPLEMENTARY_BACKFILL_MAX_DAYS`; any value is negative, non-numeric or has more than four
+decimals; or the interval lies outside the participant's personal assignment windows (counted
+separately as `dropped_outside_assignment`, not an error). Valid rows are upserted in one
+transaction per request.
+
+```json
+{ "accepted": 96, "updated": 4, "rejected": [{"index": 17, "reason": "timestamp not aligned to 15 minutes"}],
+  "dropped_outside_assignment": 0 }
+```
+
+A disabled or `reconnect_required` source answers `403 {"detail": "Source is disabled."}`.
+
+### 5.1 Additive changes to existing payloads
+
+No existing field changes meaning or type. Each block below is `null` when the feature flag is
+off, the participant has no source, or the source has no data in the window. The shared shape
+(`GrossEnergy`):
+
+```json
+{
+  "source_provider": "solar_manager",
+  "covered_from": "2026-07-01T00:00:00Z",
+  "covered_to": "2026-10-07T21:45:00Z",
+  "coverage_pct": 99.2,
+  "production_kwh": 4812.4, "consumption_kwh": 1249.1,
+  "import_kwh": 561.8,      "export_kwh": 4128.8,
+  "self_consumption_kwh": 683.6,
+  "self_consumption_rate": 14.2, "self_sufficiency_rate": 55.0,
+  "rates_withheld_reason": null,
+  "timeline": [{"bucket": "...", "production_kwh": 0, "consumption_kwh": 0,
+                "import_kwh": 0, "export_kwh": 0, "self_consumption_kwh": 0}]
+}
+```
+
+- **Participant dashboard** (`participant_dashboard_summary`): top-level `gross_energy`
+  (`GrossEnergy | null`) for the current participant, with `timeline` bucketed like the
+  dashboard's own. `has_behind_meter_generation` and the `—` semantics are unchanged.
+- **Owner dashboard** (`owner_dashboard_summary`): each `participant_stats[]` entry gains
+  `gross_energy` (without `timeline`); a selected participant adds top-level
+  `selected_gross_energy` (with `timeline`).
+- **Annual report** (`/api/v1/invoices/invoices/annual-report/`): `participants[]` gains
+  `gross_energy` (without `timeline`). `self_sufficiency_rate` stays `null` for net-metered
+  participants; `totals`, `previous_totals` and `months` are unchanged.
+- **Annual statement** (PDF context): for a net-metered participant, each month with coverage
+  `>= SUPPLEMENTARY_MIN_COVERAGE` carries the gross `self_sufficiency_pct`; other months stay
+  `None` (`—`). Context gains `gross_energy_source: "solar_manager" | "push" | None`, and the
+  template swaps `behind_meter_note` for the new `behind_meter_supplementary_note` when at least
+  one month shows a gross rate (new key in all four languages of `ANNUAL_TRANSLATIONS`, and in
+  `field_catalog_data.py`). de: "Ihre Photovoltaikanlage liegt hinter dem Zähler. Die
+  ausgewiesene Autarkie beruht auf den Messwerten Ihres eigenen Systems (z. B. Solar Manager),
+  nicht auf der Zählerablesung des Netzbetreibers. Monate ohne ausreichende Daten sind mit —
+  gekennzeichnet." en/fr/it equivalents.
+- **MCP** `consumption_summary`: each participant entry gains `gross_self_sufficiency_pct`,
+  `gross_self_consumption_pct` and `gross_coverage_pct` (`null` when absent), under the tool's
+  existing scoping.
+- **Metering point** (`MeteringPointSerializer`): gains read-only `supplementary_source_status`
+  (`null` or the source status string) so the list can show it without a second request.
+
+## 6. Async and integration behavior
+
+### 6.1 Provider interface
+
+`metering/supplementary/providers.py`:
+
+```python
+class Provider(Protocol):
+    def fetch(self, source: SupplementarySource, start: datetime, end: datetime) -> Iterable[Point]: ...
+```
+
+`Point` is `(timestamp, consumption_kwh, production_kwh, import_kwh, export_kwh)` with an aware
+UTC interval-start timestamp. `SolarManagerProvider` implements it; `push` has no provider, it
+delivers through §5. A future provider only has to return `Point`s.
+
+### 6.2 Solar Manager
+
+Source of truth: `https://cloud.solar-manager.ch/swagger.json` (API v1.88.11, retrieved
+2026-10-08), and one real response (2026-07-01, 96 intervals).
+
+- **Endpoint:** `GET /v3/users/{smId}/data/range?from=&to=&interval=900` with an ISO
+  `from`/`to`. The v1 `/v1/consumption/gateway/{smId}/range` named in the original idea is
+  **deprecated since 2025-06 with removal scheduled for 2026-06** and returns power only; it is
+  not used.
+- **Fields mapped:** `cWh` → `consumption_kwh`, `pWh` → `production_kwh`, `iWh` →
+  `import_kwh`, `eWh` → `export_kwh`, each divided by 1000. `t` is the interval timestamp in
+  UTC. The vendor's derived `cPvWh` / `scWh` and all `*W` power fields are ignored.
+- **Observed on the real day:** exactly 96 intervals 900 s apart, no gaps or nulls, `cWh` equals
+  `cW × 0.25 h` to within ~1 Wh, and the balance closes within 1.5 Wh per interval
+  (`pWh = eWh + cPvWh`, `cWh = cPvWh + iWh`). A system without a battery returns `0` for the
+  battery fields.
+- **Authentication:** the participant's API key is a **refresh token**. `POST /v3/auth/refresh`
+  exchanges it for a one-hour bearer token. With key rotation on, the response also carries a
+  **new refresh token** (30 days) and the old one is dead. The client persists the new token
+  before using the bearer token (ADR 0031); a response that cannot be saved is a failed
+  refresh. The legacy email/password `/v1/oauth/login` is deprecated (removal 2027-06) and is
+  not supported.
+- **Chunking:** one civil day per request (96 intervals). The vendor does not document a
+  maximum range or a rate limit, so the client pulls conservatively, honours `Retry-After` on
+  `429`, and treats 5xx and timeouts as transient.
+- **HTTP:** `urllib` as in `tariffs/importers/remote.py`; one fixed host
+  (`SOLAR_MANAGER_BASE_URL`), redirects refused, a short timeout, a response-size cap, and the
+  `smId` validated against `^[A-Za-z0-9]{3,24}$` before it enters a URL. No user-supplied host.
+- **Timestamp convention (verified 2026-10-08):** `t` is the **start** of its interval, the
+  same convention as `MeterReading.timestamp`, so values are stored without any shift. Checked
+  by importing the real SDAT data for the same metering point and comparing Solar Manager's
+  2026-07-01 series (96 intervals) with the meter's `out`/`in` at shifts of -3 to +3 intervals.
+  The mean absolute error per interval is smallest at shift 0 by a wide margin:
+
+  | Shift (intervals) | -3 | -2 | -1 | **0** | +1 | +2 | +3 |
+  |---|---|---|---|---|---|---|---|
+  | `eWh` vs meter `out` (kWh) | 0.205 | 0.179 | 0.118 | **0.0045** | 0.121 | 0.180 | 0.208 |
+  | `iWh` vs meter `in` (kWh) | 0.028 | 0.019 | 0.010 | **0.0005** | 0.010 | 0.019 | 0.028 |
+
+  Day totals agree to within the metering noise: export 41.29 vs 41.31 kWh (0.05 %), import
+  5.62 vs 5.64 kWh (0.4 %). The provider therefore carries `T_MARKS_INTERVAL = "start"` and
+  applies no offset; the constant stays so a vendor change would be a one-line fix, and
+  reconciliation (§6.5) keeps checking it. Both series are UTC, so no timezone conversion is
+  involved at ingestion.
+
+### 6.3 Sync tasks (`metering/tasks.py`)
+
+- `refresh_supplementary_sources` (beat, `SUPPLEMENTARY_SYNC_INTERVAL_S`): when the flag is on,
+  fans out `sync_supplementary_source.delay(id)` for every `enabled` source of a pull provider
+  with status other than `reconnect_required`. One unreachable vendor account cannot delay the
+  others.
+- `sync_supplementary_source(source_id, backfill=False)` (`bind=True, max_retries=2,
+  default_retry_delay=600`): takes a per-source cache lease (30 minutes, same pattern as
+  `dynamic_source_lock`); if held, skips. The window is
+  `[max(synced_through - 2 days, backfill_floor), floor(now to 15 min))`: the two-day overlap
+  re-fetches recent intervals so late or revised vendor values are upserted.
+  `backfill_floor` is the latest of `now - SUPPLEMENTARY_BACKFILL_MAX_DAYS` and the start of
+  the participant's personal assignment. Rows outside the participant's assignment windows are
+  dropped. Writes are chunk-wise upserts; `synced_through`, `covers_from` and `last_*` are
+  updated after each chunk so an interrupted run resumes.
+- **Failure handling:** an auth failure from the vendor, or `MultiFernet` unable to decrypt,
+  sets `reconnect_required` (no retry; the UI asks the participant to enter a key again). A
+  transport error, `429` or 5xx sets `error` and retries; the next tick picks it up anyway. A
+  deleted source between fan-out and execution is not an error.
+- **Credential refresh** runs inside `transaction.atomic()` with
+  `select_for_update()` on the source row, so two workers cannot both exchange the same
+  refresh token.
+- **Audit:** best-effort `supplementary_source.sync` events (category `METERING`, source
+  `CELERY`), never carrying a token; the audit write cannot turn a successful sync into a failure.
+- `disable_orphaned_supplementary_sources` (beat, daily): any source whose participant no longer
+  holds the metering point personally today is set `enabled = false`, its credential or push
+  token wiped, its readings kept. This is the consent boundary of ADR 0030: data stops flowing
+  when the tenancy ends. Audited `supplementary_source.disconnect` with reason
+  `assignment_ended`.
+
+### 6.4 Time
+
+Readings are UTC instants; every calendar question (which day, month, year, whether the
+participant held the meter) is answered in Swiss civil time with `allocation.validity.civil_date`
+([ADR 0026](../adr/0026-swiss-civil-time-for-billing.md)). Chunk boundaries for the vendor are
+civil days converted to UTC, so a DST day yields 92 or 100 intervals, not 96.
+
+### 6.5 Reconciliation (`metering/supplementary/reconcile.py`)
+
+Run after every successful sync (and on demand by `GET /reconciliation/`) over the last 7
+(on demand: 14) civil days that have both supplementary rows and official `MeterReading`s for
+the metering point. `energy_kwh` of `direction = "out"` is compared with `export_kwh`, and
+`direction = "in"` with `import_kwh`.
+
+Result stored in `SupplementarySource.reconciliation`:
+
+```json
+{ "checked_at": "...", "days_compared": 7, "export_deviation_pct": 1.8, "import_deviation_pct": 3.1,
+  "best_shift_intervals": 0, "state": "ok" }
+```
+
+- `deviation_pct = |Σ source − Σ meter| / max(Σ meter, 1 kWh)` per flow.
+- `best_shift_intervals`: the shift in `[-2, 2]` intervals that minimises the summed absolute
+  difference of the 15-minute export series against the meter's `out`.
+- `state`: `ok` below `SUPPLEMENTARY_RECONCILE_TOLERANCE`; `warn` above it, or when a non-zero
+  shift cuts the error by more than half ("timestamps look shifted by N intervals");
+  `insufficient` when fewer than 2 days are comparable (e.g. official data not imported yet).
+- Purely diagnostic: it changes nothing, never blocks a sync and never alters a rate. A `warn`
+  is shown on the source card and in the owner's status.
+
+### 6.6 Operations
+
+- **System health:** `AdminSystemHealthPanel` reports whether `INTEGRATION_ENCRYPTION_KEYS` is
+  configured, how many sources exist per status, and the oldest `last_success_at`.
+- **System check:** `metering.W001` warns when the feature flag is on, pull sources exist and no
+  key is configured.
+- **Backups:** `backups/registry.py` lists both models in a new ZEV section `supplementary`
+  (sources before readings); the registry's coverage test enforces it. The manifest's
+  `secret_fingerprints` gains `integration_encryption_keys`, and restore warns when a source's
+  credential was encrypted under a key this instance lacks
+  (those sources come back `reconnect_required`).
+- **Key rotation:** `manage.py rotate_integration_key`, idempotent, one transaction.
+- **Deletion cascades:** deleting a participant, a metering point or a ZEV removes their
+  sources and readings (`CASCADE`); the ZEV purge (`zev/purge.py`) needs no change beyond the models being covered by the backup registry.
+
+## 7. Frontend
+
+### 7.1 Participant: Account → "Energy data"
+
+**Files:** `frontend/src/features/account/EnergyDataSection.tsx`,
+`SupplementarySourceModal.tsx`, `SupplementarySourceCard.tsx`; `accountTabs.ts` gains
+`'energy-data'` (`ACCOUNT_TABS`); the tab is rendered only when the user holds a flagged metering
+point personally.
+
+- Query: `useQuery({ queryKey: queryKeys.metering.supplementarySources(), queryFn: listSupplementarySources })`.
+- Per flagged metering point: if no source, an explanation and **Connect**; otherwise the card:
+  status chip, last sync, covered range, reconciliation state, and actions **Test**, **Sync
+  now**, **Replace key**, **Disconnect** (keeps data), **Delete data**, **Remove source**.
+- Modal (create): provider choice; consent checkbox with the data-use text (what is stored: four
+  values per quarter hour; who can see it: you, and the ZEV's managers see status and your
+  figures; what it is *not* used for: billing); for Solar Manager `smId` and API key fields (key
+  is write-only, input type `password`, never echoed), with a link to where to create the key;
+  for Push/File a one-time token display with a copy button, the endpoint URL, the CSV column
+  list, and the Home Assistant recipe link.
+- Mutations invalidate `metering.supplementarySources` and the dashboard queries.
+
+### 7.2 Owner: metering-point list
+
+**File:** `frontend/src/features/meteringPoints/MeteringPointsList.tsx`; new
+`SupplementarySourceStatus.tsx`.
+
+Flagged metering points show a status chip from `supplementary_source_status`, and an owner can
+open a read-only panel (status, last sync, coverage, reconciliation) with **Disable**,
+**Delete data** and **Remove source** (manager actions only). No credential field is shown to
+an owner.
+
+### 7.3 Statistics surfaces
+
+- `ParticipantDashboardBody.tsx`: a net-metered participant with `gross_energy` sees
+  `GrossEnergyCard.tsx` (production, consumption, import, export, self-consumption,
+  the two rates, coverage and "based on data from … to …", a production-vs-export timeline) in
+  place of the `—` hint; without a source they see a call to action linking to the Energy data
+  tab. Rates are labelled "reported by your own system".
+- `ManagementDashboardBody.tsx` and `components/dashboard/ParticipantTableCard.tsx`: the per-
+  participant rate cell shows the gross rate with an info marker when `gross_energy` is present,
+  else `—` as today.
+- `features/reports/AnnualReportSection.tsx`: same rule per participant row.
+- Fallback rule everywhere: `rates_withheld_reason` set → `—` plus a short reason
+  (insufficient coverage / no data).
+- All text through `react-i18next`, keys under `supplementary.*`, in `de`, `fr`, `it`, `en`.
+  Colours via design tokens only (`scripts/check-frontend-hex.mjs` must pass).
+
+### TypeScript types
+
+**File:** `frontend/src/types/api.ts`
+
+```typescript
+export type SupplementaryProvider = 'solar_manager' | 'push'
+export type SupplementaryStatus = 'pending' | 'ok' | 'error' | 'reconnect_required' | 'disabled'
+
+export interface SupplementaryReconciliation {
+    checked_at?: string
+    days_compared?: number
+    export_deviation_pct?: number
+    import_deviation_pct?: number
+    best_shift_intervals?: number
+    state?: 'ok' | 'warn' | 'insufficient'
+}
+
+export interface SupplementarySource {
+    id: string
+    metering_point: string
+    metering_point_meter_id: string
+    participant: string
+    participant_name: string
+    provider: SupplementaryProvider
+    label: string
+    external_id: string
+    enabled: boolean
+    status: SupplementaryStatus
+    consented_at: string
+    last_sync_at: string | null
+    last_success_at: string | null
+    last_error: string
+    synced_through: string | null
+    covers_from: string | null
+    reconciliation: SupplementaryReconciliation
+    has_credential: boolean
+    push_token_prefix: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface GrossEnergyPoint {
+    bucket: string
+    production_kwh: number
+    consumption_kwh: number
+    import_kwh: number
+    export_kwh: number
+    self_consumption_kwh: number
+}
+
+export interface GrossEnergy {
+    source_provider: SupplementaryProvider
+    covered_from: string | null
+    covered_to: string | null
+    coverage_pct: number
+    production_kwh: number
+    consumption_kwh: number
+    import_kwh: number
+    export_kwh: number
+    self_consumption_kwh: number
+    self_consumption_rate: number | null
+    self_sufficiency_rate: number | null
+    rates_withheld_reason: 'low_coverage' | 'no_data' | null
+    timeline?: GrossEnergyPoint[]
+}
+```
+
+`ParticipantDashboardSummary`, the owner `participant_stats[]` entry, the annual-report
+participant row and `MeteringPoint` gain `gross_energy: GrossEnergy | null` /
+`supplementary_source_status: SupplementaryStatus | null`.
+
+### API client functions
+
+**File:** `frontend/src/lib/api/supplementary.ts`
+
+| Function | Method | Endpoint |
+|---|---|---|
+| `listSupplementarySources()` | GET | `/metering/supplementary/sources/` |
+| `createSupplementarySource()` | POST | `/metering/supplementary/sources/` |
+| `updateSupplementarySource()` | PATCH | `/metering/supplementary/sources/{id}/` |
+| `deleteSupplementarySource()` | DELETE | `/metering/supplementary/sources/{id}/` |
+| `disconnectSupplementarySource()` | POST | `/metering/supplementary/sources/{id}/disconnect/` |
+| `purgeSupplementaryReadings()` | POST | `/metering/supplementary/sources/{id}/purge/` |
+| `testSupplementarySource()` | POST | `/metering/supplementary/sources/{id}/test/` |
+| `syncSupplementarySource()` | POST | `/metering/supplementary/sources/{id}/sync/` |
+| `rotateSupplementaryPushToken()` | POST | `/metering/supplementary/sources/{id}/rotate-push-token/` |
+| `importSupplementaryCsv()` | POST | `/metering/supplementary/sources/{id}/import-csv/` |
+
+## 8. Risks and mitigations
+
+| Risk | Impact | Mitigation |
+|---|---|---|
+| Supplementary data reaches billing | High | Separate tables; import-isolation test; invoice-amount-invariance test; only `metering/supplementary.py` reads it (ADR 0030) |
+| Interval timestamp convention differs from `MeterReading` | High (a silent 15-minute shift, wrong curves) | Verified as interval start against a real meter day (§6.2); provider constant; reconciliation detects shifts continuously |
+| Rotated refresh token lost → participant locked out of their own key | High | Persist before use; row lock; `reconnect_required` state and re-entry flow; failure to save = failed refresh |
+| Two workers refresh concurrently and invalidate each other | Medium | `select_for_update` plus per-source lease |
+| A rate shown from partial data reads as a real figure | Medium | Coverage threshold, `covered_from/to` shown, rates `null` below it |
+| Vendor changes or removes the API (v1 already deprecated) | Medium | One provider module, fixed v3 contract, `error` state surfaces failures, tests against a recorded fixture of the real response |
+| Privacy: household profile retained after the tenant leaves | High | Consent bound to the holder; daily orphan job disconnects at assignment end; purge and delete actions; participant delete cascades |
+| Credential leaked via logs, audit, errors, backups | High | Write-only field; redacted audit metadata; safe error text; dedicated key, ciphertext only in backups (ADR 0031) |
+| Push endpoint abused or token leaked | Medium | Hashed token, per-token throttle, one source per token, rotate action, strict validation, 2000-row cap |
+| Unit mistakes in a push client (Wh sent as kWh) | Medium | Reconciliation deviation shows it; user-guide recipe states units; values are rejected only if non-numeric/negative |
+| Vendor rate limit/range unknown | Low | Day-sized chunks, `Retry-After`, sequential per source, hourly cadence |
+| Another table doubles the backup/transfer surface | Low | Registry coverage test forces a decision; readings are ~35 000 rows per source per year |
+
+## 9. Test plan
+
+All counts are targets for the implementing PRs and are updated to the real numbers when
+each lands.
+
+### Backend — `metering/test_supplementary_models.py`
+
+**`SupplementaryModelTests`** (~9):
+
+| Test | Asserts |
+|---|---|
+| `test_source_requires_flagged_metering_point` | `clean()` rejects an unflagged meter |
+| `test_source_participant_must_share_zev` | cross-ZEV participant rejected |
+| `test_one_source_per_metering_point` | second source violates the one-to-one |
+| `test_clearing_flag_blocked_while_source_exists` | `MeteringPointSerializer` and `clean()` both reject |
+| `test_reading_unique_per_metering_point_and_timestamp` | constraint |
+| `test_reading_rejects_negative_values` | check constraint |
+| `test_credential_roundtrip_and_never_serialized` | encrypt/decrypt; serializer exposes only `has_credential` |
+| `test_set_credential_without_key_raises` | `ValidationError`, setting named |
+| `test_status_derivation` | `disabled`, `reconnect_required`, `error`, `ok`, `pending` |
+
+**`GrossEnergyMathTests`** (~8): `test_self_consumption_formula_clamped`,
+`test_self_sufficiency_from_import_and_consumption`, `test_rates_null_when_denominator_zero`,
+`test_sample_day_matches_issue_figures` (the real 2026-07-01 response as a fixture: ~55 % and
+~14 %), `test_coverage_counts_only_expected_intervals`, `test_rates_withheld_below_min_coverage`,
+`test_window_clipped_to_personal_assignments`, `test_community_assignment_excluded`.
+
+**`SupplementaryIsolationTests`** (~3): `test_billing_modules_do_not_import_supplementary`
+(walks the import graph of the packages named in ADR 0030),
+`test_invoice_amounts_identical_with_and_without_supplementary_data`,
+`test_meter_reading_untouched_by_ingest`.
+
+### Backend — `metering/test_supplementary_api.py`
+
+**`SupplementarySourceApiTests`** (~16): holder creates; non-holder and community holder get
+403; manager cannot create or set `api_key`; manager can disable, disconnect, purge, delete;
+viewer read-only; other participants see nothing; consent required; flag-off `404`; missing
+`INTEGRATION_ENCRYPTION_KEYS` `503`; bad Solar Manager key `400` with nothing saved; credential
+never in any response or audit metadata; disabled ZEV is read-only for non-admins; disconnect
+keeps readings and wipes the credential; delete cascades; scoped list; sync rate-limit `429`.
+
+**`SupplementaryIngestTests`** (~12): valid batch; upsert updates; naive, unaligned, future and
+negative values rejected per row; over 2000 rows `400`; outside-assignment rows counted and
+dropped; wrong, rotated and disabled tokens; throttle; CSV `dry_run`; CSV all-or-nothing;
+DST-day timestamps accepted.
+
+### Backend — `metering/test_supplementary_sync.py`
+
+**`SolarManagerProviderTests`** (~10, stub server, recorded response fixture): field mapping and
+Wh→kWh; refresh exchange and token rotation persisted before use; save failure = failed
+refresh; 401 → `reconnect_required`; 429 honours `Retry-After`; 5xx → `error` and retry;
+undecryptable credential → `reconnect_required`; `T_MARKS_INTERVAL` shift; redirects refused;
+invalid `smId` refused.
+
+**`SyncTaskTests`** (~8): overlap re-fetch upserts revised values; lease skips a concurrent run;
+interrupted run resumes from `synced_through`; backfill floor respects assignment start and
+`SUPPLEMENTARY_BACKFILL_MAX_DAYS`; fan-out skips disabled and `reconnect_required`;
+`disable_orphaned_supplementary_sources` after assignment end; flag off skips; two concurrent
+refreshes never reuse a token.
+
+**`ReconciliationTests`** (~6): ok within tolerance; warn above it; one-interval shift detected;
+`insufficient` without official data; official data wins (nothing modified); on-demand view.
+
+### Backend — surfaces
+
+`metering/tests.py`, `invoices/test_annual_report.py`, `invoices/test_reports.py`,
+`mcp_server/tests/`: `gross_energy` present/absent for the participant dashboard, owner
+dashboard (with selected participant timeline), annual report and MCP; flag off equals 1.21.0
+output; annual statement shows gross months and `—` for low-coverage months, picks the right
+note, all four languages present; field catalog documents the new variable.
+
+### Backend — operations
+
+`backups/test_registry.py` coverage passes with the new section; `test_archive`/restore round-trip
+of sources and readings; manifest fingerprint; restore warns on a missing key.
+`test_rotate_integration_key` idempotent. System check and health entry.
+
+### Frontend
+
+- `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-hex.mjs`,
+  `npm run test:unit`, `npm run build`.
+- Unit tests: account tab visibility, source card per status, modal consent gate and write-only
+  key field, `GrossEnergyCard` withheld-reason states, rate-cell fallback to `—`.
+- Dev stack: connect a stub source, check the dashboard, owner list and report at desktop width
+  and ~400 px, no console errors; screenshots regenerated with `npm run screenshots`.
+
+### Acceptance criteria
+
+- [ ] A participant who personally holds a flagged metering point can connect Solar Manager with
+      their own API key and explicit consent; a wrong key never leaves a stored source behind.
+- [ ] The same participant can instead create a push source, receive its token once, and deliver
+      readings by push or CSV; the 2026-07-01 sample reproduces ~55 % self-sufficiency and ~14 %
+      self-consumption.
+- [ ] Their dashboard, the owner dashboard, the annual report, the annual statement PDF and MCP
+      show the gross figures labelled as reported by their own system, and show `—` with a reason
+      where coverage is below 95 %.
+- [ ] Invoices, allocation and invoice PDFs are identical in every amount with and without
+      supplementary data; no billing module imports the supplementary package.
+- [ ] A manager sees status and can disable, disconnect, purge and delete, but can neither
+      create a source nor read or set a credential.
+- [ ] Ingestion stops, and the credential is wiped, when the participant no longer holds the
+      metering point; the readings are kept.
+- [ ] A rotated Solar Manager token is persisted before use and concurrent syncs never reuse it.
+- [ ] Reconciliation flags a source whose export deviates from the meter by more than 10 % or
+      whose timestamps look shifted.
+- [ ] Backups round-trip both models; a restore on an instance without the key marks sources
+      `reconnect_required` and says why.
+- [ ] With the feature flag off the product behaves exactly as in 1.21.0.
+- [ ] All user-facing text is translated in de/fr/it/en; the user guide is updated.
+
+## 10. Implementation plan
+
+Six PRs, in order, each independently green on `ruff check .`, `manage.py check`, `pytest -q`,
+and for frontend work the lint/test/build set. Each updates this spec's status and test counts.
+
+**Phase 0: Verify before building. Done 2026-10-08.** The timestamp convention was checked
+against real meter data for the metering point behind the sample response (§6.2): `t` marks the
+interval start, shift 0, day totals within 0.05 % (export) and 0.4 % (import). Still unmeasured,
+and to be observed during PR 3: rate limits and the maximum `from`/`to` range per call.
+
+**PR 1: Foundation** (backend, no user-visible change)
+- Models and migrations (`SupplementarySource`, `SupplementaryReading`), constraints, the
+  `has_behind_meter_generation` guard.
+- `FeatureFlag.SUPPLEMENTARY_ENERGY_DATA_ENABLED`; settings (§4.5); `INTEGRATION_ENCRYPTION_KEYS`
+  in `.env.example`, `.env.production.example`, Helm values.
+- `metering/supplementary/crypto.py`, `rotate_integration_key`, system check.
+- `metering/supplementary.py`: `gross_energy_totals`, coverage, assignment clipping.
+- Backup registry section and manifest fingerprint; `SupplementaryIsolationTests`.
+- Tests: `SupplementaryModelTests`, `GrossEnergyMathTests`, `SupplementaryIsolationTests`.
+
+**PR 2: Sources, push and CSV** (backend)
+- `SupplementarySourcePermission`, serializers, viewset and the actions in §5, audit events.
+- `SupplementaryPushAuthentication`, `ozs_` tokens (a namespace parameter on
+  `accounts.api_keys.generate_key`), throttle scope, ingest and CSV validation.
+- Tests: `SupplementarySourceApiTests`, `SupplementaryIngestTests`.
+
+**PR 3: Solar Manager and reconciliation** (backend, async)
+- `providers.py`, `solar_manager.py`, the sync tasks, orphan job, beat entries, create-time
+  key check, `test` and `sync` actions.
+- `reconcile.py`, system-health entry.
+- Tests: `SolarManagerProviderTests`, `SyncTaskTests`, `ReconciliationTests`, with the real
+  response (identifiers removed) as a fixture, plus the matching meter `out`/`in` series for
+  the reconciliation tests.
+
+**PR 4: Statistics surfaces** (backend)
+- `gross_energy` on the participant and owner dashboards, annual report, annual statement
+  (context, template, translations, field catalog) and MCP; `supplementary_source_status` on the
+  metering point.
+- Tests: surface tests; flag-off parity with 1.21.0.
+
+**PR 5: Frontend and docs**
+- Types, API client, query keys, Account tab, modal, owner status panel, gross card, rate
+  cells, `AnnualReportSection`, i18n in four languages.
+- User guide chapter (connect Solar Manager; the Home Assistant push recipe; what the numbers
+  mean; privacy), screenshots regenerated, baseline specs updated (§11).
+
+**PR 6: Transfer archive and hardening**
+- Transfer archive: sources (without credential, push token or `reconciliation`; imported as
+  `enabled = false`, `status = "reconnect_required"`) and readings, with a format-version bump
+  and the `FIELDS_EXCLUDED_FROM_ARCHIVE` entry. Older archives import without them.
+- Anything the earlier PRs deferred; then flip the feature flag's code default only if the
+  project decides to (it ships off).
+
+## 11. Documentation to update
+
+- Baseline `2026-03-metering-point-management.md`: the `has_behind_meter_generation` guard and
+  `supplementary_source_status`.
+- `2026-03-metering-import-and-quality.md`: the dashboard payloads' `gross_energy` blocks.
+- `2026-09-annual-zev-report.md`: the participant row's `gross_energy`, TS types, tests.
+- Annual statement documentation (`2026-03-invoice-lifecycle-and-communication.md`): the new
+  context key and note.
+- `2026-09-mcp-server.md`: `consumption_summary` shape.
+- `2026-09-backup-and-restore.md`: the new section, manifest fingerprint, restore behaviour.
+- `2026-08-zev-transfer-archive.md`: the new sections and exclusions (PR 6).
+- `2026-09-behind-the-meter-generation.md`: replace the "possible follow-up" line with a link
+  to this spec.
+- `AGENTS.md`: add this spec to the completed-feature-spec list once shipped.
+- User guide: the metering-point, account, energy-balance and reports chapters; a new "Connect
+  your own energy data" page.
+
+## 12. Open decisions
+
+Defaults are what this spec implements; each can be changed before PR 2 without reshaping the
+model.
+
+1. **Can a ZEV owner connect a source for a participant?** Default **no**: the account is the
+   participant's, so the credential stays theirs. An owner can disable, disconnect and delete.
+   Revisit if participants without an account (no `Participant.user`) are common.
+2. **Notify the participant when a source needs reconnecting?** Default **status banner only**
+   in v1. An email on `reconnect_required` is a small follow-up using the existing email
+   infrastructure.
+3. **Resolution to keep.** Default **15 minutes**, matching the official data and the existing
+   hourly-profile charts. Storing only daily aggregates would reduce sensitivity but would drop
+   the profile charts.
+4. **Automatic retention.** Default **none** beyond the explicit purge/delete actions and the
+   disconnect-at-assignment-end rule. A retention window can be added as an `AppSettings` field.
+5. **Batteries and EVs.** Default **out**; the rates are battery-agnostic because they use
+   import/export. Add `battery_charge_kwh` / `battery_discharge_kwh` only if a chart needs them.
+6. **A second source per metering point** (e.g. Solar Manager and a Home Assistant push).
+   Default **one**; the one-to-one can become a foreign key with a priority later.
+7. **Home Assistant pull.** Default **not built**; revisit for self-hosted deployments where HA
+   is reachable from the server.
