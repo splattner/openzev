@@ -699,9 +699,7 @@ FeatureFlag.register(
     FeatureFlag.SUPPLEMENTARY_ENERGY_DATA_ENABLED,
     default=False,
     description=(
-        "Let participants with generation behind the meter connect their own energy data source "
-        "(Solar Manager, or a push/file feed) so statistics can show their real production and "
-        "self-sufficiency. Statistics only, never billing (ADR 0030). A Solar Manager source sends "
-        "requests to the vendor's cloud with the participant's API key."
+        "Let participants with PV behind their meter connect their own energy data (Solar Manager, "
+        "push or file) for statistics only, never billing (ADR 0030). Solar Manager sources call the vendor's cloud."
     ),
 )

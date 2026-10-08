@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.core import mail
 from django.test.utils import override_settings
 from rest_framework.test import APIClient
@@ -297,6 +297,15 @@ class RegistrationTests(TestCase):
 
 		self.assertEqual(resp.status_code, 403)
 		self.assertIn("detail", resp.data)
+
+
+class FeatureFlagRegistryTests(SimpleTestCase):
+    def test_every_registered_description_fits_its_column(self):
+        # SQLite does not enforce varchar lengths, PostgreSQL does: a long
+        # description only fails in the second CI leg, and then on every request.
+        limit = FeatureFlag._meta.get_field("description").max_length
+        too_long = {name: len(text) for name, text in FeatureFlag.DESCRIPTIONS.items() if len(text) > limit}
+        self.assertEqual(too_long, {})
 
 
 class FeatureFlagsApiTests(TestCase):
