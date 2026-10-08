@@ -2429,12 +2429,16 @@ same issuer — the flagship <strong>ZEV STWEG Sonnenhof</strong> and the smalle
 data to show. It also has a viewer of the flagship community and a property
 manager who manages both, to show per-community access. Credentials and the full list of what the seed creates are in
 the root <a href="https://github.com/splattner/openzev/blob/main/README.md#seed-data--demo-accounts"><code>README.md</code></a>.</p>
+<p>The flagship includes <strong>Netznutzung dynamisch</strong>, a dynamic tariff with
+synthetic demo prices, so its tariff details and the platform's dynamic-price
+console have data to show. It starts after the demo's invoiced periods.</p>
 <h3 id="resetting-demo-data">Resetting Demo Data<a class="headerlink" href="#resetting-demo-data" title="Permanent link">&para;</a></h3>
 <p>To reload the demo dataset:</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>backend<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>seed_demo
 </code></pre></div>
 <p>This refreshes demo readings, invoices, import/email logs and audit events for
-both communities. Issued contract snapshots are retained.</p>
+both communities, and fills the synthetic dynamic-price series through tomorrow.
+Its stored price history and issued contract snapshots are retained.</p>
 <h2 id="first-time-setup">First-Time Setup<a class="headerlink" href="#first-time-setup" title="Permanent link">&para;</a></h2>
 <p>This tour uses the demo accounts. On a production instance, sign in with the
 admin account you <a href="#creating-the-first-admin-account">created above</a>; the
