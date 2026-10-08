@@ -46,10 +46,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libffi-dev \
     shared-mime-info \
+    fonts-inter \
     fonts-liberation \
     fonts-noto \
     nginx \
     && rm -rf /var/lib/apt/lists/*
+
+# The PDFs are set in Inter; without it fontconfig falls back to another face
+# silently, so fail the build instead.
+RUN test "$(fc-match -f '%{family[0]}' Inter)" = Inter \
+    || { echo "fonts-inter is not installed: the PDFs would not render in Inter" >&2; exit 1; }
 
 COPY backend/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt && \

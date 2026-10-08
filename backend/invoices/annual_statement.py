@@ -28,6 +28,7 @@ from metering.models import MeterReading, ReadingDirection
 from metering.supplementary.surfaces import statement_gross
 from zev.models import AllocationMode, MeteringPointAssignment
 from .generated_chart_tokens import (
+    _CHART_FONT_FAMILY,
     _CHART_GRID,
     _CHART_GRIDLINE,
     _CHART_LABEL,
@@ -506,7 +507,8 @@ def _build_monthly_chart_svg(monthly_data: list[dict], tr: dict) -> str | None:
     gap = bar_area_w / 12 * 0.3
 
     svg_parts = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {chart_w} {chart_h}" class="bar-chart">'
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {chart_w} {chart_h}" class="bar-chart"'
+        f' font-family=\'{_CHART_FONT_FAMILY}\'>'
     ]
 
     # Y-axis labels

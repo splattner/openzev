@@ -21,6 +21,7 @@
   --ink: #0f172a;
   --ink-soft: #334155;
   --line: #e2e8f0;
+  --line-strong: #cbd5e1;
   --line-subtle: #f1f5f9;
   --muted: #64748b;
   --neutral-100: #e2e8f0;
@@ -37,4 +38,5 @@
   --warning-800: #854d0e;
   --white: #ffffff;
   --zebra: #f3f6f2;
+  --font-print: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
 }

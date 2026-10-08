@@ -119,6 +119,14 @@ function validate(tokens) {
   assert(tokens.type && typeof tokens.type === 'object', 'type must be an object')
   const typeJson = JSON.stringify(tokens.type)
   assert(!HEX_CONTAINS.test(typeJson), 'type must not contain raw hex literals')
+  // Both stacks are emitted verbatim into CSS custom properties (screen and
+  // print) and into an SVG attribute (PDF charts), so they must be plain
+  // font-family lists: no declaration or attribute delimiters.
+  for (const medium of ['screen', 'print']) {
+    const stack = tokens.type.fontFamily?.[medium]
+    assert(typeof stack === 'string' && stack.trim() !== '', `type.fontFamily.${medium} must be a non-empty string`)
+    assert(!/[;{}<>]/.test(stack), `type.fontFamily.${medium} must be a plain font-family list, got: ${stack}`)
+  }
 
   // ensure no hex outside primitives and charts
   const semanticsJson = JSON.stringify(tokens.semantics)
@@ -148,6 +156,8 @@ function generateTokensCss(tokens) {
   for (const k of fieldKeys) {
     lines.push(`  ${k}: ${tokens.fields[k]};`)
   }
+  // The screen face; the print face is emitted to the PDF tokens.
+  lines.push(`  --font-sans: ${tokens.type.fontFamily.screen};`)
   lines.push('}')
   // themes: emit [data-theme] overrides for any alternate theme maps
   // (the default theme is expressed by semantics in :root).
@@ -172,6 +182,9 @@ function generatePdfTokensCss(tokens) {
   for (const k of primKeys) {
     lines.push(`  ${k}: ${tokens.primitives[k]};`)
   }
+  // Documents set the same family as the screen (Inter), installed for the
+  // renderer; the rest of the stack is the pre-Inter fallback.
+  lines.push(`  --font-print: ${tokens.type.fontFamily.print};`)
   lines.push('}')
   lines.push('')
   return lines.join('\n')
@@ -287,6 +300,8 @@ function generatePyTokens(tokens) {
   lines.push(`_DIVERGING_POSITIVE = ${JSON.stringify(c.divergingPositive)}`)
   // On-bar label fill — Python-only: no screen chart currently paints on-bar labels.
   if (c.labelOnFill) lines.push(`_CHART_LABEL_ON_FILL = ${JSON.stringify(c.labelOnFill)}`)
+  // Inline SVG does not inherit the document font, so chart roots set it.
+  lines.push(`_CHART_FONT_FAMILY = ${JSON.stringify(tokens.type.fontFamily.print)}`)
   lines.push('')
   return lines.join('\n')
 }
