@@ -487,7 +487,7 @@ available after billing. The selected community appears above the page title.
 - The wrong ZEV is selected (check the community name above the page title).
 
 **Fix:**
-1. Check the ZEV switcher at the top of the sidebar (or the community name above the page title).
+1. Check the community name above the page title (click it to choose another).
 2. Verify that [Participants](03-participant-management.md) exist and have [metering-point assignments](04-metering-points.md) covering the period.
 
 ### Invoice totals look wrong

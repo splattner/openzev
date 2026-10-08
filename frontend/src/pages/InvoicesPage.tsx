@@ -46,6 +46,7 @@ export function InvoicesPage() {
         <div className="page-stack">
             <PageHeader
                 eyebrow={selectedZev?.name}
+                communitySwitch
                 scopeNote={scopeNote}
                 title={t('pages.invoices.title')}
                 description={t('pages.invoices.description')}

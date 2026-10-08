@@ -64,6 +64,7 @@ export function ImportsPage() {
         <div className="page-stack">
             <PageHeader
                 eyebrow={selectedZev?.name}
+                communitySwitch
                 scopeNote={scopeNote}
                 title={t('pages.imports.title')}
                 description={t('pages.imports.description')}

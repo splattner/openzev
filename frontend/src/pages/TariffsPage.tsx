@@ -254,6 +254,7 @@ export function TariffsPage() {
     const header = (
         <PageHeader
             eyebrow={selectedZev?.name}
+            communitySwitch
             scopeNote={scopeNote}
             title={t('pages.tariffs.title')}
             description={t('pages.tariffs.description')}

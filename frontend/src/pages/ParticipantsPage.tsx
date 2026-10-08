@@ -329,6 +329,7 @@ export function ParticipantsPage() {
     const header = (
         <PageHeader
             eyebrow={selectedZev?.name}
+            communitySwitch
             scopeNote={scopeNote}
             title={t('pages.participants.title')}
             description={t('pages.participants.description')}

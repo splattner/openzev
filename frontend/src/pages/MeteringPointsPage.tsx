@@ -31,6 +31,7 @@ export function MeteringPointsPage() {
         <div className="page-stack">
             <PageHeader
                 eyebrow={selectedCommunityName({ selectedZev, entries, selectedZevId })}
+                communitySwitch
                 scopeNote={scopeNote}
                 title={t('pages.meteringPoints.title')}
                 description={t(isZevScope ? 'pages.meteringPoints.adminDescription' : 'pages.meteringPoints.participantDescription')}

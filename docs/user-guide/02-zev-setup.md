@@ -397,9 +397,9 @@ Participants automatically see only their own metering data and invoices (ZEV-sc
 
 If running multiple ZEVs:
 
-1. **ZEV switcher:** Use the ZEV switcher at the top of the sidebar (top-left); the selected community is also shown above the page title on every page. Under Platform pages (`/admin/*`) the switcher is replaced by the **Platform administration** indicator — enter a ZEV via **Platform → Overview → ZEVs → Manage** instead
+1. **Choosing the ZEV:** The selected community is named above the page title on every page; click the name (it has a small arrow when you have more than one community) and pick another from the list. Platform pages (`/admin/*`) show **Platform administration** there instead — enter a ZEV via **Platform → Overview → ZEVs → Manage**
 2. **Each ZEV is independent:** Tariffs, participants, and invoices are isolated
-3. **One account, several communities:** an account can manage or view several ZEVs and take part in others; the switcher lists each with your relation to it
+3. **One account, several communities:** an account can manage or view several ZEVs and take part in others; the list behind the community name shows each with your relation to it
 
 ## Next Steps
 

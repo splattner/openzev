@@ -380,8 +380,8 @@ const twoZevs = [{ id: '42', name: 'Review ZEV' }, { id: '43', name: 'Other ZEV'
 const overviewEndpoint = '/invoices/invoices/period-overview/'
 
 async function switchToOtherZev(page: Page) {
-  await page.locator('.sidebar-zev-menu .user-menu-trigger').click()
-  await page.locator('.zev-dropdown-item').filter({ hasText: 'Other ZEV' }).click()
+  await page.locator('main .community-switch').click()
+  await page.getByRole('menuitem', { name: 'Other ZEV' }).click()
 }
 
 /**
@@ -446,7 +446,7 @@ for (const role of ['manager', 'viewer'] as const) {
     await expect(page.locator('main .eyebrow').first()).toHaveText(role === 'viewer' ? 'Review ZEV · Viewer (read only)' : 'Review ZEV')
     await expect(page.locator('main').getByText('MP-42', { exact: true }).first()).toBeVisible()
     await expect(page.locator('main').getByText('MP-43', { exact: true })).toHaveCount(0)
-    await expect(page.locator('.sidebar-zev-menu')).toHaveCount(0)
+    await expect(page.locator('.community-switch')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'New Metering Point', exact: true })).toHaveCount(role === 'manager' ? 1 : 0)
     await expect(page.getByRole('button', { name: 'Add building', exact: true })).toHaveCount(role === 'manager' ? 1 : 0)
 

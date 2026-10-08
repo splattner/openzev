@@ -30,6 +30,7 @@ export function OverviewPage() {
         <div className="page-stack">
             <PageHeader
                 eyebrow={selectedZev?.name}
+                communitySwitch
                 scopeNote={scopeNote}
                 title={t('pages.overview.title')}
                 description={t('pages.overview.description')}

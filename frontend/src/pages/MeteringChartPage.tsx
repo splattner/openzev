@@ -546,6 +546,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
         <div className="page-stack">
             <PageHeader
                 eyebrow={selectedCommunityName({ selectedZev, entries, selectedZevId })}
+                communitySwitch
                 scopeNote={scopeNote}
                 title={t('pages.meteringData.title')}
                 description={t('pages.meteringData.description')}

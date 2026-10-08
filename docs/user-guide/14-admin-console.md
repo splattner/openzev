@@ -3,7 +3,7 @@
 > This guide retains its historical filename (`14-admin-console.md`) and old
 > anchor links; the product term is now **Platform**.
 
-This guide covers all administration features available to users with the **Admin** role. The platform tooling lives in the sidebar under **Platform** (routes `/admin/*`). While there, the shell shows a persistent **Platform administration** indicator and no tenant context is displayed — the ZEV switcher is hidden until you re-enter a community via **Overview → ZEVs → Manage** (your previously selected community is preserved).
+This guide covers all administration features available to users with the **Admin** role. The platform tooling lives in the sidebar under **Platform** (routes `/admin/*`). While there, every page shows **Platform administration** above its title and no community is displayed or chosen — re-enter a community via **Overview → ZEVs → Manage** (your previously selected community is preserved).
 
 The Platform group has four entries (hubs with tabs-as-routes):
 
@@ -220,7 +220,7 @@ billing-relevant, and destructive actions.
   and viewers see the events of the currently selected community.
   Managers and viewers only see events for communities they can access;
   they cannot see global or other-community events.
-  There is no community selector here (it follows the sidebar switcher) and no
+  There is no community selector here (it follows the community chosen above the page title) and no
   text search; the filters are date range, actor, category, action type,
   target type, target ID, and status. (The legacy route `/audit-logs` redirects here.)
 

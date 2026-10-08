@@ -46,6 +46,7 @@ export function ReportsPage() {
         <div className="page-stack">
             <PageHeader
                 eyebrow={scopeName}
+                communitySwitch
                 scopeNote={scopeNote}
                 title={t('pages.reports.title')}
                 description={isParticipant ? t('pages.reports.participantDescription') : t('pages.reports.description')}

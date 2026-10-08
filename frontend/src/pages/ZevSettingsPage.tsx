@@ -573,6 +573,7 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
         <div className="page-stack">
             <PageHeader
                 eyebrow={selectedZev?.name}
+                communitySwitch
                 scopeNote={scopeNote}
                 title={t('pages.zevSettings.title')}
                 description={t('pages.zevSettings.description')}

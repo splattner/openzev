@@ -65,8 +65,12 @@ read as relatives rather than as one product:
 3. **A quieter shell.** The sidebar is a white sheet with a hairline beside
    the paper workspace: a horizontal logo lockup, compact navigation that fits
    a 900px viewport, the current page as a pale forest row with a short forest
-   mark, and the signed-in account at its foot (account, language, log out)
-   instead of a top bar. On phones a white app bar carries the menu button and
+   mark, and the signed-in account at its foot (account, language, log out,
+   and the source link as the panel's last line) instead of a top bar. The
+   sidebar names no scope: the community is named — and chosen — in each
+   page's scope line, the kicker above the title, which opens the list of the
+   account's communities when there is more than one (the documents, too,
+   name their issuer once, above the title). On phones a white app bar carries the menu button and
    the lockup. Forest is kept for what matters — the current page, the primary
    action, the one accent figure — as the documents keep it for their rule,
    table headers and accent card. Sheets are white with a hairline and no
@@ -128,6 +132,18 @@ Trade-offs:
    forms and no gradient chrome — the shared elements are
    the ones that carry meaning (rules, tiles, pills, type), not the page
    geometry.
+7. **Keep the community switcher in the sidebar.** The usual workspace-switcher
+   place, and where it was. Rejected: the page's scope line already
+   named the community right under it, so every page said it twice, and the
+   switcher card (plus a platform chip of the same height) made the sidebar
+   top heavy. In the scope line the name and the choice are one element, it
+   works the same with a collapsed rail and on phones (no drawer to open), and
+   the sidebar keeps only the logo, the navigation and the account.
+   Consequence, accepted: the community is switched only on pages that are
+   scoped to it (those whose header carries the scope line). Platform pages
+   (`/admin/*`), the account, a participant's own pages and detail pages
+   (one invoice, which belongs to one community) offer no switcher; their
+   content does not change with the selection.
 
 ## Notes
 

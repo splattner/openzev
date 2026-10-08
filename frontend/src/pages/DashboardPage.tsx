@@ -38,6 +38,7 @@ export function DashboardPage() {
         <div className="page-stack">
             <PageHeader
                 eyebrow={scopeName}
+                communitySwitch
                 scopeNote={scopeNote}
                 title={t(isZevScopedRole ? 'pages.energyBalancePage.title' : 'dashboard.title')}
                 description={t(descriptionKey)}
