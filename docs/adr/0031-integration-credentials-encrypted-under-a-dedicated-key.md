@@ -1,6 +1,6 @@
 # ADR 0031: Third-party integration credentials are encrypted under a dedicated, rotatable key
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-08
 
 ## Context

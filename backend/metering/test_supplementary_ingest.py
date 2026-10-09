@@ -197,6 +197,16 @@ class PushAuthenticationTests(IngestTestCase):
         self.assertEqual(response.json()["detail"], "Source is disabled.")
         self.assertEqual(SupplementaryReading.objects.count(), 0)
 
+    def test_a_disabled_zev_accepts_nothing(self):
+        from django.utils import timezone
+
+        self.zev.disabled_at = timezone.now()
+        self.zev.save()
+        response = self.push([reading_payload(quarter_hours(1)[0])])
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "This ZEV is disabled.")
+        self.assertEqual(SupplementaryReading.objects.count(), 0)
+
     def test_a_disconnected_source_no_longer_accepts_its_token(self):
         client_for(self.holder_user).post(f"{SOURCES_URL}{self.source.pk}/disconnect/")
         self.assertEqual(self.push([reading_payload(quarter_hours(1)[0])]).status_code, 401)

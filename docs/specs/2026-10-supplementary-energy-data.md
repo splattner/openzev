@@ -1,7 +1,7 @@
 # Feature Spec: Supplementary energy data for metering points with generation behind the meter
 
 - Spec ID: SPEC-2026-supplementary-energy-data
-- Status: In Progress
+- Status: Implemented
 - Scope: Major
 - Type: Feature
 - Owners: Sebastian Plattner
@@ -894,27 +894,29 @@ CI runs `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-he
 
 ### Acceptance criteria
 
-- [ ] A participant who personally holds a flagged metering point can connect Solar Manager with
+- [x] A participant who personally holds a flagged metering point can connect Solar Manager with
       their own API key and explicit consent; a wrong key never leaves a stored source behind.
+      (Verified against a stub vendor; not yet against the real one.)
 - [ ] The same participant can instead create a push source, receive its token once, and deliver
       readings by push or CSV; the 2026-07-01 sample reproduces ~55 % self-sufficiency and ~14 %
-      self-consumption.
-- [ ] Their dashboard, the owner dashboard, the annual report, the annual statement PDF and MCP
+      self-consumption. (Push and CSV are tested; the real sample is not committed, so its figures
+      were checked once by hand and are not a test.)
+- [x] Their dashboard, the owner dashboard, the annual report, the annual statement PDF and MCP
       show the gross figures labelled as reported by their own system, and show `—` with a reason
       where coverage is below 95 %.
-- [ ] Invoices, allocation and invoice PDFs are identical in every amount with and without
+- [x] Invoices, allocation and invoice PDFs are identical in every amount with and without
       supplementary data; no billing module imports the supplementary package.
-- [ ] A manager sees status and can disable, disconnect, purge and delete, but can neither
+- [x] A manager sees status and can disable, disconnect, purge and delete, but can neither
       create a source nor read or set a credential.
-- [ ] Ingestion stops, and the credential is wiped, when the participant no longer holds the
+- [x] Ingestion stops, and the credential is wiped, when the participant no longer holds the
       metering point; the readings are kept.
-- [ ] A rotated Solar Manager token is persisted before use and concurrent syncs never reuse it.
-- [ ] Reconciliation flags a source whose export deviates from the meter by more than 10 % or
+- [x] A rotated Solar Manager token is persisted before use and concurrent syncs never reuse it.
+- [x] Reconciliation flags a source whose export deviates from the meter by more than 10 % or
       whose timestamps look shifted.
-- [ ] Backups round-trip both models; a restore on an instance without the key warns, naming the
+- [x] Backups round-trip both models; a restore on an instance without the key warns, naming the
       key fingerprint, and the affected sources become `reconnect_required` at their first sync.
-- [ ] With the feature flag off the product behaves exactly as in 1.21.0.
-- [ ] All user-facing text is translated in de/fr/it/en; the user guide is updated.
+- [x] With the feature flag off the product behaves exactly as in 1.21.0.
+- [x] All user-facing text is translated in de/fr/it/en; the user guide is updated.
 
 ## 10. Implementation plan
 
@@ -970,12 +972,23 @@ and to be observed during PR 3: rate limits and the maximum `from`/`to` range pe
 - User guide chapter (connect Solar Manager; the Home Assistant push recipe; what the numbers
   mean; privacy), screenshots regenerated, baseline specs updated (§11).
 
-**PR 6: Transfer archive and hardening**
-- Transfer archive: sources (without credential, push token or `reconciliation`; imported as
-  `enabled = false`, `status = "reconnect_required"`) and readings, with a format-version bump
-  and the `FIELDS_EXCLUDED_FROM_ARCHIVE` entry. Older archives import without them.
-- Anything the earlier PRs deferred; then flip the feature flag's code default only if the
-  project decides to (it ships off).
+**PR 6: Transfer archive and hardening** (implemented, see §9)
+- Transfer archive format 7: the opt-in `supplementary_data` section. Sources travel by `meter_id` and
+  archive `participant_id` without credential, push token, `reconciliation` or any live state, and
+  are imported **disconnected** (`enabled = false`, which the model shows as `disabled`; a status of
+  `reconnect_required` would not survive `SupplementarySource.save()`, and "disconnected" is what the
+  participant sees and fixes anyway). Readings travel as one CSV per source. The `SchemaParityTests`
+  entry for `SUPPLEMENTARY_SOURCE_FIELDS` lists what is excluded and why. Older archives import
+  without it. It is opt-in everywhere (backend default, UI default) because it is raw household data
+  that managers otherwise see only as statistics.
+- Hardening found while doing it: a source in a **disabled ZEV** no longer accepts pushes (`403 "This
+  ZEV is disabled."`), is skipped by the sync (`zev_disabled`) and is not queued by the fan-out.
+- ADRs 0030 and 0031 accepted, the spec marked implemented, `AGENTS.md` lists it.
+- **Not done, on purpose:** the feature flag still ships off; the demo seed has no net-metered
+  participant (so the guide screenshots are not part of `npm run screenshots`); the reconciliation
+  day-by-day view has an API client function but no screen; there is no automatic retention (§12);
+  the Solar Manager rate limit and maximum range per call are still unmeasured, and the client has
+  never talked to the real vendor in a test run.
 
 ## 11. Documentation to update
 

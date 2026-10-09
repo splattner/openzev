@@ -108,7 +108,25 @@ commit — a failed audit must not cause a duplicate import on client retry).
 
 ## 6. Archive format (`backend/zev/transfer/schema.py`)
 
-`FORMAT_VERSION = 6`, `SUPPORTED_FORMAT_VERSIONS = {1, 2, 3, 4, 5, 6}`. Version 6
+`FORMAT_VERSION = 7`, `SUPPORTED_FORMAT_VERSIONS = {1, 2, 3, 4, 5, 6, 7}`. Version 7
+(SPEC-2026-supplementary-energy-data §10) adds the **opt-in** section `supplementary_data`
+(`SECTION_SUPPLEMENTARY`, requires `metering_points` and `participants`, listed in `OPT_IN_SECTIONS`:
+an export that names no sections leaves it out, because it is a participant's own household
+profile, shared with managers as statistics under that participant's consent and not as raw data).
+It is two parts: `supplementary_sources.json` (one entry per energy data source,
+`{"id", "meter_id", "participant_id", <SUPPLEMENTARY_SOURCE_FIELDS>}`, `SUPPLEMENTARY_SOURCE_FIELDS =
+(provider, label, external_id, consented_at, covers_from, synced_through)`) and
+`supplementary_readings/<meter>-<hash>.csv` (one file per source, even when empty, columns
+`SUPPLEMENTARY_READING_CSV_COLUMNS = (meter_id, timestamp, consumption_kwh, production_kwh,
+import_kwh, export_kwh)`). Nothing that holds a secret or describes a live connection travels: no
+credential, push token or its hash, no `enabled`, `status`, `last_*`, `reconciliation` or
+`created_by`. The manifest counts `supplementary_data` (sources) and `supplementary_readings`
+(`SUBCOUNT_SECTIONS` maps the latter to the section). An import recreates each source **disconnected**
+(`enabled = False`, so `status = disabled`; no key, no token), validates every entry and row (known
+meter and participant, flagged meter, provider and id rules from the model, non-negative values,
+15-minute alignment, no duplicates), rolls the whole import back on one error, and adds a warning
+to the summary that the participants have to connect again. The importing account is not asked to
+consent for anyone: reconnecting is the participant's act. Version 6
 (#890, SPEC-2026-10-buildings-and-sites §8) carries the ZEV's buildings in the `metering_points`
 section: `buildings.json` (`{"id", <BUILDING_FIELDS>}`, `BUILDING_FIELDS = (name, address_line1,
 address_line2, postal_code, city, egid, notes)`), each metering-point entry names its building by
@@ -522,7 +540,25 @@ collector warning that any archived periods on it were dropped; a
 format-version-3 percentage tariff with no `percentage` at all imports with no
 band.
 
-### Backend — `backend/zev/test_transfer_invoice_pdfs.py` (format version 6)
+### Backend — `backend/zev/test_transfer_supplementary.py` (format version 7, 38 tests)
+
+`OptInTests` (7: the section is known and opt-in; it needs metering points and participants; a default export
+and a default endpoint call leave it out and an explicit request includes it; the section list offers it with
+its prerequisites; it does not depend on the feature flag), `SecretsNeverTravelTests` (3: no member contains
+the credential, its ciphertext, the push token, its prefix or hash, `last_error` or `reconciliation`; a source
+entry has exactly the documented keys; no account reference), `RoundTripTests` (13: sources and readings come
+back; a source arrives disconnected without any secret or live state; what describes the data is kept; sources
+point at the imported participants and meters; readings are identical; the metering data and its import log
+are untouched; a source can be reconnected afterwards; a second export matches; leaving the section out imports
+none; importing without naming sections takes what the archive has; an empty source travels as an empty file;
+invoices are the same with and without the section; the import warns that sources are disconnected) and
+`RejectedSupplementaryArchiveTests` (15: unknown meter, participant and provider; an unflagged meter; an invalid
+Solar Manager id; an external id on a push source; two sources for one meter; a negative, unaligned, duplicate,
+garbled, missing-column and unknown-meter reading; a dropped readings file caught by the manifest counts; one
+bad row rolls everything back). `SchemaParityTests` gains `SUPPLEMENTARY_SOURCE_FIELDS` against
+`SupplementarySource` with its excluded set.
+
+### Backend — `backend/zev/test_transfer_invoice_pdfs.py` (format version 7)
 
 `FormatVersionTests`: `FORMAT_VERSION == 6`; `SUPPORTED_FORMAT_VERSIONS ==
 {1, 2, 3, 4, 5, 6}`; `invoice_pdfs` is a known section depending on `invoices`.

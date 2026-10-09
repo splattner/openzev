@@ -124,7 +124,7 @@ when the capability changes; do not treat them as baselines:
   namespace shipped in 1.15.0. See [#740](https://github.com/splattner/openzev/issues/740).
 - `2026-10-zev-access-grants.md` (Approved, in progress) — per-ZEV manager/viewer grants replace the
   platform role; phase 1 of [#761](https://github.com/splattner/openzev/issues/761). ADR 0027.
-- `2026-10-supplementary-energy-data.md` (In progress; PR 1 foundation) — gross production/consumption from a participant's own
+- `2026-10-supplementary-energy-data.md` (Implemented) — gross production/consumption from a participant's own
   system (Solar Manager pull, push/CSV) for metering points with generation behind the meter, statistics
   only. See [#925](https://github.com/splattner/openzev/issues/925). ADRs 0030, 0031.
 

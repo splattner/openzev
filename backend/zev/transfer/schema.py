@@ -11,7 +11,8 @@ break every archive already sitting on someone's disk.
 """
 
 # Bumped whenever the archive layout changes in a way an older importer cannot
-# read. Version 6 carries the ZEV's buildings (#890): metering points and
+# read. Version 7 adds the opt-in supplementary_data section (a participant's
+# own energy data sources and readings, never their credentials). Version 6 carries the ZEV's buildings (#890): metering points and
 # landowner roles point at one. Version 5 carries the ZEV's parties and their dated roles (#761):
 # participants point at a party instead of carrying its name and address.
 # Version 4 moves the percentage of a percentage-of-energy tariff onto
@@ -21,11 +22,12 @@ break every archive already sitting on someone's disk.
 # provenance. Version 1 remains readable for static exports and legacy
 # adapter-based dynamic descriptors. An archive naming a version that is not
 # listed here is rejected outright rather than imported half-understood.
-FORMAT_VERSION = 6
-SUPPORTED_FORMAT_VERSIONS = frozenset({1, 2, 3, 4, 5, 6})
+FORMAT_VERSION = 7
+SUPPORTED_FORMAT_VERSIONS = frozenset({1, 2, 3, 4, 5, 6, 7})
 
 MANIFEST_NAME = "manifest.json"
 READINGS_DIR = "readings"
+SUPPLEMENTARY_READINGS_DIR = "supplementary_readings"
 INVOICE_PDFS_DIR = "invoices/pdf"
 
 SECTION_ZEV = "zev"
@@ -33,6 +35,7 @@ SECTION_PARTICIPANTS = "participants"
 SECTION_METERING_POINTS = "metering_points"
 SECTION_TARIFFS = "tariffs"
 SECTION_READINGS = "readings"
+SECTION_SUPPLEMENTARY = "supplementary_data"
 SECTION_INVOICES = "invoices"
 SECTION_INVOICE_PDFS = "invoice_pdfs"
 
@@ -47,9 +50,17 @@ SECTIONS = (
     SECTION_METERING_POINTS,
     SECTION_TARIFFS,
     SECTION_READINGS,
+    SECTION_SUPPLEMENTARY,
     SECTION_INVOICES,
     SECTION_INVOICE_PDFS,
 )
+
+# Sections an export only includes when asked for by name. Supplementary data is
+# a participant's own 15-minute household profile, shared with the ZEV's
+# managers as statistics under that participant's consent (ADR 0030), not as raw
+# data, so a request that names no sections must not carry it out of the
+# instance.
+OPT_IN_SECTIONS = (SECTION_SUPPLEMENTARY,)
 
 # What a section cannot be imported without. These mirror actual foreign keys,
 # so the check is enforceable rather than advisory:
@@ -71,6 +82,7 @@ SECTION_DEPENDENCIES = {
     SECTION_METERING_POINTS: (SECTION_PARTICIPANTS,),
     SECTION_TARIFFS: (),
     SECTION_READINGS: (SECTION_METERING_POINTS,),
+    SECTION_SUPPLEMENTARY: (SECTION_METERING_POINTS, SECTION_PARTICIPANTS),
     SECTION_INVOICES: (SECTION_PARTICIPANTS,),
     SECTION_INVOICE_PDFS: (SECTION_INVOICES,),
 }
@@ -83,6 +95,7 @@ SECTION_FILES = {
     SECTION_METERING_POINTS: "metering_points.json",
     SECTION_TARIFFS: "tariffs.json",
     SECTION_INVOICES: "invoices.json",
+    SECTION_SUPPLEMENTARY: "supplementary_sources.json",
 }
 
 # Format 5: the participants section is three files. Parties come first (a
@@ -100,6 +113,7 @@ SUBCOUNT_SECTIONS = {
     "parties": SECTION_PARTICIPANTS,
     "party_roles": SECTION_PARTICIPANTS,
     "buildings": SECTION_METERING_POINTS,
+    "supplementary_readings": SECTION_SUPPLEMENTARY,
 }
 
 # ── Field lists ────────────────────────────────────────────────────────────
@@ -222,6 +236,35 @@ METERING_POINT_FIELDS = (
     "is_active",
     "location_description",
     "has_behind_meter_generation",
+)
+
+# A supplementary energy data source (format 7), pointing at its metering point
+# by ``meter_id`` and at its participant by the archive ``participant_id``.
+#
+# No credential or push token travels, and neither does anything that describes
+# a live connection: ``enabled``, ``status``, ``last_*`` and ``reconciliation``
+# belong to the instance that held the connection. An imported source arrives
+# disconnected, and its participant connects again (a new key, or a new push
+# token) on the instance that now holds the data. ``created_by`` is an account
+# reference, and accounts never travel.
+SUPPLEMENTARY_SOURCE_FIELDS = (
+    "provider",
+    "label",
+    "external_id",
+    "consented_at",
+    "covers_from",
+    "synced_through",
+)
+
+# One CSV per source, like the metering readings. ``meter_id`` names the
+# metering point (and so the source: one source per point).
+SUPPLEMENTARY_READING_CSV_COLUMNS = (
+    "meter_id",
+    "timestamp",
+    "consumption_kwh",
+    "production_kwh",
+    "import_kwh",
+    "export_kwh",
 )
 
 ASSIGNMENT_FIELDS = (
@@ -347,7 +390,9 @@ def normalise_sections(requested, *, available=None):
     ``available`` is given — every section that is not in the archive.
     """
     if requested is None:
-        return tuple(SECTIONS if available is None else available)
+        if available is not None:
+            return tuple(available)
+        return tuple(name for name in SECTIONS if name not in OPT_IN_SECTIONS)
 
     if isinstance(requested, str) or not hasattr(requested, "__iter__"):
         raise ValueError("sections must be a list of section names.")

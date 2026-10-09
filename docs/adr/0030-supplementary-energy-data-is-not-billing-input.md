@@ -1,6 +1,6 @@
 # ADR 0030: Supplementary energy data lives in its own table and never reaches billing
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-08
 
 ## Context

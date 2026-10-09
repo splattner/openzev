@@ -276,6 +276,15 @@ class SyncSkipTests(SyncTestCase):
         self.source.save()
         self.assertEqual(self.run_sync()["skipped"], "disabled")
 
+    def test_a_source_in_a_disabled_zev_is_skipped_and_not_queued(self):
+        self.zev.disabled_at = timezone.now()
+        self.zev.save()
+        self.assertEqual(self.run_sync()["skipped"], "zev_disabled")
+        self.assertEqual(self.vendor.refresh_requests, [])
+        with mock.patch.object(tasks.sync_supplementary_source, "delay") as delay:
+            self.assertEqual(tasks.refresh_supplementary_sources(), {"queued": 0})
+        delay.assert_not_called()
+
     def test_a_source_that_needs_a_reconnect_is_skipped(self):
         self.source.mark_reconnect_required("enter the key")
         self.source.save()

@@ -110,6 +110,8 @@ def sync_source(source: SupplementarySource, *, backfill: bool = False, now: dat
         raise SyncSkipped("not_a_pull_source")
     if not source.enabled:
         raise SyncSkipped("disabled")
+    if source.metering_point.zev.disabled_at is not None:
+        raise SyncSkipped("zev_disabled")
     if source.status == SupplementaryStatus.RECONNECT_REQUIRED:
         raise SyncSkipped("reconnect_required")
 

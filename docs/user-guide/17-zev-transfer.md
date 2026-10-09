@@ -55,8 +55,24 @@ You get a file named `openzev-export-<community>-<date>.zip`.
 | **Metering points & assignments** | The community's buildings, meters (each in its building) and which participant held each one over which period |
 | **Tariffs** | Every tariff, all its versions, and their price bands |
 | **Meter readings** | Every reading, as one CSV per meter |
+| **Own energy data** | The energy data sources participants connected for a PV system behind their meter, and their quarter-hour values — opt-in, see below |
 | **Invoices** | Invoices and their line items |
 | **Invoice PDFs** | The original rendered document for every invoice that has one — needs Invoices |
+
+### Own energy data
+
+[Own energy data](20-energy-data.md) is a participant's household profile — what their own system
+measured, every quarter hour. They connected it for statistics, and you, as manager, see it as
+statistics rather than as raw values. So this section is **never ticked by default**, and a request
+that names no sections (a script calling the export) leaves it out. Tick it deliberately, for
+instance when you move a community to a new instance and want the history to come along.
+
+What travels is the data and what describes it (the source type, its Solar Manager ID or name, the
+period covered). **No key and no push token travels**, and neither does anything about the live
+connection. After an import every source is **disconnected**: it keeps its data, but no new data
+arrives until the participant opens **Account → Energy data** and connects again with their own key
+or a new push token. The import tells you so. It needs **Participants** and **Metering points &
+assignments**, because a source belongs to a participant's metering point.
 
 Some sections need others. Assignments point at participants, readings point at
 metering points, invoices point at participants, and invoice PDFs point at
@@ -200,6 +216,8 @@ openzev-export-demo-community-2026-08-04.zip
   tariffs.json           versions and price bands
   invoices.json          invoices and line items
   readings/<meter>.csv   one file per meter (name includes a short checksum)
+  supplementary_sources.json            energy data sources, if ticked
+  supplementary_readings/<meter>.csv    their quarter-hour values, one file per source
   invoices/pdf/<invoice>.pdf   one file per invoice that has a rendered PDF, if ticked
 ```
 

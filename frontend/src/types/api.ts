@@ -1965,7 +1965,7 @@ export interface VseTariffImportResult {
     errors: Array<{ name: string; error: string }>
 }
 
-export type TransferSectionName = 'zev' | 'participants' | 'metering_points' | 'tariffs' | 'readings' | 'invoices' | 'invoice_pdfs'
+export type TransferSectionName = 'zev' | 'participants' | 'metering_points' | 'tariffs' | 'readings' | 'supplementary_data' | 'invoices' | 'invoice_pdfs'
 
 export interface ZevArchiveImportResult {
     zev_id: string

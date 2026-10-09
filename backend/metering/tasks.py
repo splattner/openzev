@@ -129,6 +129,7 @@ def refresh_supplementary_sources() -> dict:
         SupplementarySource.objects.filter(enabled=True)
         .exclude(provider=SupplementaryProvider.PUSH)
         .exclude(status=SupplementaryStatus.RECONNECT_REQUIRED)
+        .filter(metering_point__zev__disabled_at__isnull=True)
         .values_list("pk", flat=True)
     )
     for source_id in ids:

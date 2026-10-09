@@ -40,7 +40,16 @@ from metering.importers.limits import (
     reject_unsafe_member_path,
     validate_zip,
 )
-from metering.models import ImportLog, ImportSource, MeterReading, ReadingDirection, ReadingResolution
+from metering.models import (
+    ImportLog,
+    ImportSource,
+    MeterReading,
+    ReadingDirection,
+    ReadingResolution,
+    SupplementaryProvider,
+    SupplementaryReading,
+    SupplementarySource,
+)
 from tariffs.dynamic.adapters import DynamicApiVersion
 from tariffs.dynamic.models import DynamicTariffSource, FetchStatus
 from tariffs.dynamic.protocol import V2_PRODUCT_REQUIRED
@@ -78,9 +87,13 @@ from .schema import (
     SECTION_METERING_POINTS,
     SECTION_PARTICIPANTS,
     SECTION_READINGS,
+    SECTION_SUPPLEMENTARY,
     SECTION_TARIFFS,
     SECTION_ZEV,
     SUBCOUNT_SECTIONS,
+    SUPPLEMENTARY_READING_CSV_COLUMNS,
+    SUPPLEMENTARY_READINGS_DIR,
+    SUPPLEMENTARY_SOURCE_FIELDS,
     TARIFF_FIELDS,
     TARIFF_PERIOD_FIELDS,
     ZEV_FIELDS,
@@ -870,6 +883,150 @@ def _import_readings(archive, points_by_meter_id, collector, *, batch_id):
     return total
 
 
+# ── Supplementary energy data (format 7) ───────────────────────────────────
+
+_SUPPLEMENTARY_VALUE_COLUMNS = tuple(
+    name for name in SUPPLEMENTARY_READING_CSV_COLUMNS if name not in ("meter_id", "timestamp")
+)
+_SUPPLEMENTARY_DATETIME_FIELDS = ("consented_at", "covers_from", "synced_through")
+
+
+def _import_supplementary_sources(archive, zev, participants_by_archive_id, points_by_meter_id, collector):
+    """Recreate the energy data sources, disconnected, and return them by ``meter_id``.
+
+    No credential or token is in the archive, and an import never starts pulling or accepting data:
+    a source arrives ``enabled = False``, which the model shows as *disconnected*. Its participant
+    connects it again on this instance (a new key, or a new push token), which is also where they
+    consent for the instance that now holds their data.
+    """
+    sources_by_meter_id = {}
+    for position, raw in enumerate(_load_json(archive, SECTION_FILES[SECTION_SUPPLEMENTARY]), start=1):
+        meter_id = (raw.get("meter_id") or "").strip() if isinstance(raw, dict) else ""
+        label = meter_id or f"source {position}"
+        point = points_by_meter_id.get(meter_id)
+        participant = participants_by_archive_id.get(str(raw.get("participant_id") or "")) if isinstance(raw, dict) else None
+        if point is None:
+            collector.add(SECTION_SUPPLEMENTARY, position, label, {"meter_id": [f"No imported metering point named '{meter_id}'."]})
+            continue
+        if participant is None:
+            collector.add(SECTION_SUPPLEMENTARY, position, label, {"participant_id": ["Unknown participant."]})
+            continue
+        fields = _pick(raw, SUPPLEMENTARY_SOURCE_FIELDS, position, SECTION_SUPPLEMENTARY)
+        try:
+            for name in _SUPPLEMENTARY_DATETIME_FIELDS:
+                if name in fields:
+                    fields[name] = _parse_datetime_utc(fields[name])
+            source = SupplementarySource(
+                metering_point=point, participant=participant, enabled=False, **fields
+            )
+            if source.provider not in SupplementaryProvider.values:
+                raise DjangoValidationError({"provider": [f"Unknown provider '{source.provider}'."]})
+            source.full_clean(
+                exclude=["credential_encrypted", "push_token_prefix", "push_token_hash", "created_by"]
+            )
+            source.save()
+        except (DjangoValidationError, ValueError, TypeError, OverflowError) as exc:
+            collector.add(SECTION_SUPPLEMENTARY, position, label, exc)
+            continue
+        sources_by_meter_id[meter_id] = source
+    return sources_by_meter_id
+
+
+def _build_supplementary_reading(row, sources_by_meter_id):
+    """A ``SupplementaryReading`` for ``row``, or a dict of errors describing why not."""
+    meter_id = (row.get("meter_id") or "").strip()
+    source = sources_by_meter_id.get(meter_id)
+    if source is None:
+        return {"meter_id": [f"No imported energy data source for '{meter_id}'."]}
+    try:
+        timestamp = _parse_datetime_utc(row.get("timestamp"))
+    except (ValueError, TypeError, OverflowError) as exc:
+        return {"timestamp": [f"Unreadable timestamp: {exc}"]}
+    if timestamp.second or timestamp.microsecond or timestamp.minute % 15:
+        return {"timestamp": ["Not aligned to a 15-minute interval."]}
+    values = {}
+    for name in _SUPPLEMENTARY_VALUE_COLUMNS:
+        try:
+            value = _parse_decimal(row.get(name))
+        except (InvalidOperation, ValueError, TypeError) as exc:
+            return {name: [f"Unreadable value: {exc}"]}
+        if value < 0 or value > MAX_ENERGY_KWH:
+            return {name: [f"Value {value} is outside the allowed range."]}
+        values[name] = value
+    return SupplementaryReading(
+        source=source, metering_point_id=source.metering_point_id, timestamp=timestamp, **values
+    )
+
+
+def _bulk_create_supplementary(rows, member_name, collector):
+    """Insert a batch; a database rejection is reported by file and does not stop the import."""
+    try:
+        with transaction.atomic():
+            SupplementaryReading.objects.bulk_create(rows)
+    except (IntegrityError, DataError) as exc:
+        logger.exception(
+            "Database rejected a batch of %s supplementary readings from archive member %r",
+            len(rows), member_name, exc_info=exc,
+        )
+        collector.add(
+            SECTION_SUPPLEMENTARY,
+            None,
+            member_name,
+            {"__all__": ["The database rejected a batch of readings; the batch was skipped. See the server log for details."]},
+        )
+        return 0
+    return len(rows)
+
+
+def _import_supplementary_readings(archive, sources_by_meter_id, collector):
+    """Load every ``supplementary_readings/*.csv`` member; returns the number stored."""
+    total = 0
+    seen = set()
+    members = [
+        name
+        for name in archive.namelist()
+        if name.startswith(f"{SUPPLEMENTARY_READINGS_DIR}/") and name.lower().endswith(".csv")
+    ]
+    required = set(SUPPLEMENTARY_READING_CSV_COLUMNS)
+    for name in sorted(members):
+        try:
+            with archive.open(name) as member:
+                text = io.TextIOWrapper(member, encoding="utf-8", newline="")
+                reader = csv.DictReader(text)
+                missing = required - set(reader.fieldnames or [])
+                if missing:
+                    collector.add(
+                        SECTION_SUPPLEMENTARY, None, name,
+                        {"__all__": [f"Missing column(s): {', '.join(sorted(missing))}."]},
+                    )
+                    text.detach()
+                    continue
+                pending = []
+                for row_number, row in enumerate(reader, start=2):
+                    reading = _build_supplementary_reading(row, sources_by_meter_id)
+                    if isinstance(reading, dict):
+                        collector.add(SECTION_SUPPLEMENTARY, row_number, name, reading)
+                        continue
+                    key = (reading.metering_point_id, reading.timestamp)
+                    if key in seen:
+                        collector.add(
+                            SECTION_SUPPLEMENTARY, row_number, name,
+                            {"__all__": ["Duplicate reading for this metering point and timestamp."]},
+                        )
+                        continue
+                    seen.add(key)
+                    pending.append(reading)
+                    if len(pending) >= READING_BATCH_SIZE:
+                        total += _bulk_create_supplementary(pending, name, collector)
+                        pending = []
+                if pending:
+                    total += _bulk_create_supplementary(pending, name, collector)
+                text.detach()
+        except (zipfile.BadZipFile, UnicodeDecodeError, csv.Error) as exc:
+            collector.add(SECTION_SUPPLEMENTARY, None, name, {"__all__": [f"Unreadable readings file: {exc}"]})
+    return total
+
+
 def _bulk_create_readings(rows, member_name, collector):
     """Insert one batch, converting database-level failures into collected errors.
 
@@ -1079,6 +1236,20 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
             rows_imported=imported,
             rows_skipped=0,
         )
+
+    if SECTION_SUPPLEMENTARY in sections:
+        sources_by_meter_id = _import_supplementary_sources(
+            archive, zev, participants_by_archive_id, points_by_meter_id, collector
+        )
+        summary["counts"][SECTION_SUPPLEMENTARY] = len(sources_by_meter_id)
+        summary["counts"]["supplementary_readings"] = _import_supplementary_readings(
+            archive, sources_by_meter_id, collector
+        )
+        if sources_by_meter_id:
+            collector.warn(
+                f"{len(sources_by_meter_id)} energy data source(s) were imported disconnected, without their keys "
+                "or tokens. Each participant connects theirs again before new data arrives."
+            )
 
     if SECTION_INVOICES in sections:
         count, highest = _import_invoices(archive, zev, participants_by_archive_id, collector)

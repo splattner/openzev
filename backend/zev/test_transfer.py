@@ -20,7 +20,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from invoices.models import Invoice, InvoiceItem, InvoiceStatus
-from metering.models import ImportLog, MeterReading, ReadingResolution
+from metering.models import ImportLog, MeterReading, ReadingResolution, SupplementarySource
 from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
 from testing.helpers import authenticate as auth, make_user, create_managed_zev
@@ -40,7 +40,7 @@ from zev.models import (
 from zev import access
 from zev.parties import assign_role, issuer_on
 from zev.transfer import ArchiveError, ImportFailed, build_archive, import_archive
-from zev.transfer.schema import FORMAT_VERSION, MANIFEST_NAME, SECTIONS, missing_dependencies
+from zev.transfer.schema import FORMAT_VERSION, MANIFEST_NAME, OPT_IN_SECTIONS, SECTIONS, missing_dependencies
 
 ZEV_URL = "/api/v1/zev/zevs"
 
@@ -1146,6 +1146,7 @@ class SchemaParityTests(TestCase):
         "TARIFF_PERIOD_FIELDS": TariffPeriod,
         "INVOICE_FIELDS": Invoice,
         "INVOICE_ITEM_FIELDS": InvoiceItem,
+        "SUPPLEMENTARY_SOURCE_FIELDS": SupplementarySource,
     }
 
     # Fields that travel through dedicated keys instead of the field lists:
@@ -1207,6 +1208,27 @@ class SchemaParityTests(TestCase):
             "updated_at",
         },
         "INVOICE_ITEM_FIELDS": {"id", "invoice"},
+        # A source travels by ``meter_id`` and the archive ``participant_id``. Nothing that holds
+        # a secret or describes a live connection travels: the credential and push token, the
+        # on/off switch and status, the sync bookkeeping and the last comparison with the meter all
+        # belong to the instance that held the connection. ``created_by`` is an account.
+        "SUPPLEMENTARY_SOURCE_FIELDS": {
+            "id",
+            "metering_point",
+            "participant",
+            "credential_encrypted",
+            "push_token_prefix",
+            "push_token_hash",
+            "enabled",
+            "status",
+            "last_sync_at",
+            "last_success_at",
+            "last_error",
+            "reconciliation",
+            "created_by",
+            "created_at",
+            "updated_at",
+        },
     }
 
     def test_field_lists_match_their_models_exactly(self):
@@ -1239,6 +1261,17 @@ class SchemaParityTests(TestCase):
                 model_fields,
                 f"READING_CSV_COLUMNS names {name!r}, which is not a MeterReading field.",
             )
+
+
+    def test_supplementary_reading_columns_exist_on_the_reading_model(self):
+        from metering.models import SupplementaryReading
+        from zev.transfer import schema
+
+        model_fields = {field.name for field in SupplementaryReading._meta.fields}
+        for name in schema.SUPPLEMENTARY_READING_CSV_COLUMNS:
+            if name == "meter_id":
+                continue
+            self.assertIn(name, model_fields)
 
 
 class TransferEndpointTests(TestCase):
@@ -1379,7 +1412,8 @@ class TransferEndpointTests(TestCase):
             format="multipart",
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["sections"], list(SECTIONS))
+        # A request that names no sections carries everything except the opt-in ones.
+        self.assertEqual(response.json()["sections"], [name for name in SECTIONS if name not in OPT_IN_SECTIONS])
         self.assertEqual(Zev.objects.count(), before)
 
     def test_inspect_refuses_a_file_that_is_not_an_archive(self):

@@ -22,7 +22,7 @@ from django.db import connection, transaction
 from django.db.models import Prefetch
 
 from invoices.models import Invoice
-from metering.models import MeterReading
+from metering.models import MeterReading, SupplementaryReading, SupplementarySource
 from tariffs.models import Tariff, TariffPeriod
 from zev.models import Building, MeteringPoint, MeteringPointAssignment, Participant, Party, ZevPartyRole
 
@@ -50,8 +50,12 @@ from .schema import (
     SECTION_METERING_POINTS,
     SECTION_PARTICIPANTS,
     SECTION_READINGS,
+    SECTION_SUPPLEMENTARY,
     SECTION_TARIFFS,
     SECTION_ZEV,
+    SUPPLEMENTARY_READING_CSV_COLUMNS,
+    SUPPLEMENTARY_READINGS_DIR,
+    SUPPLEMENTARY_SOURCE_FIELDS,
     TARIFF_FIELDS,
     TARIFF_PERIOD_FIELDS,
     ZEV_FIELDS,
@@ -89,6 +93,13 @@ def _reading_csv_name(meter_id):
     safe = "".join(char if char.isalnum() or char in "-_." else "_" for char in meter_id)
     digest = hashlib.sha1(meter_id.encode("utf-8")).hexdigest()[:8]
     return f"{READINGS_DIR}/{safe or 'meter'}-{digest}.csv"
+
+
+def _supplementary_csv_name(meter_id):
+    """The member of a source's readings: ``_reading_csv_name`` for the other directory."""
+    safe = "".join(char if char.isalnum() or char in "-_." else "_" for char in meter_id)
+    digest = hashlib.sha1(meter_id.encode("utf-8")).hexdigest()[:8]
+    return f"{SUPPLEMENTARY_READINGS_DIR}/{safe or 'meter'}-{digest}.csv"
 
 
 def pdf_member_name(invoice_number):
@@ -269,6 +280,51 @@ def _write_readings(archive, zev):
     return counts
 
 
+def _export_supplementary_sources(zev):
+    """The ZEV's energy data sources, by ``meter_id`` and archive ``participant_id``. No secret, no state."""
+    return [
+        {
+            "id": str(source.id),
+            "meter_id": source.metering_point.meter_id,
+            "participant_id": str(source.participant_id),
+            **_fields(source, SUPPLEMENTARY_SOURCE_FIELDS),
+        }
+        for source in SupplementarySource.objects.filter(metering_point__zev=zev)
+        .select_related("metering_point")
+        .order_by("metering_point__meter_id")
+    ]
+
+
+def _write_supplementary_readings(archive, zev):
+    """Stream every source's readings into ``supplementary_readings/<meter>.csv``; returns the row total."""
+    total = 0
+    for source in (
+        SupplementarySource.objects.filter(metering_point__zev=zev)
+        .select_related("metering_point")
+        .order_by("metering_point__meter_id")
+    ):
+        meter_id = source.metering_point.meter_id
+        with archive.open(_supplementary_csv_name(meter_id), "w") as member:
+            text = io.TextIOWrapper(member, encoding="utf-8", newline="")
+            writer = csv.writer(text)
+            writer.writerow(SUPPLEMENTARY_READING_CSV_COLUMNS)
+            queryset = (
+                SupplementaryReading.objects.filter(source=source)
+                .order_by("timestamp")
+                .values_list("timestamp", "consumption_kwh", "production_kwh", "import_kwh", "export_kwh")
+            )
+            for timestamp, consumption, production, imported, exported in queryset.iterator(
+                chunk_size=READING_CHUNK_SIZE
+            ):
+                writer.writerow(
+                    [meter_id, timestamp.astimezone(timezone.utc).isoformat(), consumption, production, imported, exported]
+                )
+                total += 1
+            text.flush()
+            text.detach()
+    return total
+
+
 def _write_invoice_pdfs(archive, zev):
     """Copy every issued invoice's stored PDF bytes into the archive.
 
@@ -357,6 +413,12 @@ def _write_archive(zev, sections, fileobj, *, instance_name=""):
         if SECTION_READINGS in sections:
             per_meter = _write_readings(archive, zev)
             counts[SECTION_READINGS] = sum(per_meter.values())
+
+        if SECTION_SUPPLEMENTARY in sections:
+            sources = _export_supplementary_sources(zev)
+            counts[SECTION_SUPPLEMENTARY] = len(sources)
+            archive.writestr(SECTION_FILES[SECTION_SUPPLEMENTARY], _dump(sources))
+            counts["supplementary_readings"] = _write_supplementary_readings(archive, zev)
 
         if SECTION_INVOICES in sections:
             invoices = _export_invoices(zev)
