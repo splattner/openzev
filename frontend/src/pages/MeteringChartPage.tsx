@@ -43,6 +43,7 @@ import { selectedCommunityName } from '../lib/membership'
 import { PageHeader } from '../components/PageHeader'
 import { ScopeGuard } from '../components/ScopeGuard'
 import { Notice } from '../components/Notice'
+import { MeteringGapsDrawer } from '../features/meteringPoints/MeteringGapsDrawer'
 
 // ── Custom Tooltip ────────────────────────────────────────────────────────────
 
@@ -395,20 +396,19 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
         [handleSeverityFilterChange, severityFilter],
     )
 
-    // Data Quality: which rows have their full gap list expanded in place,
-    // instead of the "+N more" dead end (#648).
-    const [expandedGapsIds, setExpandedGapsIds] = useState<ReadonlySet<string>>(new Set())
-    const toggleGapsExpanded = useCallback((meteringPointId: string) => {
-        setExpandedGapsIds((previous) => {
-            const next = new Set(previous)
-            if (next.has(meteringPointId)) {
-                next.delete(meteringPointId)
-            } else {
-                next.add(meteringPointId)
-            }
-            return next
-        })
-    }, [])
+    const [gapsSelection, setGapsSelection] = useState<{ id: string; context: string } | null>(null)
+    const gapsContext = `${tab}:${selectedZevId}:${period.from}:${period.to}:${requestedMpId}:${severityFilter}`
+    // Close immediately on a scope/filter change, even before the new query resolves.
+    const gapsPoint = gapsSelection?.context === gapsContext
+        ? qualityQuery.data?.metering_points.find(mp => mp.id === gapsSelection.id && mp.gaps.length > 0) ?? null
+        : null
+    // Drop a selection that no longer resolves, so a later refetch can't reopen it.
+    useEffect(() => { if (!gapsPoint) setGapsSelection(null) }, [gapsPoint])
+
+    const handleGoToImports = () => {
+        setGapsSelection(null)
+        updateParams(params => params.delete('tab'), { pathname: '/metering/imports' })
+    }
 
     const selectedMp = meteringPoints.find((m) => m.id === chartMpId)
     const selectedMpDataRange = meteringPointDataRange(selectedMp)
@@ -520,27 +520,21 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                 if (mp.gaps.length === 0) {
                     return <span style={{ color: 'var(--success-600)' }}>{t('meteringDataQuality.noGaps')}</span>
                 }
-                const expanded = expandedGapsIds.has(mp.id)
-                const visibleGaps = expanded ? mp.gaps : mp.gaps.slice(0, 1)
+                const days = t('meteringDataQuality.gapDays', { count: mp.gaps.reduce((sum, gap) => sum + gap.duration_days, 0) })
                 return (
-                    <div style={{ fontSize: '0.875rem' }}>
-                        {visibleGaps.map((gap, idx) => (
-                            <div key={idx} style={{ color: 'var(--text-body)' }}>
-                                {gap.start_date === gap.end_date ? <>{gap.start_date}</> : <>{gap.start_date} → {gap.end_date}</>}
-                            </div>
-                        ))}
-                        {mp.gaps.length > 1 && (
-                            <button type="button" className="table-inline-link" onClick={() => toggleGapsExpanded(mp.id)}>
-                                {expanded
-                                    ? t('meteringDataQuality.showFewerGaps')
-                                    : `+${mp.gaps.length - 1} ${t('meteringDataQuality.moreGaps')}`}
-                            </button>
-                        )}
-                    </div>
+                    <button
+                        type="button"
+                        className="table-inline-link"
+                        aria-haspopup="dialog"
+                        aria-label={t('meteringDataQuality.showGapsFor', { days, meter: mp.meter_id })}
+                        onClick={() => setGapsSelection({ id: mp.id, context: gapsContext })}
+                    >
+                        {days}
+                    </button>
                 )
             },
         },
-    ], [t, expandedGapsIds, handleJumpToChart, toggleGapsExpanded])
+    ], [t, gapsContext, handleJumpToChart, setGapsSelection])
 
     return (
         <div className="page-stack">
@@ -801,6 +795,12 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                 </Tabs.Panel>
 
                 <Tabs.Panel value="quality">
+                    <MeteringGapsDrawer
+                        point={gapsPoint}
+                        period={period}
+                        onClose={() => setGapsSelection(null)}
+                        onGoToImports={handleGoToImports}
+                    />
                     <div className="page-stack">
                         {qualityBlockedOnMeterList ? (
                             meterListPending ? <PageSkeleton variant="table" /> : null

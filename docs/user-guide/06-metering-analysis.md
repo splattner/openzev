@@ -142,8 +142,8 @@ add them. A point with no readings appears in the **Missing** group.
 
 ### Status Table
 
-Below the summary cards, a table shows per-metering-point details. Any
-column can be sorted by clicking its header (the Status column sorts worst
+Below the summary cards, a table shows per-metering-point details. Click a
+column header to sort, except for Missing Days (the Status column sorts worst
 severity first).
 
 | Column | Shows |
@@ -152,7 +152,14 @@ severity first).
 | **Participant** | The most recent holder within the selected period — not necessarily today's holder, if the meter has since changed hands |
 | **Data Completeness** | Percentage of days in the period with at least one reading |
 | **Status** | 🟢 Complete, 🟡 Partial, 🔴 Missing |
-| **Missing Days** | The first missing date range; click "+N more" to expand the full list in place |
+| **Missing Days** | The number of missing days; click it to open a drawer with the missing date ranges and their duration |
+
+The drawer identifies the meter and holder for the selected period. It shows
+the first three gap ranges; click **And N more gaps** to reveal the rest.
+**Go to imports** opens the **Import history** tab with the current period and
+filters preserved. Managers can import a metering file covering the missing
+dates; files may contain readings for several meters. Viewers can inspect import
+history and ask a manager to import the data.
 
 Two additional warnings can appear under a meter's status, independent of
 its coverage:

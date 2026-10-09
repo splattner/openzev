@@ -5,6 +5,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom'
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MeteringChartPage, ALL_METERING_POINTS_VALUE } from '../src/pages/MeteringChartPage'
+import type { MeteringPointDataQuality } from '../src/types/api'
 
 type Relation = 'admin' | 'manager' | 'viewer' | 'participant'
 
@@ -18,6 +19,7 @@ const state = vi.hoisted(() => ({
     /** Holds the meter list back until released (default: answered at once). */
     meterGate: undefined as Promise<void> | undefined,
     meterListFails: false,
+    qualityPoints: [] as MeteringPointDataQuality[],
 }))
 
 vi.mock('react-i18next', () => ({
@@ -81,7 +83,7 @@ vi.mock('../src/lib/api/metering', () => ({
         state.chartCalls.push(params)
         return Promise.resolve([])
     },
-    fetchMeteringDataQualityStatus: () => Promise.resolve({ date_from: '2026-01-01', date_to: '2026-01-31', metering_points: [] }),
+    fetchMeteringDataQualityStatus: () => Promise.resolve({ date_from: '2026-01-01', date_to: '2026-01-31', metering_points: state.qualityPoints }),
     fetchRawMeteringData: () => Promise.resolve([]),
     fetchRawMeteringDay: () => Promise.resolve([]),
 }))
@@ -112,7 +114,7 @@ async function renderChart(path = '/metering/chart', tab: 'chart' | 'quality' = 
     mounted.push(() => { act(() => root.unmount()); container.remove() })
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const render = () => root.render(createElement(MemoryRouter, { initialEntries: [path] },
-        createElement(MantineProvider, null,
+        createElement(MantineProvider, { theme: { components: { Drawer: { defaultProps: { transitionProps: { duration: 0 } } } } } },
             createElement(QueryClientProvider, { client }, createElement(MeteringChartPage, { tab }))),
         createElement(LocationProbe)))
     // Settled once no query is in flight and the page stopped changing:
@@ -132,11 +134,13 @@ async function renderChart(path = '/metering/chart', tab: 'chart' | 'quality' = 
     const select = () => container.querySelector<HTMLSelectElement>('select')!
     return {
         container,
+        client,
         select,
         options: () => Array.from(select().options).map((option) => option.value),
         location: () => container.querySelector('[data-testid="location"]')?.textContent ?? '',
         emptyTitle: () => container.querySelector('.empty-state h3')?.textContent ?? null,
-        rerender: async () => {
+        rerender: async (nextTab = tab) => {
+            tab = nextTab
             await act(async () => { render() })
             await settle()
         },
@@ -156,6 +160,75 @@ afterEach(() => {
     state.chartCalls = []
     state.meterCalls = []
     state.assignmentCalls = []
+    state.qualityPoints = []
+})
+
+describe('metering gap selection', () => {
+    const point: MeteringPointDataQuality = {
+        id: 'mp1', meter_id: 'CH-mp1', participant_name: 'Period holder',
+        severity: 'yellow', data_completeness: 96.8, days_with_data: 30, total_days: 31,
+        gaps: [{ start_date: '2026-10-02', end_date: '2026-10-02', duration_days: 1 }],
+        unassigned_days: 0, unassigned_readings: 0, assignment_overlap: false,
+    }
+    const drawer = () => document.querySelector('[role="dialog"]')
+
+    async function openGaps() {
+        state.meters = [meter('mp1'), meter('mp2'), meter('mp3', 'z2')]
+        state.qualityPoints = [point]
+        const view = await renderChart('/metering/quality?period_start=2026-10-01&period_end=2026-10-31', 'quality')
+        await act(async () => { view.container.querySelector<HTMLButtonElement>('tbody button[aria-haspopup="dialog"]')!.click() })
+        expect(drawer()?.textContent).toContain('CH-mp1')
+        return view
+    }
+
+    it.each(['removed point', 'filled gaps'])('stays closed after a refetch restores a %s', async (change) => {
+        const view = await openGaps()
+        state.qualityPoints = change === 'removed point' ? [] : [{ ...point, gaps: [] }]
+        await act(async () => { await view.client.invalidateQueries({ queryKey: ['metering', 'quality-status'] }) })
+        await view.settle()
+        expect(drawer()).toBeNull()
+        state.qualityPoints = [point]
+        await act(async () => { await view.client.invalidateQueries({ queryKey: ['metering', 'quality-status'] }) })
+        await view.settle()
+        expect(view.container.querySelector('tbody button[aria-haspopup="dialog"]')).not.toBeNull()
+        expect(drawer()).toBeNull()
+    })
+
+    it('uses updated quality data while the selected point still has gaps', async () => {
+        const view = await openGaps()
+        state.qualityPoints = [{ ...point, participant_name: 'Updated holder' }]
+        await act(async () => { await view.client.invalidateQueries({ queryKey: ['metering', 'quality-status'] }) })
+        await view.settle()
+        expect(drawer()?.textContent).toContain('Updated holder')
+        expect(drawer()?.textContent).not.toContain('Period holder')
+    })
+
+    it.each(['tab', 'community', 'period', 'meter', 'severity'])('stays closed when the %s context changes and returns', async (context) => {
+        const view = await openGaps()
+        const change = async (restore: boolean) => {
+            if (context === 'tab') return view.rerender(restore ? 'quality' : 'chart')
+            if (context === 'community') {
+                state.zevId = restore ? 'z1' : 'z2'
+                return view.rerender()
+            }
+            await act(async () => {
+                if (context === 'period') {
+                    view.container.querySelector<HTMLButtonElement>(`button[title="pages.invoices.${restore ? 'nextPeriod' : 'prevPeriod'}"]`)!.click()
+                } else if (context === 'meter') {
+                    view.select().value = restore ? '' : 'mp2'
+                    view.select().dispatchEvent(new Event('change', { bubbles: true }))
+                } else {
+                    Array.from(view.container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]'))
+                        .find(button => button.textContent?.includes('meteringDataQuality.severityYellow'))!.click()
+                }
+            })
+            await view.settle()
+        }
+        await change(false)
+        expect(drawer()).toBeNull()
+        await change(true)
+        expect(drawer()).toBeNull()
+    })
 })
 
 describe('metering chart default selection', () => {
