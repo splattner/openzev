@@ -2606,12 +2606,8 @@ class SeedDemoAuditResetTests(TestCase):
 				self.assertTrue(AuditEvent.objects.filter(pk=event.pk).exists())
 
 
-@override_settings(DEBUG=True)
-class SeedDemoEndToEndTests(TestCase):
-	"""The whole ``seed_demo`` command must run on a small deterministic window
-	and re-run identically — the integration check none of the helper-level
-	tests cover: every wipe/replace step and the operational-history seeding
-	working together."""
+class SeedDemoWindow:
+	"""The pinned seed window and the helper that runs ``seed_demo`` on it."""
 
 	# Pinned, so the seed's dates relative to --end-date ("last year") are
 	# fixed: the expectations below derive from END, not from today.
@@ -2619,20 +2615,67 @@ class SeedDemoEndToEndTests(TestCase):
 	LAST_YEAR = END.year - 1
 	WINDOW = ["--start-date=2025-11-01", f"--end-date={END.isoformat()}"]
 
-	def _run(self, window=None):
+	@classmethod
+	def _run(cls, window=None):
 		buf = StringIO()
 		with mock.patch(
 			"zev.management.commands.seed_demo.issue_contract_pdf",
 			return_value=(None, False),
 		), mock.patch(
 			"zev.management.commands.seed_demo.save_invoice_pdf",
-		) as save_pdf, self.captureOnCommitCallbacks(execute=True):
-			call_command("seed_demo", *(window or self.WINDOW), stdout=buf, stderr=buf)
+		) as save_pdf, cls.captureOnCommitCallbacks(execute=True):
+			call_command("seed_demo", *(window or cls.WINDOW), stdout=buf, stderr=buf)
 		return save_pdf
 
-	def test_the_seed_renders_only_annas_sent_and_paid_invoices(self):
-		save_pdf = self._run()
-		rendered = [call.args[0].pk for call in save_pdf.call_args_list]
+
+@override_settings(DEBUG=True)
+class SeedDemoReseedTests(SeedDemoWindow, TestCase):
+	"""What a seeded-then-re-seeded database looks like.
+
+	The seed takes tens of seconds, so it runs once for the whole class (twice:
+	the re-seed is part of what is checked) and every check reads the result.
+	The checks run as sub-tests of one test on purpose: the suite runs under
+	``--dist=worksteal``, which spreads a class's tests over workers, and each
+	worker would then repeat the seed. Tests that need their own run, or a
+	different window, live in ``SeedDemoEndToEndTests``."""
+
+	@classmethod
+	def setUpTestData(cls):
+		mails_before = len(mail.outbox)
+		cls._run()
+		cls.first = cls._snapshot()
+		save_pdf = cls._run()
+		cls.second = cls._snapshot()
+		cls.rendered = [call.args[0].pk for call in save_pdf.call_args_list]
+		cls.mails_sent = len(mail.outbox) - mails_before
+
+	@classmethod
+	def _snapshot(cls):
+		return {
+			"readings": MeterReading.objects.count(),
+			"invoices": Invoice.objects.count(),
+			"invoice_numbers": set(Invoice.objects.values_list("invoice_number", flat=True)),
+			"invoice_totals": set(Invoice.objects.values_list("invoice_number", "total_chf")),
+			"dynamic_sources": DynamicTariffSource.objects.count(),
+			"dynamic_points": DynamicPricePoint.objects.count(),
+			"email_logs": EmailLog.objects.count(),
+			"import_logs": ImportLog.objects.count(),
+			"audit_events": AuditEvent.objects.count(),
+			"contracts": ContractIssue.objects.count(),
+			"zevs": Zev.objects.count(),
+		}
+
+	def test_the_seeded_and_re_seeded_database(self):
+		for check in (
+			self._check_the_seed_renders_only_annas_sent_and_paid_invoices,
+			self._check_seed_runs_end_to_end_and_re_seeding_is_identical,
+			self._check_the_flagship_has_a_representative_and_a_contact,
+			self._check_the_access_personas_survive_a_reseed,
+		):
+			with self.subTest(check.__name__.removeprefix("_check_")):
+				check()
+
+	def _check_the_seed_renders_only_annas_sent_and_paid_invoices(self):
 		annas = set(
 			Invoice.objects.filter(
 				zev__name=DEMO_ZEV_NAME,
@@ -2641,7 +2684,184 @@ class SeedDemoEndToEndTests(TestCase):
 			).values_list("pk", flat=True)
 		)
 		self.assertTrue(annas)
-		self.assertCountEqual(rendered, annas)
+		self.assertCountEqual(self.rendered, annas)
+
+	def _check_seed_runs_end_to_end_and_re_seeding_is_identical(self):
+		flagship = Zev.objects.get(name=DEMO_ZEV_NAME)
+		self.assertEqual(Zev.objects.count(), 2)
+		self.assertTrue(FeatureFlag.is_enabled(FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED))
+		# The settled previous year feeds the reports page, which defaults to
+		# the prior calendar year and reads paid invoices only.
+		self.assertTrue(
+			Invoice.objects.filter(
+				zev=flagship,
+				status=InvoiceStatus.PAID,
+				period_end__year=2025,
+			).exists()
+		)
+
+		first, second = self.first, self.second
+		dynamic_tariff = flagship.tariffs.get(name=DEMO_DYNAMIC_TARIFF_NAME)
+		self.assertFalse(Invoice.objects.filter(zev=flagship, period_end__gte=dynamic_tariff.valid_from).exists())
+		self.assertFalse(dynamic_tariff.dynamic_source.enabled)
+		self.assertEqual(first["dynamic_sources"], 1)
+		self.assertGreater(first["dynamic_points"], 0)
+		self.assertEqual(first["zevs"], 2)
+		self.assertGreater(first["readings"], 0)
+		self.assertGreater(first["invoices"], 0)
+		self.assertGreater(first["email_logs"], 0)
+		self.assertEqual(first["import_logs"], 2)
+		self.assertGreater(first["audit_events"], 0)
+		self.assertEqual(first["contracts"], 0)  # PDF issuance is mocked
+
+		# Every invoice status the UI renders badges for is present.
+		have_statuses = set(Invoice.objects.values_list("status", flat=True))
+		self.assertTrue({"draft", "approved", "sent", "paid", "cancelled"} <= have_statuses)
+
+		self.assertEqual(second["readings"], first["readings"])
+		self.assertEqual(second["invoices"], first["invoices"])
+		self.assertEqual(second["invoice_numbers"], first["invoice_numbers"])
+		self.assertEqual(second["invoice_totals"], first["invoice_totals"])
+		self.assertEqual(second["dynamic_sources"], first["dynamic_sources"])
+		self.assertEqual(second["dynamic_points"], first["dynamic_points"])
+		self.assertEqual(second["email_logs"], first["email_logs"])
+		self.assertEqual(second["import_logs"], first["import_logs"])
+		self.assertEqual(second["audit_events"], first["audit_events"])
+		self.assertEqual(second["contracts"], first["contracts"])
+		self.assertEqual(second["zevs"], 2)
+
+	def _check_the_flagship_has_a_representative_and_a_contact(self):
+		"""The Verwaltung represents the flagship and manages it through that
+		role, not a grant; the caretaker is a contact without a role (#761).
+		A re-seed keeps one of each."""
+		from zev import access
+		from zev.models import Party, ZevPartyRole
+
+		flagship = Zev.objects.get(name=DEMO_ZEV_NAME)
+		representative = ZevPartyRole.objects.get(zev=flagship, role="representative")
+		self.assertEqual(representative.party.organisation_name, "Verwaltung Muster AG")
+		account = representative.party.user
+		self.assertEqual(account.email, "manager@openzev.local")
+		self.assertFalse(ZevAccessGrant.objects.filter(zev=flagship, user=account).exists())
+		access.invalidate(account)
+		self.assertTrue(access.can_manage(account, flagship))
+		# The issuer manages both ZEVs through its role, without a grant on top.
+		owner = flagship.participants.get(party__last_name="Producer").user
+		for zev in Zev.objects.all():
+			self.assertFalse(ZevAccessGrant.objects.filter(zev=zev, user=owner).exists(), zev.name)
+			access.invalidate(owner)
+			self.assertTrue(access.can_manage(owner, zev), zev.name)
+		contact = Party.objects.get(zev=flagship, last_name="Hauswart")
+		self.assertFalse(contact.roles.exists())
+		self.assertFalse(contact.participations.exists())
+
+	def _check_the_access_personas_survive_a_reseed(self):
+		"""Re-seeding keeps the #761 personas as the README describes them."""
+		from accounts.models import User
+		from zev import access
+		from zev.models import MeteringPointAssignment, Participant, PartyKind, ZevPartyRole
+		from zev.views_access import is_pending_invitation
+
+		flagship = Zev.objects.get(name=DEMO_ZEV_NAME)
+		second_zev = Zev.objects.get(name=SECOND_DEMO_ZEV_NAME)
+		year = self.LAST_YEAR
+
+		with self.subTest("invoices name the issuer of their period end"):
+			invoices = Invoice.objects.filter(zev=flagship, period_end__year=year)
+			self.assertEqual(len({invoice.period_end for invoice in invoices}), 4)
+			for invoice in invoices:
+				expected = "Otto Vorbesitzer" if invoice.period_end < date(year, 7, 1) else "Paula Producer"
+				self.assertIn(expected, invoice.issuer["name"], invoice.period_end)
+			self.assertEqual(ZevPartyRole.objects.filter(zev=flagship, role="issuer").count(), 2)
+
+		maria = User.objects.get(email="former@openzev.local")
+		maria_participation = Participant.objects.get(user=maria)
+		maria_invoice = Invoice.objects.get(participant=maria_participation)
+		with self.subTest("flat 3 changes tenants on one meter"):
+			robin = Participant.objects.get(user__email="household@openzev.local")
+			self.assertEqual(maria_participation.valid_to, date(year, 3, 31))
+			self.assertEqual(robin.valid_from, date(year, 4, 1))
+			self.assertEqual(robin.name_addition, "und Dominique Muster-Keller")
+			windows = list(
+				MeteringPointAssignment.objects.filter(metering_point__meter_id="CH-DEMO-CONS-0004")
+				.order_by("valid_from")
+				.values_list("participant", "valid_to")
+			)
+			self.assertEqual(windows, [(maria_participation.pk, date(year, 3, 31)), (robin.pk, None)])
+
+		with self.subTest("Maria sees her own invoice and nothing else"):
+			client = APIClient()
+			client.force_authenticate(maria)
+			listing = client.get("/api/v1/invoices/invoices/").json()
+			self.assertEqual([row["id"] for row in listing["results"]], [str(maria_invoice.pk)])
+			self.assertEqual(client.get(f"/api/v1/invoices/invoices/{maria_invoice.pk}/").status_code, 200)
+			other = Invoice.objects.filter(zev=flagship).exclude(participant=maria_participation).first()
+			self.assertEqual(client.get(f"/api/v1/invoices/invoices/{other.pk}/").status_code, 404)
+			access.invalidate(maria)
+			self.assertFalse(access.can_view(maria, flagship))
+
+		with self.subTest("her invoice keeps the address it was issued to"):
+			self.assertEqual(maria_invoice.recipient["address_line1"], "Aarestrasse 16")
+			self.assertEqual(maria_invoice.recipient["city"], "Bern")
+			self.assertEqual(maria_participation.address_line1, "Alte Sonnenbergstrasse 123, Haus C, Appartement 42")
+			self.assertEqual(maria_participation.city, "Zürich")
+
+		with self.subTest("Ben's flat and parking space share one party"):
+			ben_rows = Participant.objects.filter(user__email="ben@openzev.local")
+			self.assertEqual(ben_rows.count(), 2)
+			self.assertEqual(len({row.party_id for row in ben_rows}), 1)
+			self.assertTrue(all(row.last_name == "Consumer" for row in ben_rows))
+			meters = set(
+				MeteringPointAssignment.objects.filter(participant__in=ben_rows)
+				.values_list("metering_point__meter_id", flat=True)
+			)
+			self.assertEqual(meters, {"CH-DEMO-CONS-0002", "CH-DEMO-EV-0001"})
+
+		with self.subTest("the studio is billed to an organisation"):
+			studio = Participant.objects.get(user__email="organisation@openzev.local")
+			self.assertEqual(studio.kind, PartyKind.ORGANISATION)
+			self.assertTrue(studio.organisation_name.startswith("Atelier"))
+			self.assertEqual(studio.address_line2, "Atelier im Erdgeschoss")
+
+		with self.subTest("Sam manages ZEV 1 by grant and participates in ZEV 2"):
+			sam = User.objects.get(email="mixed@openzev.local")
+			access.invalidate(sam)
+			self.assertTrue(access.can_manage(sam, flagship))
+			self.assertFalse(access.can_manage(sam, second_zev))
+			self.assertTrue(Participant.objects.filter(user=sam, zev=second_zev).exists())
+
+		with self.subTest("each house of ZEV 2 has its landowner"):
+			pairs = set(
+				ZevPartyRole.objects.filter(zev=second_zev, role="landowner")
+				.values_list("party__last_name", "building__name")
+			)
+			self.assertEqual(pairs, {
+				("Producer", "Solarweg 1"),
+				("Müller", "Kirchenfeldstrasse 42"),
+				("Schneider", "Monbijoustrasse 88"),
+			})
+
+		with self.subTest("dated grant, self-setup and pending invitation"):
+			auditor_grant = ZevAccessGrant.objects.get(user__email="treuhand@openzev.local")
+			self.assertEqual(auditor_grant.role, "viewer")
+			# Grants follow the real date, not the pinned window.
+			self.assertEqual(auditor_grant.valid_to, date(date.today().year + 1, 3, 31))
+			newcomer = User.objects.get(email="newcomer@openzev.local")
+			self.assertTrue(newcomer.may_create_zev)
+			access.invalidate(newcomer)
+			self.assertFalse(any(access.can_view(newcomer, zev) for zev in Zev.objects.all()))
+			invitee = User.objects.get(email="invitee@openzev.local")
+			self.assertTrue(is_pending_invitation(invitee))
+			self.assertFalse(invitee.is_active)
+			self.assertFalse(invitee.has_usable_password())
+			self.assertEqual(invitee.email_verification_tokens.filter(consumed_at__isnull=True).count(), 1)
+			self.assertEqual(self.mails_sent, 0)
+
+
+@override_settings(DEBUG=True)
+class SeedDemoEndToEndTests(SeedDemoWindow, TestCase):
+	"""``seed_demo`` runs that cannot share a seeded database: real storage,
+	a failure part-way, or a different window. Each seeds on its own."""
 
 	def test_a_reseed_keeps_the_current_pdfs_and_removes_the_previous_ones(self):
 		# Real storage, mocked rendering: only the file lifecycle is under test.
@@ -2743,69 +2963,6 @@ class SeedDemoEndToEndTests(TestCase):
 		self.assertEqual(delete.call_count, 2)
 		self.assertIn("invoices/pdf/a.pdf not removed", command.stdout.getvalue())
 
-	def _snapshot(self):
-		return {
-			"readings": MeterReading.objects.count(),
-			"invoices": Invoice.objects.count(),
-			"invoice_numbers": set(Invoice.objects.values_list("invoice_number", flat=True)),
-			"invoice_totals": set(Invoice.objects.values_list("invoice_number", "total_chf")),
-			"dynamic_sources": DynamicTariffSource.objects.count(),
-			"dynamic_points": DynamicPricePoint.objects.count(),
-			"email_logs": EmailLog.objects.count(),
-			"import_logs": ImportLog.objects.count(),
-			"audit_events": AuditEvent.objects.count(),
-			"contracts": ContractIssue.objects.count(),
-			"zevs": Zev.objects.count(),
-		}
-
-	def test_seed_runs_end_to_end_and_re_seeding_is_identical(self):
-		self._run()
-		flagship = Zev.objects.get(name=DEMO_ZEV_NAME)
-		self.assertEqual(Zev.objects.count(), 2)
-		self.assertTrue(FeatureFlag.is_enabled(FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED))
-		# The settled previous year feeds the reports page, which defaults to
-		# the prior calendar year and reads paid invoices only.
-		self.assertTrue(
-			Invoice.objects.filter(
-				zev=flagship,
-				status=InvoiceStatus.PAID,
-				period_end__year=2025,
-			).exists()
-		)
-
-		first = self._snapshot()
-		dynamic_tariff = flagship.tariffs.get(name=DEMO_DYNAMIC_TARIFF_NAME)
-		self.assertFalse(Invoice.objects.filter(zev=flagship, period_end__gte=dynamic_tariff.valid_from).exists())
-		self.assertFalse(dynamic_tariff.dynamic_source.enabled)
-		self.assertEqual(first["dynamic_sources"], 1)
-		self.assertGreater(first["dynamic_points"], 0)
-		self.assertEqual(first["zevs"], 2)
-		self.assertGreater(first["readings"], 0)
-		self.assertGreater(first["invoices"], 0)
-		self.assertGreater(first["email_logs"], 0)
-		self.assertEqual(first["import_logs"], 2)
-		self.assertGreater(first["audit_events"], 0)
-		self.assertEqual(first["contracts"], 0)  # PDF issuance is mocked
-
-		# Every invoice status the UI renders badges for is present.
-		have_statuses = set(Invoice.objects.values_list("status", flat=True))
-		self.assertTrue({"draft", "approved", "sent", "paid", "cancelled"} <= have_statuses)
-
-		self._run()
-		second = self._snapshot()
-
-		self.assertEqual(second["readings"], first["readings"])
-		self.assertEqual(second["invoices"], first["invoices"])
-		self.assertEqual(second["invoice_numbers"], first["invoice_numbers"])
-		self.assertEqual(second["invoice_totals"], first["invoice_totals"])
-		self.assertEqual(second["dynamic_sources"], first["dynamic_sources"])
-		self.assertEqual(second["dynamic_points"], first["dynamic_points"])
-		self.assertEqual(second["email_logs"], first["email_logs"])
-		self.assertEqual(second["import_logs"], first["import_logs"])
-		self.assertEqual(second["audit_events"], first["audit_events"])
-		self.assertEqual(second["contracts"], first["contracts"])
-		self.assertEqual(second["zevs"], 2)
-
 	def test_a_next_quarter_re_seed_bills_none_of_the_dynamic_tariff(self):
 		"""The dynamic tariff is replaced before invoices are rebuilt. Otherwise
 		the previous run's tariff would still cover the new invoice quarter."""
@@ -2820,134 +2977,3 @@ class SeedDemoEndToEndTests(TestCase):
 		self.assertFalse(Invoice.objects.filter(zev=flagship, period_end__gte=dynamic_tariff.valid_from).exists())
 		self.assertFalse(Invoice.objects.filter(dynamic_evidence__isnull=False).exists())
 		self.assertLessEqual(points, set(DynamicPricePoint.objects.values_list("pk", "price_chf_per_kwh")))
-
-	def test_the_flagship_has_a_representative_and_a_contact(self):
-		"""The Verwaltung represents the flagship and manages it through that
-		role, not a grant; the caretaker is a contact without a role (#761).
-		A re-seed keeps one of each."""
-		from zev import access
-		from zev.models import Party, ZevPartyRole
-
-		self._run()
-		self._run()
-		flagship = Zev.objects.get(name=DEMO_ZEV_NAME)
-		representative = ZevPartyRole.objects.get(zev=flagship, role="representative")
-		self.assertEqual(representative.party.organisation_name, "Verwaltung Muster AG")
-		account = representative.party.user
-		self.assertEqual(account.email, "manager@openzev.local")
-		self.assertFalse(ZevAccessGrant.objects.filter(zev=flagship, user=account).exists())
-		access.invalidate(account)
-		self.assertTrue(access.can_manage(account, flagship))
-		# The issuer manages both ZEVs through its role, without a grant on top.
-		owner = flagship.participants.get(party__last_name="Producer").user
-		for zev in Zev.objects.all():
-			self.assertFalse(ZevAccessGrant.objects.filter(zev=zev, user=owner).exists(), zev.name)
-			access.invalidate(owner)
-			self.assertTrue(access.can_manage(owner, zev), zev.name)
-		contact = Party.objects.get(zev=flagship, last_name="Hauswart")
-		self.assertFalse(contact.roles.exists())
-		self.assertFalse(contact.participations.exists())
-
-	def test_the_access_personas_survive_a_reseed(self):
-		"""Re-seeding keeps the #761 personas as the README describes them."""
-		from accounts.models import User
-		from zev import access
-		from zev.models import MeteringPointAssignment, Participant, PartyKind, ZevPartyRole
-		from zev.views_access import is_pending_invitation
-
-		self._run()
-		self._run()
-		flagship = Zev.objects.get(name=DEMO_ZEV_NAME)
-		second_zev = Zev.objects.get(name=SECOND_DEMO_ZEV_NAME)
-		year = self.LAST_YEAR
-
-		with self.subTest("invoices name the issuer of their period end"):
-			invoices = Invoice.objects.filter(zev=flagship, period_end__year=year)
-			self.assertEqual(len({invoice.period_end for invoice in invoices}), 4)
-			for invoice in invoices:
-				expected = "Otto Vorbesitzer" if invoice.period_end < date(year, 7, 1) else "Paula Producer"
-				self.assertIn(expected, invoice.issuer["name"], invoice.period_end)
-			self.assertEqual(ZevPartyRole.objects.filter(zev=flagship, role="issuer").count(), 2)
-
-		maria = User.objects.get(email="former@openzev.local")
-		maria_participation = Participant.objects.get(user=maria)
-		maria_invoice = Invoice.objects.get(participant=maria_participation)
-		with self.subTest("flat 3 changes tenants on one meter"):
-			robin = Participant.objects.get(user__email="household@openzev.local")
-			self.assertEqual(maria_participation.valid_to, date(year, 3, 31))
-			self.assertEqual(robin.valid_from, date(year, 4, 1))
-			self.assertEqual(robin.name_addition, "und Dominique Muster-Keller")
-			windows = list(
-				MeteringPointAssignment.objects.filter(metering_point__meter_id="CH-DEMO-CONS-0004")
-				.order_by("valid_from")
-				.values_list("participant", "valid_to")
-			)
-			self.assertEqual(windows, [(maria_participation.pk, date(year, 3, 31)), (robin.pk, None)])
-
-		with self.subTest("Maria sees her own invoice and nothing else"):
-			client = APIClient()
-			client.force_authenticate(maria)
-			listing = client.get("/api/v1/invoices/invoices/").json()
-			self.assertEqual([row["id"] for row in listing["results"]], [str(maria_invoice.pk)])
-			self.assertEqual(client.get(f"/api/v1/invoices/invoices/{maria_invoice.pk}/").status_code, 200)
-			other = Invoice.objects.filter(zev=flagship).exclude(participant=maria_participation).first()
-			self.assertEqual(client.get(f"/api/v1/invoices/invoices/{other.pk}/").status_code, 404)
-			access.invalidate(maria)
-			self.assertFalse(access.can_view(maria, flagship))
-
-		with self.subTest("her invoice keeps the address it was issued to"):
-			self.assertEqual(maria_invoice.recipient["address_line1"], "Aarestrasse 16")
-			self.assertEqual(maria_invoice.recipient["city"], "Bern")
-			self.assertEqual(maria_participation.address_line1, "Alte Sonnenbergstrasse 123, Haus C, Appartement 42")
-			self.assertEqual(maria_participation.city, "Zürich")
-
-		with self.subTest("Ben's flat and parking space share one party"):
-			ben_rows = Participant.objects.filter(user__email="ben@openzev.local")
-			self.assertEqual(ben_rows.count(), 2)
-			self.assertEqual(len({row.party_id for row in ben_rows}), 1)
-			self.assertTrue(all(row.last_name == "Consumer" for row in ben_rows))
-			meters = set(
-				MeteringPointAssignment.objects.filter(participant__in=ben_rows)
-				.values_list("metering_point__meter_id", flat=True)
-			)
-			self.assertEqual(meters, {"CH-DEMO-CONS-0002", "CH-DEMO-EV-0001"})
-
-		with self.subTest("the studio is billed to an organisation"):
-			studio = Participant.objects.get(user__email="organisation@openzev.local")
-			self.assertEqual(studio.kind, PartyKind.ORGANISATION)
-			self.assertTrue(studio.organisation_name.startswith("Atelier"))
-			self.assertEqual(studio.address_line2, "Atelier im Erdgeschoss")
-
-		with self.subTest("Sam manages ZEV 1 by grant and participates in ZEV 2"):
-			sam = User.objects.get(email="mixed@openzev.local")
-			access.invalidate(sam)
-			self.assertTrue(access.can_manage(sam, flagship))
-			self.assertFalse(access.can_manage(sam, second_zev))
-			self.assertTrue(Participant.objects.filter(user=sam, zev=second_zev).exists())
-
-		with self.subTest("each house of ZEV 2 has its landowner"):
-			pairs = set(
-				ZevPartyRole.objects.filter(zev=second_zev, role="landowner")
-				.values_list("party__last_name", "building__name")
-			)
-			self.assertEqual(pairs, {
-				("Producer", "Solarweg 1"),
-				("Müller", "Kirchenfeldstrasse 42"),
-				("Schneider", "Monbijoustrasse 88"),
-			})
-
-		with self.subTest("dated grant, self-setup and pending invitation"):
-			auditor_grant = ZevAccessGrant.objects.get(user__email="treuhand@openzev.local")
-			self.assertEqual(auditor_grant.role, "viewer")
-			# Grants follow the real date, not the pinned window.
-			self.assertEqual(auditor_grant.valid_to, date(date.today().year + 1, 3, 31))
-			newcomer = User.objects.get(email="newcomer@openzev.local")
-			self.assertTrue(newcomer.may_create_zev)
-			access.invalidate(newcomer)
-			self.assertFalse(any(access.can_view(newcomer, zev) for zev in Zev.objects.all()))
-			invitee = User.objects.get(email="invitee@openzev.local")
-			self.assertTrue(is_pending_invitation(invitee))
-			self.assertFalse(invitee.is_active)
-			self.assertFalse(invitee.has_usable_password())
-			self.assertEqual(invitee.email_verification_tokens.filter(consumed_at__isnull=True).count(), 1)
-			self.assertEqual(len(mail.outbox), 0)

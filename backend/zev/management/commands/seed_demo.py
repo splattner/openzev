@@ -2315,11 +2315,9 @@ class Command(BaseCommand):
         stop = period_start_dt(stop_date)
         while hour_start < stop:
             day_index = (civil_date(hour_start) - history_start).days
+            quarters = [wall_clock(hour_start + timedelta(minutes=15 * quarter)) for quarter in range(4)]
             for meter, direction, profile in meters:
-                total = sum(
-                    float(profile(wall_clock(hour_start + timedelta(minutes=15 * quarter)), day_index))
-                    for quarter in range(4)
-                )
+                total = sum(float(profile(local, day_index)) for local in quarters)
                 readings.append(
                     MeterReading(
                         metering_point=meter,

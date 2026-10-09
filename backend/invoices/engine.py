@@ -13,6 +13,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
+from functools import lru_cache
 from typing import Iterable, NamedTuple
 from uuid import UUID
 
@@ -30,7 +31,7 @@ from allocation.read_model import (
     community_totals_by_timestamp,
     iter_allocated_readings,
 )
-from allocation.validity import active_during, civil_date, period_window
+from allocation.validity import active_during, civil_date, period_window, wall_clock
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
 from zev.models import AllocationMode, Zev, Participant, MeteringPoint, MeteringPointAssignment, VatMode
@@ -181,6 +182,18 @@ def _readings_in_period(metering_points, start_dt, end_dt, direction):
         timestamp__lt=end_dt,
         direction=direction,
     )
+
+
+def _reading_rows(readings: models.QuerySet):
+    """Stream ``readings`` oldest first as ``(id, timestamp, metering_point_id, energy_kwh)``.
+
+    The pricing loops read these four values and nothing else, and a period
+    holds tens of thousands of readings per invoice: building a model
+    instance for each costs more than pricing it.
+    """
+    return readings.order_by("timestamp").values_list(
+        "id", "timestamp", "metering_point_id", "energy_kwh",
+    ).iterator()
 
 
 def _gather_period_readings(
@@ -485,6 +498,7 @@ class TariffResolver:
             elif tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY and len(tariff.periods.all()) > 0:
                 self._percentage.setdefault(tariff.energy_type, []).append(tariff)
         self._active_cache: dict[tuple[str, str, date], list[Tariff]] = {}
+        self._band_cache: dict[tuple[UUID, tuple], "TariffPeriod | None"] = {}
         self._context = generation_context
 
     def _active(self, bucket: str, buckets: dict, energy_type: str, day: date) -> list[Tariff]:
@@ -494,6 +508,21 @@ class TariffResolver:
                 tariff for tariff in buckets.get(energy_type, []) if _tariff_is_active(tariff, day)
             ]
         return self._active_cache[key]
+
+    def _band(self, tariff: Tariff, ts: datetime) -> "TariffPeriod | None":
+        """``_resolve_tariff_band``, memoised on what the resolution reads.
+
+        The pricing loops resolve a band for every reading, and band
+        resolution depends only on the wall-clock month, weekday and time of
+        day (``tariffs.periods.resolve_band``) — a handful of distinct values
+        however many readings there are.
+        """
+        key = (tariff.pk, _band_key(ts))
+        try:
+            return self._band_cache[key]
+        except KeyError:
+            band = self._band_cache[key] = _resolve_tariff_band(tariff, ts)
+            return band
 
     def energy(self, energy_type: str, day: date) -> list[Tariff]:
         """Tariffs priced per kWh of ``energy_type`` and valid on ``day``."""
@@ -530,7 +559,7 @@ class TariffResolver:
             if tariff.minimum_price_chf_per_kwh is not None:
                 price = max(price, tariff.minimum_price_chf_per_kwh)
             return price, None
-        period = _resolve_tariff_band(tariff, ts)
+        period = self._band(tariff, ts)
         return (period.price_chf_per_kwh if period is not None else Decimal("0")), period
 
     def percentage_at(self, tariff: Tariff, ts: datetime) -> tuple[Decimal, "TariffPeriod | None"]:
@@ -541,7 +570,7 @@ class TariffResolver:
         energy tariff (§5.1), there is no separate rule for it. ``(0, None)``
         for a tariff with no band.
         """
-        period = _resolve_tariff_band(tariff, ts)
+        period = self._band(tariff, ts)
         return (period.percentage if period is not None else Decimal("0")), period
 
 
@@ -628,6 +657,18 @@ ENERGY_TYPE_SORT_ORDER = {
 
 def _tariff_is_active(tariff: Tariff, day: date) -> bool:
     return tariff.valid_from <= day and (tariff.valid_to is None or tariff.valid_to >= day)
+
+
+@lru_cache(maxsize=1 << 17)
+def _band_key(ts: datetime) -> tuple:
+    """The parts of ``ts`` that ``resolve_band`` reads, on the Swiss wall clock.
+
+    Cached per instant: every participant of a batch is priced over the same
+    readings, so the timezone conversion is paid once per instant, not once
+    per reading.
+    """
+    local = wall_clock(ts)
+    return local.month, local.weekday(), local.time()
 
 
 def _resolve_tariff_band(tariff: Tariff, ts: datetime):
@@ -1609,22 +1650,21 @@ def generate_invoice(
 
     items_accumulator = ItemAccumulator(itemize_bands=zev.itemize_tariff_bands)
 
-    for reading in readings.participant_consumption.order_by("timestamp").iterator():
-        ts = reading.timestamp
-        resolution = readings.assignment_windows.assignment_at(reading.metering_point_id, ts)
+    for reading_id, ts, metering_point_id, energy_kwh in _reading_rows(readings.participant_consumption):
+        resolution = readings.assignment_windows.assignment_at(metering_point_id, ts)
         if resolution is None:
             # A true gap: no assignment covers this timestamp. Belongs to
             # nobody in this billing run.
-            personal_gap_reading_ids.add(reading.id)
+            personal_gap_reading_ids.add(reading_id)
             skipped_consumption_readings += 1
-            skipped_consumption_kwh += reading.energy_kwh
+            skipped_consumption_kwh += energy_kwh
             continue
         if resolution.allocation_mode != AllocationMode.PERSONAL or resolution.holder_id != participant.id:
             # Community energy (billed in the community loop below) or
             # somebody else's meter (billed on their own invoice) — neither
             # is a gap, so the skip counters must not count it (§7.3).
             continue
-        participant_kwh = reading.energy_kwh
+        participant_kwh = energy_kwh
         zev_consumption_at_ts = zev_consumption_by_ts.get(ts, Decimal("0"))
         zev_production_at_ts = zev_production_by_ts.get(ts, Decimal("0"))
 
@@ -1647,17 +1687,16 @@ def generate_invoice(
     skipped_production_readings = 0
     skipped_production_kwh = Decimal("0")
 
-    for reading in readings.participant_production.order_by("timestamp").iterator():
-        ts = reading.timestamp
-        resolution = readings.assignment_windows.assignment_at(reading.metering_point_id, ts)
+    for reading_id, ts, metering_point_id, energy_kwh in _reading_rows(readings.participant_production):
+        resolution = readings.assignment_windows.assignment_at(metering_point_id, ts)
         if resolution is None:
-            personal_gap_reading_ids.add(reading.id)
+            personal_gap_reading_ids.add(reading_id)
             skipped_production_readings += 1
-            skipped_production_kwh += reading.energy_kwh
+            skipped_production_kwh += energy_kwh
             continue
         if resolution.allocation_mode != AllocationMode.PERSONAL or resolution.holder_id != participant.id:
             continue
-        produced_kwh = reading.energy_kwh
+        produced_kwh = energy_kwh
 
         zev_production_at_ts = zev_production_by_ts.get(ts, Decimal("0"))
         zev_consumption_at_ts = zev_consumption_by_ts.get(ts, Decimal("0"))
@@ -1697,16 +1736,15 @@ def generate_invoice(
     # shared energy.
     skipped_community_consumption_readings = 0
     skipped_community_consumption_kwh = Decimal("0")
-    for reading in readings.community_consumption.order_by("timestamp").iterator():
-        ts = reading.timestamp
-        resolution = readings.assignment_windows.assignment_at(reading.metering_point_id, ts)
+    for reading_id, ts, metering_point_id, energy_kwh in _reading_rows(readings.community_consumption):
+        resolution = readings.assignment_windows.assignment_at(metering_point_id, ts)
         if resolution is None:
             # A true gap: no assignment covers this timestamp — belongs to
             # nobody. Counted here only if the personal loops did not already
             # count it (a mixed-mode meter appears in both querysets).
-            if reading.id not in personal_gap_reading_ids:
+            if reading_id not in personal_gap_reading_ids:
                 skipped_community_consumption_readings += 1
-                skipped_community_consumption_kwh += reading.energy_kwh
+                skipped_community_consumption_kwh += energy_kwh
             continue
         if resolution.allocation_mode != AllocationMode.COMMUNITY:
             continue  # personal window — billed in the personal loop above
@@ -1721,7 +1759,7 @@ def generate_invoice(
         zev_consumption_at_ts = zev_consumption_by_ts.get(ts, Decimal("0"))
         zev_production_at_ts = zev_production_by_ts.get(ts, Decimal("0"))
         r_local, r_grid = split_consumption(
-            reading.energy_kwh, zev_consumption_at_ts, zev_production_at_ts
+            energy_kwh, zev_consumption_at_ts, zev_production_at_ts
         )
         shared_local = r_local * share
         shared_grid = r_grid * share
@@ -1739,13 +1777,12 @@ def generate_invoice(
 
     skipped_community_production_readings = 0
     skipped_community_production_kwh = Decimal("0")
-    for reading in readings.community_production.order_by("timestamp").iterator():
-        ts = reading.timestamp
-        resolution = readings.assignment_windows.assignment_at(reading.metering_point_id, ts)
+    for reading_id, ts, metering_point_id, energy_kwh in _reading_rows(readings.community_production):
+        resolution = readings.assignment_windows.assignment_at(metering_point_id, ts)
         if resolution is None:
-            if reading.id not in personal_gap_reading_ids:
+            if reading_id not in personal_gap_reading_ids:
                 skipped_community_production_readings += 1
-                skipped_community_production_kwh += reading.energy_kwh
+                skipped_community_production_kwh += energy_kwh
             continue
         if resolution.allocation_mode != AllocationMode.COMMUNITY:
             continue
@@ -1760,7 +1797,7 @@ def generate_invoice(
         zev_production_at_ts = zev_production_by_ts.get(ts, Decimal("0"))
         zev_consumption_at_ts = zev_consumption_by_ts.get(ts, Decimal("0"))
         local_sold_kwh, exported_kwh = split_production(
-            reading.energy_kwh, zev_production_at_ts, zev_consumption_at_ts
+            energy_kwh, zev_production_at_ts, zev_consumption_at_ts
         )
         shared_local_sold = local_sold_kwh * share
         shared_exported = exported_kwh * share

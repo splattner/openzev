@@ -212,7 +212,7 @@ reads through `OrderBy` expressions to the column they sort on).
 The frontend sorts again for display, by season first
 (`features/tariffs/recurrence.ts`, `seasonSortKey`).
 
-**Period matching rules** (evaluated per-timestamp, `tariffs.periods.resolve_band`, which `invoices/engine.py:_resolve_tariff_band` delegates to).
+**Period matching rules** (evaluated per-timestamp, `tariffs.periods.resolve_band`, which `invoices/engine.py:_resolve_tariff_band` delegates to; `TariffResolver` memoises the result per tariff and per wall-clock month, weekday and time of day, the only inputs the rule reads).
 Months, weekdays and hours describe the **Swiss wall clock**: `resolve_band`
 first converts an aware `ts` (the ORM returns UTC) with
 `allocation.validity.wall_clock`, so HT 06:00–22:00 means 06:00 in Zurich in
