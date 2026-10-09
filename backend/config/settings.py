@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "allocation",
     "exports",
     "backups",
+    "privacy",
     "mcp_server",
 ]
 
@@ -351,6 +352,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "backups.tasks.sweep_backup_artifacts",
         "schedule": 3600.0,
     },
+    # Retention for personal data nothing else expires: audit IPs, email
+    # recipients, spent one-time tokens (PRIVACY_* settings below).
+    "sweep-personal-data": {
+        "task": "privacy.tasks.sweep_personal_data",
+        "schedule": 24 * 60 * 60.0,
+    },
     "refresh-dynamic-tariff-sources": {
         "task": "tariffs.tasks.refresh_dynamic_tariff_sources",
         "schedule": 4 * 60 * 60.0,
@@ -407,3 +414,13 @@ BACKUP_RUNNER_TIMEOUT_S = env.int("BACKUP_RUNNER_TIMEOUT_S", default=10800)
 # restore, not a routine backup, so it expires by date instead of by count.
 # ``0`` keeps them until an administrator deletes them.
 BACKUP_SAFETY_RETENTION_DAYS = env.int("BACKUP_SAFETY_RETENTION_DAYS", default=30)
+
+# ── Privacy retention (privacy.sweep) ─────────────────────────────────────────
+# Days before personal data nothing else expires is scrubbed by the daily sweep
+# (`manage.py openzev_privacy_sweep`). 0 switches a step off.
+# Audit events keep who/what/when; only their IP address and user agent go.
+PRIVACY_AUDIT_NETWORK_RETENTION_DAYS = env.int("PRIVACY_AUDIT_NETWORK_RETENTION_DAYS", default=365)
+# Invoice email logs keep status and timing; recipient and error text go.
+PRIVACY_EMAIL_LOG_RETENTION_DAYS = env.int("PRIVACY_EMAIL_LOG_RETENTION_DAYS", default=730)
+# Consumed, revoked or expired one-time tokens are deleted this long after they stopped working.
+PRIVACY_TOKEN_GRACE_DAYS = env.int("PRIVACY_TOKEN_GRACE_DAYS", default=30)

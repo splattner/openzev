@@ -699,6 +699,14 @@ Default operational retention should be long enough to cover invoice, account,
 and tenant troubleshooting windows, then move older records to an archive or
 remove them under controlled maintenance procedures.
 
+The one slice that is automated is the network detail: `AuditEvent.ip_address`
+and `user_agent` are blanked (the event row itself stays) once an event is older
+than `PRIVACY_AUDIT_NETWORK_RETENTION_DAYS` (default 365, `0` keeps them), by the
+daily privacy sweep — see
+[`2026-10-privacy-retention-sweep.md`](2026-10-privacy-retention-sweep.md). The
+sweep leaves a `system` / `privacy.swept` event with its counts. Retention of
+the event rows themselves is still not implemented.
+
 ---
 
 ## 10. Test plan

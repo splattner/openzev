@@ -248,6 +248,31 @@ The API is `GET /api/v1/audit/events/` (list) and
 [2026-05-audit-log-and-operational-traceability.md](../specs/2026-05-audit-log-and-operational-traceability.md)
 for the data model and redaction rules.
 
+### How long IP addresses are kept
+
+Each event records the IP address and browser (user agent) of the request that
+caused it. Those two details are personal data and are not needed once an
+incident can no longer be investigated, so a daily job blanks them after 365
+days. The event itself — who did what, to which record, and when — is kept.
+The same job blanks the recipient address of invoice email attempts after 730
+days (the delivery status stays) and deletes used, revoked or expired sign-in,
+verification and onboarding links 30 days after they stopped working.
+
+An operator sets the windows with environment variables; `0` switches a step
+off:
+
+| Setting | Purpose |
+|---|---|
+| `PRIVACY_AUDIT_NETWORK_RETENTION_DAYS` | Days before an audit event's IP address and user agent are blanked. Default 365. |
+| `PRIVACY_EMAIL_LOG_RETENTION_DAYS` | Days before an invoice email attempt's recipient and error text are blanked. Default 730. |
+| `PRIVACY_TOKEN_GRACE_DAYS` | Days after a one-time link stopped working before it is deleted. Default 30. |
+
+To see what the windows would remove before the daily job does it, or to run
+it where no scheduler is running, use `manage.py openzev_privacy_sweep
+--dry-run` and `manage.py openzev_privacy_sweep`. Blanking cannot be undone.
+A failed invoice email whose recipient has been blanked cannot be retried;
+send the invoice again instead.
+
 ## System Health
 
 **Platform → Overview → System health** (`/admin/health`) shows a read-only

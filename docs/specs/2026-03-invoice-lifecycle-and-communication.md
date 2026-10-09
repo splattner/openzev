@@ -152,6 +152,10 @@ Ordering: `["sort_order", "item_type", "description"]`.
 
 Ordering: `["-created_at"]`.
 
+`recipient` and `error_message` are blanked to `""` by the privacy sweep once a row is older than
+`PRIVACY_EMAIL_LOG_RETENTION_DAYS` (default 730); the row stays so the newest-log-per-invoice status
+keeps working ([`2026-10-privacy-retention-sweep.md`](2026-10-privacy-retention-sweep.md)).
+
 ### 3.4 PdfTemplate
 
 | Field | Type | Description |
@@ -338,7 +342,7 @@ coverage runs against PostgreSQL only (§13, `test_workflow.py`).
 |---|---|---|---|
 | `POST` | `/invoices/{id}/generate-pdf/` | `HasZevAccess` | Generate/regenerate PDF; returns `{pdf_url}` |
 | `POST` | `/invoices/{id}/send-email/` | `HasZevAccess` | Queue email to participant (optional `email` override); returns `{detail}` |
-| `POST` | `/invoices/{id}/retry-email/{email_log_id}/` | `HasZevAccess` | Re-queue a failed email; `400` if already sent |
+| `POST` | `/invoices/{id}/retry-email/{email_log_id}/` | `HasZevAccess` | Re-queue a failed email; `400` if already sent or its recipient was swept |
 | `POST` | `/invoices/approve-all/` | `HasZevAccess` | Approve all draft invoices for a ZEV period (`zev_id`, `period_start`, `period_end`); returns `{approved}`; audit-logged (`invoice.approve_all`) |
 | `POST` | `/invoices/send-all/` | `HasZevAccess` | Queue emails for all approved invoices in a ZEV period; returns `{queued, skipped}`; audit-logged (`invoice.send_all`, status `queued`) |
 | `POST` | `/invoices/download-pdfs/` | `HasZevAccess` | Download all period invoice PDFs as a single ZIP (`{invoice_number}.pdf` entries); `404` when the period has no PDFs |
@@ -717,7 +721,8 @@ Total rendered output is not capped; repeated fields can amplify it.
 
 The `retry-email` endpoint re-queues a Celery task for a specific failed
 `EmailLog` entry. If the log's status is already `"sent"`, the retry is
-rejected (HTTP `400`). The retried send creates a **new** `EmailLog` entry.
+rejected (HTTP `400`), and so is a log whose `recipient` the privacy sweep has blanked. The
+retried send creates a **new** `EmailLog` entry.
 
 ### 7.4 System email template management
 

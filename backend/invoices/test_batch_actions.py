@@ -773,6 +773,23 @@ class TestInvoiceRetryEmailAction:
         assert response.data["detail"] == "Email retry queued for failed@example.com."
         delay.assert_called_once_with(str(invoice.pk), "failed@example.com")
 
+    def test_retry_email_refuses_a_log_whose_recipient_was_swept(self):
+        owner = OwnerFactory()
+        zev = ZevFactory(owner=owner)
+        participant = ParticipantFactory(zev=zev)
+        invoice = _invoice(participant, status=InvoiceStatus.APPROVED)
+        email_log = EmailLog.objects.create(
+            invoice=invoice, recipient="", subject="Invoice", status=EmailLog.Status.FAILED,
+        )
+        client = _owner_client(owner)
+
+        with mock.patch("invoices.views.send_invoice_email_task.delay") as delay:
+            response = client.post(f"/api/v1/invoices/invoices/{invoice.pk}/retry-email/{email_log.pk}/")
+
+        assert response.status_code == 400
+        assert "privacy retention sweep" in response.data["error"]
+        delay.assert_not_called()
+
     def test_retry_email_rejects_log_from_different_invoice(self):
         owner = OwnerFactory()
         zev = ZevFactory(owner=owner)

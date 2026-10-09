@@ -718,6 +718,13 @@ class InvoiceViewSet(
             )
             return Response({"error": "Email already sent."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # The privacy sweep blanks the recipient of old logs; there is nobody to retry to.
+        if not email_log.recipient:
+            return Response(
+                {"error": "The recipient of this attempt was removed by the privacy retention sweep. Send the invoice again."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Queue retry
         send_invoice_email_task.delay(str(invoice.pk), email_log.recipient)
         _record_invoice_event(
