@@ -1124,6 +1124,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#own-energy-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Own energy data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#what-deliberately-does-not-travel" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1607,6 +1618,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#own-energy-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Own energy data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#what-deliberately-does-not-travel" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1853,6 +1875,10 @@ the audit log with the sections that left the instance.</p>
 <td>Every reading, as one CSV per meter</td>
 </tr>
 <tr>
+<td><strong>Own energy data</strong></td>
+<td>The energy data sources participants connected for a PV system behind their meter, and their quarter-hour values — opt-in, see below</td>
+</tr>
+<tr>
 <td><strong>Invoices</strong></td>
 <td>Invoices and their line items</td>
 </tr>
@@ -1862,6 +1888,18 @@ the audit log with the sections that left the instance.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="own-energy-data">Own energy data<a class="headerlink" href="#own-energy-data" title="Permanent link">&para;</a></h3>
+<p><a href="../20-energy-data/">Own energy data</a> is a participant's household profile — what their own system
+measured, every quarter hour. They connected it for statistics, and you, as manager, see it as
+statistics rather than as raw values. So this section is <strong>never ticked by default</strong>, and a request
+that names no sections (a script calling the export) leaves it out. Tick it deliberately, for
+instance when you move a community to a new instance and want the history to come along.</p>
+<p>What travels is the data and what describes it (the source type, its Solar Manager ID or name, the
+period covered). <strong>No key and no push token travels</strong>, and neither does anything about the live
+connection. After an import every source is <strong>disconnected</strong>: it keeps its data, but no new data
+arrives until the participant opens <strong>Account → Energy data</strong> and connects again with their own key
+or a new push token. The import tells you so. It needs <strong>Participants</strong> and <strong>Metering points &amp;
+assignments</strong>, because a source belongs to a participant's metering point.</p>
 <p>Some sections need others. Assignments point at participants, readings point at
 metering points, invoices point at participants, and invoice PDFs point at
 invoices — so the dialog greys out a section whose prerequisite is unticked and
@@ -1976,6 +2014,8 @@ move.</p>
   tariffs.json           versions and price bands
   invoices.json          invoices and line items
   readings/&lt;meter&gt;.csv   one file per meter (name includes a short checksum)
+  supplementary_sources.json            energy data sources, if ticked
+  supplementary_readings/&lt;meter&gt;.csv    their quarter-hour values, one file per source
   invoices/pdf/&lt;invoice&gt;.pdf   one file per invoice that has a rendered PDF, if ticked
 </code></pre></div>
 <p>Readings use the same column layout the
