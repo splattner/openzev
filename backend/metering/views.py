@@ -29,7 +29,7 @@ from .analytics import (
     compute_hourly_profile,
     compute_data_quality_status,
 )
-from .supplementary.surfaces import attach_owner_gross, attach_participant_gross, window_for
+from .supplementary.surfaces import attach_hourly_gross, attach_owner_gross, attach_participant_gross, window_for
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import record_audit_event
 
@@ -426,7 +426,8 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             else:
                 return Response({"hourly_profile": None})
 
-        return Response(compute_hourly_profile(selected_zev_id, participant_ids, start_dt, end_dt, ps, pe))
+        result = compute_hourly_profile(selected_zev_id, participant_ids, start_dt, end_dt, ps, pe)
+        return Response(attach_hourly_gross(result, participant_ids, ps, pe))
 
     @action(detail=False, methods=["get"], url_path="data-quality-status", permission_classes=[IsAuthenticated])
     def data_quality_status(self, request):

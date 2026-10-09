@@ -2659,6 +2659,7 @@ export const de = {
                 exported: 'Exportiert',
                 selfConsumedPct: 'Eigenverbrauch %',
                 fromZevPct: 'Aus ZEV %',
+                ownSystemConsumption: 'Verbrauch (eigenes System)',
             },
             noData: 'Keine Messdaten für den ausgewählten Zeitraum.',
             perParticipant: 'Pro Teilnehmer',
@@ -2686,6 +2687,7 @@ export const de = {
                 refreshFailed: 'Das Verbrauchsprofil konnte nicht aktualisiert werden. Die zuletzt geladenen Daten werden angezeigt.',
                 title: 'Durchschnittliches Tagesverbrauchsprofil (24 h)',
                 description: 'Durchschnittlicher stündlicher Energiebezug über die Abrechnungsperiode — aufgeteilt in lokale ZEV-Energie und Netzbezug.',
+                ownSystemNote: 'Die gestrichelte Linie zeigt den Verbrauch laut dem eigenen System der Person (z. B. Solar Manager), nicht vom Zähler abgelesen.',
             },
             invoicesSection: 'Rechnungen',
             invoicesAllCommunitiesSection: 'Rechnungen aller ZEVs',
@@ -3257,6 +3259,7 @@ export const de = {
     },
     supplementary: {
         rateHint: 'Vom eigenen System der Person gemeldet (z. B. Solar Manager), nicht vom Zähler abgelesen.',
+        ownSystemValue: 'Eigenes System: {{value}}',
         never: 'nie',
         disconnectedNote: 'Diese Quelle ist getrennt: Es kommen keine neuen Daten und der gespeicherte Zugang ist gelöscht. Bereits gesammelte Daten bleiben erhalten.',
         status: {
@@ -3419,7 +3422,9 @@ export const de = {
     behindMeter: {
         badge: 'Überschussmessung',
         participantHint: 'Die Photovoltaikanlage dieser Person liegt hinter ihrem Zähler; ihr eigener Verbrauch ab Anlage wird nicht erfasst, daher wird keine Quote ausgewiesen.',
+        participantHintConnected: 'Die Photovoltaikanlage dieser Person liegt hinter ihrem Zähler; der Zähler misst nur Überschuss und Netzbezug. Verbrauch, Produktion und Quote stammen vom eigenen System der Person.',
         ownHint: 'Ihre Photovoltaikanlage liegt hinter Ihrem Zähler; Ihr eigener Verbrauch ab Anlage wird nicht erfasst, daher wird keine Quote ausgewiesen.',
+        ownHintConnected: 'Ihre Photovoltaikanlage liegt hinter Ihrem Zähler; der Zähler misst nur Überschuss und Netzbezug. Verbrauch, Produktion und Quote Ihres eigenen Systems finden Sie unter «Ihr eigenes System».',
         zevNote: 'Einige Messpunkte haben eine Photovoltaikanlage hinter dem Zähler. Für diese bedeutet Produktion den eingespeisten Überschuss, und die Quoten beschreiben die an den Anschlusspunkten ausgetauschte Energie, nicht den Eigenverbrauch der Anlage selbst.',
     },
     features: {

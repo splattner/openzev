@@ -2,7 +2,9 @@ import { useTranslation } from 'react-i18next'
 import { BehindMeterBadge } from '../BehindMeterBadge'
 import { dashboardKwhStat } from '../../lib/dashboardFormatting'
 import { formatPercent } from '../../lib/numbers'
+import { behindMeterHintKey } from '../../lib/supplementary'
 import { NetMeteredRate } from './NetMeteredRate'
+import { OwnSystemKwh } from './OwnSystemKwh'
 import type { ZevOwnerDashboardSummary } from '../../types/api'
 
 type ParticipantRow = ZevOwnerDashboardSummary['participant_stats'][number]
@@ -69,16 +71,24 @@ export function ParticipantTableCard({
                                                 <span className="badge badge-info">{t('pages.dashboard.youBadge')}</span>
                                             )}
                                             {participant.has_behind_meter_generation && (
-                                                <BehindMeterBadge hintKey="behindMeter.participantHint" />
+                                                <BehindMeterBadge hintKey={behindMeterHintKey('participant', participant.gross_energy)} />
                                             )}
                                         </td>
                                         <td
                                             className="numeric"
-                                            title={participant.has_behind_meter_generation ? t('behindMeter.participantHint') : undefined}
+                                            title={participant.has_behind_meter_generation ? t(behindMeterHintKey('participant', participant.gross_energy)) : undefined}
                                         >
                                             {dashboardKwhStat(participant.total_consumed_kwh)}
+                                            {participant.has_behind_meter_generation && (
+                                                <OwnSystemKwh gross={participant.gross_energy} kind="consumption" />
+                                            )}
                                         </td>
-                                        <td className="numeric">{dashboardKwhStat(participant.total_produced_kwh)}</td>
+                                        <td className="numeric">
+                                            {dashboardKwhStat(participant.total_produced_kwh)}
+                                            {participant.has_behind_meter_generation && (
+                                                <OwnSystemKwh gross={participant.gross_energy} kind="production" />
+                                            )}
+                                        </td>
                                         <td className="numeric">{dashboardKwhStat(participant.from_zev_kwh)}</td>
                                         <td className="numeric">{dashboardKwhStat(participant.from_grid_kwh)}</td>
                                         <td className="numeric">

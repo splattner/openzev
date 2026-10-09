@@ -16,6 +16,20 @@ export function withheldReasonKey(gross: Pick<GrossEnergy, 'rates_withheld_reaso
     }
 }
 
+/** Whether the participant's own system reported enough for this period to be shown next to the meter. */
+export function hasOwnSystemData(gross: Pick<GrossEnergy, 'rates_withheld_reason'> | null | undefined): boolean {
+    return !!gross && !gross.rates_withheld_reason
+}
+
+/** Hint for the surplus-meter badge and notes: says where the figures come from once the own system is connected. */
+export function behindMeterHintKey(
+    whose: 'participant' | 'own',
+    gross: Pick<GrossEnergy, 'rates_withheld_reason'> | null | undefined,
+): 'behindMeter.participantHint' | 'behindMeter.participantHintConnected' | 'behindMeter.ownHint' | 'behindMeter.ownHintConnected' {
+    if (whose === 'participant') return hasOwnSystemData(gross) ? 'behindMeter.participantHintConnected' : 'behindMeter.participantHint'
+    return hasOwnSystemData(gross) ? 'behindMeter.ownHintConnected' : 'behindMeter.ownHint'
+}
+
 export type GrossRateKind = 'self_sufficiency' | 'self_consumption'
 
 /**

@@ -238,6 +238,53 @@ def gross_energy(
     return result
 
 
+def gross_hourly_consumption(
+    participant_ids: Iterable,
+    start: datetime,
+    end: datetime,
+    *,
+    hour_of: Callable[[datetime], int],
+    min_coverage: float | None = None,
+) -> list[float] | None:
+    """Average daily consumption per hour of day (24 kWh values), as the participants' own systems report it.
+
+    Same inclusion rules and coverage gate as ``gross_energy``; ``None`` when
+    that would withhold the rates (no source, no data, low coverage), since a
+    thin profile next to a full-period meter profile would mislead. Each hour
+    is averaged over the days that actually have data for it, so a source
+    connected mid-period is not diluted by days it never saw. Several sources
+    add up, each averaged on its own.
+    """
+    if min_coverage is None:
+        min_coverage = settings.SUPPLEMENTARY_MIN_COVERAGE
+
+    sources = SupplementarySource.objects.filter(participant_id__in=list(participant_ids)).order_by("created_at", "id")
+    profile = [ZERO] * 24
+    expected = present = 0
+    for source in sources:
+        windows = expected_windows(source, start, end)
+        if not windows:
+            continue
+        expected += _slots(windows)
+        sums = [ZERO] * 24
+        counts = [0] * 24
+        rows = SupplementaryReading.objects.filter(source=source).filter(_window_q(windows)).values_list(
+            "timestamp", "consumption_kwh"
+        )
+        for ts, consumption in rows:
+            hour = hour_of(ts)
+            sums[hour] += consumption
+            counts[hour] += 1
+            present += 1
+        for hour in range(24):
+            if counts[hour]:
+                profile[hour] += sums[hour] * 4 / counts[hour]  # four intervals per hour and day
+
+    if expected == 0 or present == 0 or present / expected < min_coverage:
+        return None
+    return [float(value) for value in profile]
+
+
 def civil_window(start: date, end: date) -> Window:
     """UTC bounds of the inclusive civil-date range ``[start, end]``."""
     return period_start_dt(start), period_end_exclusive_dt(end)

@@ -422,3 +422,46 @@ class MeteringPointStatusTests(SurfaceTestCase):
     def test_null_while_the_flag_is_off(self):
         enable_feature(False)
         self.assertIsNone(self.status_for(self.manager))
+
+
+HOURLY_PROFILE = "/api/v1/metering/readings/hourly-profile/"
+
+
+class HourlyProfileTests(SurfaceTestCase):
+    def profile(self, user, **params):
+        params = {"zev_id": str(self.zev.pk), "date_from": "2026-07-01", "date_to": "2026-07-03", **params}
+        response = client_for(user).get(HOURLY_PROFILE, params)
+        self.assertEqual(response.status_code, 200, response.content)
+        return response.json()["hourly_profile"]
+
+    def test_each_hour_carries_the_own_systems_average_consumption(self):
+        self.seed()
+        profile = self.profile(self.holder_user)
+        self.assertEqual(len(profile), 24)
+        # Four intervals of 0.4 kWh per hour and day.
+        self.assertTrue(all(entry["own_system_consumption_kwh"] == 1.6 for entry in profile))
+
+    def test_an_hour_is_averaged_over_the_days_that_have_data_for_it(self):
+        self.seed(days=DAYS[:1])
+        self.seed(days=DAYS[1:], row=dict(ROW, consumption_kwh=Decimal("0.8")))
+        profile = self.profile(self.holder_user)
+        self.assertAlmostEqual(profile[12]["own_system_consumption_kwh"], (1.6 + 3.2 + 3.2) / 3, places=3)
+
+    def test_a_manager_sees_it_for_the_selected_participant_only(self):
+        self.seed()
+        selected = self.profile(self.manager, participant_id=str(self.holder.pk))
+        self.assertTrue(all("own_system_consumption_kwh" in entry for entry in selected))
+
+    def test_the_meter_split_is_unchanged(self):
+        self.seed()
+        with_source = self.profile(self.holder_user)
+        enable_feature(False)
+        without = self.profile(self.holder_user)
+        self.assertTrue(all("own_system_consumption_kwh" not in entry for entry in without))
+        strip = lambda rows: [{k: v for k, v in row.items() if k != "own_system_consumption_kwh"} for row in rows]
+        self.assertEqual(strip(with_source), without)
+
+    def test_thin_coverage_leaves_the_own_system_out(self):
+        self.seed(share=0.3)
+        profile = self.profile(self.holder_user)
+        self.assertTrue(all("own_system_consumption_kwh" not in entry for entry in profile))

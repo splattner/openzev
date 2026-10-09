@@ -2659,6 +2659,7 @@ export const it = {
                 exported: 'Immesso',
                 selfConsumedPct: 'Autoconsumo %',
                 fromZevPct: 'Dalla RCP %',
+                ownSystemConsumption: 'Consumo (sistema proprio)',
             },
             noData: 'Nessun dato di misurazione per il periodo selezionato.',
             perParticipant: 'Per partecipante',
@@ -2686,6 +2687,7 @@ export const it = {
                 refreshFailed: 'Impossibile aggiornare il profilo di consumo. Sono visualizzati gli ultimi dati caricati.',
                 title: 'Profilo medio di consumo giornaliero (24 h)',
                 description: 'Consumo orario medio nel periodo di fatturazione — suddiviso tra energia locale CEE e importazione dalla rete.',
+                ownSystemNote: 'La linea tratteggiata mostra il consumo secondo il sistema proprio della persona (ad es. Solar Manager), non letto dal contatore.',
             },
             invoicesSection: 'Fatture',
             invoicesAllCommunitiesSection: 'Fatture di tutti i RCP',
@@ -3257,6 +3259,7 @@ export const it = {
     },
     supplementary: {
         rateHint: 'Indicato dal sistema proprio della persona (ad es. Solar Manager), non letto dal contatore.',
+        ownSystemValue: 'Sistema proprio: {{value}}',
         never: 'mai',
         disconnectedNote: 'Questa fonte è scollegata: non arrivano più nuovi dati e l\'accesso salvato è eliminato. I dati già raccolti vengono conservati.',
         status: {
@@ -3419,7 +3422,9 @@ export const it = {
     behindMeter: {
         badge: 'Misurazione del surplus',
         participantHint: 'L\'impianto fotovoltaico di questa persona si trova dietro il proprio contatore; il proprio consumo diretto dall\'impianto non viene misurato, quindi non viene indicato alcun tasso.',
+        participantHintConnected: 'L\'impianto fotovoltaico di questa persona si trova dietro il suo contatore; il contatore misura solo l\'eccedenza e il prelievo dalla rete. Consumo, produzione e quota provengono dal sistema proprio della persona.',
         ownHint: 'Il vostro impianto fotovoltaico si trova dietro il vostro contatore; il vostro consumo diretto dall\'impianto non viene misurato, quindi non viene indicato alcun tasso.',
+        ownHintConnected: 'Il vostro impianto fotovoltaico si trova dietro il vostro contatore; il contatore misura solo l\'eccedenza e il prelievo dalla rete. Consumo, produzione e quota del vostro sistema sono indicati sotto «Il vostro sistema».',
         zevNote: 'Alcuni punti di misura hanno un impianto fotovoltaico dietro il contatore. Per questi, la produzione significa il surplus immesso, e i tassi descrivono l\'energia scambiata ai punti di connessione, non l\'autoconsumo dell\'impianto stesso.',
     },
     features: {

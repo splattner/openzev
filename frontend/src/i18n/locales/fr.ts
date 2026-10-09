@@ -2659,6 +2659,7 @@ export const fr = {
                 exported: 'Injecté',
                 selfConsumedPct: 'Autoconsommation %',
                 fromZevPct: 'Du RCP %',
+                ownSystemConsumption: 'Consommation (système propre)',
             },
             noData: 'Aucune donnée de mesure pour la période sélectionnée.',
             perParticipant: 'Par participant',
@@ -2686,6 +2687,7 @@ export const fr = {
                 refreshFailed: 'Impossible d’actualiser le profil de consommation. Les dernières données chargées sont affichées.',
                 title: 'Profil de consommation journalier moyen (24 h)',
                 description: 'Consommation horaire moyenne sur la période de facturation — répartie entre énergie locale CEL et importation réseau.',
+                ownSystemNote: 'La ligne en pointillés montre la consommation selon le propre système de la personne (p. ex. Solar Manager), non relevée sur le compteur.',
             },
             invoicesSection: 'Factures',
             invoicesAllCommunitiesSection: 'Factures de tous les RCP',
@@ -3257,6 +3259,7 @@ export const fr = {
     },
     supplementary: {
         rateHint: 'Indiqué par le propre système de la personne (p. ex. Solar Manager), non relevé sur le compteur.',
+        ownSystemValue: 'Système propre : {{value}}',
         never: 'jamais',
         disconnectedNote: 'Cette source est déconnectée : plus aucune nouvelle donnée n\'arrive et l\'accès enregistré est supprimé. Les données déjà collectées sont conservées.',
         status: {
@@ -3419,7 +3422,9 @@ export const fr = {
     behindMeter: {
         badge: 'Comptage du surplus',
         participantHint: 'L\'installation photovoltaïque de cette personne se trouve derrière son compteur ; sa propre consommation depuis l\'installation n\'est pas mesurée, aucun taux n\'est donc indiqué.',
+        participantHintConnected: 'L\'installation photovoltaïque de cette personne se trouve derrière son compteur ; le compteur ne mesure que le surplus et le soutirage du réseau. La consommation, la production et le taux proviennent du propre système de la personne.',
         ownHint: 'Votre installation photovoltaïque se trouve derrière votre compteur ; votre propre consommation depuis l\'installation n\'est pas mesurée, aucun taux n\'est donc indiqué.',
+        ownHintConnected: 'Votre installation photovoltaïque se trouve derrière votre compteur ; le compteur ne mesure que le surplus et le soutirage du réseau. La consommation, la production et le taux de votre propre système figurent sous « Votre propre système ».',
         zevNote: 'Certains points de mesure ont une installation photovoltaïque derrière le compteur. Pour ceux-ci, la production correspond au surplus injecté, et les taux décrivent l\'énergie échangée aux points de raccordement, pas l\'autoconsommation propre de l\'installation.',
     },
     features: {

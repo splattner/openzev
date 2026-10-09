@@ -1,6 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
+import type { behindMeterHintKey } from '../lib/supplementary'
 
 type BehindMeterBadgeProps = {
     /**
@@ -8,7 +9,7 @@ type BehindMeterBadgeProps = {
      * label) next to the badge. Omit for the plain metering-point-list badge,
      * which needs no extra explanation beyond its own label.
      */
-    hintKey?: 'behindMeter.participantHint' | 'behindMeter.ownHint'
+    hintKey?: ReturnType<typeof behindMeterHintKey>
     className?: string
 }
 

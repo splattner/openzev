@@ -2670,6 +2670,7 @@ export const en = {
                 exported: 'Exported',
                 selfConsumedPct: 'Self-consumed %',
                 fromZevPct: 'From ZEV %',
+                ownSystemConsumption: 'Consumption (own system)',
             },
             noData: 'No metering data for selected period.',
             perParticipant: 'Per Participant',
@@ -2697,6 +2698,7 @@ export const en = {
                 refreshFailed: 'Could not refresh the consumption profile. Showing the last loaded data.',
                 title: 'Average Daily Consumption Profile (24 h)',
                 description: 'Average hourly energy draw over the billing period — split between local ZEV energy and grid import.',
+                ownSystemNote: 'The dashed line shows consumption as the participant\'s own system (for example Solar Manager) reports it, not read from the meter.',
             },
             invoicesSection: 'Invoices',
             invoicesAllCommunitiesSection: 'Invoices from all communities',
@@ -3268,6 +3270,7 @@ export const en = {
     },
     supplementary: {
         rateHint: 'Reported by the participant\'s own system (for example Solar Manager), not read from the meter.',
+        ownSystemValue: 'Own system: {{value}}',
         never: 'never',
         disconnectedNote: 'This source is disconnected: no new data arrives and the stored credential is gone. The data already collected is kept.',
         status: {
@@ -3430,7 +3433,9 @@ export const en = {
     behindMeter: {
         badge: 'Surplus metering',
         participantHint: "This participant's PV system sits behind their meter; their own use of it is not measured, so no rate is shown.",
+        participantHintConnected: 'This participant\'s PV system sits behind their meter; the meter only measures surplus and grid draw. Consumption, production and rate come from the participant\'s own system.',
         ownHint: 'Your PV system sits behind your meter; your own use of it is not measured, so no rate is shown.',
+        ownHintConnected: 'Your PV system sits behind your meter; the meter only measures surplus and grid draw. Consumption, production and rate from your own system are shown under “Your own system”.',
         zevNote: "Some metering points have a PV system behind them. For those, production means the surplus fed in, and the rates describe energy exchanged at the connection points, not the plant's own self-consumption.",
     },
     features: {

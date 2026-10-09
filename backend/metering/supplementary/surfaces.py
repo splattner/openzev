@@ -11,14 +11,14 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone as dt_timezone
 from typing import Callable, Iterable
 
-from allocation.validity import business_tz, civil_date, period_start_dt
+from allocation.validity import business_tz, civil_date, period_start_dt, wall_clock
 
 from zev import access
 from zev.models import Participant
 
 from ..models import SupplementarySource
 from .permissions import feature_enabled
-from .stats import civil_window, gross_energy
+from .stats import civil_window, gross_energy, gross_hourly_consumption
 
 #: Wide enough to mean "no bound": ``gross_energy`` clips to what each source has ingested.
 EARLIEST = datetime(2000, 1, 1, tzinfo=dt_timezone.utc)
@@ -100,6 +100,24 @@ def attach_participant_gross(summary: dict, participant_ids: Iterable, window: W
         start, end = window
         summary["gross_energy"] = gross_energy(list(participant_ids), start, end, bucket_key=bucket_key_for(bucket))
     return summary
+
+
+def attach_hourly_gross(result: dict, participant_ids: Iterable, date_from: date, date_to: date) -> dict:
+    """Adds ``own_system_consumption_kwh`` to each hour of the 24 h consumption profile.
+
+    The value is the average consumption of that hour of day as the participants' own systems
+    report it, next to the meter-based split. Left out entirely while the feature is off or the
+    data is too thin (see ``gross_hourly_consumption``).
+    """
+    profile = result.get("hourly_profile")
+    if not profile or not feature_enabled():
+        return result
+    start, end = window_for(date_from, date_to)
+    hourly = gross_hourly_consumption(participant_ids, start, end, hour_of=lambda ts: wall_clock(ts).hour)
+    if hourly is not None:
+        for entry in profile:
+            entry["own_system_consumption_kwh"] = round(hourly[entry["hour"]], 4)
+    return result
 
 
 def statement_gross(participant_id, year: int):

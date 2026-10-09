@@ -9,7 +9,7 @@ import { dashboardKwhStat, fromZevRate, kwhTick } from '../../lib/dashboardForma
 import { useAuth } from '../../lib/auth'
 import { personalInvoiceFilter, selectedCommunityName } from '../../lib/membership'
 import { useManagedZev } from '../../lib/managedZev'
-import { useEnergyDataEligibility } from '../../lib/supplementary'
+import { behindMeterHintKey, useEnergyDataEligibility } from '../../lib/supplementary'
 import { PageSkeleton } from '../../components/PageSkeleton'
 import { Notice } from '../../components/Notice'
 import { StatCard } from '../../components/StatCard'
@@ -125,14 +125,14 @@ export function ParticipantDashboardBody({ interval, period, onPeriodChange, per
                         <StatCard
                             label={t('pages.dashboard.participantStats.totalConsumption')}
                             value={dashboardKwhStat(summary.totals.total_consumed_kwh)}
-                            hint={summary.has_behind_meter_generation ? t('behindMeter.ownHint') : undefined}
+                            hint={summary.has_behind_meter_generation ? t(behindMeterHintKey('own', summary.gross_energy)) : undefined}
                         />
                         <StatCard
                             label={t('pages.dashboard.participantStats.fromZevShare')}
                             value={participantFromZev ? formatPercent(participantFromZev.pct) : '—'}
                             hint={
                                 summary.has_behind_meter_generation
-                                    ? t('behindMeter.ownHint')
+                                    ? t(behindMeterHintKey('own', summary.gross_energy))
                                     : participantFromZev
                                       ? t('pages.dashboard.hints.fromZevShare', {
                                             zev: formatKwh(participantFromZev.zevKwh, { maxDecimals: 0 }),

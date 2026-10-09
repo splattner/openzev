@@ -343,6 +343,12 @@ because official data is often imported later than the source delivers. The shar
   source cost no extra query. It also carries `own_gross_energy` (with `timeline`): the signed-in
   user's own figures as a participant of that ZEV, independent of the selection, `null` without one. A
   manager is usually a participant too, and their own picture should not hide behind a dropdown.
+- **24 h consumption profile** (`hourly-profile`): when the profiled participants have a source with
+  enough data (the same coverage gate as the rates), every `hourly_profile[]` entry gains
+  `own_system_consumption_kwh`: the average consumption of that civil hour of day as the own system
+  reports it (`stats.gross_hourly_consumption`, attached by `surfaces.attach_hourly_gross`). Each
+  hour is averaged over the days that have data for it, several sources add up, and the key is
+  absent (not `null`) otherwise. `from_zev_kwh` / `from_grid_kwh` are unchanged.
 - **Annual report** (`/api/v1/invoices/invoices/annual-report/`): `participants[]` gains
   `gross_energy` (without `timeline`). `self_sufficiency_rate` stays `null` for net-metered
   participants; `totals`, `previous_totals` and `months` are unchanged.
@@ -588,7 +594,19 @@ an owner.
 - `components/dashboard/ParticipantTableCard.tsx`: the per-participant rate cell of a net-metered
   participant is `NetMeteredRate` (shared with the annual report): the gross rate with an info
   marker when `gross_energy` is present, else `—` as today (with the withheld reason as a tooltip).
-  A participant who is not net-metered is untouched.
+  The "Verbrauch" and "Produktion/Export" cells keep the meter value and add a second line
+  `OwnSystemKwh` ("Eigenes System: x kWh", info marker, tooltip naming the source) under it while the
+  own system reported enough data (`rates_withheld_reason` null); "Aus ZEV", "Aus Netz" stay
+  meter-based. A participant who is not net-metered is untouched.
+- `BehindMeterBadge` hints (`lib/supplementary.ts#behindMeterHintKey`): once `gross_energy` is present
+  without a withheld reason, the participant table, annual report and participant dashboard stat cards
+  use `behindMeter.participantHintConnected` / `ownHintConnected` (the meter only measures surplus and
+  grid draw; consumption, production and rate come from the own system) instead of the "no rate is
+  shown" text.
+- `components/dashboard/HourlyProfileCard.tsx`: the chart is a `ComposedChart`; when an entry carries
+  `own_system_consumption_kwh` it adds a dashed line `pages.dashboard.chart.ownSystemConsumption`
+  ("Verbrauch (eigenes System)") and a note under the description saying the line is reported by the
+  own system, not read from the meter.
 - `features/reports/AnnualReportSection.tsx`: same rule per participant row.
 - Fallback rule everywhere: `rates_withheld_reason` set → `—` plus a short reason
   (insufficient coverage / no data).
@@ -836,7 +854,7 @@ stopped syncing but not one that needs a reconnect.
 
 ### Backend — surfaces (PR 4: 41 tests)
 
-**`metering/test_supplementary_surfaces.py`** (37; a synthetic three-day profile with known rates,
+**`metering/test_supplementary_surfaces.py`** (42; a synthetic three-day profile with known rates,
 75 % self-sufficiency and 25 % self-consumption): `WindowAndBucketTests` (3: civil-date window, open
 window, and the bucket labels equal the dashboard's own across both DST changes for day, month and
 hour), `ParticipantDashboardTests` (10: own figures and timeline; the dashboard's own numbers are
@@ -852,7 +870,9 @@ coverage judged on the synced range; everything else unchanged; participants wit
 own coverage and shows when the year is fully covered; the note in all four languages; the plain
 note stays without enough data; no source; flag off; not net-metered; the catalog lists the new
 key) and `MeteringPointStatusTests` (4: owner, manager, viewer and admin see it; another participant
-does not; no source; flag off).
+does not; no source; flag off) and `HourlyProfileTests` (5: each hour carries the own system's
+average; an hour is averaged over the days with data; a manager's selected participant; the meter
+split is unchanged and the key absent with the flag off; thin coverage leaves it out).
 
 **`mcp_server/tests/test_tools.py`** (+4): gross figures per participant and in the selected
 participant's totals, `null` without a source and while the feature is off. The existing exact-keys

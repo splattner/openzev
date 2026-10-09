@@ -1793,6 +1793,8 @@ export interface HourlyProfileEntry {
     hour: number
     from_zev_kwh: number
     from_grid_kwh: number
+    /** Average consumption of this hour as the participant's own system reports it (not the meter); absent without usable data. */
+    own_system_consumption_kwh?: number
 }
 
 export interface HourlyProfileResponse {

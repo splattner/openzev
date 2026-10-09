@@ -7,6 +7,7 @@ import { queryKeys } from '../../lib/api/queryKeys'
 import { AXIS_COLOR, CHART_GRIDLINE, CHART_LOCAL, FLOW_LOCAL_CONS } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { formatChf, formatKwh, formatPercent } from '../../lib/numbers'
+import { behindMeterHintKey } from '../../lib/supplementary'
 import { StatCard } from '../../components/StatCard'
 import { PageSkeleton } from '../../components/PageSkeleton'
 import { BehindMeterBadge } from '../../components/BehindMeterBadge'
@@ -197,7 +198,7 @@ function ParticipantSavingsCard({ report }: { report: AnnualReport }) {
                                     <td>
                                         {row.participant_name || '-'}
                                         {row.has_behind_meter_generation && (
-                                            <BehindMeterBadge hintKey="behindMeter.participantHint" />
+                                            <BehindMeterBadge hintKey={behindMeterHintKey('participant', row.gross_energy)} />
                                         )}
                                     </td>
                                     <td className="numeric">{yearKwh(row.consumed_kwh)}</td>
