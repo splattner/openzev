@@ -2240,7 +2240,10 @@ demo seed ships well-known passwords.</p>
 gunicorn), a Celery worker, one Celery Beat scheduler, PostgreSQL and Redis on
 one host. Only the frontend port <code>8080</code> is published; nginx proxies <code>/api/</code> to
 the backend, and PostgreSQL and Redis are reachable only on the compose
-network. The images are built from your checkout of the repository.</p>
+network. The images are built from your checkout of the repository.
+Keep the shared Redis cache supplied by Compose: registration reservations and
+throttles must be shared across backend workers; an in-memory cache is local to
+each process.</p>
 <h3 id="1-get-the-code">1. Get the code<a class="headerlink" href="#1-get-the-code" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/splattner/openzev.git
 <span class="nb">cd</span><span class="w"> </span>openzev
@@ -2264,6 +2267,11 @@ git<span class="w"> </span>checkout<span class="w"> </span>vX.Y.Z<span class="w"
 <td><code>SECRET_KEY</code></td>
 <td><em>(generated, see below)</em></td>
 <td>The backend refuses to start without it</td>
+</tr>
+<tr>
+<td><code>DJANGO_ADMIN_ENABLED</code></td>
+<td><code>False</code></td>
+<td>Keeps Django's separate <code>/admin/</code> login disabled. Use the platform pages for normal administration; enable Django admin only behind a private network or ingress/nginx allowlist.</td>
 </tr>
 <tr>
 <td><code>ALLOWED_HOSTS</code></td>
@@ -2317,6 +2325,10 @@ git<span class="w"> </span>checkout<span class="w"> </span>vX.Y.Z<span class="w"
 </tr>
 </tbody>
 </table>
+<p><strong>OAuth upgrades:</strong> new accounts need <code>email_verified: true</code> unless an admin
+enables <strong>Allow missing email-verification claim</strong> for a trusted provider that
+omits it. Review the <a href="../14-admin-console/#oauth">OAuth upgrade requirements</a>
+before upgrading an existing deployment.</p>
 <p>Generate the three keys with Python (any machine with Python 3; the
 <code>cryptography</code> package is only needed for the second line):</p>
 <div class="highlight"><pre><span></span><code>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import secrets; print(secrets.token_urlsafe(50))"</span><span class="w">                               </span><span class="c1"># SECRET_KEY</span>

@@ -997,6 +997,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#outbound-url-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outbound URL checks
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2053,6 +2064,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#outbound-url-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outbound URL checks
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2785,6 +2807,10 @@ community pays VAT it cannot reclaim, set the VAT treatment in
 <a href="../02-zev-setup/#vat-configuration">ZEV settings</a> rather than adjusting
 tariff prices by hand; a re-import would undo that.</p>
 </blockquote>
+<h3 id="outbound-url-checks">Outbound URL checks<a class="headerlink" href="#outbound-url-checks" title="Permanent link">&para;</a></h3>
+<p>Tariff downloads must resolve to public addresses. The check cannot rule out
+DNS rebinding, so also restrict outbound traffic at the network level (see the
+<a href="https://github.com/splattner/openzev/blob/main/docs/specs/2026-09-vse-tariff-import.md">VSE import spec</a>).</p>
 <h2 id="energy-tariff-types">Energy Tariff Types<a class="headerlink" href="#energy-tariff-types" title="Permanent link">&para;</a></h2>
 <h3 id="local-energy-tariff">Local Energy Tariff<a class="headerlink" href="#local-energy-tariff" title="Permanent link">&para;</a></h3>
 <p>Charges for energy consumed from the ZEV's own production.</p>

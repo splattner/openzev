@@ -2054,8 +2054,12 @@
 <li>Go to the login page</li>
 <li>In the <strong>New to OpenZEV?</strong> panel on the right, click <strong>Create account</strong></li>
 <li>In the modal, enter your <strong>Email address</strong> — it is your sign-in name</li>
-<li>Click <strong>Send verification email</strong></li>
+<li>Click <strong>Request verification link</strong></li>
 </ol>
+<p>The page shows the same confirmation for every valid address. A registration
+that was never completed receives a new verification link (at most one mail per
+address every 15 minutes, with immediate retry after a failed send if the cache
+is available); established accounts receive no registration email.</p>
 <p>The panel is shown only while self-registration is enabled (an admin can turn
 it off under <strong>Platform → Settings → Functions</strong>).</p>
 <p><strong>Step 2: Verify your email</strong></p>
@@ -2333,7 +2337,7 @@ address, after which the new login belongs to that party.</p>
 <tbody>
 <tr>
 <td><strong>Invoice prefix</strong></td>
-<td>Prefix for invoice numbers (default: <code>INV</code>)</td>
+<td>Prefix for invoice numbers (default: <code>INV</code>); 1–10 uppercase letters, digits or hyphens</td>
 <td>No</td>
 </tr>
 <tr>

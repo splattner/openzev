@@ -2556,6 +2556,30 @@ See <a href="#feature-flags">Feature Flags</a> below.</p>
 <li><strong>Scope</strong> — Space-separated OIDC scopes (default <code>openid email profile</code>)</li>
 <li><strong>Enabled</strong> — Toggle to activate or deactivate the provider</li>
 </ul>
+<p>New accounts and email-based account matching require the provider to return
+<code>email_verified: true</code> by default. <strong>Allow missing email-verification
+claim</strong> permits new accounts when a trusted provider verifies email ownership
+but omits the claim. Leave it off unless that guarantee has been verified.
+An explicit false claim is always refused, and the option never enables
+email-based matching to an existing account. Users can instead register or
+sign in through email first and link the provider from their account page.
+Token and userinfo endpoints require HTTPS in production and public addresses
+(operators of an in-cluster identity provider can set <code>OAUTH_ALLOW_PRIVATE_HOSTS=true</code>);
+configure their final URLs because redirects are refused. The address check
+happens when the request is made and cannot rule out DNS rebinding, so restrict
+outbound traffic at the network level as well.</p>
+<p><strong>When upgrading:</strong> these rules can stop new provisioning through providers
+that omit the verification claim, and stop login through private, HTTP, or
+redirecting endpoints. Already-linked identities bypass the provisioning claim
+check, but still need reachable, allowed endpoints. Review the provider's final
+HTTPS URLs and the trust option before upgrading, and verify that an admin has
+a working alternative login. Compose deployments pass
+<code>OAUTH_ALLOW_PRIVATE_HOSTS=True</code> through <code>backend/.env</code>; Helm deployments use
+<code>backend.extraEnv.OAUTH_ALLOW_PRIVATE_HOSTS: "True"</code>. The private-host option
+applies to every provider and does not permit production HTTP.</p>
+<p>The address check uses the application's DNS; an environment-configured proxy
+can resolve the destination again. Use a trusted proxy and restrict outbound
+traffic rather than relying on the address check alone.</p>
 <blockquote>
 <p><strong>Note:</strong> The legacy routes <code>/admin/features</code>, <code>/admin/oauth</code>, and <code>/admin/settings/vat</code> redirect to
 the matching tab on the Settings page.</p>
@@ -2592,6 +2616,11 @@ the field. Open an event by clicking its summary or focusing it and pressing
 <p>The quickest way in is from the account itself: <strong>View activity</strong> on a row
 under <strong>Platform → Accounts → Users</strong> opens the audit log already filtered to
 what that account has done.</p>
+<p>For email-change delivery failures, filter action type <code>auth.email_change.failed</code>
+and status <strong>Failed</strong>; the event metadata identifies <code>mail_failed</code>. Operators
+should monitor these events and the registration issuance/send/cleanup error
+logs, since public confirmation responses deliberately do not report mail failure.
+Alert on registration cache-unavailable <code>503</code> responses as well.</p>
 <p>The API is <code>GET /api/v1/audit/events/</code> (list) and
 <code>GET /api/v1/audit/events/{id}/</code> (detail). See the access spec
 <a href="https://github.com/splattner/openzev/blob/main/docs/specs/2026-05-audit-log-and-operational-traceability.md">2026-05-audit-log-and-operational-traceability.md</a>
