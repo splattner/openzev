@@ -173,6 +173,17 @@ which period they cover.
 Both are computed from your own system's numbers alone, so numerator and
 denominator are measured the same way. The meter is only used to *check* them.
 
+The **24-hour consumption profile** below the cards adds a dashed line,
+**Consumption (own system)**, with your own system's average consumption per hour
+of the day, next to the bars measured at the meter. A note under the chart says the
+line is reported by your own system. Like the rates, it only appears when there is
+enough data in the period.
+
+The **surplus metering** badge explains where the figures come from: without a
+connected source it says no rate can be shown, with one it says the meter only
+measures surplus and grid draw, and consumption, production and rate come from
+your own system.
+
 ### Gaps are shown as dashes, not as low rates
 
 A rate is only shown when at least **95 %** of the quarter hours in the period
@@ -183,8 +194,11 @@ self-sufficiency. The energy sums are still shown.
 ### Owners, reports and statements
 
 - The ZEV manager's **Energy balance** shows the same rate in the participant
-  table, marked with an info icon, and the full card when that participant is
-  selected. A manager who is also a participant with a connected source sees their own
+  table, marked with an info icon. The **Consumption** and **Production/Export**
+  columns keep the meter value and add the own system's figure under it
+  (**Own system: x kWh**, also marked with an info icon, and only with enough data).
+  Selecting a participant shows the full card and draws their own-system line in the
+  24-hour profile. A manager who is also a participant with a connected source sees their own
   **Your own system** card there while nobody, or they themselves, are selected
   (not while another participant is); their own row is marked **You**. Without a source, the same place offers to connect one.
   Selecting a row in the table again clears the selection.
