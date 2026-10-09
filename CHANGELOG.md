@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.1](https://github.com/splattner/openzev/compare/v1.22.0...v1.22.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **dashboard:** show external energy data next to meter values ([#942](https://github.com/splattner/openzev/issues/942)) ([171cf45](https://github.com/splattner/openzev/commit/171cf45802a925fd48e321b31db217d43e8f069b))
+
 ## [1.22.0](https://github.com/splattner/openzev/compare/v1.21.0...v1.22.0) (2026-10-09)
 
 
