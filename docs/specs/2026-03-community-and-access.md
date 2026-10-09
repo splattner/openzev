@@ -1643,8 +1643,9 @@ to the visible equivalent (the drawer's menu button ↔ the sidebar's collapse
 button). Focus elsewhere is preserved.
 The shell's skip link, `main` landmark and focus after navigation follow
 SPEC-2026-04 §7.1. The account disclosure is the sidebar's last control
-(`.sidebar-footer .sidebar-user`; trigger with avatar, name, email and the
-up/down selector mark; panel `#user-menu-list` opens upward with Account, the
+(`.sidebar-footer .sidebar-user`; trigger with the name and the
+up/down selector mark; panel `#user-menu-list` opens upward with the login's
+email as its first line, then Account, the
 language choices, Logout and, as its last line, the source-code link
 `.user-menu-about` — GitHub mark, "OpenZEV" and the app version, opening in a
 new tab). Opening it focuses the Account link; Escape closes it and returns
@@ -1653,8 +1654,8 @@ choices are ordinary buttons, and selecting a language leaves it open. Account
 settings deliberately live behind the account row, not in the main navigation
 (which stays about the community's work); on `/account` the trigger carries
 `is-current` (the current nav row's pale forest), so the sidebar still shows
-where the user is. In the collapsed rail the trigger shows only the avatar
-(the name as its tooltip) and expands the sidebar before opening. There is no account control in the page header: `header.top-nav`
+where the user is. In the collapsed rail the trigger shows only the selector
+mark (the name as its tooltip) and expands the sidebar before opening. There is no account control in the page header: `header.top-nav`
 holds only the mobile app bar (`.mobile-bar`, ≤768px: menu button plus the
 decorative logo lockup, sticky) and, during impersonation, the impersonation
 banner; on desktop it is empty otherwise.
@@ -1681,8 +1682,6 @@ entries from platform tooling; the operational links above Setup
 Platform reuses `Overview` and `Settings`; its link accessible names include
 the translated Platform group label (`nav.scopedLabel`: `{{scope}}: {{label}}`).
 Tooltips appear only in the collapsed desktop rail; visible labels wrap.
-The account avatar shows up to two letter or digit initials, ignoring
-symbols; an empty name shows `·`. Avatars do not shrink.
 There is no header or sidebar scope chip: every page header names its scope
 in the eyebrow (the community, or "Platform administration" under
 `/admin/*`), so the working context stays visible when the nav scrolls, the
@@ -2165,7 +2164,7 @@ prior readings for that community, including rows outside the new seed window.
 - `ProtectedRoute` handles loading, unauthenticated, forced password change,
   redirects for accounts without community access, and shell-role gating.
 - `frontend/tests/layout-nav.test.ts` — role navigation, scoped link names,
-  the account avatar, active state (including the account row on `/account`),
+  the account row's name, the email in the account panel, active state (including the account row on `/account`),
   no scope in the sidebar, the account panel's keyboard behaviour and source
   link, and mobile presentation independent of desktop collapse.
 - `frontend/tests/community-switcher.test.ts` — the scope-line community

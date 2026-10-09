@@ -281,39 +281,11 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         }
     })
 
-    it('renders the avatar as initials rather than emoji', async () => {
-        mockSession('admin')
-        const page = await renderLayout()
-        const userAvatar = page.container.querySelector('.sidebar-user .user-avatar')
-        expect(userAvatar?.textContent).toBe('TU')
-        page.unmount()
-    })
-
-    it.each([
-        ['(v)ZEV Nord', 'VN'],
-        ['🌞 Solar', 'S'],
-        ['𐐨 Nord', '𐐀N'],
-        ['ß Team', 'ST'],
-        ['E\u0301nergie Nord', 'ÉN'],
-        ['Genossenschaft', 'G'],
-        ['', '·'],
-        ['  ', '·'],
-    ])('renders readable initials for %j', async (name, initials) => {
-        mockSession('admin')
-        Object.assign(mockAuth().user, { first_name: name, last_name: '', username: '' })
-        const page = await renderLayout()
-        try {
-            expect(page.container.querySelector('.sidebar-user .user-avatar')?.textContent).toBe(initials)
-        } finally {
-            page.unmount()
-        }
-    })
-
     it('uses the username when the account has no name', async () => {
         mockSession('participant')
         Object.assign(mockAuth().user, { first_name: '', last_name: '', username: 'marina' })
         const page = await renderLayout()
-        expect(page.container.querySelector('.sidebar-user .user-avatar')?.textContent).toBe('M')
+        expect(page.container.querySelector('.sidebar-user .user-meta strong')?.textContent).toBe('marina')
         page.unmount()
     })
 
@@ -454,6 +426,16 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         page.unmount()
     })
 
+    it('names the login in the account panel, not on the trigger', async () => {
+        mockSession('admin')
+        const page = await renderLayout()
+        const trigger = page.container.querySelector('.sidebar-user .user-menu-trigger') as HTMLElement
+        expect(trigger.textContent).not.toContain('admin@example.com')
+        await act(async () => trigger.click())
+        expect(page.container.querySelector('#user-menu-list .user-menu-email')?.textContent).toBe('admin@example.com')
+        page.unmount()
+    })
+
     it('closes the user menu on Escape', async () => {
         mockSession('admin')
         const page = await renderLayout()
@@ -511,7 +493,7 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
             mockSession('admin')
             const page = await renderLayout()
             const trigger = page.container.querySelector('.sidebar-footer .sidebar-user .user-menu-trigger') as HTMLElement
-            // Collapsed, the trigger is the avatar alone and names the account.
+            // Collapsed, the trigger is the selector mark alone and names the account.
             expect(trigger.getAttribute('title')).toBe('Test User')
             await act(async () => trigger.click())
             expect(page.container.querySelector('.shell.shell-collapsed')).toBe(null)

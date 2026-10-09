@@ -632,8 +632,8 @@ label > small.muted {
 }
 
 /* ── Account: the signed-in person at the foot ──────────────────────────────
-   A plain row on the sidebar, set off by the footer's hairline: avatar,
-   name over email and the up/down selector mark. */
+   A plain row on the sidebar, set off by the footer's hairline: the name
+   and the up/down selector mark. */
 .sidebar-footer {
   padding-top: 0.75rem;
   border-top: 1px solid var(--sidebar-line);
@@ -662,11 +662,9 @@ label > small.muted {
   background: var(--sidebar-active);
 }
 
-/* A lighter green than the current row, so it stands off every state. */
-.sidebar-user .user-avatar {
-  background: var(--brand-step-5);
-  font-size: 0.6875rem;
-  letter-spacing: 0.02em;
+.sidebar-user .user-menu-trigger.is-current .user-meta strong,
+.sidebar-user .user-menu-trigger.is-current .user-menu-caret {
+  color: var(--brand-deep);
 }
 
 .sidebar-user .user-meta {
@@ -674,22 +672,13 @@ label > small.muted {
   min-width: 0;
 }
 
-.sidebar-user .user-meta strong,
-.sidebar-user .user-meta small {
+.sidebar-user .user-meta strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.sidebar-user .user-meta strong {
   color: var(--white);
   font-size: 0.8125rem;
   font-weight: 600;
-}
-
-.sidebar-user .user-meta small {
-  color: var(--sidebar-text);
-  font-size: 0.75rem;
 }
 
 .user-menu-caret {
@@ -703,9 +692,8 @@ label > small.muted {
   height: 1rem;
 }
 
-/* Collapsed rail: the avatar alone. */
-.shell-collapsed .sidebar-user .user-meta,
-.shell-collapsed .sidebar-user .user-menu-caret {
+/* Collapsed rail: the selector mark alone. */
+.shell-collapsed .sidebar-user .user-meta {
   display: none;
 }
 
@@ -722,6 +710,18 @@ label > small.muted {
   left: 0;
   min-width: 0;
   --focus-ring: var(--brand-mid);
+}
+
+/* The panel's first line: which login this is, for people with several. */
+.user-menu-email {
+  overflow: hidden;
+  margin-bottom: 0.25rem;
+  padding: 0.25rem 0.625rem 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* The panel's last line: what runs here and where its source lives. */
@@ -871,20 +871,6 @@ label > small.muted {
   cursor: pointer;
 }
 
-.user-avatar {
-  width: 2rem;
-  height: 2rem;
-  flex-shrink: 0;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--brand);
-  color: var(--white);
-  font-size: 0.75rem;
-  font-weight: 650;
-}
-
 .user-meta {
   display: grid;
   text-align: left;
@@ -894,11 +880,6 @@ label > small.muted {
 .user-meta strong {
   font-size: 0.875rem;
   color: var(--ink);
-}
-
-.user-meta small {
-  font-size: 0.75rem;
-  color: var(--muted);
 }
 
 .user-menu-dropdown {

@@ -321,15 +321,14 @@ export function Layout() {
                                 }
                             }}
                         >
-                            <span className="user-avatar" aria-hidden="true">{initialsOf(displayName)}</span>
                             <span className="user-meta">
                                 <strong>{displayName}</strong>
-                                <small>{user?.email}</small>
                             </span>
                             <span className="user-menu-caret" aria-hidden="true"><SelectorIcon /></span>
                         </button>
                         {isUserMenuOpen && (
                             <div className="user-menu-dropdown" id="user-menu-list">
+                                {user?.email && <div className="user-menu-email">{user.email}</div>}
                                 <NavLink
                                     to="/account"
                                     className="user-menu-item"
@@ -543,15 +542,6 @@ function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {
             {direction === 'left' ? <path d="m15 18-6-6 6-6" /> : <path d="m9 18 6-6-6-6" />}
         </svg>
     )
-}
-
-/** Up to two word initials, skipping symbols. Empty input renders '·'. */
-function initialsOf(name: string | undefined | null): string {
-    const initials = (name ?? '').normalize('NFC').split(/\s+/)
-        .flatMap((word) => word.match(/[\p{L}\p{N}]/u)?.[0] ?? [])
-        .slice(0, 2)
-        .map((letter) => Array.from(letter.toUpperCase())[0]).join('')
-    return initials || '·'
 }
 
 function IconSvg({ path }: { path: string | ReactNode }) {
