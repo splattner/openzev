@@ -77,6 +77,8 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
                 .map((participant) => participant.id) ?? [],
         [user?.memberships, selectedZevId],
     )
+    // The manager's own block belongs to "everyone" and to themselves, not to a view of somebody else.
+    const showOwnBlock = !selectedParticipantId || ownParticipantIds.includes(selectedParticipantId)
     const wantsOwnEnergyData = energyData.eligible.some((point) => point.zev === selectedZevId && point.source === null)
     const highlightParticipantIds = useMemo(
         () => selectedParticipantId ? [selectedParticipantId] : undefined,
@@ -164,7 +166,7 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
                         <StatCard label={t('pages.dashboard.stats.exportedToGrid')} value={dashboardKwhStat(summary.zev_totals.exported_kwh)} />
                     </section>
                     {summary.zev_has_behind_meter_generation && <p className="muted">{t('behindMeter.zevNote')}</p>}
-                    {summary.own_gross_energy && (
+                    {showOwnBlock && summary.own_gross_energy && (
                         <GrossEnergyCard
                             gross={summary.own_gross_energy}
                             whose="own"
@@ -172,7 +174,7 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
                             formatBucketTooltipLabel={formatBucketTooltipLabel}
                         />
                     )}
-                    {!summary.own_gross_energy && wantsOwnEnergyData && <GrossEnergyCallToAction />}
+                    {showOwnBlock && !summary.own_gross_energy && wantsOwnEnergyData && <GrossEnergyCallToAction />}
                     {summary.participant_stats.length > 0 && (
                         <EnergyFlowCard
                             totals={summary.zev_totals}

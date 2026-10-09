@@ -341,7 +341,7 @@ because official data is often imported later than the source delivers. The shar
   `gross_energy` (without `timeline`); a selected participant adds top-level
   `selected_gross_energy` (with `timeline`, `null` without a source). Participants without a
   source cost no extra query. It also carries `own_gross_energy` (with `timeline`): the signed-in
-  user's own figures as a participant of that ZEV, whoever is selected, `null` without one. A
+  user's own figures as a participant of that ZEV, independent of the selection, `null` without one. A
   manager is usually a participant too, and their own picture should not hide behind a dropdown.
 - **Annual report** (`/api/v1/invoices/invoices/annual-report/`): `participants[]` gains
   `gross_energy` (without `timeline`). `self_sufficiency_rate` stays `null` for net-metered
@@ -580,10 +580,11 @@ an owner.
   place of the `—` hint; without a source they see a call to action linking to the Energy data
   tab (only shown when the tab exists: feature on). Rates are labelled "reported by your own system".
   `ManagementDashboardBody` shows the same card for the selected participant
-  (`selected_gross_energy`), and, as a permanent block under the ZEV figures, the manager's own
+  (`selected_gross_energy`), and, as a block under the ZEV figures, the manager's own
   (`own_gross_energy`, or the call to action when they hold an unconnected flagged meter in this
-  community). The own row is marked "You" in the table and the dropdown; selecting oneself shows the
-  block once. Selecting the selected table row again clears the selection.
+  community). The block (and the call to action) shows while nobody or the manager themselves is selected and
+  is hidden while another participant is, whose card replaces it. The own row is marked "You" in
+  the table and the dropdown. Selecting oneself shows the block once. Selecting the selected table row again clears the selection.
 - `components/dashboard/ParticipantTableCard.tsx`: the per-participant rate cell of a net-metered
   participant is `NetMeteredRate` (shared with the annual report): the gross rate with an info
   marker when `gross_energy` is present, else `—` as today (with the withheld reason as a tooltip).
@@ -1040,8 +1041,8 @@ model.
 
 ## 13. Follow-up: a manager's own figures (after PR 6)
 
-`own_gross_energy` on the owner dashboard (7 backend tests, `OwnBlockTests`) and the permanent
-"Your own system" block in `ManagementDashboardBody`, with the "You" marker and the call to action;
+`own_gross_energy` on the owner dashboard (7 backend tests, `OwnBlockTests`) and the
+"Your own system" block in `ManagementDashboardBody` (shown while nobody or oneself is selected), with the "You" marker and the call to action;
 the "Per participant" table now clears its selection on a second click and exposes it as
 `aria-pressed` (`tests/dashboard-behavior.test.ts`, 8 tests). `GrossEnergyCard` uses `useId` for its
 heading, because two of them can be on one page.

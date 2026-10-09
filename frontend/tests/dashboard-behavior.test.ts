@@ -813,34 +813,36 @@ describe('manager dashboard: the manager as a participant', () => {
         expect(options.some((text) => text?.includes('Alice') && text.includes('pages.dashboard.youBadge'))).toBe(false)
     })
 
-    it('shows the manager\'s own figures as a permanent block, whoever is selected', async () => {
-        asManagerAndParticipant('p2')
-        mockState.summary = withOwnBlock(gross(61))
-        const container = await renderDashboard()
-
-        expect(container.textContent).toContain('supplementary.gross.titleOwn')
-        expect(container.textContent).toContain('61')
-        expect(cards(container)).toBe(1)
-
-        await click(container.querySelectorAll('tbody tr')[0])
-        expect(container.textContent).toContain('supplementary.gross.titleOwn')
-    })
-
-    it('shows the own block once when the manager selects themselves, and a second card for someone else', async () => {
+    it('shows the manager\'s own figures when nobody is selected and when they select themselves, not for someone else', async () => {
         asManagerAndParticipant('p2')
         mockState.summary = ((args: Record<string, unknown>) =>
             withOwnBlock(gross(61), args?.participantId ? { selected_participant_name: 'x', selected_gross_energy: gross(args.participantId === 'p2' ? 61 : 40) } : {})) as unknown
         const container = await renderDashboard()
 
-        await click(container.querySelectorAll('tbody tr')[1]) // Bob, the manager
+        // Nobody selected: the own block, and nothing else of this kind.
+        expect(container.textContent).toContain('supplementary.gross.titleOwn')
+        expect(container.textContent).toContain('61')
         expect(cards(container)).toBe(1)
 
+        // Somebody else: only that participant's card, and no own block.
         await click(container.querySelectorAll('tbody tr')[0]) // Alice
-        expect(cards(container)).toBe(2)
+        expect(cards(container)).toBe(1)
         expect(container.textContent).toContain('supplementary.gross.titleParticipant')
+        expect(container.textContent).not.toContain('supplementary.gross.titleOwn')
+
+        // Themselves: the own block, once.
+        await click(container.querySelectorAll('tbody tr')[1]) // Bob, the manager
+        expect(cards(container)).toBe(1)
+        expect(container.textContent).toContain('supplementary.gross.titleOwn')
+        expect(container.textContent).not.toContain('supplementary.gross.titleParticipant')
+
+        // Cleared again: back to the own block.
+        await click(container.querySelectorAll('tbody tr')[1])
+        expect(container.textContent).toContain('supplementary.gross.titleOwn')
+        expect(cards(container)).toBe(1)
     })
 
-    it('gives the call to action to a manager with an unconnected net-metered meter', async () => {
+    it('gives the call to action to a manager with an unconnected net-metered meter, unless they look at someone else', async () => {
         asManagerAndParticipant('p2')
         eligibility.eligible = [{ metering_point: 'mp', meter_id: 'M', zev: 'z1', zev_name: 'Z1', participant: 'p2', source: null }]
         mockState.summary = withOwnBlock(null)
@@ -848,6 +850,11 @@ describe('manager dashboard: the manager as a participant', () => {
 
         expect(container.textContent).toContain('supplementary.gross.ctaTitle')
         expect(container.querySelector('a[href="/account?tab=energy-data"]')).not.toBeNull()
+
+        await click(container.querySelectorAll('tbody tr')[0]) // Alice
+        expect(container.textContent).not.toContain('supplementary.gross.ctaTitle')
+        await click(container.querySelectorAll('tbody tr')[1]) // Bob, the manager
+        expect(container.textContent).toContain('supplementary.gross.ctaTitle')
     })
 
     it('shows neither block for a manager who has no own energy data and no meter to connect', async () => {
