@@ -29,6 +29,7 @@ from .analytics import (
     compute_hourly_profile,
     compute_data_quality_status,
 )
+from .supplementary.surfaces import attach_owner_gross, attach_participant_gross, window_for
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import record_audit_event
 
@@ -351,6 +352,7 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
 
             result = owner_dashboard_summary(qs, trunc_fn, selected_participant_id)
             result["bucket"] = bucket
+            attach_owner_gross(result, window_for(date_from, date_to), bucket, selected_participant_id)
             return Response(result)
 
         # participant path
@@ -366,6 +368,10 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
 
         result = participant_dashboard_summary(zev_qs, trunc_fn, user, zev_ids)
         result["bucket"] = bucket
+        own_participant_ids = Participant.objects.filter(
+            access.live_participant_q(), user=user, zev_id__in=zev_ids
+        ).values_list("id", flat=True)
+        attach_participant_gross(result, own_participant_ids, window_for(date_from, date_to), bucket)
         return Response(result)
 
     @action(detail=False, methods=["get"], url_path="hourly-profile", permission_classes=[IsAuthenticated])

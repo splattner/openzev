@@ -305,8 +305,12 @@ A disabled source answers `403 {"detail": "Source is disabled."}`; a disconnecte
 
 ### 5.1 Additive changes to existing payloads
 
-No existing field changes meaning or type. Each block below is `null` when the feature flag is
-off, the participant has no source, or the source has no data in the window. The shared shape
+No existing field changes meaning or type. Each block below is present in every response and is
+`null` when the feature flag is off, the participant has no source, or the source has no data in
+the window. All of it is computed in `metering/supplementary/surfaces.py` on top of
+`stats.gross_energy`; the surfaces never read the models. The window is the inclusive civil
+dates the request asked for (open ends are unbounded), not the span of the meter readings,
+because official data is often imported later than the source delivers. The shared shape
 (`GrossEnergy`):
 
 ```json
@@ -325,18 +329,25 @@ off, the participant has no source, or the source has no data in the window. The
 }
 ```
 
-- **Participant dashboard** (`participant_dashboard_summary`): top-level `gross_energy`
-  (`GrossEnergy | null`) for the current participant, with `timeline` bucketed like the
-  dashboard's own. `has_behind_meter_generation` and the `—` semantics are unchanged.
-- **Owner dashboard** (`owner_dashboard_summary`): each `participant_stats[]` entry gains
+- **Participant dashboard** (`dashboard-summary`, participant path): top-level `gross_energy`
+  (`GrossEnergy | null`) for the signed-in user's own participants (summed if they have several),
+  with `timeline` bucketed like the dashboard's own (`bucket_key_for` produces the identical
+  `isoformat()` labels: civil days and months in the business timezone, UTC hours).
+  `has_behind_meter_generation` and the `—` semantics are unchanged. The anonymised
+  `zev_participant_stats` of other participants carry no gross figures.
+- **Owner dashboard** (`dashboard-summary`, ZEV path, so managers, viewers and admins, the roles
+  the consent text tells the participant about): each `participant_stats[]` entry gains
   `gross_energy` (without `timeline`); a selected participant adds top-level
-  `selected_gross_energy` (with `timeline`).
+  `selected_gross_energy` (with `timeline`, `null` without a source). Participants without a
+  source cost no extra query.
 - **Annual report** (`/api/v1/invoices/invoices/annual-report/`): `participants[]` gains
   `gross_energy` (without `timeline`). `self_sufficiency_rate` stays `null` for net-metered
   participants; `totals`, `previous_totals` and `months` are unchanged.
-- **Annual statement** (PDF context): for a net-metered participant, each month with coverage
-  `>= SUPPLEMENTARY_MIN_COVERAGE` carries the gross `self_sufficiency_pct`; other months stay
-  `None` (`—`). Context gains `gross_energy_source: "solar_manager" | "push" | None`, and the
+- **Annual statement** (PDF context): for a net-metered participant, each civil month with
+  coverage `>= SUPPLEMENTARY_MIN_COVERAGE` carries the gross `self_sufficiency_pct`; other months
+  stay `None` (`—`). The year's `totals.self_sufficiency_pct` is filled only when the year, judged
+  on its own coverage, passes too (so one badly covered month keeps the total at `—`). Participants
+  who are not net-metered are untouched. Context gains `gross_energy_source: "solar_manager" | "push" | None`, and the
   template swaps `behind_meter_note` for the new `behind_meter_supplementary_note` when at least
   one month shows a gross rate (new key in all four languages of `ANNUAL_TRANSLATIONS`, and in
   `field_catalog_data.py`). de: "Ihre Photovoltaikanlage liegt hinter dem Zähler. Die
@@ -345,9 +356,12 @@ off, the participant has no source, or the source has no data in the window. The
   gekennzeichnet." en/fr/it equivalents.
 - **MCP** `consumption_summary`: each participant entry gains `gross_self_sufficiency_pct`,
   `gross_self_consumption_pct` and `gross_coverage_pct` (`null` when absent), under the tool's
-  existing scoping.
+  existing scoping; with `participant_id` the same three keys are added to `totals`. The tool
+  reads them from the dashboard endpoint it already calls.
 - **Metering point** (`MeteringPointSerializer`): gains read-only `supplementary_source_status`
-  (`null` or the source status string) so the list can show it without a second request.
+  (`null` or the source status string) so the list can show it without a second request. It is
+  `null` for anyone who could not read the source itself (another participant must not learn that
+  a neighbour has one) and while the feature is off.
 
 ## 6. Async and integration behavior
 
@@ -798,13 +812,29 @@ nothing is modified; zero totals) and `StoreTests` (2).
 off, `degraded` without a key, reports counts and the oldest success, and flags a source that has
 stopped syncing but not one that needs a reconnect.
 
-### Backend — surfaces
+### Backend — surfaces (PR 4: 41 tests)
 
-`metering/tests.py`, `invoices/test_annual_report.py`, `invoices/test_reports.py`,
-`mcp_server/tests/`: `gross_energy` present/absent for the participant dashboard, owner
-dashboard (with selected participant timeline), annual report and MCP; flag off equals 1.21.0
-output; annual statement shows gross months and `—` for low-coverage months, picks the right
-note, all four languages present; field catalog documents the new variable.
+**`metering/test_supplementary_surfaces.py`** (37; a synthetic three-day profile with known rates,
+75 % self-sufficiency and 25 % self-consumption): `WindowAndBucketTests` (3: civil-date window, open
+window, and the bucket labels equal the dashboard's own across both DST changes for day, month and
+hour), `ParticipantDashboardTests` (10: own figures and timeline; the dashboard's own numbers are
+byte-identical with and without the source; the date range bounds the figures; a range before the
+data is `null`; low coverage withholds the rates with the reason and still reports the energy; no
+source is `null`; other participants never see the figures; a disconnected source keeps its
+history; flag off; a tenancy that ended does not leak into the next holder's view),
+`OwnerDashboardTests` (7: per-participant block without a timeline; selected participant with one;
+no source is `null`; viewers and admins; flag off; the billing-shaped numbers are unchanged),
+`AnnualReportTests` (4: the row gains `gross_energy` while the meter-based rate stays `null`;
+coverage judged on the synced range; everything else unchanged; participants without a source),
+`AnnualStatementTests` (9: covered months show the rate and others `—`; the year total follows its
+own coverage and shows when the year is fully covered; the note in all four languages; the plain
+note stays without enough data; no source; flag off; not net-metered; the catalog lists the new
+key) and `MeteringPointStatusTests` (4: owner, manager, viewer and admin see it; another participant
+does not; no source; flag off).
+
+**`mcp_server/tests/test_tools.py`** (+4): gross figures per participant and in the selected
+participant's totals, `null` without a source and while the feature is off. The existing exact-keys
+test now lists the three new keys.
 
 ### Backend — operations
 
@@ -885,11 +915,13 @@ and to be observed during PR 3: rate limits and the maximum `from`/`to` range pe
   the real response (all the fields, the boundary interval included). No household's real
   consumption profile is committed to the repository.
 
-**PR 4: Statistics surfaces** (backend)
+**PR 4: Statistics surfaces** (backend; implemented, see the test list in §9)
 - `gross_energy` on the participant and owner dashboards, annual report, annual statement
   (context, template, translations, field catalog) and MCP; `supplementary_source_status` on the
   metering point.
-- Tests: surface tests; flag-off parity with 1.21.0.
+- Tests: surface tests; flag-off parity with 1.21.0. The TypeScript types for the new payload
+  fields land with it (`GrossEnergy`, the dashboard, annual report and metering point fields, and
+  the catalog description in four languages); the UI that renders them is PR 5.
 
 **PR 5: Frontend and docs**
 - Types, API client, query keys, Account tab, modal, owner status panel, gross card, rate

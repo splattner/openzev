@@ -363,6 +363,7 @@ export const de = {
             annualStatementData: 'Jahresabrechnung',
             annualYear: 'Jahr der Abrechnung',
             annualHasBehindMeterGeneration: 'Netzmessung erkannt (true/false)',
+            annualGrossEnergySource: 'Quelle der ausgewiesenen Autarkie hinter dem Zähler (z. B. solar_manager), sonst leer',
             annualTotals: 'Jahrestotale',
             annualTotalConsumed: 'Gesamtverbrauch (kWh)',
             annualFromZev: 'Energie aus ZEV (kWh)',

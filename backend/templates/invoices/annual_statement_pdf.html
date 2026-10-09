@@ -308,7 +308,7 @@
         </div>
 
         {% if has_behind_meter_generation %}
-        <p style="color: var(--muted); font-size: 8pt; margin-bottom: 4mm;">{{ tr.behind_meter_note }}</p>
+        <p style="color: var(--muted); font-size: 8pt; margin-bottom: 4mm;">{% if gross_energy_source %}{{ tr.behind_meter_supplementary_note }}{% else %}{{ tr.behind_meter_note }}{% endif %}</p>
         {% endif %}
 
         <!-- Monthly Breakdown -->

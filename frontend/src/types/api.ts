@@ -656,6 +656,35 @@ export interface ParticipantInput {
     allocation_weight?: string
 }
 
+/** Gross energy as the participant's own system measured it (Solar Manager, push or file), never used for billing.
+ * Rates are percentages (one decimal) and null, with `rates_withheld_reason`, when coverage is below the minimum. */
+export interface GrossEnergy {
+    source_provider: SupplementaryProvider | null
+    covered_from: string
+    covered_to: string
+    coverage_pct: number
+    production_kwh: number
+    consumption_kwh: number
+    import_kwh: number
+    export_kwh: number
+    self_consumption_kwh: number
+    self_consumption_rate: number | null
+    self_sufficiency_rate: number | null
+    rates_withheld_reason: 'low_coverage' | 'no_data' | null
+    /** Only where a chart asks for it (participant dashboard, selected participant). Buckets match the dashboard's own. */
+    timeline?: Array<{
+        bucket: string
+        production_kwh: number
+        consumption_kwh: number
+        import_kwh: number
+        export_kwh: number
+        self_consumption_kwh: number
+    }>
+}
+
+export type SupplementaryProvider = 'solar_manager' | 'push'
+export type SupplementaryStatus = 'pending' | 'ok' | 'error' | 'reconnect_required' | 'disabled'
+
 export interface MeteringPoint {
     id: string
     zev: string
@@ -674,6 +703,8 @@ export interface MeteringPoint {
     assignment_count: number
     first_reading_at: string | null
     last_reading_at: string | null
+    /** Status of the energy data source on this meter; null without one, while the feature is off, or when the caller may not see it. */
+    supplementary_source_status: SupplementaryStatus | null
 }
 
 export interface MeteringPointInput {
@@ -1576,7 +1607,11 @@ export interface ZevOwnerDashboardSummary {
         from_grid_kwh: number
         /** Personally holds a metering point with generation behind it for at least one reading in the window: no self-sufficiency rate is shown for this participant. */
         has_behind_meter_generation: boolean
+        /** The participant's own-system figures for the window; null without a source or while the feature is off. */
+        gross_energy?: GrossEnergy | null
     }>
+    /** The selected participant's own-system figures, with a timeline. */
+    selected_gross_energy: GrossEnergy | null
     /** Any metering point with readings in this window is flagged (has generation behind it). */
     zev_has_behind_meter_generation: boolean
 }
@@ -1611,6 +1646,8 @@ export interface ParticipantDashboardSummary {
         has_behind_meter_generation: boolean
     }>
     current_participant_id: string | null
+    /** The signed-in participant's own-system figures, with a timeline; null without a source or while the feature is off. */
+    gross_energy: GrossEnergy | null
     /** The current participant is net-metered (personally holds a flagged meter) in this window. */
     has_behind_meter_generation: boolean
     /** Any metering point with readings in this window is flagged. */
@@ -1657,6 +1694,8 @@ export interface AnnualReportParticipant {
     self_sufficiency_rate: number | null
     /** Personally holds a metering point with generation behind it for at least one reading in the year: `self_sufficiency_rate` is null. */
     has_behind_meter_generation: boolean
+    /** The participant's own-system figures for the year (no timeline); null without a source or while the feature is off. */
+    gross_energy: GrossEnergy | null
     savings: AnnualReportSavings | null
 }
 

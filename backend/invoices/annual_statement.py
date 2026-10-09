@@ -25,6 +25,7 @@ from .pdf_render import render_pdf
 
 from metering.analytics import net_metered_participant_ids
 from metering.models import MeterReading, ReadingDirection
+from metering.supplementary.surfaces import statement_gross
 from zev.models import AllocationMode, MeteringPointAssignment
 from .generated_chart_tokens import (
     _CHART_GRID,
@@ -53,6 +54,7 @@ ANNUAL_TRANSLATIONS: dict[str, dict[str, str]] = {
         "self_sufficiency": "Eigenversorgung",
         "autarky": "Autarkiegrad",
         "behind_meter_note": "Ihre Photovoltaikanlage liegt hinter dem Zähler. Erfasst werden nur der eingespeiste Überschuss und der Netzbezug; Ihr Eigenverbrauch direkt ab Anlage ist nicht enthalten. Deshalb wird keine Autarkie ausgewiesen.",
+        "behind_meter_supplementary_note": "Ihre Photovoltaikanlage liegt hinter dem Zähler. Die ausgewiesene Autarkie beruht auf den Messwerten Ihres eigenen Systems (z. B. Solar Manager), nicht auf der Zählerablesung des Netzbetreibers. Monate ohne ausreichende Daten sind mit — gekennzeichnet.",
         "monthly_breakdown": "Monatliche Übersicht",
         "monthly_chart_description": "Monatlicher Energieverbrauch — aufgeteilt in lokale ZEV-Energie und Netzbezug.",
         "month_col": "Monat",
@@ -90,6 +92,7 @@ ANNUAL_TRANSLATIONS: dict[str, dict[str, str]] = {
         "self_sufficiency": "Autosuffisance",
         "autarky": "Taux d'autarcie",
         "behind_meter_note": "Votre installation photovoltaïque se trouve derrière votre compteur. Seuls le surplus injecté et le soutirage du réseau sont enregistrés ; votre autoconsommation directe depuis l'installation n'est pas comprise. Aucun taux d'autarcie n'est donc indiqué.",
+        "behind_meter_supplementary_note": "Votre installation photovoltaïque se trouve derrière votre compteur. Le taux d'autarcie indiqué repose sur les valeurs mesurées par votre propre système (p. ex. Solar Manager), et non sur le relevé du compteur du gestionnaire de réseau. Les mois sans données suffisantes sont signalés par —.",
         "monthly_breakdown": "Aperçu mensuel",
         "monthly_chart_description": "Consommation énergétique mensuelle — répartie en énergie locale CEL et importation réseau.",
         "month_col": "Mois",
@@ -127,6 +130,7 @@ ANNUAL_TRANSLATIONS: dict[str, dict[str, str]] = {
         "self_sufficiency": "Autosufficienza",
         "autarky": "Grado di autarchia",
         "behind_meter_note": "Il vostro impianto fotovoltaico si trova dietro il vostro contatore. Vengono registrati solo il surplus immesso e il prelievo dalla rete; il vostro autoconsumo diretto dall'impianto non è incluso. Per questo motivo non viene indicato alcun grado di autarchia.",
+        "behind_meter_supplementary_note": "Il vostro impianto fotovoltaico si trova dietro il vostro contatore. Il grado di autarchia indicato si basa sui valori misurati dal vostro sistema (ad es. Solar Manager), non sulla lettura del contatore del gestore di rete. I mesi senza dati sufficienti sono contrassegnati con —.",
         "monthly_breakdown": "Panoramica mensile",
         "monthly_chart_description": "Consumo energetico mensile — suddiviso in energia locale CEL e importazione dalla rete.",
         "month_col": "Mese",
@@ -164,6 +168,7 @@ ANNUAL_TRANSLATIONS: dict[str, dict[str, str]] = {
         "self_sufficiency": "Self-Sufficiency",
         "autarky": "Autarky Rate",
         "behind_meter_note": "Your PV system sits behind your meter. Only the surplus fed in and the energy drawn from the grid are recorded; what you use directly from your system is not included. No self-sufficiency rate is therefore shown.",
+        "behind_meter_supplementary_note": "Your PV system sits behind your meter. The self-sufficiency shown is based on the measurements of your own system (e.g. Solar Manager), not on the grid operator's meter reading. Months without enough data are marked —.",
         "monthly_breakdown": "Monthly Overview",
         "monthly_chart_description": "Monthly energy consumption — split between local ZEV energy and grid import.",
         "month_col": "Month",
@@ -407,6 +412,36 @@ def _compute_monthly_data(
     return months_data, totals
 
 
+def _apply_gross_self_sufficiency(participant, year: int, monthly_data: list[dict], totals: dict) -> str | None:
+    """Fill the self-sufficiency of a net-metered participant from their own system's data.
+
+    The meter records only surplus and residual grid draw for them, so the rate stays ``None``
+    (``—``) unless a source of theirs covers a month well enough (SPEC-2026-supplementary-energy-data
+    §5.1). A month below the minimum coverage stays ``—``; the year shows a figure only when its
+    own coverage passes too. Returns the provider the figures came from, or ``None`` when no
+    figure was filled in (the template then keeps the plain behind-the-meter note).
+    """
+    if not totals["has_behind_meter_generation"]:
+        return None
+    months, year_total = statement_gross(participant.id, year)
+    if months is None:
+        return None
+
+    def rate(gross):
+        value = gross["self_sufficiency_rate"] if gross else None
+        return None if value is None else round(value)
+
+    shown = []
+    for row, gross in zip(monthly_data, months):
+        row["self_sufficiency_pct"] = rate(gross)
+        if row["self_sufficiency_pct"] is not None:
+            shown.append(gross)
+    totals["self_sufficiency_pct"] = rate(year_total)
+    if totals["self_sufficiency_pct"] is not None:
+        shown.append(year_total)
+    return shown[0]["source_provider"] if shown else None
+
+
 def compute_savings(invoices) -> dict | None:
     """Compute annual savings from local energy vs grid rates for the
     selected participant/year's non-cancelled invoices."""
@@ -557,6 +592,7 @@ def generate_annual_statement_pdf(
         shares_by_date=shares_by_date,
         zev_totals_by_ts=zev_totals_by_ts,
     )
+    gross_energy_source = _apply_gross_self_sufficiency(participant, year, monthly_data, totals)
 
     # Invoices for this year
     year_start = date(year, 1, 1)
@@ -611,6 +647,7 @@ def generate_annual_statement_pdf(
         "monthly_data": monthly_data,
         "totals": totals,
         "has_behind_meter_generation": totals["has_behind_meter_generation"],
+        "gross_energy_source": gross_energy_source,
         "monthly_chart_svg": monthly_chart_svg,
         "invoices": invoice_rows,
         "invoice_totals": invoice_totals,

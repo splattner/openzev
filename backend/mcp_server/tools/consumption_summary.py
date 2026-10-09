@@ -26,6 +26,16 @@ def _series_entry(item: dict) -> dict:
     }
 
 
+def _gross_fields(gross: dict | None) -> dict:
+    """The participant's own-system figures, ``null`` while absent or withheld for low coverage."""
+    gross = gross or {}
+    return {
+        "gross_self_sufficiency_pct": gross.get("self_sufficiency_rate"),
+        "gross_self_consumption_pct": gross.get("self_consumption_rate"),
+        "gross_coverage_pct": gross.get("coverage_pct"),
+    }
+
+
 def _participant_entry(item: dict) -> dict:
     consumed = float(item.get("total_consumed_kwh") or 0)
     from_zev = float(item.get("from_zev_kwh") or 0)
@@ -47,6 +57,7 @@ def _participant_entry(item: dict) -> dict:
             else (round(100 * from_zev / consumed, 1) if consumed else None)
         ),
         "has_behind_meter_generation": has_behind_meter_generation,
+        **_gross_fields(item.get("gross_energy")),
     }
 
 
@@ -79,7 +90,10 @@ class ConsumptionSummaryTool(Tool):
         "share), largest consumer first; with participant_id the totals and "
         "series are that participant's. Meters with generation behind them "
         "record only surplus and residual grid draw; the holder's local "
-        "share is null."
+        "share is null. Where the participant connected their own system "
+        "(e.g. Solar Manager), gross_self_sufficiency_pct, gross_self_consumption_pct "
+        "and gross_coverage_pct report the figures that system measured; they are null "
+        "without data or when coverage is too low."
     )
     input_schema = {
         "type": "object",
@@ -162,6 +176,7 @@ class ConsumptionSummaryTool(Tool):
                 # behind it: their own self-sufficiency rate is misleading,
                 # so it is suppressed rather than the ZEV-wide totals below.
                 result["totals"]["self_sufficiency_pct"] = None
+            result["totals"].update(_gross_fields(data.get("selected_gross_energy")))
         else:
             stats = data.get("participant_stats") or []
             result["participants"] = [_participant_entry(item) for item in stats[:_MAX_PARTICIPANTS]]

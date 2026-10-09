@@ -273,6 +273,11 @@ _ANNUAL_STATEMENT_FIELDS = [
                 "description_key": "admin.fields.annualHasBehindMeterGeneration",
                 "sample_path": "has_behind_meter_generation",
             },
+            {
+                "variable": "{{ gross_energy_source }}",
+                "description_key": "admin.fields.annualGrossEnergySource",
+                "sample_path": "gross_energy_source",
+            },
         ],
     },
     {
@@ -555,6 +560,7 @@ _CONTRACT_TRANSLATION_KEYS = (
 _ANNUAL_STATEMENT_TRANSLATION_KEYS = (
     "autarky",
     "behind_meter_note",
+    "behind_meter_supplementary_note",
     "consumption_col",
     "from_grid",
     "from_grid_col",

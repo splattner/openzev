@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError as DjangoValidationError
 from .geocoding import get_cached_building_footprint
 from .grid_operators import grid_operator_ids
 from django.utils import timezone
@@ -49,11 +49,33 @@ class MeteringPointSerializer(serializers.ModelSerializer):
     last_reading_at = serializers.SerializerMethodField()
     building = serializers.PrimaryKeyRelatedField(queryset=Building.objects.all(), required=False)
     building_name = serializers.CharField(source="building.name", read_only=True)
+    supplementary_source_status = serializers.SerializerMethodField()
 
     class Meta:
         model = MeteringPoint
         fields = "__all__"
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_supplementary_source_status(self, obj) -> str | None:
+        """Status of the energy data source on this meter, for those who may see sources (SPEC §5.1).
+
+        ``None`` while the feature is off, when there is no source, and for anyone who could not
+        read the source itself: another participant must not learn that a neighbour has one.
+        """
+        from metering.supplementary import permissions
+
+        if not permissions.feature_enabled():
+            return None
+        try:
+            source = obj.supplementary_source
+        except ObjectDoesNotExist:
+            return None
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        source.metering_point = obj  # already loaded; saves role_for a query
+        if user is None or not user.is_authenticated or permissions.role_for(user, source) == "none":
+            return None
+        return source.status
 
     def get_reading_count(self, obj):
         if hasattr(obj, "reading_count"):

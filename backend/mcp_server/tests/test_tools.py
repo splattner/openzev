@@ -378,7 +378,9 @@ class TestConsumptionSummary:
         assert set(top) == {
             "participant_id", "participant_name", "consumed_kwh", "from_zev_kwh",
             "from_grid_kwh", "produced_kwh", "local_share_pct", "has_behind_meter_generation",
+            "gross_self_sufficiency_pct", "gross_self_consumption_pct", "gross_coverage_pct",
         }
+        assert top["gross_self_sufficiency_pct"] is None
         assert top["consumed_kwh"] == 8.0
         assert top["local_share_pct"] == 0.0
         assert top["has_behind_meter_generation"] is False
@@ -452,6 +454,92 @@ class TestConsumptionSummary:
             "zev_id": str(zev.id), "date_from": "2026-01-01", "date_to": "2026-01-08", "bucket": "hour",
         })
         assert _is_error(response) is True
+
+
+    @staticmethod
+    def _net_metered_participant(zev, with_source=True):
+        from datetime import timedelta
+
+        from accounts.models import FeatureFlag
+        from allocation.validity import period_start_dt
+        from metering.models import SupplementaryReading, SupplementarySource
+
+        FeatureFlag.objects.update_or_create(
+            name=FeatureFlag.SUPPLEMENTARY_ENERGY_DATA_ENABLED, defaults={"enabled": True}
+        )
+        participant = ParticipantFactory(zev=zev, first_name="Net", last_name="Metered", valid_from=date(2026, 1, 1))
+        meter = MeteringPointFactory(zev=zev, meter_type="bidirectional", has_behind_meter_generation=True)
+        MeteringPointAssignmentFactory(metering_point=meter, participant=participant, valid_from=date(2026, 1, 1))
+        start = period_start_dt(date(2026, 1, 10))
+        end = period_start_dt(date(2026, 1, 11))
+        stamps = [start + timedelta(minutes=15 * i) for i in range(96)]
+        for stamp in stamps:
+            MeterReading.objects.create(metering_point=meter, timestamp=stamp, energy_kwh=Decimal("0.1"),
+                                        direction=ReadingDirection.IN, resolution=ReadingResolution.FIFTEEN_MIN)
+        if with_source:
+            source = SupplementarySource.objects.create(
+                metering_point=meter, participant=participant, provider="push",
+                covers_from=start, synced_through=end,
+            )
+            for stamp in stamps:
+                SupplementaryReading.objects.create(
+                    source=source, metering_point=meter, timestamp=stamp, consumption_kwh=Decimal("0.4"),
+                    production_kwh=Decimal("1.2"), import_kwh=Decimal("0.1"), export_kwh=Decimal("0.9"),
+                )
+        return participant
+
+    def test_gross_figures_come_from_the_participants_own_system(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        participant = self._net_metered_participant(zev)
+
+        result = _structured(call_tool(owner_mcp_client, "consumption_summary", {
+            "zev_id": str(zev.id), "date_from": "2026-01-10", "date_to": "2026-01-10", "bucket": "day",
+        }))
+
+        entry = next(p for p in result["participants"] if p["participant_id"] == str(participant.id))
+        assert entry["local_share_pct"] is None  # the meter-based figure stays withheld
+        assert entry["gross_self_sufficiency_pct"] == 75.0
+        assert entry["gross_self_consumption_pct"] == 25.0
+        assert entry["gross_coverage_pct"] == 100.0
+
+    def test_a_selected_participant_gets_the_gross_figures_in_the_totals(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        participant = self._net_metered_participant(zev)
+
+        result = _structured(call_tool(owner_mcp_client, "consumption_summary", {
+            "zev_id": str(zev.id), "date_from": "2026-01-10", "date_to": "2026-01-10", "bucket": "day",
+            "participant_id": str(participant.id),
+        }))
+
+        assert result["totals"]["self_sufficiency_pct"] is None
+        assert result["totals"]["gross_self_sufficiency_pct"] == 75.0
+        assert result["totals"]["gross_coverage_pct"] == 100.0
+
+    def test_gross_figures_are_null_without_a_source(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        participant = self._net_metered_participant(zev, with_source=False)
+
+        result = _structured(call_tool(owner_mcp_client, "consumption_summary", {
+            "zev_id": str(zev.id), "date_from": "2026-01-10", "date_to": "2026-01-10",
+        }))
+
+        entry = next(p for p in result["participants"] if p["participant_id"] == str(participant.id))
+        assert entry["gross_self_sufficiency_pct"] is None
+        assert entry["gross_coverage_pct"] is None
+
+    def test_gross_figures_are_null_while_the_feature_is_off(self, owner_mcp_client, owner_user):
+        from accounts.models import FeatureFlag
+
+        zev = ZevFactory(owner=owner_user)
+        participant = self._net_metered_participant(zev)
+        FeatureFlag.objects.filter(name=FeatureFlag.SUPPLEMENTARY_ENERGY_DATA_ENABLED).update(enabled=False)
+
+        result = _structured(call_tool(owner_mcp_client, "consumption_summary", {
+            "zev_id": str(zev.id), "date_from": "2026-01-10", "date_to": "2026-01-10",
+        }))
+
+        entry = next(p for p in result["participants"] if p["participant_id"] == str(participant.id))
+        assert entry["gross_self_sufficiency_pct"] is None
 
 
 class TestConsumptionProfile:

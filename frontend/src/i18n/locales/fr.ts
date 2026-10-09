@@ -363,6 +363,7 @@ export const fr = {
             annualStatementData: 'Décompte annuel',
             annualYear: 'Année du décompte',
             annualHasBehindMeterGeneration: 'Comptage net détecté (true/false)',
+            annualGrossEnergySource: 'Source du taux d\'autarcie indiqué derrière le compteur (p. ex. solar_manager), sinon vide',
             annualTotals: 'Totaux annuels',
             annualTotalConsumed: 'Consommation totale (kWh)',
             annualFromZev: 'Énergie depuis CEL (kWh)',

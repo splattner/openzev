@@ -372,6 +372,7 @@ export const en = {
             annualStatementData: 'Annual Statement',
             annualYear: 'Year of the statement',
             annualHasBehindMeterGeneration: 'Net-metering detected (true/false)',
+            annualGrossEnergySource: 'Source of the self-sufficiency shown for generation behind the meter (e.g. solar_manager), otherwise empty',
             annualTotals: 'Annual Totals',
             annualTotalConsumed: 'Total consumption (kWh)',
             annualFromZev: 'Energy from ZEV (kWh)',

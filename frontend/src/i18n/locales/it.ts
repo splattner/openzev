@@ -363,6 +363,7 @@ export const it = {
             annualStatementData: 'Rendiconto annuale',
             annualYear: 'Anno del rendiconto',
             annualHasBehindMeterGeneration: 'Misurazione netta rilevata (true/false)',
+            annualGrossEnergySource: 'Fonte del grado di autarchia indicato dietro il contatore (ad es. solar_manager), altrimenti vuoto',
             annualTotals: 'Totali annuali',
             annualTotalConsumed: 'Consumo totale (kWh)',
             annualFromZev: 'Energia da CEL (kWh)',

@@ -874,7 +874,9 @@ class MeteringPointViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevSco
         # Annotating drops the model's Meta.ordering (Django does not carry
         # it into a GROUP BY query), so it has to be requested explicitly
         # again or list responses come back in undefined order.
-        qs = self.scope_queryset(MeteringPoint.objects.select_related("zev", "building"))
+        qs = self.scope_queryset(
+            MeteringPoint.objects.select_related("zev", "building", "supplementary_source__participant")
+        )
         building = self.request.query_params.get("building")
         if building:
             qs = qs.filter(building_id=building)

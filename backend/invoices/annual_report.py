@@ -18,6 +18,8 @@ from django.db.models.functions import TruncMonth
 from allocation.validity import business_tz, period_end_exclusive_dt, period_start_dt
 from metering.analytics import owner_dashboard_summary, zev_balance_timeline
 from metering.models import MeterReading
+from metering.supplementary.stats import civil_window
+from metering.supplementary.surfaces import participants_gross
 
 from .annual_statement import compute_savings
 from .models import Invoice, InvoiceStatus
@@ -154,6 +156,10 @@ def build_annual_report(zev, year: int) -> dict:
                 "has_behind_meter_generation": False,
                 "savings": row_savings,
             }
+
+    gross = participants_gross(list(participants), *civil_window(date(year, 1, 1), date(year, 12, 31)))
+    for pid, row in participants.items():
+        row["gross_energy"] = gross.get(pid)
 
     saved = [Decimal(row["savings"]["saved_chf"]) for row in participants.values() if row["savings"]]
 
