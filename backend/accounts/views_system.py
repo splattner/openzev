@@ -11,7 +11,7 @@ the readiness cockpit does.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import partial
 
 from django.conf import settings
@@ -213,6 +213,45 @@ def _probe_backups() -> dict:
     }
 
 
+def _probe_supplementary() -> dict:
+    """Can the supplementary energy data feature (SPEC-2026-supplementary-energy-data) do its job?
+
+    "unknown" while the feature flag is off: not in use is a state, not a fault. "degraded" when
+    it is on and Solar Manager keys cannot be stored (``INTEGRATION_ENCRYPTION_KEYS`` unset), or
+    an enabled pull source has not synced successfully for several sync intervals.
+    """
+    try:
+        from django.db.models import Count, Min, Q
+
+        from accounts.models import FeatureFlag
+        from metering.models import SupplementaryProvider, SupplementarySource, SupplementaryStatus
+        from metering.supplementary.crypto import encryption_configured
+
+        configured = encryption_configured()
+        if not FeatureFlag.is_enabled(FeatureFlag.SUPPLEMENTARY_ENERGY_DATA_ENABLED):
+            return {"status": "unknown", "feature_enabled": False, "encryption_key_configured": configured}
+
+        counts = dict(
+            SupplementarySource.objects.values_list("status").annotate(n=Count("id")).values_list("status", "n")
+        )
+        pull = SupplementarySource.objects.filter(enabled=True).exclude(provider=SupplementaryProvider.PUSH)
+        stale_before = datetime.now(timezone.utc) - 6 * timedelta(seconds=settings.SUPPLEMENTARY_SYNC_INTERVAL_S)
+        stale = pull.exclude(status__in=[SupplementaryStatus.RECONNECT_REQUIRED, SupplementaryStatus.PENDING]).filter(
+            Q(last_success_at__lt=stale_before) | Q(last_success_at__isnull=True)
+        ).count()
+        oldest = pull.aggregate(oldest=Min("last_success_at"))["oldest"]
+    except Exception:  # noqa: BLE001 — any probe failure degrades, never 500s
+        return {"status": "unknown"}
+    return {
+        "status": "ok" if configured and not stale else "degraded",
+        "feature_enabled": True,
+        "encryption_key_configured": configured,
+        "sources_by_status": {str(name): count for name, count in counts.items()},
+        "stale_sources": stale,
+        "oldest_last_success_at": oldest.isoformat() if oldest else None,
+    }
+
+
 class SystemHealthView(APIView):
     """Snapshot of platform health for the admin System health tab.
 
@@ -230,6 +269,7 @@ class SystemHealthView(APIView):
                 "mfa": _probe_mfa(),
                 "email": _probe_email(),
                 "backups": _probe_backups(),
+                "supplementary": _probe_supplementary(),
                 "checked_at": datetime.now(timezone.utc).isoformat(),
             }
         )

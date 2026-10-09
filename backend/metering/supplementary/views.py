@@ -12,6 +12,7 @@ from __future__ import annotations
 import csv
 import io
 
+from django.core.cache import cache
 from django.db import transaction
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
@@ -28,10 +29,14 @@ from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, build_instance_snapshot, record_audit_event
 from zev.scoping import ZevScopedQuerySetMixin
 
-from ..models import SupplementarySource
+from ..models import SupplementaryProvider, SupplementarySource, SupplementaryStatus
+from ..tasks import queue_sync, sync_supplementary_source
 from . import ingest as ingest_service
+from . import reconcile as reconcile_service
+from . import sync as sync_service
 from .authentication import IsPushSource, SupplementaryPushAuthentication, SupplementaryPushThrottle
 from .permissions import SupplementarySourcePermission, require_feature
+from .providers import PROVIDERS, ProviderAuthError, ProviderError
 from .serializers import (
     CsvUploadSerializer,
     IngestResultSerializer,
@@ -43,6 +48,7 @@ from .serializers import (
 AUDIT_TARGET = "metering.SupplementarySource"
 TRACKED_FIELDS = ["label", "enabled", "external_id"]
 CSV_MAX_BYTES = 8 * 1024 * 1024
+SYNC_COOLDOWN_S = 5 * 60
 
 
 class FeatureGatedMixin:
@@ -127,6 +133,7 @@ class SupplementarySourceViewSet(
                     "created_by_admin": request.user.is_admin and source.participant.user_id != request.user.pk,
                 },
             )
+        queue_sync(source, backfill=True)
         data = self.get_serializer(source).data
         push_token = getattr(serializer, "push_token", None)
         body = {**data, **({"push_token": push_token} if push_token else {})}
@@ -142,6 +149,7 @@ class SupplementarySourceViewSet(
         serializer = self.get_serializer(source, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         before = build_instance_snapshot(source, TRACKED_FIELDS)
+        was_enabled = source.enabled
         with transaction.atomic():
             source = serializer.save()
             changes = build_diff(before, build_instance_snapshot(source, TRACKED_FIELDS), TRACKED_FIELDS)
@@ -149,6 +157,9 @@ class SupplementarySourceViewSet(
                 request, "update", source, f"Updated energy data source for {source.metering_point.meter_id}.",
                 changes=changes, metadata={"credential_changed": bool(getattr(serializer, "credential_changed", False))},
             )
+            if source.enabled and (getattr(serializer, "credential_changed", False) or not was_enabled):
+                # A fresh key, or a source switched back on: pick up where it left off now, not at the next tick.
+                queue_sync(source)
         return Response(self.get_serializer(source).data)
 
     def update(self, request, *args, **kwargs):
@@ -211,6 +222,53 @@ class SupplementarySourceViewSet(
                 metadata={"readings_deleted": deleted, "date_from": start, "date_to": end},
             )
         return Response({"deleted": deleted})
+
+    def _pull_provider(self, source):
+        provider = PROVIDERS.get(source.provider)
+        if source.provider == SupplementaryProvider.PUSH or provider is None:
+            raise ValidationError({"detail": "Only sources that pull from a vendor can do this."})
+        return provider
+
+    @action(detail=True, methods=["post"])
+    def test(self, request, pk=None):
+        """Exchange the stored key and read an hour of data. Never echoes a credential or a vendor response."""
+        source = self.get_object()
+        self._refuse_if_zev_disabled(source)
+        provider = self._pull_provider(source)
+        if not source.enabled:
+            raise ValidationError({"detail": "This source is disconnected."})
+        try:
+            provider.check(source)
+        except ProviderAuthError as exc:
+            sync_service.record_failure(source, SupplementaryStatus.RECONNECT_REQUIRED, str(exc))
+            raise ValidationError({"detail": str(exc)}) from None
+        except ProviderError as exc:
+            raise ValidationError({"detail": str(exc)}) from None
+        return Response({"ok": True})
+
+    @action(detail=True, methods=["post"])
+    def sync(self, request, pk=None):
+        """Queue a sync now. At most one request per source every five minutes."""
+        source = self.get_object()
+        self._refuse_if_zev_disabled(source)
+        self._pull_provider(source)
+        if not source.enabled:
+            raise ValidationError({"detail": "This source is disconnected."})
+        if source.status == SupplementaryStatus.RECONNECT_REQUIRED:
+            raise ValidationError({"detail": "Enter the API key again before syncing."})
+        if not cache.add(f"supplementary-sync-requested:{source.pk}", 1, timeout=SYNC_COOLDOWN_S):
+            response = Response({"detail": "A sync was requested a moment ago. Try again in a few minutes."},
+                                status=status.HTTP_429_TOO_MANY_REQUESTS)
+            response["Retry-After"] = str(SYNC_COOLDOWN_S)
+            return response
+        sync_supplementary_source.delay(str(source.pk))
+        return Response({"queued": True}, status=status.HTTP_202_ACCEPTED)
+
+    @action(detail=True, methods=["get"])
+    def reconciliation(self, request, pk=None):
+        """Day-by-day comparison with the official meter for the newest 14 comparable days."""
+        source = self.get_object()
+        return Response(reconcile_service.reconcile(source, days=14, include_days=True))
 
     @action(detail=True, methods=["post"], url_path="rotate-push-token")
     def rotate_push_token(self, request, pk=None):

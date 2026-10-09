@@ -188,6 +188,15 @@ export interface SystemHealth {
         encryption_required?: boolean
         encryption_key_problem?: boolean
     }
+    /** Supplementary energy data (Solar Manager): "unknown" while the feature flag is off. */
+    supplementary: {
+        status: SystemHealthStatus
+        feature_enabled?: boolean
+        encryption_key_configured?: boolean
+        sources_by_status?: Record<string, number>
+        stale_sources?: number
+        oldest_last_success_at?: string | null
+    }
     checked_at: string
 }
 

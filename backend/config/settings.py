@@ -352,6 +352,16 @@ CELERY_BEAT_SCHEDULE = {
         "task": "tariffs.tasks.refresh_dynamic_tariff_sources",
         "schedule": 4 * 60 * 60.0,
     },
+    # Pull sources (Solar Manager) for the participant's own gross energy data.
+    "refresh-supplementary-sources": {
+        "task": "metering.tasks.refresh_supplementary_sources",
+        "schedule": float(SUPPLEMENTARY_SYNC_INTERVAL_S),
+    },
+    # The consent boundary: a source stops when its participant stops holding the meter.
+    "disable-orphaned-supplementary-sources": {
+        "task": "metering.tasks.disable_orphaned_supplementary_sources",
+        "schedule": 24 * 60 * 60.0,
+    },
 }
 
 # ── Async export jobs (ADR 0017) ────────────────────────────────────────────

@@ -270,16 +270,16 @@ All answer `404` while the feature flag is off.
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
 | `/sources/` | GET | `SupplementarySourcePermission` | Scoped list (admin all; manager/viewer their ZEVs; participant their own). Filter `?zev_id=` (as on every ZEV-scoped list), `?metering_point=` |
-| `/sources/` | POST | holder or admin | Create. Requires `consent: true`, a flagged metering point, a free metering point (one source each). `solar_manager`: needs `external_id` and `api_key`; the key is exchanged and one interval fetched **before** anything is saved, so a wrong key is a `400` with a safe message, not a broken row. Without a configured `INTEGRATION_ENCRYPTION_KEYS`: `503` naming the setting. `push`: returns the push token **once** in `push_token`. A provider that is not registered yet (`solar_manager` until PR 3) is refused with `400`. PR 3 additionally queues a backfill. A manager gets `403`; someone who cannot see the metering point gets `400 Invalid pk`, so its existence is not revealed. Audited `supplementary_source.create` |
+| `/sources/` | POST | holder or admin | Create. Requires `consent: true`, a flagged metering point, a free metering point (one source each). `solar_manager`: needs `external_id` and `api_key`; the key is exchanged and one interval fetched **before** anything is saved, so a wrong key is a `400` with a safe message, not a broken row. Without a configured `INTEGRATION_ENCRYPTION_KEYS`: `503` naming the setting. `push`: returns the push token **once** in `push_token`. A provider that is not registered is refused with `400`. After the commit a backfill sync is queued (`backfill=True`, §6.3); a broker outage is logged and does not fail the request. A manager gets `403`; someone who cannot see the metering point gets `400 Invalid pk`, so its existence is not revealed. Audited `supplementary_source.create` |
 | `/sources/{id}/` | GET | scoped | Detail |
-| `/sources/{id}/` | PATCH | holder or admin; manager only for `enabled` | `label`, `enabled`, `external_id`, write-only `api_key`. An absent `api_key` keeps the stored one. Audited `supplementary_source.update` with a diff over the tracked fields and `credential_changed` in metadata, never the value |
+| `/sources/{id}/` | PATCH | holder or admin; manager only for `enabled` | `label`, `enabled`, `external_id`, write-only `api_key`. An absent `api_key` keeps the stored one. A new key, or switching a disabled source back on, queues a sync. Audited `supplementary_source.update` with a diff over the tracked fields and `credential_changed` in metadata, never the value |
 | `/sources/{id}/` | DELETE | holder, manager, admin | Deletes the source **and all its readings**. Audited `supplementary_source.delete` |
 | `/sources/{id}/disconnect/` | POST | holder, manager, admin | Sets `enabled = false`, wipes the credential or push token, **keeps the readings**. Audited `supplementary_source.disconnect` |
 | `/sources/{id}/purge/` | POST | holder, manager, admin | Body `{date_from?, date_to?}` (civil dates; both absent = everything). Deletes readings only. Audited `supplementary_source.purge` with the count |
-| `/sources/{id}/test/` | POST | holder or admin (PR 3) | `solar_manager`: refresh + one interval; `{"ok": true}` or `400 {"detail"}` with a safe message. Never echoes credentials or a raw vendor response |
-| `/sources/{id}/sync/` | POST | holder or admin (PR 3) | Queues a sync now, `202`. At most one per source per 5 minutes (`429` otherwise) |
+| `/sources/{id}/test/` | POST | holder or admin | `solar_manager`: refresh (a rotated key is stored) + one hour of data; `{"ok": true}` or `400 {"detail"}` with a safe message. A rejected key also sets `reconnect_required`. Never echoes credentials or a raw vendor response. `400` for a push, disconnected or unregistered source |
+| `/sources/{id}/sync/` | POST | holder or admin | Queues a sync now, `202 {"queued": true}`. At most one per source per 5 minutes (`429` with `Retry-After: 300` otherwise). `400` for a push or disconnected source and for one that is `reconnect_required` (enter the key again first) |
 | `/sources/{id}/rotate-push-token/` | POST | holder or admin | `push` only. Issues a new token, returned once; the old one stops working at once |
-| `/sources/{id}/reconciliation/` | GET | scoped (PR 3) | Day-by-day comparison for the last 14 days (§6.5), computed on demand |
+| `/sources/{id}/reconciliation/` | GET | scoped | The newest 14 comparable days with per-day totals (§6.5), computed on demand |
 | `/sources/{id}/import-csv/` | POST | holder or admin | Multipart `file`; `?dry_run=true` validates only. Columns `timestamp,consumption_kwh,production_kwh,import_kwh,export_kwh`. All-or-nothing: one invalid row rejects the file with per-row errors. Same response as ingest |
 | `/ingest/` | POST | `SupplementaryPushAuthentication` (token `ozs_<prefix>_<secret>` as `Authorization: Bearer`) | Body `{"readings": [{timestamp, consumption_kwh, production_kwh, import_kwh, export_kwh}, ...]}`, at most 2000 per request. Throttled per token (`supplementary_push`) |
 
@@ -357,12 +357,19 @@ off, the participant has no source, or the source has no data in the window. The
 
 ```python
 class Provider(Protocol):
-    def fetch(self, source: SupplementarySource, start: datetime, end: datetime) -> Iterable[Point]: ...
+    def verify(self, external_id: str, credential: str) -> str: ...      # returns the credential to store
+    def check(self, source: SupplementarySource) -> None: ...             # "test connection"
+    def fetch(self, source: SupplementarySource, start: datetime, end: datetime) -> Iterator[list[Point]]: ...
 ```
 
-`Point` is `(timestamp, consumption_kwh, production_kwh, import_kwh, export_kwh)` with an aware
-UTC interval-start timestamp. `SolarManagerProvider` implements it; `push` has no provider, it
-delivers through §5. A future provider only has to return `Point`s.
+`Point` is a `NamedTuple` `(timestamp, consumption_kwh, production_kwh, import_kwh, export_kwh)`
+with an aware UTC interval-start timestamp. `fetch` yields one list per chunk (for Solar Manager
+one civil day), oldest first, so the caller stores each before asking for the next. Errors:
+`ProviderAuthError` (the vendor rejected the credential or the installation),
+`ProviderRateLimited(retry_after)` and `ProviderError` (transient); every message is safe to show
+the participant. `solar_manager.py` registers `SolarManagerProvider` in `PROVIDERS` on import,
+and `MeteringConfig.ready()` imports it. `push` has no provider, it delivers through §5. A future
+provider only has to return `Point`s.
 
 ### 6.2 Solar Manager
 
@@ -387,10 +394,15 @@ Source of truth: `https://cloud.solar-manager.ch/swagger.json` (API v1.88.11, re
   refresh. The legacy email/password `/v1/oauth/login` is deprecated (removal 2027-06) and is
   not supported.
 - **Chunking:** one civil day per request (96 intervals). The vendor does not document a
-  maximum range or a rate limit, so the client pulls conservatively, honours `Retry-After` on
-  `429`, and treats 5xx and timeouts as transient.
+  maximum range or a rate limit, so the client pulls conservatively (0.25 s between requests,
+  sequential per source), turns a `429` into `ProviderRateLimited` carrying `Retry-After`
+  (bounded to one hour), and treats 5xx and timeouts as transient. A `401`, `403` or `404` from
+  the data endpoint, and a `400`, `401` or `403` from the refresh, mean the key or the installation
+  is not accepted (`ProviderAuthError`). A row missing any of the four flows is skipped (a gap,
+  never a zero); a negative value within 5 Wh is sensor noise and reads as 0, a larger one is left
+  for ingest validation to reject.
 - **HTTP:** `urllib` as in `tariffs/importers/remote.py`; one fixed host
-  (`SOLAR_MANAGER_BASE_URL`), redirects refused, a short timeout, a response-size cap, and the
+  (`SOLAR_MANAGER_BASE_URL`), redirects refused, a 20 s timeout, a 2 MiB response-size cap, and the
   `smId` validated against `^[A-Za-z0-9]{3,24}$` before it enters a URL. No user-supplied host.
 - **Timestamp convention (verified 2026-10-08):** `t` is the **start** of its interval, the
   same convention as `MeterReading.timestamp`, so values are stored without any shift. Checked
@@ -416,21 +428,30 @@ Source of truth: `https://cloud.solar-manager.ch/swagger.json` (API v1.88.11, re
   with status other than `reconnect_required`. One unreachable vendor account cannot delay the
   others.
 - `sync_supplementary_source(source_id, backfill=False)` (`bind=True, max_retries=2,
-  default_retry_delay=600`): takes a per-source cache lease (30 minutes, same pattern as
-  `dynamic_source_lock`); if held, skips. The window is
-  `[max(synced_through - 2 days, backfill_floor), floor(now to 15 min))`: the two-day overlap
-  re-fetches recent intervals so late or revised vendor values are upserted.
-  `backfill_floor` is the latest of `now - SUPPLEMENTARY_BACKFILL_MAX_DAYS` and the start of
-  the participant's personal assignment. Rows outside the participant's assignment windows are
-  dropped. Writes are chunk-wise upserts; `synced_through`, `covers_from` and `last_*` are
-  updated after each chunk so an interrupted run resumes.
+  default_retry_delay=600`; the logic is `sync_supplementary_source_impl`, called directly by
+  tests): takes a per-source cache lease (30 minutes, same pattern as `dynamic_source_lock`); if
+  held, skips. The window is `[max(synced_through - 2 days, backfill_floor), floor(now to 15
+  min))`: the two-day overlap re-fetches recent intervals so late or revised vendor values are
+  upserted. `backfill_floor` is the latest of `now - SUPPLEMENTARY_BACKFILL_MAX_DAYS` and the
+  start of the participant's personal assignment; `backfill=True` ignores `synced_through`. The
+  window is cut to the participant's personal assignment windows before anything is requested, and
+  every chunk goes through `ingest.ingest`, the same validation and clipping as push and CSV
+  (a rejected vendor row is counted, not fatal). Each civil day is stored, and `synced_through`,
+  `covers_from` and `last_*` advanced, before the next is requested, so an interrupted run
+  resumes. The source is re-checked as enabled before each chunk and failure states are written
+  with a conditional update, so a disconnect during a run is never overwritten. A run that finds
+  nothing new still succeeds. Skip reasons (returned, not errors): `feature_off`,
+  `not_a_pull_source`, `disabled`, `reconnect_required`, `nothing_to_sync`, `missing`, `busy`.
+- **When it is queued:** by the beat fan-out; with `backfill=True` after a source is created; and
+  after a new key or after a disabled source is switched back on. The `sync` action queues it too.
 - **Failure handling:** an auth failure from the vendor, or `MultiFernet` unable to decrypt,
   sets `reconnect_required` (no retry; the UI asks the participant to enter a key again). A
-  transport error, `429` or 5xx sets `error` and retries; the next tick picks it up anyway. A
+  transport error, `429` or 5xx sets `error` and retries (a `429` waits at least its `Retry-After`, otherwise the default delay); the next tick picks it up anyway. A
   deleted source between fan-out and execution is not an error.
 - **Credential refresh** runs inside `transaction.atomic()` with
   `select_for_update()` on the source row, so two workers cannot both exchange the same
-  refresh token.
+  refresh token. The row is re-read under the lock, so the token spent is always the latest. A
+  long run renews its one-hour access token after 45 minutes.
 - **Audit:** best-effort `supplementary_source.sync` events (category `METERING`, source
   `CELERY`), never carrying a token; the audit write cannot turn a successful sync into a failure.
 - `disable_orphaned_supplementary_sources` (beat, daily): any source whose participant no longer
@@ -448,19 +469,22 @@ civil days converted to UTC, so a DST day yields 92 or 100 intervals, not 96.
 
 ### 6.5 Reconciliation (`metering/supplementary/reconcile.py`)
 
-Run after every successful sync (and on demand by `GET /reconciliation/`) over the last 7
+Run after every successful sync (and on demand by `GET /reconciliation/`) over the newest 7
 (on demand: 14) civil days that have both supplementary rows and official `MeterReading`s for
-the metering point. `energy_kwh` of `direction = "out"` is compared with `export_kwh`, and
+the metering point, looking back at most 60 days because official data is often imported in
+batches. A day is comparable when at least 90 % of its intervals (92 or 100 on a DST day) are
+present on both sides for both flows, and only intervals present on both sides are summed. `energy_kwh` of `direction = "out"` is compared with `export_kwh`, and
 `direction = "in"` with `import_kwh`.
 
-Result stored in `SupplementarySource.reconciliation`:
+Result stored in `SupplementarySource.reconciliation` (the on-demand view adds `days`, one
+`{date, export_source_kwh, export_meter_kwh, import_source_kwh, import_meter_kwh}` per day):
 
 ```json
 { "checked_at": "...", "days_compared": 7, "export_deviation_pct": 1.8, "import_deviation_pct": 3.1,
   "best_shift_intervals": 0, "state": "ok" }
 ```
 
-- `deviation_pct = |Σ source − Σ meter| / max(Σ meter, 1 kWh)` per flow.
+- `*_deviation_pct = |Σ source − Σ meter| / max(Σ meter, 1 kWh) × 100` per flow.
 - `best_shift_intervals`: the shift in `[-2, 2]` intervals that minimises the summed absolute
   difference of the 15-minute export series against the meter's `out`.
 - `state`: `ok` below `SUPPLEMENTARY_RECONCILE_TOLERANCE`; `warn` above it, or when a non-zero
@@ -471,8 +495,12 @@ Result stored in `SupplementarySource.reconciliation`:
 
 ### 6.6 Operations
 
-- **System health:** `AdminSystemHealthPanel` reports whether `INTEGRATION_ENCRYPTION_KEYS` is
-  configured, how many sources exist per status, and the oldest `last_success_at`.
+- **System health:** `GET /auth/system-health/` gains a `supplementary` probe: `unknown` while
+  the flag is off; otherwise `degraded` when `INTEGRATION_ENCRYPTION_KEYS` is unset or an enabled
+  pull source (not `pending` or `reconnect_required`, which are the participant's to fix) has not
+  succeeded for six sync intervals, else `ok`. It carries `feature_enabled`,
+  `encryption_key_configured`, `sources_by_status`, `stale_sources` and `oldest_last_success_at`
+  (the TypeScript type is added now; the panel renders it with the frontend, PR 5).
 - **System check:** `metering.W001` warns when the feature flag is forced on through the
   environment (`FEATURE_SUPPLEMENTARY_ENERGY_DATA_ENABLED`) and no key is configured. Environment
   only, because system checks run without a database; the health panel reports the case where the
@@ -722,22 +750,53 @@ throttle) and `CsvImportTests` (8: valid and audited; semicolons, BOM and decima
 `dry_run`; all-or-nothing; missing columns, empty and too many rows; not UTF-8; owner or admin
 only; disabled source).
 
-### Backend — `metering/test_supplementary_sync.py`
+### Backend — Solar Manager, sync and reconciliation (PR 3: 122 tests)
 
-**`SolarManagerProviderTests`** (~10, stub server, recorded response fixture): field mapping and
-Wh→kWh; refresh exchange and token rotation persisted before use; save failure = failed
-refresh; 401 → `reconnect_required`; 429 honours `Retry-After`; 5xx → `error` and retry;
-undecryptable credential → `reconnect_required`; `T_MARKS_INTERVAL` shift; redirects refused;
-invalid `smId` refused.
+All against a local stand-in for the vendor (`StubSolarManager` in `supplementary/testing.py`: a
+real HTTP server that rotates refresh tokens, includes the boundary interval, and can be told to
+answer `429`, 5xx, redirects, oversized or malformed bodies). The values are synthetic: no
+household's real consumption profile is committed to the repository.
 
-**`SyncTaskTests`** (~8): overlap re-fetch upserts revised values; lease skips a concurrent run;
-interrupted run resumes from `synced_through`; backfill floor respects assignment start and
-`SUPPLEMENTARY_BACKFILL_MAX_DAYS`; fan-out skips disabled and `reconnect_required`;
-`disable_orphaned_supplementary_sources` after assignment end; flag off skips; two concurrent
-refreshes never reuse a token.
+**`metering/test_supplementary_solar_manager.py`** (42): `ClientTests` (15: the refresh grant and
+the rotated token; a vendor that does not rotate; a rejected or malformed key is an auth error
+that never echoes the key; interval 900 and the bearer header; Wh to kWh with the interval start
+kept; a malformed `smId` never reaches the network; `429` with, without and with an absurd
+`Retry-After`; 5xx is transient; 403 and 404 are auth errors; redirects, oversized and garbage
+bodies refused; an unreachable host gives a safe message), `MapPointsTests` (8: a row missing a
+flow is a gap; null and non-numeric skipped; noise versus a real negative; out-of-window and junk
+rows ignored; duplicates; `T_MARKS_INTERVAL`; offsets to UTC), `CivilDaysTests` (4: cut at Swiss
+midnight; 92 and 100 interval DST days; partial and empty windows) and `ProviderTests` (15:
+`verify` rotates and fails before any data request; the rotated key is persisted before data is
+requested; the next fetch spends the new key; a save failure is a failed refresh and the bearer
+token is never used; a non-rotating vendor leaves the ciphertext alone; one request per civil
+day, lazily; the access token is renewed; an undecryptable or wiped credential asks for a
+reconnect; `check`; registry).
 
-**`ReconciliationTests`** (~6): ok within tolerance; warn above it; one-interval shift detected;
-`insufficient` without official data; official data wins (nothing modified); on-demand view.
+**`metering/test_supplementary_sync.py`** (59): `SyncStorageTests` (13: first sync stores the
+tenancy and marks the source ok; values in kWh; nothing before the tenancy or the backfill limit;
+only complete intervals; a second sync re-fetches only the overlap; revised values are upserted;
+`backfill`; each day stored before the next so a failure keeps the earlier days; vendor values
+that fail validation are rejected without failing the sync; an empty run still succeeds; the
+rotated key stored; `MeterReading` untouched), `SyncFailureTests` (8: a rejected or undecryptable
+key is `reconnect_required` and not retried; transient failure sets `error` and retries; `429`
+waits at least its `Retry-After`; a concurrent disconnect is never overwritten and stops the run),
+`SyncSkipTests` (8: flag off, disabled, `reconnect_required`, push, deleted, busy lease, no
+tenancy, community mode), `FanOutTests` (4), `OrphanTests` (5: tenancy ended, current, future end,
+community mode, flag off), `SyncAuditTests` (5: no token in the audit; failure outcome; a broken
+audit write or reconciliation does not fail a sync; the result is stored), `ActionTests` (11:
+`test` and `sync` roles, cooldown, refusals for push, disconnected and `reconnect_required`;
+`reconciliation` visibility; flag off) and `QueueOnWriteTests` (5: backfill after create, none for
+push, new key, re-enable, broker outage).
+
+**`metering/test_supplementary_reconcile.py`** (17): `ReconcileTests` (15: matching series are ok;
+deviation above and below the tolerance, and the tolerance as a setting; a shift of +1 and of -2
+intervals is detected; fewer than two comparable days, no official data and no source data are
+`insufficient`; a half-empty day is skipped; the newest days win; the lookback; the per-day view;
+nothing is modified; zero totals) and `StoreTests` (2).
+
+**`accounts/test_system_health.py`** (+4): the `supplementary` probe is `unknown` with the flag
+off, `degraded` without a key, reports counts and the oldest success, and flags a source that has
+stopped syncing but not one that needs a reconnect.
 
 ### Backend — surfaces
 
@@ -817,13 +876,13 @@ and to be observed during PR 3: rate limits and the maximum `from`/`to` range pe
   Solar Manager, so a half-built integration cannot be connected.
 - Tests: `test_supplementary_api.py`, `test_supplementary_ingest.py`.
 
-**PR 3: Solar Manager and reconciliation** (backend, async)
+**PR 3: Solar Manager and reconciliation** (backend, async; implemented, see the test list in §9)
 - `providers.py`, `solar_manager.py`, the sync tasks, orphan job, beat entries, create-time
   key check, `test` and `sync` actions.
-- `reconcile.py`, system-health entry.
-- Tests: `SolarManagerProviderTests`, `SyncTaskTests`, `ReconciliationTests`, with a response
-  fixture shaped like the real one (96 intervals, same fields) and a matching meter `out`/`in`
-  series for the reconciliation tests. The values are synthetic: no household's real
+- `reconcile.py`, system-health probe (the panel UI comes with the frontend).
+- Tests: `test_supplementary_solar_manager.py`, `test_supplementary_sync.py`,
+  `test_supplementary_reconcile.py`, against a stub vendor server with synthetic values shaped like
+  the real response (all the fields, the boundary interval included). No household's real
   consumption profile is committed to the repository.
 
 **PR 4: Statistics surfaces** (backend)

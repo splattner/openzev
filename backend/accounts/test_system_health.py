@@ -56,12 +56,13 @@ def test_system_health_returns_probe_snapshot(admin_client):
 
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"database", "celery", "mfa", "email", "backups", "checked_at"}
+    assert set(body) == {"database", "celery", "mfa", "email", "backups", "supplementary", "checked_at"}
     _assert_probe_shape(body["database"])
     _assert_probe_shape(body["celery"])
     _assert_probe_shape(body["mfa"])
     _assert_probe_shape(body["email"])
     _assert_probe_shape(body["backups"])
+    _assert_probe_shape(body["supplementary"])
     # Configuration facts the tab renders directly.
     assert body["database"]["engine"]
     assert body["database"]["status"] == "ok"
@@ -172,3 +173,83 @@ def test_system_health_reports_no_workers_as_degraded(admin_client, monkeypatch)
     response = admin_client.get(URL)
     assert response.json()["celery"]["status"] == "degraded"
     assert response.json()["celery"]["workers_responding"] == 0
+
+
+def _flag(enabled: bool) -> None:
+    from accounts.models import FeatureFlag
+
+    FeatureFlag.objects.update_or_create(
+        name=FeatureFlag.SUPPLEMENTARY_ENERGY_DATA_ENABLED, defaults={"enabled": enabled}
+    )
+
+
+def _pull_source(status="ok", last_success_at=None):
+    from testing import factories
+
+    from metering.models import SupplementarySource
+
+    zev = factories.ZevFactory()
+    point = factories.MeteringPointFactory(zev=zev, has_behind_meter_generation=True)
+    participant = factories.ParticipantFactory(zev=zev)
+    return SupplementarySource.objects.create(
+        metering_point=point, participant=participant, provider="solar_manager", external_id="ABC123",
+        status=status, last_success_at=last_success_at,
+    )
+
+
+@override_settings(INTEGRATION_ENCRYPTION_KEYS=[])
+def test_system_health_supplementary_probe_is_unknown_while_the_feature_is_off(admin_client):
+    _flag(False)
+
+    probe = admin_client.get(URL).json()["supplementary"]
+
+    assert probe == {"status": "unknown", "feature_enabled": False, "encryption_key_configured": False}
+
+
+@override_settings(INTEGRATION_ENCRYPTION_KEYS=[])
+def test_system_health_supplementary_probe_degrades_when_the_feature_is_on_without_a_key(admin_client):
+    _flag(True)
+
+    probe = admin_client.get(URL).json()["supplementary"]
+
+    assert probe["status"] == "degraded"
+    assert probe["encryption_key_configured"] is False
+
+
+def test_system_health_supplementary_probe_reports_counts_and_the_oldest_success(admin_client):
+    from datetime import timedelta
+
+    from cryptography.fernet import Fernet
+    from django.utils import timezone
+
+    _flag(True)
+    recent = timezone.now() - timedelta(minutes=10)
+    older = timezone.now() - timedelta(minutes=30)
+    _pull_source("ok", recent)
+    _pull_source("ok", older)
+    _pull_source("reconnect_required")
+
+    with override_settings(INTEGRATION_ENCRYPTION_KEYS=[Fernet.generate_key().decode()]):
+        probe = admin_client.get(URL).json()["supplementary"]
+
+    assert probe["status"] == "ok"
+    assert probe["sources_by_status"] == {"ok": 2, "reconnect_required": 1}
+    assert probe["stale_sources"] == 0
+    assert probe["oldest_last_success_at"].startswith(older.strftime("%Y-%m-%dT%H:%M"))
+
+
+def test_system_health_supplementary_probe_flags_a_source_that_has_stopped_syncing(admin_client):
+    from datetime import timedelta
+
+    from cryptography.fernet import Fernet
+    from django.utils import timezone
+
+    _flag(True)
+    _pull_source("error", timezone.now() - timedelta(days=2))
+    _pull_source("reconnect_required", timezone.now() - timedelta(days=9))  # the participant's to fix, not the platform's
+
+    with override_settings(INTEGRATION_ENCRYPTION_KEYS=[Fernet.generate_key().decode()]):
+        probe = admin_client.get(URL).json()["supplementary"]
+
+    assert probe["status"] == "degraded"
+    assert probe["stale_sources"] == 1
