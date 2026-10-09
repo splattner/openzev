@@ -11,6 +11,7 @@ import { PageSkeleton } from '../../components/PageSkeleton'
 import { Notice } from '../../components/Notice'
 import { StatCard } from '../../components/StatCard'
 import { PeriodSelector } from '../../components/PeriodSelector'
+import { GrossEnergyCard } from '../../components/dashboard/GrossEnergyCard'
 import { BalanceChart } from '../../components/dashboard/BalanceChart'
 import { EnergyFlowCard } from '../../components/dashboard/EnergyFlowCard'
 import { HourlyProfileCard } from '../../components/dashboard/HourlyProfileCard'
@@ -166,6 +167,15 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
                         formatBucketTooltipLabel={formatBucketTooltipLabel}
                         kwhTick={kwhTick}
                     />
+                    {selectedParticipantId && summary.selected_gross_energy && (
+                        <GrossEnergyCard
+                            gross={summary.selected_gross_energy}
+                            whose="participant"
+                            participantName={selectedParticipantName ?? undefined}
+                            formatBucketLabel={formatBucketLabel}
+                            formatBucketTooltipLabel={formatBucketTooltipLabel}
+                        />
+                    )}
                     <ParticipantTableCard
                         participantStats={summary.participant_stats}
                         selectedParticipantId={selectedParticipantId}

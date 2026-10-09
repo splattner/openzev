@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { BehindMeterBadge } from '../BehindMeterBadge'
 import { dashboardKwhStat } from '../../lib/dashboardFormatting'
 import { formatPercent } from '../../lib/numbers'
+import { NetMeteredRate } from './NetMeteredRate'
 import type { ZevOwnerDashboardSummary } from '../../types/api'
 
 type ParticipantRow = ZevOwnerDashboardSummary['participant_stats'][number]
@@ -69,7 +70,11 @@ export function ParticipantTableCard({ participantStats, selectedParticipantId, 
                                         <td className="numeric">{dashboardKwhStat(participant.from_zev_kwh)}</td>
                                         <td className="numeric">{dashboardKwhStat(participant.from_grid_kwh)}</td>
                                         <td className="numeric">
-                                            {participant.has_behind_meter_generation ? '—' : formatPercent(zevSharePercent(participant))}
+                                            {participant.has_behind_meter_generation ? (
+                                                <NetMeteredRate gross={participant.gross_energy} />
+                                            ) : (
+                                                formatPercent(zevSharePercent(participant))
+                                            )}
                                         </td>
                                     </tr>
                                 )

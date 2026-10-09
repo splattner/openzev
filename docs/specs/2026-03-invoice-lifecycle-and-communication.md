@@ -1295,3 +1295,12 @@ the cockpit readiness and attention caches.
 - [x] Whole-ZEV annual statements are prepared asynchronously: the UI polls until the archive is ready, then downloads; partial failures show omission counts, total failure shows an error with retry (§5.4, §8.1)
 - [x] Completed export artifacts expire after the retention window and downloads of expired artifacts return `410` (§8.1, ADR 0017)
 - [x] Reset-to-default DELETE reverts to on-disk file without modifying it (§5.7)
+
+## Supplementary energy data (2026-10)
+
+The annual statement context gains `gross_energy_source` (`"solar_manager" | "push" | None`).
+For a net-metered participant each civil month with enough coverage shows the self-sufficiency from
+the participant's own system and the year total follows its own coverage; other months stay `—`. When
+a figure is shown the template prints `behind_meter_supplementary_note` instead of
+`behind_meter_note` (new in all four languages; listed in `field_catalog_data.py`). Invoices and
+invoice PDFs are not affected ([2026-10-supplementary-energy-data.md](2026-10-supplementary-energy-data.md), ADR 0030).

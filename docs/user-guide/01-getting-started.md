@@ -101,6 +101,7 @@ Fill in every value. The examples below assume the instance is reached at
 | `WEBAUTHN_ORIGIN` | `https://zev.example.ch` | Full origin for passkeys |
 | `MFA_ENCRYPTION_KEYS` | *(generated, see below)* | Encrypts two-factor secrets; without it nobody can enrol an authenticator app |
 | `BACKUP_ENCRYPTION_KEYS` | *(generated, see below)* | Encrypts backup archives; without it backups are written unencrypted — see [Backups](18-backups.md) |
+| `INTEGRATION_ENCRYPTION_KEYS` | *(optional, a Fernet key as for `MFA_ENCRYPTION_KEYS`)* | Encrypts the API keys participants enter to connect Solar Manager; without it only push and file sources work — see [Your Own Energy Data](20-energy-data.md) |
 
 Generate the three keys with Python (any machine with Python 3; the
 `cryptography` package is only needed for the second line):
@@ -120,6 +121,7 @@ What each key protects, and what losing it costs:
 | Key | Protects | If lost |
 |---|---|---|
 | `BACKUP_ENCRYPTION_KEYS` | Backup archives **and stored destination credentials** | Encrypted backups and stored S3 secrets needing that key cannot be opened. Keep old keys while retained archives or stored secrets still depend on them; new backups alone do not re-encrypt stored credentials. See [Backups](18-backups.md). |
+| `INTEGRATION_ENCRYPTION_KEYS` | Participants' Solar Manager API keys | Those connections cannot be read and show *Reconnect needed*; each participant enters their key again. Nothing else is affected. Keep old keys in the list while you rotate (`manage.py rotate_integration_key`). |
 | `MFA_ENCRYPTION_KEYS` | Two-factor (TOTP) secrets | Authenticator access is affected; it is not the key that opens a backup archive. It is needed when recovering those devices. |
 | `SECRET_KEY` | Signing and authentication state | Replacing it can invalidate sessions and tokens; it does not make the backed-up business data undecryptable. |
 

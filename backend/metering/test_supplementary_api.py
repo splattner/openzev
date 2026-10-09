@@ -390,3 +390,51 @@ class ClearingTheFlagTests(SupplementaryApiTestCase):
             f"/api/v1/zev/metering-points/{self.point.pk}/", {"has_behind_meter_generation": False}, format="json"
         )
         self.assertEqual(response.status_code, 400)
+
+
+class EligibleMeteringPointTests(SupplementaryApiTestCase):
+    URL = SOURCES_URL + "eligible/"
+
+    def test_the_holder_gets_their_flagged_meter_without_a_source_yet(self):
+        rows = client_for(self.holder_user).get(self.URL).json()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["metering_point"], str(self.point.pk))
+        self.assertEqual(rows[0]["meter_id"], self.point.meter_id)
+        self.assertEqual(rows[0]["zev_name"], self.zev.name)
+        self.assertIsNone(rows[0]["source"])
+
+    def test_it_carries_the_source_id_once_connected(self):
+        source_id = self.create_push_source().json()["id"]
+        self.assertEqual(client_for(self.holder_user).get(self.URL).json()[0]["source"], source_id)
+
+    def test_everyone_else_gets_nothing(self):
+        for user in (self.manager, self.viewer, self.other_user, self.stranger, self.admin):
+            self.assertEqual(client_for(user).get(self.URL).json(), [], user.username)
+
+    def test_an_unflagged_meter_a_community_holder_and_an_ended_tenancy_are_not_offered(self):
+        self.point.has_behind_meter_generation = False
+        self.point.save()
+        self.assertEqual(client_for(self.holder_user).get(self.URL).json(), [])
+        self.point.has_behind_meter_generation = True
+        self.point.save()
+        self.assignment.allocation_mode = AllocationMode.COMMUNITY
+        self.assignment.save()
+        self.assertEqual(client_for(self.holder_user).get(self.URL).json(), [])
+        self.assignment.allocation_mode = AllocationMode.PERSONAL
+        self.assignment.valid_to = date(2025, 6, 1)
+        self.assignment.save()
+        self.assertEqual(client_for(self.holder_user).get(self.URL).json(), [])
+
+    def test_a_disabled_zev_is_not_offered(self):
+        from django.utils import timezone
+
+        self.zev.disabled_at = timezone.now()
+        self.zev.save()
+        self.assertEqual(client_for(self.holder_user).get(self.URL).json(), [])
+
+    def test_404_while_the_flag_is_off(self):
+        enable_feature(False)
+        self.assertEqual(client_for(self.holder_user).get(self.URL).status_code, 404)
+
+    def test_anonymous_is_refused(self):
+        self.assertEqual(client_for(None).get(self.URL).status_code, 401)

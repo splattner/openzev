@@ -15,6 +15,7 @@ import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
 import { BehindMeterBadge } from '../../components/BehindMeterBadge'
 import { formatDateTime, formatShortDate } from '../../lib/appSettings'
 import { todayBusinessIso } from '../../lib/dates'
+import { SupplementarySourceStatus } from './SupplementarySourceStatus'
 import type { AppSettings, MeteringPoint, MeteringPointAssignment } from '../../types/api'
 import {
   assignmentStateBadgeClass,
@@ -184,6 +185,9 @@ export function MeteringPointsList({
                   </span>
                   <span className="badge badge-neutral">{t(`pages.meteringPoints.meterTypes.${point.meter_type}`)}</span>
                   {point.has_behind_meter_generation && <BehindMeterBadge />}
+                  {isManagedScope && (
+                    <SupplementarySourceStatus point={point} canManage={!readOnly} confirm={confirm} />
+                  )}
                   <Link
                     className={meteringPointHealthBadgeClass(health)}
                     style={{ textDecoration: 'none' }}

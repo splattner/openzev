@@ -8,6 +8,7 @@ import { resolveAccountTab } from '../src/features/account/accountTabs'
 import { AccountProfilePage } from '../src/pages/AccountProfilePage'
 
 const auth = vi.hoisted(() => ({ mustChangePassword: false }))
+const energy = vi.hoisted(() => ({ available: false, isLoading: false }))
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: vi.fn() }) }))
@@ -22,6 +23,10 @@ vi.mock('../src/features/account/LinkedAccountsCard', () => ({ LinkedAccountsCar
 vi.mock('../src/features/account/SessionsCard', () => ({ SessionsCard: () => createElement('div', null, 'sessions-card') }))
 vi.mock('../src/features/account/TwoFactorSection', () => ({ TwoFactorSection: () => createElement('div', null, 'two-factor-card') }))
 vi.mock('../src/features/account/ApiKeysSection', () => ({ ApiKeysSection: () => createElement('div', null, 'api-keys-card') }))
+vi.mock('../src/features/account/EnergyDataSection', () => ({ EnergyDataSection: () => createElement('div', null, 'energy-data-card') }))
+vi.mock('../src/lib/supplementary', () => ({
+    useEnergyDataEligibility: () => ({ isLoading: energy.isLoading, tabAvailable: energy.available }),
+}))
 
 const params = (query: string) => new URLSearchParams(query)
 
@@ -48,6 +53,13 @@ describe('resolveAccountTab', () => {
         expect(resolveAccountTab(params('oauth_error=already_linked_other'), { mustChangePassword: false })).toBe('security')
     })
 
+    it('opens the Energy data tab only for someone who can use it', () => {
+        expect(resolveAccountTab(params('tab=energy-data'), { mustChangePassword: false, energyDataAvailable: true })).toBe('energy-data')
+        expect(resolveAccountTab(params('tab=energy-data'), { mustChangePassword: false })).toBe('profile')
+        expect(resolveAccountTab(params('tab=energy-data'), { mustChangePassword: false, energyDataAvailable: false })).toBe('profile')
+        expect(resolveAccountTab(params('tab=energy-data'), { mustChangePassword: true })).toBe('security')
+    })
+
     it('lets an explicit tab beat the contextual default', () => {
         expect(resolveAccountTab(params('tab=profile'), { mustChangePassword: true })).toBe('profile')
     })
@@ -65,6 +77,8 @@ const cleanups: (() => void)[] = []
 afterEach(() => {
     cleanups.splice(0).forEach((cleanup) => cleanup())
     auth.mustChangePassword = false
+    energy.available = false
+    energy.isLoading = false
 })
 
 async function render(url: string) {
@@ -100,6 +114,34 @@ describe('account page tabs', () => {
         expect(tab(container, 'profile').hasAttribute('data-active')).toBe(true)
         expect(visibleText(container)).toContain('profile-card')
         expect(visibleText(container)).not.toContain('password-card')
+    })
+
+    it('adds an Energy data tab for a participant with a net-metered meter while the feature is on', async () => {
+        energy.available = true
+        const container = await render('/account?tab=energy-data')
+
+        expect(container.querySelectorAll('[role="tab"]')).toHaveLength(4)
+        expect(tab(container, 'energyData').hasAttribute('data-active')).toBe(true)
+        expect(visibleText(container)).toContain('energy-data-card')
+    })
+
+    it('shows Profile for a link to Energy data while the check runs, then the tab once it exists', async () => {
+        energy.isLoading = true
+        const container = await render('/account?tab=energy-data')
+        expect(tab(container, 'profile').hasAttribute('data-active')).toBe(true)
+
+        energy.isLoading = false
+        energy.available = true
+        const rerendered = await render('/account?tab=energy-data')
+        expect(tab(rerendered, 'energyData').hasAttribute('data-active')).toBe(true)
+    })
+
+    it('falls back to Profile and shows no extra tab without the feature or a flagged meter', async () => {
+        const container = await render('/account?tab=energy-data')
+
+        expect(container.querySelectorAll('[role="tab"]')).toHaveLength(3)
+        expect(container.textContent).not.toContain('energy-data-card')
+        expect(tab(container, 'profile').hasAttribute('data-active')).toBe(true)
     })
 
     it('groups the ways to sign in under Security', async () => {

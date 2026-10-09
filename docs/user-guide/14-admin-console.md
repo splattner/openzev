@@ -439,6 +439,7 @@ The backend and frontend both read the same feature flag state.
 | `zev_self_registration_enabled` | `true` | Allows self-registration (setting up one's own ZEV) from the login page |
 | `feasibility_calculator_enabled` | `false` | Shows the [feasibility calculator](13-feasibility-calculator.md) to admins and managers |
 | `participant_geocoding_enabled` | `false` | Looks up building outlines on OpenStreetMap for the [participants map](03-participant-management.md#map); sends building addresses to the public Nominatim service |
+| `supplementary_energy_data_enabled` | `false` | Lets participants with a PV system behind their meter connect their [own energy data](20-energy-data.md) (Solar Manager, push or file) for statistics, never for billing; Solar Manager sources call the vendor's cloud and need `INTEGRATION_ENCRYPTION_KEYS` |
 | `mcp_server_enabled` | `false` | Lets AI assistants read OpenZEV data through the [MCP endpoint](19-ai-assistants.md) using a user's API key; answers are sent to the assistant's LLM provider |
 
 ### How State Is Resolved

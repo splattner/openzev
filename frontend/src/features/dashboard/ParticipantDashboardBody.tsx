@@ -9,11 +9,13 @@ import { dashboardKwhStat, hourlyKwhTick, hourlyKwhTooltipValue, fromZevRate, kw
 import { useAuth } from '../../lib/auth'
 import { personalInvoiceFilter, selectedCommunityName } from '../../lib/membership'
 import { useManagedZev } from '../../lib/managedZev'
+import { useEnergyDataEligibility } from '../../lib/supplementary'
 import { PageSkeleton } from '../../components/PageSkeleton'
 import { Notice } from '../../components/Notice'
 import { StatCard } from '../../components/StatCard'
 import { PeriodSelector } from '../../components/PeriodSelector'
 import { ConsumptionSplitCard } from '../../components/dashboard/ConsumptionSplitCard'
+import { GrossEnergyCallToAction, GrossEnergyCard } from '../../components/dashboard/GrossEnergyCard'
 import { EnergyFlowCard } from '../../components/dashboard/EnergyFlowCard'
 import { HourlyProfileCard } from '../../components/dashboard/HourlyProfileCard'
 import { ParticipantInvoicesCard } from '../../components/dashboard/ParticipantInvoicesCard'
@@ -24,6 +26,7 @@ export function ParticipantDashboardBody({ interval, period, onPeriodChange, per
     const { t } = useTranslation()
     const { user } = useAuth()
     const { entries, selectedZevId, selectedZev } = useManagedZev()
+    const energyData = useEnergyDataEligibility()
 
     const [bucket, setBucket] = useState<DashboardBucket>('day')
     const hasMultipleCommunities = (entries?.length ?? 0) > 1
@@ -140,6 +143,17 @@ export function ParticipantDashboardBody({ interval, period, onPeriodChange, per
                         />
                     </section>
                     {summary.zev_has_behind_meter_generation && <p className="muted">{t('behindMeter.zevNote')}</p>}
+                    {summary.has_behind_meter_generation && summary.gross_energy && (
+                        <GrossEnergyCard
+                            gross={summary.gross_energy}
+                            whose="own"
+                            formatBucketLabel={formatBucketLabel}
+                            formatBucketTooltipLabel={formatBucketTooltipLabel}
+                        />
+                    )}
+                    {summary.has_behind_meter_generation && !summary.gross_energy && energyData.tabAvailable && (
+                        <GrossEnergyCallToAction />
+                    )}
                     {summary.zev_participant_stats.length > 0 && summary.current_participant_id && (
                         <EnergyFlowCard
                             totals={summary.zev_totals}

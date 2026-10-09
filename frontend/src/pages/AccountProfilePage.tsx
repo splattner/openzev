@@ -4,11 +4,13 @@ import { usePageNavigation } from '../lib/usePageNavigation'
 import { Tabs } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
+import { useEnergyDataEligibility } from '../lib/supplementary'
 import { useToast } from '../lib/toast'
 import { queryKeys } from '../lib/api/queryKeys'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { ACCOUNT_TABS, resolveAccountTab, type AccountTab } from '../features/account/accountTabs'
 import { ApiKeysSection } from '../features/account/ApiKeysSection'
+import { EnergyDataSection } from '../features/account/EnergyDataSection'
 import { LinkedAccountsCard } from '../features/account/LinkedAccountsCard'
 import { PasswordCard } from '../features/account/PasswordCard'
 import { ProfileCard } from '../features/account/ProfileCard'
@@ -19,7 +21,8 @@ import { PageHeader } from '../components/PageHeader'
 /**
  * The signed-in user's own account, in three tabs: Profile (who you are),
  * Security (how you sign in: password, two-factor, linked providers) and API
- * keys (scripted access). The tab lives in `?tab=` so a link — the enrolment
+ * keys (scripted access). A fourth, Energy data, appears for a participant who
+ * holds a metering point with generation behind it while the feature is on. The tab lives in `?tab=` so a link — the enrolment
  * gate's, an OAuth return — can land on the right one.
  */
 export function AccountProfilePage() {
@@ -30,7 +33,13 @@ export function AccountProfilePage() {
     const queryClient = useQueryClient()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
-    const activeTab = resolveAccountTab(searchParams, { mustChangePassword: Boolean(user?.must_change_password) })
+    const energyData = useEnergyDataEligibility()
+    // The tab is derived from the URL on every render, so a link to Energy data shows Profile while the
+    // check runs and switches over as soon as the tab exists.
+    const activeTab = resolveAccountTab(searchParams, {
+        mustChangePassword: Boolean(user?.must_change_password),
+        energyDataAvailable: energyData.tabAvailable,
+    })
 
     // Handle oauth_linked / oauth_error query params (the OAuth link callback
     // redirects here). resolveAccountTab has already opened Security for them.
@@ -82,6 +91,7 @@ export function AccountProfilePage() {
                     <Tabs.Tab value="profile">{t('account.tabs.profile')}</Tabs.Tab>
                     <Tabs.Tab value="security">{t('account.tabs.security')}</Tabs.Tab>
                     <Tabs.Tab value="api-keys">{t('account.tabs.apiKeys')}</Tabs.Tab>
+                    {energyData.tabAvailable && <Tabs.Tab value="energy-data">{t('account.tabs.energyData')}</Tabs.Tab>}
                 </Tabs.List>
 
                 <Tabs.Panel value="profile">
@@ -155,6 +165,14 @@ export function AccountProfilePage() {
                         />
                     </div>
                 </Tabs.Panel>
+
+                {energyData.tabAvailable && (
+                    <Tabs.Panel value="energy-data">
+                        <div style={{ maxWidth: '1000px' }}>
+                            <EnergyDataSection />
+                        </div>
+                    </Tabs.Panel>
+                )}
             </Tabs>
 
             {dialog && (

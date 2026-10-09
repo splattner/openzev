@@ -271,6 +271,7 @@ All answer `404` while the feature flag is off.
 |---|---|---|---|
 | `/sources/` | GET | `SupplementarySourcePermission` | Scoped list (admin all; manager/viewer their ZEVs; participant their own). Filter `?zev_id=` (as on every ZEV-scoped list), `?metering_point=` |
 | `/sources/` | POST | holder or admin | Create. Requires `consent: true`, a flagged metering point, a free metering point (one source each). `solar_manager`: needs `external_id` and `api_key`; the key is exchanged and one interval fetched **before** anything is saved, so a wrong key is a `400` with a safe message, not a broken row. Without a configured `INTEGRATION_ENCRYPTION_KEYS`: `503` naming the setting. `push`: returns the push token **once** in `push_token`. A provider that is not registered is refused with `400`. After the commit a backfill sync is queued (`backfill=True`, §6.3); a broker outage is logged and does not fail the request. A manager gets `403`; someone who cannot see the metering point gets `400 Invalid pk`, so its existence is not revealed. Audited `supplementary_source.create` |
+| `/sources/eligible/` | GET | authenticated | The flagged metering points the caller personally holds today (enabled ZEVs only), each with its `source` id or `null`; `[]` for anyone else, an admin included. What the Account page offers to connect (PR 5) |
 | `/sources/{id}/` | GET | scoped | Detail |
 | `/sources/{id}/` | PATCH | holder or admin; manager only for `enabled` | `label`, `enabled`, `external_id`, write-only `api_key`. An absent `api_key` keeps the stored one. A new key, or switching a disabled source back on, queues a sync. Audited `supplementary_source.update` with a diff over the tracked fields and `credential_changed` in metadata, never the value |
 | `/sources/{id}/` | DELETE | holder, manager, admin | Deletes the source **and all its readings**. Audited `supplementary_source.delete` |
@@ -533,11 +534,21 @@ Result stored in `SupplementarySource.reconciliation` (the on-demand view adds `
 ### 7.1 Participant: Account → "Energy data"
 
 **Files:** `frontend/src/features/account/EnergyDataSection.tsx`,
-`SupplementarySourceModal.tsx`, `SupplementarySourceCard.tsx`; `accountTabs.ts` gains
-`'energy-data'` (`ACCOUNT_TABS`); the tab is rendered only when the user holds a flagged metering
-point personally.
+`SupplementarySourceModal.tsx`, `SupplementarySourceCard.tsx`; shared pieces in
+`features/supplementary/` (`SourceStatusBadge`, `ReconciliationSummary`, `PushTokenPanel`,
+`CsvImport`); `accountTabs.ts` gains `'energy-data'` (`ACCOUNT_TABS`) and
+`resolveAccountTab` takes `energyDataAvailable`, so a link to the tab lands on Profile for everyone
+who cannot use it.
 
-- Query: `useQuery({ queryKey: queryKeys.metering.supplementarySources(), queryFn: listSupplementarySources })`.
+**Visibility.** The tab exists only when the feature is on *and* the user personally holds a
+flagged metering point. The frontend asks `GET /metering/supplementary/sources/eligible/` (added in
+PR 5; `useEnergyDataEligibility` in `lib/supplementary.ts`): `404` means the feature is off, an
+empty list means nothing to connect. It returns, for the signed-in user only (an admin gets `[]`),
+the flagged meters they hold personally today in an enabled ZEV, each with its `source` id or
+`null`: `{metering_point, meter_id, zev, zev_name, participant, source}`.
+
+- Query: `useQuery({ queryKey: queryKeys.metering.supplementarySources(), queryFn: listSupplementarySources })`,
+  joined to the eligible list by metering point.
 - Per flagged metering point: if no source, an explanation and **Connect**; otherwise the card:
   status chip, last sync, covered range, reconciliation state, and actions **Test**, **Sync
   now**, **Replace key**, **Disconnect** (keeps data), **Delete data**, **Remove source**.
@@ -552,7 +563,7 @@ point personally.
 ### 7.2 Owner: metering-point list
 
 **File:** `frontend/src/features/meteringPoints/MeteringPointsList.tsx`; new
-`SupplementarySourceStatus.tsx`.
+`SupplementarySourceStatus.tsx` (a button-styled badge, `badge-button` in `index.css`, and the panel).
 
 Flagged metering points show a status chip from `supplementary_source_status`, and an owner can
 open a read-only panel (status, last sync, coverage, reconciliation) with **Disable**,
@@ -562,13 +573,16 @@ an owner.
 ### 7.3 Statistics surfaces
 
 - `ParticipantDashboardBody.tsx`: a net-metered participant with `gross_energy` sees
-  `GrossEnergyCard.tsx` (production, consumption, import, export, self-consumption,
+  `components/dashboard/GrossEnergyCard.tsx` (production, consumption, import, export, self-consumption,
   the two rates, coverage and "based on data from … to …", a production-vs-export timeline) in
   place of the `—` hint; without a source they see a call to action linking to the Energy data
-  tab. Rates are labelled "reported by your own system".
-- `ManagementDashboardBody.tsx` and `components/dashboard/ParticipantTableCard.tsx`: the per-
-  participant rate cell shows the gross rate with an info marker when `gross_energy` is present,
-  else `—` as today.
+  tab (only shown when the tab exists: feature on). Rates are labelled "reported by your own system".
+  `ManagementDashboardBody` shows the same card for the selected participant
+  (`selected_gross_energy`).
+- `components/dashboard/ParticipantTableCard.tsx`: the per-participant rate cell of a net-metered
+  participant is `NetMeteredRate` (shared with the annual report): the gross rate with an info
+  marker when `gross_energy` is present, else `—` as today (with the withheld reason as a tooltip).
+  A participant who is not net-metered is untouched.
 - `features/reports/AnnualReportSection.tsx`: same rule per participant row.
 - Fallback rule everywhere: `rates_withheld_reason` set → `—` plus a short reason
   (insufficient coverage / no data).
@@ -661,7 +675,9 @@ participant row and `MeteringPoint` gain `gross_energy: GrossEnergy | null` /
 | `testSupplementarySource()` | POST | `/metering/supplementary/sources/{id}/test/` |
 | `syncSupplementarySource()` | POST | `/metering/supplementary/sources/{id}/sync/` |
 | `rotateSupplementaryPushToken()` | POST | `/metering/supplementary/sources/{id}/rotate-push-token/` |
-| `importSupplementaryCsv()` | POST | `/metering/supplementary/sources/{id}/import-csv/` |
+| `importSupplementaryCsv()` | POST | `/metering/supplementary/sources/{id}/import-csv/` (`?dry_run=true` to check) |
+| `listEligibleMeteringPoints()` / `fetchEligibleOrNull()` | GET | `/metering/supplementary/sources/eligible/` (`null` on `404`) |
+| `fetchSupplementaryReconciliation()` | GET | `/metering/supplementary/sources/{id}/reconciliation/` (client only; no screen yet) |
 
 ## 8. Risks and mitigations
 
@@ -842,14 +858,39 @@ test now lists the three new keys.
 of sources and readings; manifest fingerprint; restore warns on a missing key.
 `test_rotate_integration_key` idempotent. System check and health entry.
 
-### Frontend
+### Frontend (PR 5: 50 unit tests, 7 backend)
 
-- `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-hex.mjs`,
-  `npm run test:unit`, `npm run build`.
-- Unit tests: account tab visibility, source card per status, modal consent gate and write-only
-  key field, `GrossEnergyCard` withheld-reason states, rate-cell fallback to `—`.
-- Dev stack: connect a stub source, check the dashboard, owner list and report at desktop width
-  and ~400 px, no console errors; screenshots regenerated with `npm run screenshots`.
+CI runs `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-hex.mjs`,
+`npm run test:unit` and `npm run build`.
+
+- **`tests/supplementary-helpers.test.ts`** (10): `grossRate` never shows a withheld rate and keeps
+  a real zero; the withheld reason keys; status tones; the push address for a relative and an
+  absolute API base.
+- **`tests/gross-energy-card.test.ts`** (9): both rates and the "reported by your own system" label;
+  a dash and the reason for low coverage and no data while the energy is still shown; the
+  participant's name for an owner; the call to action links to the tab; `NetMeteredRate` with a
+  rate, without a source and withheld.
+- **`tests/energy-data-section.test.ts`** (18): connect offered per meter; the modal's write-only
+  key field, consent gate and consent text; the create payload; a vendor rejection next to the key
+  field; a push source ends on a one-time token screen; the card per status (ok, reconnect required,
+  disconnected, push); test, sync (cooldown), replace key, disconnect, delete data, remove and
+  rotate, the destructive ones behind a confirmation; CSV check, import and row errors.
+- **`tests/supplementary-owner-status.test.ts`** (9): no chip without a source; the chip as a
+  button with its tone; the panel shows status and comparison but no credential field; a manager
+  can switch off, delete data and remove behind confirmations; a viewer has no actions; the
+  participant table's rate cell with a rate, without one, withheld, and for a non-net-metered row.
+- **`tests/account-tabs.test.ts`** (+4): the tab resolves only when available; four tabs for a
+  participant with a flagged meter; Profile while the check runs; no extra tab without the feature.
+- **Backend** `metering/test_supplementary_api.py::EligibleMeteringPointTests` (7): the holder gets
+  their flagged meter and, once connected, the source id; nobody else gets anything, an admin
+  included; unflagged, community and ended tenancies and a disabled ZEV are not offered; `404` while
+  the flag is off; anonymous `401`.
+- Dev stack (throwaway ZEV, removed afterwards): the tab, the dashboard card with figures checked
+  by hand (53.4 % = 1 − 58.95 / 126.56), the owner chip and panel, the owner table cell and the
+  selected-participant card, at 1280 px and 400 px. The 400 px check found the long meter id and the
+  action buttons overflowing; fixed. The three user-guide screenshots (`24-energy-data-*`) were
+  captured from that scenario with `npm run shot`; they are **not** part of
+  `npm run screenshots`, because the demo seed has no net-metered participant.
 
 ### Acceptance criteria
 
@@ -923,7 +964,7 @@ and to be observed during PR 3: rate limits and the maximum `from`/`to` range pe
   fields land with it (`GrossEnergy`, the dashboard, annual report and metering point fields, and
   the catalog description in four languages); the UI that renders them is PR 5.
 
-**PR 5: Frontend and docs**
+**PR 5: Frontend and docs** (implemented, see the test list in §9)
 - Types, API client, query keys, Account tab, modal, owner status panel, gross card, rate
   cells, `AnnualReportSection`, i18n in four languages.
 - User guide chapter (connect Solar Manager; the Home Assistant push recipe; what the numbers
@@ -937,6 +978,9 @@ and to be observed during PR 3: rate limits and the maximum `from`/`to` range pe
   project decides to (it ships off).
 
 ## 11. Documentation to update
+
+Done in PR 5, except the transfer archive (PR 6) and the `AGENTS.md` entry, which waits until the
+feature has shipped.
 
 - Baseline `2026-03-metering-point-management.md`: the `has_behind_meter_generation` guard and
   `supplementary_source_status`.

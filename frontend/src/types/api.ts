@@ -685,6 +685,77 @@ export interface GrossEnergy {
 export type SupplementaryProvider = 'solar_manager' | 'push'
 export type SupplementaryStatus = 'pending' | 'ok' | 'error' | 'reconnect_required' | 'disabled'
 
+/** Result of the last comparison with the official meter. Purely diagnostic. */
+export interface SupplementaryReconciliation {
+    checked_at?: string
+    days_compared?: number
+    export_deviation_pct?: number | null
+    import_deviation_pct?: number | null
+    best_shift_intervals?: number
+    state?: 'ok' | 'warn' | 'insufficient'
+}
+
+/** The connection between a metering point and a participant's own system. Never carries a secret. */
+export interface SupplementarySource {
+    id: string
+    metering_point: string
+    metering_point_meter_id: string
+    participant: string
+    participant_name: string
+    provider: SupplementaryProvider
+    label: string
+    external_id: string
+    enabled: boolean
+    status: SupplementaryStatus
+    consented_at: string
+    last_sync_at: string | null
+    last_success_at: string | null
+    last_error: string
+    synced_through: string | null
+    covers_from: string | null
+    reconciliation: SupplementaryReconciliation
+    has_credential: boolean
+    push_token_prefix: string | null
+    created_at: string
+    updated_at: string
+}
+
+/** A create response: a push token is shown once and cannot be recovered. */
+export type SupplementarySourceCreated = SupplementarySource & { push_token?: string }
+
+export interface SupplementarySourceInput {
+    metering_point: string
+    provider: SupplementaryProvider
+    label?: string
+    external_id?: string
+    api_key?: string
+    consent: boolean
+}
+
+export interface SupplementarySourceUpdate {
+    label?: string
+    enabled?: boolean
+    external_id?: string
+    api_key?: string
+}
+
+/** A flagged metering point the signed-in user personally holds today, and its source if connected. */
+export interface EligibleMeteringPoint {
+    metering_point: string
+    meter_id: string
+    zev: string
+    zev_name: string
+    participant: string
+    source: string | null
+}
+
+export interface SupplementaryIngestResult {
+    accepted: number
+    updated: number
+    rejected: Array<{ index: number; reason: string }>
+    dropped_outside_assignment: number
+}
+
 export interface MeteringPoint {
     id: string
     zev: string

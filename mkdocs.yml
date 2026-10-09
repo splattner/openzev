@@ -112,6 +112,7 @@ nav:
   - Operations:
       - Metering Imports: 05-metering-import.md
       - Metering Analysis: 06-metering-analysis.md
+      - Your Own Energy Data: 20-energy-data.md
       - Tariff Configuration: 07-tariff-configuration.md
   - Billing and Invoicing:
       - How Allocation and Billing Works: 08-billing-allocation-explained.md

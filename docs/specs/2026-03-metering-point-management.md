@@ -580,3 +580,13 @@ python -m pytest -q
 - [x] Assignment queryset supports filtering by `metering_point` parameter (§4.3)
 - [x] Participant serializer exposes nested metering points and assignment flag (§4.4)
 - [x] Billing engine and period overview correctly resolve assignment windows (§8)
+
+## Supplementary energy data (2026-10)
+
+A metering point with `has_behind_meter_generation` can have one energy data source connected by the
+participant who personally holds it ([2026-10-supplementary-energy-data.md](2026-10-supplementary-energy-data.md)). `MeteringPointSerializer` gains the read-only
+`supplementary_source_status` (`pending | ok | error | reconnect_required | disabled`, or `null`):
+`null` while the feature flag is off, without a source, and for anyone who could not read the
+source themselves. Clearing the flag is refused while a source exists. The metering-point list shows
+the status as a chip that opens a read-only panel (managers can switch off, delete data and remove).
+Deleting a metering point deletes its source and readings.

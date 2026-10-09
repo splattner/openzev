@@ -185,6 +185,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Assignment-only validity model (`MeteringPointAssignment` with date range) | `shipped` | — | [ADR 0009](adr/0009-remove-direct-meteringpoint-participant-fk.md) |
 | Buildings and sites between a ZEV and its metering points (owner link, geocoded outlines) | `shipped` | — | [spec](specs/2026-10-buildings-and-sites.md), [ADR 0029](adr/0029-buildings-between-zev-and-metering-points.md), #761 |
 | Generation behind the meter on bidirectional / production metering points (excluded from local share) | `shipped` | — | [spec](specs/2026-09-behind-the-meter-generation.md) |
+| Own energy data (Solar Manager, push, file) for real self-sufficiency of a PV system behind the meter; statistics only | `in-progress` | `medium` — #925 | [spec](specs/2026-10-supplementary-energy-data.md) · [guide](user-guide/20-energy-data.md) |
 | Community-allocated metering points (common-area meter split by `allocation_weight`) | `shipped` | — | [spec](specs/2026-08-shared-metering-points.md), #387 |
 | `MeteringPointAssignment` CRUD with overlap/containment validation | `shipped` | — | [spec](specs/2026-03-metering-point-management.md) |
 | Bulk participant import from CSV | `idea` | `medium` | Useful when onboarding large ZEVs; reduces manual data entry |

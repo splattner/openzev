@@ -24,9 +24,12 @@ from rest_framework.views import APIView
 from django.conf import settings
 from drf_spectacular.utils import extend_schema
 
-from allocation.validity import period_end_exclusive_dt, period_start_dt
+from allocation.validity import active_on, period_end_exclusive_dt, period_start_dt
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, build_instance_snapshot, record_audit_event
+from django.utils import timezone
+from zev import access
+from zev.models import AllocationMode, MeteringPointAssignment
 from zev.scoping import ZevScopedQuerySetMixin
 
 from ..models import SupplementaryProvider, SupplementarySource, SupplementaryStatus
@@ -181,6 +184,40 @@ class SupplementarySourceViewSet(
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     # ---- actions ----
+
+    @action(detail=False, methods=["get"])
+    def eligible(self, request):
+        """The flagged metering points the signed-in user personally holds today, each with its source id.
+
+        This is what the Account page offers to connect; it is empty for everyone else, an admin
+        included (an admin connects on a participant's behalf from the support view).
+        """
+        assignments = (
+            active_on(
+                MeteringPointAssignment.objects.filter(
+                    participant__user=request.user,
+                    allocation_mode=AllocationMode.PERSONAL,
+                    metering_point__has_behind_meter_generation=True,
+                    metering_point__zev__disabled_at__isnull=True,
+                ).filter(access.live_participant_q(prefix="participant__")),
+                timezone.localdate(),
+            )
+            .select_related("metering_point__zev", "participant", "metering_point__supplementary_source")
+            .order_by("metering_point__meter_id", "id")
+        )
+        rows = []
+        for assignment in assignments:
+            point = assignment.metering_point
+            source = getattr(point, "supplementary_source", None)
+            rows.append({
+                "metering_point": str(point.pk),
+                "meter_id": point.meter_id,
+                "zev": str(point.zev_id),
+                "zev_name": point.zev.name,
+                "participant": str(assignment.participant_id),
+                "source": str(source.pk) if source and source.participant_id == assignment.participant_id else None,
+            })
+        return Response(rows)
 
     @action(detail=True, methods=["post"])
     def disconnect(self, request, pk=None):

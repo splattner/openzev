@@ -10,6 +10,7 @@ import { formatChf, formatKwh, formatPercent } from '../../lib/numbers'
 import { StatCard } from '../../components/StatCard'
 import { PageSkeleton } from '../../components/PageSkeleton'
 import { BehindMeterBadge } from '../../components/BehindMeterBadge'
+import { NetMeteredRate } from '../../components/dashboard/NetMeteredRate'
 import type { AnnualReport, AnnualReportBalance } from '../../types/api'
 
 const percentOrDash = (value: number | null | undefined) => (value == null ? '—' : formatPercent(value))
@@ -201,7 +202,13 @@ function ParticipantSavingsCard({ report }: { report: AnnualReport }) {
                                     </td>
                                     <td className="numeric">{yearKwh(row.consumed_kwh)}</td>
                                     <td className="numeric">{yearKwh(row.from_zev_kwh)}</td>
-                                    <td className="numeric">{percentOrDash(row.self_sufficiency_rate)}</td>
+                                    <td className="numeric">
+                                        {row.has_behind_meter_generation ? (
+                                            <NetMeteredRate gross={row.gross_energy} />
+                                        ) : (
+                                            percentOrDash(row.self_sufficiency_rate)
+                                        )}
+                                    </td>
                                     <td className="numeric">{chfOrDash(row.savings?.local_chf)}</td>
                                     <td className="numeric">{chfOrDash(row.savings?.hypothetical_chf)}</td>
                                     <td className="numeric">{chfOrDash(row.savings?.saved_chf)}</td>

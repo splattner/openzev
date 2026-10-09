@@ -413,3 +413,10 @@ unchanged.
 - [x] The annual-statement ZIP is on `/reports`; `/billing/statements` redirects there; Billing has two tabs.
 - [x] Participants cannot call the endpoint; owners cannot read other owners' ZEVs.
 - [x] No horizontal page overflow at 400 px; no console errors.
+
+## Supplementary energy data (2026-10)
+
+`participants[]` gains `gross_energy` (`GrossEnergy | null`, no timeline) for the civil year
+([2026-10-supplementary-energy-data.md](2026-10-supplementary-energy-data.md) §5.1). `self_sufficiency_rate` stays `null` for net-metered participants; the table cell
+shows the gross rate with an info marker when `gross_energy` carries one (`NetMeteredRate`). Totals,
+`previous_totals` and `months` are unchanged. TypeScript: `AnnualReportParticipant.gross_energy`.

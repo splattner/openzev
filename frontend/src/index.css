@@ -1642,6 +1642,21 @@ h3 {
   white-space: nowrap;
 }
 
+/* A badge that opens something: a real button, so keyboard and screen readers get it. */
+button.badge-button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+button.badge-button:hover {
+  filter: brightness(0.96);
+}
+
+button.badge-button:focus-visible {
+  outline: 2px solid var(--brand-mid);
+  outline-offset: 2px;
+}
+
 .badge-neutral {
   background: var(--status-neutral);
   border-color: transparent;

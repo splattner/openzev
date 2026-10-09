@@ -626,3 +626,10 @@ tests) for the `participant_id`/`period_from`/`period_to` narrow-only filters ad
 3. Participant tools (own invoices, own consumption).
 4. User guide as MCP resources; tariff comparison; feasibility scenarios.
 5. "Connect an AI assistant" panel in the frontend (URL + config snippet).
+
+## Supplementary energy data (2026-10)
+
+`consumption_summary` participant entries (and `totals` for a selected participant) gain
+`gross_self_sufficiency_pct`, `gross_self_consumption_pct` and `gross_coverage_pct`: what the
+participant's own system measured, `null` without a source, while the feature is off or when coverage
+is too low ([2026-10-supplementary-energy-data.md](2026-10-supplementary-energy-data.md) §5.1). The tool reads them from the dashboard endpoint it already calls.

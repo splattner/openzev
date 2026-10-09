@@ -80,6 +80,9 @@ export const queryKeys = {
     dashboardSummary: (params: Record<string, string | undefined>) => ['metering', 'dashboard-summary', params] as const,
     qualityStatus: (dateFrom: string, dateTo: string, zevId?: string, meteringPointId?: string) =>
       ['metering', 'quality-status', dateFrom, dateTo, zevId ?? 'all', meteringPointId ?? 'all'] as const,
+    supplementarySources: () => ['metering', 'supplementary-sources'] as const,
+    supplementaryEligible: () => ['metering', 'supplementary-eligible'] as const,
+    supplementaryReconciliation: (sourceId: string) => ['metering', 'supplementary-reconciliation', sourceId] as const,
     hourlyProfile: (dateFrom: string, dateTo: string, zevId?: string, participantId?: string) =>
       ['metering', 'hourly-profile', dateFrom, dateTo, zevId ?? 'all', participantId ?? 'all'] as const,
   },

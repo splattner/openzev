@@ -120,9 +120,10 @@ for `Consumption` meters, since a consumption-only meter cannot have
 generation behind it). Once ticked:
 
 - The participant who personally holds that meter no longer sees a
-  self-sufficiency rate anywhere — **Energy balance**, their own dashboard,
-  the **annual report**, and their **annual statement** PDF all show **—**
-  with a short explanation instead.
+  meter-based self-sufficiency rate anywhere — **Energy balance**, their own
+  dashboard, the **annual report**, and their **annual statement** PDF all show
+  **—** with a short explanation instead, unless they connect their own system
+  (see below).
 - The ZEV's own kWh totals and rates are **not** changed or excluded — the
   energy is real, and billing depends on it. Instead, wherever the ZEV has a
   flagged meter, an explanatory note appears next to the ZEV-wide figures.
@@ -131,8 +132,16 @@ generation behind it). Once ticked:
 
 If you later add a true production meter (measuring everything the PV system
 generates, not just the surplus), leave this box unticked on that separate
-meter and consult the OpenZEV team about importing gross production data —
-that is a planned follow-up, not yet supported.
+meter.
+
+To show the real self-sufficiency of such a participant, they can connect the
+system behind their meter (Solar Manager, or their own data by push or file).
+The figures are used for statistics only, never for billing, and are shown as
+reported by the participant's own system. See
+[Your Own Energy Data](20-energy-data.md). A flagged metering point then also
+shows the connection's status next to the badge; you open it to see the status
+and, as a manager, to switch it off, delete its data or remove it. You never see
+or enter the participant's key.
 
 ## Assignment Validity Periods
 

@@ -1321,3 +1321,12 @@ the dev worker.
 - [x] The registry coverage tests pass, so a new model or file field cannot silently stop being backed up (this replaces the field-level parity test; see *Deviations*)
 - [x] User-guide chapter written, including a restore drill; the `12-troubleshooting.md` snippet is replaced 
 - [x] `ROADMAP.md` updated
+
+## Supplementary energy data (2026-10)
+
+The ZEV registry section `supplementary` holds `SupplementarySource` (before) and
+`SupplementaryReading`. Sources travel as they are, with the credential as ciphertext under
+`INTEGRATION_ENCRYPTION_KEYS`; the key never enters an archive. The manifest records
+`secret_fingerprints.integration_encryption_keys`, and a restore warns when a source was encrypted
+under a key the target lacks: those sources become `reconnect_required` at their first sync
+([2026-10-supplementary-energy-data.md](2026-10-supplementary-energy-data.md) §6.6, ADR 0031).

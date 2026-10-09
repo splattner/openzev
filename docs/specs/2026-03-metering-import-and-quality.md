@@ -1284,3 +1284,11 @@ component test infra exists).
 - [x] All date queries and civil dates go through `allocation.validity` (§7)
 - [x] Participants cannot import or access import logs (§6.2)
 - [x] Metering data filters and date ranges behave consistently across all endpoints (§7)
+
+## Supplementary energy data (2026-10)
+
+`dashboard-summary` gains `gross_energy` blocks that read the participant's own energy data, never
+`MeterReading` ([2026-10-supplementary-energy-data.md](2026-10-supplementary-energy-data.md) §5.1): top-level `gross_energy` (with a `timeline`) on the participant
+payload, `participant_stats[].gross_energy` and `selected_gross_energy` on the owner payload. Each is
+`null` while the feature is off or without a source. Everything else in the payload is unchanged.
+Supplementary data is not imported through this module's importers and has no `ImportLog`.
