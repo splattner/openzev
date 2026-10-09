@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.22.0](https://github.com/splattner/openzev/compare/v1.21.0...v1.22.0) (2026-10-09)
+
+
+### Features
+
+* **frontend:** a manager's own energy data on the energy balance ([#925](https://github.com/splattner/openzev/issues/925)) ([#937](https://github.com/splattner/openzev/issues/937)) ([9fbe677](https://github.com/splattner/openzev/commit/9fbe677eecf6af3e3bfd1318eda7df4fc996eb78))
+* **frontend:** energy data UI, dashboards and user guide ([#925](https://github.com/splattner/openzev/issues/925)) ([#935](https://github.com/splattner/openzev/issues/935)) ([6402877](https://github.com/splattner/openzev/commit/6402877ed0c79d5346da657d07691b94cf5ffd09))
+* **metering:** gross energy on the statistics surfaces ([#925](https://github.com/splattner/openzev/issues/925)) ([#934](https://github.com/splattner/openzev/issues/934)) ([5421403](https://github.com/splattner/openzev/commit/5421403dffbb0ed117edcdc275bc57c11560648b))
+* **metering:** Solar Manager sync, reconciliation and health probe ([#925](https://github.com/splattner/openzev/issues/925)) ([#933](https://github.com/splattner/openzev/issues/933)) ([135ead2](https://github.com/splattner/openzev/commit/135ead2ea9b8dfb380548c0745021ec92a90675b))
+* **metering:** supplementary energy data foundation ([#925](https://github.com/splattner/openzev/issues/925)) ([#927](https://github.com/splattner/openzev/issues/927)) ([21be202](https://github.com/splattner/openzev/commit/21be202a9a10405f17150ba9efdc1e7c573391e5))
+* **metering:** supplementary energy data sources, push and CSV ([#925](https://github.com/splattner/openzev/issues/925)) ([#929](https://github.com/splattner/openzev/issues/929)) ([583475f](https://github.com/splattner/openzev/commit/583475fec6fad7679918d8209929eea096595394))
+* **zev:** energy data in the transfer archive, disabled-ZEV hardening ([#925](https://github.com/splattner/openzev/issues/925)) ([#936](https://github.com/splattner/openzev/issues/936)) ([566ce43](https://github.com/splattner/openzev/commit/566ce437f473fd51a58d4ebee6e9dfea59afdb11))
+
+
+### Bug Fixes
+
+* **dashboard:** keep hourly profiles independent of summary ([#930](https://github.com/splattner/openzev/issues/930)) ([4f17c76](https://github.com/splattner/openzev/commit/4f17c766ee3744a2c7751bbe07e9242dea2202ea))
+* **security:** harden account flows, templates and downloads ([#932](https://github.com/splattner/openzev/issues/932)) ([b092e9c](https://github.com/splattner/openzev/commit/b092e9c9f46cb1b6a2fdb5a6a59fc9adc256d7f0))
+* **ui:** preserve dialog ownership and isolate modal interactions ([#931](https://github.com/splattner/openzev/issues/931)) ([6c79871](https://github.com/splattner/openzev/commit/6c79871ef0904774467a15f037d5e220997b52f5))
+
 ## [1.21.0](https://github.com/splattner/openzev/compare/v1.20.0...v1.21.0) (2026-10-08)
 
 
