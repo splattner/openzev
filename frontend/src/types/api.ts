@@ -1683,6 +1683,8 @@ export interface ZevOwnerDashboardSummary {
     }>
     /** The selected participant's own-system figures, with a timeline. */
     selected_gross_energy: GrossEnergy | null
+    /** The signed-in manager's own figures as a participant of this ZEV (with a timeline), whoever is selected. */
+    own_gross_energy: GrossEnergy | null
     /** Any metering point with readings in this window is flagged (has generation behind it). */
     zev_has_behind_meter_generation: boolean
 }

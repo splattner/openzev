@@ -7,6 +7,10 @@ import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { MembershipParticipant } from '../src/types/api'
 
+const eligibility = vi.hoisted(() => ({
+    eligible: [] as Array<{ metering_point: string; meter_id: string; zev: string; zev_name: string; participant: string; source: string | null }>,
+}))
+
 const mockState = vi.hoisted(() => ({
     // The account's relation to the selected community (#761).
     relation: 'manager',
@@ -31,6 +35,19 @@ vi.mock('react-i18next', () => ({
         i18n: { language: 'en', changeLanguage: vi.fn() },
     }),
 }))
+
+vi.mock('../src/lib/supplementary', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../src/lib/supplementary')>()
+    return {
+        ...actual,
+        useEnergyDataEligibility: () => ({
+            isLoading: false,
+            featureOn: true,
+            eligible: eligibility.eligible,
+            tabAvailable: eligibility.eligible.length > 0,
+        }),
+    }
+})
 
 vi.mock('../src/lib/auth', () => ({
     useAuth: () => ({
@@ -113,6 +130,7 @@ afterEach(() => {
     mockState.invoiceCalls = []
     mockState.participantMemberships = [{ id: 'me', valid_from: '2026-01-01', valid_to: null, live: true }]
     mockState.membershipsAvailable = true
+    eligibility.eligible = []
 })
 
 function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
@@ -757,5 +775,129 @@ describe('dashboard behavior preservation', () => {
         expect(empty.querySelector('table')).toBeNull()
         empty.querySelector<HTMLButtonElement>('.error-banner button')?.click()
         expect(onRetry).toHaveBeenCalledOnce()
+    })
+})
+
+
+describe('manager dashboard: the manager as a participant', () => {
+    const gross = (rate: number) => ({
+        source_provider: 'solar_manager', covered_from: '2026-07-01T00:00:00Z', covered_to: '2026-07-04T00:00:00Z', coverage_pct: 100,
+        production_kwh: 100, consumption_kwh: 50, import_kwh: 20, export_kwh: 60, self_consumption_kwh: 30,
+        self_consumption_rate: 30, self_sufficiency_rate: rate, rates_withheld_reason: null, timeline: [],
+    })
+    const withOwnBlock = (own: unknown, extra: Record<string, unknown> = {}) => ({ ...managerSummary(), own_gross_energy: own, selected_gross_energy: null, ...extra })
+    const cards = (container: Element) => container.querySelectorAll('section[aria-labelledby]').length
+    // Selecting starts a new query: settle it before looking at the page again.
+    const click = async (element: Element) => {
+        await act(async () => { element.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+        await flush()
+        await flush()
+    }
+
+    function asManagerAndParticipant(participantId: string) {
+        mockState.relation = 'manager'
+        mockState.invoices = []
+        mockState.participantMemberships = [{ id: participantId, valid_from: '2026-01-01', valid_to: null, live: true }]
+    }
+
+    it('marks the manager\'s own row in the table and the dropdown', async () => {
+        asManagerAndParticipant('p2')
+        mockState.summary = managerSummary()
+        const container = await renderDashboard()
+
+        const rows = container.querySelectorAll('tbody tr')
+        expect(rows[0].textContent).not.toContain('pages.dashboard.youBadge')
+        expect(rows[1].textContent).toContain('pages.dashboard.youBadge')
+        const options = Array.from(container.querySelectorAll('select option')).map((option) => option.textContent)
+        expect(options.some((text) => text?.includes('Bob') && text.includes('pages.dashboard.youBadge'))).toBe(true)
+        expect(options.some((text) => text?.includes('Alice') && text.includes('pages.dashboard.youBadge'))).toBe(false)
+    })
+
+    it('shows the manager\'s own figures as a permanent block, whoever is selected', async () => {
+        asManagerAndParticipant('p2')
+        mockState.summary = withOwnBlock(gross(61))
+        const container = await renderDashboard()
+
+        expect(container.textContent).toContain('supplementary.gross.titleOwn')
+        expect(container.textContent).toContain('61')
+        expect(cards(container)).toBe(1)
+
+        await click(container.querySelectorAll('tbody tr')[0])
+        expect(container.textContent).toContain('supplementary.gross.titleOwn')
+    })
+
+    it('shows the own block once when the manager selects themselves, and a second card for someone else', async () => {
+        asManagerAndParticipant('p2')
+        mockState.summary = ((args: Record<string, unknown>) =>
+            withOwnBlock(gross(61), args?.participantId ? { selected_participant_name: 'x', selected_gross_energy: gross(args.participantId === 'p2' ? 61 : 40) } : {})) as unknown
+        const container = await renderDashboard()
+
+        await click(container.querySelectorAll('tbody tr')[1]) // Bob, the manager
+        expect(cards(container)).toBe(1)
+
+        await click(container.querySelectorAll('tbody tr')[0]) // Alice
+        expect(cards(container)).toBe(2)
+        expect(container.textContent).toContain('supplementary.gross.titleParticipant')
+    })
+
+    it('gives the call to action to a manager with an unconnected net-metered meter', async () => {
+        asManagerAndParticipant('p2')
+        eligibility.eligible = [{ metering_point: 'mp', meter_id: 'M', zev: 'z1', zev_name: 'Z1', participant: 'p2', source: null }]
+        mockState.summary = withOwnBlock(null)
+        const container = await renderDashboard()
+
+        expect(container.textContent).toContain('supplementary.gross.ctaTitle')
+        expect(container.querySelector('a[href="/account?tab=energy-data"]')).not.toBeNull()
+    })
+
+    it('shows neither block for a manager who has no own energy data and no meter to connect', async () => {
+        asManagerAndParticipant('p2')
+        mockState.summary = withOwnBlock(null)
+        const container = await renderDashboard()
+
+        expect(cards(container)).toBe(0)
+        expect(container.textContent).not.toContain('supplementary.gross.ctaTitle')
+    })
+
+    it('does not offer to connect a meter of another community', async () => {
+        asManagerAndParticipant('p2')
+        eligibility.eligible = [{ metering_point: 'mp', meter_id: 'M', zev: 'z2', zev_name: 'Z2', participant: 'p9', source: null }]
+        mockState.summary = withOwnBlock(null)
+        const container = await renderDashboard()
+
+        expect(container.textContent).not.toContain('supplementary.gross.ctaTitle')
+    })
+
+    it('clicking the selected row again clears the selection, and so does its name button', async () => {
+        asManagerAndParticipant('p2')
+        mockState.summaryCalls = []
+        mockState.summary = managerSummary()
+        const container = await renderDashboard()
+
+        await click(container.querySelectorAll('tbody tr')[0])
+        expect(container.querySelectorAll('tbody tr')[0].classList.contains('is-selected')).toBe(true)
+        expect((container.querySelector('select') as HTMLSelectElement).value).toBe('p1')
+
+        await click(container.querySelectorAll('tbody tr')[0])
+        expect(container.querySelectorAll('tbody tr')[0].classList.contains('is-selected')).toBe(false)
+        expect((container.querySelector('select') as HTMLSelectElement).value).toBe('')
+        expect(mockState.summaryCalls.at(-1)?.participantId).toBeUndefined()
+
+        // Select again and clear through the name button inside the row.
+        await click(container.querySelectorAll('tbody tr')[0].querySelector('button.participant-select')!)
+        expect(container.querySelectorAll('tbody tr')[0].classList.contains('is-selected')).toBe(true)
+        await click(container.querySelectorAll('tbody tr')[0].querySelector('button.participant-select')!)
+        expect(container.querySelectorAll('tbody tr')[0].classList.contains('is-selected')).toBe(false)
+    })
+
+    it('exposes the selection state of a row to assistive technology', async () => {
+        asManagerAndParticipant('p2')
+        mockState.summary = managerSummary()
+        const container = await renderDashboard()
+
+        const button = () => container.querySelectorAll('tbody tr')[0].querySelector('button.participant-select')!
+        expect(button().getAttribute('aria-pressed')).toBe('false')
+        await click(button())
+        expect(button().getAttribute('aria-pressed')).toBe('true')
     })
 })

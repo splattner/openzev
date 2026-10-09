@@ -15,10 +15,18 @@ function zevSharePercent(participant: ParticipantRow): number {
 interface ParticipantTableCardProps {
     participantStats: ParticipantRow[]
     selectedParticipantId: string
+    /** Selecting the selected row again clears the selection (an empty id). */
     onSelect: (participantId: string) => void
+    /** The signed-in user's own participant rows, marked in the table. */
+    ownParticipantIds?: string[]
 }
 
-export function ParticipantTableCard({ participantStats, selectedParticipantId, onSelect }: ParticipantTableCardProps) {
+export function ParticipantTableCard({
+    participantStats,
+    selectedParticipantId,
+    onSelect,
+    ownParticipantIds = [],
+}: ParticipantTableCardProps) {
     const { t } = useTranslation()
     return (
         <section className="card">
@@ -45,17 +53,21 @@ export function ParticipantTableCard({ participantStats, selectedParticipantId, 
                                     <tr
                                         key={participant.participant_id}
                                         className={isSelected ? 'is-selected' : undefined}
-                                        onClick={() => onSelect(participant.participant_id)}
+                                        onClick={() => onSelect(isSelected ? '' : participant.participant_id)}
                                     >
                                         <td>
                                             <button
                                                 type="button"
                                                 className="participant-select"
+                                                aria-pressed={isSelected}
                                                 aria-current={isSelected ? 'true' : undefined}
                                                 aria-label={t('pages.dashboard.showDetailsFor', { name: participant.participant_name || '-' })}
                                             >
                                                 {participant.participant_name || '-'}
                                             </button>
+                                            {ownParticipantIds.includes(participant.participant_id) && (
+                                                <span className="badge badge-info">{t('pages.dashboard.youBadge')}</span>
+                                            )}
                                             {participant.has_behind_meter_generation && (
                                                 <BehindMeterBadge hintKey="behindMeter.participantHint" />
                                             )}

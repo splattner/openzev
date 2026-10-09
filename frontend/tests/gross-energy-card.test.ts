@@ -86,7 +86,7 @@ describe('GrossEnergyCard', () => {
         const { container } = await renderWithProviders(card(gross()), cleanups)
 
         const section = container.querySelector('section')!
-        expect(container.querySelector(`#${section.getAttribute('aria-labelledby')}`)).not.toBeNull()
+        expect(document.getElementById(section.getAttribute('aria-labelledby')!)).not.toBeNull()
     })
 })
 

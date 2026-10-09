@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -27,14 +28,16 @@ interface Props {
 export function GrossEnergyCard({ gross, whose, participantName, formatBucketLabel, formatBucketTooltipLabel }: Props) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
+    // Two of these cards can be on one page (a manager's own and a selected participant's).
+    const titleId = useId()
     const reasonKey = withheldReasonKey(gross)
     const selfSufficiency = grossRate(gross, 'self_sufficiency')
     const selfConsumption = grossRate(gross, 'self_consumption')
     const timeline = gross.timeline ?? []
 
     return (
-        <section className="card chart-card" aria-labelledby="gross-energy-title">
-            <h3 id="gross-energy-title">
+        <section className="card chart-card" aria-labelledby={titleId}>
+            <h3 id={titleId}>
                 {t(whose === 'own' ? 'supplementary.gross.titleOwn' : 'supplementary.gross.titleParticipant')}
                 {whose === 'participant' && participantName ? ` — ${participantName}` : ''}
             </h3>

@@ -208,6 +208,53 @@ class OwnerDashboardTests(SurfaceTestCase):
         self.assertEqual(with_source["timeline"], without["timeline"])
 
 
+class OwnBlockTests(SurfaceTestCase):
+    """A manager is usually a participant too: their own figures come with the owner dashboard."""
+
+    def setUp(self):
+        super().setUp()
+        from zev.models import ZevAccessGrant, ZevAccessRole
+
+        ZevAccessGrant.objects.create(zev=self.zev, user=self.holder_user, role=ZevAccessRole.MANAGER)
+        self.seed()
+
+    def test_a_manager_who_is_a_participant_gets_their_own_figures_with_a_timeline(self):
+        own = self.dashboard(self.holder_user)["own_gross_energy"]
+
+        self.assertEqual(own["self_sufficiency_rate"], 75.0)
+        self.assertEqual(len(own["timeline"]), 3)
+        self.assertAlmostEqual(own["consumption_kwh"], 38.4 * 3, places=3)
+
+    def test_it_does_not_depend_on_who_is_selected(self):
+        data = self.dashboard(self.holder_user, participant_id=str(self.other.pk))
+
+        self.assertIsNotNone(data["own_gross_energy"])
+        self.assertIsNone(data["selected_gross_energy"])
+
+    def test_selecting_yourself_still_gives_both_so_the_page_can_show_one(self):
+        data = self.dashboard(self.holder_user, participant_id=str(self.holder.pk))
+
+        self.assertEqual(data["own_gross_energy"]["self_sufficiency_rate"], data["selected_gross_energy"]["self_sufficiency_rate"])
+
+    def test_a_manager_who_is_not_a_participant_gets_null(self):
+        self.assertIsNone(self.dashboard(self.manager)["own_gross_energy"])
+
+    def test_a_participant_without_a_source_gets_null(self):
+        from zev.models import ZevAccessGrant, ZevAccessRole
+
+        ZevAccessGrant.objects.create(zev=self.zev, user=self.other_user, role=ZevAccessRole.VIEWER)
+        self.assertIsNone(self.dashboard(self.other_user)["own_gross_energy"])
+
+    def test_the_range_bounds_it(self):
+        own = self.dashboard(self.holder_user, date_from="2026-07-02", date_to="2026-07-02")["own_gross_energy"]
+
+        self.assertAlmostEqual(own["consumption_kwh"], 38.4, places=3)
+
+    def test_nothing_while_the_flag_is_off(self):
+        enable_feature(False)
+        self.assertIsNone(self.dashboard(self.holder_user)["own_gross_energy"])
+
+
 class AnnualReportTests(SurfaceTestCase):
     def report(self, user=None):
         response = client_for(user or self.manager).get(ANNUAL_REPORT, {"zev_id": str(self.zev.pk), "year": 2026})

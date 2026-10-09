@@ -13,6 +13,9 @@ from typing import Callable, Iterable
 
 from allocation.validity import business_tz, civil_date, period_start_dt
 
+from zev import access
+from zev.models import Participant
+
 from ..models import SupplementarySource
 from .permissions import feature_enabled
 from .stats import civil_window, gross_energy
@@ -64,8 +67,14 @@ def participants_gross(participant_ids: Iterable, start: datetime, end: datetime
     }
 
 
-def attach_owner_gross(summary: dict, window: Window, bucket: str, selected_participant_id: str | None) -> dict:
-    """Adds ``gross_energy`` to each ``participant_stats`` entry and ``selected_gross_energy`` to ``summary``."""
+def attach_owner_gross(summary: dict, window: Window, bucket: str, selected_participant_id: str | None,
+                       *, user=None, zev_id=None) -> dict:
+    """Adds ``gross_energy`` to each ``participant_stats`` entry and ``selected_gross_energy`` to ``summary``.
+
+    With ``user`` and ``zev_id`` it also adds ``own_gross_energy``: the signed-in manager's own
+    figures as a participant of that ZEV (with a timeline), independent of whom they selected. A
+    manager is usually a participant too, and their own picture should not hide behind a dropdown.
+    """
     stats = summary.get("participant_stats") or []
     start, end = window
     gross = participants_gross([item["participant_id"] for item in stats], start, end)
@@ -77,6 +86,10 @@ def attach_owner_gross(summary: dict, window: Window, bucket: str, selected_part
             str(selected_participant_id)
         )
     summary["selected_gross_energy"] = selected
+    summary["own_gross_energy"] = None
+    if user is not None and zev_id is not None and feature_enabled():
+        own_ids = Participant.objects.filter(access.live_participant_q(), user=user, zev_id=zev_id).values_list("id", flat=True)
+        summary["own_gross_energy"] = gross_energy(list(own_ids), start, end, bucket_key=bucket_key_for(bucket))
     return summary
 
 

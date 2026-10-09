@@ -2659,6 +2659,7 @@ export const de = {
             },
             noData: 'Keine Messdaten für den ausgewählten Zeitraum.',
             perParticipant: 'Pro Teilnehmer',
+            youBadge: 'Sie',
             noParticipantData: 'Keine Daten auf Teilnehmerebene für den ausgewählten Zeitraum.',
             showDetailsFor: 'Details für {{name}} anzeigen',
             col: {

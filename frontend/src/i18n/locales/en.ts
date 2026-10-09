@@ -2670,6 +2670,7 @@ export const en = {
             },
             noData: 'No metering data for selected period.',
             perParticipant: 'Per Participant',
+            youBadge: 'You',
             noParticipantData: 'No participant-level data for selected period.',
             showDetailsFor: 'Show details for {{name}}',
             col: {

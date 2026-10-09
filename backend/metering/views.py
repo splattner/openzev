@@ -352,7 +352,10 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
 
             result = owner_dashboard_summary(qs, trunc_fn, selected_participant_id)
             result["bucket"] = bucket
-            attach_owner_gross(result, window_for(date_from, date_to), bucket, selected_participant_id)
+            attach_owner_gross(
+                result, window_for(date_from, date_to), bucket, selected_participant_id,
+                user=user, zev_id=selected_zev_id,
+            )
             return Response(result)
 
         # participant path

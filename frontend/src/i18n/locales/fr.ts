@@ -2659,6 +2659,7 @@ export const fr = {
             },
             noData: 'Aucune donnée de mesure pour la période sélectionnée.',
             perParticipant: 'Par participant',
+            youBadge: 'Vous',
             noParticipantData: 'Aucune donnée par participant pour la période sélectionnée.',
             showDetailsFor: 'Afficher les détails de {{name}}',
             col: {

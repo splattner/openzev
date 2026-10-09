@@ -7,11 +7,12 @@ import { formatKwh, formatPercent } from '../../lib/numbers'
 import { dashboardKwhStat, hourlyKwhTick, hourlyKwhTooltipValue, fromZevRate, kwhTick } from '../../lib/dashboardFormatting'
 import { useAuth } from '../../lib/auth'
 import { useManagedZev } from '../../lib/managedZev'
+import { useEnergyDataEligibility } from '../../lib/supplementary'
 import { PageSkeleton } from '../../components/PageSkeleton'
 import { Notice } from '../../components/Notice'
 import { StatCard } from '../../components/StatCard'
 import { PeriodSelector } from '../../components/PeriodSelector'
-import { GrossEnergyCard } from '../../components/dashboard/GrossEnergyCard'
+import { GrossEnergyCallToAction, GrossEnergyCard } from '../../components/dashboard/GrossEnergyCard'
 import { BalanceChart } from '../../components/dashboard/BalanceChart'
 import { EnergyFlowCard } from '../../components/dashboard/EnergyFlowCard'
 import { HourlyProfileCard } from '../../components/dashboard/HourlyProfileCard'
@@ -23,6 +24,7 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
     const { t } = useTranslation()
     const { user } = useAuth()
     const { selectedZevId, selectedZev } = useManagedZev()
+    const energyData = useEnergyDataEligibility()
 
     const [bucket, setBucket] = useState<DashboardBucket>('day')
     const [participantSelection, setParticipantSelection] = useState({ scopeId: selectedZevId, id: '' })
@@ -66,6 +68,16 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
     })
 
     const summary = summaryQuery.data
+    // A manager is usually a participant too: their own rows in this community, marked in the table.
+    const ownParticipantIds = useMemo(
+        () =>
+            (user?.memberships ?? [])
+                .find((membership) => membership.zev === selectedZevId)
+                ?.participants.filter((participant) => participant.live)
+                .map((participant) => participant.id) ?? [],
+        [user?.memberships, selectedZevId],
+    )
+    const wantsOwnEnergyData = energyData.eligible.some((point) => point.zev === selectedZevId && point.source === null)
     const highlightParticipantIds = useMemo(
         () => selectedParticipantId ? [selectedParticipantId] : undefined,
         [selectedParticipantId],
@@ -113,6 +125,7 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
                                     summary.participant_stats.map((participant) => (
                                         <option key={participant.participant_id} value={participant.participant_id}>
                                             {participant.participant_name || participant.participant_id}
+                                            {ownParticipantIds.includes(participant.participant_id) ? ` (${t('pages.dashboard.youBadge')})` : ''}
                                         </option>
                                     ))}
                             </select>
@@ -151,6 +164,15 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
                         <StatCard label={t('pages.dashboard.stats.exportedToGrid')} value={dashboardKwhStat(summary.zev_totals.exported_kwh)} />
                     </section>
                     {summary.zev_has_behind_meter_generation && <p className="muted">{t('behindMeter.zevNote')}</p>}
+                    {summary.own_gross_energy && (
+                        <GrossEnergyCard
+                            gross={summary.own_gross_energy}
+                            whose="own"
+                            formatBucketLabel={formatBucketLabel}
+                            formatBucketTooltipLabel={formatBucketTooltipLabel}
+                        />
+                    )}
+                    {!summary.own_gross_energy && wantsOwnEnergyData && <GrossEnergyCallToAction />}
                     {summary.participant_stats.length > 0 && (
                         <EnergyFlowCard
                             totals={summary.zev_totals}
@@ -167,7 +189,7 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
                         formatBucketTooltipLabel={formatBucketTooltipLabel}
                         kwhTick={kwhTick}
                     />
-                    {selectedParticipantId && summary.selected_gross_energy && (
+                    {selectedParticipantId && summary.selected_gross_energy && !ownParticipantIds.includes(selectedParticipantId) && (
                         <GrossEnergyCard
                             gross={summary.selected_gross_energy}
                             whose="participant"
@@ -180,6 +202,7 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
                         participantStats={summary.participant_stats}
                         selectedParticipantId={selectedParticipantId}
                         onSelect={setSelectedParticipantId}
+                        ownParticipantIds={ownParticipantIds}
                     />
                     {selectedParticipantId && hourlyProfileData.length > 0 && (
                         <HourlyProfileCard
