@@ -742,6 +742,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../20-energy-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your Own Energy Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../07-tariff-configuration/" class="md-nav__link">
         
   
@@ -2869,6 +2897,11 @@ message when available, so you can correct the template and retry.</p>
 <td><code>participant_geocoding_enabled</code></td>
 <td><code>false</code></td>
 <td>Looks up building outlines on OpenStreetMap for the <a href="../03-participant-management/#map">participants map</a>; sends building addresses to the public Nominatim service</td>
+</tr>
+<tr>
+<td><code>supplementary_energy_data_enabled</code></td>
+<td><code>false</code></td>
+<td>Lets participants with a PV system behind their meter connect their <a href="../20-energy-data/">own energy data</a> (Solar Manager, push or file) for statistics, never for billing; Solar Manager sources call the vendor's cloud and need <code>INTEGRATION_ENCRYPTION_KEYS</code></td>
 </tr>
 <tr>
 <td><code>mcp_server_enabled</code></td>

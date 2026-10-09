@@ -1151,6 +1151,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../20-energy-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your Own Energy Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../07-tariff-configuration/" class="md-nav__link">
         
   
@@ -2260,6 +2288,11 @@ git<span class="w"> </span>checkout<span class="w"> </span>vX.Y.Z<span class="w"
 <td><em>(generated, see below)</em></td>
 <td>Encrypts backup archives; without it backups are written unencrypted — see <a href="../18-backups/">Backups</a></td>
 </tr>
+<tr>
+<td><code>INTEGRATION_ENCRYPTION_KEYS</code></td>
+<td><em>(optional, a Fernet key as for <code>MFA_ENCRYPTION_KEYS</code>)</em></td>
+<td>Encrypts the API keys participants enter to connect Solar Manager; without it only push and file sources work — see <a href="../20-energy-data/">Your Own Energy Data</a></td>
+</tr>
 </tbody>
 </table>
 <p>Generate the three keys with Python (any machine with Python 3; the
@@ -2285,6 +2318,11 @@ python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">"impor
 <td><code>BACKUP_ENCRYPTION_KEYS</code></td>
 <td>Backup archives <strong>and stored destination credentials</strong></td>
 <td>Encrypted backups and stored S3 secrets needing that key cannot be opened. Keep old keys while retained archives or stored secrets still depend on them; new backups alone do not re-encrypt stored credentials. See <a href="../18-backups/">Backups</a>.</td>
+</tr>
+<tr>
+<td><code>INTEGRATION_ENCRYPTION_KEYS</code></td>
+<td>Participants' Solar Manager API keys</td>
+<td>Those connections cannot be read and show <em>Reconnect needed</em>; each participant enters their key again. Nothing else is affected. Keep old keys in the list while you rotate (<code>manage.py rotate_integration_key</code>).</td>
 </tr>
 <tr>
 <td><code>MFA_ENCRYPTION_KEYS</code></td>

@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://www.openzev.ch/docs/04-metering-points/">
+        <link rel="canonical" href="https://www.openzev.ch/docs/20-energy-data/">
       
       
-        <link rel="prev" href="../03-participant-management/">
+        <link rel="prev" href="../06-metering-analysis/">
       
       
-        <link rel="next" href="../05-metering-import/">
+        <link rel="next" href="../07-tariff-configuration/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Metering Points - OpenZEV Documentation</title>
+        <title>Your Own Energy Data - OpenZEV Documentation</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#metering-points" class="md-skip">
+        <a href="#your-own-energy-data" class="md-skip">
           Skip to content
         </a>
       
@@ -115,7 +115,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Metering Points
+              Your Own Energy Data
             
           </span>
         </div>
@@ -488,8 +488,6 @@
       
   
   
-    
-  
   
   
     
@@ -502,11 +500,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
           <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
@@ -527,7 +525,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -598,37 +596,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Metering Points
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../04-metering-points/" class="md-nav__link">
         
   
   
@@ -644,242 +615,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#what-is-a-metering-point" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What is a Metering Point?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#metering-point-types" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Metering Point Types
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#buildings" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Buildings
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#creating-a-metering-point" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Creating a Metering Point
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#generation-behind-the-meter" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Generation behind the meter
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#assignment-validity-periods" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Assignment Validity Periods
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Assignment Validity Periods">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#example-validity-scenarios" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example Validity Scenarios
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#shared-common-area-metering-points" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Shared (Common-Area) Metering Points
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Shared (Common-Area) Metering Points">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#switching-a-meter-to-community" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Switching a meter to Community
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#switching-mid-period-is-safe" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Switching mid-period is safe
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#what-gets-split" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What gets split
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#eligibility-is-date-accurate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Eligibility is date-accurate
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-a-metering-point-card-shows" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What a Metering Point Card Shows
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#meter-maintenance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Meter Maintenance
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Meter Maintenance">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#updating-a-metering-point" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Updating a Metering Point
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#decommissioning-a-meter" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Decommissioning a Meter
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#metering-point-and-billing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Metering Point and Billing
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -896,8 +631,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -908,11 +645,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
@@ -933,7 +670,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1004,10 +741,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../20-energy-data/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your Own Energy Data
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1023,6 +787,198 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#who-can-connect-what" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who can connect what
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connect-solar-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connect Solar Manager
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connect Solar Manager">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-stored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is stored
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#send-the-data-yourself-push-or-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Send the data yourself (push or file)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Send the data yourself (push or file)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#home-assistant-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Home Assistant example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upload-a-csv-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upload a CSV file
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-you-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What you see
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What you see">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#your-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your dashboard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gaps-are-shown-as-dashes-not-as-low-rates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gaps are shown as dashes, not as low rates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#owners-reports-and-statements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Owners, reports and statements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#does-it-match-the-meter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Does it match the meter?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disconnect-delete-remove" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disconnect, delete, remove
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1606,10 +1562,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-is-a-metering-point" class="md-nav__link">
+  <a href="#who-can-connect-what" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What is a Metering Point?
+        Who can connect what
       
     </span>
   </a>
@@ -1617,66 +1573,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#metering-point-types" class="md-nav__link">
+  <a href="#connect-solar-manager" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Metering Point Types
+        Connect Solar Manager
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#buildings" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Buildings
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#creating-a-metering-point" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Creating a Metering Point
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#generation-behind-the-meter" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Generation behind the meter
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#assignment-validity-periods" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Assignment Validity Periods
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Assignment Validity Periods">
+    <nav class="md-nav" aria-label="Connect Solar Manager">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#example-validity-scenarios" class="md-nav__link">
+  <a href="#what-is-stored" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example Validity Scenarios
+        What is stored
       
     </span>
   </a>
@@ -1689,22 +1601,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#shared-common-area-metering-points" class="md-nav__link">
+  <a href="#send-the-data-yourself-push-or-file" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Shared (Common-Area) Metering Points
+        Send the data yourself (push or file)
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Shared (Common-Area) Metering Points">
+    <nav class="md-nav" aria-label="Send the data yourself (push or file)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#switching-a-meter-to-community" class="md-nav__link">
+  <a href="#home-assistant-example" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Switching a meter to Community
+        Home Assistant example
       
     </span>
   </a>
@@ -1712,32 +1624,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#switching-mid-period-is-safe" class="md-nav__link">
+  <a href="#upload-a-csv-file" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Switching mid-period is safe
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#what-gets-split" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What gets split
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#eligibility-is-date-accurate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Eligibility is date-accurate
+        Upload a CSV file
       
     </span>
   </a>
@@ -1750,33 +1640,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-a-metering-point-card-shows" class="md-nav__link">
+  <a href="#what-you-see" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What a Metering Point Card Shows
+        What you see
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#meter-maintenance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Meter Maintenance
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Meter Maintenance">
+    <nav class="md-nav" aria-label="What you see">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#updating-a-metering-point" class="md-nav__link">
+  <a href="#your-dashboard" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Updating a Metering Point
+        Your dashboard
       
     </span>
   </a>
@@ -1784,10 +1663,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#decommissioning-a-meter" class="md-nav__link">
+  <a href="#gaps-are-shown-as-dashes-not-as-low-rates" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Decommissioning a Meter
+        Gaps are shown as dashes, not as low rates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#owners-reports-and-statements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Owners, reports and statements
       
     </span>
   </a>
@@ -1800,10 +1690,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#metering-point-and-billing" class="md-nav__link">
+  <a href="#does-it-match-the-meter" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Metering Point and Billing
+        Does it match the meter?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disconnect-delete-remove" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disconnect, delete, remove
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
       
     </span>
   </a>
@@ -1838,7 +1750,7 @@
 
 
   
-    <a href="https://github.com/splattner/openzev/edit/main/docs/user-guide/04-metering-points.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/splattner/openzev/edit/main/docs/user-guide/20-energy-data.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -1846,330 +1758,264 @@
   
 
 
-<h1 id="metering-points">Metering Points<a class="headerlink" href="#metering-points" title="Permanent link">&para;</a></h1>
-<p>This guide covers metering point types, configuration, and maintenance in OpenZEV.</p>
-<h2 id="what-is-a-metering-point">What is a Metering Point?<a class="headerlink" href="#what-is-a-metering-point" title="Permanent link">&para;</a></h2>
-<p>A <strong>metering point</strong> is a physical or logical energy meter:</p>
-<ul>
-<li>Assigned to a participant over a validity window rather than owned outright — see <a href="#assignment-validity-periods">Assignment Validity Periods</a> below</li>
-<li>Measures energy consumption or production</li>
-<li>Records readings at regular intervals (typically every 15 minutes)</li>
-<li>Forms the basis for invoice calculations</li>
-</ul>
-<p>A single participant can be assigned multiple metering points (e.g., PV on roof + home consumption).</p>
-<p>Every metering point also belongs to a <strong>building</strong>, the site where it is — see
-<a href="#buildings">Buildings</a>. The metering point's own
-location text says which unit within the building it measures. With several
-buildings, the page groups the cards by building and the toolbar offers a <strong>Building</strong> filter.</p>
-<p><img alt="Metering points page" src="../screenshots/04-metering-points.png" /></p>
-<p>If a refresh fails, the last loaded list and any open form stay available.
-Use <strong>Retry</strong> in the warning to refresh the list.</p>
-<h2 id="metering-point-types">Metering Point Types<a class="headerlink" href="#metering-point-types" title="Permanent link">&para;</a></h2>
-<p>OpenZEV supports three metering point types:</p>
+<h1 id="your-own-energy-data">Your Own Energy Data<a class="headerlink" href="#your-own-energy-data" title="Permanent link">&para;</a></h1>
+<p>If your PV system sits <strong>behind</strong> your grid connection meter, the meter only
+sees the surplus you feed in and the power you still draw from the grid (see
+<a href="../04-metering-points/#generation-behind-the-meter">Generation behind the meter</a>).
+What you produce and use yourself never reaches it, so OpenZEV cannot tell how
+self-sufficient you really are.</p>
+<p><strong>Energy data</strong> closes that gap. You connect the system that does measure it —
+Solar Manager today, or any system that can send or export a file — and OpenZEV
+adds your real production, consumption, self-consumption and self-sufficiency to
+the statistics.</p>
+<div class="admonition note">
+<p class="admonition-title">Statistics only, never billing</p>
+<p>This data is <strong>never</strong> used for invoices. Billing keeps using the grid
+operator's meter data alone, exactly as before. A wrong or missing value in
+your own system can at worst make a statistic wrong or empty; it cannot change
+an amount.</p>
+</div>
+<p>The feature is switched on by an administrator (<strong>Platform → Settings →
+Functions → Supplementary energy data</strong>). Until then none of what follows is
+visible.</p>
+<h2 id="who-can-connect-what">Who can connect what<a class="headerlink" href="#who-can-connect-what" title="Permanent link">&para;</a></h2>
+<p>Only the <strong>participant who personally holds</strong> the metering point can connect a
+source for it. It is their account and their household, so a ZEV manager cannot
+connect it for them, cannot see the key and cannot change it. The metering point
+must be marked <strong>Generation behind the meter</strong>, and you must hold it yourself
+(not through a shared community allocation).</p>
 <table>
 <thead>
 <tr>
-<th>Type</th>
-<th>Purpose</th>
-<th>Usage</th>
+<th></th>
+<th>You (holder)</th>
+<th>ZEV manager</th>
+<th>ZEV viewer</th>
+<th>Other participants</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>Consumption</strong></td>
-<td>Measures energy drawn from grid/community</td>
-<td>Household loads, offices</td>
+<td>Connect, test, sync, replace the key, import</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>no</td>
 </tr>
 <tr>
-<td><strong>Production</strong></td>
-<td>Measures energy fed into grid/community</td>
-<td>Solar panels</td>
+<td>See the status and your figures</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes (read-only)</td>
+<td>no</td>
 </tr>
 <tr>
-<td><strong>Bidirectional</strong></td>
-<td>Combined meter (both consumption and production)</td>
-<td>A household with its own PV on one meter</td>
+<td>Switch off, disconnect, delete data, remove</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
 </tr>
 </tbody>
 </table>
-<h2 id="buildings">Buildings<a class="headerlink" href="#buildings" title="Permanent link">&para;</a></h2>
-<p>A <strong>building</strong> is where metering points are: a name, an address and,
-optionally, the federal building ID (<strong>EGID</strong>). It is a site, not a billing
-address: a participant can be invoiced somewhere other than where its meters
-are, and both are recorded. Buildings are managed on this page.</p>
-<ul>
-<li>A new ZEV starts with one building, taking the issuer's address when the
-  issuer lives at the grid connection's postal code. With a single building
-  the page shows it as one line above the list, with <strong>Edit</strong>, and the meter
-  form does not ask for a building.</li>
-<li><strong>Add building</strong> (next to <strong>New Metering Point</strong>) creates one; you can copy
-  the address of a participant or other contact. Landowners linked to a
-  building (see <a href="../02-zev-setup/#people-and-access-tab">People &amp; access</a>) are
-  named in its header.</li>
-<li>With several buildings, the cards are <strong>grouped by building</strong>, ordered by
-  name. Each group's header shows the address, EGID, landowners and number of
-  metering points, with <strong>Add metering point</strong> (that building preselected)
-  and <strong>Edit</strong>. A building without metering points shows "No
-  metering points in this building yet". Search and the other filters apply
-  within the groups; the <strong>Building</strong> filter shows one group.</li>
-<li>A building can be deleted only once it is empty: move or delete its meters
-  first, then <strong>More → Delete building</strong> appears in its header. Landowner rows that pointed at a deleted building are
-  kept, without a building.</li>
-</ul>
-<blockquote>
-<p><strong>Check the buildings of an existing community.</strong> When OpenZEV added
-buildings, every existing community got some automatically. A ZEV got one
-building holding all its metering points. A vZEV got one building per
-distinct participant address, each metering point in the building of the
-participant it is assigned to; meters without a clear holder went to the
-issuer's building. That is a <strong>guess</strong> from billing addresses, which are not
-always where the meters are (a landlord billed for an empty flat, a holiday
-home). Review the groups and correct them: move the metering points, then
-delete the empty building.</p>
-</blockquote>
-<h2 id="creating-a-metering-point">Creating a Metering Point<a class="headerlink" href="#creating-a-metering-point" title="Permanent link">&para;</a></h2>
-<p><strong>Managers</strong> create metering points in <strong>Metering Points</strong> for the selected
-community. A disabled community is read-only for managers; admins retain write
-access. If the community list cannot load, use <strong>Retry</strong> before working with
-its meters.</p>
+<p>When you no longer hold the metering point (the assignment ends), the connection
+is switched off by itself, the key is deleted, and nothing new is collected. The
+data already collected is kept until you or a manager deletes it.</p>
+<h2 id="connect-solar-manager">Connect Solar Manager<a class="headerlink" href="#connect-solar-manager" title="Permanent link">&para;</a></h2>
+<p><img alt="Account Energy data tab" src="../screenshots/24-energy-data-account.png" /></p>
 <ol>
-<li>Click <strong>New Metering Point</strong></li>
-<li>
-<p>Enter details:</p>
-<ul>
-<li><strong>Meter ID</strong> — Equipment/MSID number (required, must be unique)</li>
-<li><strong>Meter type</strong> — <code>Consumption</code>, <code>Production</code>, or <code>Bidirectional</code></li>
-<li><strong>Active</strong> — inventory status (defaults to on)</li>
-<li><strong>Building</strong> — only asked when the community has more than one
-   <a href="#buildings">building</a>; with a single building the
-   meter goes there</li>
-<li><strong>Unit within the building</strong> (optional, e.g., "Flat 3", "Common areas",
-   "Roof solar panel")</li>
-<li><strong>Generation behind the meter</strong> — only shown for <code>Bidirectional</code> or
-   <code>Production</code> meters; see
-   <a href="#generation-behind-the-meter">Generation behind the meter</a> below</li>
-</ul>
-</li>
-<li>
-<p>Click <strong>Create Metering Point</strong></p>
-</li>
-<li>
-<p>To bill this meter, assign a participant: click <strong>Assign participant</strong> on
-   its card and set the assignment's validity window — see below.</p>
-</li>
+<li>Create an <strong>API key</strong> in your Solar Manager account.</li>
+<li>In OpenZEV open <strong>Account → Energy data</strong>. The tab appears when you hold a
+   metering point with generation behind it.</li>
+<li>Choose <strong>Connect</strong> next to the metering point.</li>
+<li>Pick <strong>Solar Manager</strong>, enter your <strong>Solar Manager ID</strong> (3 to 24 letters or
+   digits) and the <strong>API key</strong>, and read what you agree to.</li>
+<li>Tick the consent box and choose <strong>Connect</strong>.</li>
 </ol>
-<blockquote>
-<p><strong>Tip:</strong> <strong>Active</strong> only tracks whether a meter is in inventory; on its own
-it does not affect billing. To <em>stop billing</em> a meter, end its assignment
-instead — see <a href="#decommissioning-a-meter">Decommissioning a Meter</a>.</p>
-</blockquote>
-<h2 id="generation-behind-the-meter">Generation behind the meter<a class="headerlink" href="#generation-behind-the-meter" title="Permanent link">&para;</a></h2>
-<p>In a vZEV, a producer's PV system usually sits <strong>behind</strong> their own grid
-connection meter, which is bidirectional. That meter only records what
-crosses the connection point — the <strong>surplus</strong> fed in once the household's
-own use is covered, and the residual <strong>grid draw</strong> for the times there is no
-surplus. This is called <strong>net (surplus) metering</strong> (<em>Überschussmessung</em>), and
-it is different from <strong>gross production metering</strong>, which needs its own,
-separate production meter and measures everything the PV system generates.</p>
-<p>Everything the household consumes directly from its own PV never reaches a
-net meter, so it never shows up as "production" or "self-consumption" in
-OpenZEV's statistics. Billing is unaffected — a vZEV can only share energy
-that actually crosses the connection point — but a producer's own
-self-sufficiency rate looks misleadingly low, because the numerator (what
-they draw from the shared pool) barely counts their own solar use at all.</p>
-<p>Tick <strong>Generation behind the meter (surplus metering)</strong> on a <code>Bidirectional</code>
-or <code>Production</code> metering point when this is the case (the checkbox is hidden
-for <code>Consumption</code> meters, since a consumption-only meter cannot have
-generation behind it). Once ticked:</p>
+<p>OpenZEV checks the key with Solar Manager <strong>before</strong> anything is saved, so a
+wrong key never leaves a half-connected source behind. The key is stored
+encrypted, only used to fetch your data, and never shown again. The first data
+arrives within a few minutes; after that OpenZEV fetches new data every hour and
+re-reads the last two days to pick up late corrections.</p>
+<p>Solar Manager replaces your key with a fresh one every time it is used, and
+OpenZEV keeps the fresh one. If the connection ever shows <strong>Reconnect needed</strong>,
+the key no longer works (for example because you revoked it): choose
+<strong>Reconnect</strong> and enter a new key.</p>
+<h3 id="what-is-stored">What is stored<a class="headerlink" href="#what-is-stored" title="Permanent link">&para;</a></h3>
+<p>Four values per quarter hour: <strong>consumption</strong>, <strong>production</strong>, <strong>grid import</strong>
+and <strong>grid export</strong>, in kWh. Nothing else from your Solar Manager account is
+read. Only the time you held the metering point is stored.</p>
+<h2 id="send-the-data-yourself-push-or-file">Send the data yourself (push or file)<a class="headerlink" href="#send-the-data-yourself-push-or-file" title="Permanent link">&para;</a></h2>
+<p>If you do not use Solar Manager — for instance with Home Assistant, n8n or a
+script — choose <strong>Push / file</strong> when you connect. You get a <strong>push token</strong>
+shown <strong>once</strong>; copy it right away. OpenZEV stores only a hash, so if you lose
+it you issue a new one (<strong>New push token</strong>), which stops the old one at once.</p>
+<p>Send readings with an HTTP <code>POST</code>:</p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">"https://your-openzev.example.com/api/v1/metering/supplementary/ingest/"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer ozs_abcd1234_yourtoken"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"readings": [</span>
+<span class="s1">        {"timestamp": "2026-07-01T10:00:00+02:00",</span>
+<span class="s1">         "consumption_kwh": 0.42, "production_kwh": 1.31,</span>
+<span class="s1">         "import_kwh": 0.05, "export_kwh": 0.94}</span>
+<span class="s1">      ]}'</span>
+</code></pre></div>
+<p>The rules, so that nothing is silently wrong:</p>
 <ul>
-<li>The participant who personally holds that meter no longer sees a
-  meter-based self-sufficiency rate anywhere — <strong>Energy balance</strong>, their own
-  dashboard, the <strong>annual report</strong>, and their <strong>annual statement</strong> PDF all show
-  <strong>—</strong> with a short explanation instead, unless they connect their own system
-  (see below).</li>
-<li>The ZEV's own kWh totals and rates are <strong>not</strong> changed or excluded — the
-  energy is real, and billing depends on it. Instead, wherever the ZEV has a
-  flagged meter, an explanatory note appears next to the ZEV-wide figures.</li>
-<li>Metering-point lists and tables show a <strong>Surplus metering</strong> badge next to
-  the meter type.</li>
+<li><strong>One reading per quarter hour</strong>, with the timestamp of the interval's
+  <strong>start</strong> (<code>10:00</code> means 10:00 to 10:15) on a quarter-hour boundary
+  (<code>:00</code>, <code>:15</code>, <code>:30</code>, <code>:45</code>) and a UTC offset.</li>
+<li><strong>kWh used in that quarter hour</strong>, not a running total and not watts. If your
+  system reports a meter reading that only ever grows, send the difference.</li>
+<li>No negative values, no future timestamps, at most 2000 readings per request
+  and about 120 requests per hour.</li>
+<li>Sending the same timestamp again replaces the earlier value, so a retry is
+  harmless.</li>
+<li>A bad reading is rejected on its own, with its position and the reason; the
+  good ones in the same request are still stored.</li>
 </ul>
-<p>If you later add a true production meter (measuring everything the PV system
-generates, not just the surplus), leave this box unticked on that separate
-meter.</p>
-<p>To show the real self-sufficiency of such a participant, they can connect the
-system behind their meter (Solar Manager, or their own data by push or file).
-The figures are used for statistics only, never for billing, and are shown as
-reported by the participant's own system. See
-<a href="../20-energy-data/">Your Own Energy Data</a>. A flagged metering point then also
-shows the connection's status next to the badge; you open it to see the status
-and, as a manager, to switch it off, delete its data or remove it. You never see
-or enter the participant's key.</p>
-<h2 id="assignment-validity-periods">Assignment Validity Periods<a class="headerlink" href="#assignment-validity-periods" title="Permanent link">&para;</a></h2>
-<p>Metering points themselves do not have <code>valid_from</code>/<code>valid_to</code> fields.
-Date validity is defined on the <strong>metering point assignment</strong> to a participant:</p>
+<h3 id="home-assistant-example">Home Assistant example<a class="headerlink" href="#home-assistant-example" title="Permanent link">&para;</a></h3>
+<p>With a <code>utility_meter</code> per value (cycle <code>quarter-hourly</code>), an automation can send
+the previous quarter hour shortly after each boundary. The entity names below are
+placeholders for your own sensors:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">rest_command</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">openzev_push</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">"https://your-openzev.example.com/api/v1/metering/supplementary/ingest/"</span>
+<span class="w">    </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POST</span>
+<span class="w">    </span><span class="nt">headers</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">Authorization</span><span class="p">:</span><span class="w"> </span><span class="s">"Bearer</span><span class="nv"> </span><span class="s">ozs_abcd1234_yourtoken"</span>
+<span class="w">      </span><span class="nt">Content-Type</span><span class="p">:</span><span class="w"> </span><span class="s">"application/json"</span>
+<span class="w">    </span><span class="nt">payload</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;</span>
+<span class="w">      </span><span class="no">{"readings": [{</span>
+<span class="w">        </span><span class="no">"timestamp": "{{ timestamp }}",</span>
+<span class="w">        </span><span class="no">"consumption_kwh": {{ consumption }}, "production_kwh": {{ production }},</span>
+<span class="w">        </span><span class="no">"import_kwh": {{ import_kwh }}, "export_kwh": {{ export }}</span>
+<span class="w">      </span><span class="no">}]}</span>
+
+<span class="nt">automation</span><span class="p">:</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Send energy data to OpenZEV</span>
+<span class="w">    </span><span class="nt">trigger</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">platform</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">time_pattern</span>
+<span class="w">        </span><span class="nt">minutes</span><span class="p">:</span><span class="w"> </span><span class="s">"/15"</span>
+<span class="w">        </span><span class="nt">seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+<span class="w">    </span><span class="nt">action</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">service</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rest_command.openzev_push</span>
+<span class="w">        </span><span class="nt">data</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">timestamp</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;</span>
+<span class="w">            </span><span class="no">{{ (now().replace(second=0, microsecond=0, minute=(now().minute // 15) * 15) - timedelta(minutes=15)).isoformat() }}</span>
+<span class="w">          </span><span class="nt">consumption</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">state_attr('sensor.house_consumption_quarter_hour',</span><span class="nv"> </span><span class="s">'last_period')</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">float(0)</span><span class="nv"> </span><span class="s">}}"</span>
+<span class="w">          </span><span class="nt">production</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">state_attr('sensor.pv_production_quarter_hour',</span><span class="nv"> </span><span class="s">'last_period')</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">float(0)</span><span class="nv"> </span><span class="s">}}"</span>
+<span class="w">          </span><span class="nt">import_kwh</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">state_attr('sensor.grid_import_quarter_hour',</span><span class="nv"> </span><span class="s">'last_period')</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">float(0)</span><span class="nv"> </span><span class="s">}}"</span>
+<span class="w">          </span><span class="nt">export</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">state_attr('sensor.grid_export_quarter_hour',</span><span class="nv"> </span><span class="s">'last_period')</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">float(0)</span><span class="nv"> </span><span class="s">}}"</span>
+</code></pre></div>
+<h3 id="upload-a-csv-file">Upload a CSV file<a class="headerlink" href="#upload-a-csv-file" title="Permanent link">&para;</a></h3>
+<p>For a one-off import or to fill a gap, choose <strong>Import CSV</strong> on the source. The
+columns are:</p>
+<div class="highlight"><pre><span></span><code>timestamp,consumption_kwh,production_kwh,import_kwh,export_kwh
+2026-07-01T10:00:00+02:00,0.42,1.31,0.05,0.94
+</code></pre></div>
+<p>Semicolons and decimal commas (as in a Swiss Excel export) are accepted. Choose
+<strong>Check file</strong> first: it reports the problems row by row and imports nothing.
+<strong>Import</strong> stores the file only if <strong>every</strong> row is valid.</p>
+<h2 id="what-you-see">What you see<a class="headerlink" href="#what-you-see" title="Permanent link">&para;</a></h2>
+<h3 id="your-dashboard">Your dashboard<a class="headerlink" href="#your-dashboard" title="Permanent link">&para;</a></h3>
+<p><img alt="Participant dashboard with own-system figures" src="../screenshots/24-energy-data-dashboard.png" /></p>
+<p>With a connected source, your dashboard shows a card <strong>Your own system</strong> with
+production, consumption, self-consumption, grid import and export, your
+<strong>self-sufficiency</strong> and <strong>self-consumption</strong> rates, and a chart. It always says
+the figures are <strong>reported by your own system</strong>, not read from the meter, and
+which period they cover.</p>
 <ul>
-<li><strong>Valid From:</strong> Assignment start date (e.g., 2026-01-01)</li>
-<li><strong>Valid To:</strong> Assignment end date (optional; leave blank for ongoing)</li>
+<li><strong>Self-sufficiency</strong> — the share of what you consume that did not come from the
+  grid: one minus grid import divided by consumption.</li>
+<li><strong>Self-consumption</strong> — the share of what you produce that you used directly.</li>
 </ul>
-<p>Assignment validity affects:</p>
+<p>Both are computed from your own system's numbers alone, so numerator and
+denominator are measured the same way. The meter is only used to <em>check</em> them.</p>
+<h3 id="gaps-are-shown-as-dashes-not-as-low-rates">Gaps are shown as dashes, not as low rates<a class="headerlink" href="#gaps-are-shown-as-dashes-not-as-low-rates" title="Permanent link">&para;</a></h3>
+<p>A rate is only shown when at least <strong>95 %</strong> of the quarter hours in the period
+are present. With less, the rate is <strong>—</strong> and a short reason says so
+("not enough data in this period"). A missing hour never turns into a low
+self-sufficiency. The energy sums are still shown.</p>
+<h3 id="owners-reports-and-statements">Owners, reports and statements<a class="headerlink" href="#owners-reports-and-statements" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Which participant is associated with the meter at a given date</li>
-<li>Whether imported readings can be attributed for billing</li>
-<li>Invoicing — only active assignment windows in the billing period are used</li>
+<li>The ZEV manager's <strong>Energy balance</strong> shows the same rate in the participant
+  table, marked with an info icon, and the full card when that participant is
+  selected.</li>
+<li>The <strong>annual report</strong> shows it per participant.</li>
+<li>The <strong>annual statement</strong> PDF shows your self-sufficiency for every month with
+  enough data, <strong>—</strong> for the others, and a note saying the figures come from your
+  own system.</li>
+<li>The <a href="../19-ai-assistants/">AI assistant tools</a> report it as
+  <code>gross_self_sufficiency_pct</code> and <code>gross_self_consumption_pct</code>.</li>
 </ul>
-<p>Unsaved metering and assignment forms close if your account, selected
-community or write access changes. A failed refresh of the same community
-keeps your draft open. Disabling the community also closes managers' dialogs.
-Switching communities does not cancel a submitted save; check its
-original community for the result.</p>
-<p><img alt="Assign participant modal" src="../screenshots/04b-metering-points-assign.png" /></p>
-<h3 id="example-validity-scenarios">Example Validity Scenarios<a class="headerlink" href="#example-validity-scenarios" title="Permanent link">&para;</a></h3>
-<p><strong>Scenario 1: New solar installation mid-year</strong></p>
+<h2 id="does-it-match-the-meter">Does it match the meter?<a class="headerlink" href="#does-it-match-the-meter" title="Permanent link">&para;</a></h2>
+<p><img alt="Source status with the meter comparison" src="../screenshots/24-energy-data-status.png" /></p>
+<p>After every sync OpenZEV compares your export and import with the grid
+operator's meter for the newest days present in both. This is only a check — the
+meter always wins and nothing is corrected. The result shows on the source:</p>
 <ul>
-<li>Meter installed: 2026-06-15</li>
-<li>Create assignment with <strong>Valid From</strong> = 2026-06-15</li>
-<li>Leave assignment <strong>Valid To</strong> blank (ongoing)</li>
-<li>Result: Billing includes solar production from June onwards</li>
+<li><strong>Matches the meter</strong> — the difference is below 10 %.</li>
+<li><strong>Differs from the meter</strong> — more than that. A typical cause is the wrong unit
+  (Wh sent as kWh) in a push client.</li>
+<li><strong>The timestamps look shifted</strong> — your values fit the meter better one or two
+  quarter hours earlier or later, which usually means the interval start and end
+  were mixed up.</li>
+<li><strong>Not enough to compare</strong> — there are fewer than two days present in both, for
+  example because the meter data has not been imported yet.</li>
 </ul>
-<p><strong>Scenario 2: Meter replacement</strong></p>
-<ul>
-<li>Old meter final reading: 2026-12-31</li>
-<li>New meter first reading: 2027-01-01</li>
-<li>Old assignment: <strong>Valid To</strong> = 2026-12-31</li>
-<li>New assignment: <strong>Valid From</strong> = 2027-01-01</li>
-<li>Result: No billing gaps or overlaps</li>
-</ul>
-<h2 id="shared-common-area-metering-points">Shared (Common-Area) Metering Points<a class="headerlink" href="#shared-common-area-metering-points" title="Permanent link">&para;</a></h2>
-<p>A common-area meter — <em>Allgemeinstrom</em>: stairwell lighting, lift, laundry,
-heat pump, the shared grid connection — measures energy the whole community
-uses, not one household's. Every assignment has an <strong>Allocation</strong> setting that
-decides who pays for it:</p>
+<h2 id="disconnect-delete-remove">Disconnect, delete, remove<a class="headerlink" href="#disconnect-delete-remove" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Allocation</th>
-<th>Who pays</th>
+<th>Action</th>
+<th>Stops new data</th>
+<th>Deletes data</th>
+<th>Keeps the connection</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>Personal</strong> (default)</td>
-<td>The assigned participant alone. This is how every meter behaved before this setting existed.</td>
+<td><strong>Disconnect</strong></td>
+<td>yes</td>
+<td>no (and it is still used for statistics)</td>
+<td>no (key and token are deleted)</td>
 </tr>
 <tr>
-<td><strong>Community</strong></td>
-<td>Every participant of the ZEV, split by their <a href="../03-participant-management/#allocation-weight">allocation weight</a>.</td>
+<td><strong>Delete data</strong></td>
+<td>no</td>
+<td>yes, all readings</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><strong>Remove source</strong></td>
+<td>yes</td>
+<td>yes, all readings</td>
+<td>no</td>
 </tr>
 </tbody>
 </table>
-<blockquote>
-<p><strong>The assigned participant does not change.</strong> A community meter still has a
-holder of record — usually the <em>Verwaltung</em> or a caretaker participant — who
-stays responsible for the meter in the UI, in data-quality checks, and in
-the audit log. <code>Community</code> changes only <strong>who is billed</strong>, not who holds it.
-The holder pays their own weighted share like everybody else, with no
-special case.</p>
-</blockquote>
-<p>Assignment rows set to <code>Community</code> are marked with a <strong>Community</strong> badge in
-the metering points list — visible on the common-area meter in the
-<a href="#what-is-a-metering-point">page screenshot above</a>.</p>
-<h3 id="switching-a-meter-to-community">Switching a meter to Community<a class="headerlink" href="#switching-a-meter-to-community" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Go to <strong>Metering Points</strong></li>
-<li>Find the meter and click <strong>Edit</strong> on its assignment row</li>
-<li>Set <strong>Allocation</strong> to <code>Community</code></li>
-<li>Click <strong>Save Assignment</strong></li>
-</ol>
-<p>Regenerate any <strong>draft</strong> invoices for affected periods to pick up the change.
-Invoices that have already been sent are protected and will not change — see
-<a href="../09-invoice-management/">Invoice Management</a>.</p>
-<h3 id="switching-mid-period-is-safe">Switching mid-period is safe<a class="headerlink" href="#switching-mid-period-is-safe" title="Permanent link">&para;</a></h3>
-<p>Allocation is resolved <strong>per reading</strong>, not per invoice. A meter that is
-<code>Personal</code> in January and <code>Community</code> from February bills correctly on both
-sides of the change: January's readings go to the holder in full, February's
-are split across the community. No readings are lost and none are billed
-twice.</p>
-<h3 id="what-gets-split">What gets split<a class="headerlink" href="#what-gets-split" title="Permanent link">&para;</a></h3>
-<p>For a <code>Community</code> meter, all of the following are divided by allocation weight:</p>
-<ul>
-<li>Energy consumed (both the local/solar share and the grid share), including
-  any levies and percentage-based tariffs on it</li>
-<li>Energy produced, if the meter is a production or bidirectional meter —
-  credits follow the same weights as charges</li>
-<li>Per-metering-point fees (see <a href="../07-tariff-configuration/">Tariff Configuration</a>)</li>
-</ul>
-<p>Invoice lines for a community share are labelled <strong>Gemeinschaftsanteil</strong>
-(<em>Community share</em> / <em>Part communautaire</em> / <em>Quota comunitaria</em>), so they are
-easy to tell apart from a participant's own consumption.</p>
-<h3 id="eligibility-is-date-accurate">Eligibility is date-accurate<a class="headerlink" href="#eligibility-is-date-accurate" title="Permanent link">&para;</a></h3>
-<p>A participant only shares readings from days they were actually a member. A
-mid-period joiner pays nothing towards community energy measured before their
-join date, and a leaver's share stops on their leave date.</p>
-<blockquote>
-<p><strong>Note:</strong> An <strong>inactive</strong> community meter (<strong>Active</strong> = off) bills nobody
-for per-metering-point fees, exactly like an inactive personal meter. Its
-historical readings still count towards the community energy pool.</p>
-</blockquote>
-<h2 id="what-a-metering-point-card-shows">What a Metering Point Card Shows<a class="headerlink" href="#what-a-metering-point-card-shows" title="Permanent link">&para;</a></h2>
-<p>Each card on the <strong>Metering Points</strong> page shows, at a glance:</p>
-<ul>
-<li>The <strong>meter ID</strong>, its <strong>building</strong> (when the community has several) and
-  its <strong>location</strong> within the building (or "No location set")</li>
-<li><strong>Active</strong>/<strong>Inactive</strong> and meter-<strong>type</strong> badges, plus a <strong>Surplus
-  metering</strong> badge when <a href="#generation-behind-the-meter">Generation behind the meter</a>
-  is ticked</li>
-<li>A <strong>data-health badge</strong> — <code>Healthy</code>, <code>Data gaps</code>, <code>Data at risk</code>, or <code>No
-  data yet</code>, based on the last 30 days of readings; click it to open the
-  metering point's data-quality view</li>
-<li><strong>Last reading</strong> date, or "No readings received yet"</li>
-<li>A <strong>No current holder</strong> warning if the meter has readings but no
-  participant is currently assigned to it</li>
-<li>Its current assignment (holder and validity window), or its full
-  assignment history if it has more than one</li>
-</ul>
-<p>Click <strong>Chart</strong> on a card for the metering point's full reading history.</p>
-<h2 id="meter-maintenance">Meter Maintenance<a class="headerlink" href="#meter-maintenance" title="Permanent link">&para;</a></h2>
-<h3 id="updating-a-metering-point">Updating a Metering Point<a class="headerlink" href="#updating-a-metering-point" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Go to <strong>Metering Points</strong></li>
-<li>Open the meter's <strong>⋯ More</strong> menu and click <strong>Edit</strong></li>
-<li>Update its ID, type, active status, location, or
-   <a href="#generation-behind-the-meter">Generation behind the meter</a> flag</li>
-<li>Click <strong>Save Changes</strong></li>
-</ol>
-<blockquote>
-<p><strong>Warning:</strong> Changing a meter ID retroactively can break billing audit trails. Prefer creating a new meter and adjusting assignment windows.</p>
-</blockquote>
-<h3 id="decommissioning-a-meter">Decommissioning a Meter<a class="headerlink" href="#decommissioning-a-meter" title="Permanent link">&para;</a></h3>
-<p>To stop billing a meter:</p>
-<ol>
-<li>Click <strong>Edit</strong> on its current assignment row</li>
-<li>Set <strong>Valid To</strong> to the last day it should be billed</li>
-<li>Click <strong>Save Assignment</strong></li>
-</ol>
-<p>Then, if the meter is physically gone, open its <strong>⋯ More</strong> menu, click
-<strong>Edit</strong>, set <strong>Active</strong> to off and click <strong>Save Changes</strong>. Deactivating
-removes it from data-health and "needs attention" monitoring and stops
-per-metering-point fees; on its own it does not stop energy billing.
-Historical data remains available either way.</p>
-<h2 id="metering-point-and-billing">Metering Point and Billing<a class="headerlink" href="#metering-point-and-billing" title="Permanent link">&para;</a></h2>
-<p>During invoice generation:</p>
-<ol>
-<li>Resolves each participant's metering point assignments by date</li>
-<li>Loads readings from each point during the invoice period</li>
-<li>Allocates energy between local and grid (see <a href="../08-billing-allocation-explained/">Billing Allocation</a>)</li>
-<li>Generates line items per metering point type</li>
-</ol>
-<p>If a metering point is <strong>missing readings</strong> in an invoice period, nothing is
-estimated: the missing intervals simply count as no energy. The period's
-readiness check on <strong>Overview</strong> flags the gap before you generate, so import
-the missing data first — see <a href="../06-metering-analysis/">Data Quality</a>.</p>
+<p>A ZEV manager sees the same buttons for a participant's source, except for the
+ones that touch the key. Deleting a participant or a metering point deletes their
+sources and readings with them.</p>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<p><strong>The Energy data tab is missing.</strong> The feature is off, or you do not personally
+hold a metering point marked <em>Generation behind the meter</em>. Ask your ZEV manager.</p>
+<p><strong>"Not accepted" when connecting.</strong> The key or the Solar Manager ID is wrong. The
+ID is the one of your installation, not your login name.</p>
+<p><strong>The server says the key cannot be stored.</strong> The platform administrator has not
+set up the encryption key for integrations (<code>INTEGRATION_ENCRYPTION_KEYS</code>). Push
+and file import still work without it.</p>
+<p><strong>The rate stays a dash.</strong> Less than 95 % of the period is covered. Look at
+<em>Data covers</em> on the source, and use <strong>Sync now</strong> or <strong>Import CSV</strong> to fill a gap.</p>
+<p><strong>Sync now says to wait.</strong> One manual sync every five minutes is allowed; the
+hourly one runs anyway.</p>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Import readings:</strong> <a href="../05-metering-import/">Metering Imports</a></li>
-<li><strong>Check data quality:</strong> <a href="../06-metering-analysis/">Metering Analysis</a></li>
-<li><strong>Configure tariffs:</strong> <a href="../07-tariff-configuration/">Tariff Configuration</a></li>
-<li><strong>Understand billing:</strong> <a href="../08-billing-allocation-explained/">How Energy Allocation Works</a></li>
+<li><a href="../04-metering-points/">Metering points</a> — mark generation behind the meter</li>
+<li><a href="../06-metering-analysis/">Metering analysis</a> — the charts and the data quality view</li>
+<li><a href="../11-roles-and-permissions/">Roles and permissions</a></li>
 </ul>
 
 
@@ -2206,7 +2052,7 @@ the missing data first — see <a href="../06-metering-analysis/">Data Quality</
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../03-participant-management/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Managing Participants">
+          <a href="../06-metering-analysis/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Metering Analysis">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2216,20 +2062,20 @@ the missing data first — see <a href="../06-metering-analysis/">Data Quality</
                 Previous
               </span>
               <div class="md-ellipsis">
-                Managing Participants
+                Metering Analysis
               </div>
             </div>
           </a>
         
         
           
-          <a href="../05-metering-import/" class="md-footer__link md-footer__link--next" aria-label="Next: Metering Imports">
+          <a href="../07-tariff-configuration/" class="md-footer__link md-footer__link--next" aria-label="Next: Tariff Configuration">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Metering Imports
+                Tariff Configuration
               </div>
             </div>
             <div class="md-footer__button md-icon">
