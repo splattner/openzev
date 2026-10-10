@@ -215,7 +215,8 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Audit log export (CSV or JSON) for a filtered time range | `idea` | `medium` | Useful for compliance reviews and incident hand-off |
 | Participant-scoped audit view (show own actions to participant role) | `deferred` | — | Explicitly deferred to v2 in spec |
 | Full-text search on audit list for ZEV owners | `deferred` | — | Admin-only in v1 by design; revisit if owner needs grow |
-| Configurable retention / automated archival job | `idea` | `low` | Operational guidance exists; automation not yet implemented |
+| Configurable retention / automated archival job | `idea` | `low` | Retention of the `AuditEvent` rows themselves is not implemented; the IP/user-agent slice is, see the privacy sweep below |
+| Privacy retention sweep — audit IP/user agent, invoice email recipients and spent one-time tokens, daily or via `openzev_privacy_sweep` | `shipped` | — | [spec](specs/2026-10-privacy-retention-sweep.md), #795 |
 | SIEM / webhook / streaming export of audit events | `deferred` | — | Out of scope for v1 |
 | Audit historical backfill (pre-feature changes) | `deferred` | — | Explicitly out of scope |
 
