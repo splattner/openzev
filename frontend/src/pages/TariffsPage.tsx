@@ -12,7 +12,6 @@ import { TariffPeriodFormModal } from '../features/tariffs/TariffPeriodFormModal
 import { TariffToolbar, type TariffValidityFilter } from '../features/tariffs/TariffToolbar'
 import { TariffVersionModal } from '../features/tariffs/TariffVersionModal'
 import { useTariffVersions } from '../features/tariffs/useTariffVersions'
-import { seasonSortKey } from '../features/tariffs/recurrence'
 import { isTariffCurrentlyValid } from '../features/tariffs/validity'
 import { seriesKeyOf } from '../features/tariffs/useTariffDisplay'
 import { tariffOverviewFilename, tariffOverviewParams } from '../features/tariffs/tariffOverview'
@@ -29,7 +28,7 @@ import { useCommunityAccess, useScopeNote } from '../lib/communityAccess'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
-import type { Tariff, TariffPeriod, TariffSeries } from '../types/api'
+import type { Tariff, TariffSeries } from '../types/api'
 import { PageHeader } from '../components/PageHeader'
 import { Notice } from '../components/Notice'
 import { ScopeGuard } from '../components/ScopeGuard'
@@ -123,45 +122,8 @@ export function TariffsPage() {
         [allSeries],
     )
 
-    const periodsByTariff = useMemo(() => {
-        const grouped = new Map<string, TariffPeriod[]>()
-
-        periods.forEach((period) => {
-            const existing = grouped.get(period.tariff) ?? []
-            existing.push(period)
-            grouped.set(period.tariff, existing)
-        })
-
-        grouped.forEach((tariffPeriods) => {
-            tariffPeriods.sort((left, right) => {
-                // Season first: a seasonal tariff's bands otherwise interleave
-                // its winter and summer prices under one another.
-                const seasonDelta = seasonSortKey(left.months) - seasonSortKey(right.months)
-                if (seasonDelta !== 0) return seasonDelta
-
-                // Appended rather than inserted, so tariffs that predate
-                // unnamed bands display exactly as they did.
-                const periodTypeOrder: Record<TariffPeriod['period_type'], number> =
-                    { flat: 0, high: 1, low: 2, band: 3 }
-                const typeDelta = periodTypeOrder[left.period_type] - periodTypeOrder[right.period_type]
-                if (typeDelta !== 0) return typeDelta
-
-                const fromDelta = (left.time_from ?? '').localeCompare(right.time_from ?? '')
-                if (fromDelta !== 0) return fromDelta
-
-                return (left.time_to ?? '').localeCompare(right.time_to ?? '')
-            })
-        })
-
-        return grouped
-    }, [periods])
-
     const tariffNameById = useMemo(() => {
         return new Map((tariffs || []).map((tariff) => [tariff.id, tariff.name]))
-    }, [tariffs])
-
-    const energyTariffs = useMemo(() => {
-        return tariffs.filter((tariff) => tariff.billing_mode === 'energy')
     }, [tariffs])
 
     // Energy and percentage-of-energy tariffs are the two modes that take
@@ -171,22 +133,24 @@ export function TariffsPage() {
         return tariffs.filter((tariff) => tariff.billing_mode === 'energy' || tariff.billing_mode === 'percentage_of_energy')
     }, [tariffs])
 
-    const tariffsWithPeriodsCount = useMemo(
-        () => tariffs.filter((tariff) => (periodsByTariff.get(tariff.id)?.length ?? 0) > 0).length,
-        [tariffs, periodsByTariff],
-    )
-
     // "Valid only" now hides whole series that have no version in force, which is
     // what collapses a pile of superseded tariffs down to what is current.
     // Resolved client-side with the same helper the validity badge uses, so the
     // filter and the badge cannot disagree.
-    const visibleSeries = useMemo(
-        () => (validityFilter === 'all'
-            ? allSeries
-            : allSeries.filter((series) => series.versions.some(
-                (version) => isTariffCurrentlyValid(version, today),
-            ))),
-        [allSeries, validityFilter, today],
+    const validSeries = useMemo(
+        () => allSeries.filter((series) => series.versions.some(
+            (version) => isTariffCurrentlyValid(version, today),
+        )),
+        [allSeries, today],
+    )
+    const visibleSeries = validityFilter === 'all' ? allSeries : validSeries
+    // Only then can the overview PDF differ between its two scopes; the list's
+    // tabs need no such flag, as FilterTabs drops a tab that changes nothing.
+    const hasOutOfForceVersions = useMemo(
+        () => allSeries.some((series) => series.versions.some(
+            (version) => !isTariffCurrentlyValid(version, today),
+        )),
+        [allSeries, today],
     )
 
     const tariffSections = useMemo(
@@ -242,11 +206,11 @@ export function TariffsPage() {
         cancelConfirmation()
     }, [readOnly, selectedZevId, user?.id])
 
-    // Scope follows the page's own validity filter, so the PDF matches what
-    // the operator is currently looking at — "current tariffs" or "every
-    // version" — without a second control to keep in sync.
+    // The scope is chosen at the download, not by the list's tabs: those
+    // filter whole series, so "All" often changes nothing in the list while
+    // it would still add every superseded version to the PDF.
     const overviewMutation = useMutation({
-        mutationFn: () => downloadTariffOverview(tariffOverviewParams(selectedZevId ?? '', validityFilter)),
+        mutationFn: (scope: TariffValidityFilter) => downloadTariffOverview(tariffOverviewParams(selectedZevId ?? '', scope)),
         onSuccess: (blob) => downloadBlob(blob, tariffOverviewFilename(today)),
         onError: (error) => pushToast(formatApiError(error, t('pages.tariffs.overviewPdf.error')), 'error'),
     })
@@ -254,6 +218,7 @@ export function TariffsPage() {
     const header = (
         <PageHeader
             eyebrow={selectedZev?.name}
+            communitySwitch
             scopeNote={scopeNote}
             title={t('pages.tariffs.title')}
             description={t('pages.tariffs.description')}
@@ -268,16 +233,15 @@ export function TariffsPage() {
                 <Notice tone="error" onRetry={() => void seriesQuery.refetch()} isRetrying={seriesQuery.isFetching}>{t('common.error')}</Notice>
             ) : <>
             <TariffToolbar
-                tariffCount={tariffs.length}
-                energyTariffCount={energyTariffs.length}
-                tariffsWithPeriodsCount={tariffsWithPeriodsCount}
-                periodCount={periods.length}
+                validCount={validSeries.length}
+                totalCount={allSeries.length}
+                hasOutOfForceVersions={hasOutOfForceVersions}
                 validityFilter={validityFilter}
                 onValidityFilterChange={setValidityFilter}
                 onOpenCreateTariffModal={openCreateTariffModal}
                 onOpenImportModal={selectedZevId && !readOnly ? () => setShowImportModal(true) : undefined}
                 readOnly={readOnly}
-                onDownloadOverview={selectedZevId ? () => overviewMutation.mutate() : undefined}
+                onDownloadOverview={selectedZevId ? (scope) => overviewMutation.mutate(scope) : undefined}
                 overviewBusy={overviewMutation.isPending}
             />
 

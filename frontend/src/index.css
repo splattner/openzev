@@ -1,5 +1,5 @@
 :root {
-  font-family: 'Inter Variable', Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-sans);
   color: var(--text-primary);
   background: var(--app-bg);
   line-height: 1.5;
@@ -8,6 +8,18 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Shape and depth, shared by every surface: sheets sit on the paper with a
+     hairline, and only what floats above the page casts a shadow. */
+  --radius-xs: 0.375rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --shadow-sheet: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-raised: 0 1px 2px rgba(15, 23, 42, 0.05), 0 6px 16px rgba(15, 23, 42, 0.06);
+  --shadow-overlay: 0 2px 6px rgba(15, 23, 42, 0.06), 0 18px 44px rgba(15, 23, 42, 0.16);
+
 }
 
 * {
@@ -23,6 +35,33 @@ body,
 
 body {
   background: var(--app-bg);
+  font-size: 0.9375rem;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--text-heading);
+  letter-spacing: -0.01em;
+}
+
+hr {
+  height: 0;
+  margin: 1.25rem 0;
+  border: 0;
+  border-top: 1px solid var(--border-default);
+}
+
+/* A form set straight into a sheet stacks its fields with breathing room. */
+.card > form {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.card > form > .button:not([style]) {
+  justify-self: start;
 }
 
 /* Focus visibility everywhere — covers hand-rolled CSS and Mantine widgets. */
@@ -51,9 +90,10 @@ select:where(:not([multiple])) {
   width: 100%;
   height: var(--field-height);
   padding: 0 var(--field-padding-inline);
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--border-strong);
   border-radius: var(--field-radius);
   background: var(--white);
+  color: var(--text-primary);
   font-size: var(--field-font-size);
   line-height: var(--field-line-height);
 }
@@ -63,7 +103,7 @@ select:where(:not([multiple])) {
 .zev-email-field textarea {
   width: 100%;
   padding: 0.625rem var(--field-padding-inline);
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--border-strong);
   border-radius: var(--field-radius);
   background: var(--white);
   font: inherit;
@@ -78,27 +118,41 @@ input[type="radio"] {
   width: auto;
 }
 
+/* Field labels match Mantine's (theme `InputWrapper`): the label is quieter
+   than the value it names. */
 label {
   display: grid;
   gap: var(--field-gap);
+  font-size: var(--field-label-size);
+  font-weight: var(--field-label-weight);
+  color: var(--text-body);
+}
+
+label :is(input, select, textarea) {
+  font-weight: 400;
 }
 
 label > small.muted {
   font-size: var(--field-help-size);
+  font-weight: 400;
   line-height: var(--field-line-height);
 }
 
+/* ── Tables — the documents' line items in screen form ──────────────────────
+   Kicker-style column labels in white on the documents' dark forest header
+   band, hairline rows, tabular figures right-aligned. */
 .page-stack table,
 .data-table table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 0.875rem;
 }
 
 .page-stack th,
 .page-stack td,
 .data-table th,
 .data-table td {
-  padding: 0.6rem 0.85rem;
+  padding: 0.625rem 0.875rem;
   border-bottom: 1px solid var(--border-default);
   text-align: left;
 }
@@ -106,6 +160,12 @@ label > small.muted {
 .page-stack th,
 .page-stack td {
   vertical-align: top;
+}
+
+/* Wide record tables (DataTable) keep columns closer together. */
+.data-table th,
+.data-table td {
+  padding-inline: 0.75rem;
 }
 
 .data-table th,
@@ -125,6 +185,11 @@ label > small.muted {
   max-height: calc(100dvh - 12rem);
   overflow-y: auto;
   scrollbar-width: thin;
+}
+
+.participant-table th,
+.participant-table td {
+  vertical-align: middle;
 }
 
 /* Frozen name column; corner 4, header row 3, body column 1. */
@@ -165,7 +230,7 @@ label > small.muted {
 .participant-table thead tr th {
   position: sticky;
   top: 0;
-  background: var(--surface);
+  background: var(--brand-deep);
   z-index: 3;
 }
 
@@ -201,7 +266,7 @@ label > small.muted {
   width: 100%;
   border: 0;
   background: transparent;
-  padding: 0.15rem 0.25rem;
+  padding: 0.15rem 0;
   font: inherit;
   color: inherit;
   text-align: left;
@@ -230,20 +295,40 @@ label > small.muted {
   white-space: nowrap;
 }
 
-/* Operational table contract: sticky header, scannable rows (36–40px),
+/* Operational table contract: sticky header, scannable rows (40–44px),
    hover feedback, right-aligned tabular quantities/money. */
 .page-stack thead th,
 .data-table thead th {
   position: sticky;
   top: 0;
   z-index: 1;
-  font-size: 0.85rem;
-  color: var(--text-body);
-  background: var(--surface);
-  font-weight: 600;
+  padding-block: 0.55rem;
+  border-bottom-color: var(--brand-deep);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--white);
+  background: var(--brand-deep);
+}
+
+/* The band's outer corners follow the sheet's. */
+.page-stack thead th:first-child,
+.data-table thead th:first-child {
+  border-top-left-radius: var(--radius-sm);
+}
+
+.page-stack thead th:last-child,
+.data-table thead th:last-child {
+  border-top-right-radius: var(--radius-sm);
 }
 
 .data-table thead th {
+  white-space: nowrap;
+}
+
+/* Identifiers (invoice and meter numbers) never break at their hyphens. */
+.data-table td code {
   white-space: nowrap;
 }
 
@@ -254,7 +339,12 @@ label > small.muted {
 
 .page-stack tbody tr,
 .data-table tbody tr {
-  height: 2.25rem;
+  height: 2.75rem;
+}
+
+.page-stack tbody tr:last-child > td,
+.data-table tbody tr:last-child > td {
+  border-bottom-color: transparent;
 }
 
 .page-stack tbody tr:hover > td,
@@ -279,85 +369,80 @@ label > small.muted {
   background: transparent;
   color: inherit;
   font: inherit;
-  font-weight: 600;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
   cursor: pointer;
 }
 
 .data-table-footer {
-  font-size: 0.82rem;
+  font-size: 0.8125rem;
 }
 
-.data-table-page-size {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.data-table-page-size select {
-  width: auto;
-}
-
+/* ── App shell: forest sidebar + paper workspace ───────────────────────────
+   The sidebar is deep forest, like the documents' dark header band: sage
+   text, white for what is current, and the gold mark only here, on the
+   dark. */
 .shell {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 14rem minmax(0, 1fr);
   min-height: 100vh;
   transition: grid-template-columns 0.2s ease;
 }
 
 .shell.shell-collapsed {
-  grid-template-columns: 96px 1fr;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 1.25rem;
-  padding: 2rem;
+  gap: 0.75rem;
+  padding: 1rem 0.75rem 0.75rem;
   background: var(--sidebar-bg);
-  color: var(--white);
+  color: var(--sidebar-text);
   transition: padding 0.2s ease;
   height: 100dvh;
   position: sticky;
   top: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sidebar-line) transparent;
+
+  /* The forest ring would vanish on the forest; the account panel, a white
+     sheet, takes it back. */
+  --focus-ring: var(--white);
 }
 
 .sidebar.collapsed {
-  padding: 1.5rem 0.85rem;
-}
-
-.sidebar h1 {
-  margin: 0;
-  font-size: 1.8rem;
+  padding-inline: 0.625rem;
 }
 
 .sidebar-top {
   display: grid;
-  gap: 1.5rem;
   flex: 1;
   min-width: 0;
   min-height: 4.5rem;
   overflow-x: hidden;
   overflow-y: auto;
-  padding-right: 0.25rem;
   padding-bottom: 0.5rem;
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+  scrollbar-color: var(--sidebar-line) transparent;
   align-content: start;
 }
 
 .sidebar-fixed {
   display: grid;
-  gap: 1rem;
+  gap: 0.875rem;
   flex-shrink: 1;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   grid-template-rows: auto minmax(0, auto);
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+  scrollbar-color: var(--sidebar-line) transparent;
 }
 
 .sidebar-fixed::-webkit-scrollbar,
@@ -380,34 +465,44 @@ label > small.muted {
   background: transparent;
 }
 
+/* Horizontal lockup: the logo's mark beside its wordmark. */
 .sidebar-brand-row {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding-left: 0.375rem;
 }
 
 .sidebar-brand {
   display: flex;
   flex: 1;
-  justify-content: center;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
 }
 
-.sidebar-logo {
-  max-width: 150px;
-  max-height: clamp(56px, 17dvh, 150px);
-  width: auto;
-  height: auto;
+.sidebar-brand-mark {
   display: block;
-  margin: 0 auto;
+  width: 2.125rem;
+  height: 2.125rem;
+  flex-shrink: 0;
+}
+
+.sidebar-brand-wordmark {
+  display: block;
+  width: auto;
+  height: 1.125rem;
+  min-width: 0;
 }
 
 .sidebar-collapse-button {
-  width: 2.5rem;
-  height: 2.5rem;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--brand-accent);
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--sidebar-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -416,19 +511,19 @@ label > small.muted {
 }
 
 .sidebar-collapse-button:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--sidebar-hover);
   color: var(--white);
 }
 
 .sidebar-collapse-button svg {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 .eyebrow {
   margin: 0 0 0.35rem;
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 650;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-muted);
@@ -436,44 +531,47 @@ label > small.muted {
 
 .nav-list {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.125rem;
   min-width: 0;
 }
 
 .nav-link {
+  position: relative;
   width: 100%;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-  padding: 0.55rem 0.85rem;
-  min-height: 2.4rem;
-  border-radius: 0.9rem;
-  color: var(--brand-accent);
-  transition: background 0.2s ease, color 0.2s ease;
+  gap: 0.75rem;
+  padding: 0.4rem 0.625rem;
+  min-height: 2.25rem;
+  border-radius: var(--radius-sm);
+  color: var(--sidebar-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .nav-link:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--sidebar-hover);
   color: var(--white);
 }
 
+/* Current page: a lighter forest row in white. */
 .nav-link.active {
   background: var(--sidebar-active);
-  color: var(--brand-deep);
-  font-weight: 650;
-  box-shadow: inset 3px 0 0 var(--brand-mid);
+  color: var(--white);
+  font-weight: 600;
 }
 
 .nav-section {
   display: grid;
-  gap: 0.3rem;
+  gap: 0.125rem;
   min-width: 0;
 }
 
 .nav-icon {
-  width: 1.2rem;
-  height: 1.2rem;
+  width: 1.125rem;
+  height: 1.125rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -481,8 +579,8 @@ label > small.muted {
 }
 
 .nav-icon svg {
-  width: 1.2rem;
-  height: 1.2rem;
+  width: 1.125rem;
+  height: 1.125rem;
 }
 
 .nav-label {
@@ -493,220 +591,179 @@ label > small.muted {
 
 /* First labelled group — same clearance as nav-standalone, no divider. */
 .nav-section-start {
-  margin-top: 1rem;
+  margin-top: 0.75rem;
 }
 
 .nav-section-end {
   margin-top: 0.75rem;
-  padding-top: 0.6rem;
-  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--sidebar-line);
 }
 
 .nav-standalone {
-  margin-top: 1rem;
-}
-
-/* White ring for the dark sidebar. */
-.nav-link:focus-visible {
-  outline: 2px solid var(--white);
-  outline-offset: 2px;
+  margin-top: 0.75rem;
 }
 
 /* Short viewports: tighten sidebar rhythm. */
-@media (max-height: 56.25rem) {
+@media (max-height: 50rem) {
   .sidebar {
-    gap: 0.75rem;
-    padding-top: 1.25rem;
-    padding-bottom: 1.25rem;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
   }
 
-  .sidebar-top {
-    gap: 1rem;
+  .nav-link {
+    min-height: 2rem;
+    padding-block: 0.3rem;
   }
 
   .nav-section-start,
+  .nav-section-end,
   .nav-standalone {
     margin-top: 0.5rem;
-  }
-
-  .sidebar-footer {
-    padding-top: 0.5rem;
-    gap: 0.5rem;
   }
 }
 
 .nav-group-label {
-  padding: 0.35rem 0.85rem 0.1rem;
-  font-size: 0.7rem;
-  font-weight: 700;
+  padding: 0.5rem 0.625rem 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 650;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--brand-accent);
-  opacity: 0.75;
-}
-
-.sidebar-zev-menu {
-  margin-bottom: 0.25rem;
-}
-
-/* Inline expander — the sidebar clips floating content; override the
- * header-era trigger width so the switcher fits the column. */
-.sidebar-zev-menu,
-.sidebar-zev-menu .user-menu-trigger,
-.sidebar-zev-menu .zev-menu-dropdown {
-  min-width: 0;
-  width: 100%;
-}
-
-.sidebar-zev-menu .user-menu-trigger {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(148, 163, 184, 0.3);
-}
-.sidebar-zev-menu .user-meta strong { color: var(--white); }
-.sidebar-zev-menu .user-meta small { color: rgba(255, 255, 255, 0.7); }
-.sidebar-zev-menu .user-meta { min-width: 0; }
-.sidebar-zev-menu .user-meta strong,
-.sidebar-zev-menu .user-meta small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sidebar-zev-menu .user-menu-dropdown {
-  position: static;
-  margin-top: 0.35rem;
-  min-height: 12rem;
-}
-
-.sidebar-zev-menu,
-.sidebar-zev-menu .user-menu-section {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.sidebar-zev-menu .user-menu-dropdown {
-  display: flex;
-  flex-direction: column;
-}
-.sidebar-zev-menu .user-menu-trigger,
-.sidebar-zev-menu .user-menu-section-title {
-  flex-shrink: 0;
-}
-.sidebar-zev-menu .user-menu-dropdown,
-.sidebar-zev-menu .user-menu-section,
-.zev-dropdown-list {
-  flex: 1 1 auto;
-}
-
-.shell-collapsed .sidebar-zev-menu .user-meta { display: none; }
-.shell-collapsed .sidebar-zev-menu .user-menu-trigger {
-  justify-content: center;
-  padding: 0.5rem;
-}
-/* Hide the list in the collapsed sidebar. */
-.shell-collapsed .sidebar-zev-menu .user-menu-dropdown { display: none; }
-
-/* Platform scope: switcher unmounted, group-label tint stays readable. */
-.shell-scope-platform .nav-group-label {
-  color: var(--white);
-  opacity: 0.85;
-}
-
-/* Full-width platform scope indicator in the sidebar. */
-.sidebar-scope-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.55rem 0.75rem;
-  font-size: 0.88rem;
-  font-weight: 600;
-  width: 100%;
-  min-height: 2.4rem;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--white);
-}
-
-.sidebar-scope-chip .nav-icon {
-  flex-shrink: 0;
-  color: var(--gold);
-}
-
-.sidebar-scope-chip-label {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.shell-collapsed .sidebar-scope-chip {
-  justify-content: center;
-  padding: 0.5rem;
-}
-
-.shell-collapsed .sidebar-scope-chip-label {
-  display: none;
-}
-
-.sidebar-footer {
-  display: grid;
-  gap: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(148, 163, 184, 0.15);
-}
-
-.sidebar-github-link {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  color: var(--brand-accent);
-  text-decoration: none;
-  font-size: 0.8rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
-  transition: color 0.15s, background 0.15s;
-}
-
-.sidebar-github-link:hover {
-  color: var(--white);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.sidebar-github-link svg {
-  flex-shrink: 0;
-}
-
-.sidebar-github-label {
-  display: flex;
-  gap: 0.35em;
-  align-items: baseline;
-}
-
-.sidebar-github-version {
-  font-size: 0.72rem;
+  color: var(--sidebar-text);
   opacity: 0.8;
 }
 
-.shell-collapsed .sidebar-github-label {
+/* ── Account: the signed-in person at the foot ──────────────────────────────
+   A plain row on the sidebar, set off by the footer's hairline: the name
+   and the up/down selector mark. */
+.sidebar-footer {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--sidebar-line);
+}
+
+.sidebar-user .user-menu-trigger {
+  width: 100%;
+  min-width: 0;
+  gap: 0.625rem;
+  padding: 0.5rem;
+  border-color: transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--white);
+  transition: background-color 0.15s ease;
+}
+
+.sidebar-user .user-menu-trigger:hover,
+.sidebar-user .user-menu-trigger[aria-expanded='true'] {
+  background: var(--sidebar-hover);
+}
+
+/* On the account page the account row is the current place, marked like
+   the current navigation row. */
+.sidebar-user .user-menu-trigger.is-current {
+  background: var(--sidebar-active);
+}
+
+.sidebar-user .user-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-user .user-meta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--white);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.user-menu-caret {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--sidebar-text);
+}
+
+.user-menu-caret svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Collapsed rail: the selector mark alone. */
+.shell-collapsed .sidebar-user .user-meta {
   display: none;
 }
 
-.shell-collapsed .sidebar-brand {
-  display: none;
+.shell-collapsed .sidebar-user .user-menu-trigger {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+/* The account panel opens upwards over the navigation, inside the sidebar. */
+.sidebar-user .user-menu-dropdown {
+  top: auto;
+  right: 0;
+  bottom: calc(100% + 0.375rem);
+  left: 0;
+  min-width: 0;
+  --focus-ring: var(--brand-mid);
+}
+
+/* The panel's first line: which login this is, for people with several. */
+.user-menu-email {
+  overflow: hidden;
+  margin-bottom: 0.25rem;
+  padding: 0.25rem 0.625rem 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The panel's last line: what runs here and where its source lives. */
+.user-menu-about {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.625rem 0.25rem;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-decoration: none;
+}
+
+.user-menu-about:hover {
+  color: var(--text-primary);
+}
+
+.user-menu-about svg {
+  flex-shrink: 0;
+}
+
+.user-menu-about-version {
+  font-variant-numeric: tabular-nums;
 }
 
 .shell-collapsed .sidebar-brand-row {
+  flex-direction: column;
+  gap: 0.625rem;
+  padding-left: 0;
+}
+
+.shell-collapsed .sidebar-brand {
+  flex: none;
   justify-content: center;
 }
 
-.shell-collapsed .sidebar-collapse-button {
-  width: 3rem;
+.shell-collapsed .sidebar-brand-wordmark {
+  display: none;
 }
 
 .shell-collapsed .nav-link {
   justify-content: center;
-  padding: 0.9rem 0.75rem;
+  padding: 0.55rem;
 }
 
 .shell-collapsed .nav-label,
@@ -715,13 +772,16 @@ label > small.muted {
 }
 
 .content {
-  padding: 2.5rem;
+  padding: 2rem 2rem 2.5rem;
 }
 
 /* Page content only; the top bar is a separate banner. Programmatic focus
    target for the skip link and route changes, not a tab stop. */
 .content-main {
+  width: 100%;
+  max-width: 88rem;
   min-width: 0;
+  margin-inline: auto;
 }
 
 .content-main:focus,
@@ -738,92 +798,57 @@ label > small.muted {
   z-index: 300;
   padding: 0.6rem 1rem;
   border: 1px solid var(--border-default);
-  border-radius: 0.6rem;
+  border-radius: var(--radius-sm);
   background: var(--surface-card);
   color: var(--interactive);
   font-weight: 600;
   transform: translateY(calc(-100% - 1.5rem));
 }
 
+/* The shadow only while shown: parked above the viewport, its blur would
+   still reach into the top of the page. */
 .skip-link:focus {
+  box-shadow: var(--shadow-overlay);
   transform: none;
 }
 
+/* Banner above the page: the phone's app bar, and the impersonation notice
+   on any width. Empty on a desktop session. */
 .top-nav {
-  display: flex;
-  align-items: center;
+  display: grid;
   gap: 0.75rem;
-  justify-content: flex-end;
-  margin-bottom: 0.5rem;
+  width: 100%;
+  max-width: 88rem;
+  margin-inline: auto;
+}
+
+.top-nav:has(.impersonation-banner) {
+  margin-bottom: 1.25rem;
+}
+
+.mobile-bar {
+  display: none;
 }
 
 .impersonation-banner {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.6rem;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
   border: 1px solid var(--warning-300);
   background: var(--warning-100);
   color: var(--warning-800);
-  border-radius: 0.9rem;
-  padding: 0.4rem 0.55rem 0.4rem 0.75rem;
-  font-size: 0.85rem;
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 .impersonation-banner .button {
-  padding: 0.35rem 0.65rem;
-}
-
-.zev-dropdown-list {
-  max-height: min(220px, 30dvh);
-  min-height: 2.75rem;
-  overflow-y: auto;
-  display: grid;
-  gap: 0.35rem;
-}
-
-.zev-dropdown-item {
-  width: 100%;
-  border: 1px solid var(--border-default);
-  background: var(--white);
-  color: var(--ink);
-  border-radius: 0.6rem;
-  padding: 0.55rem 0.65rem;
-  text-align: left;
-  cursor: pointer;
-}
-
-.zev-dropdown-item:hover:not(:disabled) {
-  background: var(--surface);
-}
-
-.zev-dropdown-item.active {
-  background: var(--brand-pale);
-  border-color: var(--brand-mid);
-  color: var(--brand-deep);
-  font-weight: 700;
-}
-
-.zev-dropdown-item:disabled {
-  cursor: default;
-  opacity: 0.7;
-}
-
-/* The account's relation to the community (manager, viewer, participant),
-   below the name: the sidebar dropdown is too narrow for both on one line. */
-.zev-dropdown-item {
-  display: grid;
-  gap: 0.1rem;
-}
-
-.zev-dropdown-relation {
-  color: var(--muted);
-  font-weight: 400;
-}
-
-.zev-dropdown-item-muted {
-  border-style: dashed;
-  color: var(--muted);
-  background: var(--surface);
+  min-height: 2rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8125rem;
 }
 
 .user-menu {
@@ -834,46 +859,24 @@ label > small.muted {
   display: inline-flex;
   align-items: center;
   gap: 0.75rem;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  background: rgba(255, 255, 255, 0.92);
-  border-radius: 0.9rem;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  border-radius: var(--radius-md);
   padding: 0.5rem 0.75rem;
+  text-align: left;
+  font: inherit;
   cursor: pointer;
-  min-width: 250px;
-}
-
-.user-avatar {
-  width: 2rem;
-  height: 2rem;
-  flex-shrink: 0;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--brand);
-  color: var(--white);
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.user-avatar svg {
-  width: 1.2rem;
-  height: 1.2rem;
 }
 
 .user-meta {
   display: grid;
   text-align: left;
+  line-height: 1.35;
 }
 
 .user-meta strong {
-  font-size: 0.92rem;
+  font-size: 0.875rem;
   color: var(--ink);
-}
-
-.user-meta small {
-  font-size: 0.78rem;
-  color: var(--muted);
 }
 
 .user-menu-dropdown {
@@ -882,31 +885,34 @@ label > small.muted {
   top: calc(100% + 0.35rem);
   z-index: 10;
   min-width: 220px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  background: var(--white);
-  border-radius: 0.8rem;
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
-  padding: 0.4rem;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+  padding: 0.375rem;
   display: grid;
-  gap: 0.25rem;
+  gap: 0.125rem;
 }
 
 .user-menu-item {
   border: 0;
   background: transparent;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.625rem;
   text-align: left;
   width: 100%;
-  border-radius: 0.6rem;
-  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.625rem;
   color: var(--ink);
+  font: inherit;
+  font-size: 0.875rem;
   cursor: pointer;
 }
 
 .user-menu-item:hover {
-  background: var(--surface);
+  background: var(--surface-sunken);
 }
 
 .user-menu-item-icon {
@@ -918,27 +924,122 @@ label > small.muted {
   color: var(--text-body);
 }
 
+/* ── Filter bar: the period and the view's filters, on one line ───────────
+   Set directly on the page, like the document's meta row (period, dates)
+   above its line items. */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+}
+
+.filter-bar > :is(.error-banner, .warning-banner) {
+  flex-basis: 100%;
+}
+
+/* The fields move as one group: its basis is room for all of them side by
+   side (13rem each plus the gap), so it either shares the period's line
+   whole or wraps below it whole — never split around the period. Beside
+   the period it sits at the end of the line. */
+.filter-bar-fields {
+  display: flex;
+  flex: 1 1 13rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  min-width: 0;
+  max-width: 24rem;
+  margin-left: auto;
+}
+
+.filter-bar-fields:has(> :nth-child(2)) {
+  flex-basis: 27rem;
+  max-width: 50rem;
+}
+
+.filter-bar-fields:has(> :nth-child(3)) {
+  flex-basis: 41rem;
+  max-width: 75rem;
+}
+
+.filter-bar-fields > label {
+  flex: 1 1 13rem;
+  min-width: 0;
+}
+
+.filter-bar-note {
+  flex-basis: 100%;
+  margin: -0.25rem 0 0;
+  font-size: 0.8125rem;
+  text-align: end;
+}
+
+/* Previous / range / next as one group, kept on one line: the range gives
+   way (ellipsis) before the arrows wrap. */
 .period-selector {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.period-selector:not(.period-selector--compact) .period-selector-trigger {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.period-selector:not(.period-selector--compact) .period-selector-text {
+  min-width: 0;
+}
+
+/* Beside other fields the range and its interval share one line, so the
+   trigger keeps the shared control height; the interval's label is left to
+   screen readers. Phones stack the fields, and the trigger its two lines. */
+@media (min-width: 769px) {
+  .period-selector:not(.period-selector--compact) .period-selector-text {
+    grid-auto-flow: column;
+    align-items: baseline;
+    gap: 0.625rem;
+  }
+
+  .period-selector-interval-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+.period-selector:not(.period-selector--compact) :is(.period-selector-range, .period-selector-interval) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .period-selector-trigger {
   display: inline-flex;
   align-items: center;
   gap: 0.75rem;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  background: rgba(255, 255, 255, 0.92);
-  border-radius: 0.9rem;
-  padding: 0.45rem 0.9rem;
+  min-height: var(--field-height);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-card);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sheet);
+  padding: 0.3rem 0.875rem;
+  font: inherit;
+  color: var(--text-primary);
   cursor: pointer;
 }
 
 .period-selector-trigger:hover:not(:disabled) {
-  background: var(--surface);
+  background: var(--surface-sunken);
 }
 
 .period-selector-trigger:disabled {
@@ -946,26 +1047,38 @@ label > small.muted {
   cursor: default;
 }
 
+.period-selector .button {
+  min-height: var(--field-height);
+}
+
+.period-selector:not(.period-selector--compact) .period-selector-step {
+  width: var(--field-height);
+  padding-inline: 0;
+  flex: none;
+}
+
 .period-selector-text {
   display: grid;
-  gap: 0.15rem;
-  justify-items: center;
+  gap: 0.05rem;
+  justify-items: start;
+  text-align: start;
 }
 
 .period-selector-title {
-  font-weight: 700;
-  font-size: 0.95rem;
+  font-weight: 650;
+  font-size: 0.8125rem;
   color: var(--ink);
 }
 
 .period-selector-range {
-  font-weight: 700;
-  font-size: 0.95rem;
+  font-weight: 650;
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 
 .period-selector-interval {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
 }
 
 .period-selector-caret {
@@ -980,12 +1093,12 @@ label > small.muted {
 .period-selector-dropdown {
   display: flex;
   gap: 1rem;
-  padding: 0.9rem;
+  padding: 0.75rem;
 }
 
 .period-selector-presets {
   display: grid;
-  gap: 0.25rem;
+  gap: 0.125rem;
   align-content: start;
   min-width: 12rem;
 }
@@ -994,22 +1107,23 @@ label > small.muted {
   display: grid;
   border: 0;
   background: transparent;
-  border-radius: 0.6rem;
+  border-radius: var(--radius-sm);
   padding: 0.45rem 0.65rem;
   text-align: left;
-  font-size: 0.88rem;
+  font: inherit;
+  font-size: 0.875rem;
   color: var(--ink);
   cursor: pointer;
 }
 
 .period-selector-preset:hover {
-  background: var(--surface);
+  background: var(--surface-sunken);
 }
 
 .period-selector-preset.active {
   background: var(--brand-pale);
   color: var(--brand-deep);
-  font-weight: 700;
+  font-weight: 650;
 }
 
 .period-selector-preset small {
@@ -1021,6 +1135,14 @@ label > small.muted {
 @media (max-width: 640px) {
   .period-selector-dropdown {
     flex-direction: column;
+  }
+
+  .filter-bar-fields {
+    max-width: none;
+  }
+
+  .filter-bar-note {
+    text-align: start;
   }
 }
 
@@ -1208,19 +1330,19 @@ label > small.muted {
 }
 
 .user-menu-section {
-  padding: 0.55rem 0.75rem 0.35rem;
-  border-top: 1px solid var(--border-default);
-  border-bottom: 1px solid var(--border-default);
-  margin: 0.2rem 0;
+  padding: 0.5rem 0.625rem 0.625rem;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  margin: 0.25rem 0;
 }
 
 .user-menu-section-title {
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: 0.6875rem;
+  font-weight: 650;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--muted);
-  margin-bottom: 0.5rem;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
 }
 
 .language-selector {
@@ -1240,38 +1362,39 @@ label > small.muted {
   display: none;
 }
 
+/* A segmented control: the chosen language is the raised segment. */
 .language-selector-options {
-  display: flex;
-  gap: 0.3rem;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.125rem;
+  padding: 0.1875rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
 }
 
 .language-selector-button {
-  padding: 0.4rem 0.6rem;
-  border-radius: 0.4rem;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--brand-accent);
+  padding: 0.3rem 0.4rem;
+  border-radius: var(--radius-xs);
+  border: 0;
+  background: transparent;
+  color: var(--text-body);
   cursor: pointer;
+  font: inherit;
   font-size: 0.75rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.language-selector-button:hover {
+  color: var(--text-primary);
 }
 
 .language-selector-button.active {
-  background: var(--sidebar-active);
+  background: var(--surface-card);
   color: var(--brand-deep);
-  font-weight: 700;
-}
-
-.language-selector-button.menu {
-  background: var(--white);
-  color: var(--ink-soft);
-}
-
-.language-selector-button.menu.active {
-  background: var(--brand-pale);
-  color: var(--brand-deep);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 0 0 1px var(--border-default);
 }
 
 .page-stack {
@@ -1280,28 +1403,154 @@ label > small.muted {
   gap: 1.5rem;
 }
 
+/* ── Page header — the documents' header in screen form ─────────────────────
+   Scope kicker with the brand dot, title, one line of context, then the
+   signature of every OpenZEV document: a hairline with a short forest rule
+   at its start (shared_pdf_base.html `.document-header::after`). */
 .page-header {
+  position: relative;
   min-width: 0;
   overflow-wrap: anywhere;
+  padding-bottom: 1.125rem;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.page-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 3.5rem;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent-rule);
+}
+
+/* Tabbed pages draw one line, not two: the tab strip carries the hairline
+   and its active tab the forest rule, so the header draws neither — also
+   when the tabs sit inside the page body (scope guard, year picker). The
+   templates hub keeps its two tab rows. */
+.page-header:has(~ .app-tabs, ~ * .app-tabs, ~ .template-tabs-rows) {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.page-header:has(~ .app-tabs, ~ * .app-tabs, ~ .template-tabs-rows)::after {
+  content: none;
+}
+
+.page-header > .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+  color: var(--accent-rule);
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+}
+
+.page-header .eyebrow-note {
+  color: var(--text-muted);
+}
+
+/* The scope line as the community switch: the name keeps the kicker's
+   type, gains a caret, and answers hover like a quiet control. */
+.page-header > .eyebrow {
+  min-width: 0;
+}
+
+.community-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  max-width: 100%;
+  margin: -0.25rem -0.4rem;
+  padding: 0.25rem 0.4rem;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.community-switch:hover,
+.community-switch[aria-expanded='true'] {
+  background: var(--brand-pale);
+}
+
+.community-switch-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-switch-caret {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+}
+
+.community-menu {
+  min-width: 16rem;
+  max-width: min(24rem, calc(100vw - 2rem));
+  max-height: min(22rem, 60dvh);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.community-menu-item .mantine-Menu-itemLabel {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.community-menu-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-menu-item.is-current {
+  color: var(--text-heading);
+  font-weight: 600;
+}
+
+.community-menu-relation {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.community-menu-check {
+  width: 1rem;
+  height: 1rem;
+  color: var(--interactive);
 }
 
 .page-header-main {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 1rem 1.5rem;
   flex-wrap: wrap;
   min-width: 0;
 }
 
 .page-header-text {
-  flex: 1 1 0;
+  flex: 1 1 22rem;
   min-width: 0;
 }
 
 .page-header-actions {
   flex-shrink: 0;
   max-width: 100%;
+  flex-wrap: wrap;
 }
 
 .page-header-actions .button {
@@ -1311,9 +1560,17 @@ label > small.muted {
 
 .page-header h1 {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.page-header-text > p.muted {
+  max-width: 90ch;
+  margin: 0.375rem 0 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
 }
 
 .grid {
@@ -1335,55 +1592,232 @@ label > small.muted {
 
 .form-section {
   display: grid;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
+/* A kicker over a hairline, as the documents label their blocks. */
 .form-section-header {
   margin: 0;
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.6875rem;
+  font-weight: 650;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--muted);
+  letter-spacing: 0.08em;
+  color: var(--text-body);
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border-default);
 }
 
+/* ── Sheets ─────────────────────────────────────────────────────────────────
+   One surface: white paper, a hairline, a soft corner. No floating shadows —
+   depth is for menus, dialogs and toasts. */
 .card,
 .table-card,
 .stat-card {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 1.2rem;
-  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sheet);
 }
 
 .card,
 .table-card {
-  padding: 1.3rem 1.4rem;
+  --sheet-pad-block: 1.25rem;
+  --sheet-pad-inline: 1.5rem;
+
+  padding: var(--sheet-pad-block) var(--sheet-pad-inline);
 }
 
+/* A table fills its sheet edge to edge, as the line items fill the
+   documents' measure: the dark band meets the sheet's sides, and its top
+   too when the table opens the sheet. The outer columns keep the sheet's
+   inset, so their text still lines up with the sheet's title. Kept at low
+   specificity (:where) so a component's own layout can override it. */
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table),
+:is(.card, .table-card) > :where(.page-stack, div:not([class])) > :where(table, .table-scroll, .data-table) {
+  margin-inline: calc(-1 * var(--sheet-pad-inline));
+}
+
+:is(.card, .table-card) > table,
+:is(.card, .table-card) > :where(.page-stack, div:not([class])) > table {
+  width: calc(100% + 2 * var(--sheet-pad-inline));
+  max-width: none;
+}
+
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table) :where(th, td):first-child,
+:is(.card, .table-card) > :where(.page-stack, div:not([class])) > :where(table, .table-scroll, .data-table) :where(th, td):first-child {
+  padding-inline-start: var(--sheet-pad-inline);
+}
+
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table) :where(th, td):last-child,
+:is(.card, .table-card) > :where(.page-stack, div:not([class])) > :where(table, .table-scroll, .data-table) :where(th, td):last-child {
+  padding-inline-end: var(--sheet-pad-inline);
+}
+
+/* Square band corners where it crosses the sheet; the sheet's own inner
+   corners where it opens it. */
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table) thead th:is(:first-child, :last-child),
+:is(.card, .table-card) > :where(.page-stack, div:not([class])) > :where(table, .table-scroll, .data-table) thead th:is(:first-child, :last-child) {
+  border-radius: 0;
+}
+
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table):first-child {
+  margin-top: calc(-1 * var(--sheet-pad-block));
+  border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
+}
+
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table):first-child thead th:first-child {
+  border-top-left-radius: calc(var(--radius-lg) - 1px);
+}
+
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table):first-child thead th:last-child {
+  border-top-right-radius: calc(var(--radius-lg) - 1px);
+}
+
+/* A sheet's title: the documents' section heading (invoice page 3
+   `.section-title`). Also when a toolbar or a card header carries the title
+   beside the sheet's controls. */
+.section-title,
+:is(.card, .table-card) > :is(h2, h3):first-child,
+:is(.card, .table-card) > div:first-child:not([class]) > :is(h2, h3):first-child,
+:is(.card, .table-card) > .toolbar:first-child > .toolbar-main > :is(h2, h3),
+.card-header > :is(h2, h3) {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.875rem;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.section-title + p.muted {
+  margin: -0.5rem 0 0.75rem;
+  font-size: 0.875rem;
+}
+
+/* Title and a control (a mode switch, a filter) on one line. */
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.875rem;
+}
+
+.card-header > :is(h2, h3) {
+  margin: 0;
+}
+
+.card-header + p.muted {
+  margin-top: -0.375rem;
+}
+
+/* In a sheet that already spaces its children, the title adds none. */
+.card.page-stack > :is(h2, h3):first-child,
+.card.page-stack > .card-header:first-child {
+  margin-bottom: 0;
+}
+
+select.select-compact {
+  width: auto;
+  height: 2rem;
+  padding: 0 1.75rem 0 0.625rem;
+  font-size: 0.8125rem;
+}
+
+:is(.card, .table-card) > .toolbar:first-child {
+  align-items: baseline;
+}
+
+:is(.card, .table-card) > .toolbar:first-child > .toolbar-main > :is(h2, h3) {
+  margin: 0;
+}
+
+:is(.card, .table-card) > .toolbar:first-child:has(> .toolbar-main > :is(h2, h3)) {
+  margin-bottom: 0.875rem;
+}
+
+/* Plain links in the workspace read as links: forest, underlined on hover. */
+.content-main a:not([class]) {
+  color: var(--interactive);
+  font-weight: 600;
+  text-underline-offset: 0.18em;
+}
+
+.content-main a:not([class]):hover {
+  color: var(--interactive-hover);
+  text-decoration: underline;
+}
+
+/* Context under a sheet's title, as under the document's section titles. */
+:is(.card, .table-card) > :is(h2, h3):first-child + p.muted,
+:is(.card, .table-card) > div:first-child:not([class]) > :is(h2, h3):first-child + p.muted {
+  margin: -0.5rem 0 1rem;
+  font-size: 0.875rem;
+}
+
+:is(.card, .table-card) > div:first-child:not([class]) > :is(h2, h3):first-child:last-child,
+:is(.card, .table-card) > div:first-child:not([class]) > :is(h2, h3):first-child + p.muted:last-child {
+  margin-bottom: 0;
+}
+
+/* ── KPI tiles — the documents' figure tiles ───────────────────────────────
+   Kicker label, the figure with its unit set small, an optional hint line. */
 .stat-card {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  overflow-wrap: anywhere;
-  padding: 1.25rem;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  gap: 0.25rem;
+  overflow-wrap: break-word;
+  padding: 0.95rem 1.1rem 1rem;
+  border-radius: var(--radius-md);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 26px 55px rgba(15, 23, 42, 0.13);
-}
-
+/* The value line is the size container (the tile itself stays a subgrid):
+   figures scale to the tile, so a narrow tile never breaks a number. */
 .stat-card .stat-value {
   max-width: 100%;
-  font-size: 1.75rem;
-  font-weight: 700;
-  line-height: 1.2;
+  margin: 0.125rem 0 0;
+  container-type: inline-size;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
+}
+
+.stat-figure {
+  font-size: clamp(1.125rem, 16cqi, 1.625rem);
+  white-space: nowrap;
+}
+
+.stat-unit {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+.stat-card > p.muted,
+.stat-card > span.muted {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* Tiles in a row share their label, figure and hint tracks (subgrid), so
+   every figure sits on one line even where a label wraps to two. */
+:is(.stat-grid, .kpi-row, .grid) > .stat-card {
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  row-gap: 0.25rem;
+  align-content: start;
+  align-items: start;
 }
 
 /* Toggle selection uses the interactive color; severity colors the value. */
@@ -1395,9 +1829,13 @@ label > small.muted {
   cursor: pointer;
 }
 
+.stat-card--interactive:hover {
+  border-color: var(--border-strong);
+}
+
 .stat-card--interactive[aria-pressed='true'] {
   border-color: var(--interactive);
-  box-shadow: 0 0 0 2px var(--interactive);
+  box-shadow: 0 0 0 1px var(--interactive), var(--shadow-sheet);
 }
 
 /* Tile grids: combine the wide modifier with the base class. */
@@ -1433,12 +1871,15 @@ label > small.muted {
   min-width: 0;
 }
 
+/* Actions stay at the right, also when they wrap below the summary. */
 .toolbar-actions {
   min-width: 0;
   max-width: 100%;
+  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: flex-end;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
@@ -1456,31 +1897,44 @@ label > small.muted {
   }
 
   .toolbar-actions {
+    margin-left: 0;
     justify-content: flex-start;
   }
 }
 
+/* Long compound labels (Amortisationsdauer) hyphenate in narrow tiles. */
 .stat-label {
-  margin: 0 0 0.35rem;
-  font-size: 0.9rem;
-  color: var(--text-body);
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  hyphens: auto;
+  color: var(--text-muted);
 }
 
 /* ── KPI row (dashboard hero + stats; redesign spec §5.1/§7.5) ── */
 
 .kpi-row {
   display: grid;
-  grid-template-columns: 1.2fr repeat(4, minmax(0, 1fr));
+  grid-template-columns: 1.25fr repeat(4, minmax(0, 1fr));
   gap: 1rem;
 }
 
-/* Flat dark brand variant — at most one per view. No gradient/shine (§5.1). */
+/* The dark figure tile — the invoice's savings tile. At most one per view. */
+/* The dark accent tile is lit like the documents' dark cards: their forest
+   gradient with a soft light in the top corner. */
 .stat-card--accent {
-  background: var(--brand-deep);
   border-color: var(--brand-deep);
+  background-color: var(--brand-deep);
+  background-image:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--white) 13%, transparent), transparent 62%),
+    linear-gradient(160deg, var(--brand) 0%, var(--brand-deep) 100%);
 }
 
-.stat-card--accent .stat-label {
+.stat-card--accent .stat-label,
+.stat-card--accent .stat-unit {
   color: var(--brand-accent);
 }
 
@@ -1490,7 +1944,8 @@ label > small.muted {
 
 .stat-card--accent-hint {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
   color: var(--brand-accent);
 }
 
@@ -1512,11 +1967,6 @@ label > small.muted {
   border: 0;
   box-shadow: none;
   padding: 0.5rem 0.25rem;
-}
-
-.stat-card.stat-card--flat:hover {
-  transform: none;
-  box-shadow: none;
 }
 
 /* ── Setup guidance — the Overview start page (spec §7) ─────────────── */
@@ -1579,8 +2029,9 @@ label > small.muted {
 
 .pdf-frame {
   border: 1px solid var(--border-default);
-  border-radius: 8px;
-  background: var(--surface);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  box-shadow: var(--shadow-sheet);
   overflow: hidden;
 }
 
@@ -1607,7 +2058,7 @@ h3 {
 .skeleton-block {
   /* Keep fixed-width placeholders within their container. */
   max-width: 100%;
-  border-radius: 0.75rem;
+  border-radius: var(--radius-md);
 }
 
 .skeleton-table-rows {
@@ -1615,9 +2066,39 @@ h3 {
   gap: 0.6rem;
 }
 
+/* A blank sheet: dashed edge, centred message, the way forward below it. */
 .empty-state {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  justify-items: center;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+}
+
+.card.empty-state {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: transparent;
+  box-shadow: none;
+}
+
+.empty-state > :is(h2, h3):first-child {
+  justify-content: center;
+  margin: 0;
+}
+
+.empty-state > :is(h2, h3):first-child::before {
+  content: none;
+}
+
+.empty-state > p.muted {
+  max-width: 52ch;
+  margin: 0;
+}
+
+.empty-state > .actions-row {
+  justify-content: center;
+  margin-top: 0.75rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1629,16 +2110,19 @@ h3 {
   }
 }
 
+/* Status pills — the document's status pill: a pale fill, a hairline of the
+   next tone, sentence case for scanning in tables. */
 .badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.18rem 0.5rem;
+  gap: 0.3rem;
+  padding: 0.125rem 0.55rem;
   border-radius: 999px;
   border: 1px solid transparent;
   font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1.1;
+  font-weight: 600;
+  line-height: 1.35;
   white-space: nowrap;
 }
 
@@ -1659,32 +2143,50 @@ button.badge-button:focus-visible {
 
 .badge-neutral {
   background: var(--status-neutral);
-  border-color: transparent;
+  border-color: var(--border-default);
   color: var(--ink-soft);
 }
 
 .badge-info {
   background: var(--status-info);
-  border-color: transparent;
+  border-color: var(--info-200);
   color: var(--ink-soft);
 }
 
 .badge-success {
   background: var(--status-success);
-  border-color: transparent;
+  border-color: var(--success-200);
   color: var(--success-700);
 }
 
 .badge-danger {
   background: var(--status-danger);
-  border-color: transparent;
+  border-color: var(--danger-300);
   color: var(--danger-700);
 }
 
 .badge-warning {
   background: var(--status-warning);
-  border-color: transparent;
+  border-color: var(--warning-200);
   color: var(--warning-800);
+}
+
+/* The status pill printed on the invoice (shared_pdf_base.html
+   `.document-status`). */
+.badge-brand {
+  background: var(--brand-pale);
+  border-color: var(--brand-glow);
+  color: var(--brand-mid);
+}
+
+/* Attributes, not states: what a record is (billing mode, energy type, meter
+   type, role, kind), set quiet and outlined, so the coloured pills beside
+   them can say what is going on (current, scheduled, needs attention). */
+.badge-tag {
+  background: var(--surface-card);
+  border-color: var(--border-strong);
+  color: var(--text-body);
+  font-weight: 500;
 }
 
 /* Status dot — small filled circle for one-glance health/readiness
@@ -1721,13 +2223,6 @@ button.badge-button:focus-visible {
   gap: 0.5rem;
 }
 
-.badge-draft,
-.badge-cancelled {
-  background: var(--status-neutral);
-  border-color: transparent;
-  color: var(--ink-soft);
-}
-
 /* Shared ActionMenu (Mantine dropdown) danger entries. Mantine's color prop
    cannot resolve CSS variables for its hover tint, so the class carries both
    label and hover colors from the tokens directly. */
@@ -1739,21 +2234,26 @@ button.badge-button:focus-visible {
   background: var(--danger-100);
 }
 
-.badge-approved,
-.badge-sent {
-  background: var(--status-info);
-  border-color: transparent;
-  color: var(--ink-soft);
-}
-
-.badge-paid {
-  background: var(--status-success);
-  border-color: transparent;
-  color: var(--success-700);
-}
-
 .chart-card {
   min-height: 360px;
+}
+
+/* ── Charts (Recharts) — the documents' chart grammar ─────────────────────
+   Legends in ink beside a colour swatch, as the PDF charts set them;
+   tooltips are small raised sheets. Recharts writes these styles inline. */
+.recharts-default-legend {
+  font-size: 0.8125rem;
+}
+
+.recharts-legend-item-text {
+  color: var(--text-body) !important;
+}
+
+.recharts-default-tooltip {
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-raised);
+  font-size: 0.8125rem;
 }
 
 .chart-card-description {
@@ -1798,55 +2298,59 @@ button.badge-button:focus-visible {
   opacity: 0.3;
 }
 
-/* Admin dashboard invoice-status tiles */
+/* Admin dashboard invoice-status tiles: figure tiles, paid set in green. */
 .status-tile {
-  padding: 1rem;
-  border-radius: 0.5rem;
-}
-
-.status-tile-draft,
-.status-tile-cancelled {
-  background: var(--status-neutral);
-  color: var(--ink-soft);
-}
-
-.status-tile-approved,
-.status-tile-sent {
-  background: var(--status-info);
-  color: var(--ink-soft);
-}
-
-.status-tile-paid {
-  background: var(--status-success);
-  color: var(--success-700);
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
 }
 
 .status-tile-label {
-  font-size: 0.875rem;
-  margin-bottom: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .status-tile-value {
-  font-size: 1.875rem;
-  font-weight: 600;
+  font-size: 1.625rem;
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
 }
 
+.status-tile-paid .status-tile-value {
+  color: var(--success-700);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────────
+   Primary = flat deep forest; secondary = paper with a hairline; one
+   height scale. */
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.6rem 0.9rem;
+  padding: 0.5rem 0.95rem;
   min-height: 2.5rem;
-  border: 0;
-  border-radius: 0.7rem;
-  background: var(--interactive);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--brand-deep);
+  box-shadow: 0 1px 2px rgba(13, 43, 29, 0.3);
   color: var(--white);
+  font: inherit;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   line-height: 1.2;
   text-decoration: none;
   cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 /* `:where()` keeps specificity at (0,2,0) so variant hover rules below
@@ -1854,22 +2358,23 @@ button.badge-button:focus-visible {
    hovered secondary button got the deep brand background while keeping its
    dark ink text (unreadable). */
 :where(.button):hover:not(:disabled) {
-  background: var(--interactive-hover);
+  background: var(--brand);
 }
 
 .button:disabled {
-  opacity: 0.65;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
 .button-secondary {
-  background: var(--white);
+  background: var(--surface-card);
   color: var(--ink);
-  border: 1px solid var(--muted);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-sheet);
 }
 
 .button-secondary:hover {
-  background: var(--surface);
+  background: var(--surface-sunken);
 }
 
 .button-danger,
@@ -1884,10 +2389,29 @@ button.badge-button:focus-visible {
   background: var(--danger-700);
 }
 
+/* Destructive but rare: quiet until hovered; the confirm dialog's button is
+   the solid red one. Row-level (compact) danger buttons follow the same rule. */
+.button-secondary.button-destructive,
+.button-danger.button-compact,
+.button.danger.button-compact {
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  color: var(--danger-700);
+  box-shadow: var(--shadow-sheet);
+}
+
+.button-secondary.button-destructive:hover:not(:disabled),
+.button-danger.button-compact:hover:not(:disabled),
+.button.danger.button-compact:hover:not(:disabled) {
+  background: var(--danger-100);
+  border-color: var(--danger-300);
+}
+
 .button-compact {
-  min-height: 2.1rem;
-  padding: 0.45rem 0.7rem;
-  font-size: 0.82rem;
+  min-height: 2rem;
+  padding: 0.3rem 0.7rem;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
 }
 
 .menu-item-icon {
@@ -1910,10 +2434,6 @@ button.badge-button:focus-visible {
   align-items: start;
 }
 
-.inline-form--narrow {
-  max-width: 320px;
-}
-
 .field-error {
   color: var(--danger-600);
   font-size: 0.85rem;
@@ -1928,6 +2448,12 @@ button.badge-button:focus-visible {
 
 .imports-history-filters input[type="search"] {
   flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.imports-history-filters select {
+  flex: 0 1 16rem;
+  width: auto;
   min-width: 0;
 }
 
@@ -2065,11 +2591,37 @@ input.recurrence-chip-input {
 
 .actions-cell-content {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.375rem;
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
   min-height: 100%;
+}
+
+/* In a row, the main action is a forest outline: one solid button per page
+   (the page's own primary action), not one per record. */
+:is(td, .actions-cell-content) > .button:not(.button-secondary, .button-ghost, .button-danger, .danger, .button-outline) {
+  background: transparent;
+  border-color: var(--interactive);
+  box-shadow: none;
+  color: var(--interactive);
+}
+
+:is(td, .actions-cell-content) > .button:not(.button-secondary, .button-ghost, .button-danger, .danger, .button-outline):hover:not(:disabled) {
+  background: var(--brand-pale);
+  color: var(--brand-deep);
+}
+
+/* A destructive row action is quiet, as in the compact rule below. */
+:is(td, .actions-cell-content) > :is(.button-danger, .button.danger) {
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  color: var(--danger-700);
+}
+
+:is(td, .actions-cell-content) > :is(.button-danger, .button.danger):hover:not(:disabled) {
+  background: var(--danger-100);
+  border-color: var(--danger-300);
 }
 
 /* ── Billing period page: command bar and row filter ── */
@@ -2166,33 +2718,56 @@ input.recurrence-chip-input {
   visibility: hidden;
 }
 
-.invoice-filter-bar {
+/* ── List filters ───────────────────────────────────────────────────────────
+   Above a list: the main filter tabs share the toolbar row with the page's
+   actions; search and the narrowing filters take the line below. All keep
+   the shared control height. */
+.list-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 1rem;
 }
 
-.invoice-filter-bar > p {
+.list-filters > p {
   margin: 0;
 }
 
-.invoice-row-filters {
+.list-filters > input {
+  flex: 0 1 22rem;
+  width: auto;
+  min-width: 0;
+}
+
+.list-filters > select {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+@media (max-width: 700px) {
+  .list-filters > input {
+    flex-basis: 100%;
+  }
+}
+
+/* Filter tabs (FilterTabs): segments with counts, as tall as a field. */
+.filter-tabs {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 0.25rem;
   max-width: 100%;
-  padding: 0.25rem;
+  padding: calc((var(--field-height) - 2rem - 2px) / 2);
   border: 1px solid var(--border-default);
   border-radius: 0.8rem;
   background: var(--surface-card);
 }
 
-.invoice-row-filter {
+.filter-tab {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  min-height: 2.1rem;
+  min-height: 2rem;
   padding: 0.35rem 0.75rem;
   border: 0;
   border-radius: 0.6rem;
@@ -2204,22 +2779,16 @@ input.recurrence-chip-input {
   cursor: pointer;
 }
 
-.invoice-row-filter:hover:not(:disabled) {
+.filter-tab:hover {
   background: var(--surface);
 }
 
-/* An empty segment has nothing to show: it stays readable but inert. */
-.invoice-row-filter:disabled {
-  color: var(--muted);
-  cursor: default;
-}
-
-.invoice-row-filter[aria-pressed='true'] {
+.filter-tab[aria-pressed='true'] {
   background: var(--brand-pale);
   color: var(--brand-deep);
 }
 
-.invoice-row-filter-count {
+.filter-tab-count {
   min-width: 1.4rem;
   padding: 0.05rem 0.4rem;
   border-radius: 999px;
@@ -2230,121 +2799,103 @@ input.recurrence-chip-input {
   text-align: center;
 }
 
-.invoice-row-filter[aria-pressed='true'] .invoice-row-filter-count {
+.filter-tab[aria-pressed='true'] .filter-tab-count {
   background: var(--surface-card);
 }
 
-.invoice-row-filter--attention .invoice-row-filter-count {
+.filter-tab--attention .filter-tab-count {
   background: var(--danger-100);
   color: var(--danger-700);
 }
 
-.metering-toolbar {
+/* ── Management toolbars: controls set directly on the page ────────────────
+   Filter tabs, the page's actions and the filters; no sheet around them —
+   the list below is the sheet. */
+.metering-toolbar,
+.participant-toolbar,
+.tariff-toolbar {
   display: grid;
-  gap: 1rem;
-}
-
-.metering-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.metering-summary-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.28rem 0.55rem;
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--border-default);
-  font: inherit;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-.metering-summary-stat:hover {
-  border-color: var(--brand-mid);
-}
-
-.metering-summary-stat.is-active {
-  background: var(--brand-pale);
-  border-color: var(--brand-mid);
-}
-
-.metering-summary-label {
-  font-size: 0.78rem;
-  color: var(--text-body);
-}
-
-.metering-summary-value {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.metering-filter-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0.75rem;
+}
+
+:is(.metering-toolbar, .participant-toolbar, .tariff-toolbar).card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.participant-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.75rem 1rem;
   align-items: end;
 }
 
+/* ── Ledger lists: records as rows of one sheet ─────────────────────────────
+   Hairline-separated entries, the way the invoice lists its line items:
+   name and status first, details in labelled columns beneath, actions at
+   the right. */
 .metering-point-list {
   display: grid;
-  gap: 1rem;
 }
 
 .building-groups {
   display: grid;
-  gap: 1.5rem;
+  gap: 1.75rem;
 }
 
 .building-group {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.25rem;
 }
 
 .building-group-empty {
   margin: 0;
+  padding: 0.75rem 0;
 }
 
 .building-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 0.75rem 1rem;
   flex-wrap: wrap;
 }
 
+/* One building: a quiet line naming it above the sheet. */
 .building-header-line {
-  padding: 0.65rem 1rem;
-  border: 1px solid var(--border-default);
-  border-radius: 0.75rem;
-  background: var(--surface);
+  padding: 0 0.125rem;
 }
 
 .building-header-group {
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid var(--border-default);
+  padding-bottom: 0.625rem;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .building-header-main {
   display: grid;
-  gap: 0.2rem;
+  gap: 0.15rem;
   flex: 1 1 260px;
   min-width: 0;
 }
 
 .building-header-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   overflow-wrap: anywhere;
+  font-size: 0.9375rem;
+  font-weight: 650;
+  color: var(--text-heading);
 }
 
 .building-header-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 0.15rem 0.9rem;
-  font-size: 0.85rem;
+  font-size: 0.8125rem;
 }
 
 .building-header-actions {
@@ -2352,33 +2903,46 @@ input.recurrence-chip-input {
 }
 
 .metering-point-card {
-  border: 1px solid var(--border-default);
-  border-radius: 1rem;
-  overflow: hidden;
-  background: var(--white);
+  min-width: 0;
+}
+
+.metering-point-card + .metering-point-card {
+  border-top: 1px solid var(--border-default);
 }
 
 .metering-filtered-count {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.8125rem;
 }
 
 .metering-point-card-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 1.1rem;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border-default);
+  gap: 0.75rem 1rem;
+  padding: 0.875rem 0 0.625rem;
   flex-wrap: wrap;
+}
+
+.metering-point-list > .metering-point-card:first-child .metering-point-card-header {
+  padding-top: 0.125rem;
 }
 
 .metering-point-title {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.3rem;
   flex: 1 1 320px;
   min-width: 220px;
+}
+
+.metering-point-title > strong {
+  font-size: 0.9375rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.metering-point-title > .muted {
+  font-size: 0.8125rem;
 }
 
 .metering-point-badges,
@@ -2387,7 +2951,7 @@ input.recurrence-chip-input {
 .metering-assignment-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.375rem;
   flex-wrap: wrap;
 }
 
@@ -2396,41 +2960,48 @@ input.recurrence-chip-input {
   justify-content: flex-end;
 }
 
+/* Who holds the meter, indented under it like a sub-ledger. */
 .metering-point-body {
-  padding: 0.9rem 1.1rem 1.1rem;
+  margin: 0 0 0.875rem;
+  padding: 0.125rem 0 0.125rem 0.875rem;
+  border-left: 2px solid var(--border-default);
 }
 
 .metering-assignment-list {
   display: grid;
-  gap: 0.65rem;
+  gap: 0.375rem;
 }
 
 .metering-assignment-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.8rem 0.9rem;
-  border: 1px solid var(--border-default);
-  border-radius: 0.9rem;
-  background: var(--white);
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
   flex-wrap: wrap;
 }
 
 .metering-assignment-main {
   display: grid;
-  gap: 0.3rem;
+  gap: 0.15rem;
+  font-size: 0.875rem;
+}
+
+.metering-assignment-main > .muted {
+  font-size: 0.8125rem;
 }
 
 /* The common case — one tenant, ongoing — collapsed to a single line instead
-   of the full bordered row (#624). */
+   of the full row (#624). */
 .metering-assignment-compact {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.5rem 1rem;
   flex-wrap: wrap;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
 }
 
 .metering-assignment-compact-badge {
@@ -2439,105 +3010,24 @@ input.recurrence-chip-input {
 
 .metering-no-assignments {
   margin: 0;
-  font-size: 0.84rem;
-}
-
-.participant-toolbar {
-  display: grid;
-  gap: 1rem;
-}
-
-.participant-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.participant-summary-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.28rem 0.55rem;
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--border-default);
-}
-
-.participant-summary-label {
-  font-size: 0.78rem;
-  color: var(--text-body);
-}
-
-.participant-summary-value {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.tariff-toolbar {
-  display: grid;
-  gap: 1rem;
-}
-
-.tariff-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.tariff-summary-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.28rem 0.55rem;
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--border-default);
-}
-
-.tariff-summary-label {
-  font-size: 0.78rem;
-  color: var(--text-body);
-}
-
-.tariff-summary-value {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--ink);
+  font-size: 0.8125rem;
 }
 
 .tariff-category-sections {
   display: grid;
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 
+/* A category is a sheet of its own; the documents tint categories in the
+   line items, here a kicker heading names it. */
 .tariff-category-section {
   display: grid;
-  gap: 1rem;
-  padding: 1rem 1.1rem;
-  border-radius: 1.15rem;
+  gap: 0.25rem;
+  padding: 1.125rem 1.5rem 0.5rem;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-default);
-  background: rgba(255, 255, 255, 0.72);
-}
-
-.tariff-category-section-energy {
-  background: linear-gradient(180deg, rgba(236, 253, 245, 0.92), rgba(255, 255, 255, 0.9));
-  border-color: var(--success-200);
-}
-
-.tariff-category-section-grid-fees {
-  background: linear-gradient(180deg, rgba(239, 246, 255, 0.92), rgba(255, 255, 255, 0.9));
-  border-color: var(--info-200);
-}
-
-.tariff-category-section-levies {
-  background: linear-gradient(180deg, rgba(255, 251, 235, 0.94), rgba(255, 255, 255, 0.9));
-  border-color: var(--warning-200);
-}
-
-.tariff-category-section-metering {
-  background: linear-gradient(180deg, rgba(245, 243, 255, 0.94), rgba(255, 255, 255, 0.9));
-  border-color: var(--violet-200);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sheet);
 }
 
 .tariff-category-header {
@@ -2546,52 +3036,65 @@ input.recurrence-chip-input {
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
+  padding-bottom: 0.625rem;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .tariff-category-title-row,
 .tariff-period-section-title-row {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
 .tariff-category-title-row h3 {
-  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 650;
 }
 
 .tariff-card-list {
   display: grid;
-  gap: 1rem;
 }
 
 .tariff-card {
-  border: 1px solid var(--border-default);
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.96);
-  padding: 1rem 1.1rem;
   display: grid;
-  gap: 1rem;
+  gap: 0.625rem;
+  padding: 0.875rem 0;
+  border-radius: 0;
+}
+
+.tariff-card + .tariff-card {
+  border-top: 1px solid var(--border-default);
 }
 
 /* The card whose detail drawer is currently open — so it stays identifiable
    once you've scrolled or the list re-sorts under you. */
 .tariff-card.is-open {
-  border-color: var(--brand-accent);
+  margin-inline: -0.75rem;
+  padding-inline: 0.75rem;
+  border-radius: var(--radius-sm);
   background: var(--brand-pale);
+}
+
+.tariff-card.is-open + .tariff-card {
+  border-top-color: transparent;
 }
 
 .tariff-card-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.75rem 1rem;
   flex-wrap: wrap;
 }
 
 .tariff-card-title {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.375rem;
   flex: 1 1 320px;
   min-width: 220px;
 }
@@ -2599,18 +3102,20 @@ input.recurrence-chip-input {
 .tariff-card-heading {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.375rem 0.625rem;
   flex-wrap: wrap;
 }
 
 .tariff-card-title strong {
+  font-size: 0.9375rem;
+  font-weight: 650;
   color: var(--ink);
 }
 
 .tariff-name-badges {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.375rem;
   flex-wrap: wrap;
 }
 
@@ -2619,7 +3124,7 @@ input.recurrence-chip-input {
 .tariff-period-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.375rem;
   flex-wrap: wrap;
 }
 
@@ -2631,7 +3136,7 @@ input.recurrence-chip-input {
 .tariff-card-summary-row {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem 0.75rem;
   flex-wrap: wrap;
 }
 
@@ -2642,16 +3147,16 @@ input.recurrence-chip-input {
 .tariff-card-details {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
+/* A labelled value: kicker over the figure, on a sunken ground. */
 .tariff-detail-card {
   display: grid;
-  gap: 0.35rem;
-  padding: 0.8rem 0.9rem;
-  border: 1px solid var(--border-default);
-  border-radius: 0.9rem;
-  background: var(--white);
+  gap: 0.2rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
 }
 
 .tariff-detail-card-wide {
@@ -2659,13 +3164,18 @@ input.recurrence-chip-input {
 }
 
 .tariff-detail-label {
-  font-size: 0.78rem;
-  color: var(--text-body);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .tariff-detail-value {
   color: var(--ink);
+  font-size: 0.875rem;
   line-height: 1.45;
+  font-variant-numeric: tabular-nums;
   word-break: break-word;
 }
 
@@ -2690,7 +3200,7 @@ input.recurrence-chip-input {
 
 .tariff-period-list {
   display: grid;
-  gap: 0.65rem;
+  gap: 0.375rem;
 }
 
 .tariff-period-row {
@@ -2698,10 +3208,9 @@ input.recurrence-chip-input {
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.8rem 0.9rem;
-  border: 1px solid var(--border-default);
-  border-radius: 0.9rem;
-  background: var(--white);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
   flex-wrap: wrap;
 }
 
@@ -2713,21 +3222,7 @@ input.recurrence-chip-input {
 .tariff-period-meta,
 .tariff-period-empty {
   margin: 0;
-  font-size: 0.84rem;
-}
-
-.tariff-filter-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.75rem;
-  align-items: end;
-}
-
-.participant-filter-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.75rem;
-  align-items: end;
+  font-size: 0.8125rem;
 }
 
 /* Communities an account belongs to (admin accounts list). Chips are buttons:
@@ -2746,55 +3241,57 @@ input.recurrence-chip-input {
   align-items: center;
   text-align: start;
   gap: 0.4rem;
-  padding: 0.18rem 0.6rem;
+  padding: 0.15rem 0.6rem;
   border: 1px solid var(--border-default);
   border-radius: 999px;
-  background: transparent;
+  background: var(--surface-card);
   color: var(--text-body);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   cursor: pointer;
 }
 
 .account-membership-chip:hover {
   background: var(--brand-pale);
-  border-color: var(--brand-mid);
+  border-color: var(--brand-glow);
 }
 
 .account-membership-kind {
   /* "Verwaltung · Rechnungssteller" stays on one line; the ZEV name wraps. */
   white-space: nowrap;
   color: var(--text-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: 0.6875rem;
+  font-weight: 650;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.05em;
 }
 
 .participant-card-list {
   display: grid;
-  gap: 1rem;
 }
 
 .participant-card {
-  border: 1px solid var(--border-default);
-  border-radius: 1rem;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.96);
+  min-width: 0;
 }
 
-/* Deep-link target (`?focus=` from attention links): briefly flash the card. */
+.participant-card + .participant-card {
+  border-top: 1px solid var(--border-default);
+}
+
+/* Deep-link target (`?focus=` from attention links): briefly flash the row. */
 .participant-card-focus {
   animation: participant-card-flash 2.4s ease-out 1;
-  border-color: var(--accent, var(--focus-ring));
+  border-radius: var(--radius-sm);
 }
 
 @keyframes participant-card-flash {
   0% {
     box-shadow: 0 0 0 3px var(--focus-ring);
+    background: var(--brand-pale);
   }
   100% {
     box-shadow: 0 0 0 0 transparent;
+    background: transparent;
   }
 }
 
@@ -2802,18 +3299,37 @@ input.recurrence-chip-input {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 1.1rem;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border-default);
+  gap: 0.75rem 1rem;
+  padding: 0.875rem 0 0.5rem;
   flex-wrap: wrap;
+}
+
+.participant-card:first-child .participant-card-header {
+  padding-top: 0.125rem;
 }
 
 .participant-card-title {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.375rem;
   flex: 1 1 320px;
   min-width: 220px;
+}
+
+.participant-card-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.5rem;
+}
+
+.participant-card-heading strong {
+  font-size: 0.9375rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.participant-card-heading .muted {
+  font-size: 0.875rem;
 }
 
 .participant-card-badges,
@@ -2821,8 +3337,12 @@ input.recurrence-chip-input {
 .participant-warning-list {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.375rem;
   flex-wrap: wrap;
+}
+
+.participant-card-badges > .muted {
+  font-size: 0.8125rem;
 }
 
 .participant-card-actions {
@@ -2831,27 +3351,32 @@ input.recurrence-chip-input {
 
 .participant-card-body {
   display: grid;
-  gap: 0.9rem;
-  padding: 0.95rem 1.1rem 1.1rem;
+  gap: 0.75rem;
+  padding: 0.125rem 0 0.875rem;
 }
 
 .participant-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
+  gap: 0.75rem 1.25rem;
 }
 
 .participant-card-section {
   display: grid;
-  gap: 0.25rem;
+  align-content: start;
+  gap: 0.15rem;
+  min-width: 0;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
 }
 
 .participant-card-label {
-  font-size: 0.78rem;
-  font-weight: 700;
+  margin-bottom: 0.1rem;
+  font-size: 0.6875rem;
+  font-weight: 650;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
 }
 
 .invoice-cell-stack {
@@ -3111,6 +3636,17 @@ input.recurrence-chip-input {
     padding-top: 0.2rem;
   }
 
+  /* No band to meet the sheet's top: the cards start at its inset, their
+     dividers still run edge to edge. */
+  .table-card.invoice-rows > table:first-child {
+    margin-top: 0;
+  }
+
+  .table-card.invoice-rows tbody tr {
+    padding-inline: var(--sheet-pad-inline);
+  }
+
+  .table-card.invoice-rows tbody td,
   .invoice-rows tbody td,
   .invoice-rows tbody tr:hover > td {
     width: auto;
@@ -3237,11 +3773,12 @@ input.recurrence-chip-input {
 .toast {
   min-width: 240px;
   max-width: 420px;
-  padding: 0.8rem 1rem;
-  border-radius: 0.8rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
   color: var(--white);
+  font-size: 0.875rem;
   font-weight: 600;
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.2);
+  box-shadow: var(--shadow-overlay);
 }
 
 .toast-info {
@@ -3269,29 +3806,63 @@ input.recurrence-chip-input {
   width: min(100%, 480px);
 }
 
+/* Sign-in: a quiet sheet on the paper — the logo, one heading, the form. */
 .login-card {
   display: grid;
   gap: 1rem;
+  padding: 2rem 2.25rem 2.25rem;
+  box-shadow: var(--shadow-raised);
+}
+
+.login-card h1 {
+  margin: 0.25rem 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.login-card h1 + p.muted {
+  margin: -0.5rem 0 0.25rem;
 }
 
 .login-brand {
   display: flex;
   justify-content: center;
   width: 100%;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border-default);
+  position: relative;
+}
+
+/* The documents' rule under the brand, centred. */
+.login-brand::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: calc(50% - 1.75rem);
+  width: 3.5rem;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent-rule);
 }
 
 .login-logo {
-  width: min(100%, 340px);
+  width: min(100%, 200px);
   height: auto;
   display: block;
   margin: 0 auto;
 }
 
+/* Notices: a pale tone with a hairline of the next step — the pills' grammar
+   at paragraph size. */
 .error-banner {
-  padding: 0.9rem 1rem;
-  border-radius: 0.85rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--danger-300);
+  border-radius: var(--radius-md);
   background: var(--danger-100);
   color: var(--danger-700);
+  font-size: 0.875rem;
+  box-shadow: none;
 }
 
 .error-text {
@@ -3299,19 +3870,21 @@ input.recurrence-chip-input {
 }
 
 .warning-banner {
-  padding: 0.9rem 1rem;
-  border-radius: 0.85rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--warning-200);
+  border-radius: var(--radius-md);
   background: var(--warning-100);
   color: var(--warning-800);
+  font-size: 0.875rem;
 }
 
 .info-banner {
-  padding: 0.9rem 1rem;
-  border-radius: 0.85rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
   background: var(--info-100);
   border: 1px solid var(--info-200);
   color: var(--text-body);
-  font-size: 0.85rem;
+  font-size: 0.875rem;
 }
 
 .warning-banner a {
@@ -3327,14 +3900,16 @@ input.recurrence-chip-input {
   max-width: 220px;
 }
 
-/* z-index is set inline from lib/zLayers.ts, which owns the stacking order. */
+/* z-index is set inline from lib/zLayers.ts, which owns the stacking order.
+   The scrim is the forest at half strength, not a grey veil. */
 .dialog-scrim {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: color-mix(in srgb, var(--brand-ink) 45%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 1rem;
 }
 
 .dialog-actions {
@@ -3353,30 +3928,54 @@ input.recurrence-chip-input {
   background-color: var(--surface-card);
 }
 
+/* A dialog is a sheet lifted off the page; its header carries the documents'
+   hairline and forest rule and stays put while a long form scrolls. */
 .form-modal {
-  border-radius: 0.5rem;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-overlay);
+  padding: 0 1.75rem 1.75rem;
 }
 
 .form-modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin: 0 -1.75rem 1.5rem;
+  padding: 1.25rem 1.75rem 1rem;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-card);
+}
+
+.form-modal-header::after {
+  content: '';
+  position: absolute;
+  left: 1.75rem;
+  bottom: -1px;
+  width: 2.5rem;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent-rule);
 }
 
 .form-modal-header h2 {
   overflow-wrap: anywhere;
   margin: 0;
   min-width: 0;
+  font-size: 1.125rem;
+  font-weight: 650;
+  line-height: 1.3;
 }
 
 .form-modal-close {
   flex-shrink: 0;
   background: none;
   border: none;
-  font-size: 1.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
   cursor: pointer;
   color: var(--text-muted);
   padding: 0;
@@ -3385,6 +3984,11 @@ input.recurrence-chip-input {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.form-modal-close:hover {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
 }
 
 .card.confirm-dialog {
@@ -3536,17 +4140,18 @@ fieldset.form-grid {
   }
 }
 
-/* Main + aside layout (e.g. admin template editor + field reference) */
+/* Main + aside layout (e.g. admin template editor + field reference): the
+   work gets the room, the reference stays a readable column. */
 .content-with-aside {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 640px;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 30rem);
   gap: 1.5rem;
   align-items: start;
 }
 
 .content-with-aside > aside {
   width: 100%;
-  max-width: 640px;
+  max-width: 30rem;
   min-width: 0;
 }
 
@@ -3588,26 +4193,51 @@ fieldset.form-grid {
   }
 }
 
-/* Hamburger button visible only on mobile */
+/* Hamburger button: part of the phone's app bar. */
 .mobile-menu-button {
-  display: none;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 2.75rem;
   height: 2.75rem;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.92);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-body);
   cursor: pointer;
   flex-shrink: 0;
   padding: 0;
-  margin-right: auto;
+}
+
+.mobile-menu-button:hover {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.mobile-menu-button:focus-visible {
+  outline-offset: -2px;
 }
 
 .mobile-menu-button svg {
-  width: 1.4rem;
-  height: 1.4rem;
-  color: var(--ink-soft);
+  width: 1.375rem;
+  height: 1.375rem;
+}
+
+.mobile-bar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.mobile-bar-brand img:first-child {
+  width: 1.875rem;
+  height: 1.875rem;
+}
+
+.mobile-bar-brand img:last-child {
+  width: auto;
+  height: 1rem;
 }
 
 /* Sidebar overlay backdrop for mobile */
@@ -3630,9 +4260,22 @@ fieldset.form-grid {
 }
 
 @media (max-width: 768px) {
-  .form-modal,
   .card.confirm-dialog {
     padding: 1rem;
+  }
+
+  /* The header stays edge to edge on the narrower inset. */
+  .form-modal {
+    padding: 0 1rem 1rem;
+  }
+
+  .form-modal-header {
+    margin-inline: -1rem;
+    padding-inline: 1rem;
+  }
+
+  .form-modal-header::after {
+    left: 1rem;
   }
 
   /* Keep in sync with Layout.tsx's mobile media query. */
@@ -3649,24 +4292,25 @@ fieldset.form-grid {
     top: 0;
     left: 0;
     bottom: 0;
-    width: 280px;
+    width: min(17.5rem, 86vw);
     height: 100dvh;
     z-index: 200;
     transform: translateX(-100%);
     transition: transform 0.25s ease;
-    padding: 1.5rem;
+    padding: 1rem 0.75rem 0.75rem;
   }
 
   .sidebar.mobile-open {
     transform: translateX(0);
+    box-shadow: var(--shadow-overlay);
   }
 
-  /* Dark overlay behind drawer */
+  /* Forest scrim behind the drawer */
   .sidebar-overlay {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
+    background: color-mix(in srgb, var(--brand-ink) 45%, transparent);
     z-index: 199;
   }
 
@@ -3679,33 +4323,36 @@ fieldset.form-grid {
     display: none;
   }
 
-  /* Show hamburger */
-  .mobile-menu-button {
-    display: inline-flex;
-  }
-
   .content {
-    padding: 1rem;
+    padding: 0 1rem 1.5rem;
   }
 
-  /* Top nav: allow wrapping and smaller gaps */
+  /* The app bar: a full-bleed white strip, pinned while the page scrolls. */
   .top-nav {
-    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 150;
+    width: auto;
+    margin: 0 -1rem 1.25rem;
+  }
+
+  .top-nav:has(.impersonation-banner) {
+    margin-bottom: 1rem;
+  }
+
+  .top-nav .impersonation-banner {
+    margin: 0 1rem;
+  }
+
+  .mobile-bar {
+    display: flex;
+    align-items: center;
     gap: 0.5rem;
-  }
-
-  /* User menu trigger: remove fixed min-width */
-  .user-menu-trigger {
-    min-width: 0;
-  }
-
-  /* User meta text can truncate */
-  .user-meta strong,
-  .user-meta small {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 30vw;
+    min-height: 3.5rem;
+    padding: 0.375rem 0.75rem 0.375rem 0.375rem;
+    border-bottom: 1px solid var(--border-default);
+    background: var(--surface-card);
+    color: var(--text-primary);
   }
 
   /* Table cards always scroll horizontally on mobile */
@@ -3726,7 +4373,10 @@ fieldset.form-grid {
   /* Cards: reduce padding */
   .card,
   .table-card {
-    padding: 1rem;
+    --sheet-pad-block: 1rem;
+    --sheet-pad-inline: 1rem;
+
+    padding: var(--sheet-pad-block) var(--sheet-pad-inline);
   }
 }
 
@@ -3738,23 +4388,22 @@ fieldset.form-grid {
     grid-template-columns: 1fr;
   }
 
+  /* Two tiles a row on a phone; the hero figure takes the whole first row. */
   .kpi-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .kpi-row > :first-child {
+    grid-column: 1 / -1;
   }
 
   .payment-fields-grid {
     grid-template-columns: 1fr;
   }
 
-  .content {
-    padding: 0.75rem;
-  }
-
-  /* Smaller card radius on narrow screens */
-  .card,
-  .table-card,
-  .stat-card {
-    border-radius: 0.75rem;
+  .page-header h1 {
+    font-size: 1.5rem;
   }
 
   .tariff-detail-card-wide {
@@ -3762,7 +4411,10 @@ fieldset.form-grid {
   }
 
   .tariff-card-actions,
-  .tariff-period-actions {
+  .tariff-period-actions,
+  .participant-card-actions,
+  .metering-point-actions,
+  .metering-assignment-actions {
     justify-content: flex-start;
   }
 
@@ -3875,17 +4527,17 @@ fieldset.form-grid {
 
 .login-register-inner {
   display: grid;
-  gap: 1.25rem;
+  gap: 1rem;
   text-align: center;
-  padding: 2.5rem;
-  border-radius: 1.25rem;
+  padding: 2rem;
+  border-radius: var(--radius-lg);
   background: var(--brand-pale);
   border: 1px solid var(--brand-glow);
 }
 
 .login-register-inner h2 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   color: var(--brand-deep);
 }
 
@@ -3899,23 +4551,26 @@ fieldset.form-grid {
 /* Button variants */
 .button-outline {
   background: transparent;
-  border: 2px solid var(--interactive);
+  border: 1px solid var(--interactive);
+  box-shadow: none;
   color: var(--interactive);
 }
 
 .button-outline:hover:not(:disabled) {
-  background: var(--interactive);
-  color: var(--white);
+  background: var(--brand-pale);
+  color: var(--brand-deep);
 }
 
 .button-ghost {
   background: transparent;
-  border: 1.5px solid var(--border-default);
-  color: var(--ink-soft);
+  border: 1px solid transparent;
+  box-shadow: none;
+  color: var(--text-body);
 }
 
 .button-ghost:hover:not(:disabled) {
-  background: var(--surface);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
 }
 
 .field-reference {
@@ -3999,17 +4654,19 @@ fieldset.form-grid {
 
 /* Success banner */
 .success-banner {
-  padding: 0.9rem 1rem;
-  border-radius: 0.85rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--success-200);
+  border-radius: var(--radius-md);
   background: var(--success-100);
   color: var(--success-700);
+  font-size: 0.875rem;
 }
 
 /* Modal */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: color-mix(in srgb, var(--brand-ink) 45%, transparent);
   display: grid;
   place-items: center;
   padding: 1.5rem;
@@ -4049,15 +4706,11 @@ fieldset.form-grid {
   width: fit-content;
 }
 
-/* Ensure footer sits below content in main layout */
+/* The workspace column: the banner (top-nav) above the page. */
 .content {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-}
-
-.content>.app-footer {
-  margin-top: auto;
 }
 
 /* Feature flags: the switch column, wide enough for the longest state label. */
@@ -4345,8 +4998,10 @@ fieldset.form-grid {
   gap: 1.5rem;
 }
 
+/* The strip under a page header: its hairline is the header's rule, the
+   active tab's underline the forest accent. */
 .app-tabs-list {
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .app-tabs-list::before {
@@ -4354,8 +5009,9 @@ fieldset.form-grid {
 }
 
 .app-tabs-tab {
-  padding: 0.75rem 1rem;
-  font-size: 1rem;
+  padding: 0.6rem 0.125rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
   color: var(--text-muted);
 }
 
@@ -4365,13 +5021,13 @@ fieldset.form-grid {
 }
 
 .app-tabs-tab:not([data-active]):hover {
-  border-color: transparent;
+  border-color: var(--border-strong);
 }
 
 .app-tabs-tab[data-active] {
-  color: var(--text-primary);
-  font-weight: 600;
-  border-bottom-color: var(--interactive);
+  color: var(--text-heading);
+  font-weight: 650;
+  border-bottom-color: var(--accent-rule);
 }
 
 /* ── Public invoice page ──────────────────────────────────────────────────
@@ -4600,15 +5256,6 @@ fieldset.form-grid {
   align-items: flex-start;
   min-width: 0;
   min-height: 19rem;
-  border-top: 3px solid var(--interactive);
-}
-
-.overview-period-card--danger {
-  border-top-color: var(--danger-700);
-}
-
-.overview-period-card--warning {
-  border-top-color: var(--warning-800);
 }
 
 .overview-period-card header {
@@ -4826,8 +5473,11 @@ fieldset.form-grid {
   width: auto;
 }
 
+/* The viewer's bars are paper strips around the document. */
 .pdf-preview-actions {
-  padding: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-card);
 }
 
 .pdf-preview-frame {
@@ -4837,13 +5487,39 @@ fieldset.form-grid {
 }
 
 .pdf-preview-link {
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 0.875rem;
   margin: 0;
+  border-top: 1px solid var(--border-default);
+  background: var(--surface-card);
+  font-size: 0.875rem;
 }
 
 .pdf-preview-empty {
   padding: 2rem;
   text-align: center;
+}
+
+/* Invoice detail: the document's header line (status pill, recipient,
+   period) and its figures above the embedded PDF. */
+.invoice-detail-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.625rem;
+}
+
+.invoice-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr));
+  gap: 1rem;
+}
+
+.pdf-missing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
 }
 
 /* Hold the viewer height while generating. */

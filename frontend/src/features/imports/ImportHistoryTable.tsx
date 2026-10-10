@@ -63,7 +63,6 @@ export function ImportHistoryTable<T>({ rows, columns, getRowId, filters, onFilt
                 initialSorting={[{ id: 'created_at', desc: true }]}
                 columnFilters={filters}
                 onColumnFiltersChange={onFiltersChange}
-                initialPageSize={25}
                 emptyMessage={t('pages.imports.noRows')}
             />
         </div>

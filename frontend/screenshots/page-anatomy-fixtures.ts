@@ -199,7 +199,7 @@ export async function mockApi(page: Page, state: ApiState = {}) {
       zev_id: scope, periods: [], period: null, steps: [], next_action: 'none', awaiting_first_period: true,
     } })
     if (path.endsWith('/invoices/invoices/attention/')) return route.fulfill({ json: { zev_id: scope, items: [] } })
-    if (['/exports/jobs/', '/tariffs/dynamic-sources/', '/zev/parties/'].some(endpoint => path.endsWith(endpoint))) return route.fulfill({ json: [] })
+    if (['/exports/jobs/', '/tariffs/dynamic-sources/', '/zev/parties/', '/metering/supplementary/sources/eligible/'].some(endpoint => path.endsWith(endpoint))) return route.fulfill({ json: [] })
     if (path.endsWith('/feasibility/enabled/')) return route.fulfill({ json: { enabled: false } })
     if (path.endsWith('/zev/participants/geocoding-enabled/')) return route.fulfill({ json: { enabled: false } })
     const ids = (state.zevs ?? [defaultZev]).map(zev => zev.id)

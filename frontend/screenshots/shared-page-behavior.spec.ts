@@ -99,9 +99,9 @@ test('scope switches clear invalid meters and participants before their next req
   await page.goto('/metering/chart?period_start=2026-02-12&period_end=2026-03-14&metering_point=mp42#readings')
   const meter = page.getByRole('combobox', { name: 'Metering Point *', exact: true })
   await expect(meter).toHaveValue('mp42')
-  await page.locator('.sidebar-zev-menu .user-menu-trigger').click()
+  await page.locator('main .community-switch').click()
   state.expectedScope = '43'
-  await page.locator('.zev-dropdown-item').filter({ hasText: 'Other ZEV' }).click()
+  await page.getByRole('menuitem', { name: 'Other ZEV' }).click()
   await expect(page.locator('main .eyebrow').first()).toHaveText('Other ZEV')
   // The unavailable meter is cleared; the chart falls back to the new community's total.
   await expect.poll(() => new URL(page.url()).searchParams.has('metering_point')).toBe(false)
@@ -115,10 +115,10 @@ test('scope switches clear invalid meters and participants before their next req
   const participant = page.getByRole('combobox', { name: 'Participant', exact: true })
   await participant.selectOption('p42')
   await expect(participant).toHaveValue('p42')
-  await page.locator('.sidebar-zev-menu .user-menu-trigger').click()
+  await page.locator('main .community-switch').click()
   state.period = ['2026-10-01', '2026-10-31']
   state.expectedScope = '43'
-  await page.locator('.zev-dropdown-item').filter({ hasText: 'Other ZEV' }).click()
+  await page.getByRole('menuitem', { name: 'Other ZEV' }).click()
   await expect(participant).toHaveValue('')
   await expect(page.locator('.period-selector-range')).toHaveText('01.10.2026 → 31.10.2026')
   await expect(page.locator('main .eyebrow').first()).toHaveText('Other ZEV')

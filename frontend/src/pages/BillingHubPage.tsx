@@ -31,6 +31,7 @@ export function BillingHubPage({ tab }: { tab: BillingTab }) {
         <div className="page-stack">
             <PageHeader
                 eyebrow={selectedZev?.name}
+                communitySwitch
                 scopeNote={scopeNote}
                 title={t('nav.billing')}
                 description={t('pages.billingHub.description')}

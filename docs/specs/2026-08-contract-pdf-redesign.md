@@ -200,15 +200,16 @@ design system, extracted verbatim from the invoice template:
   `--subtotal-color`, plus UI status fills). The hex source is
   `design/tokens.json`; regenerate via `scripts/generate-tokens.mjs`
   (see `2026-08-ui-redesign-pdf-style.md`).
-- **Base** — `*` reset, `body` font stack (`Helvetica Neue`, 9.5 pt, `--ink`).
+- **Base** — `*` reset, `body` font stack (`var(--font-print)`: Inter, ADR 0032; 9.5 pt, `--ink`).
 - **Utilities** — `.eyebrow`, `.visually-hidden`.
 - **Document header anatomy** — `.document-header` (flex, bottom border,
-  brand accent underline via `::after`), `.brand-row`, `.brand-mark`,
+  brand accent underline via `::after`), `.brand-row`, `.brand-mark` (hidden
+  since ADR 0032: the issuer's name stands alone),
   `.company-name`, `.company-address`, `.document-label`, `.document-number`,
   `.document-status`.
 - **Page furniture classes** — `.page-meta`, `.page-meta-inner`,
-  `.page-meta--header`, `.page-meta--footer`, `.meta-left` (with brand bullet
-  via `::before`), `.meta-center`, `.meta-right`.
+  `.page-meta--header`, `.page-meta--footer`, `.meta-left`, `.meta-center`,
+  `.meta-right` (the brand bullet before `.meta-left` was dropped, ADR 0032).
 
 Consumption contract:
 

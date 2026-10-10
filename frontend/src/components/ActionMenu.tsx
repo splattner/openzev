@@ -17,9 +17,11 @@ interface ActionMenuProps {
     items: ActionMenuItem[]
     icon?: ReactNode
     iconOnly?: boolean
+    /** Row-level size by default; `false` for a page toolbar, beside full-size buttons. */
+    compact?: boolean
 }
 
-export function ActionMenu({ label, items, icon, iconOnly = false }: ActionMenuProps) {
+export function ActionMenu({ label, items, icon, iconOnly = false, compact = true }: ActionMenuProps) {
     const availableItems = useMemo(() => items.filter((item) => !item.disabled), [items])
     const renderedItems = useMemo(() => {
         return items.map((item, index) => {
@@ -44,7 +46,7 @@ export function ActionMenu({ label, items, icon, iconOnly = false }: ActionMenuP
             <Menu.Target>
                 <button
                     type="button"
-                    className="button button-secondary button-compact"
+                    className={`button button-secondary${compact ? ' button-compact' : ''}`}
                     disabled={availableItems.length === 0}
                     aria-haspopup="menu"
                     onKeyDown={closePopupOnEscape}

@@ -57,7 +57,7 @@ const fieldInputVars = (_theme: MantineTheme, props: InputProps, ctx?: InputFact
       // Error/success borders are set on this same wrapper. An unconditional
       // inline variable would mask them, even with the native CSS fixed.
       '--input-bd': !hasStateBorder && (!props.variant || props.variant === 'default')
-        ? 'var(--border-default)'
+        ? 'var(--border-strong)'
         : undefined,
     },
   }
@@ -66,6 +66,8 @@ const fieldInputVars = (_theme: MantineTheme, props: InputProps, ctx?: InputFact
 export const mantineTheme: MantineThemeOverride = {
   ...generatedTheme,
   defaultRadius: 'md',
+  // Overlays share the app's depth scale (index.css `--shadow-*`).
+  shadows: { sm: 'var(--shadow-raised)', md: 'var(--shadow-overlay)' },
   components: {
     Popover: { defaultProps: overlay },
     Menu: { defaultProps: overlay },
@@ -88,7 +90,7 @@ export const mantineTheme: MantineThemeOverride = {
         error: { '--input-error-size': 'var(--field-help-size)' },
       }),
       styles: {
-        label: { fontWeight: 'var(--field-label-weight)', marginBottom: 'var(--field-gap)' },
+        label: { fontWeight: 'var(--field-label-weight)', marginBottom: 'var(--field-gap)', color: 'var(--text-body)' },
         description: { color: 'var(--text-muted)', lineHeight: 'var(--field-line-height)' },
       },
     },

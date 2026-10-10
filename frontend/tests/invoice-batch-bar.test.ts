@@ -50,7 +50,7 @@ function mountFilters(activeFilter: InvoiceRowFilter = null, counts = COUNTS) {
     return { container, changes }
 }
 
-const segments = (container: HTMLElement) => [...container.querySelectorAll<HTMLButtonElement>('.invoice-row-filter')]
+const segments = (container: HTMLElement) => [...container.querySelectorAll<HTMLButtonElement>('.filter-tab')]
 const segment = (container: HTMLElement, label: string) =>
     segments(container).find((button) => button.textContent?.includes(label))!
 
@@ -69,10 +69,8 @@ describe('invoice row filter segments', () => {
         // The unfiltered period is the pressed segment.
         expect(segments(container).map((button) => button.getAttribute('aria-pressed')))
             .toEqual(['true', 'false', 'false', 'false', 'false'])
-        // Rows needing attention stand out only while there are any.
-        expect(segment(container, 'filters.issues').className).toContain('invoice-row-filter--attention')
-        const calm = mountFilters(null, { ...COUNTS, issues: 0 })
-        expect(segment(calm.container, 'filters.issues').className).not.toContain('invoice-row-filter--attention')
+        // Rows needing attention stand out.
+        expect(segment(container, 'filters.issues').className).toContain('filter-tab--attention')
     })
 
     it('narrows to a segment and clears it on a second press or on All', () => {
@@ -90,16 +88,26 @@ describe('invoice row filter segments', () => {
 })
 
 describe('empty invoice row filter segments', () => {
-    it('cannot be pressed, but a pressed one that empties can be released', () => {
+    it('are left out, but a pressed one that empties stays so it can be released', () => {
         const empty = { ...COUNTS, approved: 0, issues: 0 }
         const { container } = mountFilters(null, empty)
-        expect(segment(container, 'filters.approved').disabled).toBe(true)
-        expect(segment(container, 'filters.issues').disabled).toBe(true)
-        expect(segment(container, 'filters.drafts').disabled).toBe(false)
+        expect(segments(container).map((button) => button.textContent)).toEqual([
+            'pages.invoices.filters.all 9',
+            'pages.invoices.filters.drafts 2',
+            'pages.invoices.filters.sent 1',
+        ])
         const pressed = mountFilters('approved', empty)
-        expect(segment(pressed.container, 'filters.approved').disabled).toBe(false)
-        // All always shows the whole period.
-        expect(segment(mountFilters(null, { ...empty, all: 0 }).container, 'filters.all').disabled).toBe(false)
+        expect(segment(pressed.container, 'filters.approved').getAttribute('aria-pressed')).toBe('true')
+        // All left on its own offers no choice: the group is left out.
+        const nothing = mountFilters(null, { ...COUNTS, drafts: 0, approved: 0, sent: 0, issues: 0 })
+        expect(nothing.container.querySelector('[role="group"]')).toBeNull()
+    })
+
+    it('leave out a segment that counts the whole period, as it shows the same rows', () => {
+        const allDrafts = { ...COUNTS, all: 2, approved: 0, sent: 0, issues: 0 }
+        expect(mountFilters(null, allDrafts).container.querySelector('[role="group"]')).toBeNull()
+        const pressed = mountFilters('drafts', allDrafts)
+        expect(segment(pressed.container, 'filters.drafts').getAttribute('aria-pressed')).toBe('true')
     })
 })
 

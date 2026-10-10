@@ -4,7 +4,7 @@ import { useEffect, useMemo } from 'react'
 import { GeoJSON, MapContainer, TileLayer, useMap } from 'react-leaflet'
 import { useTranslation } from 'react-i18next'
 import type { Building, BuildingFootprint } from '../../types/api'
-import { FLOW_LOCAL_CONS } from '../../lib/chartTokens'
+import { CHART_LOCAL } from '../../lib/chartTokens'
 
 export interface BuildingMapEntry {
     id: string
@@ -132,7 +132,7 @@ export function BuildingsMap({ buildings }: BuildingsMapProps) {
                         <GeoJSON
                             key={group.buildings.map((building) => building.id).join('-')}
                             data={group.footprint}
-                            style={{ color: FLOW_LOCAL_CONS, weight: 2, fillOpacity: 0.25 }}
+                            style={{ color: CHART_LOCAL, weight: 2, fillOpacity: 0.25 }}
                             onEachFeature={bindGroupPopup(group, labels)}
                         />
                     ))}

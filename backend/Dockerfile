@@ -37,6 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libffi-dev \
     shared-mime-info \
+    fonts-inter \
     fonts-liberation \
     fonts-noto \
     && rm -rf /var/lib/apt/lists/*

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CHART_LABEL, CHART_LOCAL, FLOW_GRID_EXP, FLOW_LOCAL_CONS } from '../../lib/chartTokens'
+import { AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CHART_LABEL, CHART_LOCAL, CHART_RATIO, FLOW_GRID_EXP } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { formatConsumptionMixTooltip, formatProductionMixTooltip } from '../../lib/dashboardTooltips'
 import type { ZevOwnerDashboardSummary } from '../../types/api'
@@ -66,7 +66,7 @@ export function BalanceChart({
                                     type="monotone"
                                     dataKey="from_zev_rate"
                                     name={t('pages.dashboard.chart.fromZevPct')}
-                                    stroke={FLOW_LOCAL_CONS}
+                                    stroke={CHART_RATIO}
                                     dot={false}
                                     strokeWidth={2}
                                     connectNulls
@@ -99,7 +99,7 @@ export function BalanceChart({
                                     type="monotone"
                                     dataKey="self_consumption_rate"
                                     name={t('pages.dashboard.chart.selfConsumedPct')}
-                                    stroke={FLOW_LOCAL_CONS}
+                                    stroke={CHART_RATIO}
                                     dot={false}
                                     strokeWidth={2}
                                     connectNulls

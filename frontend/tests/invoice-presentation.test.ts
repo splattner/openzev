@@ -148,19 +148,21 @@ describe('shared invoice presentation', () => {
     })
 
     it('retains one pagination layer over the complete admin dataset and stable sorting/filtering', async () => {
-        api.list.mockResolvedValue(Array.from({ length: 30 }, (_, i) => ({ ...invoice, id: `i${i}`, invoice_number: `INV-${i}`, total_chf: i.toFixed(2) })))
+        api.list.mockResolvedValue(Array.from({ length: 130 }, (_, i) => ({ ...invoice, id: `i${i}`, invoice_number: `INV-${i}`, total_chf: i.toFixed(2) })))
         const { container } = await mount(createElement(AdminInvoicesContent))
         expect(api.list).toHaveBeenCalledWith()
-        expect(container.querySelectorAll('tbody tr')).toHaveLength(25)
+        expect(container.querySelectorAll('tbody tr')).toHaveLength(100)
         expect(container.querySelectorAll('.data-table')).toHaveLength(1)
         expect(container.querySelector('.data-table-footer')?.textContent).toContain('common.pagination.range')
+        // One fixed page size: the footer offers no rows-per-page choice.
+        expect(container.querySelector('.data-table-footer select')).toBeNull()
         const sort = [...container.querySelectorAll<HTMLButtonElement>('.data-table-sort')]
             .find(button => button.textContent?.includes('adminInvoices.total'))!
         await act(async () => sort.click())
-        expect(container.querySelector('tbody tr')?.textContent).toContain('29.00 CHF')
+        expect(container.querySelector('tbody tr')?.textContent).toContain('129.00 CHF')
         await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="common.pagination.next"]')!.click())
-        expect(container.querySelectorAll('tbody tr')).toHaveLength(5)
-        expect(container.querySelector('tbody tr')?.textContent).toContain('4.00 CHF')
+        expect(container.querySelectorAll('tbody tr')).toHaveLength(30)
+        expect(container.querySelector('tbody tr')?.textContent).toContain('29.00 CHF')
         const input = container.querySelector('input[type="search"]') as HTMLInputElement
         await act(async () => {
             Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'INV-29')

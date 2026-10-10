@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CHART_LOCAL, FLOW_LOCAL_CONS } from '../../lib/chartTokens'
+import { AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CHART_LOCAL, CHART_RATIO } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { formatConsumptionMixTooltip } from '../../lib/dashboardTooltips'
 import type { ParticipantDashboardSummary } from '../../types/api'
@@ -50,7 +50,7 @@ export function ConsumptionSplitCard({
                             type="monotone"
                             dataKey="from_zev_rate"
                             name={t('pages.dashboard.chart.fromZevPct')}
-                            stroke={FLOW_LOCAL_CONS}
+                            stroke={CHART_RATIO}
                             dot={false}
                             strokeWidth={2}
                             connectNulls

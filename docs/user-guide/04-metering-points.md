@@ -15,9 +15,17 @@ A single participant can be assigned multiple metering points (e.g., PV on roof 
 Every metering point also belongs to a **building**, the site where it is — see
 [Buildings](#buildings). The metering point's own
 location text says which unit within the building it measures. With several
-buildings, the page groups the cards by building and the toolbar offers a **Building** filter.
+buildings, the page groups the metering points by building and the toolbar offers a **Building** filter.
 
 ![Metering points page](screenshots/04-metering-points.png)
+
+The tabs above the list count the metering points and show one view at a time:
+**All**, **Active**, **Inactive**, **Unassigned** (no participant today) and
+**Needs attention**; click the active tab again to show all. A tab with nothing
+in it, or with everything in it, is left out. Below them, the search finds a meter ID, location, building
+or participant, and, when the community has more than one metering point
+type, a second row of tabs narrows to one type. The filters are kept in the
+page address, so a bookmark or shared link opens the same view.
 
 If a refresh fails, the last loaded list and any open form stay available.
 Use **Retry** in the warning to refresh the list.
@@ -47,7 +55,7 @@ are, and both are recorded. Buildings are managed on this page.
   the address of a participant or other contact. Landowners linked to a
   building (see [People & access](02-zev-setup.md#people-and-access-tab)) are
   named in its header.
-- With several buildings, the cards are **grouped by building**, ordered by
+- With several buildings, the metering points are **grouped by building**, ordered by
   name. Each group's header shows the address, EGID, landowners and number of
   metering points, with **Add metering point** (that building preselected)
   and **Edit**. A building without metering points shows "No
@@ -91,7 +99,7 @@ its meters.
 3. Click **Create Metering Point**
 
 4. To bill this meter, assign a participant: click **Assign participant** on
-   its card and set the assignment's validity window — see below.
+   its entry and set the assignment's validity window — see below.
 
 > **Tip:** **Active** only tracks whether a meter is in inventory; on its own
 > it does not affect billing. To *stop billing* a meter, end its assignment
@@ -247,7 +255,7 @@ join date, and a leaver's share stops on their leave date.
 
 ## What a Metering Point Card Shows
 
-Each card on the **Metering Points** page shows, at a glance:
+Each entry on the **Metering Points** page shows, at a glance:
 
 - The **meter ID**, its **building** (when the community has several) and
   its **location** within the building (or "No location set")
@@ -263,7 +271,7 @@ Each card on the **Metering Points** page shows, at a glance:
 - Its current assignment (holder and validity window), or its full
   assignment history if it has more than one
 
-Click **Chart** on a card for the metering point's full reading history.
+Click **Chart** on an entry for the metering point's full reading history.
 
 ## Meter Maintenance
 

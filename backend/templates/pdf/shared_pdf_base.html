@@ -29,7 +29,7 @@ How to use:
     }
 
     body {
-        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font-family: var(--font-print);
         font-size: 9.5pt;
         color: var(--ink);
         line-height: 1.4;
@@ -85,12 +85,10 @@ How to use:
         margin-bottom: 2mm;
     }
 
+    /* The issuer's name stands alone. Stored template overrides may still
+       carry the former disc's markup; it no longer renders. */
     .brand-mark {
-        width: 6mm;
-        height: 6mm;
-        background: var(--brand-deep);
-        border-radius: 50%;
-        flex-shrink: 0;
+        display: none;
     }
 
     .company-name {
@@ -147,6 +145,80 @@ How to use:
         border: 0.5pt solid var(--brand-glow);
     }
 
+    /* Summary band under the header: recipient left, facts (dates,
+       period) right — the invoice's band, shared by every document. */
+    .doc-summary {
+        display: flex;
+        gap: 10mm;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin: 6mm 0 5mm;
+    }
+
+    .recipient-block {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .facts .fact dt {
+        color: var(--muted);
+        font-size: 6.8pt;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .recipient-block .eyebrow {
+        color: var(--brand-mid);
+        margin-bottom: 1.5mm;
+    }
+
+    .recipient-name {
+        display: block;
+        font-size: 12pt;
+        font-weight: 700;
+        letter-spacing: -0.015em;
+        line-height: 1.15;
+        color: var(--ink);
+        margin-bottom: 1mm;
+    }
+
+    .recipient-address {
+        color: var(--ink-soft);
+        font-size: 9pt;
+        line-height: 1.35;
+    }
+
+    .recipient-email {
+        color: var(--muted);
+        font-size: 7.5pt;
+        margin-top: 1.5mm;
+    }
+
+    .facts {
+        display: flex;
+        flex: 0 0 42mm;
+        flex-direction: column;
+        justify-content: space-between;
+        align-self: stretch;
+        text-align: right;
+    }
+
+    .facts .fact + .fact {
+        margin-top: 1.5mm;
+    }
+
+    .facts .fact dd {
+        font-size: 9pt;
+        font-weight: 600;
+        line-height: 1.15;
+        margin-top: 0.4mm;
+        color: var(--ink);
+        letter-spacing: -0.01em;
+        white-space: nowrap;
+    }
+
     /* ══ 4. Page furniture: running header/footer meta ══════ */
     /* Pairs with `position: running(header-meta|footer-meta)` elements in the
        template body and `element(...)` margin boxes in the @page rules. The
@@ -159,7 +231,7 @@ How to use:
         box-sizing: border-box;
         color: var(--muted);
         font-size: 7pt;
-        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font-family: var(--font-print);
     }
 
     .page-meta-inner {
@@ -179,19 +251,273 @@ How to use:
         border-bottom: 0.5pt solid var(--line);
     }
 
-    .page-meta .meta-left::before {
-        content: "";
-        display: inline-block;
-        width: 2.5mm;
-        height: 2.5mm;
-        background: var(--brand-mid);
-        border-radius: 50%;
-        margin-right: 2mm;
-        vertical-align: middle;
-        position: relative;
-        top: -0.2mm;
-    }
     .page-meta .meta-center { text-align: center; flex: 0 0 auto; }
     .page-meta .meta-left { text-align: left; flex: 1; }
     .page-meta .meta-right { text-align: right; flex: 1; }
+
+    /* ══ 5. Shared document components ════════════════════════
+       Used by every OpenZEV document, and mirrored on screen by the app's
+       KPI tiles and section titles (frontend/src/index.css): a page heading
+       with one intro line; figure tiles (kicker label, figure, small unit,
+       hint; one dark accent tile at most); sections opened by a forest dot;
+       dark-header tables with zebra rows; a pale summary box. */
+    .page-heading {
+        color: var(--brand-deep);
+        font-size: 15pt;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+        margin-bottom: 1mm;
+    }
+
+    .page-intro {
+        color: var(--muted);
+        font-size: 8.5pt;
+        margin-bottom: 5mm;
+        max-width: 150mm;
+        line-height: 1.4;
+    }
+
+    .kpi-row {
+        display: flex;
+        gap: 2.5mm;
+        margin-bottom: 4mm;
+    }
+
+    .kpi-card {
+        flex: 1 1 0;
+        background: var(--surface);
+        border: 0.5pt solid var(--line);
+        border-radius: 2mm;
+        padding: 2.5mm 3mm;
+        min-width: 0;
+    }
+
+    .kpi-card .kpi-label {
+        color: var(--muted);
+        font-size: 6.5pt;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        margin-bottom: 1mm;
+    }
+
+    .kpi-card .kpi-value {
+        color: var(--brand-deep);
+        font-size: 12pt;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .kpi-card .kpi-unit {
+        color: var(--muted);
+        font-size: 8pt;
+        font-weight: 500;
+        margin-left: 0.8mm;
+    }
+
+    .kpi-card .kpi-hint {
+        color: var(--ink-soft);
+        font-size: 7pt;
+        margin-top: 1mm;
+    }
+
+    /* Lit like the invoice's savings card: the forest gradient with a soft
+       light in the top corner (the app's accent tile matches). */
+    .kpi-card--accent {
+        background-color: var(--brand-deep);
+        background-image:
+            radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0) 62%),
+            linear-gradient(160deg, var(--brand) 0%, var(--brand-deep) 100%);
+        border-color: var(--brand-deep);
+    }
+
+    .kpi-card--accent .kpi-label {
+        color: var(--brand-accent);
+    }
+
+    .kpi-card--accent .kpi-value {
+        color: var(--white);
+        font-weight: 900;
+    }
+
+    .kpi-card--accent .kpi-unit {
+        color: var(--brand-light);
+    }
+
+    .kpi-card--accent .kpi-hint {
+        color: var(--brand-muted);
+    }
+
+    .chart-section {
+        break-inside: avoid;
+        border-top: 1.2pt solid var(--brand-pale);
+        padding-top: 2.5mm;
+        margin-bottom: 3mm;
+    }
+
+    .chart-section h3 {
+        color: var(--brand-deep);
+        font-size: 9.5pt;
+        font-weight: 700;
+        margin-bottom: 1.5mm;
+        letter-spacing: -0.01em;
+    }
+
+    .chart-description {
+        color: var(--muted);
+        font-size: 7.5pt;
+        margin-bottom: 2mm;
+        line-height: 1.35;
+    }
+
+    .chart {
+        margin: 0 auto;
+        width: 100%;
+        background: var(--chart-surface);
+        border: 0.5pt solid var(--line-subtle);
+        border-radius: 2mm;
+        padding: 1.5mm 1mm;
+    }
+
+    .chart svg {
+        display: block;
+        height: auto;
+        width: 100%;
+    }
+
+    .doc-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-top: 1mm;
+    }
+
+    .doc-table thead {
+        display: table-header-group;
+    }
+
+    .doc-table thead th {
+        background: var(--brand-deep);
+        color: var(--white);
+        font-size: 7pt;
+        font-weight: 700;
+        padding: 1.5mm 2.5mm;
+        text-align: left;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .doc-table thead th:first-child {
+        border-top-left-radius: 1.5mm;
+    }
+
+    .doc-table thead th:last-child {
+        border-top-right-radius: 1.5mm;
+    }
+
+    .doc-table td {
+        border-bottom: 0.5pt solid var(--line);
+        font-size: 8.2pt;
+        padding: 1.2mm 2.5mm;
+        vertical-align: top;
+        color: var(--ink-soft);
+    }
+
+    .doc-table tbody tr:nth-child(even) td {
+        background: var(--zebra);
+    }
+
+    .doc-table tr {
+        break-inside: avoid;
+    }
+
+    .doc-table .numeric {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Figures stay on one line; long column labels wrap instead. */
+    .doc-table td.numeric {
+        white-space: nowrap;
+    }
+
+    .doc-table .muted {
+        color: var(--muted);
+    }
+
+    .doc-table .strong td {
+        color: var(--ink);
+        font-weight: 700;
+    }
+
+    /* The table's sum: the invoice's grand-total treatment. */
+    .doc-table tr.total-row td {
+        background: var(--brand-glow);
+        border-top: 1.5pt solid var(--brand-mid);
+        border-bottom: 0;
+        color: var(--brand-deep);
+        font-weight: 700;
+    }
+
+    .doc-table tr.total-row td:first-child {
+        border-bottom-left-radius: 1.5mm;
+    }
+
+    .doc-table tr.total-row td:last-child {
+        border-bottom-right-radius: 1.5mm;
+    }
+
+    /* A short ledger of amounts (savings, taxable income): the invoice's
+       totals box at full width. */
+    .summary-box {
+        background: var(--brand-pale);
+        border-radius: 2mm;
+        padding: 1.5mm 3mm 2.5mm;
+        break-inside: avoid;
+    }
+
+    .summary-box table {
+        border-collapse: collapse;
+        width: 100%;
+    }
+
+    .summary-box td {
+        border-bottom: 0.5pt solid var(--line-subtle);
+        font-size: 8.5pt;
+        padding: 1.2mm 0.5mm;
+        color: var(--ink);
+    }
+
+    .summary-box .numeric {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        font-weight: 600;
+    }
+
+    .summary-box .quantity {
+        color: var(--muted);
+        font-weight: 400;
+    }
+
+    .summary-box .grand-total td {
+        background: var(--brand-glow);
+        border-bottom: 0;
+        border-top: 1.5pt solid var(--brand-mid);
+        color: var(--brand-deep);
+        font-size: 10pt;
+        font-weight: 700;
+        padding: 2mm 1.2mm;
+        letter-spacing: -0.01em;
+    }
+
+    .summary-note {
+        color: var(--muted);
+        font-size: 7.5pt;
+        line-height: 1.4;
+        margin-top: 1.5mm;
+    }
 </style>

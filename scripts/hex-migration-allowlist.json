@@ -6,5 +6,6 @@
   "pages/MeteringChartPage.tsx@alpha",
   "features/feasibility/ParticipantRowsEditor.tsx@alpha",
   "invoices/invoice_pdf.html@alpha",
-  "contracts/participant_contract_pdf.html@alpha"
+  "contracts/participant_contract_pdf.html@alpha",
+  "pdf/shared_pdf_base.html@alpha"
 ]

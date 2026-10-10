@@ -551,7 +551,7 @@ False` (SPEC-2026-behind-the-meter-generation §5.5): the real
 `monthly_data[].self_sufficiency_pct`/`totals.self_sufficiency_pct` to `None`,
 when the statement's participant personally held a metering point with
 generation behind it for a reading that year. The template renders `—` for a
-`None` rate and, when the flag is set, a note below the monthly table using
+`None` rate and, when the flag is set, a note below the figure tiles using
 the new `ANNUAL_TRANSLATIONS` key `behind_meter_note` (all four languages).
 The field catalog (`field_catalog_data.py`) documents both the
 `{{ has_behind_meter_generation }}` variable and the `{{ tr.behind_meter_note }}` key.
@@ -748,6 +748,7 @@ The `participant_magic_link`, `zev_access_invitation` and `zev_access_granted` s
    - If a DB record exists: render using `django.template.Template(content).render(Context(context))`.
    - Otherwise: render from the on-disk default using `render_to_string(template_name, context)`.
 3. Convert HTML → PDF via WeasyPrint through `render_pdf()` in `invoices/pdf_render.py`, which emits **PDF/A-3b** (`PDF_VARIANT = "pdf/a-3b"`) — a long-term archival format suitable for Swiss GeBüV retention, with WeasyPrint adding the XMP identification, sRGB OutputIntent, and font subsets. The same helper renders contract, annual statement, and financial summary PDFs. Because template content is admin-editable, the WeasyPrint fetcher is restricted to `data:` URIs (`ALLOWED_URL_PROTOCOLS` in `pdf_render.py`) — templates embed images as data URIs and cannot make the renderer read local files or request remote URLs.
+   Text renders in Inter, the app's face (ADR 0032): the default templates set `var(--font-print)` from `pdf/_tokens.css`, and the generated chart SVGs carry the same stack on their root (`_CHART_FONT_FAMILY`), since inline SVG does not inherit the document font. Inter comes from Debian's `fonts-inter` in the backend images; without it the stack falls back to Helvetica Neue/Helvetica/Arial. The Swiss QR-bill payment part keeps the `qrbill` SVG's own `Arial,Helvetica` stack (resolved to the metric-compatible Liberation Sans in the image), as its standard requires.
 4. Save PDF to `invoice.pdf_file` (`invoices/pdf/invoice_{number}.pdf`).
    `save_invoice_pdf()` writes the file without saving the (possibly stale)
    invoice instance, then updates only `pdf_file`/`updated_at` via a
@@ -1240,8 +1241,9 @@ the cockpit readiness and attention caches.
   explicitly icon-only with translated accessible names.
 - Filters are **All**, **Drafts**, **Approved**, **Sent** and **Issues** with
   counts. Sent means the exact sent status, excluding paid. Pressing All or
-  the active segment clears filtering. A zero-count segment is disabled unless
-  active, so an emptied selection can still be released. Empty filtered results
+  the active segment clears filtering. A zero-count segment, or one counting
+  the whole period (the same rows as All), is left out unless active, so an
+  emptied selection can still be released. Empty filtered results
   have an explanation and clear action. Filtering changes visible rows only;
   batch counts and payloads always use the full period. Filters reset on
   account, community or period changes and remain available read-only.

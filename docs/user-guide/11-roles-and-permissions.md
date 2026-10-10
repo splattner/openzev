@@ -105,7 +105,7 @@ manager access under **ZEV settings → People & access**.
 A manager is **scoped** to the ZEVs it has access to:
 
 - **Single ZEV:** the manager sees one community only
-- **Multiple ZEVs:** the community switcher lists each one
+- **Multiple ZEVs:** the community name above the page title opens a list of each one
 - Each ZEV is isolated—data from one ZEV is not visible in another
 
 ### Who Should Be a Manager?
@@ -464,15 +464,15 @@ If operating multiple communities:
 - Can monitor cross-ZEV metrics and KPIs
 
 **Manager, viewer and participant perspective:**
-- The community switcher (sidebar top) lists every community your account
-  relates to, with your relation (Manager, Viewer, Participant, Former
+- The community name above the page title opens a list of every community
+  your account relates to, with your relation (Manager, Viewer, Participant, Former
   participant) under each name
 - The navigation follows the selected community: management pages for a
   manager or viewer, your dashboard and invoices for a participant, only your
   invoices for a former participant
 - Each ZEV has isolated data
-- With only one community there is nothing to switch, and the switcher is
-  hidden
+- With only one community there is nothing to choose, and the name is plain
+  text
 
 ## Troubleshooting
 

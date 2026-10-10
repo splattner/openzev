@@ -4,313 +4,183 @@
 <head>
     <meta charset="UTF-8">
     <title>{{ tr.title }} {{ year }}</title>
+    {% comment %}Same document anatomy as the invoice and the annual statement
+    (pdf/shared_pdf_base.html): document header, summary band, sections with
+    the forest dot, dark-header tables and the running footer.{% endcomment %}
+    {% include "pdf/shared_pdf_base.html" %}
+
     <style>
-        {% include "pdf/_tokens.css" %}
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
+        .summary-page {
+            padding: 12mm 16mm;
         }
 
-        body {
-            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-            font-size: 10pt;
-            color: var(--ink);
-        }
-
-        .page {
-            padding: 13mm 16mm 16mm;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 6mm;
-        }
-
-        .company-name {
-            font-size: 13pt;
-            font-weight: bold;
-            color: var(--brand-mid);
-        }
-
-        .company-meta {
-            font-size: 8pt;
-            color: var(--ink-soft);
-            margin-top: 1mm;
-        }
-
-        .statement-title {
-            font-size: 14pt;
-            font-weight: bold;
-            margin-bottom: 1mm;
-        }
-
-        .statement-subtitle {
-            font-size: 9pt;
-            color: var(--ink-soft);
-            margin-bottom: 4mm;
-        }
-
-        .meta-row {
-            display: flex;
-            gap: 10mm;
-            margin-bottom: 5mm;
-        }
-
-        .meta-block dt {
-            font-size: 7pt;
+        .empty-note {
             color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+            font-size: 8.5pt;
+            margin-top: 4mm;
         }
 
-        .meta-block dd {
-            font-size: 9pt;
-            font-weight: 600;
+        .summary-box .strong td {
+            font-weight: 700;
         }
 
-        h2.section-title {
-            font-size: 11pt;
-            font-weight: bold;
-            color: var(--brand-mid);
-            margin: 5mm 0 3mm;
-            padding-bottom: 1mm;
-            border-bottom: 0.5pt solid var(--line);
-        }
-
-        .revenue-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 10pt;
-            margin-bottom: 5mm;
-        }
-
-        .revenue-table td {
-            padding: 2mm 2mm;
-            border-bottom: 0.5pt solid var(--line-subtle);
-        }
-
-        .revenue-table td.number {
-            text-align: right;
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-        }
-
-        .revenue-table tr.total td {
-            font-weight: bold;
-            font-size: 11pt;
-            border-top: 1pt solid var(--muted);
-            border-bottom: none;
-            padding-top: 2.5mm;
-        }
-
-        .revenue-table tr.total td.number {
-            color: var(--brand-mid);
-        }
-
-        .taxable-note {
-            background: var(--brand-pale);
-            border: 0.5pt solid var(--brand-mid);
-            border-radius: 2mm;
-            padding: 3mm 4mm;
-            font-size: 8pt;
-            color: var(--brand-mid);
-            margin-bottom: 5mm;
-        }
-
-        table.breakdown {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 9pt;
-            margin-bottom: 4mm;
-        }
-
-        table.breakdown thead th {
-            background: var(--brand-deep);
-            color: var(--white);
-            font-weight: 600;
-            font-size: 8pt;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-            padding: 2mm 2mm;
-            border-bottom: 1pt solid var(--line);
-            text-align: left;
-        }
-
-        table.breakdown thead th.number {
-            text-align: right;
-        }
-
-        table.breakdown tbody td {
-            padding: 1.5mm 2mm;
-            border-bottom: 0.5pt solid var(--line-subtle);
-        }
-
-        table.breakdown tbody td.number {
-            text-align: right;
-            font-variant-numeric: tabular-nums;
-        }
-
-        table.breakdown tbody tr.total-row td {
-            font-weight: bold;
-            border-top: 1pt solid var(--muted);
-            border-bottom: none;
-            padding-top: 2mm;
-        }
-
-        .footer {
-            margin-top: 6mm;
-            padding-top: 3mm;
-            border-top: 0.5pt solid var(--line);
-            font-size: 8pt;
-            color: var(--muted);
-            text-align: center;
-        }
+        .page-meta .meta-center::after { content: counter(page) " / " counter(pages); }
 
         @page {
             size: A4;
-            margin: 0;
+            margin: 0 0 12mm 0;
+            @top-center { content: none; }
+            @bottom-center {
+                content: element(footer-meta);
+                width: 210mm;
+            }
         }
     </style>
 </head>
 
 <body>
-    <div class="page">
-        <!-- Header -->
-        <div class="header">
-            <div>
-                <div class="company-name">{{ zev.name }}</div>
-                {% if zev.vat_number %}
-                <div class="company-meta">{{ zev.vat_number }}</div>
-                {% endif %}
-            </div>
-            <div style="text-align: right;">
-                <div style="font-size: 8pt; color: var(--muted);">{{ tr.generated_on }}</div>
-                <div style="font-size: 9pt; font-weight: 600;">{{ formatted_dates.generated_on }}</div>
-            </div>
-        </div>
-
-        <!-- Title -->
-        <div class="statement-title">{{ tr.title }} {{ year }}</div>
-        <div class="statement-subtitle">{{ tr.subtitle }}</div>
-
-        <!-- Meta -->
-        <div class="meta-row">
-            <dl class="meta-block">
-                <dt>{{ tr.zev }}</dt>
-                <dd>{{ zev.name }}</dd>
-            </dl>
-            <dl class="meta-block">
-                <dt>{{ tr.year }}</dt>
-                <dd>{{ year }}</dd>
-            </dl>
-            <dl class="meta-block">
-                <dt>{{ tr.producer }}</dt>
-                <dd>{{ producer_name }}</dd>
-            </dl>
-        </div>
-
-        {% if not has_data %}
-        <p style="color: var(--muted); font-size: 9pt; margin-top: 5mm;">{{ tr.no_data }}</p>
-        {% else %}
-
-        <!-- Taxable Income -->
-        <h2 class="section-title">{{ tr.taxable_income }}</h2>
-        <table class="revenue-table">
-            <tbody>
-                <tr>
-                    <td>{{ tr.local_sold }}</td>
-                    <td class="number" style="color: var(--muted);">{{ totals.local_sold_kwh }} {{ tr.kwh }}</td>
-                    <td class="number">{{ totals.local_sold }} {{ tr.chf }}</td>
-                </tr>
-                <tr>
-                    <td>{{ tr.local_consumed }}</td>
-                    <td class="number" style="color: var(--muted);">{{ totals.local_consumed_kwh }} {{ tr.kwh }}</td>
-                    <td class="number">−{{ totals.local_consumed }} {{ tr.chf }}</td>
-                </tr>
-                <tr>
-                    <td style="font-weight: 600;">{{ tr.net_local }}</td>
-                    <td class="number"></td>
-                    <td class="number" style="font-weight: 600;">{{ totals.net_local }} {{ tr.chf }}</td>
-                </tr>
-                <tr>
-                    <td>{{ tr.feed_in }}</td>
-                    <td class="number" style="color: var(--muted);">{{ totals.feed_in_kwh }} {{ tr.kwh }}</td>
-                    <td class="number">{{ totals.feed_in }} {{ tr.chf }}</td>
-                </tr>
-                <tr class="total">
-                    <td>{{ tr.total_taxable }}</td>
-                    <td class="number"></td>
-                    <td class="number">{{ totals.total_taxable }} {{ tr.chf }}</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <div class="taxable-note">{{ tr.taxable_note }}</div>
-
-        {% if tariff_rows %}
-        <!-- Tariff Detail -->
-        <h2 class="section-title">{{ tr.tariff_detail }}</h2>
-        <table class="breakdown">
-            <thead>
-                <tr>
-                    <th>{{ tr.tariff_category }}</th>
-                    <th>{{ tr.tariff_name }}</th>
-                    <th class="number">{{ tr.kwh }}</th>
-                    <th class="number">{{ tr.tariff_price }}</th>
-                    <th class="number">{{ tr.chf }}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in tariff_rows %}
-                <tr>
-                    <td>{{ row.category }}</td>
-                    <td>{{ row.description }}</td>
-                    <td class="number">{{ row.quantity_kwh }}</td>
-                    <td class="number">{{ row.unit_price }}</td>
-                    <td class="number">{{ row.total_chf }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% endif %}
-
-        <!-- Monthly Breakdown -->
-        <h2 class="section-title">{{ tr.monthly_breakdown }}</h2>
-        <table class="breakdown">
-            <thead>
-                <tr>
-                    <th>{{ tr.month }}</th>
-                    <th class="number">{{ tr.local_sold }}</th>
-                    <th class="number">{{ tr.local_consumed }}</th>
-                    <th class="number">{{ tr.net_local }}</th>
-                    <th class="number">{{ tr.feed_in }}</th>
-                    <th class="number">{{ tr.total_taxable }}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in monthly_rows %}
-                <tr>
-                    <td>{{ row.month }}</td>
-                    <td class="number">{{ row.local_sold }}</td>
-                    <td class="number">{{ row.local_consumed }}</td>
-                    <td class="number">{{ row.net_local }}</td>
-                    <td class="number">{{ row.feed_in }}</td>
-                    <td class="number">{{ row.total }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        {% endif %}
-
-        <!-- Footer -->
-        <div class="footer">
-            {{ zev.name }} — {{ tr.title }} {{ year }}
+    <div style="position: running(footer-meta)" class="page-meta page-meta--footer">
+        <div class="page-meta-inner">
+            <span class="meta-left">{{ zev.name }} · {{ tr.title }} {{ year }}</span>
+            <span class="meta-center"></span>
+            <span class="meta-right">{{ tr.generated_on }} {{ formatted_dates.generated_on }}</span>
         </div>
     </div>
+
+    <main class="summary-page">
+        <header class="document-header">
+            <div>
+                <div class="brand-row">
+                    <div class="company-name">{{ zev.name }}</div>
+                </div>
+                {% if zev.vat_number %}
+                <div class="company-address">{{ zev.vat_number }}</div>
+                {% endif %}
+            </div>
+            <div>
+                <div class="document-label">{{ tr.title }}</div>
+                <div class="document-number"><strong>{{ year }}</strong></div>
+            </div>
+        </header>
+
+        <section class="doc-summary">
+            <div class="recipient-block">
+                <div class="eyebrow">{{ tr.producer }}</div>
+                <strong class="recipient-name">{{ producer_name }}</strong>
+                <div class="recipient-address">{{ tr.subtitle }}</div>
+            </div>
+            <dl class="facts">
+                <div class="fact">
+                    <dt>{{ tr.zev }}</dt>
+                    <dd>{{ zev.name }}</dd>
+                </div>
+                <div class="fact">
+                    <dt>{{ tr.year }}</dt>
+                    <dd>{{ year }}</dd>
+                </div>
+                <div class="fact">
+                    <dt>{{ tr.generated_on }}</dt>
+                    <dd>{{ formatted_dates.generated_on }}</dd>
+                </div>
+            </dl>
+        </section>
+
+        {% if not has_data %}
+        <p class="empty-note">{{ tr.no_data }}</p>
+        {% else %}
+
+        <section class="chart-section">
+            <h3>{{ tr.taxable_income }}</h3>
+            <div class="summary-box">
+                <table>
+                    <tr>
+                        <td>{{ tr.local_sold }}</td>
+                        <td class="numeric quantity">{{ totals.local_sold_kwh }} {{ tr.kwh }}</td>
+                        <td class="numeric">{{ totals.local_sold }} {{ tr.chf }}</td>
+                    </tr>
+                    <tr>
+                        <td>{{ tr.local_consumed }}</td>
+                        <td class="numeric quantity">{{ totals.local_consumed_kwh }} {{ tr.kwh }}</td>
+                        <td class="numeric">−{{ totals.local_consumed }} {{ tr.chf }}</td>
+                    </tr>
+                    <tr class="strong">
+                        <td>{{ tr.net_local }}</td>
+                        <td class="numeric"></td>
+                        <td class="numeric">{{ totals.net_local }} {{ tr.chf }}</td>
+                    </tr>
+                    <tr>
+                        <td>{{ tr.feed_in }}</td>
+                        <td class="numeric quantity">{{ totals.feed_in_kwh }} {{ tr.kwh }}</td>
+                        <td class="numeric">{{ totals.feed_in }} {{ tr.chf }}</td>
+                    </tr>
+                    <tr class="grand-total">
+                        <td>{{ tr.total_taxable }}</td>
+                        <td class="numeric"></td>
+                        <td class="numeric">{{ totals.total_taxable }} {{ tr.chf }}</td>
+                    </tr>
+                </table>
+            </div>
+            <p class="summary-note">{{ tr.taxable_note }}</p>
+        </section>
+
+        {% if tariff_rows %}
+        <section class="chart-section">
+            <h3>{{ tr.tariff_detail }}</h3>
+            <table class="doc-table">
+                <thead>
+                    <tr>
+                        <th>{{ tr.tariff_category }}</th>
+                        <th>{{ tr.tariff_name }}</th>
+                        <th class="numeric">{{ tr.kwh }}</th>
+                        <th class="numeric">{{ tr.tariff_price }}</th>
+                        <th class="numeric">{{ tr.chf }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in tariff_rows %}
+                    <tr>
+                        <td>{{ row.category }}</td>
+                        <td>{{ row.description }}</td>
+                        <td class="numeric">{{ row.quantity_kwh }}</td>
+                        <td class="numeric">{{ row.unit_price }}</td>
+                        <td class="numeric">{{ row.total_chf }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        {% endif %}
+
+        <section class="chart-section">
+            <h3>{{ tr.monthly_breakdown }}</h3>
+            <table class="doc-table">
+                <thead>
+                    <tr>
+                        <th>{{ tr.month }}</th>
+                        <th class="numeric">{{ tr.local_sold }}</th>
+                        <th class="numeric">{{ tr.local_consumed }}</th>
+                        <th class="numeric">{{ tr.net_local }}</th>
+                        <th class="numeric">{{ tr.feed_in }}</th>
+                        <th class="numeric">{{ tr.total_taxable }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in monthly_rows %}
+                    <tr>
+                        <td>{{ row.month }}</td>
+                        <td class="numeric">{{ row.local_sold }}</td>
+                        <td class="numeric">{{ row.local_consumed }}</td>
+                        <td class="numeric">{{ row.net_local }}</td>
+                        <td class="numeric">{{ row.feed_in }}</td>
+                        <td class="numeric">{{ row.total }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        {% endif %}
+    </main>
 </body>
 
 </html>

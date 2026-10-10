@@ -286,7 +286,7 @@ A demo dataset is available for testing. It is loaded by starting the stack
 with `scripts/start-demo-environment.sh`, or by running `seed_demo` on an
 already-running stack (see below). It contains two communities with the
 same issuer — the flagship **ZEV STWEG Sonnenhof** and the smaller
-**ZEV Sonnenfirma AG** — so both sides of the community switcher have real
+**ZEV Sonnenfirma AG** — so both sides of the community choice have real
 data to show. It also has a viewer of the flagship community and a property
 manager who manages both, to show per-community access. Credentials and the full list of what the seed creates are in
 the root [`README.md`](../../README.md#seed-data--demo-accounts).
@@ -321,8 +321,9 @@ pages look the same, just without data.
    Unlinked guest accounts see an explanation and a link to **Account settings**.
 
 The interface follows your browser's language (German, French, Italian or
-English). To change it, open the account menu at the top right
-and pick a **Language**; the choice is remembered in this browser. Invoice and
+English). To change it, open the account menu at the foot of the sidebar
+(your name) and pick a **Language**; the choice is remembered in this browser.
+The same menu leads to **Account** settings and **Log out**, and its last line shows the OpenZEV version with a link to the source code. Invoice and
 contract PDFs use the community's own **Invoice language** instead.
 
 ![Login page](screenshots/01-login.png)
@@ -339,9 +340,9 @@ account without community access should ask an administrator to grant it.
 If logged in as admin:
 - Go to **Platform → Overview** to see system-wide KPIs
 - View **ZEVs**, **Accounts**, **Invoices**, and **Settings** (regional/VAT)
-- To work inside a community: open **Platform → Overview → ZEVs** and click **Manage** on a row — this selects the ZEV and takes you to its operational Overview. (While under `/admin` the shell shows the **Platform administration** indicator instead of the switcher.)
-- The sidebar ZEV switcher (top-left) selects the working community anywhere else; the selected community is shown above the page title on every page, so it stays visible even when the navigation scrolls, the sidebar is collapsed, or you are on mobile. With read-only access it reads e.g. *Sonnenhof · Viewer (read only)*
-- For keyboard access, open the switcher or account button with Enter or Space, use Tab to move through its options, and press Escape to close it. After selecting a community, focus returns to the switcher. On mobile, Escape closes the navigation drawer and returns focus to its menu button.
+- To work inside a community: open **Platform → Overview → ZEVs** and click **Manage** on a row — this selects the ZEV and takes you to its operational Overview. (Under `/admin` pages show **Platform administration** above the title instead of a community.)
+- Anywhere else, the community name above the page title shows the working community and, when you have more than one, opens the list to choose another — so it stays visible and in reach when the navigation scrolls, the sidebar is collapsed, or you are on mobile. With read-only access it reads e.g. *Sonnenhof · Viewer (read only)*
+- For keyboard access, open the community name or the account button with Enter or Space, move through the options with the arrow keys (community list) or Tab (account menu), and press Escape to close it. After choosing a community, focus returns to its name. On mobile, Escape closes the navigation drawer and returns focus to its menu button.
 - Once signed in, the first Tab on a page reaches **Skip to main content**, which jumps past the navigation. After you open another page, focus starts at its title; switching tabs or changing filters keeps focus where it was. The browser tab shows the page and the community, e.g. *Billing · Muster ZEV – OpenZEV*.
 
 ### 3. Explore as a Manager

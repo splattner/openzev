@@ -131,7 +131,7 @@ for (const [path, endpoint, body] of [
   ['/admin/accounts/users', '/auth/users/', 'table'],
   ['/admin/zevs', '/zev/zevs/', 'table'],
   ['/billing/invoices', '/invoices/invoices/period-overview/', '.empty-state'],
-  ['/billing/invoices/1', '/invoices/invoices/1/', '.badge-sent'],
+  ['/billing/invoices/1', '/invoices/invoices/1/', '.invoice-detail-meta .badge'],
 ]) {
   test(`${path} keeps one title across loading, error and content states`, async ({ page }) => {
     let release!: () => void
@@ -336,10 +336,12 @@ test('long German headers and narrow tile containers fit at desktop and mobile w
     mountPageLayout()
   }, '/screenshots/fixtures/page-layout.tsx')
   const fixture = page.locator('#page-layout-fixture')
-  for (const width of [1440, 400]) {
+  // The page title is set like the documents' page heading: 700, 28px (24px on phones).
+  for (const [width, titleSize] of [[1440, '28px'], [400, '24px']] as const) {
     await page.setViewportSize({ width, height: 900 })
     await expect(fixture.locator('.page-header-text')).toHaveCSS('min-width', '0px')
-    await expect(fixture.locator('h1')).toHaveCSS('font-weight', '650')
+    await expect(fixture.locator('h1')).toHaveCSS('font-weight', '700')
+    await expect(fixture.locator('h1')).toHaveCSS('font-size', titleSize)
     for (const selector of ['.page-header', '.page-header-actions', '.toolbar', '.toolbar-actions', '.stat-grid']) {
       const overflow = await fixture.locator(selector).evaluate(element => element.scrollWidth - element.clientWidth)
       expect(overflow, `${selector} overflow at ${width}px`).toBeLessThanOrEqual(1)
@@ -378,8 +380,8 @@ const twoZevs = [{ id: '42', name: 'Review ZEV' }, { id: '43', name: 'Other ZEV'
 const overviewEndpoint = '/invoices/invoices/period-overview/'
 
 async function switchToOtherZev(page: Page) {
-  await page.locator('.sidebar-zev-menu .user-menu-trigger').click()
-  await page.locator('.zev-dropdown-item').filter({ hasText: 'Other ZEV' }).click()
+  await page.locator('main .community-switch').click()
+  await page.getByRole('menuitem', { name: 'Other ZEV' }).click()
 }
 
 /**
@@ -444,7 +446,7 @@ for (const role of ['manager', 'viewer'] as const) {
     await expect(page.locator('main .eyebrow').first()).toHaveText(role === 'viewer' ? 'Review ZEV · Viewer (read only)' : 'Review ZEV')
     await expect(page.locator('main').getByText('MP-42', { exact: true }).first()).toBeVisible()
     await expect(page.locator('main').getByText('MP-43', { exact: true })).toHaveCount(0)
-    await expect(page.locator('.sidebar-zev-menu')).toHaveCount(0)
+    await expect(page.locator('.community-switch')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'New Metering Point', exact: true })).toHaveCount(role === 'manager' ? 1 : 0)
     await expect(page.getByRole('button', { name: 'Add building', exact: true })).toHaveCount(role === 'manager' ? 1 : 0)
 

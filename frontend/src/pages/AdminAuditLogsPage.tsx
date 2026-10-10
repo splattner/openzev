@@ -220,6 +220,7 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
             {!embedded && (
                 <PageHeader
                     eyebrow={isAdminView ? t('nav.platformScope') : selectedZev?.name}
+                    communitySwitch={!isAdminView}
                     scopeNote={isAdminView ? undefined : scopeNote}
                     title={t('pages.auditLogs.title')}
                     description={scopeDescription}

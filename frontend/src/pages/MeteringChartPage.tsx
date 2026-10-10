@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Tabs } from '@mantine/core'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { DataTable, type ColumnDef } from '../components/DataTable'
 import { EmptyState } from '../components/EmptyState'
 import { PageSkeleton } from '../components/PageSkeleton'
@@ -251,6 +251,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
 
     const periodDays = daysInPeriod(period.from, period.to)
     const hourlyResolutionAvailable = periodDays <= MAX_HOURLY_RESOLUTION_DAYS
+    const hourlyHintId = useId()
     const effectiveBucket = bucket === 'hour' && !hourlyResolutionAvailable ? 'day' : bucket
 
     // Fall back to daily if the period grows past the hourly cap (e.g. a
@@ -545,6 +546,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
         <div className="page-stack">
             <PageHeader
                 eyebrow={selectedCommunityName({ selectedZev, entries, selectedZevId })}
+                communitySwitch
                 scopeNote={scopeNote}
                 title={t('pages.meteringData.title')}
                 description={t('pages.meteringData.description')}
@@ -563,13 +565,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                     {isManagedScope && <Tabs.Tab value="imports">{t('nav.meteringImportsTab')}</Tabs.Tab>}
                 </Tabs.List>
 
-                {tab !== 'imports' && <div
-                    className="card"
-                    style={{
-                        display: 'grid',
-                        gap: '1rem',
-                    }}
-                >
+                {tab !== 'imports' && <div className="filter-bar">
                     {mpQuery.isError && (
                         <Notice tone={meterListResolved ? 'warning' : 'error'} onRetry={() => void mpQuery.refetch()} isRetrying={mpQuery.isFetching}>
                             {formatApiError(mpQuery.error)}
@@ -584,14 +580,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                     />
 
                     {tab === 'chart' && (
-                        <div
-                            className="inline-form align-start"
-                            style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                                gap: '1rem',
-                            }}
-                        >
+                        <div className="filter-bar-fields">
                             {!hasNoMeters && (
                                 <label>
                                     <span>{t('pages.meteringData.meteringPoint')}</span>
@@ -619,6 +608,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                                 <select
                                     value={bucket}
                                     onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}
+                                    aria-describedby={hourlyResolutionAvailable ? undefined : hourlyHintId}
                                 >
                                     <option
                                         value="hour"
@@ -630,25 +620,18 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                                     <option value="day">{t('pages.meteringData.resolutions.day')}</option>
                                     <option value="month">{t('pages.meteringData.resolutions.month')}</option>
                                 </select>
-                                {!hourlyResolutionAvailable && (
-                                    <small className="muted">
-                                        {t('pages.meteringData.resolutions.hourlyUnavailableHint', { maxDays: MAX_HOURLY_RESOLUTION_DAYS })}
-                                    </small>
-                                )}
                             </label>
                         </div>
                     )}
+                    {/* Below the row, so the fields keep one baseline. */}
+                    {tab === 'chart' && !hourlyResolutionAvailable && (
+                        <p id={hourlyHintId} className="muted filter-bar-note">
+                            {t('pages.meteringData.resolutions.hourlyUnavailableHint', { maxDays: MAX_HOURLY_RESOLUTION_DAYS })}
+                        </p>
+                    )}
 
                     {tab === 'quality' && (
-                        <div
-                            className="inline-form"
-                            style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                                gap: '1rem',
-                                alignItems: 'end',
-                            }}
-                        >
+                        <div className="filter-bar-fields">
                             <label>
                                 <span>{t('pages.meteringData.meterIdOptional')}</span>
                                 <select

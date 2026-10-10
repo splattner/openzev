@@ -42,7 +42,7 @@ name it, and the ZEV's VAT treatment stated on the face of the document.
 | Backend — template | `templates/invoices/tariff_overview_pdf.html`, on `pdf/shared_pdf_base.html` |
 | Backend — API | `GET /api/v1/invoices/invoices/tariff-overview/` |
 | Backend — shared helper | `band_recurrence()` in `invoices/band_labels.py`; `display_grid_base_summary()` in `invoices/tariff_pricing.py`, shared with the contract |
-| Frontend | Download button in `TariffToolbar`, wired to the page's existing validity filter |
+| Frontend | Download button in `TariffToolbar`; a scope menu while any version is out of force |
 | Docs | `docs/user-guide/07-tariff-configuration.md` |
 
 ### Out of scope
@@ -250,13 +250,14 @@ harm.
 
 Template: `backend/templates/invoices/tariff_overview_pdf.html`, opening with
 `{% include "pdf/shared_pdf_base.html" %}` — the first *new* document on that
-base (the financial summary predates it and keeps its own styles). From it the
-overview inherits `document-header`, `.brand-mark`, `.eyebrow`,
-`.document-status`, and the running `.page-meta` furniture.
+base (the financial summary and annual statement moved onto it later, ADR 0032).
+From it the overview inherits `document-header`, `.eyebrow`,
+`.document-status`, and the running `.page-meta` furniture; the issuer's name
+stands alone (the former `.brand-mark` disc is hidden, ADR 0032).
 
 ```
                                                   TARIFÜBERSICHT
-● ZEV Sonnenhof                                       01.01.2026
+ZEV Sonnenhof                                         01.01.2026
   Anna Muster, Dorfstrasse 12, 8000 Zürich       [ GÜLTIG AM … ]
 ════════════════════════════════════════════════════════════▂▂
 
@@ -372,24 +373,34 @@ Reuses `_pdf_response(..., disposition="attachment")`.
 
 **File:** `frontend/src/features/tariffs/TariffToolbar.tsx`
 
-- New optional prop `onDownloadOverview?: () => void` and `overviewBusy: boolean`.
-- Renders a `button-secondary` with `faFilePdf`, labelled
+- Optional props `onDownloadOverview?: (scope: TariffValidityFilter) => void`,
+  `overviewBusy: boolean` and `hasOutOfForceVersions: boolean`.
+- Renders a full-size secondary control with `faFilePdf`, labelled
   `pages.tariffs.overviewPdf.action`, between the import and create buttons.
+  With `hasOutOfForceVersions` it is an `ActionMenu` (`compact={false}`)
+  whose items `pages.tariffs.overviewPdf.scope.valid` / `.scope.all` call
+  `onDownloadOverview('valid' | 'all')`; without, both scopes would render
+  the same document, so it is a plain button calling
+  `onDownloadOverview('valid')`.
 - Present only when `onDownloadOverview` is passed — the same convention the
   import button already uses for "no single ZEV selected"
   (`frontend/src/pages/TariffsPage.tsx:240`).
-- While busy, disabled and labelled `pages.tariffs.overviewPdf.busy`.
+- While busy, disabled (the menu's items) and labelled
+  `pages.tariffs.overviewPdf.busy`.
 
 ### 11.2 TariffsPage
 
 **File:** `frontend/src/pages/TariffsPage.tsx`
 
 - `useMutation` over `downloadTariffOverview`, `onSuccess` → `downloadBlob`.
-- Passes `scope` from the page's existing `validityFilter`, whose values are
-  already `'valid' | 'all'` — so the PDF shows what the operator is looking at,
-  and the filter needs no mapping.
+- The mutation takes the scope chosen at the download. It is not taken from
+  the list's Valid · All tabs: those filter whole series, so "All" often
+  changes nothing in the list (and `FilterTabs` then leaves the tabs out)
+  while it would still add every superseded version to the PDF.
+- `hasOutOfForceVersions`: some version of some series is not in force today
+  (`isTariffCurrentlyValid`), the only case in which the two scopes differ.
 - `as_of` is not sent; the backend defaults to today. A date picker is a later
-  addition and would go next to the validity filter.
+  addition and would go next to the scope choice.
 - On failure, `pushToast` with the existing error handling used by the import
   flow.
 
@@ -561,6 +572,14 @@ The download itself is browser plumbing; what is worth testing is the pure
 mapping. `tariffOverviewParams(zevId, validityFilter)` returns `scope: 'valid'`
 and `scope: 'all'` for the two filter values, and the filename helper produces
 `tariff-overview-<date>.pdf`.
+
+### Frontend — `frontend/tests/tariff-toolbar.test.ts` (4 tests)
+
+The toolbar leaves the Valid · All tabs out when both count the same series
+and shows them when All counts more; the download is a plain button calling
+`onDownloadOverview('valid')` when every version is in force, and a
+full-size scope menu (`aria-haspopup="menu"`, no `button-compact`) while a
+version is out of force.
 
 - Build and type checks: `npm run build`
 

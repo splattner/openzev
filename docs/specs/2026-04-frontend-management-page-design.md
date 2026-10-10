@@ -236,11 +236,12 @@ language and should be reused instead of ad hoc page-local CSS when possible:
 | `.page-header`, `.page-header-main`, `.page-header-text`, `.page-header-actions` (with `.page-header h1`) | Shrinking title/actions row with wrapping for long text; `.eyebrow` also serves card/section overlines |
 | `.stat-grid`, `.stat-grid--wide` | Auto-fit tiles with 1rem gap and 150px/220px minimums capped at container width; wide modifier requires the base class |
 | `.toolbar`, `.toolbar-main`, `.toolbar-actions` | Toolbar layout owned by `Toolbar` (space-between, wraps below 700px) |
-| `.card`, `.table-card`, `.stat-card` | Primary container surfaces |
+| `.card`, `.table-card`, `.stat-card` | Primary container surfaces (white sheet, hairline, `--shadow-sheet`); sheet titles are plain forest headings (`.section-title`, `.card-header`) — SPEC-2026-08 §15 |
+| `.filter-bar`, `.filter-bar-fields`, `.filter-bar-note` | Period selector and view filters on one line, set on the page without a sheet; the fields wrap below the period as one group, never split around it |
 | `.stat-card--interactive` | `StatCard` with `onPress`: real button semantics, `[aria-pressed='true']` shows the selected state with `var(--interactive)`; focus styling comes from the global `:focus-visible` ring |
 | `.stat-card--accent`, `.stat-card--success`, `.stat-card--warning`, `.stat-card--danger`, `.stat-card--flat` | Dark accent (≤1 per view); semantic tones color the value (`h3` or span); `flat` removes card chrome for nested tiles |
-| `.button`, `.button-secondary`, `.button-danger`, `.button-compact` | Shared button system (flat `var(--interactive)` fill; see SPEC-2026-08-ui-redesign-pdf-style; hover `var(--interactive-hover)`) |
-| `.badge`, `.badge-neutral`, `.badge-info`, `.badge-success`, `.badge-danger`, `.badge-warning` (+ invoice workflow variants `.badge-draft/.badge-approved/.badge-sent/.badge-paid/.badge-cancelled`) | Small semantic status/category labels — filled desaturated fills from the generated `--status-*` semantics, never gold-on-white |
+| `.button`, `.button-secondary`, `.button-outline`, `.button-danger`, `.button-compact` | Shared button system (flat `var(--interactive)` fill; see SPEC-2026-08-ui-redesign-pdf-style; hover `var(--interactive-hover)`). Inside rows the main action is a forest outline (`button-outline`); destructive row actions are quiet until hovered (`.button-secondary.button-destructive`, and every compact `.button-danger`); confirm dialogs keep the solid red — SPEC-2026-08 §7.4 |
+| `.badge`, `.badge-neutral`, `.badge-info`, `.badge-success`, `.badge-danger`, `.badge-warning`, `.badge-brand`, `.badge-tag` | Small labels. Colour means state: filled desaturated fills from the generated `--status-*` semantics with a matching hairline (current/active/healthy → success, upcoming/scheduled/open → info, needs attention → warning, failed/gap → danger, ended/inactive → neutral), never gold-on-white. Attributes — what a record is (billing mode, energy type, dynamic, version/period counts, meter type, community allocation, roles, kinds, building) — are `.badge-tag`: white, `--border-strong` hairline, `--text-body`, weight 500. Invoice statuses map through `invoiceStatusBadgeClass` everywhere, the detail page included (`InvoiceStatusBadge`): approved → `.badge-brand` (the document's sage pill), sent → info, draft → neutral, paid → success, cancelled → danger |
 | `.error-banner`, `.warning-banner`, `.info-banner` | Error/warning surfaces used by `Notice`; `.info-banner` remains for existing information callouts. |
 | `.actions-row`, `.actions-row-wrap`, `.actions-row-end`, `.actions-row-gap-lg` | Inline action layouts; the large gap preserves 1rem between confirmation buttons |
 | `.app-tabs`, `.app-tabs-list`, `.app-tabs-tab` | Token styling for Mantine `Tabs`: root grid rhythm (1.5rem gap), 1rem tab gap, muted labels with a 2px `--interactive` underline when active; applied via the `classNames` prop. |
@@ -274,10 +275,11 @@ modals are migrated separately.
 Form controls: native text-like inputs and single-value selects share one
 default presentation with Mantine field controls (`TextInput`,
 `Autocomplete`, `DatePickerInput`). Both implementations consume the same
-field tokens (`design/tokens.json` → `fields`): 2.75rem (44px) height, 1rem value
+field tokens (`design/tokens.json` → `fields`): 2.5rem (40px) height — the
+buttons' height, so fields and buttons on one line align — 1rem value
 type at 1.5 line height (native selects retain platform line-height behavior),
-0.75rem radius, 0.95rem base inline padding, 1rem/400 labels, 0.875rem
-helpers, and 0.4rem label/control/helper gaps. Native rules live in `index.css`;
+0.5rem radius, 0.95rem base inline padding, 0.875rem/500 labels in
+`--text-body`, 0.8125rem helpers, and 0.4rem label/control/helper gaps. Native rules live in `index.css`;
 their input-type exclusions use `:where()` to keep specificity below Mantine's
 state and section rules. Native helpers (`label > small.muted`) use the shared
 helper size and line height.
@@ -286,7 +288,7 @@ Mantine defaults live in `frontend/src/lib/mantineTheme.ts`: `Input` box vars
 and `InputWrapper` label → input → description → error order, label/help type,
 label bottom margin, and conditional input offsets for descriptions/errors.
 Left/right section insets continue to reserve space for icons and clear buttons.
-The neutral default border uses `--border-default`; the theme omits that override
+The neutral default border uses `--border-strong`; the theme omits that override
 when an error/success border is enabled, leaving Mantine's state colors intact.
 Focus changes the border on the control itself and disabled backgrounds remain
 Mantine-owned. Filled/unstyled variants retain their own border behavior. Mantine
@@ -306,7 +308,7 @@ it wraps (#490). Guarded by
 jsdom.
 
 Tables additionally follow the operational contract introduced by the UI
-redesign: sticky `thead`, 36px row rhythm, row-hover on `var(--surface)`, and
+redesign: sticky `thead` with uppercase kicker labels on `--surface-sunken`, 44px row rhythm, row-hover on `var(--surface)`, and
 right-aligned tabular numerals for quantities/money. All values resolve through
 the design tokens (`design/tokens.json` → `frontend/src/styles/tokens.css`);
 raw hex colors are lint-barred (stylelint `color-no-hex` + hex sweep).
@@ -420,10 +422,11 @@ their current state. The title is not reset on unmount; `index.html` keeps
 #### A. When to use tables (DataTable)
 
 Use a `DataTable` when records are flat and users scan across repeated dense
-columns. The `DataTable` footer (range label, page-size select, prev/next
-buttons) renders only when the rows span more than one page
-(`table.getPageCount() > 1`); single-page tables hide it entirely instead of
-showing permanently disabled pagination buttons.
+columns. Pages hold a fixed 100 rows (`PAGE_SIZE`; no rows-per-page
+choice). The `DataTable` footer (range label, prev/next buttons) renders only
+when the rows span more than one page (`table.getPageCount() > 1`);
+single-page tables hide it entirely instead of showing permanently disabled
+pagination buttons.
 
 Current examples:
 

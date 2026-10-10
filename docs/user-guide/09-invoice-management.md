@@ -252,7 +252,7 @@ The filter above the table counts the period's rows: **All**, **Drafts**,
 **Approved**, **Sent** and **Issues** (rows with missing metering data, a
 generation conflict, a failed PDF, a failed email or no email address). Select one to show just
 those rows; select it again, **All** or **Show all rows** to clear it. A
-category with no rows cannot be selected. If the selected category empties,
+category with no rows, or with all of them, is left out. If the selected category empties,
 the page explains why and offers **Show all rows**. Paid invoices appear
 under **All** only. Changing period or community clears the filter.
 
@@ -271,7 +271,7 @@ while that invoice's delivery is checked.
 ## Generating Invoices
 
 1. Navigate to the desired billing period.
-2. Check the **Issues** filter — ensure metering data is complete for the participants you want to invoice.
+2. Check the **Issues** filter (shown only while there are issues) — ensure metering data is complete for the participants you want to invoice.
 3. Click **Generate invoice** on a participant's row, or the recommended batch
    action (*Generate n invoices*) in the command bar. Generating all runs in
    the background: each row shows *Creating invoice…* until its invoice
@@ -302,10 +302,12 @@ Click the invoice number in the **Participant** column to view the invoice detai
 
 ![Invoice detail page](screenshots/08b-invoice-detail.png)
 
-The detail page shows:
+The page header names the invoice and, next to the recipient and the billing
+period, its current **status** — the same status pill the invoice document
+prints. Below it, two rows of figure tiles summarise the invoice the way its
+PDF does:
 
-- **Status card** — current invoice status as a badge.
-- **Total CHF** — the final invoiced amount.
+- **Total CHF** (the dark tile) — the final invoiced amount.
 - **Subtotal CHF** — amount before VAT.
 - **VAT CHF** — the VAT portion.
 
@@ -317,7 +319,7 @@ The detail page shows:
 | Grid kWh | Energy drawn from the external grid. |
 | Feed-in kWh | Energy fed back into the grid. |
 
-**The invoice document** — the stored PDF itself is embedded below the summary cards in a full document viewer (the same file the participant receives by email). It contains the line items, grouped by **tariff category** (e.g. Energy, Fee),
+**The invoice document** — the stored PDF itself is embedded below the figure tiles in a full document viewer (the same file the participant receives by email). It contains the line items, grouped by **tariff category** (e.g. Energy, Fee),
 with each line's type, description, quantity (kWh), unit price (CHF), and
 total, plus a subtotal per group. If no PDF has been generated yet, the page shows a **Generate PDF** button instead (managers and admins only — a participant sees a plain document-unavailable message, since the API rejects their generation attempt); the viewer appears once the document exists.
 
@@ -485,7 +487,7 @@ available after billing. The selected community appears above the page title.
 - The wrong ZEV is selected (check the community name above the page title).
 
 **Fix:**
-1. Check the ZEV switcher at the top of the sidebar (or the community name above the page title).
+1. Check the community name above the page title (click it to choose another).
 2. Verify that [Participants](03-participant-management.md) exist and have [metering-point assignments](04-metering-points.md) covering the period.
 
 ### Invoice totals look wrong

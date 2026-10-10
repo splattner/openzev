@@ -73,10 +73,10 @@ The chart shows:
 - **X-axis:** Time periods
 - **Y-axis:** Energy (kWh)
 - **Grouped bars** (side by side, not stacked):
-  - 🟢 **Green:** Production or feed-in (`OUT`) — only shown when the meter
+  - **Green:** Production or feed-in (`OUT`) — only shown when the meter
     has exported energy in the period. The label reads "Production" for a
     pure production meter and "Feed-in" for a bidirectional one.
-  - 🔵 **Blue:** Consumption (`IN`)
+  - **Grey:** Consumption (`IN`)
 - **Tooltips:** Hover to see exact values
 - **Summary cards** above the chart: total consumption, average and peak
   consumption per bar (with the peak card naming which bar it was), total

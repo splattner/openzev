@@ -300,6 +300,29 @@ describe('StatCard', () => {
         expect(onPress).toHaveBeenCalledTimes(1)
     })
 
+    it.each([
+        ['439.55 kWh', '439.55', 'kWh'],
+        ['35.4 %', '35.4', '%'],
+        ['CHF 1066.94', '1066.94', 'CHF'],
+        ['CHF \u2212548.31', '\u2212548.31', 'CHF'],
+        ['1066.94 CHF', '1066.94', 'CHF'],
+    ])('sets the unit of %j apart from the figure, as the documents do', (value, figure, unit) => {
+        const page = render(createElement(StatCard, { label: 'Figure', value }))
+        const heading = page.container.querySelector('section.stat-card h3')!
+        // The text (and so what assistive technology reads) is unchanged.
+        expect(heading.textContent).toBe(value)
+        expect(heading.querySelector('.stat-figure')?.textContent).toBe(figure)
+        expect(heading.querySelector('.stat-unit')?.textContent).toBe(unit)
+    })
+
+    it.each(['—', '05.10.2026', '1 von 8', '8'])('keeps %j whole', (value) => {
+        const page = render(createElement(StatCard, { label: 'Value', value }))
+        const heading = page.container.querySelector('section.stat-card h3')!
+        expect(heading.textContent).toBe(value)
+        expect(heading.querySelector('.stat-unit')).toBeNull()
+        expect(heading.querySelector('.stat-figure')?.textContent).toBe(value)
+    })
+
     it('uses phrasing content for an unpressed toggle with a hint', () => {
         const page = render(createElement(StatCard, { label: 'Red', value: 2, hint: 'Missing readings', onPress: vi.fn(), pressed: false }))
         const button = page.container.querySelector('button')!

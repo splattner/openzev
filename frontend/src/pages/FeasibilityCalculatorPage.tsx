@@ -118,16 +118,17 @@ function FeasibilityCalculator() {
                 }
             >
                 <form className="card page-stack" onSubmit={(event) => event.preventDefault()}>
-                    <h3 style={{ marginTop: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                        {t('pages.feasibility.form.systemTitle')}
+                    <div className="card-header">
+                        <h3>{t('pages.feasibility.form.systemTitle')}</h3>
                         <select
                             {...form.register('energy_input_mode')}
-                            style={{ width: 'auto', fontSize: '0.78rem', padding: '0.1rem 0.3rem' }}
+                            className="select-compact"
+                            aria-label={t('pages.feasibility.form.energyInputModeLabel')}
                         >
                             <option value="aggregate">{t('pages.feasibility.form.energyInputModeAggregate')}</option>
                             <option value="participants">{t('pages.feasibility.form.energyInputModeParticipants')}</option>
                         </select>
-                    </h3>
+                    </div>
 
                     {watchedValues.energy_input_mode === 'participants' ? (
                         <div>

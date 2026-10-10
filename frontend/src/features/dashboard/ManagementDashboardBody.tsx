@@ -122,30 +122,29 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
 
     return (
         <>
-            <section className="card">
-                <div className="grid">
-                    {interval && <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={onPeriodChange} />}
-                    <div className="inline-form grid grid-2">
-                        <label>
-                            <span>{t('pages.dashboard.participant')}</span>
-                            <select value={selectedParticipantId} onChange={(e) => setSelectedParticipantId(e.target.value)}>
-                                <option value="">{t('pages.dashboard.allParticipants')}</option>
-                                {selectedParticipantId && !participantStats.some((participant) => participant.participant_id === selectedParticipantId) && (
-                                    <option value={selectedParticipantId}>
-                                        {selectedParticipantName}
-                                        {ownParticipantIds.includes(selectedParticipantId) ? ` (${t('pages.dashboard.youBadge')})` : ''}
-                                    </option>
-                                )}
-                                {participantStats.map((participant) => (
-                                    <option key={participant.participant_id} value={participant.participant_id}>
-                                        {participant.participant_name || participant.participant_id}
-                                        {ownParticipantIds.includes(participant.participant_id) ? ` (${t('pages.dashboard.youBadge')})` : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                        <ResolutionSelect value={bucket} onChange={setBucket} />
-                    </div>
+            <section className="filter-bar">
+                {interval && <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={onPeriodChange} />}
+                <div className="filter-bar-fields">
+                    <label>
+                        <span>{t('pages.dashboard.participant')}</span>
+                        <select value={selectedParticipantId} onChange={(e) => setSelectedParticipantId(e.target.value)}>
+                            <option value="">{t('pages.dashboard.allParticipants')}</option>
+                            {selectedParticipantId && !participantStats.some((participant) => participant.participant_id === selectedParticipantId) && (
+                                <option value={selectedParticipantId}>
+                                    {selectedParticipantName}
+                                    {ownParticipantIds.includes(selectedParticipantId) ? ` (${t('pages.dashboard.youBadge')})` : ''}
+                                </option>
+                            )}
+                            {participantStats.map((participant) => (
+                                <option key={participant.participant_id} value={participant.participant_id}>
+                                    {participant.participant_name || participant.participant_id}
+                                    {ownParticipantIds.includes(participant.participant_id) ? ` (${t('pages.dashboard.youBadge')})` : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                    <ResolutionSelect value={bucket} onChange={setBucket} />
+
                 </div>
             </section>
 

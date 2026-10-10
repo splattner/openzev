@@ -84,11 +84,11 @@ export function TariffCategorySections({
                                             <div className="tariff-card-heading">
                                                 <strong>{series.name}</strong>
                                                 <div className="tariff-name-badges">
-                                                    <span className="badge badge-info">
+                                                    <span className="badge badge-tag">
                                                         {t(`pages.tariffs.billingModes.${series.billing_mode}` as Parameters<typeof t>[0], { defaultValue: series.billing_mode })}
                                                     </span>
                                                     {series.energy_type && (
-                                                        <span className="badge badge-success">
+                                                        <span className="badge badge-tag">
                                                             {t(`pages.tariffs.energyTypes.${series.energy_type}` as Parameters<typeof t>[0])}
                                                         </span>
                                                     )}
@@ -97,7 +97,7 @@ export function TariffCategorySections({
                                                             className={
                                                                 dynamicSource?.last_fetch_status === 'failed'
                                                                     ? 'badge badge-danger'
-                                                                    : 'badge badge-info'
+                                                                    : 'badge badge-tag'
                                                             }
                                                             title={dynamicSource?.last_fetch_status === 'failed'
                                                                 ? t('pages.tariffs.dynamicFetchFailedTooltip', { error: dynamicSource.last_fetch_error })
@@ -112,7 +112,7 @@ export function TariffCategorySections({
                                                     </span>
                                                     {series.version_count > 1 && (
                                                         <span
-                                                            className="badge badge-neutral"
+                                                            className="badge badge-tag"
                                                             title={t('pages.tariffs.versions.countTooltip')}
                                                         >
                                                             <FontAwesomeIcon icon={faLayerGroup} fixedWidth />{' '}
@@ -140,7 +140,7 @@ export function TariffCategorySections({
                                                 </button>
                                             )}
                                             <button
-                                                className="button button-primary button-compact"
+                                                className="button button-primary button-outline button-compact"
                                                 type="button"
                                                 aria-expanded={isOpen}
                                                 onClick={() => onOpenDetail(series)}
@@ -159,7 +159,7 @@ export function TariffCategorySections({
                                             </div>
                                         )}
                                         {usesPeriods && (
-                                            <span className="badge badge-neutral">
+                                            <span className="badge badge-tag">
                                                 {t('pages.tariffs.periodCountSummary', { count: active.periods.length })}
                                             </span>
                                         )}

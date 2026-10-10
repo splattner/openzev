@@ -1,6 +1,6 @@
 # ADR 0014: Print parity via shared tokens and real-PDF previews
 
-- Status: Accepted
+- Status: Accepted (amended by ADR 0032: one typeface, shared document anatomy)
 - Date: 2026-08-23
 - Related specs: `2026-08-ui-redesign-pdf-style` (baseline), `2026-08-contract-pdf-redesign` (PDF design system), `2026-04-frontend-management-page-design` (CRUD shell)
 - Related ADRs: 0001, 0003, 0007

@@ -134,6 +134,7 @@ import { ParticipantDashboardBody } from '../src/features/dashboard/ParticipantD
 import { ParticipantInvoicesCard } from '../src/components/dashboard/ParticipantInvoicesCard'
 import { HourlyProfileCard } from '../src/components/dashboard/HourlyProfileCard'
 import { openInvoicePdf } from '../src/lib/api/invoices'
+import { ToastProvider } from '../src/lib/toast'
 
 const cleanups: Array<() => void> = []
 afterEach(() => {
@@ -224,7 +225,9 @@ async function renderDashboard(page?: ReactElement, client = new QueryClient({ d
                 createElement(
                     QueryClientProvider,
                     { client },
-                    createElement(MemoryRouter, null, page ?? createElement(DashboardPage)),
+                    // The page header's community switcher confirms through a toast.
+                    createElement(ToastProvider, null,
+                        createElement(MemoryRouter, null, page ?? createElement(DashboardPage))),
                 ),
             ),
         )

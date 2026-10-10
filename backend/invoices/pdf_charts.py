@@ -11,6 +11,7 @@ from .pdf_stats import _compute_period_participant_stats
 from .generated_chart_tokens import (  # used by this module internally
     _CHART_AXIS,
     _CHART_BG,
+    _CHART_FONT_FAMILY,
     _CHART_GRID,
     _CHART_GRIDLINE,
     _CHART_INK,
@@ -266,7 +267,7 @@ def _build_energy_flow_svg(
     # ── SVG rendering ─────────────────────────────────────────────────────
     header = (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{view_h}" '
-        f'viewBox="0 0 {W} {view_h}">'
+        f'viewBox="0 0 {W} {view_h}" font-family=\'{_CHART_FONT_FAMILY}\'>'
     )
     svg = [header]
 
@@ -382,7 +383,7 @@ def _build_energy_chart_svg(invoice, tr: dict) -> str | None:
     svg = []
     svg.append(
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}"'
-        f' viewBox="0 0 {W} {H}">'
+        f' viewBox="0 0 {W} {H}" font-family=\'{_CHART_FONT_FAMILY}\'>'
     )
     # Soft chart background
     svg.append(
@@ -645,7 +646,7 @@ def _build_hourly_profile_chart_svg(
     svg: list[str] = []
     svg.append(
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}"'
-        f' viewBox="0 0 {W} {H}">'
+        f' viewBox="0 0 {W} {H}" font-family=\'{_CHART_FONT_FAMILY}\'>'
     )
     svg.append(
         f'<rect x="{ML - 4}" y="{MT - 6}" width="{cw + 8}" height="{ch + 10}"'

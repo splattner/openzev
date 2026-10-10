@@ -8,7 +8,7 @@
 - Created: 2026-08-23
 - Target Release: post-1.8.0
 - Related Issues: n/a
-- Related ADRs: 0014, 0015
+- Related ADRs: 0014, 0015, 0032 (one typeface and shared document anatomy, §15)
 - Impacted Areas: backend | frontend | docs
 - Source audit: `b7a1b75` (2026-08-22)
 
@@ -85,7 +85,7 @@ Top-level keys:
 | `themes` | `object<string, object>` | The default theme is expressed by `semantics` directly (emitted as `:root`). `themes` holds only *alternate* maps (`paper-light`, `high-contrast`, etc.) once one ships — deferred until a tested use case exists. Adding a theme is a token-file change only (pure data: reassignment of the same semantic names to primitives/ramp steps; no component code branches). |
 | `fields` | `object` | Frontend-only form-field dimensions (`--field-*`: height, type, radius, insets, label/help sizes, gaps). Dimension literals only — never hex, never `var()`; emitted to the frontend stylesheet only, so chart/PDF outputs stay color-only |
 | `charts` | `object` | Mirrors `invoices/pdf_charts.py:7-18` 1:1 (see §4.3) |
-| `type` | `object` | Font families for screen (`Inter Variable`) and print (`Helvetica Neue`). Additional scale/tracking/numeric-policy properties are deferred until they are consumed by generated outputs.
+| `type` | `object` | Font families for screen (`'Inter Variable', Inter, …`) and print (`Inter, "Helvetica Neue", Helvetica, Arial, sans-serif` — Inter installed in the backend image, ADR 0032). Both stacks are validated as plain font-family lists (no `;{}<>`) and emitted: screen as `--font-sans` (`tokens.css`), print as `--font-print` (`pdf/_tokens.css`) and `_CHART_FONT_FAMILY` (`generated_chart_tokens.py`). Additional scale/tracking/numeric-policy properties are deferred until they are consumed by generated outputs.
 
 The schema is purpose-built (no external token framework). DTCG 2025.10 (`.tokens.json`, `$value`/`$type` groups) is the recognized standard and the migration target **if** a design-tool pipeline (Figma Variables, Style Dictionary) ever enters the workflow — not adopted now: there is no design-tool consumer today and the generator stays dependency-free. The primitive → semantic-alias → theme structure already maps 1:1 onto DTCG concepts.
 
@@ -115,6 +115,7 @@ The schema is purpose-built (no external token framework). DTCG 2025.10 (`.token
     "--ink-soft": "#334155",
     "--line": "#e2e8f0",
     "--line-subtle": "#f1f5f9",
+    "--line-strong": "#cbd5e1",
     "--muted": "#64748b",
     "--neutral-100": "#e2e8f0",
     "--subtotal-color": "#24352c",
@@ -123,6 +124,7 @@ The schema is purpose-built (no external token framework). DTCG 2025.10 (`.token
     "--success-600": "#15803d",
     "--success-700": "#166534",
     "--surface": "#f8faf7",
+    "--canvas": "#f2f5f0",
     "--violet-200": "#ddd6fe",
     "--warning-100": "#fef9c3",
     "--warning-200": "#fde68a",
@@ -136,13 +138,14 @@ The schema is purpose-built (no external token framework). DTCG 2025.10 (`.token
 
 Semantic examples (final map decided in Phase 0; names below are normative):
 
-- `--app-bg` → `var(--surface)` (replaces `index.css:4 #f8fafc` + sky radials `index.css:25-28`)
+- `--app-bg` → `var(--canvas)` (`#f2f5f0`, one step darker than the documents' `--surface` paper so white sheets stand off the page; replaces `index.css:4 #f8fafc` + sky radials `index.css:25-28`)
 - `--surface-card` → `var(--white)` with `border: var(--line)` (replaces `card`/`table-card` `rgba(255,255,255,0.9)` / `rgba(148,163,184,0.2)`); semantics always alias primitives — never raw hex
 - `--text-primary` → `var(--ink)`; `--text-body` → `var(--ink-soft)`; `--text-muted` → `var(--muted)`
 - `--border-default` → `var(--line)`; `--border-subtle` → `var(--line-subtle)`
 - `--interactive` → `var(--brand-mid)`; `--interactive-hover` → `var(--brand)`; `--focus-ring` → `var(--brand-mid)` 2px / 2px offset
-- `--status-draft/open/paid/overdue/cancelled` + `--status-neutral/info/success/warning/danger` for `.badge-*` remap (desaturated fills, never gold-on-white)
-- `--sidebar-bg` → `var(--brand-deep)`; `--sidebar-active` → `var(--brand-pale)`
+- `--status-neutral/info/success/warning/danger` for the `.badge-*` remap (desaturated fills, never gold-on-white); the invoice-workflow `--status-draft/open/paid/overdue/cancelled` aliases went with the per-status badge classes (invoice statuses map through `invoiceStatusBadgeClass`, §15)
+- `--sidebar-bg` → `var(--brand-deep)` (§15.2; briefly `var(--white)` during ADR 0032's review); `--sidebar-active` → `var(--brand-mid)`; `--sidebar-hover` → `var(--brand)`; `--sidebar-line` → `var(--brand-mid)` (hairlines and scrollbar on the sidebar)
+- §15 additions: `--text-heading` → `var(--brand-deep)` (h1–h4, as the documents set headings), `--border-strong` → `var(--line-strong)` (control borders: inputs, secondary buttons), `--surface-sunken` → `var(--zebra)` (table header band, hover, segmented tracks), `--accent-rule` → `var(--brand-mid)` (the header rule, section dots, active tab), `--sidebar-text` → `var(--brand-accent)` (sage, 7.9:1 on `--brand-deep`)
 
 No raw hex may appear outside `design/tokens.json` and its generated outputs, and neither may raw `rgb()/rgba()/hsl()/hsla()` function literals — the original hex-only sweep missed an `rgba(0, 102, 204, …)` legacy sky-blue in the template editor, so the sweep now covers color functions too. Enforcement is split by surface: `stylelint` `color-no-hex` covers `frontend/src/**/*.css` (only the generated `frontend/src/styles/tokens.css` is allowlisted); hand-written TSX is enforced by the `scripts/check-frontend-hex.mjs` color sweep, which also walks the backend PDF/HTML templates and `invoices` Python (generated outputs, tests, and migrations exempt). The sweep's allowlist (`scripts/hex-migration-allowlist.json`) supports per-file `"path@alpha"` entries that sanction *neutral alpha scrims/shadows only* (`rgba()`/`hsla()` white/black/slate fades in `index.css`, the overlay modals, and the invoice/contract dark headers); hex and opaque `rgb()`/`hsl()` are never allowlistable. The JSON source is enforced by `node scripts/generate-tokens.mjs --check` + the idempotence test — JSON is not CSS and never sits in a stylelint allowlist.
 
@@ -152,11 +155,11 @@ All five are pure derivations; hand-editing them is a lint/test error.
 
 | File | Consumes | Consumed by |
 |---|---|---|
-| `frontend/src/styles/tokens.css` | `primitives + semantics + themes + fields` → `:root` map (alternate `[data-theme]` maps only when a second theme ships) | Imported in `frontend/src/main.tsx` before `index.css`; every component uses `var(--semantic)` (colors) and `var(--field-*)` (field dimensions) |
+| `frontend/src/styles/tokens.css` | `primitives + semantics + themes + fields` → `:root` map (alternate `[data-theme]` maps only when a second theme ships), plus `--font-sans` from `type.fontFamily.screen` (`index.css` `:root { font-family: var(--font-sans) }`) | Imported in `frontend/src/main.tsx` before `index.css`; every component uses `var(--semantic)` (colors) and `var(--field-*)` (field dimensions) |
 | `frontend/src/styles/generatedTheme.ts` | Mantine theme object: `primitives.brand` ramp + semantics (`primaryColor: "brand"`, `primaryShade: 6`, `fontFamily` sync with `index.css:2`) — replaces sky ramp `#f0f9ff … #0c4a6e` | Imported by `MantineProvider` in `main.tsx`; the entrypoint stays hand-written — generated code lives only in visibly generated files |
 | `frontend/src/lib/chartTokens.ts` | `charts` block, emitted as **resolved literal strings** (Recharts props and SVG `fill="…"` need real color values; they do not resolve `var(--…)`) | dashboard cards (`components/dashboard/`), `MeteringChartPage`, `TariffPriceHistoryChart`, `DynamicPriceHistoryModal`, `AnnualReportSection`, feasibility charts, `EnergyFlowChart`, `RawMeteringTable` (recharts); `BuildingsMap` (building footprints, Leaflet) |
-| `backend/invoices/generated_chart_tokens.py` | `charts` block as plain Python constants (same literals as `chartTokens.ts`) | imported by `invoices/pdf_charts.py` and `invoices/annual_statement.py` (its SVG chart) — no duplicated color literals in Python |
-| `backend/templates/pdf/_tokens.css` | `primitives` (same block as `shared_pdf_base.html:23-42`) | `{% include "pdf/_tokens.css" %}` from `shared_pdf_base.html` (or an equivalent `_tokens.html` partial) — the PDF stays the source of the same hex values; no hex drift between screen and print |
+| `backend/invoices/generated_chart_tokens.py` | `charts` block as plain Python constants (same literals as `chartTokens.ts`), plus `_CHART_FONT_FAMILY` from `type.fontFamily.print` | imported by `invoices/pdf_charts.py` and `invoices/annual_statement.py` (its SVG chart) — no duplicated color literals in Python; every chart `<svg>` root sets `font-family='{_CHART_FONT_FAMILY}'` because inline SVG does not inherit the document font |
+| `backend/templates/pdf/_tokens.css` | `primitives` (same block as `shared_pdf_base.html:23-42`), plus `--font-print` from `type.fontFamily.print` (body and page-meta use `font-family: var(--font-print)`) | `{% include "pdf/_tokens.css" %}` from `shared_pdf_base.html` (or an equivalent `_tokens.html` partial) — the PDF stays the source of the same hex values; no hex drift between screen and print |
 
 `scripts/generate-tokens.mjs` (new, no deps): reads `tokens.json`, validates its schema (required keys; semantics reference existing primitives; hex literals only inside `primitives`; `fields` holds only `--field-*` dimension literals), enforces strictly decreasing WCAG 2.1 relative luminance across the 10-step brand ramp (`--brand-pale` → `--brand-ink`) in both generate and `--check` modes, and emits the five files deterministically. A unit test `design/tokens.test.mjs` asserts that regenerating and diffing produces no changes (parity by construction), and a negative test runs the generator against a temp tree with the historical `--brand-glow` ↔ `--brand-muted` inversion (plus an equal-luminance tie) and asserts non-zero exit with the actionable inversion message in both generate and `--check` modes.
 
@@ -173,12 +176,26 @@ _CHART_GRIDLINE = "#e8edeb"
 _CHART_AXIS  = "#94a3b8"
 _CHART_BG    = "#fbfcfb"   # = --chart-surface
 _CHART_LABEL = "#334155"   # = --ink-soft
-_FLOW_LOCAL_CONS = "#0e7490"
-_FLOW_GRID_EXP   = "#7c3aed"
-PROD_COLORS  = ["#1f5c3a", "#2f7a4d", "#15803d", "#0f766e", ...]
-CONS_COLORS  = ["#1d4ed8", "#2563eb", "#1e40af", ...]
+_FLOW_LOCAL_CONS = "#2f7a4d"   # = --brand-step-5
+_FLOW_GRID_EXP   = "#6f9f82"   # sage: feed-in
+PROD_COLORS  = ["#1f5c3a", "#2f7a4d", "#3d8b5c", "#4d9b6a", "#15803d", "#5aa877"]
+CONS_COLORS  = ["#64748b", "#475569", "#7b8794", "#334155", "#8a96a8", "#56657a"]
+_DIVERGING_POSITIVE = "#1f5c3a"   # positive half of the forest/red diverging pair
 _CHART_LABEL_ON_FILL = "#fff"   # = charts.labelOnFill — on-bar white labels
 ```
+
+**One energy palette, from the brand (ADR 0032 review).** Every chart, on
+screen and in the PDFs, encodes the same meanings: forest (`local`,
+`prodColors`) is production and energy from the community; amber (`grid`) is
+the grid; sage (`flowGridExp`, ≥3:1 on white, lighter than forest) is feed-in
+— "your solar, sent out"; forest step-5 (`flowLocalCons`) is the community's
+local consumption node and the NT band; slate (`consColors`, `[0]` =
+consumption) is demand — metering IN series, consumer nodes, price lines and
+self-sufficiency; dark ink (`ratio` #24352c, screen-only `CHART_RATIO`) draws
+percentage lines over bars. The earlier teal (`#0e7490`), violet (`#7c3aed`)
+and blue/indigo consumer ramp are gone; the feasibility charts' positive half
+is forest, and the cash-flow legend swatch now uses the bars' own colour
+(`DIVERGING_POSITIVE`).
 
 `design/tokens.json:charts` mirrors this 1:1 (same hexes, same role names) and is the SSOT: the generator emits `backend/invoices/generated_chart_tokens.py`, and `pdf_charts.py` imports its constants from it — no duplicated color literals remain in Python, and drift between `pdf_charts.py` and `tokens.json` becomes a `--check`/idempotence failure. `frontend/src/lib/chartTokens.ts` currently holds only `AXIS_COLOR / ANNOTATION_COLOR`; after generation it re-exports the full map as **resolved literal strings** (`export const CHART_LOCAL = "#1f5c3a"` — Recharts props and SVG `fill="…"` do not resolve `var(…)`), so recharts and the PDF SVG share one map. Hand-written companion `frontend/src/lib/chartTheme.tsx` centralizes the recharts config *shapes* shared by the feasibility charts (axis tick typography, bottom-axis/CHF y-axis labels, tooltip card, legend swatch) on top of those literals — it is not generated and holds no colors of its own.
 
@@ -202,6 +219,15 @@ The PDF language is an excellent print system and a mediocre spec for a dense bi
 
 **Share tokens, brand and chart palette. Do not share layout grammar 1:1.**
 
+> **Amended by ADR 0032 (§15).** The typeface is now shared (Inter on screen
+> and in every document), and so are the documents' meaning-carrying elements:
+> the header rule, the forest headings, the figure tile, the sage status
+> pill and the kicker table labels (the round dot motif was dropped from both
+> in review: repeated on every title it carried no meaning). Page geometry, `@page` machinery and
+> gradient chrome stay print-only; gold stays on dark surfaces, except the
+> sidebar's current-page mark (§15.2). The table
+> below is kept as the historical baseline; where it disagrees, §15 wins.
+
 | Keep from the PDF | Do NOT copy to screen | Improve on both |
 |---|---|---|
 | Forest/ink/paper palette (`--brand*`, `--ink*`, `--surface`, `--zebra`) | 9.5pt / Helvetica print scale — screen stays `Inter Variable` (`index.css:2`, `main.tsx:25`) at functional sizes | Type hierarchy: page title 1.5–1.75rem/650/−0.02em + one-line description; labels 0.75–0.8125rem/500; uppercase only for true section kickers via `text-transform`, never in translation strings |
@@ -215,14 +241,15 @@ The PDF language is an excellent print system and a mediocre spec for a dense bi
 
 `--gold #bfa05a` on white `#fff` is contrast `~2.8:1`. WCAG AA requires `4.5:1` for normal text (`3:1` for large/bold ≥18pt/14pt-bold) — gold-on-white **fails** and would block the Phase 4 contrast audit. The PDF already obeys this: gold is only `savings-row.highlight .savings-value` on `var(--brand-deep)` at `9pt/900` inside `.amount-card` (`invoice_pdf.html:180-184`). Binding rule:
 
-- `--gold` is decorative/display only. Permitted on `var(--brand-deep)` / `var(--brand)` at `≥16pt` or `≥14pt/700`, or as 1–2px accent bars/dots that are not text.
+- `--gold` is decorative/display only. Permitted on `var(--brand-deep)` / `var(--brand)` at `≥16pt` or `≥14pt/700`, or as thin accent bars/dots that are not text and never carry a state alone — the sidebar's 3px current-page mark sits on a `--sidebar-active` row with `600` text, which name the page without it.
 - Never as text color on `#fff` / `var(--surface)` / `var(--brand-pale)` / `var(--zebra)`. Status pills in dense tables use desaturated fills (`--brand-pale`, `var(--success-100)`, `var(--danger-100)`, etc. — status hexes live in `primitives`, §4.1) with `--ink-soft` text — the same rule the PDF follows.
 - Manual axe-core / browser contrast check in Phase 4 must pass at AA+ (see §9).
 
 ### 5.3 Screen quality bar (review checklist on every PR)
 
 - Page title + description; toolbar = filters left, primary action right, no second card wrapper.
-- Sidebar `var(--brand-deep)`; active item = `var(--brand-pale)` pill + 3px `var(--brand-mid)` leading bar (functional, not a decorative dot).
+- Sidebar: deep forest (`var(--sidebar-bg)`), sage text; active item = lighter forest row (`--sidebar-active`, white, 600) (§15).
+- Page header ends in the documents' rule (hairline + short `--accent-rule` segment) unless the page has tabs, whose strip carries it; sheet titles are plain forest headings (no dot).
 - Focus: `2px solid var(--focus-ring)` / `2px` offset, everywhere — including Mantine widgets (`DatePickerInput`, `Menu`, `Switch`) via global `:focus-visible` + Mantine `focusRing`. Exception: programmatic focus targets that are not tab stops (the shell's `main` and the page `h1`, focused by the skip link and after navigation) show no outline.
 - Readability > "premium": for a Swiss billing tool, clear > ornamental.
 
@@ -319,8 +346,8 @@ A `rg --pcre2 '#[0-9a-fA-F]{3,8}\b' frontend/src` inventory is committed as a Ph
 
 ### 7.3 Typography
 
-- App keeps `Inter Variable` (`index.css:2`, `main.tsx:25`). PDF keeps `Helvetica Neue, Helvetica, Arial` (`shared_pdf_base.html:51` `9.5pt`). Do not unify.
-- Hierarchy: page title `1.5–1.75rem / 650 / -0.02em` + one-line description; section kicker `0.75rem / 700 / 0.08em / uppercase` via `text-transform`; body `0.875–1rem / 400`; labels `0.75–0.8125rem / 500`. `tabular-nums` only on CHF/kWh/money/quantities (`td.numeric`, `savings-value`, `kpi-value`, `raw-metering-num`).
+- One typeface (ADR 0032): the app sets `var(--font-sans)` (`'Inter Variable'`, loaded from `@fontsource-variable/inter/opsz.css` so display sizes use Inter's optical-size axis); every document sets `var(--font-print)` (Inter, installed in the backend images as Debian `fonts-inter`, falling back to the former Helvetica/Arial chain). The Swiss QR payment part keeps its standard's fonts (Liberation Sans via `qrbill`).
+- Hierarchy: page title `1.75rem / 700 / -0.025em` in `--text-heading` (1.5rem at ≤640px) + one-line description (`0.9375rem`, muted, ≤90ch); page kicker `0.6875rem / 650 / 0.1em / uppercase` in `--accent-rule`; sheet titles `1rem / 650` in `--text-heading`; body `0.9375rem / 400` (`body`); field labels `0.875rem / 500` in `--text-body` (field tokens); KPI and table labels `0.6875rem / 650 / uppercase` via `text-transform`. `tabular-nums` only on CHF/kWh/money/quantities (`td.numeric`, `stat-value`, `kpi-value`, `raw-metering-num`) — not on identifiers: Inter's tabular forms widen the hyphen.
 - Management page titles use `PageHeader` (`h1`), outside data/scope state
   branches. Embedded views inherit the host title; see the management-page
   reference spec for the shell contract.
@@ -328,15 +355,16 @@ A `rg --pcre2 '#[0-9a-fA-F]{3,8}\b' frontend/src` inventory is committed as a Ph
 ### 7.4 Tables
 
 - Plain tables (`.page-stack table`) + the shared `frontend/src/components/DataTable.tsx` (TanStack) styled by the `.data-table` CSS contract (sticky header, `td.numeric`, hover). The planned bridging module `frontend/src/lib/dataGridTheme.ts` was never needed — MUI was retired in one sweep rather than re-themed first.
-- Sticky `thead`, `36–40px` rows, `1px solid var(--border-default)` separators, `hover: var(--surface)`, `selected: var(--brand-pale)`; quantities/money `text-align:right` + `tabular-nums`; header `background: var(--brand-deep)` only for invoice-like dense billing tables (participants/metering keep light headers). Zebra `var(--zebra)` optional (documents keep it; UI uses it only where scans benefit).
+- Sticky `thead` on the documents' dark header band (`--brand-deep`, same-colour bottom border; outer corners `--radius-sm` for a table outside a sheet) with white uppercase kicker labels (`0.6875rem / 650 / 0.05em`; sort buttons inherit the colour) — ADR 0032 alternative 5 records the pale band it replaced; `44px` rows (`height: 2.75rem`) at `0.875rem`, `1px solid var(--border-default)` separators (none under the last row), `hover: var(--surface)`, `selected: var(--brand-pale)`; quantities/money `text-align:right` + `tabular-nums`; DataTable cells `0.75rem` horizontal padding; `td code` identifiers never wrap. The documents' `.line-items` and `.doc-table` use the same `--brand-deep` header. `.participant-table` uses the same band. Inside a sheet (`.card`, `.table-card`) a table fills it edge to edge: a table, `.table-scroll` or `.data-table` that is a direct child of the sheet, or of a classless `div` or `.page-stack` directly inside it, takes `margin-inline: calc(-1 * var(--sheet-pad-inline))` (a bare `table` also `width: calc(100% + 2 * var(--sheet-pad-inline))`), and its outer cells pad by `--sheet-pad-inline` so their text lines up with the sheet's title; the band's corners are square. When that table is the sheet's first child it also takes `margin-top: calc(-1 * var(--sheet-pad-block))` and the sheet's inner top corners (`calc(var(--radius-lg) - 1px)`). The rules sit behind `:where()` so a component layout can override them: the stacked invoice rows (`@container (max-width: 46rem)`, no visible band) keep the sheet's top inset and pad each row card by `--sheet-pad-inline`, with dividers still running edge to edge. Zebra `var(--zebra)` optional (documents keep it; UI uses it only where scans benefit).
+- Row actions (`td > .button`, `.actions-cell-content > .button`): a primary action renders as a forest outline, a destructive one quiet (paper, `--danger-700` text, red tint on hover); only the page's own primary action is solid (§15).
 
 ### 7.5 Cards and chrome
 
-- KPI cards: `StatCard` (`frontend/src/components/StatCard.tsx`) plus `KpiCard` patterns on insights — one dark accent variant max per view (`kpi-card--accent` `var(--brand-deep)`/`--brand-accent` on dark). No gradient shine circles on buttons.
+- KPI cards: `StatCard` (`frontend/src/components/StatCard.tsx`) mirrors the documents' `.kpi-card` — uppercase kicker label (`.stat-label`, hyphenated), the figure with its unit set apart (`.stat-figure` + `.stat-unit`: a leading three-letter currency or a trailing non-numeric unit is split off; dates, dashes and ratios stay whole; the text content is unchanged), optional hint — one dark accent variant max per view (`stat-card--accent` `var(--brand-deep)`/`--brand-accent` on dark). In `.stat-grid`, `.kpi-row` and `.grid`, tiles are subgrids spanning three rows, so label, figure and hint align across a row; the value line is the size container and figures scale with `clamp(1.125rem, 16cqi, 1.625rem)` (the tile itself cannot be a container: layout containment disables subgrid). No hover lift. The accent tile is lit like the documents' dark cards: the `160deg` `--brand` → `--brand-deep` gradient with a soft radial light in its top corner (`radial-gradient(circle at 100% 0%, white 13% → transparent 62%)`); the PDF's `.kpi-card--accent` matches, and the invoice `.amount-card-shine` / contract `.tariff-card-shine` are the same soft glow instead of a hard-edged disc.
 - Interactive `StatCard` severity filters use value tones, a selection outline
   and the shared focus ring. Labels, values and hints remain phrasing content
   inside the native button; `aria-pressed` always exposes the toggle state.
-- Login (`frontend/src/pages/LoginPage.tsx`): quiet `var(--surface)` paper + centred brand mark + `var(--brand-deep)` primary action; remove gradient.
+- Login (`frontend/src/pages/LoginPage.tsx`): quiet `var(--surface)` paper; the sign-in sheet carries the stacked logo (200px) over the documents' rule (hairline with a centred `--accent-rule` segment), one `1.5rem` heading and the form.
 
 ### 7.6 Date pickers
 
@@ -511,9 +539,10 @@ This is the anchor the UI shares, not a spec to copy verbatim (see §5.1). The P
 | `--muted` | `#64748b` | labels, eyebrows, meta | `--text-muted` |
 | `--line` | `#e2e8f0` | borders, row seps | `--border-default` |
 | `--line-subtle` | `#f1f5f9` | subtle seps | `--border-subtle` |
-| `--surface` | `#f8faf7` | warm paper | `--app-bg` (replaces `#f8fafc` + sky radials) |
+| `--surface` | `#f8faf7` | warm paper | row hover, sunken panels inside sheets |
+| `--canvas` | `#f2f5f0` | screen-only page tone | `--app-bg` (replaces `#f8fafc` + sky radials) |
 | `--brand` | `#143828` | forest mid-dark | `--interactive-hover` |
-| `--brand-deep` | `#0d2b1d` | darkest forest | `--sidebar-bg`, dark table headers, primary button |
+| `--brand-deep` | `#0d2b1d` | darkest forest | dark table headers, accent tiles, headings |
 | `--brand-mid` | `#1f5c3a` | interactive green | `--interactive`, `--focus-ring`, selection accent |
 | `--brand-pale` | `#e8f0ec` | pale fill | `--sidebar-active`, pill/selected-row bg |
 | `--brand-glow` | `#d4e0d7` | stronger pale | category panels |
@@ -525,12 +554,17 @@ This is the anchor the UI shares, not a spec to copy verbatim (see §5.1). The P
 | `--chart-surface` | `#fbfcfb` | chart card bg | chart card bg |
 | `--subtotal-color` | `#24352c` | subtotal text | totals text |
 
-**Document anatomy (not copied 1:1, but shared where it helps family resemblance):**
+**Document anatomy (shared by every document; mirrored on screen where it carries meaning — ADR 0032):**
 
-- `.document-header` flex + hairline + `brand-mid` 40mm underline (`shared_pdf_base.html:80-98`) — stays PDF-only; UI uses the simpler page-header/toolbar pattern from `2026-04-frontend-management-page-design.md:139-150`.
-- `.page-meta` running header/footer (`shared_pdf_base.html:169-216`, `position: running(footer-meta)` + `@page @bottom-center {content: element(footer-meta)}`) — PDF-only.
-- Invoice `amount-card` dark forest gradient (`invoice_pdf.html:91-113`) — stays as a **document** motif + at most one dark KPI card per screen view; never as the default button skin.
-- Contract `section-heading` masked rule (`contract_pdf.html:20-43`) — PDF-only; UI section kickers are the eyebrow style without the spanning rule.
+`pdf/shared_pdf_base.html` is included by every default document template — invoice, contract, tariff overview, and (since §15) the annual statement and the tax overview (financial summary). Its sections:
+
+1. Tokens & base — `_tokens.css`, `body { font-family: var(--font-print); font-size: 9.5pt }`.
+2. Utilities — `.eyebrow`, `.visually-hidden`.
+3. Document header (page 1) — `.document-header` flex + hairline + `brand-mid` 40mm rule (`::after`), `.brand-row`/`.company-name`/`.company-address` (the issuer's name stands alone; `.brand-mark` is `display: none`, so stored overrides that still carry the former disc render without it), `.document-label`/`.document-number` (light prefix, bold suffix)/`.document-status`. On screen the same rule closes `PageHeader` and dialog headers. Then the summary band: `.doc-summary` (flex), `.recipient-block` (`.eyebrow` in brand-mid, `.recipient-name`, `.recipient-address`, `.recipient-email`) and `.facts` (`.facts .fact dt/dd`, right-aligned; scoped so the contract's own `.facts-grid .fact` keeps its layout). The invoice keeps `.invoice-summary` as its band container (layout tests measure `recipient-block`, `facts`, `amount-card`).
+4. Page furniture — `.page-meta` running header/footer (`position: running(footer-meta)` + `@page @bottom-center {content: element(footer-meta)}`). PDF-only.
+5. Shared document components — `.page-heading`, `.page-intro`; figure tiles `.kpi-row`/`.kpi-card` (`.kpi-label`, `.kpi-value`, `.kpi-unit`, `.kpi-hint`, `--accent`); `.chart-section` (top rule, `h3` with the forest dot), `.chart-description`, `.chart`; `.doc-table` (dark header with rounded top corners, zebra rows, `td.numeric` nowrap, headers wrap, `tr.total-row` in the grand-total treatment); `.summary-box` (the invoice's totals box at full width: rows, `.quantity`, `.grand-total`) and `.summary-note`. On screen: `StatCard` (figure tiles), `.section-title` and sheet titles (dot), status pills.
+
+Kept document-only: the invoice `amount-card` itself (at most one dark KPI tile per screen view instead — sharing its gradient and soft corner light since ADR 0032's review — never a button skin), the contract `section-heading` masked rule, the line-items category panel, `@page` geometry and the QR slip.
 
 ---
 
@@ -737,7 +771,7 @@ Existing suites stay green (contract: 59 tests in `test_contract_context.py`; te
   `design/tokens.test.mjs`, five committed generated outputs. The generator holds
   zero hex literals: the 10-step Mantine ramp derives from primitives plus
   `charts.prodColors[1]`; `--brand-ink` was added for the darkest step. Chart
-  tokens gained `positiveColor`/`negativeColor` during Phase 3, plus `divergingPositive` (validated blue half of the blue/red diverging pair) during review follow-up. The generator also asserts WCAG 2.1 relative-luminance monotonicity (strictly decreasing) across the 10-step ramp (`--brand-pale` → `--brand-ink`) in both generate and `--check` modes, failing on any `--brand-glow` ↔ `--brand-muted` inversion (CI gate via `pr-quality.yml` `--check`).
+  tokens gained `positiveColor`/`negativeColor` during Phase 3 (`positiveColor` was dropped again in ADR 0032's review: its only consumer was a legend swatch that did not match its bars), plus `divergingPositive` (first a validated blue half of a blue/red diverging pair, forest since the ADR 0032 palette review, §4.3) during review follow-up. The generator also asserts WCAG 2.1 relative-luminance monotonicity (strictly decreasing) across the 10-step ramp (`--brand-pale` → `--brand-ink`) in both generate and `--check` modes, failing on any `--brand-glow` ↔ `--brand-muted` inversion (CI gate via `pr-quality.yml` `--check`).
 - **Phase 1** — full `index.css` token sweep (zero raw hex), sidebar/nav active
   pill + leading bar, flat `.button`, desaturated badges incl. invoice workflow
   variants, global `:focus-visible`. `preview-pdf-template` accepts body
@@ -881,3 +915,263 @@ Existing suites stay green (contract: 59 tests in `test_contract_context.py`; te
   `Accept: application/pdf` header: `PdfTemplatePreviewView` now falls back
   to the default renderer instead of raising `NotAcceptable` (regression
   test `test_accept_pdf_header_does_not_fail_content_negotiation`).
+
+## 15. One language — screen and documents (2026-10, ADR 0032)
+
+The first redesign shared tokens; this pass shares the language. Screens and
+documents now use one typeface and the same meaning-carrying elements (header
+rule, forest headings, figure tile, sage status pill, kicker labels), and the shell
+was made quieter so the content leads. Behaviour, routes, permissions and API
+contracts are unchanged.
+
+### 15.1 Tokens and type
+
+- `design/tokens.json`: primitive `--line-strong #cbd5e1`; semantics
+  `--text-heading`, `--border-strong`, `--surface-sunken`, `--accent-rule`,
+  `--sidebar-text`, `--sidebar-hover`,
+  `--sidebar-line` (§4.1); field tokens
+  `--field-radius 0.5rem`, `--field-label-size 0.875rem`,
+  `--field-label-weight 500`, `--field-help-size 0.8125rem`, `--field-height
+  2.5rem` (the buttons' `min-height`, so a field and a button on one line
+  align); `type.fontFamily.print` leads with `Inter`.
+- Page tone: primitive `--canvas #f2f5f0` (screen only) and `--app-bg` →
+  `var(--canvas)`. The page sits one step darker than the documents' paper
+  (`--surface`, which stays for row hover and inset panels), so white sheets,
+  and fields stand off it without heavier borders.
+- `scripts/generate-tokens.mjs` validates both font stacks (non-empty, no
+  `;{}<>`) and emits `--font-sans`, `--font-print` and `_CHART_FONT_FAMILY`
+  (§4.2).
+- `backend/Dockerfile` and `Dockerfile.fullstack` install `fonts-inter`.
+  `frontend/src/main.tsx` imports `@fontsource-variable/inter/opsz.css`.
+- `index.css` `:root` adds the shape/depth scale: `--radius-xs/sm/md/lg/xl`
+  (0.375–1rem), `--shadow-sheet` (hairline lift for sheets),
+  `--shadow-raised`, `--shadow-overlay` (menus, dialogs, toasts). Tinted
+  translucency (the dialog and drawer scrims) uses
+  `color-mix(in srgb, var(--brand-ink) 45%, transparent)` — no new raw color
+  literal. `body` text is `0.9375rem`; `h1–h4` use `--text-heading`; `hr` is a
+  hairline. `mantineTheme.ts` sets `shadows.sm/md` to the raised/overlay
+  shadows, the default input border to `--border-strong` and labels to
+  `--text-body`.
+
+### 15.2 Shell (`frontend/src/components/Layout.tsx`)
+
+- Sidebar `14rem` (collapsed `4.5rem`) — wide enough for the longest
+  navigation label in any language (Italian "Punti di misurazione"), padding
+  `1rem 0.75rem`: deep forest (`--sidebar-bg`, no border), like the
+  documents' dark header band. Hairlines and the
+  scrollbar use `--sidebar-line`. The sidebar sets `--focus-ring` to white, so
+  the global ring shows on the forest; its account panel, a white sheet,
+  sets it back to `--brand-mid`. Brand row: a horizontal lockup of the logo
+  for dark backgrounds — `public/brand/openzev-mark-light.png` (the mark
+  with its white halo, `alt=""`) and `public/brand/openzev-wordmark-light.png`
+  (white wordmark, `alt` = `app.title`); collapsed, the mark stacks above the
+  expand button and the wordmark hides. The phone app bar keeps the
+  light-background lockup (`openzev-mark.png`, `openzev-wordmark-dark.png`,
+  cropped from `openzevlogo_whitebg.png`). The stacked logo files stay for the
+  login page.
+- Navigation: `2.25rem` rows (`2rem` below 50rem viewport height),
+  `0.875rem/500` in `--sidebar-text` (sage) with icons in the same colour,
+  `0.5rem` radius, group labels as sage kickers at 80% opacity; hover
+  `--sidebar-hover` with white text. Current page: `--sidebar-active` row,
+  white `600` text. The collapse button is sage, white on a
+  `--sidebar-hover` fill when hovered. The whole platform group fits a
+  1440×900 viewport.
+- The sidebar names no scope: no community switcher, no platform chip. The
+  community is named and chosen in the page's scope line (§15.3).
+- Account: the trigger (`.sidebar-footer .sidebar-user .user-menu-trigger`)
+  is the sidebar's last control, a plain row below the footer's hairline
+  (`--sidebar-line`, `0.75rem` above): no border or card fill,
+  `--radius-md`, padding `0.5rem`; hover/open `--sidebar-hover`; on
+  `/account` `.is-current` (`--sidebar-active`). It holds the name (`0.8125rem/600`, white,
+  ellipsized) and the sage up/down selector mark (`.user-menu-caret`,
+  `SelectorIcon`). Its panel (`#user-menu-list`) opens upwards over the
+  navigation, starts with the login's email (`.user-menu-email`: `0.75rem`
+  muted, ellipsized, hairline below), lists Account, Language, Log out and
+  ends with
+  the source link (`.user-menu-about`: hairline above, GitHub mark,
+  "OpenZEV" and the version, `0.75rem` muted, darker on hover). Collapsed, the
+  trigger shows the selector mark alone, centred, with the account name as `title`,
+  and expands the sidebar before opening. Focus, Escape and outside-click
+  behave as before.
+- `header.top-nav` (outside `main`) holds `.mobile-bar` and the impersonation
+  banner. On phones (≤768px) `.mobile-bar` is a sticky white app bar with a
+  hairline, the menu button and the lockup; on desktop it is hidden, so an ordinary session
+  has no top band. The impersonation banner is a full-width warning strip with
+  its stop button at the right.
+- `.content` padding `2rem 2rem 2.5rem` (phones `0 1rem 1.5rem`);
+  `.content-main` max-width `88rem`, centred. Language selection is a
+  segmented control (`.language-selector-options`).
+
+### 15.3 Page anatomy
+
+- `PageHeader`: `.page-header > .eyebrow` is the scope kicker in
+  `--accent-rule`; `h1` per §7.3;
+  description `p.muted`; actions bottom-aligned. The header closes with the
+  documents' rule: `border-bottom: 1px var(--border-default)` and a
+  `3.5rem × 2px` `--accent-rule` segment (`::after`). On a tabbed page — any
+  later `.app-tabs`, also nested in the page body (scope guard, year picker),
+  or `.template-tabs-rows` — the header draws neither, so the page shows one
+  line: the tab strip's hairline with the active tab's `--accent-rule`
+  underline. The templates hub keeps its two tab rows.
+- Scope line as community switch: with `communitySwitch`, `PageHeader`
+  renders the eyebrow through `CommunitySwitcher`. With more than one
+  community it is a button (`.community-switch`) in the kicker's own type
+  (font, tracking and uppercase inherited) with a `0.875rem` down caret,
+  `--radius-xs`, a `0.25rem 0.4rem` hit area pulled back by negative margins
+  so the text stays aligned with the title, and `--brand-pale` on hover/open;
+  the name ellipsizes. Its menu (`.community-menu`, Mantine `Menu`,
+  bottom-start, `min-width 16rem`, at most `min(22rem, 60dvh)` high and
+  scrolling) lists the communities: name, the relation below for non-admins
+  (`.community-menu-relation`, `0.75rem` muted), and on the current one
+  `--text-heading` `600` plus an `--interactive` check. Otherwise the eyebrow
+  is plain text (behaviour: `2026-03-community-and-access.md` §9.3).
+- Sheets (`.card`, `.table-card`): white, hairline, `--radius-lg`,
+  `--shadow-sheet`, padding `var(--sheet-pad-block) var(--sheet-pad-inline)` (`1.25rem 1.5rem`; `1rem` each up to 768px). Sheet titles — the first `h2/h3`
+  of a sheet, the `h2/h3` of a sheet-leading unclassed `div` title block or of a
+  leading `.toolbar`, `.card-header > h2/h3`, and `.section-title` — get
+  `1rem/650` in `--text-heading`, without decoration (a title may still carry
+  its own status `.dot`, e.g. health probes). `.card-header` lays out a title and a control on
+  one line. A `form` directly in a sheet stacks its fields with `1rem` gaps.
+  Empty states are dashed blank sheets with centred text.
+- Filter bar (`.filter-bar`, `.filter-bar-fields`, `.filter-bar-note`): the
+  period selector and the view's filters on one line, set on the page (no
+  sheet). The fields wrap as one group: `.filter-bar-fields` has a flex basis
+  of room for all its fields side by side (`13rem` each plus `1rem` gaps,
+  chosen with `:has(> :nth-child(n))`; max width `24rem`/`50rem`/`75rem` for
+  one/two/three fields, pushed to the line's end), so it either shares the
+  period's line whole or moves below it whole, its fields sharing the width
+  equally — never split around the period. Used by `ManagementDashboardBody`, `ParticipantDashboardBody` and
+  `MeteringChartPage` (whose hourly-resolution hint moved below the row as
+  `.filter-bar-note`, linked with `aria-describedby`). `PeriodSelector` step
+  buttons show only their arrow in both variants; the label is a
+  visually-hidden span (non-compact) or `aria-label` (compact), plus `title`.
+  The group never wraps; the range text ellipsizes first.
+  From 769px the non-compact trigger sets the range and its interval on one
+  line at the shared control height; the interval shows only its name
+  (`Vierteljährlich`), its label (`.period-selector-interval-label`,
+  "Abrechnungsintervall:") stays for screen readers. Phones stack the
+  trigger's two lines with the label.
+- Management toolbars (`.participant-toolbar`, `.metering-toolbar`,
+  `.tariff-toolbar`) lose their sheet: a `.toolbar` row with the main filter
+  tabs on the left and the page's actions on the right (also when wrapped),
+  then, where the page has further filters, a `.list-filters` row with search
+  and those filters. The tariff summary chips are gone.
+- Filter tabs (`FilterTabs`, `frontend/src/components/FilterTabs.tsx`;
+  `.filter-tabs`, `.filter-tab`, `.filter-tab-count`,
+  `.filter-tab--attention`): one segmented group of counted, mutually
+  exclusive views of a list, used by invoices (`InvoiceRowFilterTabs`),
+  participants, metering points and tariffs. The first tab is the default
+  view; it always shows, and pressing an active tab returns to it. Any other
+  tab with a count of 0, or with the default tab's count (it would show the
+  same list), is left out unless it is the active one, and a default tab
+  left on its own renders no group at all. An
+  `attention` tab shows its count in the danger tone while it is above 0.
+  The group is as tall as a field (`--field-height`). `.list-filters` is one
+  wrapping line: a search input (`flex: 0 1 22rem`, full width on phones),
+  further tab groups and compact selects, labelled by `aria-label`.
+  Participants: All · Needs attention · No metering point, with the search
+  in the same `.list-filters` row (nothing else narrows them).
+  Metering points: All · Active · Inactive · Unassigned (managers only) ·
+  Needs attention; below, search, type tabs (All types · Consumption ·
+  Production · Bidirectional, shown when more than one type is present or a
+  type is selected) and, with more than one building, the building select.
+  The view is stored in the query param of its own dimension (`status`,
+  `assignment` or `attention`), and a link setting several keeps the first;
+  the type keeps `type`. Tariffs: Valid (default) · All, counting tariff
+  series with a version in force today against all series; the tariff
+  overview PDF's scope is chosen at its download instead
+  (SPEC-2026-09-tariff-overview-pdf §11).
+- Ledger lists: participants, metering points and tariffs render as
+  hairline-separated rows inside one sheet. Participant rows lead with the
+  name (`.participant-card-heading`), then badges, then five labelled detail
+  columns; Edit is a secondary action (SPEC-2026-04 §7.3). Metering points
+  nest their assignments under a left rule; Assign is `button-outline`.
+  Tariff categories are sheets with a plain heading and a count (the coloured
+  category gradients are gone); Details is `button-outline`.
+- Buttons: the primary `.button` is flat `--brand-deep` with a small forest
+  drop shadow, no gradient or inner highlight; hover lightens it to
+  `--brand`.
+  Secondary, outline, ghost and row-level buttons replace the background and
+  draw no shadow of their own except the secondary's `--shadow-sheet`.
+- Row actions: see §7.4. `.button-secondary.button-destructive` and compact
+  danger buttons are the quiet destructive style (imports' "Delete imports",
+  admin invoice/ZEV rows); confirm dialogs keep the solid red.
+- Status pills: fill + hairline of the next tone, `0.75rem/600`, sentence
+  case. Colour is reserved for state; attributes (billing mode, energy type,
+  meter type, roles, counts) are outlined `.badge-tag`s (white, `--border-strong`
+  hairline, `--text-body`, `500`), so a row shows one coloured pill — its
+  state — among quiet tags. Tariff validity `scheduled` is info (the blue of
+  "upcoming" elsewhere); an inactive metering point is neutral, not danger. `.badge-brand` (brand-pale, brand-glow border, brand-mid text) is the
+  invoice document's pill; `invoiceStatusBadgeClass('approved')` uses it, so
+  "approved" looks the same in the app and on the PDF. The invoice detail page
+  renders the same `InvoiceStatusBadge` as the tables, so the former
+  per-status classes (`.badge-draft`, `.badge-approved`, `.badge-sent`,
+  `.badge-paid`, `.badge-cancelled`) are gone.
+- Dialogs (`FormModal`): `--radius-xl`, `--shadow-overlay`, forest scrim;
+  the header is sticky and closes with the documents' rule (`2.5rem` segment).
+- Charts: Recharts legend text in `--text-body` beside the swatch (the PDF
+  convention) and tooltips as small raised sheets.
+
+### 15.4 Pages
+
+- Invoice detail: the status pill joins the recipient and period in the page
+  header (`.invoice-detail-meta`, with a visually-hidden "Status:" label);
+  below it `.invoice-figures` holds two `.stat-grid` rows of figure tiles —
+  Total (accent), Subtotal, VAT; Local, Grid, Feed-in (`aria-label` =
+  `pages.invoiceDetail.energyTotals`) — then the embedded PDF. The back link is
+  secondary. The PDF frame's bars (`.pdf-preview-actions`,
+  `.pdf-preview-link`) are paper strips around the document.
+- Imports: the start sheet uses `.card-header` (title + actions) with the
+  description below; "Delete imports" is the quiet destructive button.
+- Feasibility: the system sheet's mode select moved out of the `h3` into a
+  `.card-header` (`select.select-compact`, labelled by the new
+  `pages.feasibility.form.energyInputModeLabel` key in all four locales); chart
+  titles use `.section-title`.
+- Admin accounts: the filter panel is no longer a sheet. Admin invoices: the
+  delete action is compact (quiet destructive).
+- Overview: period cards (`.overview-period-card`) are plain sheets like the
+  current-period row, without a coloured top edge; the status pill carries
+  the tone.
+- Login: §7.5.
+
+### 15.5 Documents
+
+- `annual_statement_pdf.html` and `financial_summary_pdf.html` include
+  `pdf/shared_pdf_base.html` and follow the invoice's anatomy: document header
+  (ZEV name, issuer address, document label + the year as
+  `document-number`), summary band (recipient left; facts right), figure tiles
+  (annual statement: consumption, from ZEV, from grid, self-sufficiency as the
+  accent tile), sections with forest headings, `.doc-table` tables with a total row,
+  `.summary-box` for savings and taxable income, and the running footer
+  (`N / M`). The annual statement keeps its page break before the ledger
+  (invoices and savings). Both use exactly the translation keys and output
+  variables they used before (the field-catalog coverage tests pin this for the
+  annual statement).
+- The invoice's tile/section styles and its recipient/facts styles moved into
+  the shared base (§8); `invoice_pdf.html` markup is unchanged.
+
+### 15.6 Tests and verification
+
+- `tests/layout-nav.test.ts`: account-menu selectors point at
+  `.sidebar-user`; "expands the collapsed sidebar before opening the account
+  panel at its foot", "ends the sidebar with the account, and the account
+  panel with the source link", "marks the account card as the current place
+  on the account page only" and "names no scope in the sidebar" (community
+  and platform routes). The sidebar-switcher cases moved to
+  `tests/community-switcher.test.ts` (10: list and current mark, switching,
+  relation labels, plain text with one or no community and without the
+  provider or the prop, title and description intact, the dirty-draft
+  confirm/cancel flow with the dialog outside the paragraph, no prompt for the
+  current community, fixed selection).
+- `screenshots/layout-overflow.spec.ts`: "a long community list scrolls
+  inside its menu and stays on screen" (1440×600 to 390×600) replaces the
+  sidebar-eviction case; focus recovery across the breakpoint lands on the
+  collapse button. `page-anatomy` and `shared-page-behavior` switch
+  communities through `main .community-switch` and its menu items.
+- `tests/page-primitives.test.ts`: `StatCard` sets the unit apart for
+  `439.55 kWh`, `35.4 %`, `CHF 1066.94`, `CHF −548.31`, `1066.94 CHF` (text
+  content unchanged) and keeps `—`, `05.10.2026`, `1 von 8`, `8` whole.
+- `screenshots/field-geometry.spec.ts`: the field contract is now 16px values,
+  14px/500 labels, 13px helpers, 8px radius, 40px height (the buttons').
+- Backend: the full suite passes against PostgreSQL with Inter installed
+  (PDF layout, PDF/A, template-admin and field-catalog tests included).

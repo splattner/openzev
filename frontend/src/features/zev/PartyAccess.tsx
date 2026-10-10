@@ -144,7 +144,7 @@ export function AccessControls({ entries, party = null, canManage, actions, mana
         <div className="party-access">
             {byRole.length > 0 && (
                 <span className="party-access-line">
-                    <span className="badge badge-info">{t('pages.zevSettings.access.managesByRole')}</span>
+                    <span className="badge badge-tag">{t('pages.zevSettings.access.managesByRole')}</span>
                     {login && <span className="muted">{login}</span>}
                 </span>
             )}

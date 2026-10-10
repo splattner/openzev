@@ -12,10 +12,13 @@ import {
   isMeteringPointHolderLess,
   meteringPointHealthBadgeClass,
   meteringPointNeedsAttention,
+  meteringPointViewFilters,
+  meteringPointViewParam,
   readMeteringPointAssignmentFilter,
   readMeteringPointAttentionFilter,
   readMeteringPointStatusFilter,
   readMeteringPointTypeFilter,
+  readMeteringPointView,
 } from '../src/features/meteringPoints/useMeteringPointForms'
 import type { MeteringPoint, MeteringPointAssignment, MeteringPointDataQuality } from '../src/types/api'
 
@@ -244,6 +247,40 @@ describe('metering point form helpers', () => {
       expect(readMeteringPointAssignmentFilter('unassigned')).toBe('unassigned')
       expect(readMeteringPointAssignmentFilter(null)).toBe('all')
       expect(readMeteringPointAssignmentFilter('maybe')).toBe('all')
+    })
+  })
+
+  describe('one list view (filter tabs)', () => {
+    const read = (query: string) => readMeteringPointView(new URLSearchParams(query))
+
+    it('reads the view from the param of its own dimension', () => {
+      expect(read('')).toBe('all')
+      expect(read('status=active')).toBe('active')
+      expect(read('status=inactive')).toBe('inactive')
+      expect(read('assignment=unassigned')).toBe('unassigned')
+      expect(read('attention=attention')).toBe('attention')
+    })
+
+    it('keeps the first dimension of a link that sets several, and ignores views it has no tab for', () => {
+      expect(read('assignment=unassigned&status=inactive')).toBe('inactive')
+      expect(read('attention=attention&assignment=unassigned')).toBe('unassigned')
+      expect(read('assignment=assigned')).toBe('all')
+      expect(read('status=bogus&attention=attention')).toBe('attention')
+    })
+
+    it('narrows exactly one dimension per view', () => {
+      expect(meteringPointViewFilters('all')).toEqual({ statusFilter: 'all', assignmentFilter: 'all', attentionFilter: 'all' })
+      expect(meteringPointViewFilters('inactive')).toEqual({ statusFilter: 'inactive', assignmentFilter: 'all', attentionFilter: 'all' })
+      expect(meteringPointViewFilters('unassigned')).toEqual({ statusFilter: 'all', assignmentFilter: 'unassigned', attentionFilter: 'all' })
+      expect(meteringPointViewFilters('attention')).toEqual({ statusFilter: 'all', assignmentFilter: 'all', attentionFilter: 'attention' })
+    })
+
+    it('writes each view back to a param that reads as the same view', () => {
+      expect(meteringPointViewParam('all')).toBeNull()
+      for (const view of ['active', 'inactive', 'unassigned', 'attention'] as const) {
+        const param = meteringPointViewParam(view)!
+        expect(read(new URLSearchParams([param]).toString())).toBe(view)
+      }
     })
   })
 })

@@ -340,7 +340,7 @@ test.describe('User Guide Screenshots', () => {
     // screenshotFull grows the viewport to the content height, so the embedded
     // PDF viewer — which Chromium only paints inside the viewport — renders.
     await navigateTo(page, `/billing/invoices/${invoice.id}`)
-    await page.waitForSelector('.grid-4', { timeout: 10_000 })
+    await page.waitForSelector('.invoice-figures', { timeout: 10_000 })
     await page.waitForSelector('iframe[title]', { timeout: 15_000 })
     await assertPdfLoaded(page)
     await closePdfSidebar(page)

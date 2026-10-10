@@ -46,6 +46,7 @@ export function InvoicesPage() {
         <div className="page-stack">
             <PageHeader
                 eyebrow={selectedZev?.name}
+                communitySwitch
                 scopeNote={scopeNote}
                 title={t('pages.invoices.title')}
                 description={t('pages.invoices.description')}
@@ -232,7 +233,7 @@ export function InvoicesContent() {
                 <InvoicesEmptyState />
             ) : (
                 <>
-                    <div className="invoice-filter-bar">
+                    <div className="list-filters">
                         <InvoiceRowFilterTabs counts={rowCounts} activeFilter={rowFilter} onFilterChange={setRowFilter} />
                         {rowFilter !== null && visibleRows.length > 0 && (
                             <p className="muted" role="status">

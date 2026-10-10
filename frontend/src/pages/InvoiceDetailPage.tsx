@@ -19,6 +19,9 @@ import { InvoiceAccessLinkCard } from '../features/invoices/InvoiceAccessLinkCar
 import { usePdfObjectUrl } from '../lib/usePdfObjectUrl'
 import { PageHeader } from '../components/PageHeader'
 import { Notice } from '../components/Notice'
+import { StatCard } from '../components/StatCard'
+import { InvoiceStatusBadge } from '../components/InvoicePresentation'
+import { formatChf, formatKwh } from '../lib/numbers'
 
 export function InvoiceDetailPage() {
     const { t } = useTranslation()
@@ -114,29 +117,34 @@ export function InvoiceDetailPage() {
                 eyebrow={inv.zev_name}
                 scopeNote={invoiceScopeNoteKey ? t(invoiceScopeNoteKey) : undefined}
                 title={t('pages.invoiceDetail.title', { number: inv.invoice_number })}
-                description={`${inv.participant_name} · ${formatShortDate(inv.period_start, settings)} → ${formatShortDate(inv.period_end, settings)}`}
+                description={
+                    // The document's own header: status pill, recipient, period.
+                    <span className="invoice-detail-meta">
+                        <span className="visually-hidden">{t('pages.invoiceDetail.status')}: </span>
+                        <InvoiceStatusBadge status={inv.status} />
+                        <span>{`${inv.participant_name} · ${formatShortDate(inv.period_start, settings)} → ${formatShortDate(inv.period_end, settings)}`}</span>
+                    </span>
+                }
                 actions={
-                    <Link to={backHref} className="button button-primary" style={{ textDecoration: 'none' }}>
+                    <Link to={backHref} className="button button-secondary">
                         {backLabel}
                     </Link>
                 }
             />
 
-            <section className="grid grid-4">
-                <div className="card"><strong>{t('pages.invoiceDetail.status')}</strong><div><span className={`badge badge-${inv.status}`}>{t(`invoice.status.${inv.status}`)}</span></div></div>
-                <div className="card"><strong>{t('pages.invoiceDetail.total')}</strong><div>CHF {inv.total_chf}</div></div>
-                <div className="card"><strong>{t('pages.invoiceDetail.subtotal')}</strong><div>CHF {inv.subtotal_chf ?? '-'}</div></div>
-                <div className="card"><strong>{t('pages.invoiceDetail.vat')}</strong><div>CHF {inv.vat_chf ?? '-'}</div></div>
-            </section>
-
-            <section className="card">
-                <h3 style={{ marginTop: 0 }}>{t('pages.invoiceDetail.energyTotals')}</h3>
-                <div className="inline-form grid grid-4">
-                    <div><strong>{t('pages.invoiceDetail.local')}</strong><div>{inv.total_local_kwh ?? '0'} kWh</div></div>
-                    <div><strong>{t('pages.invoiceDetail.grid')}</strong><div>{inv.total_grid_kwh ?? '0'} kWh</div></div>
-                    <div><strong>{t('pages.invoiceDetail.feedIn')}</strong><div>{inv.total_feed_in_kwh ?? '0'} kWh</div></div>
-                </div>
-            </section>
+            {/* The figures of the invoice, as its summary tiles print them. */}
+            <div className="invoice-figures">
+                <section className="stat-grid">
+                    <StatCard accent label={t('pages.invoiceDetail.total')} value={formatChf(Number(inv.total_chf))} />
+                    <StatCard label={t('pages.invoiceDetail.subtotal')} value={inv.subtotal_chf != null ? formatChf(Number(inv.subtotal_chf)) : '—'} />
+                    <StatCard label={t('pages.invoiceDetail.vat')} value={inv.vat_chf != null ? formatChf(Number(inv.vat_chf)) : '—'} />
+                </section>
+                <section className="stat-grid" aria-label={t('pages.invoiceDetail.energyTotals')}>
+                    <StatCard label={t('pages.invoiceDetail.local')} value={`${formatKwh(Number(inv.total_local_kwh ?? 0))} kWh`} />
+                    <StatCard label={t('pages.invoiceDetail.grid')} value={`${formatKwh(Number(inv.total_grid_kwh ?? 0))} kWh`} />
+                    <StatCard label={t('pages.invoiceDetail.feedIn')} value={`${formatKwh(Number(inv.total_feed_in_kwh ?? 0))} kWh`} />
+                </section>
+            </div>
 
             {canManageAccessLink && inv.access_link != null && (
                 <InvoiceAccessLinkCard
@@ -169,8 +177,8 @@ export function InvoiceDetailPage() {
                         <PdfPreview src={pdfObjectUrl} title={t('pages.invoiceDetail.title', { number: inv.invoice_number })} openInNewTabFetcher={openPdfInNewTab} />
                     )
                 ) : (
-                    <div className="card" style={{ display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <p className="muted" style={{ margin: 0 }}>
+                    <div className="card pdf-missing">
+                        <p className="muted m-0">
                             {generateError ? <span className="text-error">{t('pdf.generateError')}</span> : t('pdf.noDocument')}
                         </p>
                         {/* PDF generation takes a manager of the invoice's ZEV (#761). */}

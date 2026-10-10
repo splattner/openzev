@@ -1041,7 +1041,7 @@ the account's role everywhere.
   and not `"compliant"`, and a muted "Last sign-in `<date>`" /
   "Never signed in" line from `last_login`), *Actions*.
 - **Membership chips** read `Owner|Participant · <community>`. Selecting one
-  calls `setSelectedZevId(zev)` (the shell's community switcher — which also
+  calls `setSelectedZevId(zev)` (as the scope-line community switch does — which also
   saves the admin's `preferred_zev`, as any switch does) and opens
   `/participants?focus=<participant>` (`/participants` when the account is an
   owner with no participant record). Memberships are edited there, not here.
@@ -1570,38 +1570,62 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 Overview stays active on `/admin` and its six tab routes, without matching
 Accounts, Templates or Settings.
 
-The community switcher lives at the sidebar top (inline expander, full
-sidebar width, expands-first when collapsed, auto-closes on entry into
-platform scope) only when there is something to switch: it shows for an
-account in ZEV scope or with more than one community, and is unmounted with
-exactly one community. It lists the provider's `entries` (§9.4) — every
-community the account relates to — each with the account's relation below the
-name (`nav.relation.{admin,manager,viewer,participant,former}`, class
-`zev-dropdown-relation`). The trigger's subtitle shows the current issuer's display name when the
-selected ZEV has one, otherwise the relation. A participant with one community gets no
-switcher, as before.
-The switcher is a keyboard-operable disclosure: opening it focuses the first
-enabled community button (or the empty/loading panel), Escape closes it and
-returns focus to the trigger, selecting a community closes it and restores
-focus to the trigger, and tabbing out closes it. When the ZEV settings draft
-is dirty, selecting a different community opens `ConfirmDialog`: Cancel keeps
-the current selection and edits; Switch without saving changes the selection
-and drops the draft. Selecting the current community or switching with a clean
-draft opens no confirmation. `ZevSettingsPage` publishes and clears this state
-through `zevUnsavedGuard`; `layout-nav.test.ts` covers both owner and admin
-confirmation flows. On mobile, Escape also closes
-the sidebar drawer and returns focus to its menu button. Mobile navigation
-ignores the saved desktop collapse preference. Returning to desktop restores
-it, closes the drawer and releases the scroll lock. Breakpoint changes close
-the community disclosure and move focus from hidden controls to a visible
-navigation control. Focus elsewhere is preserved.
+The community is chosen where it is named: in the page's scope line. Every
+ZEV-scoped page header names the selected community as its eyebrow
+(`PageHeader` `eyebrow`); pages that name the *selected* community also pass
+`communitySwitch`, and `PageHeader` then renders the name through
+`CommunitySwitcher` (`frontend/src/components/CommunitySwitcher.tsx`). When
+the provider lists more than one entry (§9.4), the name is a button
+(`.community-switch`: the kicker's type plus a down caret) that opens a
+Mantine `Menu` of every community the account relates to; otherwise — one
+community, none, or no provider — it stays plain text, so a participant or
+manager with one community sees no control. Each menu item shows the
+community name and, for non-admin relations, the account's relation below it
+(`nav.relation.{manager,viewer,participant,former}`, class
+`community-menu-relation`); the current community carries `aria-current="true"`
+and a check mark. When the selection is fixed (`isSelectable` false) the other
+items are disabled. The switch chooses a community; it manages nothing. Its
+accessible name is `nav.chooseZevCurrent` ("Choose (v)ZEV, current:
+{{name}}"), its `title` `nav.chooseZev`. Keyboard handling, focus return to
+the trigger on Escape or selection, and outside-click dismissal are the
+menu's. When the ZEV settings draft is dirty, selecting a different community
+opens `ConfirmDialog` (portalled to `document.body`, since the scope line is a
+paragraph): Cancel keeps the current selection and edits; Switch without
+saving changes the selection and drops the draft. Selecting the current
+community or switching with a clean draft opens no confirmation.
+`ZevSettingsPage` publishes and clears this state through `zevUnsavedGuard`;
+`community-switcher.test.ts` covers the list, the relation labels, the plain
+fallbacks, the dirty-draft flow and fixed selections. Pages with the switch:
+Overview, Energy balance (`DashboardPage`), Metering chart and imports,
+Metering points, Billing hub and invoices, Reports, Participants, Tariffs, ZEV
+settings, and the owner audit log (not its `/admin` view). The invoice
+detail page (the invoice's own community), My invoices and every `/admin/*`
+page keep a plain eyebrow. The sidebar names no scope: it holds the logo, the
+navigation and the account. On mobile, Escape closes the sidebar drawer and
+returns focus to its menu button. Mobile navigation ignores the saved desktop
+collapse preference. Returning to desktop restores it, closes the drawer and
+releases the scroll lock; focus on a control that the breakpoint hides moves
+to the visible equivalent (the drawer's menu button ↔ the sidebar's collapse
+button). Focus elsewhere is preserved.
 The shell's skip link, `main` landmark and focus after navigation follow
-SPEC-2026-04 §7.1. Opening one disclosure closes the other. The account
-disclosure in the top bar follows the same focus and dismissal rules while
-keeping its language choices as ordinary buttons; selecting a language leaves
-it open.
-Every ZEV-scoped page header carries the selected ZEV name as an eyebrow
-above the page title. My invoices, the one participant page that lists across
+SPEC-2026-04 §7.1. The account disclosure is the sidebar's last control
+(`.sidebar-footer .sidebar-user`; trigger with the name and the
+up/down selector mark; panel `#user-menu-list` opens upward with the login's
+email as its first line, then Account, the
+language choices, Logout and, as its last line, the source-code link
+`.user-menu-about` — GitHub mark, "OpenZEV" and the app version, opening in a
+new tab). Opening it focuses the Account link; Escape closes it and returns
+focus to the trigger; tabbing out or clicking outside closes it; its language
+choices are ordinary buttons, and selecting a language leaves it open. Account
+settings deliberately live behind the account row, not in the main navigation
+(which stays about the community's work); on `/account` the trigger carries
+`is-current` (the current nav row's pale forest), so the sidebar still shows
+where the user is. In the collapsed rail the trigger shows only the selector
+mark (the name as its tooltip) and expands the sidebar before opening. There is no account control in the page header: `header.top-nav`
+holds only the mobile app bar (`.mobile-bar`, ≤768px: menu button plus the
+decorative logo lockup, sticky) and, during impersonation, the impersonation
+banner; on desktop it is empty otherwise.
+My invoices, the one participant page that lists across
 every membership, shows the community name only when the account has exactly
 one membership (`soleCommunityName(user)`, from `/auth/me` `memberships`) and
 otherwise names the broader scope (`pages.myInvoices.allCommunities`), so a
@@ -1610,7 +1634,7 @@ metering points and chart name the selected community, because they ask about
 it (`zev_id`): `selectedCommunityName` (`frontend/src/lib/membership.ts`) takes
 the readable ZEV record, else the selected switcher entry. Viewers get
 `nav.relation.viewer` after the community name (`PageHeader` `scopeNote`),
-including when the switcher is unmounted; invoice detail uses the relation to
+whether or not the name is a switch; invoice detail uses the relation to
 the invoice's own community. No other relation adds a note, and the note is not
 part of the browser tab title.
 The invoice detail page shows the invoice's own `zev_name` (a deep link may
@@ -1624,15 +1648,10 @@ entries from platform tooling; the operational links above Setup
 Platform reuses `Overview` and `Settings`; its link accessible names include
 the translated Platform group label (`nav.scopedLabel`: `{{scope}}: {{label}}`).
 Tooltips appear only in the collapsed desktop rail; visible labels wrap.
-Avatars show up to two letter or digit initials, ignoring symbols. Empty names
-show `·`; no selected community shows a decorative platform icon. Avatars do
-not shrink.
-Under `/admin/*` the shell adds
-`shell-scope-platform`: the switcher is unmounted in favour of a translated
-"Platform administration" chip (`nav.platformScope`) in the sidebar context
-block. There is no header scope chip: every ZEV-scoped page header names the
-selected ZEV as an eyebrow, so the working context stays visible when the nav
-scrolls, the sidebar collapses, or the sidebar lives in the mobile drawer.
+There is no header or sidebar scope chip: every page header names its scope
+in the eyebrow (the community, or "Platform administration" under
+`/admin/*`), so the working context stays visible when the nav scrolls, the
+sidebar collapses, or the sidebar lives in the mobile drawer.
 The Manage action on `/admin/zevs` (`setSelectedZevId` + jump to `/`) is
 how an admin enters a ZEV's working scope from platform scope.
 
@@ -2111,10 +2130,15 @@ prior readings for that community, including rows outside the new seed window.
 - `ProtectedRoute` handles loading, unauthenticated, forced password change,
   redirects for accounts without community access, and shell-role gating.
 - `frontend/tests/layout-nav.test.ts` — role navigation, scoped link names,
-  avatars, active state, scope context, disclosure keyboard behaviour and
-  mobile presentation independent of desktop collapse.
-- `frontend/screenshots/layout-overflow.spec.ts` — sidebar sizing and focus
-  recovery across the mobile breakpoint with browser CSS applied.
+  the account row's name, the email in the account panel, active state (including the account row on `/account`),
+  no scope in the sidebar, the account panel's keyboard behaviour and source
+  link, and mobile presentation independent of desktop collapse.
+- `frontend/tests/community-switcher.test.ts` — the scope-line community
+  switch: list, current mark, relation labels, plain-text fallbacks, the
+  dirty-draft confirmation and fixed selections.
+- `frontend/screenshots/layout-overflow.spec.ts` — the community menu's
+  scrolling and placement across viewport sizes, and focus recovery across
+  the mobile breakpoint with browser CSS applied.
 - `frontend/tests/nav-labels.test.ts` — distinct labels within community,
   platform and participant navigation plus the charts-tab-vs-hub guard, in
   all four locales.

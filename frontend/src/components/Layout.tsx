@@ -4,13 +4,10 @@ import { useMediaQuery } from '@mantine/hooks'
 import { Link, NavLink, Outlet, matchPath, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
-import { useManagedZev } from '../lib/managedZev'
 import { useCommunityAccess } from '../lib/communityAccess'
 import { fetchFeasibilityCalculatorEnabled } from '../lib/api/feasibility'
 import { queryKeys } from '../lib/api/queryKeys'
 import { LanguageSelector } from './LanguageSelector'
-import { ConfirmDialog, useConfirmDialog } from './ConfirmDialog'
-import { hasUnsavedZevSettingsDraft } from '../lib/zevUnsavedGuard'
 import { useToast } from '../lib/toast'
 import { useRouteFocus } from '../lib/useRouteFocus'
 import pkg from '../../package.json'
@@ -51,13 +48,6 @@ function SidebarLink({ to, label, icon, active, end, className, scope, collapsed
 export function Layout() {
     const { t } = useTranslation()
     const { user, logout, isImpersonating, impersonator, stopImpersonation } = useAuth()
-    const { entries: providedEntries, managedZevs, selectedZevId, selectedZev, isSelectable, isLoading: managedZevLoading, setSelectedZevId } = useManagedZev()
-    // A context without `entries` (the shape before #761) lists the readable ZEVs.
-    const entries = providedEntries ?? managedZevs.map((zev) => ({
-        id: zev.id,
-        name: zev.name,
-        relation: user?.role === 'admin' ? ('admin' as const) : ('manager' as const),
-    }))
     const { shellRole, isZevScope, isParticipantScope } = useCommunityAccess()
     // Query the flag only for accounts with community-wide access.
     const feasibilityEnabledQuery = useQuery({
@@ -70,7 +60,6 @@ export function Layout() {
     const navigate = useNavigate()
     const { pushToast } = useToast()
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
-    const [isZevMenuOpen, setIsZevMenuOpen] = useState(false)
     const [isStoppingImpersonation, setIsStoppingImpersonation] = useState(false)
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
         if (typeof window === 'undefined') {
@@ -81,11 +70,8 @@ export function Layout() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY, undefined, { getInitialValueInEffect: false })
     const isNavigationCollapsed = isSidebarCollapsed && !isMobile
-    const { dialog: zevSwitchDialog, confirm: confirmZevSwitch, handleConfirm: handleZevSwitchConfirm, handleCancel: handleZevSwitchCancel } = useConfirmDialog()
     const userMenuRef = useRef<HTMLDivElement | null>(null)
-    const zevMenuRef = useRef<HTMLDivElement | null>(null)
     const userMenuTriggerRef = useRef<HTMLButtonElement | null>(null)
-    const zevMenuTriggerRef = useRef<HTMLButtonElement | null>(null)
     const mobileMenuButtonRef = useRef<HTMLButtonElement | null>(null)
     const sidebarRef = useRef<HTMLElement | null>(null)
     const sidebarCollapseButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -118,13 +104,10 @@ export function Layout() {
         const focused = document.activeElement === document.body ? lastNavigationFocusRef.current : document.activeElement
         lastNavigationFocusRef.current = null
         const focusInSidebar = sidebarRef.current?.contains(focused)
-        const focusInDropdown = focused instanceof Element && focused.closest('.zev-menu-dropdown') != null
-        setIsZevMenuOpen(false)
         if (isMobile && focusInSidebar) {
             mobileMenuButtonRef.current?.focus()
-        } else if (!isMobile && (focusInDropdown || focused === mobileMenuButtonRef.current)) {
-            const focusTarget = zevMenuTriggerRef.current ?? sidebarCollapseButtonRef.current
-            focusTarget?.focus()
+        } else if (!isMobile && focused === mobileMenuButtonRef.current) {
+            sidebarCollapseButtonRef.current?.focus()
         }
     }, [isMobile])
 
@@ -143,21 +126,9 @@ export function Layout() {
     }, [isUserMenuOpen])
 
     useEffect(() => {
-        if (isZevMenuOpen) {
-            const dropdown = zevMenuRef.current?.querySelector<HTMLElement>('.zev-menu-dropdown')
-            const firstOption = dropdown?.querySelector<HTMLElement>('button:not(:disabled)')
-            const focusTarget = firstOption ?? dropdown
-            focusTarget?.focus()
-        }
-    }, [isZevMenuOpen])
-
-    useEffect(() => {
         function handleOutsideClick(event: MouseEvent) {
             if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
                 setIsUserMenuOpen(false)
-            }
-            if (zevMenuRef.current && !zevMenuRef.current.contains(event.target as Node)) {
-                setIsZevMenuOpen(false)
             }
         }
 
@@ -165,9 +136,7 @@ export function Layout() {
             if (event.key === 'Escape') {
                 if (isMobileMenuOpen) mobileMenuButtonRef.current?.focus()
                 else if (isUserMenuOpen) userMenuTriggerRef.current?.focus()
-                else if (isZevMenuOpen) zevMenuTriggerRef.current?.focus()
                 setIsUserMenuOpen(false)
-                setIsZevMenuOpen(false)
                 setIsMobileMenuOpen(false)
             }
         }
@@ -178,14 +147,13 @@ export function Layout() {
             document.removeEventListener('mousedown', handleOutsideClick)
             document.removeEventListener('keydown', handleEscape)
         }
-    }, [isUserMenuOpen, isZevMenuOpen, isMobileMenuOpen])
+    }, [isUserMenuOpen, isMobileMenuOpen])
 
     const displayName = `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || user?.username || ''
     // What the shell shows follows the account's relation to the selected
     // community, not a platform role (#761).
     const canManage = isZevScope
     const isFormerParticipant = shellRole === 'former'
-    const selectedEntry = entries.find((entry) => entry.id === selectedZevId)
     const isGuest = shellRole === 'none'
     // Hub entries light on their sub-routes (chart/quality/imports are tabs
     // of the metering hub since phase 3).
@@ -194,46 +162,17 @@ export function Layout() {
     const meteringImportsActive = useMatch('/metering/imports') != null
     const meteringActive = meteringChartActive || meteringQualityActive || meteringImportsActive
     const billingActive = useMatch('/billing/*') != null
+    // Account settings live behind the account card, so on that page the card
+    // is where the sidebar shows "you are here".
+    const accountActive = useMatch('/account') != null
     const adminOverviewMatch = useMatch('/admin/:tab')
     const adminOverviewActive = useMatch('/admin') != null ||
         ['overview', 'zevs', 'invoices', 'dynamic-sources', 'audit', 'health'].includes(adminOverviewMatch?.params.tab ?? '')
 
-    // Whom the community's documents are from today (#761).
-    const selectedZevIssuerName = selectedZev?.issuer?.display_name ?? ''
-
-    // /admin/*: platform scope. Switcher inert; ZEV entry goes through Manage on /admin/zevs.
-    const isPlatformScope = location.pathname.startsWith('/admin')
-
-    // Close the ZEV menu when entering platform scope.
-    useEffect(() => {
-        if (isPlatformScope) {
-            setIsZevMenuOpen(false)
-        }
-    }, [isPlatformScope])
-
-    // A dirty settings draft lives in ZevSettingsPage; confirm before the
-    // switcher drops it. Clean switches go through immediately.
-    function requestZevSwitch(zevId: string) {
-        if (zevId === selectedZevId) {
-            return
-        }
-        if (!hasUnsavedZevSettingsDraft()) {
-            setSelectedZevId(zevId)
-            return
-        }
-        confirmZevSwitch({
-            title: t('pages.zevSettings.unsavedGuardTitle'),
-            message: t('pages.zevSettings.unsavedGuardSwitchMessage'),
-            confirmText: t('pages.zevSettings.switchWithoutSaving'),
-            onConfirm: () => {
-                setSelectedZevId(zevId)
-            },
-        })
-    }
 
     return (
         <div
-            className={`shell${isNavigationCollapsed ? ' shell-collapsed' : ''}${isPlatformScope ? ' shell-scope-platform' : ''}`}
+            className={`shell${isNavigationCollapsed ? ' shell-collapsed' : ''}`}
             onFocusCapture={(event) => {
                 lastNavigationFocusRef.current = sidebarRef.current?.contains(event.target) || mobileMenuButtonRef.current?.contains(event.target)
                     ? event.target : null
@@ -265,11 +204,13 @@ export function Layout() {
                 {/* Persistent scope context (replaces switcher on platform routes). */}
                 <div className="sidebar-fixed">
                     <div className="sidebar-brand-row">
+                        {/* Horizontal lockup of the logo; the wordmark names the app. */}
                         <div className="sidebar-brand">
+                            <img src="/brand/openzev-mark-light.png" alt="" className="sidebar-brand-mark" />
                             <img
-                                src="/openzevlogo_darkbg.png"
+                                src="/brand/openzev-wordmark-light.png"
                                 alt={t('app.title')}
-                                className="sidebar-logo"
+                                className="sidebar-brand-wordmark"
                             />
                         </div>
                         <button
@@ -283,98 +224,6 @@ export function Layout() {
                             <ChevronIcon direction={isSidebarCollapsed ? 'right' : 'left'} />
                         </button>
                     </div>
-
-                    {/* Platform scope swaps the switcher for an explicit indicator. */}
-                    {canManage && isPlatformScope && (
-                        <div className="sidebar-scope-chip" title={t('nav.platformScope')}>
-                            <span className="nav-icon" aria-hidden="true"><PlatformIcon /></span>
-                            <span className="sidebar-scope-chip-label">{t('nav.platformScope')}</span>
-                        </div>
-                    )}
-
-                    {/* Exactly one managed community means there is nothing to
-                        switch — the page eyebrows carry the name instead. */}
-                    {(canManage || entries.length > 1) && !isPlatformScope && entries.length !== 1 && (
-                        <div
-                            className="user-menu zev-menu sidebar-zev-menu"
-                            ref={zevMenuRef}
-                            onBlur={(event) => {
-                                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsZevMenuOpen(false)
-                            }}
-                        >
-                            <button
-                                ref={zevMenuTriggerRef}
-                                type="button"
-                                className="user-menu-trigger"
-                                aria-label={selectedZev?.name ? t('nav.manageZevFor', { name: selectedZev.name }) : t('nav.manageZev')}
-                                aria-expanded={isZevMenuOpen}
-                                aria-controls="zev-menu-list"
-                                onClick={() => {
-                                    setIsUserMenuOpen(false)
-                                    // Auto-expand sidebar if collapsed before opening menu.
-                                    if (isNavigationCollapsed) {
-                                        setIsSidebarCollapsed(false)
-                                        setIsZevMenuOpen(true)
-                                    } else {
-                                        setIsZevMenuOpen((prev) => !prev)
-                                    }
-                                }}
-                            >
-                                <span className="user-avatar" aria-hidden="true">
-                                    {selectedEntry?.name ? initialsOf(selectedEntry.name) : <PlatformIcon />}
-                                </span>
-                                <span className="user-meta">
-                                    <strong>{selectedEntry?.name || selectedZev?.name || t('nav.noZevSelected')}</strong>
-                                    <small>
-                                        {/* The issuer when the community has one; otherwise
-                                            how this account relates to the community. */}
-                                        {selectedZevIssuerName
-                                            || (selectedEntry ? t(`nav.relation.${selectedEntry.relation}`) : '-')}
-                                    </small>
-                                </span>
-                            </button>
-
-                            {isZevMenuOpen && (
-                                <div className="user-menu-dropdown zev-menu-dropdown" id="zev-menu-list" role="group" aria-label={t('nav.manageZev')} tabIndex={-1}>
-                                    <div className="user-menu-section">
-                                        <div className="user-menu-section-title">{t('nav.manageZev')}</div>
-                                        <div className="zev-dropdown-list">
-                                            {managedZevLoading ? (
-                                                <div className="zev-dropdown-item zev-dropdown-item-muted">{t('nav.loadingZevs')}</div>
-                                            ) : entries.length === 0 ? (
-                                                <div className="zev-dropdown-item zev-dropdown-item-muted">{t('nav.noZevAvailable')}</div>
-                                            ) : (
-                                                entries.map((zev) => {
-                                                    const isSelected = zev.id === selectedZevId
-                                                    return (
-                                                        <button
-                                                            key={zev.id}
-                                                            type="button"
-                                                            className={`zev-dropdown-item${isSelected ? ' active' : ''}`}
-                                                            onClick={() => {
-                                                                zevMenuTriggerRef.current?.focus()
-                                                                if (isSelectable) {
-                                                                    requestZevSwitch(zev.id)
-                                                                }
-                                                                setIsZevMenuOpen(false)
-                                                            }}
-                                                            disabled={!isSelectable && !isSelected}
-                                                            aria-current={isSelected ? 'true' : undefined}
-                                                        >
-                                                            <span>{zev.name}</span>
-                                                            {zev.relation !== 'admin' && (
-                                                                <small className="zev-dropdown-relation">{t(`nav.relation.${zev.relation}`)}</small>
-                                                            )}
-                                                        </button>
-                                                    )
-                                                })
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
                 </div>
 
                 <div className="sidebar-top">
@@ -445,36 +294,96 @@ export function Layout() {
                     </nav>
                 </div>
                 <div className="sidebar-footer">
-                    <a
-                        className="sidebar-github-link"
-                        href="https://github.com/splattner/openzev"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={t('nav.sourceCode')}
+                    <div
+                        className="user-menu sidebar-user"
+                        ref={userMenuRef}
+                        onBlur={(event) => {
+                            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsUserMenuOpen(false)
+                        }}
                     >
-                        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.01.08-2.11 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.91.08 2.11.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
-                        </svg>
-                        <span className="sidebar-github-label">OpenZEV <span className="sidebar-github-version">v{(pkg as any).version ?? 'dev'}</span></span>
-                    </a>
+                        <button
+                            ref={userMenuTriggerRef}
+                            type="button"
+                            className={`user-menu-trigger${accountActive ? ' is-current' : ''}`}
+                            aria-expanded={isUserMenuOpen}
+                            aria-controls="user-menu-list"
+                            title={isNavigationCollapsed ? displayName : undefined}
+                            onClick={() => {
+                                // The panel needs the full width: expand a collapsed sidebar first.
+                                if (isNavigationCollapsed) {
+                                    setIsSidebarCollapsed(false)
+                                    setIsUserMenuOpen(true)
+                                } else {
+                                    setIsUserMenuOpen((prev) => !prev)
+                                }
+                            }}
+                        >
+                            <span className="user-meta">
+                                <strong>{displayName}</strong>
+                            </span>
+                            <span className="user-menu-caret" aria-hidden="true"><SelectorIcon /></span>
+                        </button>
+                        {isUserMenuOpen && (
+                            <div className="user-menu-dropdown" id="user-menu-list">
+                                {user?.email && <div className="user-menu-email">{user.email}</div>}
+                                <NavLink
+                                    to="/account"
+                                    className="user-menu-item"
+                                    onClick={() => setIsUserMenuOpen(false)}
+                                >
+                                    <span className="user-menu-item-icon"><AccountIcon /></span>
+                                    {t('account.title')}
+                                </NavLink>
+                                <div className="user-menu-section">
+                                    <div className="user-menu-section-title">{t('common.language')}</div>
+                                    <LanguageSelector variant="menu" />
+                                </div>
+                                <button
+                                    type="button"
+                                    className="user-menu-item"
+                                    onClick={logout}
+                                >
+                                    <span className="user-menu-item-icon"><LogoutIcon /></span>
+                                    {t('nav.logout')}
+                                </button>
+                                {/* What runs here, and where its source lives: quiet, at the end. */}
+                                <a
+                                    className="user-menu-about"
+                                    href="https://github.com/splattner/openzev"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title={t('nav.sourceCode')}
+                                >
+                                    <GitHubIcon />
+                                    <span>OpenZEV <span className="user-menu-about-version">v{(pkg as any).version ?? 'dev'}</span></span>
+                                </a>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </aside>
 
             <div className="content">
                 <header className="top-nav">
-                    <button
-                        ref={mobileMenuButtonRef}
-                        type="button"
-                        className="mobile-menu-button"
-                        onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-                        aria-label={t('nav.menu')}
-                        aria-expanded={isMobileMenuOpen}
-                        aria-controls="app-sidebar"
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d="M3 12h18M3 6h18M3 18h18" />
-                        </svg>
-                    </button>
+                    <div className="mobile-bar">
+                        <button
+                            ref={mobileMenuButtonRef}
+                            type="button"
+                            className="mobile-menu-button"
+                            onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+                            aria-label={t('nav.menu')}
+                            aria-expanded={isMobileMenuOpen}
+                            aria-controls="app-sidebar"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M3 12h18M3 6h18M3 18h18" />
+                            </svg>
+                        </button>
+                        <span className="mobile-bar-brand" aria-hidden="true">
+                            <img src="/brand/openzev-mark.png" alt="" />
+                            <img src="/brand/openzev-wordmark-dark.png" alt="" />
+                        </span>
+                    </div>
 
                     {isImpersonating && impersonator && (
                         <div className="impersonation-banner" role="status">
@@ -501,69 +410,11 @@ export function Layout() {
                             </button>
                         </div>
                     )}
-
-                    <div
-                        className="user-menu"
-                        ref={userMenuRef}
-                        onBlur={(event) => {
-                            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsUserMenuOpen(false)
-                        }}
-                    >
-                        <button
-                            ref={userMenuTriggerRef}
-                            type="button"
-                            className="user-menu-trigger"
-                            aria-expanded={isUserMenuOpen}
-                            aria-controls="user-menu-list"
-                            onClick={() => {
-                                setIsZevMenuOpen(false)
-                                setIsUserMenuOpen((prev) => !prev)
-                            }}
-                        >
-                            <span className="user-avatar" aria-hidden="true">{initialsOf(displayName)}</span>
-                            <span className="user-meta">
-                                <strong>{displayName}</strong>
-                                <small>{user?.email}</small>
-                            </span>
-                        </button>
-
-                        {isUserMenuOpen && (
-                            <div className="user-menu-dropdown" id="user-menu-list">
-                                <NavLink
-                                    to="/account"
-                                    className="user-menu-item"
-                                    onClick={() => setIsUserMenuOpen(false)}
-                                >
-                                    <span className="user-menu-item-icon"><AccountIcon /></span>
-                                    {t('account.title')}
-                                </NavLink>
-                                <div className="user-menu-section">
-                                    <div className="user-menu-section-title">{t('common.language')}</div>
-                                    <LanguageSelector variant="menu" />
-                                </div>
-                                <button
-                                    type="button"
-                                    className="user-menu-item"
-                                    onClick={logout}
-                                >
-                                    <span className="user-menu-item-icon"><LogoutIcon /></span>
-                                    {t('nav.logout')}
-                                </button>
-                            </div>
-                        )}
-                    </div>
                 </header>
                 <main id="main-content" ref={mainRef} className="content-main" tabIndex={-1}>
                     <Outlet />
                 </main>
             </div>
-            {zevSwitchDialog && (
-                <ConfirmDialog
-                    {...zevSwitchDialog}
-                    onConfirm={handleZevSwitchConfirm}
-                    onCancel={handleZevSwitchCancel}
-                />
-            )}
         </div>
     )
 }
@@ -650,10 +501,6 @@ function OverviewIcon() {
     return <IconSvg path="M4 4h7v7H4zm9 0h7v4h-7zM4 13h4v7H4zm6 3h10v4H10z" />
 }
 
-function PlatformIcon() {
-    return <IconSvg path="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" />
-}
-
 function PdfIcon() {
     return <IconSvg path="M7 3h8l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm1 14h2.5a2.5 2.5 0 0 0 0-5H8Zm1.5-3.5h1a1 1 0 1 1 0 2h-1Zm5.5-1.5h-3v5h1.5v-1.75h1.25M13.5 13.5h1.5m-1.5 2h1.25" />
 }
@@ -671,21 +518,24 @@ function LogoutIcon() {
     return <IconSvg path="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9" />
 }
 
+function GitHubIcon() {
+    return (
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.01.08-2.11 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.91.08 2.11.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+        </svg>
+    )
+}
+
+function SelectorIcon() {
+    return <IconSvg path="m7 15 5 5 5-5M7 9l5-5 5 5" />
+}
+
 function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {
     return (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             {direction === 'left' ? <path d="m15 18-6-6 6-6" /> : <path d="m9 18 6-6-6-6" />}
         </svg>
     )
-}
-
-/** Up to two word initials, skipping symbols. Empty input renders '·'. */
-function initialsOf(name: string | undefined | null): string {
-    const initials = (name ?? '').normalize('NFC').split(/\s+/)
-        .flatMap((word) => word.match(/[\p{L}\p{N}]/u)?.[0] ?? [])
-        .slice(0, 2)
-        .map((letter) => Array.from(letter.toUpperCase())[0]).join('')
-    return initials || '·'
 }
 
 function IconSvg({ path }: { path: string | ReactNode }) {

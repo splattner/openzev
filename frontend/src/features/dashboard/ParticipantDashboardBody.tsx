@@ -102,12 +102,10 @@ export function ParticipantDashboardBody({ interval, period, onPeriodChange, per
 
     return (
         <>
-            <section className="card">
-                <div className="grid">
-                    {interval && <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={onPeriodChange} />}
-                    <div className="inline-form inline-form--narrow">
-                        <ResolutionSelect value={bucket} onChange={setBucket} />
-                    </div>
+            <section className="filter-bar">
+                {interval && <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={onPeriodChange} />}
+                <div className="filter-bar-fields">
+                    <ResolutionSelect value={bucket} onChange={setBucket} />
                 </div>
             </section>
 

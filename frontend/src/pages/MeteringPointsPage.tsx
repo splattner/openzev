@@ -19,6 +19,7 @@ import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { useCommunityAccess, useScopeNote } from '../lib/communityAccess'
 import { selectedCommunityName } from '../lib/membership'
+import type { MeteringPoint } from '../types/api'
 
 export function MeteringPointsPage() {
     const { user } = useAuth()
@@ -31,6 +32,7 @@ export function MeteringPointsPage() {
         <div className="page-stack">
             <PageHeader
                 eyebrow={selectedCommunityName({ selectedZev, entries, selectedZevId })}
+                communitySwitch
                 scopeNote={scopeNote}
                 title={t('pages.meteringPoints.title')}
                 description={t(isZevScope ? 'pages.meteringPoints.adminDescription' : 'pages.meteringPoints.participantDescription')}
@@ -80,14 +82,10 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
         setDeleteDataTo,
         searchTerm,
         setSearchTerm,
-        statusFilter,
-        setStatusFilter,
+        view,
+        setView,
         typeFilter,
         setTypeFilter,
-        attentionFilter,
-        setAttentionFilter,
-        assignmentFilter,
-        setAssignmentFilter,
         buildingFilter,
         setBuildingFilter,
         buildings,
@@ -145,6 +143,9 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
     // An empty building still shows its header, so the page is not "empty".
     const hasGroups = !!groups && groups.length > 0
 
+    const typeCounts: Partial<Record<MeteringPoint['meter_type'], number>> = {}
+    for (const point of scopedMeteringPoints) typeCounts[point.meter_type] = (typeCounts[point.meter_type] ?? 0) + 1
+
     return (
         <>
             {meteringPointsQuery.isError && meteringPointsQuery.data !== undefined && (
@@ -169,19 +170,15 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                     assignedCount={assignedCount}
                     needsAttentionCount={needsAttentionCount}
                     searchTerm={searchTerm}
-                    statusFilter={statusFilter}
+                    view={view}
                     typeFilter={typeFilter}
-                    attentionFilter={attentionFilter}
-                    assignmentFilter={assignmentFilter}
+                    typeCounts={typeCounts}
                     buildings={buildings}
                     buildingFilter={buildingFilter}
                     onChangeBuildingFilter={setBuildingFilter}
                     onChangeSearchTerm={setSearchTerm}
-                    onChangeStatusFilter={setStatusFilter}
+                    onChangeView={setView}
                     onChangeTypeFilter={setTypeFilter}
-                    onChangeAttentionFilter={setAttentionFilter}
-                    onChangeAssignmentFilter={setAssignmentFilter}
-                    onClearFilters={clearFilters}
                     onOpenCreateModal={openCreateMpModal}
                     onOpenCreateBuildingModal={openCreateBuildingModal}
                 />

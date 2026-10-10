@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { fetchAnnualReport } from '../../lib/api/invoices'
 import { queryKeys } from '../../lib/api/queryKeys'
-import { AXIS_COLOR, CHART_GRIDLINE, CHART_LOCAL, FLOW_LOCAL_CONS } from '../../lib/chartTokens'
+import { AXIS_COLOR, CHART_GRIDLINE, CHART_LOCAL, CONS_COLORS } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { formatChf, formatKwh, formatPercent } from '../../lib/numbers'
 import { behindMeterHintKey } from '../../lib/supplementary'
@@ -139,7 +139,7 @@ function AnnualTrendCard({ report }: { report: AnnualReport }) {
                         type="monotone"
                         dataKey="self_sufficiency_rate"
                         name={t('pages.reports.annualReport.trend.selfSufficiency', { year: current })}
-                        stroke={FLOW_LOCAL_CONS}
+                        stroke={CONS_COLORS[0]}
                         strokeWidth={2}
                     />
                     {hasPrevious && (
@@ -158,7 +158,7 @@ function AnnualTrendCard({ report }: { report: AnnualReport }) {
                             type="monotone"
                             dataKey="previous_self_sufficiency_rate"
                             name={t('pages.reports.annualReport.trend.selfSufficiency', { year: previous })}
-                            stroke={FLOW_LOCAL_CONS}
+                            stroke={CONS_COLORS[0]}
                             strokeDasharray="5 4"
                             strokeOpacity={0.6}
                             dot={false}

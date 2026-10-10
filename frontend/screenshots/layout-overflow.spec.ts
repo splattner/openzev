@@ -24,67 +24,34 @@ async function prepareProbeZevs(page: Page) {
   })
 }
 
-async function openSwitcher(page: Page) {
-  await page.locator('.sidebar-zev-menu .user-menu-trigger').click()
-  await expect(page.locator('#zev-menu-list')).toBeVisible()
-}
-
-async function expectNavSurvives(page: Page) {
-  const viewport = page.viewportSize()
-  expect(viewport, 'no viewport size').not.toBeNull()
-  const topBox = await page.locator('.sidebar-top').boundingBox()
-  expect(topBox, 'sidebar nav has no box — it collapsed').not.toBeNull()
-  expect(topBox!.height).toBeGreaterThanOrEqual(70)
-  await expect(page.locator('.sidebar-top nav a').first()).toBeVisible()
-  await page.locator('.sidebar').evaluate((el) => { el.scrollTop = el.scrollHeight })
-  const footerBox = await page.locator('.sidebar-footer').boundingBox()
-  expect(footerBox, 'sidebar footer has no box').not.toBeNull()
-  expect(footerBox!.y, 'footer starts above the viewport').toBeGreaterThanOrEqual(0)
-  expect(footerBox!.y + footerBox!.height, 'footer ends below the viewport').toBeLessThanOrEqual(viewport!.height)
-}
-
-async function expectListUsable(page: Page) {
-  const listBox = await page.locator('#zev-menu-list .zev-dropdown-list').boundingBox()
-  expect(listBox, 'community list has no box — it was crushed').not.toBeNull()
-  expect(listBox!.height).toBeGreaterThanOrEqual(100)
-}
-
-async function selectLastProbe(page: Page) {
-  const target = page.locator('.zev-dropdown-item', { hasText: `${PROBE_PREFIX}10` })
-  await target.scrollIntoViewIfNeeded()
-  await target.click()
-  await expect(page.locator('#zev-menu-list')).toBeHidden()
-  await expect(page.locator('.sidebar-zev-menu .user-menu-trigger')).toContainText(`${PROBE_PREFIX}10`)
-}
-
-test('open community list never evicts the sidebar navigation', async ({ page }) => {
+test('a long community list scrolls inside its menu and stays on screen', async ({ page }) => {
   await prepareProbeZevs(page)
-  await navigateTo(page, '/account')
-  let first = true
+  await navigateTo(page, '/tariffs')
+  const switcher = page.locator('main .community-switch')
   for (const size of [
-    { width: 1440, height: 600, drawer: false },
-    { width: 1280, height: 400, drawer: false },
-    { width: 740, height: 390, drawer: true },
-    { width: 390, height: 600, drawer: true },
+    { width: 1440, height: 600 },
+    { width: 1280, height: 400 },
+    { width: 740, height: 390 },
+    { width: 390, height: 600 },
   ]) {
     await page.setViewportSize(size)
-    if (size.drawer) {
-      await page.locator('.mobile-menu-button').click()
-      await expect(page.locator('.sidebar.mobile-open')).toBeVisible()
+    await switcher.click()
+    const menu = page.locator('.community-menu')
+    await expect(menu).toBeVisible()
+    const box = await menu.boundingBox()
+    expect(box, 'community menu has no box').not.toBeNull()
+    expect(box!.y, 'menu starts above the viewport').toBeGreaterThanOrEqual(0)
+    expect(box!.y + box!.height, 'menu ends below the viewport').toBeLessThanOrEqual(size.height)
+    expect(box!.x + box!.width, 'menu ends right of the viewport').toBeLessThanOrEqual(size.width)
+    expect(box!.height, 'community menu was crushed').toBeGreaterThanOrEqual(100)
+    if (size.height <= 400) {
+      expect(await menu.evaluate((el) => el.scrollHeight > el.clientHeight), 'the list scrolls inside the menu').toBe(true)
     }
-    await openSwitcher(page)
-    if (first) {
-      const scrollable = await page.evaluate(() => {
-        const list = document.querySelector('#zev-menu-list .zev-dropdown-list')
-        return list ? list.scrollHeight > list.clientHeight : null
-      })
-      expect(scrollable, 'community list should scroll internally').toBe(true)
-      first = false
-    }
-    await expectListUsable(page)
-    await expectNavSurvives(page)
-    await selectLastProbe(page)
-    if (size.drawer) await page.keyboard.press('Escape')
+    const target = page.getByRole('menuitem', { name: `${PROBE_PREFIX}10` })
+    await target.scrollIntoViewIfNeeded()
+    await target.click()
+    await expect(menu).toBeHidden()
+    await expect(switcher).toContainText(`${PROBE_PREFIX}10`)
   }
 })
 
@@ -94,14 +61,6 @@ async function prepareFocusPage(page: Page, width = 1366) {
     localStorage.setItem('openzev.sidebarCollapsed', 'true')
     localStorage.setItem('openzev.language', 'en')
   })
-  // Browser-local communities keep the switcher independent of seeded data.
-  await page.route(/\/api\/v1\/zev\/zevs\/(?:\?.*)?$/, (route) => route.fulfill({ json: {
-    count: 2, next: null, previous: null,
-    results: [
-      { id: 'focus-a', name: 'Focus A', owner: 0 },
-      { id: 'focus-b', name: 'Focus B', owner: 0 },
-    ],
-  } }))
   await navigateTo(page, '/account')
 }
 
@@ -117,7 +76,6 @@ test('breakpoint changes recover focus from hidden navigation controls', async (
   await prepareFocusPage(page)
   const collapse = page.locator('.sidebar-collapse-button')
   const hamburger = page.locator('.mobile-menu-button')
-  const switcher = page.locator('.sidebar-zev-menu .user-menu-trigger')
   await collapse.focus()
   await page.setViewportSize({ width: 400, height: 800 })
   await expect(collapse).toBeHidden()
@@ -125,28 +83,16 @@ test('breakpoint changes recover focus from hidden navigation controls', async (
   await hamburger.press('Enter')
   await expect(page.locator('.sidebar.mobile-open')).toBeVisible()
   await expect(page.locator('#app-sidebar')).toBeInViewport({ ratio: 0.95 })
-  await switcher.click()
-  await expect(page.locator('.zev-dropdown-item').first()).toBeFocused()
-  await page.setViewportSize({ width: 1366, height: 768 })
-  await expect(switcher).toBeFocused()
-  await expect(switcher).toBeVisible()
-  await expect(page.locator('.zev-menu-dropdown')).toHaveCount(0)
-  await expect(page.locator('.sidebar.mobile-open')).toHaveCount(0)
-  expect(await page.evaluate(() => document.body.style.overflow)).not.toBe('hidden')
-  await collapse.focus()
-  await page.setViewportSize({ width: 400, height: 800 })
-  await expect(hamburger).toBeFocused()
-  await expect(page.locator('#app-sidebar')).not.toBeInViewport()
-  await hamburger.press('Enter')
-  await expect(page.locator('#app-sidebar')).toBeInViewport({ ratio: 0.95 })
   await page.keyboard.press('Shift+Tab')
-  await expect(page.locator('.sidebar-footer a')).toBeFocused()
+  await expect(page.locator('.sidebar-footer .user-menu-trigger')).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(hamburger).toBeFocused()
   await expect(page.locator('#app-sidebar')).not.toBeInViewport()
   await page.setViewportSize({ width: 1366, height: 768 })
-  await expect(switcher).toBeFocused()
-  await expect(switcher).toBeVisible()
+  await expect(collapse).toBeFocused()
+  await expect(collapse).toBeVisible()
+  await expect(page.locator('.sidebar.mobile-open')).toHaveCount(0)
+  expect(await page.evaluate(() => document.body.style.overflow)).not.toBe('hidden')
   await expect(page.locator('nav a[href="/admin/system-settings"]')).toHaveAccessibleName('Platform: Settings')
   expect(await page.evaluate(() => localStorage.getItem('openzev.sidebarCollapsed'))).toBe('true')
 })

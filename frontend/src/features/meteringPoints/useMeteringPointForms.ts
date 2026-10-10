@@ -208,3 +208,41 @@ export function readMeteringPointAttentionFilter(value: string | null): Metering
 export function readMeteringPointAssignmentFilter(value: string | null): MeteringPointAssignmentFilter {
   return value === 'assigned' || value === 'unassigned' ? value : 'all'
 }
+
+/**
+ * The list's one counted view (`FilterTabs`): a status, the meters without a
+ * holder today, or those needing attention. It is stored in the query param
+ * of its own dimension, so links using `status`, `assignment` or `attention`
+ * keep working.
+ */
+export type MeteringPointView = 'all' | 'active' | 'inactive' | 'unassigned' | 'attention'
+
+/** Reads the view from the query params; a link setting several dimensions keeps the first (status, assignment, attention). */
+export function readMeteringPointView(params: URLSearchParams): MeteringPointView {
+  const status = readMeteringPointStatusFilter(params.get(METERING_POINT_FILTER_KEYS.status))
+  if (status !== 'all') return status
+  if (readMeteringPointAssignmentFilter(params.get(METERING_POINT_FILTER_KEYS.assignment)) === 'unassigned') return 'unassigned'
+  if (readMeteringPointAttentionFilter(params.get(METERING_POINT_FILTER_KEYS.attention)) === 'attention') return 'attention'
+  return 'all'
+}
+
+/** The view as the filter dimensions of `getScopedAndFilteredMeteringPoints`. */
+export function meteringPointViewFilters(view: MeteringPointView): {
+  statusFilter: MeteringPointStatusFilter
+  assignmentFilter: MeteringPointAssignmentFilter
+  attentionFilter: MeteringPointAttentionFilter
+} {
+  return {
+    statusFilter: view === 'active' || view === 'inactive' ? view : 'all',
+    assignmentFilter: view === 'unassigned' ? 'unassigned' : 'all',
+    attentionFilter: view === 'attention' ? 'attention' : 'all',
+  }
+}
+
+/** The view's query param and value; `null` for the whole list. */
+export function meteringPointViewParam(view: MeteringPointView): [key: string, value: string] | null {
+  if (view === 'active' || view === 'inactive') return [METERING_POINT_FILTER_KEYS.status, view]
+  if (view === 'unassigned') return [METERING_POINT_FILTER_KEYS.assignment, view]
+  if (view === 'attention') return [METERING_POINT_FILTER_KEYS.attention, view]
+  return null
+}
