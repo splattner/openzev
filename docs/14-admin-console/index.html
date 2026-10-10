@@ -1181,6 +1181,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Audit Logs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-long-ip-addresses-are-kept" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How long IP addresses are kept
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2008,6 +2025,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Audit Logs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-long-ip-addresses-are-kept" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How long IP addresses are kept
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2625,6 +2659,43 @@ Alert on registration cache-unavailable <code>503</code> responses as well.</p>
 <code>GET /api/v1/audit/events/{id}/</code> (detail). See the access spec
 <a href="https://github.com/splattner/openzev/blob/main/docs/specs/2026-05-audit-log-and-operational-traceability.md">2026-05-audit-log-and-operational-traceability.md</a>
 for the data model and redaction rules.</p>
+<h3 id="how-long-ip-addresses-are-kept">How long IP addresses are kept<a class="headerlink" href="#how-long-ip-addresses-are-kept" title="Permanent link">&para;</a></h3>
+<p>Each event records the IP address and browser (user agent) of the request that
+caused it. Those two details are personal data and are not needed once an
+incident can no longer be investigated, so a daily job blanks them after 365
+days. The event itself — who did what, to which record, and when — is kept.
+The same job blanks the recipient address of invoice email attempts after 730
+days (the delivery status stays) and deletes used, revoked or expired sign-in,
+verification and onboarding links 30 days after they stopped working.</p>
+<p>An operator sets the windows with environment variables; <code>0</code> switches a step
+off:</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PRIVACY_AUDIT_NETWORK_RETENTION_DAYS</code></td>
+<td>Days before an audit event's IP address and user agent are blanked. Default 365.</td>
+</tr>
+<tr>
+<td><code>PRIVACY_EMAIL_LOG_RETENTION_DAYS</code></td>
+<td>Days before an invoice email attempt's recipient and error text are blanked. Default 730.</td>
+</tr>
+<tr>
+<td><code>PRIVACY_TOKEN_GRACE_DAYS</code></td>
+<td>Days after a one-time link stopped working before it is deleted. Default 30.</td>
+</tr>
+</tbody>
+</table>
+<p>To see what the windows would remove before the daily job does it, or to run
+it where no scheduler is running, use <code>manage.py openzev_privacy_sweep
+--dry-run</code> and <code>manage.py openzev_privacy_sweep</code>. Blanking cannot be undone.
+A failed invoice email whose recipient has been blanked cannot be retried;
+send the invoice again instead.</p>
 <h2 id="system-health">System Health<a class="headerlink" href="#system-health" title="Permanent link">&para;</a></h2>
 <p><strong>Platform → Overview → System health</strong> (<code>/admin/health</code>) shows a read-only
 snapshot of platform infrastructure:</p>
