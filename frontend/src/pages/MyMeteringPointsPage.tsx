@@ -67,7 +67,10 @@ function MyMeteringPointsView() {
 
     const eligible = energyData.eligible.filter((point) => point.zev === selectedZevId)
     const eligibleByPoint = new Map(eligible.map((point) => [point.metering_point, point]))
-    const plainPoints = (pointsQuery.data ?? []).filter((point) => !eligibleByPoint.has(point.id))
+    // The key is shared with the metering points page, so a disabled query can still hold the
+    // community's whole list from a visit there: only a participant's own list is used.
+    const ownPoints = isParticipantScope ? (pointsQuery.data ?? []) : []
+    const plainPoints = ownPoints.filter((point) => !eligibleByPoint.has(point.id))
     const sources = sourcesQuery.data ?? []
 
     const loading = energyData.isLoading || (isParticipantScope && pointsQuery.isLoading)

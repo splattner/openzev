@@ -1,7 +1,8 @@
-import { createElement } from 'react'
+import { act, createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MyMeteringPointsPage } from '../src/pages/MyMeteringPointsPage'
 import type { EligibleMeteringPoint, MeteringPoint } from '../src/types/api'
+import { queryKeys } from '../src/lib/api/queryKeys'
 import { renderWithProviders } from './helpers/render'
 import { waitForCondition } from './helpers/waitForCondition'
 
@@ -116,6 +117,19 @@ describe('MyMeteringPointsPage', () => {
         expect(container.querySelectorAll('[data-testid="energy-data"]')).toHaveLength(1)
         expect(container.querySelector('article[aria-label="CH-2"]')).toBeNull()
         expect(container.textContent).not.toContain('pages.myMeteringPoints.flagHint')
+    })
+
+    it('ignores the community list the metering points page left in the cache, for a manager', async () => {
+        access.participantScope = false
+        const { container, client } = await mount()
+
+        await act(async () => {
+            client.setQueryData(queryKeys.metering.points('zev-1'), [point('1', true), point('2', false), point('3', true)])
+            await new Promise((resolve) => setTimeout(resolve, 20))
+        })
+
+        expect(container.querySelectorAll('article')).toHaveLength(1)
+        expect(container.querySelector('article[aria-label="CH-2"]')).toBeNull()
     })
 
     it('has a sensible empty state for each audience', async () => {
