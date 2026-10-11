@@ -312,6 +312,25 @@ label > small.muted {
   background: var(--brand-deep);
 }
 
+/* At a fractional position or zoom, two dark cells each half-cover the
+   pixel on their shared edge, and the band's background and its bottom
+   border snap apart: both show as light seams. Each cell repaints the band
+   behind its content, reaching 1px past its bottom and (after the first)
+   past its left edge (a pseudo-element: cells ignore box-shadow when
+   borders collapse). The cells are sticky, so they position it. */
+:where(.page-stack, .data-table) thead th::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--brand-deep);
+}
+
+:where(.page-stack, .data-table) thead th + th::before {
+  left: -1px;
+}
+
 /* The band's outer corners follow the sheet's. */
 .page-stack thead th:first-child,
 .data-table thead th:first-child {
@@ -1308,6 +1327,10 @@ label > small.muted {
   background: var(--surface);
   font-weight: 600;
   text-align: center;
+}
+
+.raw-metering-grid thead th::before {
+  content: none;
 }
 
 .raw-metering-grid tbody th {
