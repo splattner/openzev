@@ -12,18 +12,21 @@ audit events, which are the part most at risk from moving the admin check from
 a hand-written ``if`` to a permission class.
 """
 
-from datetime import date
+from datetime import date, timedelta
+from unittest.mock import patch
 
 from django.test import TestCase
 from rest_framework.test import APIClient
-from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
 from testing.helpers import authenticate as auth, make_user, create_managed_zev
 from zev.models import Participant
 
 from .cookies import ACCESS_COOKIE, ADMIN_ACCESS_COOKIE, ADMIN_REFRESH_COOKIE, REFRESH_COOKIE
-from .models import UserRole
+from .jwt_utils import make_jwt_for_user
+from .models import User, UserRole
+from .session_revocation import revoke_sessions, validate_refresh_token
 
 TOKEN = "/api/v1/auth/token/"
 STOP = "/api/v1/auth/users/stop-impersonation/"
@@ -216,18 +219,106 @@ class ImpersonationCookieRoundTripTests(TestCase):
             with self.subTest(cookie=name):
                 self.assertTrue(resp.cookies[name]["httponly"])
 
-    def test_stopping_restores_the_admin_tokens_and_clears_the_backup(self):
-        admin_access, admin_refresh = self._login_as_admin()
+    def test_stop_restores_admin_session_and_clears_backup(self):
+        self._login_as_admin()
         self.client.post(impersonate_url(self.target.pk))
 
         resp = self.client.post(STOP)
 
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.cookies[ACCESS_COOKIE].value, admin_access)
-        self.assertEqual(resp.cookies[REFRESH_COOKIE].value, admin_refresh)
+        self.assertEqual(AccessToken(resp.cookies[ACCESS_COOKIE].value)["user_id"], str(self.admin.pk))
+        self.assertEqual(RefreshToken(resp.cookies[REFRESH_COOKIE].value)["user_id"], str(self.admin.pk))
         # The backup pair is expired rather than left lying around.
         self.assertEqual(resp.cookies[ADMIN_ACCESS_COOKIE].value, "")
         self.assertEqual(resp.cookies[ADMIN_REFRESH_COOKIE].value, "")
+
+    def test_stop_works_without_the_parked_access_cookie(self):
+        self._login_as_admin()
+        self.client.post(impersonate_url(self.target.pk))
+        del self.client.cookies[ADMIN_ACCESS_COOKIE]
+
+        resp = self.client.post(STOP)
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(self.client.get("/api/v1/auth/me/").data["id"], self.admin.pk)
+
+    def test_a_signed_out_admin_session_cannot_be_restored(self):
+        self._login_as_admin()
+        self.client.post(impersonate_url(self.target.pk))
+        revoke_sessions(self.admin)
+
+        resp = self.client.post(STOP)
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.data["code"], "impersonation_session_expired")
+        for name in (ACCESS_COOKIE, REFRESH_COOKIE, ADMIN_ACCESS_COOKIE, ADMIN_REFRESH_COOKIE):
+            self.assertEqual(resp.cookies[name]["max-age"], 0)
+        self.assertEqual(self.client.get("/api/v1/auth/me/").status_code, 401)
+        event = AuditEvent.objects.get(action_type="impersonation.end")
+        self.assertEqual(event.metadata_json["impersonated_by"], self.admin.pk)
+
+    def test_invalid_parked_refresh_ends_only_the_browser_session(self):
+        target_client = APIClient()
+        target_client.post(TOKEN, {"username": self.target.username, "password": "pass1234"})
+        for invalid in ("missing", "expired", "malformed"):
+            with self.subTest(refresh=invalid):
+                self._login_as_admin()
+                self.client.post(impersonate_url(self.target.pk))
+                if invalid == "missing":
+                    del self.client.cookies[ADMIN_REFRESH_COOKIE]
+                elif invalid == "expired":
+                    refresh = RefreshToken(self.client.cookies[ADMIN_REFRESH_COOKIE].value)
+                    refresh.set_exp(lifetime=timedelta(seconds=-1))
+                    self.client.cookies[ADMIN_REFRESH_COOKIE] = str(refresh)
+                else:
+                    self.client.cookies[ADMIN_REFRESH_COOKIE] = "not-a-token"
+
+                previous_events = AuditEvent.objects.filter(action_type="impersonation.end").count()
+                resp = self.client.post(STOP)
+
+                self.assertEqual(resp.status_code, 400)
+                self.assertEqual(resp.data["code"], "impersonation_session_expired")
+                for name in (ACCESS_COOKIE, REFRESH_COOKIE, ADMIN_ACCESS_COOKIE, ADMIN_REFRESH_COOKIE):
+                    self.assertEqual(resp.cookies[name].value, "")
+                    self.assertEqual(resp.cookies[name]["max-age"], 0)
+                    self.assertEqual(resp.cookies[name]["path"], "/")
+                self.assertEqual(self.client.get("/api/v1/auth/me/").status_code, 401)
+                self.assertEqual(target_client.get("/api/v1/auth/me/").status_code, 200)
+                self.assertEqual(
+                    AuditEvent.objects.filter(action_type="impersonation.end").count(), previous_events + 1,
+                )
+                event = AuditEvent.objects.filter(action_type="impersonation.end").latest("created_at")
+                self.assertEqual(event.target_id, str(self.target.pk))
+                self.assertEqual(event.metadata_json["impersonated_by"], self.admin.pk)
+
+    def test_unavailable_admin_accounts_end_the_browser_session(self):
+        for change, during_refresh in (("inactive", False), ("deleted", False), ("inactive", True), ("deleted", True)):
+            with self.subTest(change=change, during_refresh=during_refresh):
+                self.admin = make_user(f"ck_{change}_{during_refresh}", UserRole.ADMIN)
+                self._login_as_admin()
+                self.client.post(impersonate_url(self.target.pk))
+
+                def make_unavailable():
+                    if change == "inactive":
+                        User.objects.filter(pk=self.admin.pk).update(is_active=False)
+                    else:
+                        self.admin.delete()
+
+                def validate_then_change(token):
+                    validated = validate_refresh_token(token)
+                    if during_refresh:
+                        make_unavailable()
+                    return validated
+
+                if not during_refresh:
+                    make_unavailable()
+                with patch("accounts.views_impersonation.validate_refresh_token", side_effect=validate_then_change):
+                    resp = self.client.post(STOP)
+
+                self.assertEqual(resp.status_code, 400)
+                self.assertEqual(resp.data["code"], "impersonation_session_expired")
+                for name in (ACCESS_COOKIE, REFRESH_COOKIE, ADMIN_ACCESS_COOKIE, ADMIN_REFRESH_COOKIE):
+                    self.assertEqual(resp.cookies[name]["max-age"], 0)
 
     def test_the_restored_session_is_the_admin_again(self):
         self._login_as_admin()
@@ -251,12 +342,43 @@ class StopImpersonationTests(TestCase):
 
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.data["detail"], "No active impersonation session.")
+        self.assertNotIn("code", resp.data)
+        self.assertFalse(resp.cookies)
 
-    def test_half_a_backup_pair_is_not_enough(self):
+    def test_access_cookie_without_refresh_is_not_enough(self):
         auth(self.client, make_user("stop_half", UserRole.ADMIN))
         self.client.cookies[ADMIN_ACCESS_COOKIE] = "access-only"
 
         self.assertEqual(self.client.post(STOP).status_code, 400)
+
+    def test_a_parked_refresh_without_impersonation_is_a_no_op(self):
+        admin = make_user("stop_ordinary", UserRole.ADMIN)
+        auth(self.client, admin)
+        self.client.cookies[ADMIN_REFRESH_COOKIE] = make_jwt_for_user(admin)["refresh"]
+
+        resp = self.client.post(STOP)
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.data["detail"], "No active impersonation session.")
+        self.assertFalse(resp.cookies)
+        self.assertFalse(AuditEvent.objects.filter(action_type="impersonation.end").exists())
+
+    def test_unrelated_or_impersonated_parked_refresh_is_not_rotated(self):
+        admin = make_user("stop_original", UserRole.ADMIN)
+        other = make_user("stop_other", UserRole.ADMIN)
+        target = make_user("stop_target", UserRole.USER)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {make_jwt_for_user(target, impersonated_by=admin.pk)['access']}")
+        for tokens in (make_jwt_for_user(other), make_jwt_for_user(admin, impersonated_by=other.pk)):
+            with self.subTest(refresh=tokens["refresh"]):
+                self.client.cookies[ADMIN_REFRESH_COOKIE] = tokens["refresh"]
+                with patch("accounts.views_impersonation.TokenRefreshSerializer") as serializer:
+                    resp = self.client.post(STOP)
+
+                self.assertEqual(resp.status_code, 400)
+                self.assertEqual(resp.data["code"], "impersonation_session_expired")
+                serializer.assert_not_called()
+                for name in (ACCESS_COOKIE, REFRESH_COOKIE, ADMIN_ACCESS_COOKIE, ADMIN_REFRESH_COOKIE):
+                    self.assertEqual(resp.cookies[name]["max-age"], 0)
 
     def test_anonymous_is_refused(self):
         self.client.credentials()

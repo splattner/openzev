@@ -50,7 +50,7 @@ from .serializers import (
 )
 from .authentication import enforce_csrf
 from .jwt_utils import make_jwt_for_user, record_login
-from .session_revocation import is_session_current, keep_current_session, revoke_sessions
+from .session_revocation import is_session_current, keep_current_session, revoke_sessions, validate_refresh_token
 from .cookies import (
     ACCESS_COOKIE,
     ADMIN_ACCESS_COOKIE,
@@ -238,9 +238,9 @@ class CookieTokenRefreshView(APIView):
 
         serializer = TokenRefreshSerializer(data={"refresh": refresh_token})
         try:
-            self._ensure_session_is_current(refresh_token)
+            validate_refresh_token(refresh_token)
             serializer.is_valid(raise_exception=True)
-        except (TokenError, ValidationError):
+        except (TokenError, ValidationError, AuthenticationFailed, User.DoesNotExist):
             response = Response({"detail": "Token is invalid or expired."}, status=status.HTTP_401_UNAUTHORIZED)
             clear_auth_cookies(response)
             return response
@@ -250,23 +250,6 @@ class CookieTokenRefreshView(APIView):
         response = Response({"detail": "Token refreshed."})
         set_auth_cookies(request, response, access=new_access, refresh=new_refresh)
         return response
-
-    @staticmethod
-    def _ensure_session_is_current(refresh_token: str) -> None:
-        """Refuse a refresh token from a session that has since been signed out
-        (or whose account was deactivated). Without this a stolen refresh
-        cookie would keep minting access tokens that the authentication class
-        rejects one request later — and would work again if the account were
-        reactivated."""
-        token = RefreshToken(refresh_token)
-        try:
-            user_id = token[jwt_settings.USER_ID_CLAIM]
-        except KeyError:
-            raise TokenError("Session has been signed out.")
-        user = User.objects.filter(pk=user_id, is_active=True).first()
-        if user is None or not is_session_current(token, user):
-            raise TokenError("Session has been signed out.")
-
 
 @api_view(["POST"])
 @permission_classes([AllowAny])

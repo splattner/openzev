@@ -72,6 +72,7 @@ export const it = {
         password: 'Password',
         submit: 'Accedi',
         invalid: 'Accesso non riuscito. Controlla le tue credenziali.',
+        adminSessionExpired: 'La sessione amministratore è scaduta. Accedi di nuovo.',
         mfa: {
             title: 'Autenticazione a due fattori',
             enterCode: 'Inserisci il codice a 6 cifre dalla tua app di autenticazione.',

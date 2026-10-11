@@ -13,9 +13,13 @@ affected.
 """
 
 from django.db.models import F
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.settings import api_settings as jwt_settings
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .cookies import set_auth_cookies
 from .jwt_utils import SESSION_CLAIM, impersonator_of, make_jwt_for_user
+from .models import User
 
 
 def is_session_current(token, user) -> bool:
@@ -25,6 +29,16 @@ def is_session_current(token, user) -> bool:
     call sites (simplejwt's rule for access tokens, explicit filter elsewhere).
     """
     return token.get(SESSION_CLAIM, 0) == user.session_version
+
+
+def validate_refresh_token(refresh_token: str) -> RefreshToken:
+    """Validate a refresh token against its active account's current session."""
+    token = RefreshToken(refresh_token)
+    user_id = token.get(jwt_settings.USER_ID_CLAIM)
+    user = User.objects.filter(pk=user_id, is_active=True).first()
+    if user is None or not is_session_current(token, user):
+        raise TokenError("Session has been signed out.")
+    return token
 
 
 def revoke_sessions(user) -> None:

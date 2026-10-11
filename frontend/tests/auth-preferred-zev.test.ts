@@ -1,9 +1,16 @@
 import { createRoot } from 'react-dom/client'
 import { act, createElement, useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider, useAuth } from '../src/lib/auth'
 import type { User } from '../src/types/api'
+import { Layout } from '../src/components/Layout'
+import { ProtectedRoute } from '../src/components/ProtectedRoute'
+import { ManagedZevProvider } from '../src/lib/managedZev'
+import { ToastProvider } from '../src/lib/toast'
+import i18n from '../src/i18n'
+import type { ReactNode } from 'react'
 
 const apiAuth = vi.hoisted(() => ({
     fetchMe: vi.fn(),
@@ -251,7 +258,7 @@ describe('AuthProvider clears the query cache at session boundaries', () => {
         container.remove()
     })
 
-    function renderProvider() {
+    function renderProvider(content?: ReactNode) {
         const latest = { current: null as ReturnType<typeof useAuth> | null }
 
         function Harness() {
@@ -267,7 +274,7 @@ describe('AuthProvider clears the query cache at session boundaries', () => {
                 createElement(
                     QueryClientProvider,
                     { client: queryClient },
-                    createElement(AuthProvider, null, createElement(Harness)),
+                    createElement(AuthProvider, null, createElement(Harness), content),
                 ),
             )
         })
@@ -331,6 +338,127 @@ describe('AuthProvider clears the query cache at session boundaries', () => {
         })
 
         expect(queryClient.getQueryData(['invoices', 'list', 'all', 'all'])).toBeUndefined()
+    })
+
+    it('clears expired impersonation locally without calling logout', async () => {
+        apiAuth.fetchMe.mockResolvedValue({ ...baseUser(null), impersonated_by: adminUser })
+        const error = { isAxiosError: true, response: { data: { code: 'impersonation_session_expired' } } }
+        apiAuth.stopImpersonation.mockRejectedValue(error)
+        const latest = renderProvider()
+        await flush()
+        queryClient.setQueryData(['invoices', 'list', 'all', 'all'], [{ id: 'participant-inv' }])
+
+        await act(async () => {
+            await expect(latest.current!.stopImpersonation()).rejects.toEqual(error)
+        })
+
+        expect(latest.current?.user).toBeNull()
+        expect(latest.current?.isImpersonating).toBe(false)
+        expect(queryClient.getQueryData(['invoices', 'list', 'all', 'all'])).toBeUndefined()
+        expect(apiAuth.fetchMe).toHaveBeenCalledTimes(1)
+        expect(apiAuth.logout).not.toHaveBeenCalled()
+    })
+
+    it('keeps the impersonation session when stopping fails with a network error', async () => {
+        const participant = { ...baseUser(null), impersonated_by: adminUser }
+        apiAuth.fetchMe.mockResolvedValue(participant)
+        const error = new Error('Network unavailable')
+        apiAuth.stopImpersonation.mockRejectedValue(error)
+        const latest = renderProvider()
+        await flush()
+
+        await act(async () => {
+            await expect(latest.current!.stopImpersonation()).rejects.toEqual(error)
+        })
+
+        expect(latest.current?.user).toEqual(participant)
+        expect(apiAuth.fetchMe).toHaveBeenCalledTimes(1)
+        expect(apiAuth.logout).not.toHaveBeenCalled()
+    })
+
+    it('clears the participant identity while restoration reloads, including on failure', async () => {
+        apiAuth.fetchMe.mockResolvedValue({ ...baseUser(null), impersonated_by: adminUser })
+        const latest = renderProvider()
+        await flush()
+        let rejectMe!: (error: Error) => void
+        apiAuth.fetchMe.mockImplementationOnce(() => new Promise<User>((_, reject) => { rejectMe = reject }))
+        const error = new Error('Identity reload unavailable')
+        const stopped = latest.current!.stopImpersonation()
+        const rejected = expect(stopped).rejects.toEqual(error)
+        await flush()
+
+        expect(latest.current?.user).toBeNull()
+        expect(latest.current?.isLoading).toBe(true)
+        await act(async () => {
+            rejectMe(error)
+            await rejected
+        })
+
+        expect(latest.current?.user).toBeNull()
+        expect(latest.current?.isLoading).toBe(false)
+        expect(apiAuth.logout).not.toHaveBeenCalled()
+    })
+
+    it.each(['logout', 'restoration', 'expiry'])('ignores a late identity response after %s', async (transition) => {
+        const participant = { ...baseUser(null), impersonated_by: adminUser }
+        apiAuth.fetchMe.mockResolvedValue(participant)
+        const latest = renderProvider()
+        await flush()
+        let resolveMe!: (value: User) => void
+        apiAuth.fetchMe.mockImplementationOnce(() => new Promise<User>(resolve => { resolveMe = resolve }))
+        const pending = latest.current!.refreshUser()
+        apiAuth.fetchMe.mockResolvedValue(adminUser)
+        const error = { isAxiosError: true, response: { data: { code: 'impersonation_session_expired' } } }
+        await act(async () => {
+            if (transition === 'logout') latest.current!.logout()
+            else if (transition === 'expiry') {
+                apiAuth.stopImpersonation.mockRejectedValueOnce(error)
+                await expect(latest.current!.stopImpersonation()).rejects.toEqual(error)
+            } else await latest.current!.stopImpersonation()
+        })
+        const expected = transition === 'restoration' ? adminUser : null
+        expect(latest.current?.user).toEqual(expected)
+
+        await act(async () => {
+            resolveMe(participant)
+            await pending
+        })
+
+        expect(latest.current?.user).toEqual(expected)
+    })
+
+    it('redirects expired impersonation to login and keeps the translated recovery toast', async () => {
+        await i18n.changeLanguage('en')
+        apiAuth.fetchMe.mockResolvedValue({ ...baseUser(null), impersonated_by: adminUser })
+        apiAuth.stopImpersonation.mockRejectedValue({
+            isAxiosError: true, response: { data: { code: 'impersonation_session_expired' } },
+        })
+        function LoginLocation() {
+            return createElement('output', null, useLocation().pathname)
+        }
+        renderProvider(createElement(ToastProvider, null,
+            createElement(MemoryRouter, { initialEntries: ['/'] },
+                createElement(ManagedZevProvider, null,
+                    createElement(Routes, null,
+                        createElement(Route, { path: '/', element: createElement(ProtectedRoute, {
+                            allowUnlinked: true, children: createElement(Layout),
+                        }) }),
+                        createElement(Route, { path: '/login', element: createElement(LoginLocation) }),
+                    ),
+                ),
+            ),
+        ))
+        await flush()
+        const stop = Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Stop')
+        expect(stop).toBeDefined()
+
+        await act(async () => { stop!.click() })
+        await flush()
+
+        expect(container.querySelector('output')?.textContent).toBe('/login')
+        expect(container.querySelector('.toast')?.textContent).toBe('Your admin session expired. Sign in again.')
+        expect(apiAuth.fetchMe).toHaveBeenCalledTimes(1)
+        expect(apiAuth.logout).not.toHaveBeenCalled()
     })
 
     it('cancels an in-flight request so its late response cannot repopulate the cache for the next account', async () => {

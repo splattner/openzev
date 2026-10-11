@@ -72,6 +72,7 @@ export const de = {
         password: 'Passwort',
         submit: 'Anmelden',
         invalid: 'Anmeldung fehlgeschlagen. Überprüfen Sie Ihre Anmeldedaten.',
+        adminSessionExpired: 'Ihre Admin-Sitzung ist abgelaufen. Melden Sie sich erneut an.',
         mfa: {
             title: 'Zwei-Faktor-Authentifizierung',
             enterCode: 'Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein.',

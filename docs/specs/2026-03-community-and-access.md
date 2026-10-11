@@ -758,7 +758,10 @@ is stamped into every token as `sv`; bumping it makes all earlier tokens fail
 (§5.1). Decision and trade-offs: ADR 0022. API keys are separate credentials and
 are not affected.
 
-`accounts/session_revocation.py`: `revoke_sessions(user)` — an atomic
+`accounts/session_revocation.py`: `validate_refresh_token(refresh_token)`
+returns a validated `RefreshToken` for an active account with a current `sv`,
+or raises `TokenError`. Both ordinary refresh and stop-impersonation use it.
+`revoke_sessions(user)` — an atomic
 `UPDATE … SET session_version = session_version + 1`, then a reload so tokens
 minted straight afterwards carry the new value; `keep_current_session(request,
 response, user)` — hand the caller a fresh pair so revoking *other* sessions
@@ -849,7 +852,32 @@ metadata `is_admin` / `is_active`).
 1. Call impersonate endpoint (cookies handled via `api` with `withCredentials`); backup cookies stored httpOnly.
 2. Re-fetch `/auth/me/` to update the UI context.
 
-**Stop impersonation:** restore `ADMIN_*` cookies to main pair, clear backup cookies, re-fetch `/auth/me/`.
+**Stop impersonation:** `POST /api/v1/auth/users/stop-impersonation/`
+(`IsAuthenticated`) requires the caller's validated `impersonated_by` claim.
+`validate_refresh_token()` checks `ADMIN_REFRESH_COOKIE` for signature, expiry,
+an active account, and a current `sv`. Before rotation, the token's `user_id`
+must match the claim, and the parked token must not itself carry impersonation.
+`TokenRefreshSerializer` issues the restored credentials; the endpoint sets the
+main cookies, clears the backup pair, and returns 200
+`{"detail": "Impersonation ended."}`. The backup access cookie is not required.
+
+If the parked refresh is missing, invalid, expired, revoked, or belongs to an
+unavailable account, clear all four auth cookies and return 400
+`{"detail": "Your admin session expired. Sign in again.", "code": "impersonation_session_expired"}`.
+Account deletion or deactivation during refresh takes the same fallback.
+Neither account's sessions are revoked. Both outcomes audit `impersonation.end`
+against the impersonated account with `impersonated_by` metadata.
+Without the claim, return 400 `{"detail": "No active impersonation session."}`
+without cookie changes or auditing; anonymous callers receive 401.
+
+`AuthProvider.stopImpersonation()` clears the participant identity after
+restoration, shows the existing loading state while `/auth/me/` reloads,
+and lets `Layout` navigate to `/admin/accounts` on success. If that reload
+fails, local authentication remains cleared and `ProtectedRoute` opens `/login`
+with the normal error toast. On `impersonation_session_expired`, it clears local
+authentication without logout or an identity reload; `ProtectedRoute` opens
+`/login`, and `Layout` shows the translated `auth.adminSessionExpired` toast.
+Other stop-request failures preserve the current identity.
 
 ### 5.7a Frontend query cache lifecycle
 
@@ -862,8 +890,9 @@ showing the previous account's cached data (openzev#573).
 
 `AuthProvider` closes that gap with a single `resetQueryCache()` helper,
 called at every point the authenticated identity changes — `login`,
-`logout`, `startImpersonation`, and `stopImpersonation` (the same four
-boundaries `invalidatePrefSaves()` already guards, see 9.4):
+`logout`, `startImpersonation`, and `stopImpersonation`, plus passkey login
+and MFA completion. `invalidateSessionRequests()` also guards these boundaries
+(see 9.4):
 
 1. `await queryClient.cancelQueries()` — marks every in-flight query
    cancelled, so a response that resolves after this point is discarded by
@@ -878,6 +907,9 @@ start loading. `logout` clears synchronously alongside `setUser(null)` and
 fires the reset without awaiting it, matching its existing fire-and-forget
 `logoutRequest()` call.
 
+`loadCurrentUser()` captures `sessionVersion`; session transitions increment it
+in `invalidateSessionRequests()`, so late identity responses cannot overwrite
+the incoming account or restore cleared local authentication.
 `refreshUser()` updates the same-account user snapshot without clearing the
 query cache. Account link/unlink changes in another session are picked up
 on page reload or an explicit `refreshUser()` call; the client has no polling
@@ -2019,7 +2051,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 
 | Module | Classes | Tests | Coverage |
 |---|---|---|---|
-| `test_session_hardening.py` | 6 | 55 | Self-service profile lockdown (protected fields rejected, repeats accepted, names/preferred community still editable); session revocation (revoked/new/legacy tokens, dead access cookie leaves public endpoints working, refresh refusal, deactivation, stale-instance save cannot revive, API keys and impersonation); password change and revoke endpoints; verified email change (request/confirm, single-use, dies on password/address/deactivation/expiry, no enumeration, throttle, mail failure, API keys) |
+| `test_session_hardening.py` | 6 | 56 | Self-service profile lockdown (protected fields rejected, repeats accepted, names/preferred community still editable); session revocation (revoked/new/legacy tokens, dead access cookie leaves public endpoints working, refresh refusal, deactivation, stale-instance save cannot revive, API keys and impersonation); password change and revoke endpoints; verified email change (request/confirm, single-use, dies on password/address/deactivation/expiry, no enumeration, throttle, mail failure, API keys) |
 | `test_security_notifications.py` | 5 | 26 | Every event composes (subject, body, `{detail}` filled, admin vs. self advice, no-turn-off line); guards (no address, inactive, gone/deactivated by send time); hooked into passkey add/remove, TOTP enable/disable (not for an abandoned enrolment), recovery-code regeneration, password change (not on failure), admin MFA reset (not when nothing was removed) and admin session revocation (not for the self-service one); a broker or mail failure never fails the triggering request |
 | `test_admin_users_list.py` | 2 | 13 | Admin user list: memberships per relationship (participant, owner-who-is-also-participant merged into one, owner of several communities sorted by name), confirmed-only `mfa_methods`, `last_login` exposed and `null` before the first sign-in, fixed query count, `/auth/me/` unaffected; `mfa_compliance` (`null` outside the policy, `"grace"` before the deadline, `"overdue"` after it, `"compliant"` once enrolled regardless of the deadline, no added query per account) |
 | `test_last_login.py` | 4 | 7 | `last_login` stamped by a plain password login (not by a failed one, not by the password step of a two-step login until `/token/mfa/` completes it) and by the auto-login after email verification; not restamped by a password change or by setting your initial password moments after verifying; untouched on either side of an impersonation session |
@@ -2030,7 +2062,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `test_mfa.py` | 4 | 28 | TOTP enrolment/removal/recovery codes, two-step login, MFA at the magic-link/onboarding/OAuth/impersonation/email-verification doors, per-account throttle (`SPEC-2026-09-two-factor-authentication`) |
 | `test_registration_concurrency.py` | — (3 functions) | 7 cases | PostgreSQL cancellation/verification/resend row-lock ordering; SMTP outside transactions; transitions during delivery; late cleanup preserves newer links |
 | `test_cookie_oauth.py` | — (7 module-level test functions) | 7 | Refresh/logout cookie handling; token exchange sets cookies, consumes codes, and stamps `last_login` |
-| `test_impersonation.py` | 5 | 22 | Permissions, audit, cookie round-trip, stop-impersonation |
+| `test_impersonation.py` | 5 | 28 | Permissions, audit, cookie round-trip, stop-impersonation; parked identity binding before rotation, unavailable accounts during refresh, and invalid refresh ending only the browser session |
 | `test_throttling.py` | 4 | 15 | Per-IP 429 boundaries for all six public auth write endpoints; budgets are independent; production settings wiring and spoofed `X-Forwarded-For` regression coverage; headers neither evade the login bucket without a trusted proxy nor escape the right-most-entry bucket with one trusted hop |
 
 **`config/test_settings_guards.py`** (4 test classes, 22 tests):
@@ -2131,10 +2163,15 @@ prior readings for that community, including rows outside the new seed window.
   (3 tests) — serialized `updatePreferredZev` saves (latest wins), logout
   invalidation of late responses, and cancellation of queued dispatches
   across session transitions. `frontend/tests/auth-preferred-zev.test.ts`'s
-  second suite (5 tests) — the §5.7a query cache reset on login, logout, and
+  second suite (12 tests) — the §5.7a query cache reset on login, logout, and
   each impersonation edge, plus a delayed-response race: a query already in
   flight for the outgoing account must not repopulate the cache after the
-  switch.
+  switch. Expired impersonation clears local account state without calling
+  logout; a network failure leaves the impersonated account signed in.
+  Restoration clears the outgoing identity while it reloads, including on
+  failure; late identity responses are ignored after logout, restoration, or
+  expiry. The route integration test checks `/login`, the translated recovery
+  toast, and absence of logout or another identity fetch.
 - `frontend/tests/zev-create-wizard.test.ts` (8 tests) — the admin creation
   wizard sends `bank_iban` + `bank_name` to `createZevWithOwner` (echoed on the
   step-4 review) and `""` for both when left blank (review shows `–`); rejects

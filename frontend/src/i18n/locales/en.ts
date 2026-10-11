@@ -81,6 +81,7 @@ export const en = {
         password: 'Password',
         submit: 'Sign in',
         invalid: 'Login failed. Check your credentials.',
+        adminSessionExpired: 'Your admin session expired. Sign in again.',
         mfa: {
             title: 'Two-factor authentication',
             enterCode: 'Enter the 6-digit code from your authenticator app.',

@@ -72,6 +72,7 @@ export const fr = {
         password: 'Mot de passe',
         submit: 'Connexion',
         invalid: 'Échec de la connexion. Veuillez vérifier vos identifiants.',
+        adminSessionExpired: 'Votre session administrateur a expiré. Connectez-vous à nouveau.',
         mfa: {
             title: 'Authentification à deux facteurs',
             enterCode: 'Saisissez le code à 6 chiffres de votre application d\'authentification.',

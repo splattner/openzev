@@ -1,21 +1,16 @@
-"""Admin impersonation: issue a token as another user, and hand it back.
+"""Admin impersonation for active non-admin accounts.
 
-Split out of ``accounts.views`` because this is the most security-sensitive
-surface in that module — it mints a JWT *as somebody else* — and it was the
-only concern in there whose admin check was hand-written inside the handler
-while ``IsAdmin`` sat unused two imports away.
-
-Admin-ness is now declarative, and the DENIED audit event that the hand-written
-check used to write is emitted from ``permission_denied`` so it cannot be
-forgotten. Impersonation is also deliberately *not* self-service: the guard
-that only participants and ZEV owners may be impersonated is what stops an
-admin minting a token for another admin.
+Issue target-user tokens, preserve the original session, and audit start and end.
 """
 
 from rest_framework import status
+from rest_framework.exceptions import AuthenticationFailed, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.settings import api_settings as jwt_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from audit.models import AuditActionCategory, AuditEventStatus
@@ -29,17 +24,14 @@ from .cookies import (
     clear_auth_cookies,
     set_auth_cookies,
 )
-from .jwt_utils import IMPERSONATOR_CLAIM, add_custom_claims
+from .jwt_utils import IMPERSONATOR_CLAIM, add_custom_claims, impersonator_of
 from .models import User
 from .permissions import IsAdmin
 from .serializers import UserSerializer
+from .session_revocation import validate_refresh_token
 
-# Any non-admin account may be impersonated, and the session sees everything
-# that account holds — every grant and participant row (#761: impersonation is
-# on the account, not on one relationship). Admins are excluded on purpose: an
-# admin minting a token for another admin would be a privilege transfer with no
-# trace of which human was behind it. Inactive accounts cannot sign in, so they
-# cannot be stepped into either.
+# Impersonation covers the account's full access.
+# Admin and inactive accounts are excluded.
 
 ACTION_TYPE = "impersonation.issue_token"
 
@@ -148,34 +140,50 @@ class ImpersonateParticipantView(APIView):
 
 
 class StopImpersonationView(APIView):
-    """Restore the original admin tokens after ending an impersonation session.
+    """End impersonation and refresh the original session.
 
-    Deliberately only ``IsAuthenticated``: the caller here is holding the
-    *impersonated* user's token, so requiring admin would make it impossible to
-    get back. The authority comes from the backup cookies, which are httpOnly
-    and only ever written by :class:`ImpersonateParticipantView`.
-
-    Ending a session is audited so the impersonation window can be bounded; a
-    no-op call with no backup pair is not, since it changes nothing.
+    Requires the impersonated user's authentication, not admin permissions.
+    The parked refresh must belong to the impersonator's ordinary session.
+    If restoration fails, clear browser auth cookies without revoking sessions.
     """
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        admin_access = request.COOKIES.get(ADMIN_ACCESS_COOKIE)
-        admin_refresh = request.COOKIES.get(ADMIN_REFRESH_COOKIE)
-        if not admin_access or not admin_refresh:
+        impersonator_id = impersonator_of(request.auth)
+        if not impersonator_id:
             return Response(
                 {"detail": "No active impersonation session."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # request.user here is the *impersonated* user; the admin behind the
-        # session is only recoverable from the claim the issuing view stamped
-        # on the token.
+        admin_refresh = request.COOKIES.get(ADMIN_REFRESH_COOKIE, "")
+        try:
+            token = validate_refresh_token(admin_refresh)
+            if str(token[jwt_settings.USER_ID_CLAIM]) != str(impersonator_id) or impersonator_of(token):
+                raise TokenError("The parked session does not belong to this impersonation.")
+            serializer = TokenRefreshSerializer(data={"refresh": admin_refresh})
+            serializer.is_valid(raise_exception=True)
+        except (TokenError, ValidationError, AuthenticationFailed, User.DoesNotExist):
+            response = Response(
+                {
+                    "detail": "Your admin session expired. Sign in again.",
+                    "code": "impersonation_session_expired",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+            clear_auth_cookies(response)
+        else:
+            response = Response({"detail": "Impersonation ended."})
+            set_auth_cookies(
+                request,
+                response,
+                access=serializer.validated_data["access"],
+                refresh=serializer.validated_data.get("refresh", admin_refresh),
+            )
+
         impersonated = request.user
         display = impersonated.email or impersonated.username
-        impersonator_id = request.auth.get("impersonated_by") if request.auth is not None else None
 
         record_audit_event(
             request=request,
@@ -186,10 +194,8 @@ class StopImpersonationView(APIView):
             target_id=str(impersonated.pk),
             target_display=display,
             summary=f"Ended impersonation of {display}.",
-            metadata={"impersonated_by": impersonator_id} if impersonator_id else None,
+            metadata={"impersonated_by": impersonator_id},
         )
 
-        response = Response({"detail": "Impersonation ended."})
-        set_auth_cookies(request, response, access=admin_access, refresh=admin_refresh)
         clear_auth_cookies(response, access_cookie=ADMIN_ACCESS_COOKIE, refresh_cookie=ADMIN_REFRESH_COOKIE)
         return response

@@ -12,6 +12,7 @@ import {
     updateProfile,
 } from './api/auth'
 import type { User } from '../types/api'
+import { apiErrorPayload } from './api/errors'
 import { getPasskey } from './webauthn'
 
 /** Either the session is live (cookies set, `user` is the signed-in
@@ -46,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const queryClient = useQueryClient()
+    const sessionVersion = useRef(0)
 
     // Serializes preference saves per user: each PATCH waits for the previous
     // one, and only the latest save for the current user merges its response.
@@ -55,10 +57,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         tail: Promise.resolve(),
     })
 
-    // Drops queued and in-flight preference saves: call at the start of every
-    // session transition so a save queued under one account can never dispatch
-    // its PATCH (or merge its response) under the next account's cookies.
-    function invalidatePrefSaves() {
+    // Discard identity loads and preference saves from the outgoing session.
+    function invalidateSessionRequests() {
+        sessionVersion.current += 1
         prefSaveRef.current = { userId: null, seq: 0, tail: Promise.resolve() }
     }
 
@@ -74,15 +75,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [queryClient])
 
     async function loadCurrentUser() {
+        const version = sessionVersion.current
         const me = await fetchMe()
-        setUser(me)
+        if (version === sessionVersion.current) setUser(me)
         return me
     }
 
     useEffect(() => {
+        const version = sessionVersion.current
         void loadCurrentUser()
             .catch(() => {
-                setUser(null)
+                if (version === sessionVersion.current) setUser(null)
             })
             .finally(() => setIsLoading(false))
     }, [])
@@ -95,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             isImpersonating: Boolean(user?.impersonated_by),
             impersonator: user?.impersonated_by ?? null,
             async login(email: string, password: string) {
-                invalidatePrefSaves()
+                invalidateSessionRequests()
                 await resetQueryCache()
                 const result = await loginRequest(email, password)
                 if (result.mfaRequired) {
@@ -109,11 +112,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return { status: 'authenticated', user }
             },
             async completeMfaChallenge(mfaToken: string, code: string) {
+                invalidateSessionRequests()
+                await resetQueryCache()
                 await submitMfaChallenge(mfaToken, code)
                 return loadCurrentUser()
             },
             async loginWithPasskey(email?: string) {
-                invalidatePrefSaves()
+                invalidateSessionRequests()
                 await resetQueryCache()
                 const options = await passkeyAuthenticateBegin(email)
                 const assertion = await getPasskey(options)
@@ -156,19 +161,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (!user || user.role !== 'admin') {
                     throw new Error('Only admins can impersonate participants.')
                 }
-                invalidatePrefSaves()
+                invalidateSessionRequests()
                 await resetQueryCache()
                 await impersonateParticipantRequest(participantUserId)
                 await loadCurrentUser()
             },
             async stopImpersonation() {
-                invalidatePrefSaves()
+                invalidateSessionRequests()
                 await resetQueryCache()
-                await stopImpersonationRequest()
-                await loadCurrentUser()
+                try {
+                    await stopImpersonationRequest()
+                } catch (error) {
+                    if (apiErrorPayload(error)?.code === 'impersonation_session_expired') setUser(null)
+                    throw error
+                }
+                setIsLoading(true)
+                setUser(null)
+                try {
+                    await loadCurrentUser()
+                } finally {
+                    setIsLoading(false)
+                }
             },
             logout() {
-                invalidatePrefSaves()
+                invalidateSessionRequests()
                 setUser(null)
                 void resetQueryCache()
                 void logoutRequest().catch(() => undefined)

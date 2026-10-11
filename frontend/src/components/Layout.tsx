@@ -8,6 +8,7 @@ import { useManagedZev } from '../lib/managedZev'
 import { useCommunityAccess } from '../lib/communityAccess'
 import { fetchFeasibilityCalculatorEnabled } from '../lib/api/feasibility'
 import { queryKeys } from '../lib/api/queryKeys'
+import { apiErrorPayload } from '../lib/api/errors'
 import { LanguageSelector } from './LanguageSelector'
 import { ConfirmDialog, useConfirmDialog } from './ConfirmDialog'
 import { hasUnsavedZevSettingsDraft } from '../lib/zevUnsavedGuard'
@@ -490,8 +491,11 @@ export function Layout() {
                                         setIsStoppingImpersonation(true)
                                         await stopImpersonation()
                                         navigate('/admin/accounts')
-                                    } catch {
-                                        pushToast(t('common.error'), 'error')
+                                    } catch (error) {
+                                        const message = apiErrorPayload(error)?.code === 'impersonation_session_expired'
+                                            ? 'auth.adminSessionExpired'
+                                            : 'common.error'
+                                        pushToast(t(message), 'error')
                                     } finally {
                                         setIsStoppingImpersonation(false)
                                     }

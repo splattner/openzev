@@ -165,6 +165,12 @@ whether an address has an account.
 A manager or admin can revoke any printed link; see
 [Invoice Management → Participant access links](09-invoice-management.md#participant-access-links).
 
+## Admin Impersonation
+
+Admins can act as an active non-admin account. The banner identifies the account
+in use. Select **Stop** to return to your admin account. If that session has
+expired, sign in again. This does not sign the other account out on other devices.
+
 ## Accounts Without a Community
 
 An account that is neither a manager, a viewer nor a participant anywhere has

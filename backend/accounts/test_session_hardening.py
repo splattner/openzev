@@ -10,6 +10,7 @@ from unittest import mock
 from django.core import mail
 from django.core.cache import cache
 from django.test import TestCase
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -167,6 +168,18 @@ class SessionRevocationTests(TestCase):
         response = client.post(REFRESH)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(_bearer(response.cookies["openzev_access"].value).get(ME).status_code, 200)
+
+    def test_account_rejection_during_refresh_clears_cookies(self):
+        for error in (AuthenticationFailed(), User.DoesNotExist()):
+            with self.subTest(error=type(error).__name__):
+                client = APIClient()
+                client.cookies["openzev_refresh"] = _session(self.user)["refresh"]
+                with mock.patch("accounts.views.TokenRefreshSerializer.is_valid", side_effect=error):
+                    response = client.post(REFRESH)
+
+                self.assertEqual(response.status_code, 401)
+                self.assertEqual(response.cookies["openzev_access"]["max-age"], 0)
+                self.assertEqual(response.cookies["openzev_refresh"]["max-age"], 0)
 
     def test_a_deactivated_account_cannot_refresh_and_stays_locked_out_when_reactivated(self):
         session = _session(self.user)
