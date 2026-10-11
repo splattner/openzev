@@ -297,6 +297,27 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         page.unmount()
     })
 
+    it.each(['/me/metering-points', '/metering/chart', '/metering/points'])('highlights My metering points for a participant on %s', async (path) => {
+        mockSession('participant')
+        const page = await renderLayoutAt(path)
+        try {
+            expect(page.link('/me/metering-points')?.classList.contains('active')).toBe(true)
+            expect(page.container.querySelectorAll('nav.nav-list a.active')).toHaveLength(1)
+        } finally {
+            page.unmount()
+        }
+    })
+
+    it('does not highlight My metering points on other participant pages', async () => {
+        mockSession('participant')
+        const page = await renderLayoutAt('/me/invoices')
+        try {
+            expect(page.link('/me/metering-points')?.classList.contains('active')).toBe(false)
+        } finally {
+            page.unmount()
+        }
+    })
+
     it.each([false, true])('keeps former-participant invoice navigation accessible when collapsed=%s', async (collapsed) => {
         window.localStorage.setItem('openzev.sidebarCollapsed', String(collapsed))
         mockSession('former')

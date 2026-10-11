@@ -170,6 +170,11 @@ export function Layout() {
     // Account settings live behind the account card, so on that page the card
     // is where the sidebar shows "you are here".
     const accountActive = useMatch('/account') != null
+    // A participant has no Metering hub: their meters, and the chart and list reached from them, all
+    // belong to My metering points.
+    const myMeteringPointsMatch = useMatch('/me/metering-points') != null
+    const meteringListMatch = useMatch('/metering/points') != null
+    const myMeteringPointsActive = myMeteringPointsMatch || meteringChartActive || meteringListMatch
     const adminOverviewMatch = useMatch('/admin/:tab')
     const adminOverviewActive = useMatch('/admin') != null ||
         ['overview', 'zevs', 'invoices', 'dynamic-sources', 'audit', 'health'].includes(adminOverviewMatch?.params.tab ?? '')
@@ -255,7 +260,7 @@ export function Layout() {
                                 <SidebarLink to="/" label={t('nav.dashboard')} icon={<DashboardIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/me/invoices" label={t('nav.myInvoices')} icon={<InvoiceIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/me/statement" label={t('nav.annualStatement')} icon={<ReportsIcon />} collapsed={isNavigationCollapsed} />
-                                <SidebarLink to="/me/metering-points" label={t('nav.myMeteringPoints')} icon={<PlugIcon />} collapsed={isNavigationCollapsed} />
+                                <SidebarLink to="/me/metering-points" label={t('nav.myMeteringPoints')} icon={<PlugIcon />} active={myMeteringPointsActive} collapsed={isNavigationCollapsed} />
                             </>
                         )}
 
