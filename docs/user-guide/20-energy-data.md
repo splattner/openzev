@@ -36,6 +36,10 @@ must be marked **Generation behind the meter**, and you must hold it yourself
 | See the status and your figures | yes | yes | yes (read-only) | no |
 | Switch off, disconnect, delete data, remove | yes | yes | no | no |
 
+If you are a ZEV manager and hold a metering point yourself, you connect it the
+same way as any participant: **My metering points** appears in your menu, and the
+metering point list links your own meter there.
+
 When you no longer hold the metering point (the assignment ends), the connection
 is switched off by itself, the key is deleted, and nothing new is collected. The
 data already collected is kept until you or a manager deletes it.

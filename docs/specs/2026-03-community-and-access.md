@@ -1596,7 +1596,7 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 | Dashboard (`/`) | shell role `participant` |
 | My invoices (`/me/invoices`) | shell role `participant` or `former` (a former participant sees only this entry) |
 | Annual statement (`/me/statement`) | shell role `participant` (consumption is available on the participant dashboard) |
-| My metering points (`/me/metering-points`) | shell role `participant` (not `former`) |
+| My metering points (`/me/metering-points`) | shell role `participant` (not `former`); also `admin`, `manager` or `viewer` who personally hold a flagged metering point in the selected community while the energy data feature is on |
 | Setup group (participants, metering points `/metering/points`, tariffs, ZEV settings `/zev-settings`) | `isZevScope` (audit logs live in the ZEV settings hub; no standalone entry) |
 | Feasibility (`/feasibility`, standalone entry below Setup) | `isZevScope` + `feasibility_calculator_enabled` (planning tool, not a setup step) |
 | Platform group (four entries: Overview `/admin`, Accounts `/admin/accounts`, Templates `/admin/templates`, Settings `/admin/system-settings`) | `role == 'admin'` (ZEVs/API keys/invoices/audit-logs/pdf+email templates live as hub tabs) |

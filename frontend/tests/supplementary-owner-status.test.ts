@@ -78,6 +78,31 @@ describe('SupplementarySourceStatus (owner)', () => {
         expect(container.querySelector('button')).toBeNull()
     })
 
+    it('links a manager who holds the flagged meter themselves to where they connect it', async () => {
+        api.fetchEligibleOrNull.mockResolvedValue([
+            { metering_point: 'mp-1', meter_id: 'CH-100', zev: 'zev-1', zev_name: 'Sonnenhof', participant: 'p-1', source: null },
+        ])
+        const { container } = await renderWithProviders(
+            createElement(SupplementarySourceStatus, { point: point(null), canManage: true, confirm }), cleanups)
+        await waitForCondition(() => container.querySelector('a') !== null, 'the link')
+
+        const link = container.querySelector('a')!
+        expect(link.getAttribute('href')).toBe('/me/metering-points')
+        expect(link.textContent).toBe('supplementary.owner.connectOwn')
+    })
+
+    it('points a manager at their own connected source to their own page instead of the read-only note', async () => {
+        api.fetchEligibleOrNull.mockResolvedValue([
+            { metering_point: 'mp-1', meter_id: 'CH-100', zev: 'zev-1', zev_name: 'Sonnenhof', participant: 'p-1', source: 'src-1' },
+        ])
+        const view = await renderWithProviders(createElement(SupplementarySourceStatus, { point: point('ok'), canManage: true, confirm }), cleanups)
+        await act(async () => { view.container.querySelector<HTMLButtonElement>('button.badge')!.click() })
+        await waitForCondition(() => dialog()?.querySelector('a') != null, 'the panel')
+
+        expect(dialog()!.querySelector('a')?.getAttribute('href')).toBe('/me/metering-points')
+        expect(dialog()!.textContent).not.toContain('supplementary.owner.readOnlyNote')
+    })
+
     it('does not mark a meter without generation behind it', async () => {
         api.fetchEligibleOrNull.mockResolvedValue([])
         const { container } = await renderWithProviders(

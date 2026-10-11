@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { FormModal } from '../../components/FormModal'
 import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
@@ -40,15 +41,23 @@ interface Props {
 export function SupplementarySourceStatus({ point, canManage, confirm }: Props) {
     const { t } = useTranslation()
     const [open, setOpen] = useState(false)
-    const { featureOn } = useEnergyDataEligibility()
+    const { featureOn, eligible } = useEnergyDataEligibility()
+    // The signed-in user holds this meter themselves (a manager who is also a participant): the
+    // credential is theirs, so they set the source up and manage it on their own page.
+    const isOwnMeter = eligible.some((entry) => entry.metering_point === point.id)
     const status = point.supplementary_source_status
     if (!status) {
         // A quiet marker, not a warning: the data is optional and the participant decides.
-        return featureOn && point.has_behind_meter_generation ? (
+        if (!featureOn || !point.has_behind_meter_generation) return null
+        return isOwnMeter ? (
+            <Link className="badge badge-neutral" style={{ textDecoration: 'none' }} to="/me/metering-points" title={t('supplementary.owner.connectOwnHint')}>
+                {t('supplementary.owner.connectOwn')}
+            </Link>
+        ) : (
             <span className="badge badge-neutral" title={t('supplementary.owner.noSourceHint')}>
                 {t('supplementary.owner.noSource')}
             </span>
-        ) : null
+        )
     }
 
     return (
@@ -62,12 +71,12 @@ export function SupplementarySourceStatus({ point, canManage, confirm }: Props) 
             >
                 {t('supplementary.owner.chip', { status: t(`supplementary.status.${status}`) })}
             </button>
-            {open && <SourcePanel point={point} canManage={canManage} confirm={confirm} onClose={() => setOpen(false)} />}
+            {open && <SourcePanel point={point} canManage={canManage} isOwnMeter={isOwnMeter} confirm={confirm} onClose={() => setOpen(false)} />}
         </>
     )
 }
 
-function SourcePanel({ point, canManage, confirm, onClose }: Props & { onClose: () => void }) {
+function SourcePanel({ point, canManage, isOwnMeter, confirm, onClose }: Props & { isOwnMeter: boolean; onClose: () => void }) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
     const { pushToast } = useToast()
@@ -109,7 +118,13 @@ function SourcePanel({ point, canManage, confirm, onClose }: Props & { onClose: 
             {sourcesQuery.isError && <div className="error-banner" role="alert">{t('supplementary.section.loadError')}</div>}
             {source && (
                 <div style={{ display: 'grid', gap: '1rem' }}>
-                    <p className="muted" style={{ margin: 0 }}>{t('supplementary.owner.readOnlyNote', { name: source.participant_name })}</p>
+                    {isOwnMeter ? (
+                        <p className="muted" style={{ margin: 0 }}>
+                            <Link to="/me/metering-points">{t('supplementary.owner.manageOwn')}</Link>
+                        </p>
+                    ) : (
+                        <p className="muted" style={{ margin: 0 }}>{t('supplementary.owner.readOnlyNote', { name: source.participant_name })}</p>
+                    )}
                     <dl style={{ display: 'grid', gridTemplateColumns: 'minmax(7rem, max-content) minmax(0, 1fr)', overflowWrap: 'anywhere', gap: '0.4rem 1rem', margin: 0 }}>
                         <dt className="muted">{t('supplementary.owner.provider')}</dt>
                         <dd style={{ margin: 0 }}>{t(`supplementary.provider.${source.provider}`)}</dd>

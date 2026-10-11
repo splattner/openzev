@@ -5,6 +5,7 @@ import { Link, NavLink, Outlet, matchPath, useLocation, useMatch, useNavigate } 
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useCommunityAccess } from '../lib/communityAccess'
+import { useEnergyDataEligibility } from '../lib/supplementary'
 import { fetchFeasibilityCalculatorEnabled } from '../lib/api/feasibility'
 import { queryKeys } from '../lib/api/queryKeys'
 import { apiErrorPayload } from '../lib/api/errors'
@@ -50,6 +51,9 @@ export function Layout() {
     const { t } = useTranslation()
     const { user, logout, isImpersonating, impersonator, stopImpersonation } = useAuth()
     const { shellRole, isZevScope, isParticipantScope } = useCommunityAccess()
+    // A manager or viewer who also holds a flagged meter themselves sets up their own energy data there.
+    const energyData = useEnergyDataEligibility()
+    const holdsOwnFlaggedMeter = energyData.eligible.some((point) => point.zev === selectedZevId)
     // Query the flag only for accounts with community-wide access.
     const feasibilityEnabledQuery = useQuery({
         queryKey: queryKeys.feasibility.enabled(),
@@ -236,6 +240,9 @@ export function Layout() {
                                 <SidebarLink to="/metering/chart" label={t('nav.metering')} icon={<ChartIcon />} active={meteringActive} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/billing/invoices" label={t('nav.billing')} icon={<InvoiceIcon />} active={billingActive} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/reports" label={t('nav.reports')} icon={<ReportsIcon />} collapsed={isNavigationCollapsed} />
+                                {holdsOwnFlaggedMeter && (
+                                    <SidebarLink to="/me/metering-points" label={t('nav.myMeteringPoints')} icon={<PlugIcon />} collapsed={isNavigationCollapsed} />
+                                )}
                             </>
                         )}
 

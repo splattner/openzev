@@ -548,8 +548,11 @@ Result stored in `SupplementarySource.reconciliation` (the on-demand view adds `
 
 **Route:** `/me/metering-points` (`MyMeteringPointsPage`), sidebar entry "My metering points" for
 the shell role `participant` (not `former`). Allowed for `participant`, `manager`, `viewer` and
-`admin`: a manager who holds a flagged meter personally reaches it from their dashboard call to
-action. **Files:** `frontend/src/pages/MyMeteringPointsPage.tsx`;
+`admin`. A manager or viewer who also holds a flagged meter personally in the selected community
+gets the same sidebar entry (from `useEnergyDataEligibility`, so only while the feature is on), plus
+their dashboard call to action and a link on their own meter in the metering-point list (§7.2). The
+backend already treats them as the owner of their source (`permissions.role_for` checks ownership
+before the manager role), so connecting, replacing the key and the rest work as for any participant. **Files:** `frontend/src/pages/MyMeteringPointsPage.tsx`;
 `features/supplementary/MeteringPointEnergyData.tsx`, `SupplementarySourceModal.tsx`,
 `SupplementarySourceCard.tsx`, `SourceStatusBadge`, `ReconciliationSummary`, `PushTokenPanel`,
 `CsvImport`.
@@ -595,7 +598,10 @@ admin gets `[]`), the flagged meters they hold personally today in an enabled ZE
 
 Flagged metering points show a status chip from `supplementary_source_status`; a flagged one with no
 source shows a quiet neutral "No energy data source" marker instead (only while the feature is on,
-known from `useEnergyDataEligibility`, never a warning: the data is optional). An owner can
+known from `useEnergyDataEligibility`, never a warning: the data is optional). On a meter the
+signed-in manager holds themselves the marker is a link to "My metering points" (**Connect your energy
+data**) and the panel of a connected source links there instead of the read-only note: the credential
+is theirs to manage. An owner can
 open a read-only panel (status, last sync, coverage, reconciliation) with **Disable**,
 **Delete data** and **Remove source** (manager actions only). No credential field is shown to
 an owner.
@@ -935,6 +941,8 @@ CI runs `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-he
   not hold; the hint on who flags a meter; nothing about energy data while the feature is off; only
   the selected community's meters; a manager sees only their own flagged meters and no community
   list; the empty state per audience.
+- **`tests/layout-nav.test.ts`** (+2) and **`tests/supplementary-owner-status.test.ts`** (+2): the sidebar entry for a
+  manager or viewer who holds a flagged meter, and not otherwise; the marker link and panel link on one's own meter.
 - **`tests/system-health-backups.test.ts`** (+3): the "Energy data" health card switched off, with
   sources, and with a missing key and stale sources.
 - **Backend** `metering/test_supplementary_api.py::EligibleMeteringPointTests` (7): the holder gets
