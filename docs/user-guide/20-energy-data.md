@@ -36,6 +36,9 @@ must be marked **Generation behind the meter**, and you must hold it yourself
 | See the status and your figures | yes | yes | yes (read-only) | no |
 | Switch off, disconnect, delete data, remove | yes | yes | no | no |
 
+Each metering point on that page has a **View metering data** button that opens
+the chart of its readings.
+
 If you are a ZEV manager and hold a metering point yourself, you connect it the
 same way as any participant: **My metering points** appears in your menu, and the
 metering point list links your own meter there.

@@ -75,6 +75,14 @@ describe('MyMeteringPointsPage', () => {
         expect(container.querySelector('article[aria-label="CH-3"]')).not.toBeNull()
     })
 
+    it('links every plain meter to its metering data', async () => {
+        const { container } = await mount()
+
+        const href = (label: string) => container.querySelector(`article[aria-label="${label}"] a`)?.getAttribute('href')
+        expect(href('CH-2')).toBe('/metering/chart?metering_point=2')
+        expect(href('CH-3')).toBe('/metering/chart?metering_point=3')
+    })
+
     it('explains why a flagged meter the participant does not hold personally has no energy data', async () => {
         const { container } = await mount()
 

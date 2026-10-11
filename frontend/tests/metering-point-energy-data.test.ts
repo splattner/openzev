@@ -96,6 +96,16 @@ describe('MeteringPointEnergyData without a source', () => {
     })
 })
 
+describe('metering data link', () => {
+    it('is offered on a meter without a source and on one with a source', async () => {
+        const unconnected = await mount()
+        expect(unconnected.container.querySelector('a')?.getAttribute('href')).toBe('/metering/chart?metering_point=mp-1')
+
+        const connected = await mount([source()])
+        expect(connected.container.querySelector('a')?.getAttribute('href')).toBe('/metering/chart?metering_point=mp-1')
+    })
+})
+
 describe('connect modal', () => {
     async function open() {
         const view = await mount()

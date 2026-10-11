@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { EligibleMeteringPoint, SupplementarySource } from '../../types/api'
+import { MeteringDataLink } from './MeteringDataLink'
 import { SupplementarySourceCard } from './SupplementarySourceCard'
 import { SupplementarySourceModal } from './SupplementarySourceModal'
 
@@ -41,6 +42,7 @@ export function MeteringPointEnergyData({ point, source, confirm }: Props) {
                 <button type="button" className="button button-primary" onClick={() => setConnecting(true)}>
                     {t('supplementary.section.connect')}
                 </button>
+                <MeteringDataLink meteringPointId={point.metering_point} />
             </div>
             {connecting && <SupplementarySourceModal point={point} onClose={() => setConnecting(false)} />}
         </article>

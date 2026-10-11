@@ -649,6 +649,7 @@ export const it = {
             },
             flagHint: 'Un impianto FV si trova dietro il suo contatore, ma il punto di misura non è contrassegnato come tale? Chieda alla gestione della sua comunità di contrassegnarlo come «Produzione dietro il contatore». Potrà poi collegare qui i suoi dati energetici.',
             notHolder: 'Solo la persona che detiene personalmente questo punto di misura può collegarvi dati energetici.',
+            viewData: 'Visualizza i dati di misura',
         },
         myInvoices: {
             title: 'Le mie fatture',

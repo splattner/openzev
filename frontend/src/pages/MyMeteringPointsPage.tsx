@@ -6,6 +6,7 @@ import { Notice } from '../components/Notice'
 import { PageHeader } from '../components/PageHeader'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { ScopeGuard } from '../components/ScopeGuard'
+import { MeteringDataLink } from '../features/supplementary/MeteringDataLink'
 import { MeteringPointEnergyData } from '../features/supplementary/MeteringPointEnergyData'
 import { queryKeys } from '../lib/api/queryKeys'
 import { listSupplementarySources } from '../lib/api/supplementary'
@@ -140,6 +141,9 @@ function PlainMeteringPoint({ point, showEnergyDataNote }: { point: MeteringPoin
             {showEnergyDataNote && point.has_behind_meter_generation && (
                 <p className="muted" style={{ margin: 0 }}>{t('pages.myMeteringPoints.notHolder')}</p>
             )}
+            <div className="actions-row actions-row-wrap">
+                <MeteringDataLink meteringPointId={point.id} />
+            </div>
         </article>
     )
 }

@@ -16,6 +16,7 @@ import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { useToast } from '../../lib/toast'
 import type { EligibleMeteringPoint, SupplementarySource } from '../../types/api'
 import { CsvImport } from './CsvImport'
+import { MeteringDataLink } from './MeteringDataLink'
 import { PushTokenPanel } from './PushTokenPanel'
 import { ReconciliationSummary } from './ReconciliationSummary'
 import { SourceStatusBadge } from './SourceStatusBadge'
@@ -210,6 +211,7 @@ export function SupplementarySourceCard({ point, source, confirm }: Props) {
             {showCsv && !disconnected && <CsvImport sourceId={source.id} />}
 
             <div className="actions-row actions-row-wrap">
+                <MeteringDataLink meteringPointId={point.metering_point} />
                 {isSolar && !disconnected && (
                     <>
                         <button type="button" className="button button-secondary button-compact" disabled={busy} onClick={() => test.mutate()}>

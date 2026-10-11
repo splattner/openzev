@@ -568,6 +568,9 @@ community's, so there the page shows only the meters the user holds with generat
   **Sync now**, **Replace key**, **Disconnect** (keeps data), **Delete data**, **Remove source**.
 - Any other meter: a plain card (meter id, location, active, type, the behind-the-meter badge). A
   flagged one the user does not hold personally says only the holder can connect energy data.
+- Every card, plain or energy data, has a **View metering data** button (`MeteringDataLink`) to
+  `/metering/chart?metering_point=<id>`: the chart page was already open to participants and the
+  backend scopes the readings to the time they hold the meter, so no new access is granted.
 - A closing hint, shown only while the feature is on and only to a participant, says who flags a
   meter: the community's manager (§14). Participants cannot set the flag.
 - While the feature is off (`eligible` answers `404`) the page is a plain meter list: no energy data
@@ -936,11 +939,12 @@ CI runs `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-he
   participant table's rate cell with a rate, without one, withheld, and for a non-net-metered row.
 - **`tests/account-tabs.test.ts`**: three tabs only; a link to the former `energy-data` tab lands on
   Profile (Security for a forced password change).
-- **`tests/my-metering-points-page.test.ts`** (7), added with §14: the energy data card on the
+- **`tests/my-metering-points-page.test.ts`** (9), added with §14: the energy data card on the
   held flagged meter and plain cards for the rest; the note on a flagged meter the participant does
   not hold; the hint on who flags a meter; nothing about energy data while the feature is off; only
   the selected community's meters; a manager sees only their own flagged meters and no community
   list; the empty state per audience.
+- **`tests/metering-point-energy-data.test.ts`** (+1): the metering data link on an unconnected and a connected card. The page test also covers the link on plain meters and a manager not seeing the community list left in the cache.
 - **`tests/layout-nav.test.ts`** (+2) and **`tests/supplementary-owner-status.test.ts`** (+2): the sidebar entry for a
   manager or viewer who holds a flagged meter, and not otherwise; the marker link and panel link on one's own meter.
 - **`tests/system-health-backups.test.ts`** (+3): the "Energy data" health card switched off, with

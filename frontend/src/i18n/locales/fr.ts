@@ -649,6 +649,7 @@ export const fr = {
             },
             flagHint: 'Une installation PV se trouve derrière votre compteur, mais le point de mesure n\'est pas marqué comme tel ? Demandez à la gestion de votre communauté de le marquer « Production derrière le compteur ». Vous pourrez alors connecter ici vos propres données énergétiques.',
             notHolder: 'Seule la personne qui détient personnellement ce point de mesure peut y connecter des données énergétiques.',
+            viewData: 'Voir les données de mesure',
         },
         myInvoices: {
             title: 'Mes factures',

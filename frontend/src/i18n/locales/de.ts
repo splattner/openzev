@@ -649,6 +649,7 @@ export const de = {
             },
             flagHint: 'Steht eine PV-Anlage hinter Ihrem Zähler, der Messpunkt ist aber nicht so gekennzeichnet? Bitten Sie die Verwaltung Ihrer Gemeinschaft, ihn als «Erzeugung hinter dem Zähler» zu markieren. Danach können Sie hier Ihre eigenen Energiedaten verbinden.',
             notHolder: 'Energiedaten kann nur die Person verbinden, die diesen Messpunkt persönlich hält.',
+            viewData: 'Messdaten ansehen',
         },
         myInvoices: {
             title: 'Meine Rechnungen',

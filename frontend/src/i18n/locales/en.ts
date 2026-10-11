@@ -658,6 +658,7 @@ export const en = {
             },
             flagHint: 'Is a PV system behind your meter, but the meter is not marked as such? Ask your community\'s manager to mark it as "Generation behind the meter". Then you can connect your own energy data here.',
             notHolder: 'Only the person who holds this meter personally can connect energy data for it.',
+            viewData: 'View metering data',
         },
         myInvoices: {
             title: 'My invoices',
