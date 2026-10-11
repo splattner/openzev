@@ -34,7 +34,7 @@ The dev server proxies API requests to the backend; the API URL comes from
 | `npm run lint` | ESLint |
 | `npm run test:unit` | Vitest unit tests (one-shot) |
 | `npm run test:unit:watch` | Vitest watch mode |
-| `npm run screenshots` | Playwright: regenerate user-guide screenshots into `../docs/user-guide/screenshots/` |
+| `npm run screenshots` | Playwright: regenerate user-guide screenshots into `../docs/user-guide/screenshots/` (saved as 256-colour PNGs) |
 | `npm run preview` | Serve the production build locally |
 
 ## Project layout

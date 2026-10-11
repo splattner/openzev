@@ -1,6 +1,8 @@
 /** Shared helpers for screenshot capture (user-guide + one-off release-note shots). */
 import { expect, type APIRequestContext, type Page } from '@playwright/test'
+import { writeFile } from 'fs/promises'
 import path from 'path'
+import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 import type { User } from '../src/types/api'
 
@@ -292,6 +294,19 @@ export async function screenshotViewport(page: Page, dir: string, name: string) 
     path: path.join(dir, `${name}.png`),
     fullPage: false,
   })
+}
+
+/**
+ * Rewrite a capture in place as a 256-colour palette PNG.
+ *
+ * UI screenshots use few colours, so this cuts the user-guide set to about a
+ * third of its size with no visible change, and every regenerated set adds
+ * correspondingly less to Git history (#723). Output is deterministic, so an
+ * unchanged screen still produces an unchanged file.
+ */
+export async function quantizePng(file: string) {
+  const png = await sharp(file).png({ palette: true, effort: 10, compressionLevel: 9 }).toBuffer()
+  await writeFile(file, png)
 }
 
 export const PDF_VIEWER_URL = 'chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/'

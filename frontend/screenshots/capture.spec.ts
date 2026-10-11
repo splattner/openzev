@@ -5,7 +5,7 @@
  *   cd frontend
  *   npm run screenshots
  *
- * Screenshots are saved to: docs/user-guide/screenshots/
+ * Screenshots are saved to: docs/user-guide/screenshots/ as 256-colour PNGs
  *
  * Environment variables:
  *   SCREENSHOT_BASE_URL  – default http://localhost:8080
@@ -25,6 +25,7 @@ import {
   impersonateDemoParticipant,
   navigateTo,
   pinDemoZev,
+  quantizePng,
   resolveDemoZevId,
   screenshotFull as captureFull,
   screenshotViewport as captureViewport,
@@ -41,8 +42,14 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const SCREENSHOT_DIR = path.resolve(__dirname, '../../docs/user-guide/screenshots')
 
-const screenshotFull = (page: Page, name: string) => captureFull(page, SCREENSHOT_DIR, name)
-const screenshotViewport = (page: Page, name: string) => captureViewport(page, SCREENSHOT_DIR, name)
+const screenshotFull = async (page: Page, name: string) => {
+  await captureFull(page, SCREENSHOT_DIR, name)
+  await quantizePng(path.join(SCREENSHOT_DIR, `${name}.png`))
+}
+const screenshotViewport = async (page: Page, name: string) => {
+  await captureViewport(page, SCREENSHOT_DIR, name)
+  await quantizePng(path.join(SCREENSHOT_DIR, `${name}.png`))
+}
 
 const DEMO_DYNAMIC_TARIFF = 'Netznutzung dynamisch'
 const SEED_HINT = 'run `manage.py seed_demo` with its default end date before capturing screenshots'
