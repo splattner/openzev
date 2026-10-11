@@ -1,12 +1,15 @@
 from rest_framework import serializers
 from django.core.exceptions import ObjectDoesNotExist, ValidationError as DjangoValidationError
 from django.core.validators import RegexValidator
+from django.db import transaction
 from .geocoding import get_cached_building_footprint
 from .grid_operators import grid_operator_ids
 from django.utils import timezone
 
 from .models import Building, Zev, Participant, Party, PartyKind, PartyTitle, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode, PartyRole, ZevPartyRole
-from .services import create_zev_with_owner_setup, ensure_participant_account, has_its_own_login
+from .services import (
+    create_zev_with_owner_setup, ensure_participant_account, lock_participant_account, requires_independent_login,
+)
 from .tasks import trigger_building_geocode_if_address_present
 from .iban import (
     IBAN_ADDRESS_REQUIRED_MESSAGE,
@@ -15,6 +18,11 @@ from .iban import (
     is_valid_iban,
     normalize_iban,
 )
+
+
+def django_validation_error(exc):
+    errors = exc.message_dict if hasattr(exc, "message_dict") else {"detail": exc.messages}
+    return serializers.ValidationError(errors)
 
 
 class BankIbanValidationMixin:
@@ -296,29 +304,38 @@ class ParticipantSerializer(serializers.ModelSerializer):
         if not email:
             raise serializers.ValidationError({"email": "Participant email is required."})
 
-        # Saving a participant copies its email and name onto the linked
-        # account (ensure_participant_account). For an account with its own
-        # login — an owner, or anyone holding a manager or viewer grant — that
-        # would let a non-admin rewrite someone else's login email and take the
-        # account over through a password reset, so only an admin may edit such
-        # a row (#761; before grants this was the "participant role" check).
+        self._require_admin_for_protected_account(getattr(self.instance, "user", None))
+        return attrs
+
+    def _require_admin_for_protected_account(self, user):
+        # Rows linked to an account with its own login stay admin-only (#761),
+        # although saving them no longer syncs the account's email or name.
         request = self.context.get("request")
         is_admin = bool(request and request.user.is_admin)
-        user = getattr(self.instance, "user", None)
-        if user is not None and not is_admin and has_its_own_login(user):
+        if user is not None and not is_admin and requires_independent_login(user):
             raise serializers.ValidationError(
                 {"user": "This participant is linked to an account with its own login; only an admin can edit it."}
             )
-        return attrs
 
+    @transaction.atomic
     def create(self, validated_data):
-        participant = super().create(validated_data)
-        ensure_participant_account(participant)
+        try:
+            participant = super().create(validated_data)
+            ensure_participant_account(participant)
+        except DjangoValidationError as exc:
+            raise django_validation_error(exc) from exc
         return participant
 
+    @transaction.atomic
     def update(self, instance, validated_data):
-        participant = super().update(instance, validated_data)
-        ensure_participant_account(participant)
+        try:
+            lock_participant_account(instance)
+            # Promotion or relinking may have happened since validate().
+            self._require_admin_for_protected_account(instance.user if instance.user_id else None)
+            participant = super().update(instance, validated_data)
+            ensure_participant_account(participant)
+        except DjangoValidationError as exc:
+            raise django_validation_error(exc) from exc
         return participant
 
     class Meta:

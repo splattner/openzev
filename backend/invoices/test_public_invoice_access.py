@@ -425,6 +425,39 @@ class MagicLinkTests(PublicInvoiceTestCase):
         self.assertEqual(self._request().status_code, 202)
         self.assertEqual(mail.outbox, [])
 
+    def test_no_link_for_an_account_with_its_own_login(self):
+        """The address on file is the operator's to edit, so a link sent there
+        must not sign in an account that manages another ZEV."""
+        from django.core import mail
+
+        from accounts.models import MagicLinkToken
+        from zev.models import Participant
+        from testing.helpers import create_managed_zev
+
+        landlord = make_user("pia_landlord", UserRole.USER)
+        create_managed_zev(name="Landlord ZEV", owner=landlord, zev_type="vzev", invoice_prefix="L")
+        participant = Participant.objects.get(pk=self.participant.pk)
+        participant.user = landlord
+        participant.save()
+
+        self.assertEqual(self._request().status_code, 202)
+        self.assertEqual(mail.outbox, [])
+        self.assertFalse(MagicLinkToken.objects.filter(user=landlord).exists())
+
+    def test_an_outstanding_link_stops_once_the_account_requires_independent_login(self):
+        from testing.helpers import create_managed_zev
+
+        self._request()
+        token = self._link_token()
+        token.user.set_password("IndependentPassword42!")
+        token.user.save(update_fields=["password"])
+        create_managed_zev(name="Own ZEV", owner=token.user, zev_type="vzev", invoice_prefix="O")
+
+        resp = self.client.post(self.CONSUME_URL, {"token": token.token}, format="json")
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertNotIn("openzev_access", resp.cookies)
+
     def test_consume_issues_a_session(self):
         self._request()
 

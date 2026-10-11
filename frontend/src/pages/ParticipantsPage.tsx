@@ -26,7 +26,7 @@ import {
     sendOnboardingLink,
     updateParticipant,
 } from '../lib/api/zev'
-import { formatApiError } from '../lib/api/errors'
+import { apiErrorPayload, formatApiError } from '../lib/api/errors'
 import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useWriteScope } from '../lib/useWriteScope'
@@ -146,6 +146,13 @@ export function ParticipantsPage() {
         return participant ? `${participant.first_name} ${participant.last_name}` : t('pages.participants.fallbackName')
     }
 
+    function onboardingLinkError(error: unknown): string {
+        const code = apiErrorPayload(error)?.code
+        if (code === 'login_setup_required') return t('pages.participants.messages.loginSetupRequired')
+        if (code === 'own_login_required') return t('pages.participants.messages.ownLoginRequired')
+        return formatApiError(error, t('pages.participants.messages.onboardingLinkFailed'))
+    }
+
     const sendLinkMutation = useMutation({
         mutationFn: ({ participantId, scope: submittingScope }: { participantId: string; scope: typeof scope }) => {
             assertWritable(submittingScope)
@@ -168,7 +175,7 @@ export function ParticipantsPage() {
             })
         },
         onError: (error, variables) => {
-            if (isCurrent(variables.scope)) pushToast(formatApiError(error, t('pages.participants.messages.onboardingLinkFailed')), 'error')
+            if (isCurrent(variables.scope)) pushToast(onboardingLinkError(error), 'error')
         },
     })
 
@@ -189,7 +196,7 @@ export function ParticipantsPage() {
             })
         },
         onError: (error, variables) => {
-            if (isCurrent(variables.scope)) pushToast(formatApiError(error, t('pages.participants.messages.onboardingLinkFailed')), 'error')
+            if (isCurrent(variables.scope)) pushToast(onboardingLinkError(error), 'error')
         },
     })
 

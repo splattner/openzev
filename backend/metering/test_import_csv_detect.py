@@ -26,8 +26,8 @@ class DetectCsvSettingsTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.owner = make_user("detect_owner", UserRole.USER)
-        auth(self.client, self.owner)
         self.zev = create_managed_zev(name="Detect ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="D")
+        auth(self.client, self.owner)
         for meter_id in ("M1", "CH-DEMO-CONS-0001"):
             MeteringPoint.objects.create(zev=self.zev, meter_id=meter_id, meter_type=MeteringPointType.CONSUMPTION)
 

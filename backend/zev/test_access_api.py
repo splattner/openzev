@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from accounts.models import EmailVerificationToken, User, UserRole
+from accounts.models import EmailVerificationToken, OAuthProvider, SocialAccount, User, UserRole
 from audit.models import AuditEvent, AuditEventStatus
 from invoices.models import EmailTemplate
 from testing.helpers import authenticate, make_user, create_managed_zev
@@ -147,6 +147,137 @@ class ZevAccessInvitationTests(AccessApiTestCase):
     def invite(self, email="new.person@example.com", role=VIEWER, as_user=None):
         return self.client_for(as_user or self.owner).post(self.url(), {"email": email, "role": role}, format="json")
 
+    def test_a_passwordless_participant_gets_an_access_invitation(self):
+        participant = Participant.objects.create(
+            zev=self.zev, first_name="New", last_name="Manager", email="new.manager@example.com",
+            valid_from=date(2026, 1, 1),
+        )
+        account = ensure_participant_account(participant)
+
+        response = self.invite(account.email)
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertTrue(response.data["user"]["pending_invitation"])
+        token = account.email_verification_tokens.get(purpose=EmailVerificationToken.Purpose.INVITATION)
+        self.assertIn(token.token, mail.outbox[-1].body)
+        client = APIClient()
+        accepted = client.post("/api/v1/auth/verify-email/", {"token": token.token}, format="json")
+        self.assertEqual(accepted.status_code, 200, accepted.content)
+        password = client.post(
+            "/api/v1/auth/me/set-initial-password/", {"new_password": "SafeInitialPassword42!"}, format="json",
+        )
+        self.assertEqual(password.status_code, 200, password.content)
+        account.refresh_from_db()
+        self.assertTrue(account.check_password("SafeInitialPassword42!"))
+        self.assertEqual(client.get("/api/v1/zev/zevs/").status_code, 200)
+
+    def test_role_change_after_acceptance_before_choosing_a_password(self):
+        response = self.invite("newcomer@example.com")
+        self.assertEqual(response.status_code, 201, response.content)
+        account = User.objects.get(email="newcomer@example.com")
+        token = account.email_verification_tokens.get(purpose=EmailVerificationToken.Purpose.INVITATION)
+        accepted = APIClient().post("/api/v1/auth/verify-email/", {"token": token.token}, format="json")
+        self.assertEqual(accepted.status_code, 200, accepted.content)
+
+        changed = self.client_for(self.owner).patch(self.url(response.data["id"]), {"role": MANAGER}, format="json")
+
+        self.assertEqual(changed.status_code, 200, changed.content)
+        self.assertEqual(
+            list(ZevAccessGrant.objects.filter(zev=self.zev, user=account, valid_to__isnull=True).values_list("role", flat=True)),
+            [MANAGER],
+        )
+
+    def test_a_failed_invitation_to_a_participant_can_be_resent(self):
+        participant = Participant.objects.create(
+            zev=self.zev, first_name="Fay", last_name="Tenant", email="failed.send@example.com",
+            valid_from=date(2026, 1, 1),
+        )
+        account = ensure_participant_account(participant)
+        with mock.patch("zev.views_access.EmailMessage.send", side_effect=OSError("smtp down")):
+            invited = self.invite(account.email)
+        self.assertEqual(invited.status_code, 201, invited.content)
+        self.assertIs(invited.json()["email_sent"], False)
+        account.refresh_from_db()
+        # Link sign-in stops until the invitation is accepted; resending is the recovery path.
+        self.assertFalse(account.is_active)
+
+        resent = self.client_for(self.owner).post(self.url(invited.data["id"], "resend-invitation/"))
+
+        self.assertEqual(resent.status_code, 202, resent.content)
+        token = account.email_verification_tokens.get(
+            purpose=EmailVerificationToken.Purpose.INVITATION, consumed_at__isnull=True,
+        )
+        self.assertIn(token.token, mail.outbox[-1].body)
+
+    def test_first_grant_invalidates_a_participant_session(self):
+        participant = Participant.objects.create(
+            zev=self.zev, first_name="Pia", last_name="Tenant", email="pia.tenant@example.com",
+            valid_from=date(2026, 1, 1),
+        )
+        account = ensure_participant_account(participant)
+        account.set_password("ExistingPassword42!")
+        account.save(update_fields=["password"])
+        old_session = self.client_for(account)
+
+        self.assertEqual(self.invite(account.email).status_code, 201)
+
+        self.assertEqual(old_session.get("/api/v1/auth/me/").status_code, 401)
+
+    def test_cancelling_a_participants_only_invitation_restores_participant_login(self):
+        from .services import get_participant_onboarding_link
+
+        participant = Participant.objects.create(
+            zev=self.zev, first_name="Pia", last_name="Tenant", email="cancel.tenant@example.com",
+            valid_from=date(2026, 1, 1),
+        )
+        account = ensure_participant_account(participant)
+        invited = self.invite(account.email)
+        token = account.email_verification_tokens.get(purpose=EmailVerificationToken.Purpose.INVITATION)
+
+        response = self.client_for(self.owner).delete(self.url(invited.data["id"]))
+
+        self.assertEqual(response.status_code, 204)
+        account.refresh_from_db()
+        self.assertTrue(account.is_active)
+        self.assertEqual(APIClient().post("/api/v1/auth/verify-email/", {"token": token.token}).status_code, 400)
+        _url, onboarding = get_participant_onboarding_link(participant)
+        client = APIClient()
+        self.assertEqual(client.post(
+            "/api/v1/public/onboarding/consume/", {"prefix": onboarding.prefix, "s": onboarding.secret},
+        ).status_code, 200)
+        self.assertEqual(client.get("/api/v1/auth/me/").status_code, 200)
+
+    def test_only_an_enabled_social_provider_counts_as_an_existing_login(self):
+        for enabled in (True, False):
+            with self.subTest(enabled=enabled):
+                account = make_user(f"social_{enabled}")
+                account.set_unusable_password()
+                account.save(update_fields=["password"])
+                provider = OAuthProvider.objects.create(name=f"provider_{enabled}", enabled=enabled)
+                SocialAccount.objects.create(user=account, provider=provider, uid="identity")
+
+                response = self.invite(account.email, as_user=self.admin)
+
+                self.assertEqual(response.status_code, 201, response.content)
+                self.assertEqual(response.data["user"]["pending_invitation"], not enabled)
+
+    def test_cancelling_one_of_multiple_invitations_keeps_the_account_inactive(self):
+        participant = Participant.objects.create(
+            zev=self.zev, first_name="Pia", last_name="Tenant", email="multiple.tenant@example.com",
+            valid_from=date(2026, 1, 1),
+        )
+        account = ensure_participant_account(participant)
+        invited = self.invite(account.email)
+        other = create_managed_zev(name="Other invitation", owner=self.owner)
+        self.assertEqual(self.client_for(self.admin).post(
+            f"/api/v1/zev/zevs/{other.pk}/access/", {"email": account.email, "role": VIEWER}, format="json",
+        ).status_code, 201)
+
+        self.assertEqual(self.client_for(self.owner).delete(self.url(invited.data["id"])).status_code, 204)
+
+        account.refresh_from_db()
+        self.assertFalse(account.is_active)
+
     def test_an_unknown_email_gets_an_inactive_account_a_grant_and_an_invitation(self):
         response = self.invite()
         self.assertEqual(response.status_code, 201, response.content)
@@ -274,8 +405,6 @@ class AccountsAroundGrantsTests(AccessApiTestCase):
         self.assertTrue(self.viewer.has_usable_password())
 
     def test_a_manager_cannot_edit_a_participant_row_of_an_account_with_its_own_login(self):
-        # Saving the row copies its email onto the account: that would let one
-        # manager rewrite another's login email.
         participant = Participant.objects.create(
             zev=self.zev, user=self.viewer, first_name="View", last_name="Er", email=self.viewer.email,
             valid_from=date(2026, 1, 1),
@@ -286,3 +415,35 @@ class AccountsAroundGrantsTests(AccessApiTestCase):
         self.assertEqual(response.status_code, 400)
         self.viewer.refresh_from_db()
         self.assertNotEqual(self.viewer.email, "attacker@example.com")
+
+    def test_a_party_edit_never_reaches_a_login_of_its_own(self):
+        # OAuth signs in an existing account by its email, so whoever sets a
+        # login's email can sign in as it.
+        participant = Participant.objects.create(
+            zev=self.zev, user=self.viewer, first_name="View", last_name="Er", email=self.viewer.email,
+            valid_from=date(2026, 1, 1),
+        )
+        response = self.client_for(self.owner).patch(
+            f"/api/v1/zev/parties/{participant.party_id}/",
+            {"email": "attacker@example.com", "last_name": "Taken"}, format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+
+        ensure_participant_account(Participant.objects.get(pk=participant.pk))
+
+        self.viewer.refresh_from_db()
+        self.assertEqual((self.viewer.email, self.viewer.last_name), ("api_viewer@example.com", ""))
+
+    def test_a_participant_only_account_follows_its_participant_record(self):
+        participant = Participant.objects.create(
+            zev=self.zev, first_name="Pia", last_name="Only", email="pia@example.com",
+            valid_from=date(2026, 1, 1),
+        )
+        account = ensure_participant_account(participant)
+        participant.email = "pia.new@example.com"
+        participant.save()
+
+        ensure_participant_account(participant)
+
+        account.refresh_from_db()
+        self.assertEqual(account.email, "pia.new@example.com")

@@ -16,7 +16,8 @@ accounts that must not notice it. The rules that follow from that:
 * **Access grants are not restored either.** Who may manage or view a
   community today is not part of rolling its data back, any more than accounts
   are. A restore that recreates a deleted community leaves it without
-  managers; an admin grants access to it afterwards.
+  managers; an admin grants access to it afterwards. Restored managing roles
+  protect newly linked accounts before commit, retiring participant credentials.
 * **Every check runs twice**: once to tell the operator (a dry run is the plan),
   and again under the row lock immediately before the first write, because
   minutes can pass between them.
@@ -39,7 +40,12 @@ from typing import BinaryIO
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import DatabaseError, IntegrityError, connection, transaction
+from django.db.models import Q
+
+from zev.models import MANAGING_ROLES
+from zev.services import has_login_credentials, is_pending_invitation, protect_account_login
 
 
 from . import archive
@@ -83,6 +89,7 @@ class ArchiveFacts:
     contract_issue_ids: set[str]
     meter_ids: set[str]
     external: dict[str, set[str]] = field(default_factory=dict)  # model label → referenced ids
+    managing_user_ids: set[int] = field(default_factory=set)  # backed-up users linked to an issuer/representative party
     counts: dict[str, int] = field(default_factory=dict)  # section → rows in the backup
     media_files: int = 0
     media_missing: int = 0
@@ -146,7 +153,9 @@ def read_facts(zf, manifest: dict, entry: dict) -> ArchiveFacts:
     )
 
     external = _foreign_keys_outside_scope()
-    wanted = {"metering_points", "tariffs", "invoices", "contract_issues"}
+    wanted = {"participants", "metering_points", "tariffs", "invoices", "contract_issues"}
+    links: list[tuple[str, int]] = []  # (party pk, user id)
+    managing_parties: set[str] = set()
     for name, parts in ZEV_SECTIONS:
         if name not in wanted:
             continue
@@ -163,10 +172,15 @@ def read_facts(zf, manifest: dict, entry: dict) -> ArchiveFacts:
                 facts.contract_issue_ids.add(record["pk"])
             elif canonical == "zev.MeteringPoint":
                 facts.meter_ids.add(fields.get("meter_id", ""))
+            elif canonical in ("zev.Party", "zev.Participant") and fields.get("user") is not None:
+                links.append((str(record["pk"] if canonical == "zev.Party" else fields["party"]), fields["user"]))
+            elif canonical == "zev.ZevPartyRole" and fields.get("role") in MANAGING_ROLES:
+                managing_parties.add(str(fields["party"]))
             for fk in external.get(canonical, []):
                 value = fields.get(fk.name)
                 if value is not None:
                     facts.external.setdefault(fk.related_model._meta.label, set()).add(str(value))
+    facts.managing_user_ids = {user_id for party, user_id in links if party in managing_parties}
     return facts
 
 
@@ -259,6 +273,15 @@ def evaluate(facts: ArchiveFacts, *, force: bool, exclude_job=None) -> dict:
             _conflict("referenced_row_missing", f"{model._meta.verbose_name}: {pk}", overridable=False)
             for pk in gone[:_MAX_LISTED]
         ]
+
+    # Restored managing roles protect their accounts, which needs a login to protect.
+    relinked = {mapping.get(user_id) for user_id in facts.managing_user_ids} - {None}
+    without_login = [
+        user.email or user.username
+        for user in get_user_model().objects.filter(pk__in=relinked, independent_login_required=False).order_by("pk")
+        if not has_login_credentials(user) and not is_pending_invitation(user)
+    ]
+    conflicts += [_conflict("login_setup_required", d, overridable=False) for d in _listed(without_login)]
 
     export_model = apps.get_model("exports.ExportJob")
     if export_model._base_manager.filter(zev_id=facts.zev_id, status__in=("queued", "running")).exists():
@@ -459,6 +482,19 @@ def restore_zev(
                 progress("Replacing the community's data…")
                 _clear_zev(zev_id, facts.contract_issue_ids)
                 _apply(zf, manifest, facts, report, referenced, write=True)
+                # Raw restore writes bypass model guards; protect newly managing accounts before commit.
+                accounts = get_user_model().objects.filter(independent_login_required=False).filter(
+                    Q(parties__roles__zev_id=zev_id, parties__roles__role__in=MANAGING_ROLES)
+                    | Q(participations__party__roles__zev_id=zev_id,
+                        participations__party__roles__role__in=MANAGING_ROLES)
+                ).distinct().order_by("pk")
+                for account in accounts:
+                    try:
+                        protect_account_login(account)
+                    except ValidationError as exc:
+                        raise RestoreError(
+                            "Restore requires login setup for a managing account; nothing was restored."
+                        ) from exc
                 _verify_counts(zev_id, report)
                 connection.check_constraints()
                 progress("Restoring invoice PDFs…")

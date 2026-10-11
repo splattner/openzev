@@ -351,10 +351,24 @@ class Party(models.Model):
             raise ValidationError({"organisation_name": "An organisation needs a name."})
         if self.kind == PartyKind.PERSON and not self.last_name.strip():
             raise ValidationError({"last_name": "A person needs a last name."})
+        if self.user_id and self.roles.filter(role__in=MANAGING_ROLES).exists():
+            previous = Party.objects.filter(pk=self.pk).values_list("user_id", flat=True).first()
+            if previous != self.user_id:
+                from .services import validate_account_login
 
+                validate_account_login(self.user)
+
+    @transaction.atomic
     def save(self, *args, **kwargs):
         self.sort_name = self.compute_sort_name()
         update_fields = kwargs.get("update_fields")
+        if self.user_id and (update_fields is None or {"user", "user_id"}.intersection(update_fields)):
+            previous = Party.objects.select_for_update().filter(pk=self.pk).values("user_id").first()
+            if previous is not None and previous["user_id"] != self.user_id:
+                from .services import protect_account_login
+
+                if self.roles.filter(role__in=MANAGING_ROLES).exists():
+                    self.user = protect_account_login(self.user)
         if update_fields is not None and "sort_name" not in update_fields:
             kwargs["update_fields"] = [*update_fields, "sort_name"]
         super().save(*args, **kwargs)
@@ -501,6 +515,15 @@ class Participant(models.Model):
         super().clean()
         if self.party_id is not None and self.zev_id is not None and self.party.zev_id != self.zev_id:
             raise ValidationError({"party": "The party belongs to another ZEV."})
+        previous = Participant.objects.filter(pk=self.pk).values("user_id", "party_id").first()
+        if (
+            self.user_id and self.party_id
+            and previous != {"user_id": self.user_id, "party_id": self.party_id}
+            and self.party.roles.filter(role__in=MANAGING_ROLES).exists()
+        ):
+            from .services import validate_account_login
+
+            validate_account_login(self.user)
 
     def save(self, *args, **kwargs):
         pending = self.__dict__.pop("_party_pending", {})
@@ -525,6 +548,16 @@ class Participant(models.Model):
                 party.save(update_fields=[*pending, "updated_at"])
             if kwargs.get("update_fields") == []:
                 return
+            if self.user_id and (
+                update_fields is None or {"user", "user_id", "party", "party_id"}.intersection(update_fields)
+            ):
+                party = Party.objects.select_for_update().get(pk=self.party_id)
+                previous = Participant.objects.filter(pk=self.pk).values("user_id", "party_id").first()
+                if previous != {"user_id": self.user_id, "party_id": self.party_id}:
+                    from .services import protect_account_login
+
+                    if party.roles.filter(role__in=MANAGING_ROLES).exists():
+                        self.user = protect_account_login(self.user)
             super().save(*args, **kwargs)
 
     def refresh_from_db(self, using=None, fields=None, from_queryset=None):
@@ -874,6 +907,28 @@ class ZevAccessGrant(models.Model):
     def __str__(self):
         return f"{self.user} {self.role} {self.zev.name}"
 
+    def clean(self):
+        super().clean()
+        if self._state.adding and self.user_id:
+            from .services import validate_account_login
+
+            validate_account_login(self.user)
+
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        if self._state.adding:
+            from .services import protect_account_login
+
+            self.user = protect_account_login(self.user)
+        else:
+            type(self.user).objects.locked().get(pk=self.user_id)
+            previous = ZevAccessGrant.objects.filter(pk=self.pk).values("zev_id", "user_id").first()
+            if previous is None:
+                raise ValidationError("This grant was removed in the meantime.")
+            if previous != {"zev_id": self.zev_id, "user_id": self.user_id}:
+                raise ValidationError("A grant cannot change its ZEV or account. Revoke it and create a new grant.")
+        super().save(*args, **kwargs)
+
 
 class PartyRole(models.TextChoices):
     ISSUER = "issuer", "Issuer"
@@ -898,8 +953,8 @@ class ZevPartyRole(models.Model):
     who acts for the ZEV toward the grid operator; ``landowner``: an owner of
     the land or building. Issuer and representative have at most one holder on
     any day, landowners any number. The window is inclusive at both ends, as in
-    ADR 0001; ``valid_to`` null is open-ended. Holding a role grants nothing in
-    OpenZEV — accounts act through ``ZevAccessGrant``. Written through
+    ADR 0001; ``valid_to`` null is open-ended. Issuer and representative accounts
+    derive manager access for the role's window. Written through
     ``zev.parties``, which keeps the windows of a single-holder role apart.
     """
 
@@ -956,3 +1011,20 @@ class ZevPartyRole(models.Model):
 
     def __str__(self):
         return f"{self.party} {self.role} {self.valid_from}–{self.valid_to or ''}"
+
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            previous = ZevPartyRole.objects.filter(pk=self.pk).values("zev_id", "party_id", "role").first()
+            if previous is None:
+                raise ValidationError("This role was removed in the meantime.")
+            if previous != {"zev_id": self.zev_id, "party_id": self.party_id, "role": self.role}:
+                raise ValidationError("A role cannot change its ZEV, party or kind. End it and assign a new role.")
+        elif self.role in MANAGING_ROLES:
+            from .access import party_accounts
+            from .services import protect_account_login
+
+            party = Party.objects.select_for_update().get(pk=self.party_id)
+            for user in sorted(party_accounts(party), key=lambda user: user.pk):
+                protect_account_login(user)
+        super().save(*args, **kwargs)

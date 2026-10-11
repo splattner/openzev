@@ -299,7 +299,12 @@ keep their existing `oauth.login` event, which already names the provider. `pass
 `auth.mfa.challenge_failed` with the reason.
 
 **The challenge token** is `django.core.signing.TimestampSigner(salt="accounts.mfa.challenge")`
-over the user PK, with `max_age = MFA_CHALLENGE_TTL` (5 minutes). A signed token rather than a
+over `{user: pk, sv: session_version}`, with `max_age = MFA_CHALLENGE_TTL`
+(5 minutes). Resolution requires an active user and the current session version;
+session revocation invalidates outstanding challenges. Deploying the object-signed
+format rejects challenges issued by the previous scalar-signed format as
+`invalid_challenge`; users in the second step must restart login (a window of at
+most `MFA_CHALLENGE_TTL`, 5 minutes). A signed token rather than a
 JWT deliberately: it is structurally incapable of authenticating a request, because no
 authentication class parses it, so a bug cannot promote it into a session.
 

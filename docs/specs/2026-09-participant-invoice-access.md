@@ -26,8 +26,8 @@ than leaving a reader to infer it from a section that postdates the status.
 
 ## 1. Problem and outcome
 
-`send_participant_invitation()` (`backend/zev/services.py:98`) is the only door
-in: it generates a temporary password, sets `must_change_password`, and emails a
+Before invoice and onboarding links, `send_participant_invitation()` was the only door
+in: it generated a temporary password, set `must_change_password`, and emailed a
 username and that password. Before seeing a single number a participant must
 find the email, log in with a generated password, then invent and store a new
 one.
@@ -290,18 +290,13 @@ This removes account enumeration from the design rather than mitigating it: ther
 is no address field to probe.
 
 **Response is always 202** with `{"detail": "If the account can be reached, a
-link has been sent."}` — including when the participant has no email on file.
-
-Creates the user via `ensure_participant_account()` if absent, then clears what
-that helper sets for the invitation flow: the temporary password becomes
-unusable and `must_change_password` goes to `False`. Nothing here transmits that
-password, so leaving it usable would keep alive a credential nobody holds and
-nobody can rotate — and leaving the flag set would strand a magic-link user in a
-form asking them to change a password they were never given.
-
-**Consuming a link also disarms an outstanding invitation.** A participant who
-was invited, never activated, and then used a magic link instead would otherwise
-leave the emailed temporary password valid indefinitely.
+link has been sent."}` — including when the participant has no email on file,
+and when its account requires independent authentication. `account_for_participant`
+catches `LinkRefused` from `link_account_for` and returns `None`; nothing is
+issued or sent. Eligibility, promotion and cancellation follow the canonical
+[onboarding account policy](2026-09-participant-onboarding-link.md#no-link-signs-in-an-account-with-its-own-login).
+Eligible accounts are created passwordless by `ensure_participant_account`,
+with `must_change_password=False`.
 
 **Throttle:** `MagicLinkRequestThrottle` at 5/hour keyed on the **invoice
 prefix**, with `InvoiceLinkThrottle`'s per-IP ceiling applying to the same view.
@@ -316,10 +311,18 @@ Marks `consumed_at`, issues the normal auth cookies via the same helper
 `verify_email` uses, and returns the user payload. Subsequent requests are an
 ordinary participant session with ordinary participant scoping.
 
+A link whose account gained its own login after it was issued is spent without
+signing in (`magic_links.consume` returns `None`): such an account signs in with
+its own login (§5.3).
+
+Consumption locks the user before the token, matching access promotion's lock
+order. First independent access retires outstanding participant credentials
+and sessions (onboarding spec §4).
+
 | Status | When |
 |---|---|
 | 200 | Valid, unconsumed, within 15 minutes |
-| 400 | Unknown, consumed, or expired |
+| 400 | Unknown, consumed, expired, or the account now has its own login |
 | 429 | Throttled |
 
 ### 5.5 Tier 1 — the charts
@@ -613,6 +616,8 @@ Two consequences that constrain the design and are not negotiable within it:
 |---|---|
 | `test_request_sends_to_the_address_on_file` | Mail sent to `participant.email`, not to anything supplied |
 | `test_request_without_email_still_returns_202` | Same body as the success case |
+| `test_no_link_for_an_account_with_its_own_login` | 202, nothing sent, no token for an account that manages another ZEV |
+| `test_an_outstanding_link_stops_once_the_account_requires_independent_login` | 400 and no session once the account gained independent access |
 | `test_consume_issues_a_session` | Auth cookies set; a follow-up request is authenticated |
 | `test_consume_is_one_time` | Second attempt 400 |
 | `test_expired_token_is_400` | Past 15 minutes |

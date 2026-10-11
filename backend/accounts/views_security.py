@@ -18,7 +18,7 @@ from . import email_change, emails, notifications
 from .jwt_utils import impersonator_of
 from .models import User
 from .permissions import IsAdmin
-from .session_revocation import keep_current_session, revoke_sessions
+from .session_revocation import keep_current_session, lock_current_session, revoke_sessions
 from .throttling import AuthEmailChangeThrottle, AuthVerifyThrottle
 
 logger = logging.getLogger(__name__)
@@ -168,8 +168,9 @@ class RevokeOwnSessionsView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, *args, **kwargs):
-        user = request.user
+        user = lock_current_session(request)
         if impersonator_of(request.auth):
             return Response(NOT_WHILE_IMPERSONATING, status=status.HTTP_403_FORBIDDEN)
         revoke_sessions(user)

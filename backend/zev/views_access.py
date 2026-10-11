@@ -20,7 +20,9 @@ import logging
 
 from django.conf import settings
 from django.core.mail import EmailMessage
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -35,8 +37,11 @@ from audit.services import record_audit_event
 from config.safe_format import render_with_fallback
 
 from . import access
-from .models import Participant, Party, Zev, ZevAccessGrant, ZevAccessRole
-from .services import build_unique_username, issue_invitation
+from .models import Party, Zev, ZevAccessGrant, ZevAccessRole
+from .services import (
+    build_unique_username, requires_independent_login, has_login_credentials,
+    is_pending_invitation, issue_invitation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,13 +50,6 @@ DISABLED_MESSAGE = "This ZEV is disabled. Ask an admin to re-enable it first."
 
 
 # ── serializers ──────────────────────────────────────────────────────────────
-
-
-def is_pending_invitation(user) -> bool:
-    """An account created by an invitation that has not been accepted yet."""
-    return not user.is_active and user.email_verification_tokens.filter(
-        purpose=EmailVerificationToken.Purpose.INVITATION, consumed_at__isnull=True
-    ).exists()
 
 
 def _account_summary(user) -> dict:
@@ -282,37 +280,41 @@ class ZevAccessListView(_ZevAccessBase):
         role = payload.validated_data["role"]
         valid_to = payload.validated_data.get("valid_to")
         party = payload.validated_data.get("party")
-        if party is not None:
-            if party.zev_id != zev.pk:
-                return Response({"party": ["The party belongs to another ZEV."]}, status=status.HTTP_400_BAD_REQUEST)
-            accounts = access.party_accounts(party)
-            if accounts:
-                account, email = accounts[0], accounts[0].email
-            elif party.email.strip():
-                email = party.email.strip()
-                account = User.objects.filter(email__iexact=email).order_by("pk").first()
+        field = "party" if party is not None else "email"
+        with transaction.atomic():
+            if party is not None:
+                party = Party.objects.select_for_update().get(pk=party.pk)
+                if party.zev_id != zev.pk:
+                    return Response({"party": ["The party belongs to another ZEV."]}, status=status.HTTP_400_BAD_REQUEST)
+                accounts = access.party_accounts(party)
+                if accounts:
+                    account, email = accounts[0], accounts[0].email
+                elif party.email.strip():
+                    email = party.email.strip()
+                    account = User.objects.filter(email__iexact=email).order_by("pk").first()
+                else:
+                    return Response(
+                        {"party": ["This party has no email address to send an invitation to. Add one first."]},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
             else:
+                email = payload.validated_data["email"].strip()
+                account = User.objects.filter(email__iexact=email).order_by("pk").first()
+            if account is not None:
+                # Concurrent grants for this account wait here, then see each other's grant.
+                account = User.objects.locked().get(pk=account.pk)
+            if account is not None and account.is_admin:
+                return Response({field: ["Admins already have access to every ZEV."]}, status=status.HTTP_400_BAD_REQUEST)
+            if account is not None and ZevAccessGrant.objects.filter(
+                zev=zev, user=account, valid_to__isnull=True
+            ).exists():
                 return Response(
-                    {"party": ["This party has no email address to send an invitation to. Add one first."]},
+                    {field: ["This account already has access to this ZEV. Change its role instead."]},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        else:
-            email = payload.validated_data["email"].strip()
-            account = User.objects.filter(email__iexact=email).order_by("pk").first()
-        field = "party" if party is not None else "email"
-        if account is not None and account.is_admin:
-            return Response({field: ["Admins already have access to every ZEV."]}, status=status.HTTP_400_BAD_REQUEST)
-        if account is not None and ZevAccessGrant.objects.filter(
-            zev=zev, user=account, valid_to__isnull=True
-        ).exists():
-            return Response(
-                {field: ["This account already has access to this ZEV. Change its role instead."]},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
-        invited = account is None
-        with transaction.atomic():
-            if invited:
+            needs_invitation = account is None
+            if needs_invitation:
                 account = User.objects.create_user(
                     username=build_unique_username(first_name="", last_name="", email=email, fallback="user"),
                     email=email,
@@ -322,21 +324,42 @@ class ZevAccessListView(_ZevAccessBase):
                 )
                 account.set_unusable_password()
                 account.save(update_fields=["password"])
-            grant = ZevAccessGrant.objects.create(
-                zev=zev, user=account, role=role, valid_from=timezone.localdate(), valid_to=valid_to,
-                granted_by=request.user,
-            )
-            # A party given access keeps its account: that is how its issuer or
-            # representative role reaches the same login later.
+            else:
+                needs_invitation = not has_login_credentials(account)
+                if needs_invitation and not request.user.is_admin:
+                    if (
+                        requires_independent_login(account)
+                        or not account.participations.filter(zev=zev).exists()
+                        or account.participations.exclude(zev=zev).exists()
+                    ):
+                        _audit(
+                            request, zev, action_type="zev_access.invite", user=account,
+                            summary=f"Denied invitation on {zev.name}: account outside participant scope.",
+                            event_status=AuditEventStatus.DENIED,
+                        )
+                        return Response(
+                            {field: ["Only an admin can invite this account."]},
+                            status=status.HTTP_403_FORBIDDEN,
+                        )
+                if needs_invitation:
+                    account.is_active = False
+                    account.save(update_fields=["is_active"])
+            token = issue_invitation(account) if needs_invitation else None
+            try:
+                grant = ZevAccessGrant.objects.create(
+                    zev=zev, user=account, role=role, valid_from=timezone.localdate(), valid_to=valid_to,
+                    granted_by=request.user,
+                )
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError({field: exc.messages}) from exc
             if party is not None and not access.party_accounts(party):
                 party.user = account
                 party.save(update_fields=["user", "updated_at"])
-            token = issue_invitation(account) if invited else None
         access.invalidate(account)
 
         email_sent = True
         try:
-            if invited:
+            if needs_invitation:
                 send_invitation(zev, grant, token)
             else:
                 send_granted_notice(zev, grant)
@@ -344,8 +367,8 @@ class ZevAccessListView(_ZevAccessBase):
             logger.exception("Could not send the ZEV access email for grant %s", grant.pk)
             email_sent = False
 
-        action_type = "zev_access.invite" if invited else "zev_access.grant"
-        verb = "Invited" if invited else "Gave"
+        action_type = "zev_access.invite" if needs_invitation else "zev_access.grant"
+        verb = "Invited" if needs_invitation else "Gave"
         _audit(
             request, zev, action_type=action_type, grant=grant,
             summary=f"{verb} {email} {role} access to {zev.name}.",
@@ -388,13 +411,16 @@ class ZevAccessDetailView(_ZevAccessBase):
                             status=status.HTTP_400_BAD_REQUEST)
 
         before = {"role": grant.role, "valid_to": grant.valid_to.isoformat() if grant.valid_to else None}
-        with transaction.atomic():
-            if role != grant.role:
-                grant = access.change_role(grant, role, by=request.user)
-                grant = ZevAccessGrant.objects.select_related("user", "granted_by").get(pk=grant.pk)
-            if "valid_to" in data:
-                grant.valid_to = data["valid_to"]
-                grant.save(update_fields=["valid_to", "updated_at"])
+        try:
+            with transaction.atomic():
+                if role != grant.role:
+                    grant = access.change_role(grant, role, by=request.user)
+                    grant = ZevAccessGrant.objects.select_related("user", "granted_by").get(pk=grant.pk)
+                if "valid_to" in data:
+                    grant.valid_to = data["valid_to"]
+                    grant.save(update_fields=["valid_to", "updated_at"])
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"detail": exc.messages}) from exc
         access.invalidate(grant.user)
         after = {"role": grant.role, "valid_to": grant.valid_to.isoformat() if grant.valid_to else None}
         _audit(
@@ -410,23 +436,33 @@ class ZevAccessDetailView(_ZevAccessBase):
         if refusal is not None:
             return refusal
         grant = self.grant_in(zev, pk)
-        if grant.role == ZevAccessRole.MANAGER and access.is_last_manager(grant):
-            return Response({"detail": LAST_MANAGER_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
 
         user = grant.user
         display = user.email or user.username
         with transaction.atomic():
+            user = get_object_or_404(User.objects.locked(), pk=user.pk)
+            grant = self.grant_in(zev, pk)
+            grant.user = user
+            if grant.role == ZevAccessRole.MANAGER and access.is_last_manager(grant):
+                return Response({"detail": LAST_MANAGER_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
             access.revoke(grant)
             # An invitation nobody accepted leaves an account that never signed
             # in; once it has nothing left, it goes too.
             removed_account = False
-            if (
-                is_pending_invitation(user)
-                and not ZevAccessGrant.objects.filter(user=user).exclude(valid_to__lt=timezone.localdate()).exists()
-                and not Participant.objects.filter(user=user).exists()
+            if is_pending_invitation(user) and not (
+                user.is_admin or user.may_create_zev
+                or user.zev_grants.filter(Q(valid_to__isnull=True) | Q(valid_to__gte=timezone.localdate())).exists()
+                or access.role_holdings(user).exists()
             ):
-                user.delete()
-                removed_account = True
+                if not user.participations.exists() and not user.independent_login_required:
+                    user.delete()
+                    removed_account = True
+                else:
+                    user.is_active = True
+                    user.save(update_fields=["is_active"])
+                    user.email_verification_tokens.filter(
+                        purpose=EmailVerificationToken.Purpose.INVITATION, consumed_at__isnull=True,
+                    ).update(consumed_at=timezone.now())
         if not removed_account:
             access.invalidate(user)
         _audit(
@@ -446,11 +482,14 @@ class ZevAccessResendInvitationView(_ZevAccessBase):
         if refusal is not None:
             return refusal
         grant = self.grant_in(zev, pk)
-        # Never activated: the invitation was not accepted (or its link expired).
-        if grant.user.is_active:
-            return Response({"detail": "This account has already accepted its invitation."},
-                            status=status.HTTP_400_BAD_REQUEST)
-        token = issue_invitation(grant.user)
+        with transaction.atomic():
+            user = get_object_or_404(User.objects.locked(), pk=grant.user_id)
+            grant = self.grant_in(zev, pk)
+            grant.user = user
+            if user.is_active or (grant.valid_to is not None and grant.valid_to < timezone.localdate()):
+                return Response({"detail": "This grant no longer has a pending invitation."},
+                                status=status.HTTP_400_BAD_REQUEST)
+            token = issue_invitation(user)
         email_sent = True
         try:
             send_invitation(zev, grant, token)

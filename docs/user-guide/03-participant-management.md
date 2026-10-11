@@ -81,6 +81,10 @@ former participant, select **Ended** before searching.
 
 ## Participant Account Access
 
+Onboarding and invoice sign-in links are available to participant-only accounts.
+[Independent-access accounts](11-roles-and-permissions.md#give-a-participant-an-account)
+use their normal login; sending or copying an onboarding link is refused.
+
 Participants can:
 - Sign in through their onboarding link, and afterwards with their email and
   a password they choose themselves
@@ -118,10 +122,14 @@ An entry also shows the roles the participant holds in the community today:
 ### A Participant Forgot Their Password
 
 There is no "forgot password" link on the login page. Send or copy the
-participant's onboarding link again from **⋯** on their entry: it signs
+onboarding link for a participant-only account from **⋯** on their entry: it signs
 them in, and they then choose a new password. If their invoices carry the
 [participant QR code](02-zev-setup.md#participant-access-from-the-invoice),
 they can also request a sign-in link themselves from the page it opens.
+
+For accounts with independent access, use their external sign-in provider or
+ask someone with server access to reset the password; see
+[Roles and Permissions](11-roles-and-permissions.md#user-cannot-login).
 
 ## Participation Contract
 

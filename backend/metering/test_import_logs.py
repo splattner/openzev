@@ -30,9 +30,9 @@ class ImportLogDeletionTests(TestCase):
         self.client = APIClient()
         self.owner = make_user("import_delete_owner", UserRole.USER)
         self.other_owner = make_user("import_delete_other", UserRole.USER)
-        auth(self.client, self.owner)
 
         self.zev = create_managed_zev(name="Delete Imports ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="D")
+        auth(self.client, self.owner)
         self.other_zev = create_managed_zev(name="Other Imports ZEV", owner=self.other_owner, zev_type="vzev", invoice_prefix="O")
         self.participant = Participant.objects.create(
             zev=self.zev,

@@ -47,6 +47,7 @@ def create_managed_zev(*, owner=None, **fields) -> Zev:
     zev = Zev.objects.create(**fields)
     if owner is not None:
         grant_manager(zev, owner)
+        owner.refresh_from_db(fields=["session_version", "independent_login_required"])
     return zev
 
 
@@ -90,6 +91,7 @@ def authenticate(client, user) -> None:
     Mirrors the production ``CookieJWTAuthentication`` header fallback so test
     clients can authenticate without driving the full cookie-based login flow.
     """
+    user.refresh_from_db(fields=["session_version"])
     refresh = RefreshToken.for_user(user)
     # As production issuance does (accounts.jwt_utils.add_custom_claims), so a
     # test that signs the account out and authenticates again gets a token that

@@ -277,6 +277,26 @@ belongs to:
    person who rents in two communities keeps one login
 4. To detach an account again, choose **Unlink** (the account itself stays as it is)
 
+Independent-access accounts are admins, accounts allowed to create a community,
+and current/former manager/viewer grant or issuer/representative role holders.
+They use their normal login; participant links are refused, including after
+accepted access is revoked or admin/self-setup privileges are removed.
+
+An existing linked account without a password, enabled sign-in provider or
+passkey needs an access invitation before you assign a managing role. A party
+without an account can hold a role; invite it to enable sign-in. Giving manager/viewer access
+sends that invitation and ends their earlier participant links, sessions and API keys.
+Managers can start this flow only for participant accounts confined to their
+community; ask an admin for other accounts. Failed delivery leaves the invitation
+pending: use **Resend invitation** on the access row.
+
+Cancelling an invitation that was never accepted restores participant login when
+no other grant, managing role or independent-login requirement remains, even
+if it was sent on an earlier day. Send a fresh onboarding link. Remaining
+protected relationships keep the account in the invitation flow. Cancelling a
+reinvitation restores a previously protected account's active state when no open
+access remains; participant links stay refused. Use [account recovery](#user-cannot-login) if it has no independent credentials.
+
 ### Other Account Actions
 
 Open **More** on an account row for:
@@ -505,10 +525,11 @@ access under **ZEV settings → People & access**.
 **Fix:**
 1. Check the account under **Platform → Accounts → Users**: is it active, and
    has it ever signed in?
-2. **Participant:** a manager of the community sends or copies the onboarding link
+2. **Participant-only account:** a manager of the community sends or copies the onboarding link
    again from the **⋯** menu on the participant's row. It signs them in, and they
    choose a new password.
-3. **Manager or admin who forgot their password:** someone with server access
+3. **Account with independent access:** use its external sign-in provider, if
+   configured. For a forgotten password, someone with server access
    sets a new one on the command line (the user then signs in with it; the
    service is `backend` instead of `app` in a two-container source build):
 

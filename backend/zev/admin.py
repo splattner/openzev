@@ -63,3 +63,6 @@ class ZevAccessGrantAdmin(admin.ModelAdmin):
     list_filter = ("role",)
     search_fields = ("zev__name", "user__email", "user__username")
     raw_id_fields = ("user", "granted_by")
+
+    def get_readonly_fields(self, request, obj=None):
+        return ("zev", "user") if obj is not None else ()

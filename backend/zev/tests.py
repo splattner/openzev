@@ -652,7 +652,9 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 		self.assertEqual(self.client.get(f"/api/v1/zev/zevs/{self.zev.id}/").status_code, 200)
 
 	@mock.patch("zev.tasks.warm_building_geocode_cache_task.delay")
-	def test_profile_sync_preserves_privileged_roles(self, mock_geocode_delay):
+	def test_editing_the_participant_leaves_a_privileged_login_alone(self, mock_geocode_delay):
+		# The login's email is how it signs in, so the participant record does
+		# not rewrite it; the account changes its own address.
 		admin = make_user("admin_edit_privileged", UserRole.ADMIN)
 		for role in (UserRole.ADMIN, UserRole.USER):
 			with self.subTest(role=role):
@@ -665,11 +667,14 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 					format="json",
 				)
 				self.assertEqual(resp.status_code, 200)
+				self.owner_participant.refresh_from_db()
+				self.assertEqual(self.owner_participant.email, "updated.owner@example.com")
 				self.owner.refresh_from_db()
 				self.assertEqual(self.owner.role, role)
-				self.assertEqual(self.owner.first_name, "Updated")
-				self.assertEqual(self.owner.last_name, "Owner")
-				self.assertEqual(self.owner.email, "updated.owner@example.com")
+				self.assertEqual(
+					(self.owner.first_name, self.owner.last_name, self.owner.email),
+					("", "", "owner_for_edit_test@example.com"),
+				)
 				auth(self.client, self.owner)
 				self.assertEqual(self.client.get(f"/api/v1/zev/zevs/{self.zev.id}/").status_code, 200)
 
@@ -693,8 +698,8 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 					zev=self.zev, user=account, first_name="Invited", last_name="Person",
 					email=account.email, valid_from=date(2026, 1, 1),
 				)
+				sent_before = len(mail.outbox)
 				resp = self.client.post(f"/api/v1/zev/participants/{participant.id}/send-onboarding-link/")
-				self.assertEqual(resp.status_code, 200)
 				account.refresh_from_db()
 				# The role is no longer rewritten (#761): what an account may
 				# do comes from its grants and participant rows.
@@ -703,8 +708,15 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 				# survive being invited as a participant — only an account
 				# with no login of its own is neutralized.
 				self.assertEqual(account.has_usable_password(), has_own_login)
-				self.assertEqual(mail.outbox[-1].to, [participant.email])
-				self.assertIn(resp.data["onboarding_url"], mail.outbox[-1].body)
+				if has_own_login:
+					# It signs in with that login; a link would hand it to
+					# whoever holds the link — even when an admin asks.
+					self.assertEqual(resp.status_code, 400)
+					self.assertEqual(len(mail.outbox), sent_before)
+				else:
+					self.assertEqual(resp.status_code, 200)
+					self.assertEqual(mail.outbox[-1].to, [participant.email])
+					self.assertIn(resp.data["onboarding_url"], mail.outbox[-1].body)
 
 	def test_zev_owner_cannot_edit_their_own_owner_participant_record(self):
 		auth(self.client, self.owner)
@@ -2760,7 +2772,7 @@ class SeedDemoReseedTests(SeedDemoWindow, TestCase):
 		from accounts.models import User
 		from zev import access
 		from zev.models import MeteringPointAssignment, Participant, PartyKind, ZevPartyRole
-		from zev.views_access import is_pending_invitation
+		from zev.services import is_pending_invitation
 
 		flagship = Zev.objects.get(name=DEMO_ZEV_NAME)
 		second_zev = Zev.objects.get(name=SECOND_DEMO_ZEV_NAME)

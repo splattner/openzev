@@ -259,3 +259,20 @@ it('rejects a participant write queued before its scope changes', async () => {
     expect(state.write).not.toHaveBeenCalled()
     expect(state.toast).not.toHaveBeenCalled()
 })
+
+it.each(onboarding.filter(action => action.name !== 'revoke').flatMap(action => [
+    { ...action, code: 'own_login_required', message: 'ownLoginRequired' },
+    { ...action, code: 'login_setup_required', message: 'loginSetupRequired' },
+]))('localizes $code for $name', async ({ run, code, message }) => {
+    state.onboardingWrite.mockRejectedValue({ isAxiosError: true, response: { data: { code, error: 'Server fallback' } } })
+    act(() => run())
+    await waitForCondition(() => state.toast.mock.calls.length > 0, 'refusal toast')
+    expect(state.toast).toHaveBeenCalledWith(`pages.participants.messages.${message}`, 'error')
+})
+
+it.each(onboarding)('keeps ordinary $name error messages', async ({ run }) => {
+    state.onboardingWrite.mockRejectedValue({ isAxiosError: true, response: { data: { detail: 'Network failure' } } })
+    act(() => run())
+    await waitForCondition(() => state.toast.mock.calls.length > 0, 'failure toast')
+    expect(state.toast).toHaveBeenCalledWith('Network failure', 'error')
+})

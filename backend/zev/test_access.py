@@ -245,8 +245,8 @@ class GrantMigrationTests(TransactionTestCase):
         return executor.loader.project_state(targets).apps
 
     def test_migration_grants_every_owner(self):
-        old = self.migrate([("zev", "0030_meteringpoint_has_behind_meter_generation")])
         owner = make_user("mig_owner", UserRole.USER)
+        old = self.migrate([("zev", "0030_meteringpoint_has_behind_meter_generation")])
         OldZev = old.get_model("zev", "Zev")
         zevs = [
             OldZev.objects.create(name=f"Mig {n}", owner_id=owner.pk, zev_type="vzev", invoice_prefix="M",

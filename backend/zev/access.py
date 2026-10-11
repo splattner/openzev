@@ -233,15 +233,25 @@ def is_last_manager(grant: ZevAccessGrant) -> bool:
     return not has_manager(grant.zev_id, exclude_grant=grant)
 
 
+@transaction.atomic
 def revoke(grant: ZevAccessGrant, *, today: date | None = None) -> ZevAccessGrant | None:
     """End ``grant`` so it no longer applies today.
 
     The window is inclusive, so ending it *today* would leave today's access in
     place: it ends yesterday instead. A grant that has not taken effect yet
     (starts today or later) never applied and is deleted. An already-ended grant
-    is left alone. Returns the ended row, or ``None`` when it was deleted.
+    is left alone. Unprotected pending invitation grants are deleted regardless of age.
+    Returns the ended row, or ``None`` when it was deleted.
     """
+    from .services import is_pending_invitation
+
+    grant.user = type(grant.user).objects.locked().get(pk=grant.user_id)
+    grant.refresh_from_db(fields=["valid_from", "valid_to"])
     today = today or _today()
+    if is_pending_invitation(grant.user) and not grant.user.independent_login_required:
+        # Unaccepted grants never became usable, regardless of their start date.
+        grant.delete()
+        return None
     if grant.valid_to is not None and grant.valid_to < today:
         return grant
     if grant.valid_from >= today:

@@ -50,7 +50,13 @@ from .serializers import (
 )
 from .authentication import enforce_csrf
 from .jwt_utils import make_jwt_for_user, record_login
-from .session_revocation import is_session_current, keep_current_session, revoke_sessions, validate_refresh_token
+from .session_revocation import (
+    is_session_current,
+    keep_current_session,
+    lock_current_session,
+    revoke_sessions,
+    validate_refresh_token,
+)
 from .cookies import (
     ACCESS_COOKIE,
     ADMIN_ACCESS_COOKIE,
@@ -584,13 +590,16 @@ def me(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def change_password(request):
-    serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
-    serializer.is_valid(raise_exception=True)
-    serializer.save()
-    # A new password ends every other session — someone who knew the old one
-    # (or held a stolen session) must not stay signed in. This session carries on.
-    revoke_sessions(request.user)
-    links_revoked = zev_onboarding.revoke_active_for_user(request.user)
+    with transaction.atomic():
+        request.user = lock_current_session(request)
+        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        # Password changes retire other sessions; this authenticated caller keeps theirs.
+        revoke_sessions(request.user)
+        links_revoked = zev_onboarding.revoke_active_for_user(request.user)
+        response = Response({"detail": "Password updated successfully."})
+        keep_current_session(request, response, request.user)
     record_audit_event(
         request=request,
         action_category=AuditActionCategory.AUTH,
@@ -602,8 +611,6 @@ def change_password(request):
         summary="Changed account password.",
         metadata={"onboarding_links_revoked": links_revoked},
     )
-    response = Response({"detail": "Password updated successfully."})
-    keep_current_session(request, response, request.user)
     notifications.notify(request.user, "password_changed", request=request)
     return response
 
@@ -927,7 +934,11 @@ def verify_email(request):
         token.save(update_fields=["consumed_at"])
         user.email_verification_tokens.filter(consumed_at__isnull=True).delete()
         user.is_active = True
-        user.save(update_fields=["is_active"])
+        update_fields = ["is_active"]
+        if token.purpose == EmailVerificationToken.Purpose.INVITATION:
+            user.independent_login_required = True
+            update_fields.append("independent_login_required")
+        user.save(update_fields=update_fields)
 
         record_audit_event(
             action_category=AuditActionCategory.AUTH,
@@ -963,6 +974,7 @@ def verify_email(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def set_initial_password(request):
     """Set a password for a freshly verified account that has no usable password yet.
 
@@ -979,7 +991,7 @@ def set_initial_password(request):
     if not new_password:
         return Response({"detail": "new_password is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-    user = request.user
+    user = lock_current_session(request)
     if not (user.must_change_password or not user.has_usable_password()):
         record_audit_event(
             request=request,
@@ -1069,7 +1081,9 @@ class TotpDeviceView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, *args, **kwargs):
+        request.user = lock_current_session(request)
         existing = getattr(request.user, "totp_device", None)
         if existing is not None:
             if existing.is_active:
@@ -1101,7 +1115,9 @@ class TotpDeviceView(APIView):
             "qr_svg": mfa.totp_qr_svg(provisioning_uri),
         })
 
+    @transaction.atomic
     def delete(self, request, *args, **kwargs):
+        request.user = lock_current_session(request)
         device = getattr(request.user, "totp_device", None)
         if device is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -1142,7 +1158,9 @@ class TotpEnrolConfirmView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, *args, **kwargs):
+        request.user = lock_current_session(request)
         device = getattr(request.user, "totp_device", None)
         if device is None or device.is_active:
             return Response({"detail": "No pending two-factor setup to confirm."}, status=status.HTTP_400_BAD_REQUEST)
@@ -1182,7 +1200,9 @@ class MfaRecoveryCodesView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, *args, **kwargs):
+        request.user = lock_current_session(request)
         if not mfa.has_any_factor(request.user):
             return Response({"detail": "Two-factor authentication is not enabled."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1274,14 +1294,16 @@ class ApiKeyListCreateView(generics.ListCreateAPIView):
         full_key, prefix, hashed_key = generate_key()
         expires_at = serializer.validated_data.get("expires_at") or default_api_key_expiry()
 
-        api_key = ApiKey.objects.create(
-            user=request.user,
-            name=serializer.validated_data["name"],
-            read_only=serializer.validated_data.get("read_only", False),
-            prefix=prefix,
-            hashed_key=hashed_key,
-            expires_at=expires_at,
-        )
+        with transaction.atomic():
+            user = lock_current_session(request)
+            api_key = ApiKey.objects.create(
+                user=user,
+                name=serializer.validated_data["name"],
+                read_only=serializer.validated_data.get("read_only", False),
+                prefix=prefix,
+                hashed_key=hashed_key,
+                expires_at=expires_at,
+            )
 
         record_audit_event(
             request=request,

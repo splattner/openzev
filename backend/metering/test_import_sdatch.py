@@ -22,9 +22,9 @@ class SdatchImportTests(TestCase):
         self.owner = make_user("sdatch_owner", UserRole.USER)
         self.other_owner = make_user("sdatch_other_owner", UserRole.USER)
         self.admin = make_user("sdatch_admin", UserRole.ADMIN)
-        auth(self.client, self.owner)
 
         self.zev = create_managed_zev(name="SDAT ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="S")
+        auth(self.client, self.owner)
         self.other_zev = create_managed_zev(name="Other SDAT ZEV", owner=self.other_owner, zev_type="vzev", invoice_prefix="O")
         self.participant = Participant.objects.create(
             zev=self.zev,
@@ -286,8 +286,8 @@ class SdatchLimitTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.owner = make_user("sdatch_limit_owner", UserRole.USER)
-        auth(self.client, self.owner)
         self.zev = create_managed_zev(name="SDAT Limit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="Y")
+        auth(self.client, self.owner)
 
     def test_file_over_size_cap_is_reported_without_parsing(self):
         xml = (

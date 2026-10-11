@@ -5,6 +5,7 @@ import string
 from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
@@ -82,19 +83,14 @@ def sync_participant_user_fields(participant, user) -> None:
     user.last_name = participant.last_name
 
 
-def has_its_own_login(user) -> bool:
-    """Whether ``user`` signs in with a password it uses for more than being a
-    participant: an admin, an account that may set up a ZEV of its own
-    (self-registered), or an account holding (or having held) a manager or
-    viewer grant, or the issuer or representative role through its party
-    (#761). Such a password
-    is never neutralized because one of its participant rows was touched.
-    """
+def requires_independent_login(user) -> bool:
+    """Whether participant links must never authenticate this account."""
     from .access import holds_managing_role_ever
     from .models import ZevAccessGrant
 
     return (
-        user.is_admin
+        user.independent_login_required
+        or user.is_admin
         or user.may_create_zev
         or ZevAccessGrant.objects.filter(user=user).exists()
         or holds_managing_role_ever(user)
@@ -105,39 +101,26 @@ def has_its_own_login(user) -> bool:
 def ensure_participant_account(participant):
     """The user account linked to ``participant``, creating one if needed.
 
-    Never mints a usable password for a **participant-only** account. A
-    freshly created account gets ``set_unusable_password()``: nothing is
-    transmitted, so there is nothing to rotate, and ``must_change_password``
-    would strand the participant in a form asking them to change a password
-    they were never given. An already-linked participant account carrying a
-    password from before this behaviour existed is neutralized the same way
-    the moment it is touched here — the same safety net
-    ``accounts.magic_links.account_for_participant`` relied on before this
-    became the one place that logic lives.
-
-    Signing in happens only through an onboarding or magic-sign-in link (see
-    ``zev.onboarding``, ``accounts.magic_links``), or a password the
-    participant chooses themselves through ``set_initial_password`` once they
-    are in.
-
-    **Deliberately does not touch the password of an account with its own
-    login** (``has_its_own_login``: admins, owners, anyone holding a grant)
-    that also happens to be linked as a participant. That is their real login,
-    used for everything else they manage — nuking it because one of their own
-    participant rows was saved or invited would lock them out of their own
-    instance.
+    Participant-only accounts get unusable passwords and no password-change
+    requirement: nothing was transmitted, so ``must_change_password`` would
+    strand them on a form asking to change a password they were never given.
+    Existing passwords are cleared here; participants can set their own
+    password after signing in through a link.
+    Accounts with their own login keep their password, email and name.
     """
     if participant.user_id:
-        user = participant.user
+        user = User.objects.locked().get(pk=participant.user_id)
+        participant.user = user
+        if requires_independent_login(user):
+            return user
         sync_participant_user_fields(participant, user)
         update_fields = ['email', 'first_name', 'last_name']
-        if not has_its_own_login(user):
-            if user.has_usable_password():
-                user.set_unusable_password()
-                update_fields.append('password')
-            if user.must_change_password:
-                user.must_change_password = False
-                update_fields.append('must_change_password')
+        if user.has_usable_password():
+            user.set_unusable_password()
+            update_fields.append('password')
+        if user.must_change_password:
+            user.must_change_password = False
+            update_fields.append('must_change_password')
         user.save(update_fields=update_fields)
         return user
 
@@ -158,24 +141,103 @@ def ensure_participant_account(participant):
     return user
 
 
-@transaction.atomic
-def send_participant_onboarding_link(participant, invited_by) -> tuple[str, ParticipantOnboardingToken]:
-    """Ensure an account and onboarding link exist, and email the link.
+class LinkRefused(Exception):
+    def __init__(self, message="This account must use its existing login.", *, code="own_login_required"):
+        self.code = code
+        super().__init__(message)
 
-    Returns the URL and the token it was built from, so the caller reports
-    the expiry of exactly the link it hands out. Raises ``ValueError`` when
-    the participant has no address to send to, same guard the flow it
-    replaced used.
+
+def lock_participant_account(participant):
+    """Lock the party, reread the participant's account and lock it; returns the party.
+
+    Account and role edits take the same order (party, user, participant), so link
+    requests and participant edits cannot deadlock. Call inside a transaction.
     """
+    from .models import Participant, Party
+
+    party = Party.objects.select_for_update().get(pk=participant.party_id)
+    participant.user_id = Participant.objects.values_list("user_id", flat=True).get(pk=participant.pk)
+    if participant.user_id:
+        participant.user = User.objects.locked().get(pk=participant.user_id)
+    return party
+
+
+@transaction.atomic
+def link_account_for(participant):
+    """Return the participant account only when a link may authenticate it."""
+    from .models import MANAGING_ROLES
+
+    party = lock_participant_account(participant)
+    if not participant.user_id and party.roles.filter(role__in=MANAGING_ROLES).exists():
+        raise LinkRefused(
+            "Give this party an access invitation before creating a participant login.",
+            code="login_setup_required",
+        )
+    user = ensure_participant_account(participant)
+    if requires_independent_login(user):
+        raise LinkRefused()
+    return user
+
+
+def has_login_credentials(user):
+    return (
+        user.has_usable_password()
+        or user.social_accounts.filter(provider__enabled=True).exists()
+        or user.webauthn_credentials.exists()
+    )
+
+
+def is_pending_invitation(user) -> bool:
+    return not user.is_active and user.email_verification_tokens.filter(
+        purpose=EmailVerificationToken.Purpose.INVITATION, consumed_at__isnull=True,
+    ).exists()
+
+
+def validate_account_login(user, *, field="user") -> None:
+    if not has_login_credentials(user) and not is_pending_invitation(user):
+        raise ValidationError({
+            field: "Send an access invitation before assigning independent access.",
+        })
+
+
+def protect_account_login(user, *, credential_field="user"):
+    """Require a login, then retire sessions, API keys and participant tokens before promotion.
+
+    An already protected account was promoted before and passes unchanged, even
+    between accepting its invitation and choosing a password. Call inside a
+    transaction. Bulk writes bypass the model guards that call this, so
+    maintenance code must call it before adding access.
+    """
+    from accounts.models import ApiKey, MagicLinkToken
+    from accounts.session_revocation import revoke_sessions
+    from .onboarding import revoke_active_for_user
+
+    locked = User.objects.locked().get(pk=user.pk)
+    if locked.independent_login_required:
+        return locked
+    validate_account_login(locked, field=credential_field)
+    revoke_sessions(locked)
+    ApiKey.objects.filter(user=locked, revoked_at__isnull=True).update(revoked_at=timezone.now())
+    revoke_active_for_user(locked)
+    MagicLinkToken.objects.filter(user=locked, consumed_at__isnull=True).update(consumed_at=timezone.now())
+    if not is_pending_invitation(locked):
+        locked.independent_login_required = True
+        locked.save(update_fields=["independent_login_required"])
+    return locked
+
+
+def send_participant_onboarding_link(participant, invited_by) -> tuple[str, ParticipantOnboardingToken]:
+    """Email an onboarding link; raises ValueError without email or LinkRefused for protected accounts."""
     from . import onboarding
     from .emails import send_onboarding_email
 
     if not participant.email:
         raise ValueError("Participant email is required to send an onboarding link.")
 
-    ensure_participant_account(participant)
-    token = onboarding.get_or_create_for_participant(participant)
-    link_url = onboarding.public_url(token)
+    with transaction.atomic():
+        link_account_for(participant)
+        token = onboarding.get_or_create_for_participant(participant)
+        link_url = onboarding.public_url(token)
 
     inviter_name = invited_by.get_full_name() or invited_by.username
     send_onboarding_email(participant, inviter_name, link_url, token.expires_at)
@@ -184,17 +246,14 @@ def send_participant_onboarding_link(participant, invited_by) -> tuple[str, Part
 
 @transaction.atomic
 def get_participant_onboarding_link(participant) -> tuple[str, ParticipantOnboardingToken]:
-    """Ensure an account and onboarding link exist, without emailing it.
+    """Return a link and its token without emailing; raise LinkRefused for ineligible accounts.
 
-    Returns the URL and the token it was built from, so the caller reports
-    the expiry of exactly the link it hands out. Used by the "copy onboarding
-    link" action: an operator handing the link over in person or by some
-    channel other than email, and by the admin console's account-linking
-    action, which historically did not require an email address either.
+    Needs no email address: the operator hands the link over in person or by
+    another channel, as does the admin console's account-linking action.
     """
     from . import onboarding
 
-    ensure_participant_account(participant)
+    link_account_for(participant)
     token = onboarding.get_or_create_for_participant(participant)
     return onboarding.public_url(token), token
 
@@ -313,8 +372,12 @@ def create_zev_for_existing_owner(*, owner_user, zev_data: dict, participant_dat
     }
 
 
+@transaction.atomic
 def issue_invitation(user) -> EmailVerificationToken:
     """A fresh invitation link; earlier unused ones stop working."""
+    user = User.objects.locked().get(pk=user.pk)
+    if user.is_active:
+        raise ValidationError({"user": "This account has already accepted its invitation."})
     user.email_verification_tokens.filter(
         purpose=EmailVerificationToken.Purpose.INVITATION, consumed_at__isnull=True
     ).update(consumed_at=timezone.now())

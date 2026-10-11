@@ -13,6 +13,7 @@ affected.
 """
 
 from django.db.models import F
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.settings import api_settings as jwt_settings
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -39,6 +40,14 @@ def validate_refresh_token(refresh_token: str) -> RefreshToken:
     if user is None or not is_session_current(token, user):
         raise TokenError("Session has been signed out.")
     return token
+
+
+def lock_current_session(request):
+    """Recheck authentication under the user lock; caller must hold a transaction."""
+    user = User.objects.locked().filter(pk=request.user.pk).first()
+    if user is None or not user.is_active or not is_session_current(request.auth, user):
+        raise AuthenticationFailed("This session has been signed out.")
+    return user
 
 
 def revoke_sessions(user) -> None:

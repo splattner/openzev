@@ -536,8 +536,9 @@ class Command(BaseCommand):
         if invitee.has_usable_password():
             invitee.set_unusable_password()
             invitee.save(update_fields=["password"])
-        self._upsert_grant(zev=second_zev, user=invitee, role=ZevAccessRole.VIEWER, granted_by=owner)
+        # Invitation first: a grant needs a login or a pending invitation.
         issue_invitation(invitee)
+        self._upsert_grant(zev=second_zev, user=invitee, role=ZevAccessRole.VIEWER, granted_by=owner)
 
         # Participants and their meter assignments are valid from the start of
         # the previous calendar year — not just from the seed window — so

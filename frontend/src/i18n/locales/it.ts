@@ -1447,6 +1447,8 @@ export const it = {
                 onboardingLinkCopiedDetail: 'Copiate questo link per consegnarlo voi stessi al partecipante.',
                 onboardingLinkRevoked: 'Il link di invito è stato revocato.',
                 onboardingLinkFailed: 'Impossibile creare o inviare il link di invito.',
+                ownLoginRequired: 'Questo account deve usare le proprie credenziali esistenti.',
+                loginSetupRequired: 'Invita prima questa parte ad accedere alla comunità, poi crea un accesso partecipante.',
                 linkCopied: 'Link copiato negli appunti.',
                 copyFailed: 'Impossibile copiare il link.',
                 selectZev: 'Seleziona un RCP.',
@@ -3053,6 +3055,7 @@ export const it = {
                     referenced_row_missing: 'Il backup fa riferimento a qualcosa che qui non esiste più.',
                     export_in_progress: 'È in corso un\'esportazione del conteggio annuale per questa comunità.',
                     restore_in_progress: 'È in corso un altro ripristino di questa comunità.',
+                    login_setup_required: 'Un account ricollegato con un ruolo di gestione non ha ancora un accesso configurato.',
                 },
             },
             status: {

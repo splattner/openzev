@@ -27,6 +27,7 @@ from .parties import assign_role, end_role, set_landowner_building
 from .purge import ZevPurgeError, purge_zev
 from .scoping import ZevScopedQuerySetMixin
 from .serializers import (
+    django_validation_error,
     GridOperatorListSerializer,
     GridOperatorSuggestionSerializer,
     ZevSerializer,
@@ -54,6 +55,7 @@ from .permissions import (
 from .grid_operators import load_grid_operators, grid_operators_for_postal_code
 from .iban import IBAN_ADDRESS_REQUIRED_MESSAGE, has_required_iban_address
 from .services import (
+    LinkRefused,
     create_zev_for_existing_owner,
     get_participant_onboarding_link,
     send_participant_onboarding_link,
@@ -700,7 +702,13 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
             return Response({"detail": "Admin accounts cannot be linked to a participant."}, status=status.HTTP_400_BAD_REQUEST)
 
         participant.user = account
-        participant.save(update_fields=["user", "updated_at"])
+        try:
+            participant.save(update_fields=["user", "updated_at"])
+        except DjangoValidationError as exc:
+            error = django_validation_error(exc)
+            if "user" in error.detail:
+                error.detail["user_id"] = error.detail.pop("user")
+            raise error from exc
         record_audit_event(
             request=request,
             action_category=AuditActionCategory.PARTICIPANT,
@@ -759,6 +767,26 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         serializer = self.get_serializer(participant)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    def _refuse_link(self, request, participant, action_type, exc):
+        """Audit a refused participant-link action."""
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.PARTICIPANT,
+            action_type=action_type,
+            target_type="zev.Participant",
+            target=participant,
+            target_id=str(participant.pk),
+            target_display=participant.full_name,
+            summary=(
+                f"Refused to send an onboarding link to participant {participant.full_name}."
+                if action_type == "participant.send_onboarding_link"
+                else f"Refused an onboarding link for participant {participant.full_name}."
+            ),
+            metadata={"reason": exc.code},
+            status=AuditEventStatus.DENIED,
+        )
+        return Response({"code": exc.code, "error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(detail=True, methods=["post"], url_path="onboarding-link")
     def onboarding_link(self, request, pk=None):
         """Ensure an account and onboarding link exist, without emailing it.
@@ -769,7 +797,10 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         by some other channel needs no address on file.
         """
         participant = self.get_object()
-        onboarding_url, live_token = get_participant_onboarding_link(participant)
+        try:
+            onboarding_url, live_token = get_participant_onboarding_link(participant)
+        except LinkRefused as exc:
+            return self._refuse_link(request, participant, "participant.onboarding_link_created", exc)
         record_audit_event(
             request=request,
             action_category=AuditActionCategory.PARTICIPANT,
@@ -792,6 +823,8 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         participant = self.get_object()
         try:
             onboarding_url, live_token = send_participant_onboarding_link(participant, request.user)
+        except LinkRefused as exc:
+            return self._refuse_link(request, participant, "participant.send_onboarding_link", exc)
         except ValueError as exc:
             record_audit_event(
                 request=request,
@@ -1128,7 +1161,10 @@ class ZevPartyRoleViewSet(ZevScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet)
 
     @staticmethod
     def _invalid(exc):
-        return serializers.ValidationError(exc.message_dict if hasattr(exc, "error_dict") else {"detail": exc.messages})
+        error = django_validation_error(exc)
+        if "user" in error.detail:
+            error.detail["party"] = error.detail.pop("user")
+        return error
 
     @extend_schema(request=ZevPartyRoleAssignSerializer, responses=ZevPartyRoleSerializer)
     def create(self, request, *args, **kwargs):

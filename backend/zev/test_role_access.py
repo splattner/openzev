@@ -14,14 +14,15 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from accounts.models import User, UserRole
+from accounts.magic_links import issue
+from accounts.models import EmailVerificationToken, User, UserRole
 from audit.models import AuditEvent
 from testing.helpers import authenticate, create_managed_zev, make_user
 
 from . import access
 from .models import Participant, Party, PartyKind, PartyRole, ZevAccessGrant, ZevAccessRole
 from .parties import NO_MANAGER_LEFT, assign_role, end_role
-from .services import has_its_own_login
+from .services import ensure_participant_account, get_participant_onboarding_link, requires_independent_login
 
 TODAY = date(2026, 6, 15)
 
@@ -39,7 +40,8 @@ class RoleAccessTests(TestCase):
         self.zev = self.admin_made
         self.issuer_account = make_user("ra_issuer", UserRole.USER)
         self.issuer = Participant.objects.create(
-            zev=self.zev, user=self.issuer_account, last_name="Issuer", valid_from=date(2026, 1, 1),
+            zev=self.zev, user=self.issuer_account, last_name="Issuer", email=self.issuer_account.email,
+            valid_from=date(2026, 1, 1),
         )
         self.agency_account = make_user("ra_agency", UserRole.USER)
         self.agency = Party.objects.create(
@@ -74,9 +76,124 @@ class RoleAccessTests(TestCase):
         self.assertEqual((entry["access"], entry["roles"]), ("manager", ["issuer"]))
 
     def test_holding_the_role_protects_the_login(self):
-        self.assertFalse(has_its_own_login(self.issuer_account))
+        self.assertFalse(requires_independent_login(self.issuer_account))
         assign_role(self.zev, self.issuer.party, PartyRole.ISSUER, date(2026, 1, 1))
-        self.assertTrue(has_its_own_login(self.issuer_account))
+        self.assertTrue(requires_independent_login(self.issuer_account))
+
+    def test_first_managing_role_retires_participant_credentials(self):
+
+        _url, onboarding_token = get_participant_onboarding_link(self.issuer)
+        self.issuer.user.set_password("IndependentPassword42!")
+        self.issuer.user.save(update_fields=["password"])
+        magic_token = issue(self.issuer.user)
+        client = APIClient()
+        authenticate(client, self.issuer.user)
+
+        assign_role(self.zev, self.issuer.party, PartyRole.ISSUER, date(2026, 6, 1))
+
+        onboarding_token.refresh_from_db()
+        magic_token.refresh_from_db()
+        self.assertIsNotNone(onboarding_token.revoked_at)
+        self.assertIsNotNone(magic_token.consumed_at)
+        self.assertEqual(client.get("/api/v1/auth/me/").status_code, 401)
+
+    def test_a_passwordless_account_needs_an_access_invitation_before_a_managing_role(self):
+
+        account = ensure_participant_account(self.issuer)
+        client = APIClient()
+        authenticate(client, account)
+        admin = APIClient()
+        authenticate(admin, make_user("ra_setup_admin", UserRole.ADMIN))
+        payload = {"zev": str(self.zev.pk), "party": str(self.issuer.party_id),
+                   "role": "issuer", "valid_from": "2026-06-01"}
+
+        refused = admin.post("/api/v1/zev/party-roles/", payload, format="json")
+
+        self.assertEqual(refused.status_code, 400, refused.content)
+        self.assertIn("access invitation", str(refused.data["party"]))
+        self.assertFalse(requires_independent_login(account))
+        self.assertEqual(client.get("/api/v1/auth/me/").status_code, 200)
+        get_participant_onboarding_link(self.issuer)
+        invited = admin.post(
+            f"/api/v1/zev/zevs/{self.zev.pk}/access/", {"party": str(self.issuer.party_id), "role": "manager"},
+            format="json",
+        )
+        self.assertEqual(invited.status_code, 201, invited.content)
+        self.assertEqual(admin.post("/api/v1/zev/party-roles/", payload, format="json").status_code, 201)
+        token = account.email_verification_tokens.get(purpose=EmailVerificationToken.Purpose.INVITATION)
+        fresh = APIClient()
+        self.assertEqual(fresh.post("/api/v1/auth/verify-email/", {"token": token.token}).status_code, 200)
+        self.assertEqual(fresh.post(
+            "/api/v1/auth/me/set-initial-password/", {"new_password": "IndependentPassword42!"},
+        ).status_code, 200)
+        self.assertEqual(fresh.get("/api/v1/auth/me/").data["memberships"][0]["access"], "manager")
+
+    def linked_account_fixture(self, name):
+
+        zev = create_managed_zev(name=name, start_date=date(2026, 1, 1))
+        party = Party.objects.create(zev=zev, last_name="Issuer")
+        assign_role(zev, party, PartyRole.ISSUER, date(2026, 1, 1))
+        tenant = Participant.objects.create(
+            zev=zev, last_name="Tenant", email=f"{name}@example.com", valid_from=date(2026, 1, 1),
+        )
+        _url, onboarding = get_participant_onboarding_link(tenant)
+        old = APIClient()
+        self.assertEqual(old.post(
+            "/api/v1/public/onboarding/consume/", {"prefix": onboarding.prefix, "s": onboarding.secret},
+        ).status_code, 200)
+        tenant.user.set_password("IndependentPassword42!")
+        tenant.user.save(update_fields=["password"])
+        return party, tenant, old, onboarding, issue(tenant.user)
+
+    def assert_participant_credentials_retired(self, old, onboarding, magic):
+        self.assertEqual(old.get("/api/v1/auth/me/").status_code, 401)
+        onboarding.refresh_from_db()
+        magic.refresh_from_db()
+        self.assertIsNotNone(onboarding.revoked_at)
+        self.assertIsNotNone(magic.consumed_at)
+
+    def test_linking_a_participant_account_to_a_managing_party_retires_credentials(self):
+        party, tenant, old, onboarding, magic = self.linked_account_fixture("participant_user")
+        target = Participant.objects.create(zev=tenant.zev, party=party, valid_from=date(2026, 1, 1))
+        admin = APIClient()
+        authenticate(admin, make_user("ra_link_admin", UserRole.ADMIN))
+        response = admin.post(
+            f"/api/v1/zev/participants/{target.pk}/link-account/", {"user_id": tenant.user_id},
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assert_participant_credentials_retired(old, onboarding, magic)
+
+    def test_moving_a_participant_to_a_managing_party_retires_credentials(self):
+        party, tenant, old, onboarding, magic = self.linked_account_fixture("participant_party")
+        tenant.party = party
+        tenant.save(update_fields=["party"])
+        self.assert_participant_credentials_retired(old, onboarding, magic)
+
+    def test_linking_a_party_account_retires_participant_credentials(self):
+        party, tenant, old, onboarding, magic = self.linked_account_fixture("party_user")
+        party.user = tenant.user
+        party.save(update_fields=["user"])
+        self.assert_participant_credentials_retired(old, onboarding, magic)
+
+    def test_a_passwordless_account_cannot_be_linked_to_an_existing_managing_party(self):
+
+        account = ensure_participant_account(self.issuer)
+        party = Party.objects.create(zev=self.zev, last_name="Representative")
+        assign_role(self.zev, party, PartyRole.REPRESENTATIVE, date(2026, 1, 1))
+        target = Participant.objects.create(zev=self.zev, party=party, valid_from=date(2026, 1, 1))
+        admin = APIClient()
+        authenticate(admin, make_user("ra_passwordless_admin", UserRole.ADMIN))
+
+        response = admin.post(f"/api/v1/zev/participants/{target.pk}/link-account/", {"user_id": account.pk})
+
+        self.assertEqual(response.status_code, 400, response.content)
+        target.refresh_from_db()
+        self.assertIsNone(target.user_id)
+        copied = admin.post(f"/api/v1/zev/participants/{target.pk}/onboarding-link/")
+        self.assertEqual(copied.status_code, 400)
+        self.assertEqual(copied.data["code"], "login_setup_required")
+        target.refresh_from_db()
+        self.assertIsNone(target.user_id)
 
 
 class LastManagerTests(TestCase):

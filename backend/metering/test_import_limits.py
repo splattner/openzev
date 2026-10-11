@@ -28,8 +28,8 @@ class CsvLimitTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.owner = make_user("csv_limit_owner", UserRole.USER)
-        auth(self.client, self.owner)
         self.zev = create_managed_zev(name="CSV Limit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="X")
+        auth(self.client, self.owner)
 
     def test_file_over_size_cap_is_rejected(self):
         with mock.patch.object(csv_importer, "MAX_CSV_BYTES", 10):
@@ -183,8 +183,8 @@ class XlsxZipLimitTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.owner = make_user("xlsx_limit_owner", UserRole.USER)
-        auth(self.client, self.owner)
         self.zev = create_managed_zev(name="XLSX Limit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="Y")
+        auth(self.client, self.owner)
 
     def _upload(self, upload):
         return self.client.post(

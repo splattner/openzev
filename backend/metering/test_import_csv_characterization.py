@@ -39,10 +39,10 @@ class CsvImportCharacterizationTests(TestCase):
         self.owner = User.objects.create_user(
             username="charact_owner", password="pass1234", role=UserRole.USER
         )
-        auth(self.client, self.owner)
         self.zev = create_managed_zev(
             name="Characterization ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="X"
         )
+        auth(self.client, self.owner)
         self.metering_point = MeteringPoint.objects.create(
             zev=self.zev, meter_id="CH-IMPORT-1", meter_type=MeteringPointType.CONSUMPTION
         )

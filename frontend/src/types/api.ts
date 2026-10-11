@@ -2217,6 +2217,7 @@ export type RestoreConflictKind =
     | 'referenced_row_missing'
     | 'export_in_progress'
     | 'restore_in_progress'
+    | 'login_setup_required'
 
 export interface RestoreConflict {
     kind: RestoreConflictKind

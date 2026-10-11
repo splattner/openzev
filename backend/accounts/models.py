@@ -9,7 +9,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models, transaction
+from django.db import connection, models, transaction
 from django.utils import timezone
 
 from allocation.validity import active_during, active_on
@@ -35,6 +35,10 @@ class OpenZevUserManager(UserManager):
             raise ValueError("Superuser must have role='admin'.")
         return super().create_superuser(username, email=email, password=password, **extra_fields)
 
+    def locked(self):
+        """Lock user rows; ``no_key`` lets other transactions keep referencing them (not on MariaDB/MySQL)."""
+        return self.select_for_update(no_key=connection.features.has_select_for_no_key_update)
+
 
 class User(AbstractUser):
     """Extended user model: a platform role (admin or not) plus per-ZEV access."""
@@ -49,6 +53,7 @@ class User(AbstractUser):
     # self-registration; not a role — what the account may do in a ZEV comes
     # from its grants (zev.access).
     may_create_zev = models.BooleanField(default=False)
+    independent_login_required = models.BooleanField(default=False, editable=False)
     # The community opened by default for this user. Accounts that relate to
     # several communities can switch between them; this records the one
     # to land on, so the default does not depend on the order the list happens
@@ -71,6 +76,17 @@ class User(AbstractUser):
     def is_admin(self):
         return self.role == UserRole.ADMIN or self.is_superuser
 
+    def _privilege_field(self):
+        """The form field that granted independent access, for error messages."""
+        return "role" if self.role == UserRole.ADMIN else "is_superuser" if self.is_superuser else "may_create_zev"
+
+    def clean(self):
+        super().clean()
+        if not self._state.adding and not self.independent_login_required and (self.is_admin or self.may_create_zev):
+            from zev.services import validate_account_login
+
+            validate_account_login(self, field=self._privilege_field())
+
     def save(self, *args, **kwargs):
         # A plain ``save()`` writes every column, including ``session_version``
         # as this instance last saw it. A request that loaded the user before a
@@ -82,8 +98,25 @@ class User(AbstractUser):
             kwargs["update_fields"] = [
                 field.name
                 for field in self._meta.concrete_fields
-                if not field.primary_key and field.name != "session_version"
+                if not field.primary_key and field.name not in ("session_version", "independent_login_required")
             ]
+        privilege_fields = {"role", "is_superuser", "may_create_zev"}
+        update_fields = kwargs.get("update_fields")
+        if not self.independent_login_required and (self.is_admin or self.may_create_zev) and (
+            self._state.adding or update_fields is None or privilege_fields.intersection(update_fields)
+        ):
+            if self._state.adding:
+                self.independent_login_required = True
+            else:
+                from zev.services import protect_account_login
+
+                with transaction.atomic():
+                    protect_account_login(self, credential_field=self._privilege_field())
+                    self.independent_login_required = True
+                    if update_fields is not None:
+                        kwargs["update_fields"] = set(update_fields) | {"independent_login_required"}
+                    super().save(*args, **kwargs)
+                return
         super().save(*args, **kwargs)
 
     def __str__(self):

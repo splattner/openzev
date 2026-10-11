@@ -1447,6 +1447,8 @@ export const fr = {
                 onboardingLinkCopiedDetail: "Copiez ce lien pour le remettre vous-même au participant.",
                 onboardingLinkRevoked: "Le lien d'invitation a été révoqué.",
                 onboardingLinkFailed: "Impossible de créer ou d'envoyer le lien d'invitation.",
+                ownLoginRequired: 'Ce compte doit utiliser ses identifiants existants.',
+                loginSetupRequired: 'Invitez d’abord cette partie à accéder à la communauté avant de créer un accès participant.',
                 linkCopied: 'Lien copié dans le presse-papiers.',
                 copyFailed: 'Impossible de copier le lien.',
                 selectZev: 'Veuillez sélectionner un RCP.',
@@ -3053,6 +3055,7 @@ export const fr = {
                     referenced_row_missing: 'La sauvegarde fait référence à quelque chose qui n\'existe plus ici.',
                     export_in_progress: 'Un export de décompte annuel est en cours pour cette communauté.',
                     restore_in_progress: 'Une autre restauration de cette communauté est en cours.',
+                    login_setup_required: 'Un compte relié avec un rôle de gestion n\'a pas encore de connexion configurée.',
                 },
             },
             status: {

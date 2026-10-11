@@ -7,7 +7,7 @@
 - Owners: Sebastian Plattner
 - Created: 2026-09-12
 - Related Issues: [#712](https://github.com/splattner/openzev/issues/712)
-- Related ADRs: —
+- Related ADRs: [ADR 0034](../adr/0034-participant-links-never-sign-in-independent-accounts.md)
 - Impacted Areas: backend | frontend | docs
 
 ---
@@ -95,9 +95,8 @@ adding a third option:
 - `POST /zev/participants/<id>/send-invitation/` and its
   `{username, temporary_password}` response — **gone**, replaced by
   `send-onboarding-link`.
-- `POST .../create-account/`'s password-minting body — **gone**; the action
-  stays but returns a link instead of a password, and no longer requires
-  `participant.user is None` to be reachable (see §5).
+- `POST .../create-account/` — **gone**, replaced by `onboarding-link`, which
+  returns a link and also works when an eligible account is already linked (see §5).
 - The `participant_invitation` email template — **gone**, including any
   operator customisation of it (data migration deletes the row). The
   replacement, `participant_onboarding`, is templatable again from its own
@@ -159,34 +158,117 @@ just this — already sets the clear-text precedent.
 
 The single function every account-creating path now goes through
 (`ParticipantSerializer`, the onboarding actions, `accounts.magic_links`).
-Behavioural change: for a **participant-role** account, it always ends with
+Behavioural change: for a **participant-only** account, it always ends with
 `set_unusable_password()` and `must_change_password=False` — on creation, and
 on every touch of an already-linked account that still carries a usable
 password (the upgrade safety net).
 
-**Deliberately does not touch the password of an owner or admin account that
-also happens to be linked as a participant** — `sync_participant_user_fields`
-already carves this case out for role, for the same reason: that password is
-their real login for everything else they manage, and it must survive their
-own participant row being saved or invited. Checked by role *after*
-`sync_participant_user_fields` has run, so an owner/admin keeps their
-password while a genuine participant (including one just promoted from
-`GUEST`) is neutralized.
+**Leaves an account with its own login untouched** when it also happens to be
+linked as a participant (eligibility below). Its password, email and name are unchanged: participant edits
+must not alter its authentication identity. Only an account without its own
+login follows its participant record (`sync_participant_user_fields`) and has
+its password neutralized.
+
+### No link signs in an account with its own login
+
+`requires_independent_login(user)` is true for an admin, `may_create_zev`,
+`independent_login_required`, any grant row, or any issuer/representative role
+linked through a party or participation, including ended and future rows.
+`link_account_for` raises `LinkRefused` before issuing a link for these accounts.
+An unlinked managing party instead raises `login_setup_required`: it needs an
+access invitation. Onboarding and invoice consumption recheck eligibility;
+rejected magic tokens are spent. Public requests keep their non-enumerating
+responses (invoice request 202, bad onboarding link 404, bad magic link 400).
+
+Independent authentication remains required after accepted access is revoked,
+including same-day grants that leave no history row. `User.independent_login_required`
+(default false, not editable) records promotion, invitation acceptance and admin/
+self-setup privileges. Demotion does not clear it. It has no application reset:
+recovery establishes independent credentials rather than restoring participant links.
+The relationship checks also cover pending invitations and unsupported legacy writes;
+the flag preserves policy after those relationships disappear.
+
+**Upgrade.** `accounts.0025_backfill_independent_login_required` uses historical
+models to set the flag for existing admins, superusers, `may_create_zev` accounts,
+all grant holders (including pending invitations), and accounts linked through
+`Party.user` or `Participant.user` to an issuer/representative party. Ended and
+future grants and roles count; landowner roles and participant-only accounts do
+not. It depends on `accounts.0024` and `zev.0038`, uses the migration connection's
+database alias, and updates only the flag without changing passwords, revoking
+sessions or API keys, or consuming onboarding/magic tokens. Subsequent profile
+saves also preserve existing credentials and sessions. Passwordless legacy
+accounts are included without credential validation. Reversing the data migration
+is a no-op, so rolling back the backfill alone does not clear protection.
+
+| Account state | Participant links | Permanent flag |
+|---|---|---|
+| Participant only | Allowed | False |
+| Pending access invitation | Refused through grant/role relationships | False unless already protected or backfilled on upgrade |
+| Accepted access, admin or self-setup privileges | Refused | True |
+| Independent access subsequently revoked | Refused | Remains true |
+| Unaccepted invitation cancelled, no other protected relationship | Allowed again | Remains false |
+
+**Credential ownership.** Participant-link possession permits password/factor
+setup. Those credentials remain valid after promotion. A usable password, passkey
+or enabled linked social account is a setup check, not proof of enrollment through
+an independent channel. Promotion does not establish fresh account ownership;
+known credential compromise requires password/factor recovery separately.
+
+`protect_account_login` locks the user and returns it unchanged when permanent
+protection is already set (for example a role change after the invitation was
+accepted but before a password was chosen). Otherwise it requires a login (usable
+password, enabled social login, passkey or pending invitation; else `ValidationError`
+on `credential_field`) and retires sessions, API keys, onboarding links and magic tokens. Pending
+invitations can repeat retirement until acceptance. MFA challenges carry the
+session version, so revocation also retires them. API-key creation, initial password
+setup, password changes, signing out other devices, TOTP setup/confirmation/removal,
+recovery-code regeneration and passkey registration/removal use
+`accounts.session_revocation.lock_current_session(request)` inside a transaction.
+It reloads and locks the account, then rejects deleted/inactive accounts or a stale
+session version with 401 before writing credentials or issuing fresh cookies.
+The lock remains held through credential writes and JWT issuance, so a request
+authenticated before promotion cannot renew its retired session.
+User locks go through `User.objects.locked()`, which uses `no_key` only when
+`has_select_for_no_key_update` is true;
+MariaDB/MySQL use ordinary `FOR UPDATE`.
+Lock order is party → users ordered by id → participant → token/grant. Participant
+link lookup and participant updates both call `zev.services.lock_participant_account`,
+which locks the party, rereads the participant's account and locks it, before
+saving or synchronizing the account, preventing copy/send requests and edits from deadlocking.
+Participant updates repeat the serializer's admin-only check for protected accounts
+after that lock. Grant creation locks an existing account before its duplicate-grant
+check, so a concurrent grant for the same account is refused with 400.
+Onboarding consumption
+holds the user lock through JWT issuance; invoice JWTs use the version read under
+that lock, so concurrent promotion invalidates them. Onboarding email delivery
+runs after the service transaction; delivery failure leaves the token available
+for retry through the same send action.
+
+Account-link saves accept field names and attnames (`user_id`, `party_id`).
+Managing role identity and grant recipient/ZEV are immutable: end/revoke and
+create instead. Saving a role or grant deleted in the meantime raises `ValidationError`. Grant creation, managing links and promotion of existing accounts to admin or
+self-setup privileges require credentials or a pending invitation, with model
+`clean()` validation for admin forms. Supported
+writes use services or guarded `save()` paths; bulk updates, raw SQL and fixtures
+bypass these hooks. Archive import leaves accounts unlinked; ZEV restore explicitly
+protects newly managing accounts before committing, and its plan reports a
+`login_setup_required` conflict for one without a login. Whole-instance restore restores
+account policy from its schema-compatible snapshot.
 
 ## 5. API contracts
 
 | Endpoint | Method | Auth | Requires email | Effect |
 |---|---|---|---|---|
-| `/zev/participants/<id>/send-onboarding-link/` | POST | owner/admin, zev-scoped | Yes (400 otherwise) | Ensure account + token, email the link |
-| `/zev/participants/<id>/onboarding-link/` | POST | owner/admin, zev-scoped | No | Ensure account + token, return the link |
-| `/zev/participants/<id>/revoke-onboarding-link/` | POST | owner/admin, zev-scoped | — | Revoke the active token; account untouched |
+| `/zev/participants/<id>/send-onboarding-link/` | POST | manager/admin, zev-scoped | Yes (400 otherwise) | Ensure account + token, email after the service transaction; 400 refusal for protected accounts (audited `DENIED`) |
+| `/zev/participants/<id>/onboarding-link/` | POST | manager/admin, zev-scoped | No | Ensure account + token, return the link; same 400 refusal as send |
+| `/zev/participants/<id>/revoke-onboarding-link/` | POST | manager/admin, zev-scoped | — | Revoke the active token; account untouched |
 | `/zev/participants/<id>/unlink-account/` | POST | **admin only** (unchanged) | — | Detach the account **and** revoke the active token |
-| `/api/v1/public/onboarding/consume/` | POST | none | — | Resolve `{prefix, s}`, ensure account, sign in |
+| `/api/v1/public/onboarding/consume/` | POST | none | — | Resolve `{prefix, s}`, ensure account, sign in; 404 like any bad link when the account has its own login (audited `participant_onboarding.consumed`, `DENIED`) |
 
-`onboarding-link` is intentionally **not** admin-gated the way the old
-`create-account` was: creating a harmless, passwordless link is not the
-sensitive operation linking an *existing* arbitrary account is (`link-account`
-stays admin-only). This is what lets the Participants page's "copy onboarding
+Send/copy return 400 `{"code": "own_login_required", "error": "This account must use its existing login."}` for protected accounts, or 400 `{"code": "login_setup_required", "error": "Give this party an access invitation before creating a participant login."}` for an unlinked managing party. Both refusals are audited `DENIED` with the code in `metadata.reason`.
+
+`onboarding-link` is available to managers for participant-only accounts;
+`link-account` remains admin-only. The Participants page's "copy onboarding
 link" and the Admin Accounts page's "create account" button call the same
 action.
 
@@ -245,6 +327,8 @@ alongside `onboarding_url`, which the Participants page shows under the link
   obsolete completions do not display a URL or notify. Existing notices clear
   on scope changes, including manager-to-viewer transitions. Delayed success/error
   and notice-reset coverage is in `frontend/tests/participant-write-scope.test.ts`.
+  Send/copy map `own_login_required` and `login_setup_required` to localized
+  instructions; revoke uses its ordinary failure handler.
 - `ParticipantOnboardingNotice` replaces `ParticipantCredentialsNotice`
   (deleted): shows the link with a copy button instead of a
   username/password pair, used identically from both the Participants page
@@ -263,6 +347,8 @@ New action types: `participant.send_onboarding_link`,
 `participant.onboarding_link_created`, `participant.revoke_onboarding_link`,
 `participant_onboarding.consumed`. `participant.send_invitation` and
 `participant.create_account` stop being emitted; existing rows are untouched.
+A link refused because the account has its own login (§4) is recorded under
+the same action type with status `DENIED`.
 
 ## 8. Security model
 
@@ -280,7 +366,9 @@ setting a password (both password doors revoke the account's links). This is jud
 acceptable because:
 
 - it is scoped to exactly one participant's data, same ceiling an ordinary
-  participant session already has;
+  participant session already has — which holds only because no link signs in
+  an account with its own login (§4): an account that manages a ZEV, or may set
+  one up, is never reachable through a link;
 - the account behind it can never authenticate with a password unless the
   participant sets one themselves; and
 - an operator who suspects a link has leaked has an explicit, one-click way
@@ -317,10 +405,16 @@ and unlink interaction, `onboarding_status` transitions, plus `OnboardingExpiryT
 30-day expiry on new tokens, non-nullable column, expired → 404 and `expired`
 status, expired active token rotated with a new prefix on copy/resend,
 response URL and expiry belonging to the same token, and both password doors
-revoking the link) plus updated
+revoking the link; `OwnLoginLinkTests`: copy and send refused for an account
+with its own login and audited `DENIED`, a link minted before the account
+gained its own login no longer signs in, a participant-only account still gets
+its link and signs in, and access gained during account setup refuses sign-in;
+`LinkPromotionLockTests` (2 tests): PostgreSQL verifies the user lock remains held during
+session minting and that promotion invalidates the resulting session, and checks
+that concurrent participant edits and link copies complete with party-first locks) plus updated
 coverage in `zev/tests.py` for the create/send/link actions, including the
 owner-vs-admin password-preservation case in
-`test_onboarding_link_preserves_privileged_roles_and_promotes_guests`
+`test_onboarding_link_leaves_roles_alone_and_keeps_privileged_logins`
 (regression test for the bug found and fixed in `ensure_participant_account`
 during this implementation — see §4).
 
@@ -332,3 +426,61 @@ historical schemas (including the invoice VAT-base column) regardless of test or
 Frontend: `tests/participant-onboarding.test.ts` for the three API client
 functions; existing suite (`dead-i18n-keys`, `email-template-parity`) guards
 the locale and template-key changes.
+
+`zev/test_login_protection.py` — `LoginProtectionTests` (37 tests):
+
+| Method | Assertion |
+|---|---|
+| `test_another_zevs_manager_cannot_deactivate_a_participant` | 403; account and session stay active |
+| `test_cancelling_yesterdays_invitation_restores_login_and_only_spends_invitation_tokens` | Restore login; spend invitation, preserve signup token |
+| `test_accepted_access_keeps_its_login_after_same_day_revocation` | Preserve password; refuse links after grant deletion |
+| `test_raw_id_saves_cannot_link_a_passwordless_account_to_a_managing_party` | Reject all three attnames and reconstructed Party saves |
+| `test_accepted_access_remains_protected_after_an_older_grant_is_revoked` | Retain history; refuse onboarding |
+| `test_raw_id_saves_linking_a_managing_party_retire_participant_credentials` | Retire session, onboarding and magic credentials |
+| `test_saving_a_removed_grant_or_role_is_refused` | `ValidationError` instead of a missing-row error |
+| `test_role_identity_cannot_be_changed_in_place` | Reject kind/party changes |
+| `test_grant_recipient_cannot_be_changed_in_place` | Reject recipient reassignment |
+| `test_managing_party_without_an_account_reports_setup_required` | Copy 400 setup code; public consume 404 without cookie |
+| `test_account_sync_errors_on_participant_edit_return_400` | Convert non-dict validation safely |
+| `test_admin_form_rejects_passwordless_managing_party_link` | Show form error on user |
+| `test_rejected_valid_magic_token_is_spent` | Set consumed_at on refusal |
+| `test_failed_existing_participant_invitation_can_be_resent` | Retain pending grant; resend succeeds |
+| `test_stale_user_save_cannot_clear_independent_login_protection` | Preserve permanent flag |
+| `test_a_manager_cannot_deactivate_a_participant_shared_with_another_zev` | 403; shared account stays active |
+| `test_participant_api_key_is_retired_before_it_can_inherit_grants` | Retained key receives 401 after promotion |
+| `test_key_creation_rechecks_a_session_authenticated_before_promotion` | Reject key creation after authenticated request loses its session |
+| `test_key_creation_refuses_an_account_deleted_after_authentication` | 401; no key for a deleted account |
+| `test_session_writes_refuse_a_request_authenticated_before_promotion` | Password setup/change, signing out other devices, TOTP, recovery-code and passkey writes return 401 without credential writes or fresh cookies |
+| `test_participant_edit_rechecks_admin_rule_after_locking` | Manager edit refused with 400 when the account is promoted after validation |
+| `test_concurrent_grant_for_the_same_account_is_refused_after_the_lock` | Grant created while waiting for the user lock gives 400, not a uniqueness error |
+| `test_login_paths_use_supported_row_locks` | Copy, magic consumption, API-key creation, grant creation and revocation work without `no_key` support |
+| `test_a_password_enrolled_through_a_participant_link_remains_usable` | Preserve enrolled password; require fresh sign-in |
+| `test_promotion_retires_an_outstanding_mfa_challenge` | Reject challenge with an old session version |
+| `test_direct_grants_and_admin_forms_require_login_setup` | Reject passwordless grant; show user form error |
+| `test_foreign_manager_cannot_rotate_an_already_pending_invitation` | 403; existing invitation remains usable |
+| `test_acceptance_between_cancellation_lookup_and_lock_preserves_history` | Retain ended grant after acceptance |
+| `test_acceptance_between_resend_lookup_and_lock_refuses_a_new_token` | 400; no fresh invitation |
+| `test_cancellation_between_resend_lookup_and_lock_refuses_a_new_token` | 404; no fresh invitation |
+| `test_cancelling_a_reinvitation_restores_a_protected_accounts_active_state` | Reactivate; consume invitation; retain protection |
+| `test_admin_and_self_setup_protection_survives_demotion` | Keep permanent flag after privilege removal |
+| `test_passwordless_privilege_promotion_requires_login_setup` | Reject passwordless admin/superuser/self-setup promotion without retiring sessions |
+| `test_passwordless_admin_promotion_returns_api_and_form_errors` | Return role error through API and Django admin form |
+| `test_party_account_selection_uses_the_state_under_the_party_lock` | Grant to the refreshed party account |
+| `test_onboarding_email_runs_after_the_service_transaction` | Release service transaction before delivery |
+| `test_access_validation_failure_rolls_back_pending_invitation_changes` | 400 on request field; restore active state and discard invitation/grant |
+
+`frontend/tests/participant-write-scope.test.ts` covers localized send/copy
+refusals and ordinary failures for send, copy and revoke.
+
+`LoginProtectionUpgradeTests` (3 tests) migrates real pre-0024 rows forward and
+restores the full migration graph in cleanup:
+
+- `test_upgrade_backfills_independent_accounts_only`: admin, superuser, self-setup,
+  manager/viewer grants, and issuer/representative roles through both account-link
+  paths, with current, ended and future windows; landowners and participant-only
+  accounts remain unprotected.
+- `test_upgrade_profile_save_preserves_existing_credentials`: a profile save after
+  upgrade preserves the password, session version, working JWT and API key.
+- `test_upgrade_passwordless_admin_can_be_edited_and_stays_protected_after_demotion`:
+  a passwordless legacy admin can save its profile and remains protected after
+  demotion without session revocation.

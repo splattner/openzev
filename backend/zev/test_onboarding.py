@@ -5,22 +5,23 @@ itself, the unauthenticated consume endpoint, and revocation. See
 docs/specs and issue #712 for the design this implements.
 """
 from datetime import date, timedelta
+from unittest.mock import patch
 
 from django.core import mail
-from django.db import IntegrityError
-from django.test import TestCase, TransactionTestCase
+from django.db import DatabaseError, IntegrityError, connections, transaction
+from django.test import TestCase, TransactionTestCase, skipUnlessDBFeature
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from accounts.models import UserRole
-from audit.models import AuditEvent, AuditEventSource
+from accounts.models import User, UserRole
+from audit.models import AuditEvent, AuditEventSource, AuditEventStatus
 from testing.helpers import authenticate as auth, make_user, create_managed_zev
 
 from . import onboarding
 from invoices.models import EmailTemplate
 
 from .emails import format_expiry_date
-from .models import Participant, ParticipantOnboardingToken
+from .models import Participant, ParticipantOnboardingToken, Party
 from .services import get_participant_onboarding_link, send_participant_onboarding_link
 
 
@@ -256,6 +257,214 @@ class OnboardingConsumeViewTests(TestCase):
 
         self.participant.refresh_from_db()
         self.assertIsNotNone(self.participant.user.last_login)
+
+
+class OwnLoginLinkTests(TestCase):
+    """Participant links cannot sign in accounts with independent access."""
+
+    CONSUME_URL = "/api/v1/public/onboarding/consume/"
+
+    def setUp(self):
+        self.manager = make_user("own_login_manager", UserRole.USER)
+        self.zev = create_managed_zev(
+            name="Tenant ZEV", owner=self.manager, zev_type="vzev", invoice_prefix="T",
+        )
+        # Manages a ZEV of its own and is a participant in this one.
+        self.landlord = make_user("own_login_landlord", UserRole.USER)
+        create_managed_zev(
+            name="Landlord ZEV", owner=self.landlord, zev_type="vzev", invoice_prefix="L",
+        )
+        self.participant = Participant.objects.create(
+            zev=self.zev, user=self.landlord, first_name="Lena", last_name="Landlord",
+            email=self.landlord.email, valid_from=date(2026, 1, 1),
+        )
+        self.client = APIClient()
+        auth(self.client, self.manager)
+
+    def test_copying_a_link_is_refused(self):
+        resp = self.client.post(f"/api/v1/zev/participants/{self.participant.pk}/onboarding-link/")
+
+        self.assertEqual(resp.status_code, 400, resp.content)
+        self.assertEqual(resp.data["code"], "own_login_required")
+        self.assertFalse(self.participant.onboarding_tokens.exists())
+
+    def test_sending_a_link_is_refused(self):
+        resp = self.client.post(f"/api/v1/zev/participants/{self.participant.pk}/send-onboarding-link/")
+
+        self.assertEqual(resp.status_code, 400, resp.content)
+        self.assertEqual(mail.outbox, [])
+        self.assertFalse(self.participant.onboarding_tokens.exists())
+
+    def test_a_refusal_is_audited_as_denied(self):
+        self.client.post(f"/api/v1/zev/participants/{self.participant.pk}/onboarding-link/")
+
+        event = AuditEvent.objects.get(action_type="participant.onboarding_link_created")
+        self.assertEqual(event.status, AuditEventStatus.DENIED)
+
+    def test_a_link_from_before_the_account_had_its_own_login_stops_signing_in(self):
+        tenant = Participant.objects.create(
+            zev=self.zev, first_name="Tim", last_name="Tenant",
+            email="tim@example.com", valid_from=date(2026, 1, 1),
+        )
+        _url, token = get_participant_onboarding_link(tenant)
+        tenant.refresh_from_db()
+        tenant.user.set_password("IndependentPassword42!")
+        tenant.user.save(update_fields=["password"])
+        create_managed_zev(name="Tim's ZEV", owner=tenant.user, zev_type="vzev", invoice_prefix="M")
+
+        resp = APIClient().post(
+            self.CONSUME_URL, {"prefix": token.prefix, "s": token.secret}, format="json",
+        )
+
+        self.assertEqual(resp.status_code, 404)
+        self.assertNotIn("openzev_access", resp.cookies)
+
+    def test_a_participant_only_account_still_signs_in(self):
+        tenant = Participant.objects.create(
+            zev=self.zev, first_name="Tim", last_name="Tenant",
+            email="tim@example.com", valid_from=date(2026, 1, 1),
+        )
+
+        resp = self.client.post(f"/api/v1/zev/participants/{tenant.pk}/onboarding-link/")
+
+        self.assertEqual(resp.status_code, 200, resp.content)
+        token = tenant.onboarding_tokens.get()
+        signed_in = APIClient().post(
+            self.CONSUME_URL, {"prefix": token.prefix, "s": token.secret}, format="json",
+        )
+        self.assertEqual(signed_in.status_code, 200)
+        self.assertIn("openzev_access", signed_in.cookies)
+
+    def test_access_gained_during_account_setup_refuses_sign_in(self):
+        from .services import ensure_participant_account
+
+        tenant = Participant.objects.create(
+            zev=self.zev, first_name="Tim", last_name="Tenant", email="tim.race@example.com",
+            valid_from=date(2026, 1, 1),
+        )
+        _url, token = get_participant_onboarding_link(tenant)
+
+        def promoted_account(participant):
+            account = ensure_participant_account(participant)
+            account.set_password("IndependentPassword42!")
+            account.save(update_fields=["password"])
+            create_managed_zev(name="New Access", owner=account, zev_type="vzev", invoice_prefix="R")
+            return account
+
+        with patch("zev.services.ensure_participant_account", side_effect=promoted_account):
+            response = APIClient().post(
+                self.CONSUME_URL, {"prefix": token.prefix, "s": token.secret}, format="json",
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertNotIn("openzev_access", response.cookies)
+
+
+class LinkPromotionLockTests(TransactionTestCase):
+    @skipUnlessDBFeature("has_select_for_update_nowait")
+    def test_edit_and_copy_of_the_same_participant_complete_without_deadlock(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from decimal import Decimal
+        from threading import Event
+
+        from .serializers import ParticipantSerializer
+        from .services import ensure_participant_account
+
+        zev = create_managed_zev(name="Concurrent edit")
+        participant = Participant.objects.create(
+            zev=zev, last_name="Concurrent", email="concurrent@example.com", valid_from=timezone.localdate(),
+        )
+        ensure_participant_account(participant)
+        copying, editing, release = Event(), Event(), Event()
+        original_get = onboarding.get_or_create_for_participant
+
+        def paused_get(row):
+            copying.set()
+            if not release.wait(5):
+                raise TimeoutError("Copy was not released")
+            return original_get(row)
+
+        def copy():
+            try:
+                return get_participant_onboarding_link(Participant.objects.get(pk=participant.pk))
+            finally:
+                connections.close_all()
+
+        def edit():
+            try:
+                row = Participant.objects.get(pk=participant.pk)
+                editing.set()
+                return ParticipantSerializer().update(row, {"allocation_weight": Decimal("2")})
+            finally:
+                connections.close_all()
+
+        with (
+            patch("zev.onboarding.get_or_create_for_participant", side_effect=paused_get),
+            ThreadPoolExecutor(2) as pool,
+        ):
+            copied = pool.submit(copy)
+            try:
+                self.assertTrue(copying.wait(5))
+                # Taking the party first prevents an edit from holding it while waiting for this user.
+                with self.assertRaises(DatabaseError), transaction.atomic():
+                    Party.objects.select_for_update(nowait=True).get(pk=participant.party_id)
+                edited = pool.submit(edit)
+                self.assertTrue(editing.wait(5))
+            finally:
+                release.set()
+            self.assertEqual(copied.result(timeout=10)[1].participant_id, participant.pk)
+            self.assertEqual(edited.result(timeout=10).pk, participant.pk)
+        participant.refresh_from_db()
+        self.assertEqual(participant.allocation_weight, Decimal("2"))
+
+    @skipUnlessDBFeature("has_select_for_update_nowait")
+    def test_sign_in_holds_the_user_lock_and_promotion_retires_its_session(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+
+        from accounts.jwt_utils import make_jwt_for_user
+
+        zev = create_managed_zev(name="Lock ZEV", zev_type="vzev", invoice_prefix="K")
+        participant = Participant.objects.create(
+            zev=zev, first_name="Tim", last_name="Lock", email="tim.lock@example.com",
+            valid_from=date(2026, 1, 1),
+        )
+        _url, token = get_participant_onboarding_link(participant)
+        minting, release = Event(), Event()
+
+        def paused_mint(user):
+            minting.set()
+            if not release.wait(5):
+                raise TimeoutError("Session mint was not released")
+            return make_jwt_for_user(user)
+
+        def consume():
+            try:
+                return APIClient().post(
+                    "/api/v1/public/onboarding/consume/",
+                    {"prefix": token.prefix, "s": token.secret}, format="json",
+                )
+            finally:
+                connections.close_all()
+
+        with patch("zev.views_public.make_jwt_for_user", side_effect=paused_mint), ThreadPoolExecutor(1) as pool:
+            signed_in = pool.submit(consume)
+            try:
+                self.assertTrue(minting.wait(5))
+                with self.assertRaises(DatabaseError), transaction.atomic():
+                    User.objects.select_for_update(nowait=True).get(pk=participant.user_id)
+            finally:
+                release.set()
+            response = signed_in.result(timeout=5)
+
+        self.assertEqual(response.status_code, 200)
+        client = APIClient()
+        client.cookies = response.cookies
+        self.assertEqual(client.get("/api/v1/auth/me/").status_code, 200)
+        participant.user.set_password("IndependentPassword42!")
+        participant.user.save(update_fields=["password"])
+        create_managed_zev(name="Independent Access", owner=participant.user, zev_type="vzev", invoice_prefix="X")
+        self.assertEqual(client.get("/api/v1/auth/me/").status_code, 401)
 
 
 class RevokeAndUnlinkTests(TestCase):
@@ -574,9 +783,9 @@ class OnboardingConstraintUpgradeTests(TransactionTestCase):
 
         # The rows are written with the models as they were at 0028, not
         # today's (a participant had its own name columns then).
+        owner = make_user("owner_mig_0029", UserRole.USER)
         old_apps = migrate(("zev", "0028_onboarding_token_expires_at"))
         try:
-            owner = make_user("owner_mig_0029", UserRole.USER)
             OldZev = old_apps.get_model("zev", "Zev")
             OldParticipant = old_apps.get_model("zev", "Participant")
             OldToken = old_apps.get_model("zev", "ParticipantOnboardingToken")

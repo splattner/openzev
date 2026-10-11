@@ -37,6 +37,7 @@ This directory captures key architectural decisions for OpenZEV.
 - [0031: Third-party integration credentials are encrypted under a dedicated, rotatable key](0031-integration-credentials-encrypted-under-a-dedicated-key.md)
 - [0032: One visual language for screen and documents](0032-one-visual-language-for-screen-and-documents.md) (amends 0014)
 - [0033: The energy data flag defaults to on once the integration key is configured](0033-energy-data-flag-follows-the-integration-key.md)
+- [0034: Participant links never sign in an account with independent access](0034-participant-links-never-sign-in-independent-accounts.md)
 
 ## Conventions
 

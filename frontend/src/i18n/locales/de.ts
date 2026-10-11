@@ -1447,6 +1447,8 @@ export const de = {
                 onboardingLinkCopiedDetail: 'Kopieren Sie diesen Link, um ihn dem Teilnehmer selbst zu übergeben.',
                 onboardingLinkRevoked: 'Der Einladungslink wurde widerrufen.',
                 onboardingLinkFailed: 'Der Einladungslink konnte nicht erstellt oder gesendet werden.',
+                ownLoginRequired: 'Dieses Konto muss seine bestehenden Anmeldedaten verwenden.',
+                loginSetupRequired: 'Laden Sie diese Partei zuerst zum Zugriff ein, bevor Sie eine Teilnehmeranmeldung erstellen.',
                 linkCopied: 'Link in die Zwischenablage kopiert.',
                 copyFailed: 'Link konnte nicht kopiert werden.',
                 selectZev: 'Bitte wählen Sie einen ZEV aus.',
@@ -3053,6 +3055,7 @@ export const de = {
                     referenced_row_missing: 'Die Sicherung verweist auf etwas, das hier nicht mehr existiert.',
                     export_in_progress: 'Für diese Gemeinschaft läuft ein Jahresabrechnungs-Export.',
                     restore_in_progress: 'Für diese Gemeinschaft läuft bereits eine Wiederherstellung.',
+                    login_setup_required: 'Ein verknüpftes Konto mit Verwaltungsrolle hat noch keine Anmeldung eingerichtet.',
                 },
             },
             status: {

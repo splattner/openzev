@@ -254,7 +254,7 @@ participant "cannot unlink the owner account" rule goes. Django admin drops the 
 Name/contact/address fields write through to the party (shared by every participation of it).
 Validation: a person needs `last_name`, an organisation `organisation_name`; attaching to a party
 of another ZEV → 400 `{"party": ["The party belongs to another ZEV."]}`. The existing
-`has_its_own_login` edit guard is unchanged. `full_name` stays (= `display_name`).
+`requires_independent_login` edit guard is unchanged. `full_name` stays (= `display_name`).
 
 ### 5.2 Parties (`/api/v1/zev/parties/`, new; `PartyViewSet`)
 
@@ -271,6 +271,13 @@ in a ZEV the caller does not manage → 400 on `zev`). Validation (`PartySeriali
 person needs `last_name`, an organisation `organisation_name`; a PATCH cannot move the party to
 another ZEV. A DELETE checks participations and roles (also ended ones) first. List queryset: `select_related("zev")`, `prefetch_related("participations",
 "roles")`; `participations` sorted by `valid_from`; `roles` as on participants (today or later).
+
+Managers may edit their ZEV's shared billing/contact party even when it links
+to a protected account. A party cannot span ZEVs; these edits affect its
+participations in this ZEV, and never sync onto an independently protected
+account's email, name or password. `ParticipantSerializer` keeps its stricter
+admin-only edit rule for rows linked to such accounts. `Party.user` is not
+writable through this serializer.
 
 Serializer `PartySerializer`: `id`, `zev`, `kind`, `title`, `first_name`, `last_name`,
 `organisation_name`, `name_addition`, `email`, `phone`, `address_line1`, `address_line2`,
@@ -323,7 +330,7 @@ Access is derived from the role rows, never stored as `ZevAccessGrant`s.
 |---|---|
 | `role_holdings(user, day=None)` | The account's managing role rows active on `day` (party via `Party.user` or `participations__user`), distinct |
 | `_grant_sets(user)` | Managed and viewable ZEV ids from grants, each joined with the ZEV ids of `role_holdings` (memoised; one grant query + one role query per request) |
-| `holds_managing_role_ever(user)` | Any managing role row, at any time — `services.has_its_own_login` counts it, so a non-admin cannot rewrite the login of an issuer's participant row |
+| `holds_managing_role_ever(user)` | Any managing role row, at any time — `services.requires_independent_login` counts it, so a non-admin cannot rewrite the login of an issuer's participant row |
 | `party_accounts(party)` | As above |
 | `role_managers(zev, day=None)` | `[(account, role_row)]` managing `zev` through a role on `day` |
 | `has_manager(zev, *, exclude_grant=None, day=None)` | An active manager grant (other than `exclude_grant`) or any `role_managers` |
@@ -334,6 +341,16 @@ Access is derived from the role rows, never stored as `ZevAccessGrant`s.
 
 `bump_generation` is also connected to `Party` and `ZevPartyRole` saves and deletes, so the memo
 never answers from a stale role or account link.
+
+Managing-role creation and account linking through `Party.user` or
+`Participant.user`/`party` use `protect_account_login`; locks and retirement
+follow [onboarding §4](2026-09-participant-onboarding-link.md#no-link-signs-in-an-account-with-its-own-login).
+A password, enabled linked OAuth provider, passkey or pending inactive invitation
+is required; otherwise model validation uses `user`, role endpoints translate
+it to `party`, and link-account translates it to `user_id` (400).
+Admin forms validate before saving. Both field names and attnames are guarded.
+Role identity (`zev`, `party`, `role`) is immutable; end/assign instead of moving
+a row or changing its kind. Editing dates does not repeat credential setup.
 
 **Guards.** `NO_MANAGER_LEFT = "This would leave the ZEV without a manager. Give someone
 manager access first."` lives in `zev/access.py` (re-exported by `zev/parties.py`).
@@ -684,10 +701,12 @@ through the participant endpoints keep the existing participant audit events.
   date; end a landowner), `tests/participant-form-mapping.test.ts` (+2: organisation payload and
   validation, a second participation sends only the participation). User guide: ZEV setup →
   Parties tab, participant management (type, second name line, same party).
-- **PR 7** (shipped): `zev/test_role_access.py` (15): `RoleAccessTests` (the issuer's
+- **PR 7** (shipped; current coverage): `zev/test_role_access.py` (26): `RoleAccessTests` (the issuer's
   participant account manages exactly while the role lasts; a representative with its own
   account manages, a landowner neither manages nor views; memberships name the role; holding the
-  role protects the login), `LastManagerTests` (ending the only managing role or handing it to a
+  role protects the login; first managing access retires participant links and sessions;
+  passwordless promotion requires an invitation; later account links retire onboarding
+  sessions; linking a passwordless account is refused), `LastManagerTests` (ending the only managing role or handing it to a
   party without a login is refused; with a manager grant the role can go; a manager grant can go
   while the issuer manages; the API reports the reason), `ZugangTests` (the list shows role
   managers; access for a party with a login goes to that login; a party without one is invited

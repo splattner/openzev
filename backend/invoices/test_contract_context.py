@@ -800,14 +800,14 @@ class ContractPdfCsrfTests(TestCase):
         # _dont_enforce_csrf_checks and the negative test passes spuriously.
         from django.conf import settings
         from rest_framework.test import APIClient
-        from rest_framework_simplejwt.tokens import RefreshToken
+        from accounts.jwt_utils import make_jwt_for_user
 
         from accounts.cookies import ACCESS_COOKIE, REFRESH_COOKIE
 
         client = APIClient(enforce_csrf_checks=True)
-        refresh = RefreshToken.for_user(self.owner)
-        client.cookies[ACCESS_COOKIE] = str(refresh.access_token)
-        client.cookies[REFRESH_COOKIE] = str(refresh)
+        tokens = make_jwt_for_user(self.owner)
+        client.cookies[ACCESS_COOKIE] = tokens["access"]
+        client.cookies[REFRESH_COOKIE] = tokens["refresh"]
         if csrf_token is not None:
             client.cookies[settings.CSRF_COOKIE_NAME] = csrf_token
             client.credentials(HTTP_X_CSRFTOKEN=csrf_token)

@@ -24,6 +24,14 @@ class UserSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
 
+    def update(self, instance, validated_data):
+        try:
+            return super().update(instance, validated_data)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(
+                exc.message_dict if hasattr(exc, "error_dict") else {"detail": exc.messages}
+            ) from exc
+
     def validate_role(self, value):
         request = self.context.get("request")
         if not request or not self.instance:

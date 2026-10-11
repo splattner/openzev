@@ -35,8 +35,8 @@ class ImportTimezoneTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         owner = make_user("tz_import_owner", UserRole.USER)
-        auth(self.client, owner)
         self.zev = create_managed_zev(name="TZ ZEV", owner=owner, zev_type="vzev", invoice_prefix="Z")
+        auth(self.client, owner)
         self.meter = MeteringPoint.objects.create(
             zev=self.zev, meter_id="CH-TZ-1", meter_type=MeteringPointType.CONSUMPTION,
         )

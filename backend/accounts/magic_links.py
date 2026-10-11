@@ -15,7 +15,7 @@ import secrets
 from django.db import transaction
 from django.utils import timezone
 
-from .models import MagicLinkToken
+from .models import MagicLinkToken, User
 
 logger = logging.getLogger(__name__)
 
@@ -23,22 +23,16 @@ TOKEN_BYTES = 32
 
 
 def account_for_participant(participant):
-    """The user a magic link should sign in, creating one if needed.
-
-    Returns ``None`` when the participant has no address to send to — the
-    caller still answers 202, because saying "no account here" would answer a
-    question the requester is not entitled to ask.
-
-    ``ensure_participant_account`` never mints or leaves a usable password —
-    nothing is transmitted, so there is nothing to rotate — so there is
-    nothing left to neutralize here.
-    """
-    from zev.services import ensure_participant_account
+    """Return the account a participant link may sign in, or None."""
+    from zev.services import LinkRefused, link_account_for
 
     if not participant.email:
         return None
 
-    return ensure_participant_account(participant)
+    try:
+        return link_account_for(participant)
+    except LinkRefused:
+        return None
 
 
 @transaction.atomic
@@ -56,20 +50,23 @@ def issue(user) -> MagicLinkToken:
 
 
 def consume(token_value: str):
-    """The user for a valid, unconsumed token, or ``None``.
+    """Spend a valid token even on refusal; return its user only when participant links are allowed."""
+    from zev.services import requires_independent_login
 
-    Consuming an outstanding invitation's temporary password too: a participant
-    who was invited, never activated, and then used a magic link instead would
-    otherwise leave that emailed password valid indefinitely.
-    """
     if not token_value:
         return None
 
     with transaction.atomic():
+        user_id = MagicLinkToken.objects.filter(token=token_value).values_list("user_id", flat=True).first()
+        if user_id is None:
+            return None
+        # Promotions retire tokens under the user lock: always lock user first.
+        user = User.objects.locked().filter(pk=user_id).first()
+        if user is None:
+            return None
         token = (
             MagicLinkToken.objects
             .select_for_update()
-            .select_related("user")
             .filter(token=token_value)
             .first()
         )
@@ -79,7 +76,8 @@ def consume(token_value: str):
         token.consumed_at = timezone.now()
         token.save(update_fields=["consumed_at"])
 
-        user = token.user
+        if requires_independent_login(user):
+            return None
         if user.must_change_password:
             user.set_unusable_password()
             user.must_change_password = False

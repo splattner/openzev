@@ -242,6 +242,11 @@ See [Creating the first admin account](#creating-the-first-admin-account) below.
   docker compose up -d
   ```
 
+When upgrading to the participant-link protection, existing independent accounts
+keep their passwords, sessions and API keys. If the update happens between the
+password and two-factor steps, restart sign-in; the old challenge is no longer
+accepted.
+
 ### Synology NAS (Container Manager)
 
 On a Synology NAS the release file runs as a *Project* in **Container Manager**

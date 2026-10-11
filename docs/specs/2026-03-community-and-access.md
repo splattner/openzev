@@ -64,7 +64,8 @@ Extends `AbstractUser` (Django `accounts.models`).
 | `last_name` | `CharField(150)` | |
 | `role` | `CharField(20)` choices `UserRole` | `admin` or `user` (default `user`); migration `accounts.0021` mapped the old `zev_owner` / `participant` / `guest` to `user` |
 | `may_create_zev` | `BooleanField` (default `False`) | May set up a ZEV of its own through self-setup (§7.3); set by self-registration |
-| `must_change_password` | `BooleanField` (default `False`) | Set `True` on admin-created or invitation-created accounts |
+| `independent_login_required` | `BooleanField` (default `False`, `editable=False`) | Preserves independent authentication after access revocation; account policy in onboarding spec §4; schema migration `accounts.0024`, existing independent accounts backfilled by `accounts.0025` without revoking credentials or sessions |
+| `must_change_password` | `BooleanField` (default `False`) | Set `True` for temporary-password/admin-created or self-registered accounts; participant-only and access-invited accounts start `False` |
 | `is_active` | `BooleanField` | `False` until email verification for self-registered users |
 | `preferred_zev` | `ForeignKey('zev.Zev')`, null, `SET_NULL` | Account-level default community: an account with several communities lands here on login. `None` = first managed by name. Set by the frontend via `/auth/me/` |
 
@@ -765,10 +766,21 @@ or raises `TokenError`. Both ordinary refresh and stop-impersonation use it.
 `UPDATE … SET session_version = session_version + 1`, then a reload so tokens
 minted straight afterwards carry the new value; `keep_current_session(request,
 response, user)` — hand the caller a fresh pair so revoking *other* sessions
-does not sign them out. `User.save()` deliberately never writes
-`session_version` (a plain save from an instance loaded before a revocation
-would otherwise write the old value back and revive the sessions just signed
-out).
+does not sign them out. Plain `User.save()` excludes `session_version` and
+`independent_login_required` so stale instances cannot revive revoked sessions
+or clear independent-authentication protection. Explicit updates and admin/self-setup promotion persist the
+lifecycle flag; session revocation uses the atomic update.
+
+`lock_current_session(request)` reloads and locks the account within the caller's
+transaction and rejects deleted/inactive accounts or a mismatched session version
+with 401. Initial password setup, password changes, signing out other devices,
+API-key creation, TOTP setup/confirmation/removal, recovery-code regeneration and
+passkey registration/removal use it before writes and hold the lock through
+token/key issuance.
+A request authenticated before independent-access promotion or another revocation
+cannot obtain a fresh session by completing afterward. User locks go through
+`User.objects.locked()`, which requests `no_key` only on a database that supports
+it; otherwise it uses ordinary `FOR UPDATE`.
 
 Sessions are revoked, all with `auth.*` audit events where the action is an
 explicit one:
@@ -783,8 +795,9 @@ explicit one:
 | `POST /api/v1/auth/users/{id}/revoke-sessions/` (IsAdmin; `400` for the admin's own account) | all of the target's sessions end; audited `auth.sessions.revoked` (`scope: all`, admin as actor) |
 | `POST /api/v1/auth/logout/` (AllowAny; CSRF-enforced, unauthenticated by design so it still clears cookies when the access token is already expired — the user is resolved from the refresh cookie instead) | **all** of the caller's sessions end, on every device; audited `auth.logout` (`scope: all`). Only a token from a currently valid session revokes; stale tokens just clear cookies. During impersonation this revokes the *impersonated* account (the main cookies hold its tokens), never the admin parked in the backup cookies — the event's actor is the impersonated account. |
 
-Not revoked by design: API keys, an
-outstanding MFA challenge token. There is no per-device list: a counter can say
+API keys remain separate credentials; independent-access promotion also retires
+them (onboarding spec §4). MFA challenges carry the session version and become
+invalid when sessions are revoked. There is no per-device list: a counter can say
 "everything before now is dead", not "this one device" (ADR 0022).
 
 All four new endpoints are absent from `ACCOUNTS_API_KEY_ALLOWLIST`
@@ -1363,7 +1376,7 @@ invalid IBAN keeps the billing-settings warning until it is corrected.
 
 **Service:** `create_zev_with_owner_setup()` (atomic transaction):
 1. Generate unique username (email-local → full-name → first-name fallback, suffix if taken).
-2. Create `User` with `role=user`, `must_change_password=True`, temporary password (the owner's manager grant comes from `Zev.save()`).
+2. Create `User` with `role=user`, `must_change_password=True`, temporary password; its issuer role supplies management access (a grant bridges a future start date).
 3. Create `Zev` with that user as owner.
 4. Create owner `Participant` with `valid_from = zev.start_date`.
 5. Create each `MeteringPoint` → create `MeteringPointAssignment` to owner participant.
@@ -1424,17 +1437,18 @@ On create:
    `"The party belongs to another ZEV."`), the new participation shares it.
 3. Call `ensure_participant_account()`:
    - Generates unique username from participant name/email.
-   - Creates `User` with `role=user`, `must_change_password=True`,
-     temporary 12-char password.
-   - Links user to participant.
-4. Return participant data including `account_username` and `initial_password`.
+   - Creates `User` with `role=user`, an unusable password and `must_change_password=False`.
+   - Links user to participant, unless its managing party requires an access invitation first.
+4. Return participant data including `account_username` and `onboarding_status`; no password is returned.
 
 On update:
 1. Sync the linked user's `email`, `first_name`, and `last_name` via
-   `sync_participant_user_fields()`. The role is never written (#761).
+   `sync_participant_user_fields()` — only for an account without its own
+   login. Accounts with independent access keep their authentication identity
+   (onboarding spec §4). The role is never written (#761).
 2. Edit guard: only admins may edit a participant record linked to an account
-   with its own login (`zev.services.has_its_own_login`: admin,
-   `may_create_zev`, or any grant ever held) — 400 on `user`. Ordinary owners
+   requiring independent authentication (`zev.services.requires_independent_login`,
+   onboarding spec §4) — 400 on `user`. Ordinary owners
    cannot edit their own owner-linked participant record through this
    endpoint.
 
@@ -1448,24 +1462,24 @@ is saved (SPEC-2026-10-buildings-and-sites §7.7). `ParticipantSerializer` no lo
 
 | Action | URL | Method | Permission | Description |
 |---|---|---|---|---|
-| Send invitation | `/{id}/send-invitation/` | POST | admin or `can_manage` | Reset password, send invitation email |
+| Send onboarding link | `/{id}/send-onboarding-link/` | POST | admin or `can_manage` | Email an eligible participant's sign-in link |
+| Copy onboarding link | `/{id}/onboarding-link/` | POST | admin or `can_manage` | Return an eligible participant's link without emailing |
+| Revoke onboarding link | `/{id}/revoke-onboarding-link/` | POST | admin or `can_manage` | Revoke the link without changing the account |
 | Contract PDF (read) | `/{id}/contract-pdf/` | GET | authenticated (self or admin/owner) | Stream the latest issued contract snapshot; 404 before the first issuance. Never mints a version. |
 | Contract PDF (issue) | `/{id}/contract-pdf/` | POST | authenticated (self or admin/owner) | Issue or reuse the persisted versioned contract snapshot and stream it as PDF (see SPEC-2026-08-contract-pdf-redesign) |
 | Link account | `/{id}/link-account/` | POST | admin only | Link an existing non-admin account; it may already hold participant rows here or elsewhere (#761). An admin account → 400 |
-| Unlink account | `/{id}/unlink-account/` | POST | admin only | Unlink the account; its role is left unchanged (#761). Blocked if the account is the ZEV owner. |
-| Create account | `/{id}/create-account/` | POST | admin only | Create new user account and link to participant |
+| Unlink account | `/{id}/unlink-account/` | POST | admin only | Detach the account and revoke its onboarding link; refused if it would remove the last manager |
 
-### 8.4 Invitation email flow
+### 8.4 Participant onboarding links
 
-`send_participant_invitation()` (atomic):
-1. Ensure account exists via `ensure_participant_account()`. For linked
-   accounts, synchronize profile fields (never the role); the password of an
-   account with its own login is left alone. Newly created accounts have the
-   `user` role.
-2. Generate new temporary password (12 chars).
-3. Set `must_change_password = True`.
-4. Send email with username + temporary password to participant email.
-5. Return `(username, temporary_password)`.
+`send_participant_onboarding_link` ensures an eligible account, creates or reuses
+its 30-day onboarding token and emails the link. Copy returns the same URL and
+expiry without requiring email; revoke retires the token. Independent accounts
+receive `own_login_required`; unlinked managing parties receive `login_setup_required`.
+Eligibility and account lifecycle are specified in
+[onboarding §4](2026-09-participant-onboarding-link.md#no-link-signs-in-an-account-with-its-own-login).
+Public consumption rechecks eligibility before issuing auth cookies.
+
 
 ---
 
@@ -1812,12 +1826,13 @@ hook still rejects a missing provider. Details: SPEC-2026-10-zev-access-grants �
 | GET | `/grid-operators/` | IsAuthenticated | The official ElCom grid-operator list for the ZEV form picker — static reference data, **unpaginated** (see §3.4a) |
 | GET / POST | `/participants/` | IsAuthenticated, BaseZevScopedPermission | List/create participants |
 | GET / PATCH / PUT / DELETE | `/participants/{id}/` | IsAuthenticated, BaseZevScopedPermission | Participant detail |
-| POST | `/participants/{id}/send-invitation/` | admin or `can_manage` | Send invitation email |
+| POST | `/participants/{id}/send-onboarding-link/` | admin or `can_manage` | Email onboarding link |
+| POST | `/participants/{id}/onboarding-link/` | admin or `can_manage` | Copy onboarding link |
+| POST | `/participants/{id}/revoke-onboarding-link/` | admin or `can_manage` | Revoke onboarding link |
 | GET | `/participants/{id}/contract-pdf/` | IsAuthenticated | Read the issued participation contract (404 before the first issuance; never mints) |
 | POST | `/participants/{id}/contract-pdf/` | IsAuthenticated | Issue the participation contract (issues or reuses the persisted versioned snapshot) |
 | POST | `/participants/{id}/link-account/` | admin only | Link user account to participant |
 | POST | `/participants/{id}/unlink-account/` | admin only | Unlink user account from participant |
-| POST | `/participants/{id}/create-account/` | admin only | Create + link user account |
 | GET / POST / PATCH / DELETE | `/parties/`, `/parties/{id}/` | IsAuthenticated, BaseZevScopedPermission (viewers read, managers write; no participant link) | A ZEV's parties with their participations and current roles; delete only while unused (SPEC-2026-10-zev-parties §5.2) |
 | GET / POST | `/party-roles/`, `/party-roles/{id}/` | IsAuthenticated, BaseZevScopedPermission (viewers read, managers write; no participant link) | Current and future roles (`?include_ended=true` adds the history); POST assigns a role from a date (§5.3) |
 | POST | `/party-roles/{id}/end/` | IsAuthenticated, BaseZevScopedPermission (managers) | End a role on `last_day`; 204 when that removed a role that had not started |
@@ -1950,7 +1965,7 @@ fields written through — `kind`, `title`, `first_name`, `last_name`,
 `address_line2`, `postal_code`, `city` — `valid_from`, `valid_to`, `notes`,
 `allocation_weight`, `created_at`, `updated_at`, plus computed:
 - `account_username` (read-only, from linked user)
-- `initial_password` (read-only, only present when account is first created)
+- `onboarding_status` and `onboarding_link_expires_at` (read-only, from onboarding tokens)
 - `full_name`, `display_name` (read-only, the party's display name)
 - `roles` (read-only, the party's roles active today or later:
   `[{id, role, valid_from, valid_to}]`, from the `party__roles` prefetch)
@@ -2107,8 +2122,8 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `ParticipantEndpointRestrictionTests` | 7 | Participant cannot access ZEV/participant lists; can list own metering points; cannot create/update/delete metering points; cannot access assignments |
 | `ZevCreationWizardTests` | 6 | Non-admin cannot create ZEV; admin wizard rejects an invalid IBAN and an IBAN without the owner address; creates ZEV + owner + participant + assignments keeping the ZEV's own postal code apart from the owner's; payload persists normalized `bank_iban` + `bank_name` |
 | `ZevSelfSetupTests` | 3 | Self-setup persists `bank_iban` + `bank_name` on the created ZEV (owner participant created); an IBAN without the required owner address is rejected without creating the ZEV; falsy-but-valid JSON address values reach serializer validation without being replaced as missing |
-| `ParticipantAccountLifecycleTests` | 3 | Create participant auto-creates account with initial password; update saves contact details; invitation resets password and sends email |
-| `AdminCanEditOwnerParticipantTests` | 4 | `test_admin_can_edit_the_owner_participant_address` preserves the owner role and ZEV API access; `test_profile_sync_preserves_privileged_roles` synchronizes name/email while preserving owner/admin roles and ZEV API access; `test_onboarding_link_leaves_roles_alone_and_keeps_privileged_logins` leaves every role unchanged (#761), keeps the login of an admin, a self-registered account and a grant holder and neutralises it for a plain account, and verifies email delivery; `test_zev_owner_cannot_edit_their_own_owner_participant_record` retains the edit restriction (now: a non-admin may not edit a participant row whose account has its own login) |
+| `ParticipantAccountLifecycleTests` | 3 | `test_create_participant_creates_a_passwordless_account`; `test_update_participant_saves_contact_details`; `test_send_onboarding_link_emails_a_link_and_stays_passwordless` |
+| `AdminCanEditOwnerParticipantTests` | 4 | `test_admin_can_edit_the_owner_participant_address` preserves access; `test_editing_the_participant_leaves_a_privileged_login_alone` preserves account identity; `test_onboarding_link_leaves_roles_alone_and_keeps_privileged_logins` refuses protected accounts and emails eligible ones; `test_zev_owner_cannot_edit_their_own_owner_participant_record` enforces the admin edit guard |
 | `ParticipantAccountLinkingTests` | 8 | Admin can link/unlink accounts (unlink leaves the role); an account may hold several participant rows; an admin account cannot be linked; admin can create-and-link; non-admin cannot link/create |
 | `ZevOwnerRoleSyncTests` | 1 | Owner transfer promotes new owner, demotes previous |
 | `MeteringPointAssignmentValidationTests` | 9 | Unique assignment, no overlaps, historical OK, open-end blocks future, dates within participant window, self-update OK |
@@ -2151,7 +2166,7 @@ prior readings for that community, including rows outside the new seed window.
 | `test_scoping.py` | 1 | 4 | `ZevScopedQuerySetMixin` read scoping (admin, grant, participant link, manager-only resource) |
 | `test_access_regression.py` | 2 | 17 | #761: pins what an account with one relationship sees and may change (lists, cross-ZEV detail, reports, dashboard, statements, MCP, main writes); unchanged by the per-ZEV rewrite |
 | `test_access.py` | 4 | 24 | #761: `ZevAccessGrant` model, `zev.access` helpers, owner-grant invariant, migration 0031 (SPEC-2026-10-zev-access-grants §13) |
-| `test_access_api.py` | 3 | 25 | #761 step 5: the grant API (`/zev/zevs/{id}/access/`: list, give, change, revoke, last-manager rule, audit), email invitations (inactive account, 7-day link, accept via verify-email, resend, revoke, failed send, templates), `/auth/me` memberships, `may_create_zev`, grant holders' logins protected |
+| `test_access_api.py` | 3 | 35 | #761 step 5: the grant API (`/zev/zevs/{id}/access/`: list, give, change, revoke, last-manager rule, audit), email invitations (inactive account, 7-day link, accept via verify-email, resend, revoke, failed send, templates), `/auth/me` memberships, `may_create_zev`, grant holders' logins protected |
 | `test_access_scoping.py` | 4 | 14 | #761: viewers read what managers read and write nothing (`ViewerWriteRouterWalkTests` tries every unsafe route); accounts with several relationships get the union; former participants keep sent invoices only |
 | `test_write_scoping.py` | 5 | 19 | Write scoping: foreign create refused, move-via-PATCH refused, legit writes and admin bypass still work, audit retained; DELETE on a ZEV is `405` for every role, since the only supported removal path is disable then purge |
 | `test_disable_enable.py` | 4 | 17 | ZEV lifecycle phase 1: owner/admin can disable, only admin can enable, both audited, guarded against double-disable/double-enable; a disabled ZEV is read-only to its owner (admin can still write); the self-setup "already have a ZEV" guard excludes disabled ZEVs |

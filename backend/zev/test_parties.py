@@ -196,8 +196,8 @@ class PartyMigrationTests(TransactionTestCase):
         executor.migrate(executor.loader.graph.leaf_nodes())
 
     def test_every_participant_gets_a_party_with_its_fields_and_back(self):
-        old = self.migrate(self.BEFORE)
         owner = make_user("mig_party_owner")
+        old = self.migrate(self.BEFORE)
         zev = old.get_model("zev", "Zev").objects.create(name="Mig", owner_id=owner.pk)
         old.get_model("zev", "Participant").objects.create(
             zev=zev, title="ms", first_name="Ann", last_name="Muster", email="ann@example.com",

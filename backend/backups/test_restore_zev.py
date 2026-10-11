@@ -1,8 +1,8 @@
 """Restoring one community into a running instance.
 
 The promises worth testing are the negative ones: nothing outside the target
-community changes — not another community, not an account row, not one audit
-event — and a refusal or a failure leaves the community exactly as it was.
+community changes — not another community or an audit event; newly restored
+managing access protects its account — and a refusal or a failure leaves the community exactly as it was.
 """
 
 import io
@@ -207,6 +207,46 @@ class AccountRelinkTests(ZevRestoreTestCase):
         self.assertEqual(result.plan["accounts"]["missing"], [])
         replacement.refresh_from_db()
         self.assertEqual(replacement.email, email)  # untouched
+
+    def managing_account_restore(self):
+        from zev.models import PartyRole
+        from zev.parties import assign_role
+
+        alice = Participant.objects.get(zev_id=self.alpha_id, party__first_name="Alice")
+        assign_role(self.world.alpha, alice.party, PartyRole.REPRESENTATIVE, alice.valid_from)
+        raw, _ = build()
+        email = self.world.member.email
+        self.world.member.delete()
+        replacement = make_user("restored_manager", UserRole.USER)
+        replacement.email = email
+        replacement.save(update_fields=["email"])
+        return raw, replacement
+
+    def test_relinked_managing_account_is_protected_before_restore_commits(self):
+        from accounts.test_api_keys import create_api_key
+
+        raw, replacement = self.managing_account_restore()
+        api_key, _secret = create_api_key(replacement)
+        restore_from(raw, self.alpha_id)
+        replacement.refresh_from_db()
+        api_key.refresh_from_db()
+        self.assertTrue(replacement.independent_login_required)
+        self.assertEqual(replacement.session_version, 1)
+        self.assertIsNotNone(api_key.revoked_at)
+
+    def test_restoring_managing_access_without_login_setup_rolls_back(self):
+        raw, replacement = self.managing_account_restore()
+        replacement.set_unusable_password()
+        replacement.save(update_fields=["password"])
+        plan = restore_from(raw, self.alpha_id, dry_run=True).plan
+        self.assertTrue(plan["blocked"])
+        self.assertEqual(
+            [(c["kind"], c["detail"]) for c in plan["conflicts"]], [("login_setup_required", replacement.email)],
+        )
+        before = snapshot()
+        with self.assertRaises(restore_zev.RestoreRefused):
+            restore_from(raw, self.alpha_id)
+        self.assertEqual(snapshot(), before)
 
     def test_a_missing_account_is_reported_and_left_unlinked(self):
         email = self.world.member.email

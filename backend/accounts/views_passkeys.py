@@ -19,6 +19,7 @@ from . import mfa, notifications, passkeys
 from .cookies import set_auth_cookies
 from .jwt_utils import make_jwt_for_user, record_login
 from .models import User, WebAuthnCredential
+from .session_revocation import lock_current_session
 from .serializers import WebAuthnCredentialSerializer
 from .throttling import AuthPasskeyThrottle
 
@@ -77,8 +78,9 @@ class PasskeyRegisterCompleteView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, *args, **kwargs):
-        user = request.user
+        user = request.user = lock_current_session(request)
         credential = request.data.get("credential")
         if not isinstance(credential, dict):
             return Response({"detail": "A credential is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -145,8 +147,9 @@ class PasskeyDetailView(APIView):
         serializer.save()
         return Response(serializer.data)
 
+    @transaction.atomic
     def delete(self, request, pk, *args, **kwargs):
-        user = request.user
+        user = request.user = lock_current_session(request)
         stored = self._get(request, pk)
         if stored is None:
             return Response(status=status.HTTP_404_NOT_FOUND)

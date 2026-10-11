@@ -163,6 +163,8 @@ always name whoever held a role on their own date:
   effect, a confirmation names the login that gets access, or says that nobody
   does because the party has no login. A change that would leave the community
   without any manager is refused: give someone manager access first.
+  A passwordless participant needs an access invitation before you assign the
+  role; see [participant account access](11-roles-and-permissions.md#give-a-participant-an-account).
 - **Landowners get no access** through their role: a landowner does not see
   other participants' data.
 - Without an issuer, documents carry only the community's name. The page says

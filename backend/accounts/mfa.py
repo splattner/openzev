@@ -54,7 +54,7 @@ def issue_challenge(user: User) -> str:
     one — see ``test_challenge_token_cannot_authenticate_a_request``.
     """
     signer = signing.TimestampSigner(salt=MFA_CHALLENGE_SALT)
-    return signer.sign(str(user.pk))
+    return signer.sign_object({"user": user.pk, "sv": user.session_version})
 
 
 def resolve_challenge(token: str) -> User:
@@ -66,19 +66,21 @@ def resolve_challenge(token: str) -> User:
     """
     signer = signing.TimestampSigner(salt=MFA_CHALLENGE_SALT)
     try:
-        user_pk = signer.unsign(token or "", max_age=MFA_CHALLENGE_TTL)
+        payload = signer.unsign_object(token or "", max_age=MFA_CHALLENGE_TTL)
     except signing.SignatureExpired:
         raise MfaChallengeError("expired_challenge") from None
-    except signing.BadSignature:
+    except (signing.BadSignature, ValueError, TypeError):
         raise MfaChallengeError("invalid_challenge") from None
 
     try:
-        return User.objects.get(pk=user_pk)
-    except (User.DoesNotExist, ValueError):
-        # ValueError: user_pk isn't a valid pk shape (shouldn't happen for a
-        # token this process issued, but a foreign/forged token could claim
-        # anything the signature happens to still validate against — it
-        # can't, since the signing key differs, but defence in depth is free).
+        user = User.objects.get(pk=payload["user"], is_active=True)
+        if payload["sv"] != user.session_version:
+            raise MfaChallengeError("invalid_challenge")
+        return user
+    except (User.DoesNotExist, ValueError, TypeError, KeyError):
+        # A malformed payload (missing keys, wrong types) can only come from a
+        # token this process did not issue — the signing key differs — but
+        # defence in depth is free.
         raise MfaChallengeError("invalid_challenge") from None
 
 

@@ -1458,6 +1458,8 @@ export const en = {
                 onboardingLinkCopiedDetail: 'Copy this link to hand it to the participant yourself.',
                 onboardingLinkRevoked: 'The onboarding link was revoked.',
                 onboardingLinkFailed: 'Could not create or send the onboarding link.',
+                ownLoginRequired: 'This account must use its existing login.',
+                loginSetupRequired: 'Give this party an access invitation before creating a participant login.',
                 linkCopied: 'Link copied to clipboard.',
                 copyFailed: 'Could not copy the link.',
                 selectZev: 'Please select a ZEV.',
@@ -3064,6 +3066,7 @@ export const en = {
                     referenced_row_missing: 'The backup refers to something that no longer exists here.',
                     export_in_progress: 'An annual-statement export for this community is running.',
                     restore_in_progress: 'Another restore of this community is running.',
+                    login_setup_required: 'A relinked account with a managing role has no login set up yet.',
                 },
             },
             status: {

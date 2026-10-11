@@ -6,6 +6,8 @@ token is a reusable bearer link rather than a one-shot magic link.
 """
 import logging
 
+from django.db import transaction
+
 from rest_framework import status
 from rest_framework.decorators import (
     api_view,
@@ -24,7 +26,7 @@ from audit.models import AuditActionCategory, AuditEventSource, AuditEventStatus
 from audit.services import record_audit_event
 
 from . import onboarding
-from .services import ensure_participant_account
+from .services import LinkRefused, link_account_for
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +35,7 @@ logger = logging.getLogger(__name__)
 @permission_classes([AllowAny])
 @authentication_classes([])
 @throttle_classes([OnboardingLinkThrottle])
+@transaction.atomic
 def onboarding_consume(request):
     """Sign in as the participant this link was sent to.
 
@@ -48,7 +51,25 @@ def onboarding_consume(request):
         return Response({"detail": "This link is not valid."}, status=status.HTTP_404_NOT_FOUND)
 
     participant = token.participant
-    user = ensure_participant_account(participant)
+    try:
+        user = link_account_for(participant)
+    except LinkRefused as exc:
+        # Do not disclose why the link was rejected.
+        record_audit_event(
+            action_type="participant_onboarding.consumed",
+            action_category=AuditActionCategory.AUTH,
+            status=AuditEventStatus.DENIED,
+            source=AuditEventSource.ONBOARDING_LINK,
+            request=request,
+            zev=participant.zev,
+            target_type="zev.Participant",
+            target=participant,
+            target_id=str(participant.pk),
+            target_display=participant.full_name,
+            summary=f"Refused an onboarding link for participant {participant.full_name}.",
+            metadata={"token_prefix": token.prefix, "reason": exc.code},
+        )
+        return Response({"detail": "This link is not valid."}, status=status.HTTP_404_NOT_FOUND)
 
     request.audit_source = AuditEventSource.ONBOARDING_LINK
     underlying = getattr(request, "_request", None)

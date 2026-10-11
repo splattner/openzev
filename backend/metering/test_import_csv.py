@@ -26,9 +26,9 @@ class CsvImportTests(TestCase):
         self.client = APIClient()
         self.owner = make_user("csv_import_owner", UserRole.USER)
         self.other_owner = make_user("csv_import_other_owner", UserRole.USER)
-        auth(self.client, self.owner)
 
         self.zev = create_managed_zev(name="CSV Import ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="C")
+        auth(self.client, self.owner)
         self.zev_id = str(self.zev.id)
         self.other_zev = create_managed_zev(name="Other CSV ZEV", owner=self.other_owner, zev_type="vzev", invoice_prefix="O")
         self.participant = Participant.objects.create(

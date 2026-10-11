@@ -218,8 +218,8 @@ class BackfillMigrationTests(TransactionTestCase):
         executor.migrate(executor.loader.graph.leaf_nodes())
 
     def test_existing_invoices_get_todays_issuer_and_recipient(self):
-        old = self.migrate(self.BEFORE)
         owner = make_user("bf_owner")
+        old = self.migrate(self.BEFORE)
         zev = old.get_model("zev", "Zev").objects.create(
             name="Backfill ZEV", owner_id=owner.pk, bank_iban="CH9300762011623852957",
         )
