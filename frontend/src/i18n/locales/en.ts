@@ -1210,7 +1210,7 @@ export const en = {
             markedSent: 'Invoice marked as sent.',
             markPaid: 'Mark Paid',
             pdfReady: 'Ready',
-            pdfMissing: 'Missing',
+            pdfMissing: 'PDF missing',
             pdfGenerating: 'Generating\u2026',
             pdfFailed: 'Failed',
             pdfFailedHint: 'PDF generation failed. Generate the PDF again.',

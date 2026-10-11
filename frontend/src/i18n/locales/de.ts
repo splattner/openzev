@@ -1201,7 +1201,7 @@ export const de = {
             markedSent: 'Rechnung als versendet markiert.',
             markPaid: 'Als bezahlt markieren',
             pdfReady: 'Bereit',
-            pdfMissing: 'Fehlt',
+            pdfMissing: 'PDF fehlt',
             pdfGenerating: 'Wird erstellt…',
             pdfFailed: 'Fehlgeschlagen',
             pdfFailedHint: 'PDF-Erstellung fehlgeschlagen. Erstellen Sie das PDF erneut.',

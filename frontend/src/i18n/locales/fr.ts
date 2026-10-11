@@ -1201,7 +1201,7 @@ export const fr = {
             markedSent: 'Facture marquée comme envoyée.',
             markPaid: 'Marquer comme payé',
             pdfReady: 'Prêt',
-            pdfMissing: 'Manquant',
+            pdfMissing: 'PDF manquant',
             pdfGenerating: 'Génération…',
             pdfFailed: 'Échec',
             pdfFailedHint: 'La génération du PDF a échoué. Générez à nouveau le PDF.',
