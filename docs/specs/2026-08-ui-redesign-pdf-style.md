@@ -882,7 +882,10 @@ Existing suites stay green (contract: 59 tests in `test_contract_context.py`; te
   `FieldReference` component used by the admin email and PDF editors. The
   component's panel is explicitly keyboard-focusable, its occurrence matcher
   follows the same whitespace/filter normalization as highlighting, and its
-  insertion helpers update controlled state before restoring the caret. The
+  insertion helpers update controlled state before restoring the caret. Each
+  catalog group renders as a sheet table whose title rides in the dark
+  `thead` band (`<th scope="colgroup">`), meeting the card's sides like every
+  other card table. The
   four-locale keyboard/a11y pass is complete (below).
 
 - **Four-locale keyboard/a11y pass** — executed in two steps. Static WCAG

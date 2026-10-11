@@ -248,10 +248,16 @@ export function FieldReference({ groups, content, onInsert }: FieldReferenceProp
             )}
             {visibleGroups.map((group) => (
                 <div key={group.group_key}>
-                    {group.group_title_key && (
-                        <h5 className="field-reference__group-heading">{t(group.group_title_key)}</h5>
-                    )}
                     <table className="field-reference__table">
+                        {group.group_title_key && (
+                            <thead>
+                                <tr>
+                                    <th scope="colgroup" colSpan={counts ? 3 : 2}>
+                                        {t(group.group_title_key)}
+                                    </th>
+                                </tr>
+                            </thead>
+                        )}
                         <tbody>
                             {group.fields.map((field) => {
                                 const count = counts?.get(field.variable)
