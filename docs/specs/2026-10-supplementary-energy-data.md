@@ -7,8 +7,8 @@
 - Owners: Sebastian Plattner
 - Created: 2026-10-08
 - Target Release: TBD
-- Related Issues: [#925](https://github.com/splattner/openzev/issues/925)
-- Related ADRs: [0030](../adr/0030-supplementary-energy-data-is-not-billing-input.md) (never billing input), [0031](../adr/0031-integration-credentials-encrypted-under-a-dedicated-key.md) (connector credentials); builds on [0013](../adr/0013-shared-allocation-service.md), [0021](../adr/0021-mfa-secret-encryption-key.md), [0024](../adr/0024-backup-encryption-key.md), [0026](../adr/0026-swiss-civil-time-for-billing.md), [0027](../adr/0027-per-zev-access-grants.md)
+- Related Issues: [#925](https://github.com/splattner/openzev/issues/925), [#944](https://github.com/splattner/openzev/issues/944) (discoverability, §14)
+- Related ADRs: [0030](../adr/0030-supplementary-energy-data-is-not-billing-input.md) (never billing input), [0031](../adr/0031-integration-credentials-encrypted-under-a-dedicated-key.md) (connector credentials), [0032](../adr/0032-energy-data-flag-follows-the-integration-key.md) (the flag follows the key); builds on [0013](../adr/0013-shared-allocation-service.md), [0021](../adr/0021-mfa-secret-encryption-key.md), [0024](../adr/0024-backup-encryption-key.md), [0026](../adr/0026-swiss-civil-time-for-billing.md), [0027](../adr/0027-per-zev-access-grants.md)
 - Related specs: [behind-the-meter generation](2026-09-behind-the-meter-generation.md) (the flag this feature hangs off)
 - Impacted Areas: backend | frontend | async jobs | docs
 
@@ -67,7 +67,7 @@ or without this data.
 | Reconciliation | Source vs official meter: deviation, timestamp-shift detection |
 | API | Source CRUD and actions, push ingest, CSV import, additive `gross_energy` blocks on existing payloads |
 | Statistics | Participant dashboard, owner dashboard, annual report, annual statement PDF, MCP `consumption_summary` |
-| Frontend | Account "Energy data" tab (participant), source status on the metering-point list (owner), gross cards and rates, i18n (de/fr/it/en) |
+| Frontend | "My metering points" page with the energy data setup (participant), source status and "no source" marker on the metering-point list (owner), gross cards and rates, i18n (de/fr/it/en) |
 | Operations | Feature flag, system-health entry, system check, backup registry + manifest fingerprint, audit events |
 | Transfer archive | Sources (without secrets) and readings (last phase) |
 | Docs | User guide, baseline specs (see §11), `.env.example`, Helm values |
@@ -114,13 +114,17 @@ per-action rules above enforced in the view (`create`, `rotate_push_token`, cred
 require the holder-or-admin check). Disabled ZEVs follow the existing rule: read-only for
 non-admins.
 
-**Frontend routes:** the participant UI lives on the existing `/account` page (all roles, tab
-visible only to users who hold a flagged metering point); the owner view lives on
-`/metering-points`. No new top-level route.
+**Frontend routes:** the participant UI lives on `/me/metering-points` ("My metering points", §7.1;
+shell roles `participant`, plus managers and viewers who are participants themselves, who reach it
+from their own call to action); the owner view lives on `/metering/points`. It was an Account tab
+until [#944](https://github.com/splattner/openzev/issues/944); `/account?tab=energy-data` now lands
+on Profile like any unknown tab.
 
 **Feature flag:** `FeatureFlag.SUPPLEMENTARY_ENERGY_DATA_ENABLED`
-(`"supplementary_energy_data_enabled"`, default `False`, registered with a description, env
-override `FEATURE_SUPPLEMENTARY_ENERGY_DATA_ENABLED`). While off: source and ingest endpoints
+(`"supplementary_energy_data_enabled"`, registered with a description, env override
+`FEATURE_SUPPLEMENTARY_ENERGY_DATA_ENABLED`). Its default is computed: **on while
+`INTEGRATION_ENCRYPTION_KEYS` is configured, off otherwise**, until an admin chooses a value, after
+which the choice stands whatever the key (ADR 0032, §14). While off: source and ingest endpoints
 answer `404`, beat tasks skip, and every statistics surface behaves exactly as in 1.21.0
 (`gross_energy` is `null`). Existing data is kept, not deleted.
 
@@ -271,7 +275,7 @@ All answer `404` while the feature flag is off.
 |---|---|---|---|
 | `/sources/` | GET | `SupplementarySourcePermission` | Scoped list (admin all; manager/viewer their ZEVs; participant their own). Filter `?zev_id=` (as on every ZEV-scoped list), `?metering_point=` |
 | `/sources/` | POST | holder or admin | Create. Requires `consent: true`, a flagged metering point, a free metering point (one source each). `solar_manager`: needs `external_id` and `api_key`; the key is exchanged and one interval fetched **before** anything is saved, so a wrong key is a `400` with a safe message, not a broken row. Without a configured `INTEGRATION_ENCRYPTION_KEYS`: `503` naming the setting. `push`: returns the push token **once** in `push_token`. A provider that is not registered is refused with `400`. After the commit a backfill sync is queued (`backfill=True`, §6.3); a broker outage is logged and does not fail the request. A manager gets `403`; someone who cannot see the metering point gets `400 Invalid pk`, so its existence is not revealed. Audited `supplementary_source.create` |
-| `/sources/eligible/` | GET | authenticated | The flagged metering points the caller personally holds today (enabled ZEVs only), each with its `source` id or `null`; `[]` for anyone else, an admin included. What the Account page offers to connect (PR 5) |
+| `/sources/eligible/` | GET | authenticated | The flagged metering points the caller personally holds today (enabled ZEVs only), each with its `source` id or `null`; `[]` for anyone else, an admin included. What "My metering points" offers to connect, and what tells the frontend whether the feature is on (`404` = off) |
 | `/sources/{id}/` | GET | scoped | Detail |
 | `/sources/{id}/` | PATCH | holder or admin; manager only for `enabled` | `label`, `enabled`, `external_id`, write-only `api_key`. An absent `api_key` keeps the stored one. A new key, or switching a disabled source back on, queues a sync. Audited `supplementary_source.update` with a diff over the tracked fields and `credential_changed` in metadata, never the value |
 | `/sources/{id}/` | DELETE | holder, manager, admin | Deletes the source **and all its readings**. Audited `supplementary_source.delete` |
@@ -523,7 +527,8 @@ Result stored in `SupplementarySource.reconciliation` (the on-demand view adds `
   pull source (not `pending` or `reconnect_required`, which are the participant's to fix) has not
   succeeded for six sync intervals, else `ok`. It carries `feature_enabled`,
   `encryption_key_configured`, `sources_by_status`, `stale_sources` and `oldest_last_success_at`
-  (the TypeScript type is added now; the panel renders it with the frontend, PR 5).
+  (the admin System health tab shows it as an "Energy data" card: switched off, connected sources,
+  a missing key, stale sources, the oldest successful sync, and a link to the Functions tab).
 - **System check:** `metering.W001` warns when the feature flag is forced on through the
   environment (`FEATURE_SUPPLEMENTARY_ENERGY_DATA_ENABLED`) and no key is configured. Environment
   only, because system checks run without a database; the health panel reports the case where the
@@ -539,27 +544,40 @@ Result stored in `SupplementarySource.reconciliation` (the on-demand view adds `
 
 ## 7. Frontend
 
-### 7.1 Participant: Account → "Energy data"
+### 7.1 Participant: My metering points
 
-**Files:** `frontend/src/features/account/EnergyDataSection.tsx`,
-`SupplementarySourceModal.tsx`, `SupplementarySourceCard.tsx`; shared pieces in
-`features/supplementary/` (`SourceStatusBadge`, `ReconciliationSummary`, `PushTokenPanel`,
-`CsvImport`); `accountTabs.ts` gains `'energy-data'` (`ACCOUNT_TABS`) and
-`resolveAccountTab` takes `energyDataAvailable`, so a link to the tab lands on Profile for everyone
-who cannot use it.
+**Route:** `/me/metering-points` (`MyMeteringPointsPage`), sidebar entry "My metering points" for
+the shell role `participant` (not `former`). Allowed for `participant`, `manager`, `viewer` and
+`admin`: a manager who holds a flagged meter personally reaches it from their dashboard call to
+action. **Files:** `frontend/src/pages/MyMeteringPointsPage.tsx`;
+`features/supplementary/MeteringPointEnergyData.tsx`, `SupplementarySourceModal.tsx`,
+`SupplementarySourceCard.tsx`, `SourceStatusBadge`, `ReconciliationSummary`, `PushTokenPanel`,
+`CsvImport`.
 
-**Visibility.** The tab exists only when the feature is on *and* the user personally holds a
-flagged metering point. The frontend asks `GET /metering/supplementary/sources/eligible/` (added in
-PR 5; `useEnergyDataEligibility` in `lib/supplementary.ts`): `404` means the feature is off, an
-empty list means nothing to connect. It returns, for the signed-in user only (an admin gets `[]`),
-the flagged meters they hold personally today in an enabled ZEV, each with its `source` id or
-`null`: `{metering_point, meter_id, zev, zev_name, participant, source}`.
+**What it lists.** In the participant shell, the metering points of the selected community that
+`GET /zev/metering-points/` returns to the participant. In a management shell that list is the whole
+community's, so there the page shows only the meters the user holds with generation behind them
+(the `eligible` list) and an empty state otherwise. Per metering point:
+
+- Flagged and held personally today (an `eligible` entry of the selected community): the energy
+  data card, `MeteringPointEnergyData`. Without a source an explanation and **Connect**; with one
+  the card: status chip, last sync, covered range, reconciliation state, and actions **Test**,
+  **Sync now**, **Replace key**, **Disconnect** (keeps data), **Delete data**, **Remove source**.
+- Any other meter: a plain card (meter id, location, active, type, the behind-the-meter badge). A
+  flagged one the user does not hold personally says only the holder can connect energy data.
+- A closing hint, shown only while the feature is on and only to a participant, says who flags a
+  meter: the community's manager (§14). Participants cannot set the flag.
+- While the feature is off (`eligible` answers `404`) the page is a plain meter list: no energy data
+  card, no hint, no "ask your admin" text, and the sources are not requested.
+
+**Visibility of the feature.** The frontend asks `GET /metering/supplementary/sources/eligible/`
+(`useEnergyDataEligibility` in `lib/supplementary.ts`): `404` means the feature is off, an empty
+list means nothing to connect (`canConnect` is false). It returns, for the signed-in user only (an
+admin gets `[]`), the flagged meters they hold personally today in an enabled ZEV, each with its
+`source` id or `null`: `{metering_point, meter_id, zev, zev_name, participant, source}`.
 
 - Query: `useQuery({ queryKey: queryKeys.metering.supplementarySources(), queryFn: listSupplementarySources })`,
   joined to the eligible list by metering point.
-- Per flagged metering point: if no source, an explanation and **Connect**; otherwise the card:
-  status chip, last sync, covered range, reconciliation state, and actions **Test**, **Sync
-  now**, **Replace key**, **Disconnect** (keeps data), **Delete data**, **Remove source**.
 - Modal (create): provider choice; consent checkbox with the data-use text (what is stored: four
   values per quarter hour; who can see it: you, and the ZEV's managers see status and your
   figures; what it is *not* used for: billing); for Solar Manager `smId` and API key fields (key
@@ -567,13 +585,17 @@ the flagged meters they hold personally today in an enabled ZEV, each with its `
   for Push/File a one-time token display with a copy button, the endpoint URL, the CSV column
   list, and the Home Assistant recipe link.
 - Mutations invalidate `metering.supplementarySources` and the dashboard queries.
+- `accountTabs.ts` no longer has an `'energy-data'` tab; `resolveAccountTab` takes only
+  `mustChangePassword`.
 
 ### 7.2 Owner: metering-point list
 
 **File:** `frontend/src/features/meteringPoints/MeteringPointsList.tsx`; new
 `SupplementarySourceStatus.tsx` (a button-styled badge, `badge-button` in `index.css`, and the panel).
 
-Flagged metering points show a status chip from `supplementary_source_status`, and an owner can
+Flagged metering points show a status chip from `supplementary_source_status`; a flagged one with no
+source shows a quiet neutral "No energy data source" marker instead (only while the feature is on,
+known from `useEnergyDataEligibility`, never a warning: the data is optional). An owner can
 open a read-only panel (status, last sync, coverage, reconciliation) with **Disable**,
 **Delete data** and **Remove source** (manager actions only). No credential field is shown to
 an owner.
@@ -583,8 +605,8 @@ an owner.
 - `ParticipantDashboardBody.tsx`: a net-metered participant with `gross_energy` sees
   `components/dashboard/GrossEnergyCard.tsx` (production, consumption, import, export, self-consumption,
   the two rates, coverage and "based on data from … to …", a production-vs-export timeline) in
-  place of the `—` hint; without a source they see a call to action linking to the Energy data
-  tab (only shown when the tab exists: feature on). Rates are labelled "reported by your own system".
+  place of the `—` hint; without a source they see a call to action linking to "My metering points"
+  (only shown while `canConnect`: feature on and a flagged meter held). Rates are labelled "reported by your own system".
   `ManagementDashboardBody` shows the same card for the selected participant
   (`selected_gross_energy`), and, as a block under the ZEV figures, the manager's own
   (`own_gross_energy`, or the call to action when they hold an unconnected flagged meter in this
@@ -894,19 +916,27 @@ CI runs `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-he
   absolute API base.
 - **`tests/gross-energy-card.test.ts`** (9): both rates and the "reported by your own system" label;
   a dash and the reason for low coverage and no data while the energy is still shown; the
-  participant's name for an owner; the call to action links to the tab; `NetMeteredRate` with a
+  participant's name for an owner; the call to action links to "My metering points"; `NetMeteredRate` with a
   rate, without a source and withheld.
-- **`tests/energy-data-section.test.ts`** (18): connect offered per meter; the modal's write-only
+- **`tests/metering-point-energy-data.test.ts`** (18): connect offered for the meter; the modal's write-only
   key field, consent gate and consent text; the create payload; a vendor rejection next to the key
   field; a push source ends on a one-time token screen; the card per status (ok, reconnect required,
   disconnected, push); test, sync (cooldown), replace key, disconnect, delete data, remove and
   rotate, the destructive ones behind a confirmation; CSV check, import and row errors.
-- **`tests/supplementary-owner-status.test.ts`** (9): no chip without a source; the chip as a
+- **`tests/supplementary-owner-status.test.ts`** (12): no chip without a source, a quiet marker on a flagged
+  meter without one while the feature is on and nothing without generation or with the feature off; the chip as a
   button with its tone; the panel shows status and comparison but no credential field; a manager
   can switch off, delete data and remove behind confirmations; a viewer has no actions; the
   participant table's rate cell with a rate, without one, withheld, and for a non-net-metered row.
-- **`tests/account-tabs.test.ts`** (+4): the tab resolves only when available; four tabs for a
-  participant with a flagged meter; Profile while the check runs; no extra tab without the feature.
+- **`tests/account-tabs.test.ts`**: three tabs only; a link to the former `energy-data` tab lands on
+  Profile (Security for a forced password change).
+- **`tests/my-metering-points-page.test.ts`** (7), added with §14: the energy data card on the
+  held flagged meter and plain cards for the rest; the note on a flagged meter the participant does
+  not hold; the hint on who flags a meter; nothing about energy data while the feature is off; only
+  the selected community's meters; a manager sees only their own flagged meters and no community
+  list; the empty state per audience.
+- **`tests/system-health-backups.test.ts`** (+3): the "Energy data" health card switched off, with
+  sources, and with a missing key and stale sources.
 - **Backend** `metering/test_supplementary_api.py::EligibleMeteringPointTests` (7): the holder gets
   their flagged meter and, once connected, the source id; nobody else gets anything, an admin
   included; unflagged, community and ended tenancies and a disabled ZEV are not offered; `404` while
@@ -993,7 +1023,7 @@ and to be observed during PR 3: rate limits and the maximum `from`/`to` range pe
   the catalog description in four languages); the UI that renders them is PR 5.
 
 **PR 5: Frontend and docs** (implemented, see the test list in §9)
-- Types, API client, query keys, Account tab, modal, owner status panel, gross card, rate
+- Types, API client, query keys, Account tab (moved to "My metering points" by §14), modal, owner status panel, gross card, rate
   cells, `AnnualReportSection`, i18n in four languages.
 - User guide chapter (connect Solar Manager; the Home Assistant push recipe; what the numbers
   mean; privacy), screenshots regenerated, baseline specs updated (§11).
@@ -1010,7 +1040,7 @@ and to be observed during PR 3: rate limits and the maximum `from`/`to` range pe
 - Hardening found while doing it: a source in a **disabled ZEV** no longer accepts pushes (`403 "This
   ZEV is disabled."`), is skipped by the sync (`zev_disabled`) and is not queued by the fan-out.
 - ADRs 0030 and 0031 accepted, the spec marked implemented, `AGENTS.md` lists it.
-- **Not done, on purpose:** the feature flag still ships off; the demo seed has no net-metered
+- **Not done, on purpose:** (the flag shipped off; since §14 it follows the integration key); the demo seed has no net-metered
   participant (so the guide screenshots are not part of `npm run screenshots`); the reconciliation
   day-by-day view has an API client function but no screen; there is no automatic retention (§12);
   the Solar Manager rate limit and maximum range per call are still unmeasured, and the client has
@@ -1066,3 +1096,37 @@ model.
 the "Per participant" table now clears its selection on a second click and exposes it as
 `aria-pressed` (`tests/dashboard-behavior.test.ts`, 8 tests). `GrossEnergyCard` uses `useId` for its
 heading, because two of them can be on one page.
+
+## 14. Follow-up: discoverability ([#944](https://github.com/splattner/openzev/issues/944))
+
+Getting one meter's data in took four unlinked steps in four places (enable the feature, flag the
+meter, set up the source in account settings, import). Decisions, and what each changed:
+
+1. **The setup lives on the participant side, on "My metering points"** (§7.1), no longer in an
+   Account tab. The credential still belongs to the participant's account and managers never see it
+   (§3 unchanged). `ACCOUNT_TABS` is `profile`, `security`, `api-keys` again.
+2. **No notification after flagging.** Energy data is optional; nobody gets an email. The manager
+   sees "No energy data source" on the meter (§7.2); the participant finds the option on their own
+   page.
+3. **The platform flag follows the key** ([ADR 0032](../adr/0032-energy-data-flag-follows-the-integration-key.md)).
+   `FeatureFlag` gains `follows_default` (bool, default `False`): set when a flag with a computed
+   default (`FeatureFlag.register(..., dynamic_default=fn)`, listed in `DYNAMIC_DEFAULTS`) is
+   seeded, cleared by `PATCH /auth/feature-flags/{id}/` as soon as the request carries `enabled`.
+   `FeatureFlag.is_enabled` resolves: environment override, then the stored value unless the row
+   follows its default, then `default_for(name)` (the computed default, else `DEFAULTS`).
+   `GET /auth/feature-flags/` returns `enabled` as the effective value and a read-only
+   `follows_default`; the Functions tab shows a hint under such a flag. Migration
+   `accounts.0023_featureflag_follows_default` marks a stored "off" for this flag as unchosen (a stored
+   "on" stays a choice). While the flag is off nothing is shown to participants.
+4. **Only managers flag a meter**, with a static hint on the page saying who to ask. A request flow
+   is deferred.
+5. **Visibility for admins and managers:** the `supplementary` health probe in the System health
+   tab (§6.6) and the marker above. No ZEV-wide overview.
+
+**Tests.** Backend `accounts/test_feature_flag_defaults.py` (12): off without a key, on with one
+before and after the row exists, tracking the key without touching the row, an explicit off beating
+the default, an explicit on without a key, the environment override, other flags unchanged, the
+admin list's effective value and `follows_default`, a chosen off remembered, the audit diff over
+effective values, an unrelated edit keeping the default, and the migration. Frontend as listed in §9.
+
+**Deferred:** the request-activation flow for participants, and the ZEV-wide overview.

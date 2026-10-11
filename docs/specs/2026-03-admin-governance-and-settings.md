@@ -498,6 +498,7 @@ link the invoice breakdown to `/admin/invoices` and email statistics to
 - **Features tab:**
     - Uses `fetchFeatureFlags` with query key `['feature-flags']`.
     - Displays the registered feature flags in a table with toggle switches.
+    - A flag whose row has `follows_default` (a flag with a computed default, such as `supplementary_energy_data_enabled`, until an admin chooses) shows its current effective value and a hint that it follows the instance's default; toggling it stores a choice (`follows_default` becomes `false`). See [ADR 0032](../adr/0032-energy-data-flag-follows-the-integration-key.md).
     - Toggling uses `updateFeatureFlag` and invalidates `['feature-flags']` after success.
 - **OAuth tab:**
     - Uses `fetchOAuthProviderConfigs` with query key `['oauth-provider-configs']`.

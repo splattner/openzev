@@ -284,6 +284,10 @@ snapshot of platform infrastructure:
   depth; `unknown` means no broker is reachable (local development without
   Redis reports unknown, which is a valid state, not an outage)
 - **Email** — the configured backend mode (SMTP, console, in-memory, custom)
+- **Energy data** — whether participants' [own energy data](20-energy-data.md) is
+  switched on, how many sources are connected, whether the encryption key is set,
+  and sources that have not synced for a long time; `unknown` means the feature
+  is switched off
 
 The snapshot is taken when the tab is opened (no auto-refresh). Probes are
 best-effort — a failing probe never breaks the page.
@@ -520,7 +524,7 @@ The backend and frontend both read the same feature flag state.
 | `zev_self_registration_enabled` | `true` | Allows self-registration (setting up one's own ZEV) from the login page |
 | `feasibility_calculator_enabled` | `false` | Shows the [feasibility calculator](13-feasibility-calculator.md) to admins and managers |
 | `participant_geocoding_enabled` | `false` | Looks up building outlines on OpenStreetMap for the [participants map](03-participant-management.md#map); sends building addresses to the public Nominatim service |
-| `supplementary_energy_data_enabled` | `false` | Lets participants with a PV system behind their meter connect their [own energy data](20-energy-data.md) (Solar Manager, push or file) for statistics, never for billing; Solar Manager sources call the vendor's cloud and need `INTEGRATION_ENCRYPTION_KEYS` |
+| `supplementary_energy_data_enabled` | `true` once `INTEGRATION_ENCRYPTION_KEYS` is set, otherwise `false` | Lets participants with a PV system behind their meter connect their [own energy data](20-energy-data.md) (Solar Manager, push or file) for statistics, never for billing; Solar Manager sources call the vendor's cloud and need `INTEGRATION_ENCRYPTION_KEYS`. Switching it off here stays off, whatever the key |
 | `mcp_server_enabled` | `false` | Lets AI assistants read OpenZEV data through the [MCP endpoint](19-ai-assistants.md) using a user's API key; answers are sent to the assistant's LLM provider |
 
 ### How State Is Resolved
@@ -529,7 +533,7 @@ For each flag, OpenZEV resolves the final state in this order:
 
 1. Environment variable `FEATURE_<FLAG_NAME_IN_UPPERCASE>`
 2. Value stored in database (set via Platform → Settings → Functions)
-3. Code default
+3. Code default (for `supplementary_energy_data_enabled`: on when `INTEGRATION_ENCRYPTION_KEYS` is set, until you change it in Functions)
 4. `false` fallback
 
 For `zev_self_registration_enabled`, the environment variable key is:

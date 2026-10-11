@@ -91,7 +91,7 @@ export function useEnergyDataEligibility() {
         isLoading: query.isLoading,
         featureOn,
         eligible,
-        /** The Account tab is worth showing: the feature is on and the user holds a flagged meter. */
-        tabAvailable: featureOn && eligible.length > 0,
+        /** There is something to connect: the feature is on and the user holds a flagged meter. */
+        canConnect: featureOn && eligible.length > 0,
     }
 }

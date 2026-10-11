@@ -112,6 +112,35 @@ export function AdminSystemHealthPanel() {
                         <Link to="/admin/system-settings?tab=backup">{t('pages.adminOverview.health.backups.manage')}</Link>
                     </p>
                 </ProbeCard>
+                <ProbeCard status={health.supplementary.status} title={t('pages.adminOverview.health.supplementary.title')}>
+                    <p className="muted" style={{ margin: 0 }}>
+                        {health.supplementary.feature_enabled === false
+                            ? t('pages.adminOverview.health.supplementary.off')
+                            : health.supplementary.feature_enabled
+                              ? t('pages.adminOverview.health.supplementary.sources', {
+                                    count: Object.values(health.supplementary.sources_by_status ?? {}).reduce((sum, n) => sum + n, 0),
+                                })
+                              : null}
+                    </p>
+                    {health.supplementary.feature_enabled && !health.supplementary.encryption_key_configured && (
+                        <p className="muted text-error">{t('pages.adminOverview.health.supplementary.noKey')}</p>
+                    )}
+                    {!!health.supplementary.stale_sources && (
+                        <p className="muted text-error">
+                            {t('pages.adminOverview.health.supplementary.stale', { count: health.supplementary.stale_sources })}
+                        </p>
+                    )}
+                    {health.supplementary.oldest_last_success_at && (
+                        <p className="muted" style={{ margin: 0 }}>
+                            {t('pages.adminOverview.health.supplementary.oldest', {
+                                time: formatDateTime(health.supplementary.oldest_last_success_at),
+                            })}
+                        </p>
+                    )}
+                    <p className="muted" style={{ margin: 0 }}>
+                        <Link to="/admin/system-settings?tab=features">{t('pages.adminOverview.health.supplementary.manage')}</Link>
+                    </p>
+                </ProbeCard>
                 <ProbeCard status={health.email.status} title={t('pages.adminOverview.health.email.title')}>
                     <p className="muted" style={{ margin: 0 }}>
                         {t(`pages.adminOverview.health.email.mode.${health.email.mode}`)}

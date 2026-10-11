@@ -24,6 +24,7 @@ const DashboardPage = lazy(async () => ({ default: (await import('../pages/Dashb
 const HomePage = lazy(async () => ({ default: (await import('../pages/HomePage')).HomePage }))
 const ReportsPage = lazy(async () => ({ default: (await import('../pages/ReportsPage')).ReportsPage }))
 const InvoiceDetailPage = lazy(async () => ({ default: (await import('../pages/InvoiceDetailPage')).InvoiceDetailPage }))
+const MyMeteringPointsPage = lazy(async () => ({ default: (await import('../pages/MyMeteringPointsPage')).MyMeteringPointsPage }))
 const MyInvoicesPage = lazy(async () => ({ default: (await import('../pages/MyInvoicesPage')).MyInvoicesPage }))
 const LoginPage = lazy(async () => ({ default: (await import('../pages/LoginPage')).LoginPage }))
 const MeteringChartPage = lazy(async () => ({ default: (await import('../pages/MeteringChartPage')).MeteringChartPage }))
@@ -261,6 +262,16 @@ export function AppRoutes() {
             element={
               <ProtectedRoute allowedRoles={['participant', 'former']}>
                 <MyInvoicesPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* The participant's own meters, and the energy data of those with generation behind
+              the meter. A manager who is also a participant lands here from their own call to action. */}
+          <Route
+            path="me/metering-points"
+            element={
+              <ProtectedRoute allowedRoles={ACTIVE_SCOPE}>
+                <MyMeteringPointsPage />
               </ProtectedRoute>
             }
           />

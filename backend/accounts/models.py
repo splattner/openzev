@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Callable
 from datetime import date, timedelta
 
 import pyotp
@@ -480,6 +481,14 @@ class FeatureFlag(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.CharField(max_length=255, blank=True, default="")
     enabled = models.BooleanField(default=False)
+    follows_default = models.BooleanField(
+        default=False,
+        help_text=(
+            "No admin has chosen a value yet: the flag takes the code default, which for a flag "
+            "with a computed default (``DYNAMIC_DEFAULTS``) follows the instance's configuration. "
+            "Saving a choice clears it, so an explicit \"off\" always wins."
+        ),
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -488,18 +497,42 @@ class FeatureFlag(models.Model):
     def __str__(self):
         return f"{self.name} ({'on' if self.enabled else 'off'})"
 
+    @property
+    def effective_enabled(self) -> bool:
+        """What the flag resolves to for this row (the stored value unless it follows its default)."""
+        return self.is_enabled(self.name) if self.follows_default else self.enabled
+
     # ---- registry of known flags with code defaults ----
 
     # Map of flag name → default enabled value.
     # Register new flags here.
     DEFAULTS: dict[str, bool] = {}
     DESCRIPTIONS: dict[str, str] = {}
+    # Flags whose default is computed from the instance's configuration rather than fixed.
+    DYNAMIC_DEFAULTS: dict[str, Callable[[], bool]] = {}
 
     @classmethod
-    def register(cls, name: str, default: bool = False, description: str = ""):
-        """Register a known flag with its code default."""
+    def register(
+        cls,
+        name: str,
+        default: bool = False,
+        description: str = "",
+        dynamic_default: Callable[[], bool] | None = None,
+    ):
+        """Register a known flag with its code default.
+
+        ``dynamic_default`` replaces the fixed default with a function evaluated on every
+        read, for as long as no admin has chosen a value for the flag.
+        """
         cls.DEFAULTS[name] = default
         cls.DESCRIPTIONS[name] = description
+        if dynamic_default is not None:
+            cls.DYNAMIC_DEFAULTS[name] = dynamic_default
+
+    @classmethod
+    def default_for(cls, name: str) -> bool:
+        compute = cls.DYNAMIC_DEFAULTS.get(name)
+        return compute() if compute else cls.DEFAULTS.get(name, False)
 
     @classmethod
     def sync_defaults(cls):
@@ -522,7 +555,11 @@ class FeatureFlag(models.Model):
 
             flag, created = cls.objects.get_or_create(
                 name=flag_name,
-                defaults={"enabled": initial, "description": description},
+                defaults={
+                    "enabled": initial,
+                    "description": description,
+                    "follows_default": flag_name in cls.DYNAMIC_DEFAULTS,
+                },
             )
             if not created and description and flag.description != description:
                 flag.description = description
@@ -534,8 +571,8 @@ class FeatureFlag(models.Model):
 
         Resolution order:
         1. Environment variable ``FEATURE_<UPPER_NAME>`` (if set).
-        2. Database value (if a row exists).
-        3. Code default from ``DEFAULTS``.
+        2. Database value (if a row exists and an admin has chosen one).
+        3. Code default: ``DYNAMIC_DEFAULTS`` or ``DEFAULTS``.
         4. ``False``.
         """
         import os
@@ -545,10 +582,10 @@ class FeatureFlag(models.Model):
         if env_val is not None:
             return env_val.lower() in ("1", "true", "yes")
 
-        try:
-            return cls.objects.values_list("enabled", flat=True).get(name=name)
-        except cls.DoesNotExist:
-            return cls.DEFAULTS.get(name, False)
+        row = cls.objects.filter(name=name).values("enabled", "follows_default").first()
+        if row is None or row["follows_default"]:
+            return cls.default_for(name)
+        return row["enabled"]
 
 
 class OAuthProvider(models.Model):
@@ -699,11 +736,21 @@ FeatureFlag.register(
         "which may be a third party outside Switzerland."
     ),
 )
+
+
+def _integration_key_configured() -> bool:
+    from metering.supplementary.crypto import encryption_configured
+
+    return encryption_configured()
+
+
 FeatureFlag.register(
     FeatureFlag.SUPPLEMENTARY_ENERGY_DATA_ENABLED,
     default=False,
     description=(
         "Let participants with PV behind their meter connect their own energy data (Solar Manager, "
-        "push or file) for statistics only, never billing (ADR 0030). Solar Manager sources call the vendor's cloud."
+        "push or file) for statistics only, never billing (ADR 0030). On by default once "
+        "INTEGRATION_ENCRYPTION_KEYS is set. Solar Manager calls the vendor's cloud."
     ),
+    dynamic_default=_integration_key_configured,
 )

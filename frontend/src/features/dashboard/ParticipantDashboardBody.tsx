@@ -150,7 +150,7 @@ export function ParticipantDashboardBody({ interval, period, onPeriodChange, per
                             formatBucketTooltipLabel={formatBucketTooltipLabel}
                         />
                     )}
-                    {summary.has_behind_meter_generation && !summary.gross_energy && energyData.tabAvailable && (
+                    {summary.has_behind_meter_generation && !summary.gross_energy && energyData.canConnect && (
                         <GrossEnergyCallToAction />
                     )}
                     {summary.zev_participant_stats.length > 0 && summary.current_participant_id && (

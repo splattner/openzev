@@ -91,10 +91,10 @@ describe('GrossEnergyCard', () => {
 })
 
 describe('GrossEnergyCallToAction', () => {
-    it('links to the Energy data tab', async () => {
+    it('links to the participant metering points page', async () => {
         const { container } = await renderWithProviders(createElement(GrossEnergyCallToAction), cleanups)
 
-        expect(container.querySelector('a')?.getAttribute('href')).toBe('/account?tab=energy-data')
+        expect(container.querySelector('a')?.getAttribute('href')).toBe('/me/metering-points')
     })
 })
 

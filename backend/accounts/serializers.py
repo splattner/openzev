@@ -326,8 +326,14 @@ class AppSettingsSerializer(serializers.ModelSerializer):
 class FeatureFlagSerializer(serializers.ModelSerializer):
     class Meta:
         model = FeatureFlag
-        fields = ["id", "name", "description", "enabled", "updated_at"]
-        read_only_fields = ["id", "name", "description", "updated_at"]
+        fields = ["id", "name", "description", "enabled", "follows_default", "updated_at"]
+        read_only_fields = ["id", "name", "description", "follows_default", "updated_at"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Until an admin chooses, the flag reads as what it currently resolves to.
+        data["enabled"] = instance.effective_enabled
+        return data
 
 
 class TotpDeviceSerializer(serializers.ModelSerializer):

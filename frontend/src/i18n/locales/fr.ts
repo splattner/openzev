@@ -27,6 +27,7 @@ export const fr = {
         billing: 'Facturation',
         myInvoices: 'Mes factures',
         annualStatement: 'Décompte annuel',
+        myMeteringPoints: 'Mes points de mesure',
         adminOverview: 'Vue d\'ensemble',
         adminAccounts: 'Comptes',
         adminSystemSettings: 'Paramètres',
@@ -486,7 +487,6 @@ export const fr = {
             profile: 'Profil',
             security: 'Sécurité',
             apiKeys: 'Clés API',
-            energyData: 'Données énergétiques',
         },
         emailChange: {
             button: 'Modifier l\'e-mail',
@@ -638,6 +638,18 @@ export const fr = {
         },
     },
     pages: {
+        myMeteringPoints: {
+            title: 'Mes points de mesure',
+            description: 'Les points de mesure qui vous sont attribués.',
+            loadFailed: 'Impossible de charger vos points de mesure.',
+            empty: {
+                title: 'Aucun point de mesure',
+                participant: 'Aucun point de mesure ne vous est encore attribué dans cette communauté.',
+                manager: 'Vous ne détenez aucun point de mesure avec production derrière le compteur dans cette communauté.',
+            },
+            flagHint: 'Une installation PV se trouve derrière votre compteur, mais le point de mesure n\'est pas marqué comme tel ? Demandez à la gestion de votre communauté de le marquer « Production derrière le compteur ». Vous pourrez alors connecter ici vos propres données énergétiques.',
+            notHolder: 'Seule la personne qui détient personnellement ce point de mesure peut y connecter des données énergétiques.',
+        },
         myInvoices: {
             title: 'Mes factures',
             allCommunities: 'Toutes vos communautés',
@@ -3156,6 +3168,17 @@ export const fr = {
                 health: 'État du système',
             },
             health: {
+                supplementary: {
+                    title: 'Données énergétiques',
+                    off: 'Désactivé.',
+                    sources_one: '{{count}} source connectée',
+                    sources_other: '{{count}} sources connectées',
+                    noKey: 'INTEGRATION_ENCRYPTION_KEYS n\'est pas définie : les clés Solar Manager ne peuvent pas être enregistrées.',
+                    stale_one: '{{count}} source n\'a pas été synchronisée depuis longtemps.',
+                    stale_other: '{{count}} sources n\'ont pas été synchronisées depuis longtemps.',
+                    oldest: 'Dernière synchronisation réussie la plus ancienne : {{time}}',
+                    manage: 'Gérer dans les fonctionnalités',
+                },
                 backups: {
                     title: 'Sauvegardes',
                     notSetUp: 'Aucune destination de sauvegarde n\'est activée.',
@@ -3280,7 +3303,6 @@ export const fr = {
             insufficientHint: 'Une comparaison nécessite au moins deux jours présents à la fois dans la source et dans les données officielles du compteur.',
         },
         section: {
-            title: 'Données énergétiques',
             description: 'Connectez le système derrière votre compteur (p. ex. Solar Manager) pour que vos statistiques montrent votre production, votre consommation et votre autarcie réelles. Ces données ne servent qu\'aux statistiques et jamais à la facturation.',
             notConnected: 'Aucune source de données énergétiques n\'est encore connectée à ce point de mesure.',
             connect: 'Connecter',
@@ -3377,6 +3399,8 @@ export const fr = {
         owner: {
             chip: 'Données énergétiques : {{status}}',
             chipHint: 'Ouvrir l\'état de la source de données énergétiques de ce point de mesure',
+            noSource: 'Aucune source de données énergétiques',
+            noSourceHint: 'Le participant peut en connecter une sous « Mes points de mesure ». Les données énergétiques sont facultatives.',
             title: 'Source de données énergétiques de {{meter}}',
             readOnlyNote: '{{name}} a connecté cette source. Vous voyez son état, pas l\'accès, et ne pouvez pas modifier la connexion elle-même.',
             provider: 'Source',
@@ -3426,6 +3450,7 @@ export const fr = {
         on: 'Activé',
         off: 'Désactivé',
         updated: 'Fonctionnalité mise à jour.',
+        followsDefault: 'Suit la valeur par défaut de cette instance. Une modification rend votre choix définitif.',
     },
     mfaGate: {
         title: 'Configurer l\'authentification à deux facteurs',

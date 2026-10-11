@@ -219,7 +219,10 @@ export interface FeatureFlag {
     id: number
     name: string
     description: string
+    /** What the flag resolves to now (its default while `follows_default`). */
     enabled: boolean
+    /** No admin has chosen a value: `enabled` is the instance's default, which may change with its configuration. */
+    follows_default: boolean
     updated_at: string
 }
 

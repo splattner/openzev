@@ -11,7 +11,7 @@ import {
     updateSupplementarySource,
 } from '../../lib/api/supplementary'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
-import { STATUS_BADGE_CLASS, statusTone } from '../../lib/supplementary'
+import { STATUS_BADGE_CLASS, statusTone, useEnergyDataEligibility } from '../../lib/supplementary'
 import { useToast } from '../../lib/toast'
 import type { MeteringPoint } from '../../types/api'
 import { ReconciliationSummary } from '../supplementary/ReconciliationSummary'
@@ -40,8 +40,16 @@ interface Props {
 export function SupplementarySourceStatus({ point, canManage, confirm }: Props) {
     const { t } = useTranslation()
     const [open, setOpen] = useState(false)
+    const { featureOn } = useEnergyDataEligibility()
     const status = point.supplementary_source_status
-    if (!status) return null
+    if (!status) {
+        // A quiet marker, not a warning: the data is optional and the participant decides.
+        return featureOn && point.has_behind_meter_generation ? (
+            <span className="badge badge-neutral" title={t('supplementary.owner.noSourceHint')}>
+                {t('supplementary.owner.noSource')}
+            </span>
+        ) : null
+    }
 
     return (
         <>

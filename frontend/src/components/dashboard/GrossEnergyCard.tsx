@@ -112,7 +112,7 @@ export function GrossEnergyCallToAction() {
         <section className="card" aria-labelledby="gross-energy-cta-title">
             <h3 id="gross-energy-cta-title">{t('supplementary.gross.ctaTitle')}</h3>
             <p className="muted">{t('supplementary.gross.ctaBody')}</p>
-            <Link className="button button-primary button-compact" style={{ textDecoration: 'none' }} to="/account?tab=energy-data">
+            <Link className="button button-primary button-compact" style={{ textDecoration: 'none' }} to="/me/metering-points">
                 {t('supplementary.gross.ctaAction')}
             </Link>
         </section>

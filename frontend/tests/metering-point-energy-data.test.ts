@@ -1,6 +1,9 @@
 import { act, createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { EnergyDataSection } from '../src/features/account/EnergyDataSection'
+import { useQuery } from '@tanstack/react-query'
+import { ConfirmDialog, useConfirmDialog } from '../src/components/ConfirmDialog'
+import { MeteringPointEnergyData } from '../src/features/supplementary/MeteringPointEnergyData'
+import { queryKeys } from '../src/lib/api/queryKeys'
 import type { EligibleMeteringPoint, SupplementarySource } from '../src/types/api'
 import { renderWithProviders, setInputValue } from './helpers/render'
 import { waitForCondition } from './helpers/waitForCondition'
@@ -49,6 +52,17 @@ const source = (overrides: Partial<SupplementarySource> = {}): SupplementarySour
 
 const cleanups: Array<() => void> = []
 
+/** What the page around the component provides: the source lookup and the confirm dialog. */
+function Harness() {
+    const sources = useQuery({ queryKey: queryKeys.metering.supplementarySources(), queryFn: api.listSupplementarySources })
+    const { dialog, confirm, handleConfirm, handleCancel, isLoading } = useConfirmDialog()
+    if (!sources.data) return null
+    return createElement('div', null,
+        createElement(MeteringPointEnergyData, { point, source: sources.data.find((s: SupplementarySource) => s.metering_point === point.metering_point), confirm }),
+        dialog && createElement(ConfirmDialog, { ...dialog, isLoading, onConfirm: handleConfirm, onCancel: handleCancel }),
+    )
+}
+
 beforeEach(() => {
     vi.clearAllMocks()
     api.fetchEligibleOrNull.mockResolvedValue([point])
@@ -58,7 +72,7 @@ afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
 
 async function mount(sources: SupplementarySource[] = []) {
     api.listSupplementarySources.mockResolvedValue(sources)
-    const view = await renderWithProviders(createElement(EnergyDataSection), cleanups)
+    const view = await renderWithProviders(createElement(Harness), cleanups)
     await waitForCondition(() => view.container.querySelector('article') !== null, 'the meter card')
     return view
 }
@@ -71,14 +85,13 @@ async function click(element: HTMLElement) {
     await act(async () => { element.click() })
 }
 
-describe('EnergyDataSection without a source', () => {
-    it('offers to connect each flagged meter and explains that the data is never billed', async () => {
+describe('MeteringPointEnergyData without a source', () => {
+    it('offers to connect the flagged meter', async () => {
         const { container } = await mount()
 
         expect(container.textContent).toContain('CH-100')
         expect(container.textContent).toContain('Sonnenhof')
         expect(container.textContent).toContain('supplementary.section.notConnected')
-        expect(container.textContent).toContain('supplementary.section.description')
         expect(buttonWith(container, 'supplementary.section.connect')).toBeDefined()
     })
 })

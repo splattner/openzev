@@ -36,6 +36,7 @@ This directory captures key architectural decisions for OpenZEV.
 - [0030: Supplementary energy data lives in its own table and never reaches billing](0030-supplementary-energy-data-is-not-billing-input.md)
 - [0031: Third-party integration credentials are encrypted under a dedicated, rotatable key](0031-integration-credentials-encrypted-under-a-dedicated-key.md)
 - [0032: One visual language for screen and documents](0032-one-visual-language-for-screen-and-documents.md) (amends 0014)
+- [0033: The energy data flag defaults to on once the integration key is configured](0033-energy-data-flag-follows-the-integration-key.md)
 
 ## Conventions
 

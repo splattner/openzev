@@ -25,6 +25,7 @@ const health = (backups: SystemHealth['backups']): SystemHealth => ({
     mfa: { status: 'ok', encryption_key_configured: true },
     email: { status: 'ok', mode: 'smtp', backend: 'EmailBackend' },
     backups,
+    supplementary: { status: 'unknown', feature_enabled: false },
     checked_at: '2026-09-22T10:00:00Z',
 })
 
@@ -37,8 +38,8 @@ beforeEach(() => {
 })
 afterEach(() => { cleanups.splice(0).forEach((cleanup) => cleanup()); vi.clearAllMocks() })
 
-async function render(backups: SystemHealth['backups']) {
-    fetchSystemHealth.mockResolvedValue(health(backups))
+async function render(backups: SystemHealth['backups'], supplementary?: SystemHealth['supplementary']) {
+    fetchSystemHealth.mockResolvedValue({ ...health(backups), ...(supplementary ? { supplementary } : {}) })
     const container = document.createElement('div')
     document.body.append(container)
     const root = createRoot(container)
@@ -99,5 +100,39 @@ describe('the backups card on the system health tab', () => {
     it('reports rejected keys as blocked even when encryption is optional', async () => {
         const c = card(await render({ status: 'degraded', encrypted: false, encryption_required: false, encryption_key_problem: true }))
         expect(c.textContent).toContain('pages.adminOverview.health.backups.blocked')
+    })
+})
+
+const energyCard = (container: Element) =>
+    Array.from(container.querySelectorAll('.system-health-probe')).find((c) => c.textContent?.includes('pages.adminOverview.health.supplementary.title'))!
+
+describe('the energy data card on the system health tab', () => {
+    it('says the feature is switched off — a state, not a fault', async () => {
+        const c = energyCard(await render({ status: 'unknown' }))
+        expect(c.textContent).toContain('pages.adminOverview.health.status.unknown')
+        expect(c.textContent).toContain('pages.adminOverview.health.supplementary.off')
+        expect(c.querySelector('.dot-info')).toBeTruthy()
+    })
+
+    it('counts the connected sources and points to the Functions tab', async () => {
+        const c = energyCard(await render({ status: 'unknown' }, {
+            status: 'ok', feature_enabled: true, encryption_key_configured: true,
+            sources_by_status: { ok: 2, pending: 1 }, stale_sources: 0, oldest_last_success_at: '2026-10-10T08:00:00Z',
+        }))
+        expect(c.textContent).toContain('pages.adminOverview.health.supplementary.sources')
+        expect(c.textContent).toContain('pages.adminOverview.health.supplementary.oldest')
+        expect(c.textContent).not.toContain('pages.adminOverview.health.supplementary.noKey')
+        expect(c.querySelector('.dot-success')).toBeTruthy()
+        expect(c.querySelector('a')?.getAttribute('href')).toBe('/admin/system-settings?tab=features')
+    })
+
+    it('flags a missing key and stale sources', async () => {
+        const c = energyCard(await render({ status: 'unknown' }, {
+            status: 'degraded', feature_enabled: true, encryption_key_configured: false,
+            sources_by_status: { error: 1 }, stale_sources: 1, oldest_last_success_at: null,
+        }))
+        expect(c.textContent).toContain('pages.adminOverview.health.supplementary.noKey')
+        expect(c.textContent).toContain('pages.adminOverview.health.supplementary.stale')
+        expect(c.querySelector('.dot-warning')).toBeTruthy()
     })
 })

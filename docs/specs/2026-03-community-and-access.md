@@ -1545,6 +1545,7 @@ reaches every ZEV-scope route and sees its pages read-only
 | `/invoices/:invoiceId` · `/billing/invoices/:invoiceId` | any authenticated | `InvoiceDetailPage` (own invoices only for participants, backend-enforced) |
 | `/me/statement` | `participant` | `ReportsPage` (participant branch; impersonating admins carry the target account's relations) |
 | `/me/invoices` | `participant`, `former` | `MyInvoicesPage` (own invoices, read-only; reuses the role-scoped invoice list — no new grant, recorded exception 2) |
+| `/me/metering-points` | `participant`, `manager`, `viewer`, `admin` | `MyMeteringPointsPage` (the participant's own metering points and the energy data setup of those with generation behind the meter; a management shell shows only the flagged meters the user holds personally; see [supplementary energy data §7.1](2026-10-supplementary-energy-data.md)) |
 | `/reports` | ZEV scope, `participant` | `ReportsPage` (participants: own downloads; owners/admins: annual ZEV report, tax overview, and annual-statement ZIP) |
 | `/login` | public | `LoginPage` |
 | `/verify-email` | public | `VerifyEmailPage` |
@@ -1595,6 +1596,7 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 | Dashboard (`/`) | shell role `participant` |
 | My invoices (`/me/invoices`) | shell role `participant` or `former` (a former participant sees only this entry) |
 | Annual statement (`/me/statement`) | shell role `participant` (consumption is available on the participant dashboard) |
+| My metering points (`/me/metering-points`) | shell role `participant` (not `former`) |
 | Setup group (participants, metering points `/metering/points`, tariffs, ZEV settings `/zev-settings`) | `isZevScope` (audit logs live in the ZEV settings hub; no standalone entry) |
 | Feasibility (`/feasibility`, standalone entry below Setup) | `isZevScope` + `feasibility_calculator_enabled` (planning tool, not a setup step) |
 | Platform group (four entries: Overview `/admin`, Accounts `/admin/accounts`, Templates `/admin/templates`, Settings `/admin/system-settings`) | `role == 'admin'` (ZEVs/API keys/invoices/audit-logs/pdf+email templates live as hub tabs) |

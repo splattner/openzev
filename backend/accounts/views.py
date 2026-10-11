@@ -707,8 +707,9 @@ def feature_flag_update(request, pk: int):
 
     serializer = FeatureFlagSerializer(flag, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
-    before = {"enabled": flag.enabled}
-    updated = serializer.save()
+    before = {"enabled": flag.effective_enabled}
+    # A chosen value ends "follow the default": from here on an explicit off is an off.
+    updated = serializer.save(follows_default=False) if "enabled" in serializer.validated_data else serializer.save()
     record_audit_event(
         request=request,
         action_category=AuditActionCategory.GOVERNANCE,
@@ -718,7 +719,7 @@ def feature_flag_update(request, pk: int):
         target_id=str(updated.pk),
         target_display=updated.name,
         summary=f"Updated feature flag {updated.name}.",
-        changes=build_diff(before, {"enabled": updated.enabled}, ["enabled"]),
+        changes=build_diff(before, {"enabled": updated.effective_enabled}, ["enabled"]),
     )
     return Response(serializer.data)
 

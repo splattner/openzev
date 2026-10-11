@@ -54,7 +54,7 @@ vi.mock('../src/lib/supplementary', async (importOriginal) => {
             isLoading: false,
             featureOn: true,
             eligible: eligibility.eligible,
-            tabAvailable: eligibility.eligible.length > 0,
+            canConnect: eligibility.eligible.length > 0,
         }),
     }
 })
@@ -1096,7 +1096,7 @@ describe('manager dashboard: the manager as a participant', () => {
         const container = await renderDashboard()
 
         expect(container.textContent).toContain('supplementary.gross.ctaTitle')
-        expect(container.querySelector('a[href="/account?tab=energy-data"]')).not.toBeNull()
+        expect(container.querySelector('a[href="/me/metering-points"]')).not.toBeNull()
 
         await click(container.querySelectorAll('tbody tr')[0]) // Alice
         expect(container.textContent).not.toContain('supplementary.gross.ctaTitle')

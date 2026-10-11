@@ -364,7 +364,10 @@ export function AdminSystemSettingsPage() {
                                 {flags.map((flag) => (
                                     <tr key={flag.id}>
                                         <td><code>{flag.name}</code></td>
-                                        <td>{flag.description || <span className="muted">—</span>}</td>
+                                        <td>
+                                            {flag.description || <span className="muted">—</span>}
+                                            {flag.follows_default && <small className="muted" style={{ display: 'block' }}>{t('features.followsDefault')}</small>}
+                                        </td>
                                         <td>
                                             {/* The app's one switch (Mantine), as in every other settings form. */}
                                             <Switch

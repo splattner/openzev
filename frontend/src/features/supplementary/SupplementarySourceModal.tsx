@@ -8,7 +8,7 @@ import { formatApiError, apiErrorPayload } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { useToast } from '../../lib/toast'
 import type { EligibleMeteringPoint, SupplementaryProvider } from '../../types/api'
-import { PushTokenPanel } from '../supplementary/PushTokenPanel'
+import { PushTokenPanel } from './PushTokenPanel'
 
 interface Props {
     point: EligibleMeteringPoint

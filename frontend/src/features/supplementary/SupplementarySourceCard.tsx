@@ -15,10 +15,10 @@ import { queryKeys } from '../../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { useToast } from '../../lib/toast'
 import type { EligibleMeteringPoint, SupplementarySource } from '../../types/api'
-import { CsvImport } from '../supplementary/CsvImport'
-import { PushTokenPanel } from '../supplementary/PushTokenPanel'
-import { ReconciliationSummary } from '../supplementary/ReconciliationSummary'
-import { SourceStatusBadge } from '../supplementary/SourceStatusBadge'
+import { CsvImport } from './CsvImport'
+import { PushTokenPanel } from './PushTokenPanel'
+import { ReconciliationSummary } from './ReconciliationSummary'
+import { SourceStatusBadge } from './SourceStatusBadge'
 
 type ConfirmOptions = {
     title: string
