@@ -62,12 +62,15 @@ def build_sample_invoice_context() -> dict:
             subtotal_chf="450.00",
             # Numeric because the template compares this value with zero.
             vat_rate=Decimal("0.0810"),
+            vat_base_chf="450.00",
             vat_chf="36.45",
             total_chf="486.45",
             notes="Sample invoice for template preview.",
             zev=_Obj(invoice_language="en"),
         ),
         "vat_rate_percent": Decimal("8.1"),
+        # Zero: the sample has no producer credit to list apart from the VAT.
+        "producer_credit_chf": Decimal("0.00"),
         "grouped_items": [
             {
                 "key": "energy",

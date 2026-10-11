@@ -312,7 +312,7 @@ Break down one invoice and compare it with the same participant's previous invoi
   ```json
   {
     "invoice": {"id", "invoice_number", "participant_name", "period_start", "period_end", "status",
-                "subtotal_chf", "vat_chf", "total_chf", "vat_rate"?},
+                "subtotal_chf", "vat_chf", "total_chf", "vat_rate"?, "vat_base_chf"?},
     "lines": [{"type", "description", "quantity_kwh", "unit_price", "amount_chf"}],
     "by_type": {"<item type>": {"kwh", "amount_chf"}},
     "energy": {"local_kwh", "grid_kwh", "feed_in_kwh"?, "local_share_pct"},

@@ -885,6 +885,36 @@ class InvoicePdfVatLabelTests(TestCase):
 
         self.assertNotIn(f"<td>{INVOICE_TRANSLATIONS['de']['vat']} (", markup)
 
+    def test_totals_list_the_producer_credit_apart_from_the_vat(self):
+        # Supplies 100.00 + VAT 8.10, then the producer remuneration -40.00.
+        invoice = self._invoice(
+            subtotal_chf=Decimal("60.00"), vat_base_chf=Decimal("100.00"),
+            vat_chf=Decimal("8.10"), total_chf=Decimal("68.10"),
+        )
+        tr = INVOICE_TRANSLATIONS["de"]
+
+        context = _build_template_context(invoice)
+        markup = _render_invoice_markup(invoice)
+
+        self.assertEqual(context["producer_credit_chf"], Decimal("-40.00"))
+        self.assertIn(tr["supplies_subtotal"], markup)
+        self.assertIn("CHF 100.00", markup)
+        self.assertIn(tr["producer_credit"], markup)
+        self.assertIn("CHF -40.00", markup)
+        self.assertNotIn(f"<td>{tr['subtotal']}</td>", markup)
+
+    def test_totals_keep_the_plain_layout_without_a_producer_credit(self):
+        for number, vat_base in (("V-00002", None), ("V-00003", Decimal("120.00"))):
+            with self.subTest(vat_base=vat_base):
+                invoice = self._invoice(invoice_number=number, vat_base_chf=vat_base)
+                tr = INVOICE_TRANSLATIONS["de"]
+
+                markup = _render_invoice_markup(invoice)
+
+                self.assertIsNone(_build_template_context(invoice)["producer_credit_chf"])
+                self.assertIn(f"<td>{tr['subtotal']}</td>", markup)
+                self.assertNotIn(tr["producer_credit"], markup)
+
     def test_sample_context_renders_vat_row(self):
         from .pdf import TEMPLATE_NAME
 

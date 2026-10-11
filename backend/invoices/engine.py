@@ -1443,9 +1443,16 @@ def _round_to_group_total(raw_totals: list[Decimal], target: Decimal) -> list[De
     return quantized
 
 
+# Accumulator buckets holding what the ZEV pays a producer for the solar
+# electricity it takes over. That is a purchase by the ZEV, a supply apart
+# from the one it makes to the participant, so it never reduces the base the
+# ZEV's output VAT is charged on (#957).
+PRODUCER_CREDIT_BUCKETS = frozenset({"producer_credit", "shared_producer_credit"})
+
+
 def _build_item_payloads(
     accumulator, *, gross_rate: Decimal = Decimal("0")
-) -> tuple[list, Decimal, Decimal]:
+) -> tuple[list, Decimal, Decimal, Decimal]:
     """Turn accumulated totals into rounded line-item payloads plus the subtotal.
 
     Lines are rounded per tariff-and-bucket group rather than one by one, so a
@@ -1457,7 +1464,9 @@ def _build_item_payloads(
     VAT-bearing line (grid energy, grid fees, levies, metering) has its raw
     total multiplied by ``1 + gross_rate`` before rounding, so the derived
     unit price comes out gross too. The third return value is the
-    non-recoverable VAT thus folded in, summed over those lines.
+    non-recoverable VAT thus folded in, summed over those lines. The fourth is
+    the part of the subtotal that is producer remuneration (zero or negative):
+    the subtotal minus it is what the ZEV itself supplies.
     """
     groups: dict[str, list[dict]] = {}
     for entry in accumulator:
@@ -1468,6 +1477,7 @@ def _build_item_payloads(
     payloads = []
     subtotal = Decimal("0")
     embedded_vat = Decimal("0")
+    producer_credit = Decimal("0")
     for entries in groups.values():
         # Grossing is decided per line, as it was when a group was always one
         # line: the classifier reads the tariff, and a credit (a negative
@@ -1485,6 +1495,8 @@ def _build_item_payloads(
         group_total = sum(raw_totals).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         line_totals = _round_to_group_total(raw_totals, group_total)
         subtotal += group_total
+        if entries[0]["bucket"] in PRODUCER_CREDIT_BUCKETS:
+            producer_credit += group_total
 
         for entry, raw_total, line_total, grossed in zip(
             entries, raw_totals, line_totals, grossed_flags
@@ -1532,6 +1544,7 @@ def _build_item_payloads(
         payloads,
         subtotal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
         embedded_vat.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+        producer_credit.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
     )
 
 
@@ -1854,12 +1867,18 @@ def generate_invoice(
     # INCLUSIVE folds non-recoverable VAT into the line totals; the other
     # modes leave prices untouched here (REGISTERED adds a line below).
     gross_rate = _active_vat_rate(period_end) if zev.vat_mode == VatMode.INCLUSIVE else Decimal("0")
-    item_payloads, subtotal, embedded_vat_chf = _build_item_payloads(
+    item_payloads, subtotal, embedded_vat_chf, producer_credit_chf = _build_item_payloads(
         items_accumulator, gross_rate=gross_rate
     )
 
+    # Output VAT is charged on what the ZEV supplies. What it pays a producer
+    # for their electricity is a second supply: it is settled against the
+    # invoice (it stays in the subtotal and total) but does not shrink the VAT.
     vat_rate = _resolve_vat_rate(zev, period_end)
-    vat_chf = (subtotal * vat_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    vat_base_chf = subtotal - producer_credit_chf if zev.vat_mode == VatMode.REGISTERED else None
+    vat_chf = ((vat_base_chf if vat_base_chf is not None else subtotal) * vat_rate).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
     total_chf = subtotal + vat_chf
 
     # ─── 8. Create invoice ────────────────────────────────────────────────
@@ -1876,6 +1895,7 @@ def generate_invoice(
         total_feed_in_kwh=exported_kwh_acc.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP),
         subtotal_chf=subtotal,
         vat_rate=vat_rate,
+        vat_base_chf=vat_base_chf,
         vat_chf=vat_chf,
         embedded_vat_chf=embedded_vat_chf if zev.vat_mode == VatMode.INCLUSIVE else None,
         total_chf=total_chf,

@@ -1108,6 +1108,7 @@ export interface Invoice {
     due_date?: string | null
     subtotal_chf?: string
     vat_rate?: string
+    vat_base_chf?: string | null
     vat_chf?: string
     total_chf: string
     total_local_kwh?: string

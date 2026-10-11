@@ -20,6 +20,8 @@ def _invoice_block(data: dict) -> dict:
     }
     if data.get("vat_rate") is not None:
         block["vat_rate"] = data["vat_rate"]
+    if data.get("vat_base_chf") is not None:
+        block["vat_base_chf"] = chf(data["vat_base_chf"])
     return block
 
 

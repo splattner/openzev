@@ -65,8 +65,9 @@ lifecycle from scratch.
 | `total_feed_in_kwh` | `Decimal(12,4)` | Computed by engine |
 | `subtotal_chf` | `Decimal(10,2)` | Sum of line-item totals |
 | `vat_rate` | `Decimal(5,4)` | VAT fraction (e.g. `0.0810`) |
-| `vat_chf` | `Decimal(10,2)` | `subtotal_chf × vat_rate` |
-| `total_chf` | `Decimal(10,2)` | `subtotal_chf + vat_chf` |
+| `vat_base_chf` | `Decimal(10,2)` (nullable) | What `vat_chf` was charged on, under `vat_mode = registered`: `subtotal_chf` without the producer-credit lines (see tariffs spec §4.8). Null under the other VAT modes and on invoices issued before the field existed, whose VAT base is `subtotal_chf` |
+| `vat_chf` | `Decimal(10,2)` | `(vat_base_chf ?? subtotal_chf) × vat_rate` |
+| `total_chf` | `Decimal(10,2)` | `subtotal_chf + vat_chf` (producer credits stay in the subtotal, so they are still settled against the invoice) |
 | `pdf_file` | `FileField` | Uploaded PDF path (`invoices/pdf/`) |
 | `sent_at` | `DateTimeField` (nullable) | Timestamp of most recent email send |
 | `due_date` | `DateField` (nullable) | Payment due date. Set at generation to the generation date + `Zev.payment_term_days` (per-ZEV, default 30, min 1) |
@@ -850,6 +851,7 @@ The invoice PDF template receives:
 |---|---|
 | `invoice` | Invoice model instance |
 | `vat_rate_percent` | `invoice.vat_rate × 100` as a `Decimal`; formatted to one decimal place in the VAT label |
+| `producer_credit_chf` | `subtotal_chf − vat_base_chf` (negative) when the invoice charges VAT and has a recorded VAT base that differs from the subtotal; otherwise `None`. When set, the totals block lists the supplies subtotal (`vat_base_chf`, `tr.supplies_subtotal`), the VAT line, then the producer remuneration (`tr.producer_credit`) before the total; when `None` it shows the plain subtotal and VAT lines |
 | `grouped_items` | Items grouped by `TariffCategory` (energy → grid_fees → levies → metering), each with category subtotal |
 | `issuer` | The invoice's issuer copy (§3.1a) |
 | `recipient` | The invoice's recipient copy (§3.1a) |
@@ -996,7 +998,7 @@ Two shapes, split by cost. `InvoiceListSerializer` returns all invoice fields pl
 
 The split exists because the list is the one unbounded read: `AdminInvoicesContent` passes no ZEV filter and walks every invoice in the instance one page at a time, so each nested line item and email-log row is paid for once per invoice across the whole dataset. Measured on 50 invoices × 8 items, one page went from 151.4 KiB to 33.2 KiB (4.6×, 78% smaller) and from 4 queries to 2; at the client walker's 200-page cap that is 29.6 MiB → 6.5 MiB. No list consumer reads the nested arrays — `AdminInvoicesContent` renders `invoice_number`/`zev_name`/`participant_name`/period/`total_chf`/`status`, and `BillingEmailsPage` reads the annotated latest-email fields before loading history on demand. In `frontend/src/types/api.ts` both fields are optional (`items?`, `email_logs?`). See #488.
 
-Read-only fields: `id`, `invoice_number`, `created_at`, `updated_at`, `pdf_file`, plus all billing-engine/workflow fields that never come from client input: `status`, `total_local_kwh`, `total_grid_kwh`, `total_feed_in_kwh`, `subtotal_chf`, `vat_rate`, `vat_chf`, `total_chf`, `period_start`, `period_end`, `zev`, `participant`, `sent_at`, `due_date`. Generic create/update/partial_update endpoints are not exposed; creation happens only via `generate`/`generate-all`, mutations only via the workflow actions.
+Read-only fields: `id`, `invoice_number`, `created_at`, `updated_at`, `pdf_file`, plus all billing-engine/workflow fields that never come from client input: `status`, `total_local_kwh`, `total_grid_kwh`, `total_feed_in_kwh`, `subtotal_chf`, `vat_rate`, `vat_base_chf`, `vat_chf`, `total_chf`, `period_start`, `period_end`, `zev`, `participant`, `sent_at`, `due_date`. Generic create/update/partial_update endpoints are not exposed; creation happens only via `generate`/`generate-all`, mutations only via the workflow actions.
 
 ### 9.2 InvoiceItemSerializer
 
@@ -1203,7 +1205,7 @@ the cockpit readiness and attention caches.
 | `TranslationParityTests` | §8.3: all four locales have identical, non-empty translation keys and identical `status_values` keys |
 | `PaletteConsistencyTests` | Chart color constants in `pdf_charts.py` match the CSS variables in the default template |
 | `StatusTranslationTests` | §8.2: `status_display` is localized from `tr["status_values"]` in the template context |
-| `InvoicePdfVatLabelTests` | §8.2: percent conversion, zero-rate omission, and sample preview rendering |
+| `InvoicePdfVatLabelTests` | §8.2: percent conversion, zero-rate omission, and sample preview rendering; the totals block lists the producer credit after the VAT when `vat_base_chf` differs from the subtotal, and keeps the plain layout when it is null or equal |
 
 ### Frontend
 

@@ -341,6 +341,7 @@ INVOICE_FIELDS = (
     "total_feed_in_kwh",
     "subtotal_chf",
     "vat_rate",
+    "vat_base_chf",
     "vat_chf",
     "embedded_vat_chf",
     "total_chf",

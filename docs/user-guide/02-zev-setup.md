@@ -278,6 +278,10 @@ Choose how often invoices are generated:
   to configure VAT rates ([Platform → Settings → VAT](14-admin-console.md#vat-settings)).
   Tariff prices are treated as net; the invoice adds the active rate on top and
   shows a VAT line. You reclaim the VAT you pay upstream in your own VAT return.
+  If you buy a producer's solar electricity, the producer credit does not reduce
+  your VAT: VAT is charged on what you supply, and the credit is listed after it
+  on the invoice. A VAT-registered producer's own supply to you is not
+  calculated yet.
 
 - **Not registered — fold VAT into prices** — for the common case of a small
   ZEV that is *not* registered but whose grid operator invoices it **with VAT
