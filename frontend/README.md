@@ -30,12 +30,26 @@ The dev server proxies API requests to the backend; the API URL comes from
 | Command | Purpose |
 |---|---|
 | `npm run dev` | Dev server with HMR |
-| `npm run build` | Type-check (`tsc -b`) + production build to `dist/` |
+| `npm run build` | Type-check (`tsc -b` on TypeScript 7) + production build to `dist/` |
 | `npm run lint` | ESLint |
 | `npm run test:unit` | Vitest unit tests (one-shot) |
 | `npm run test:unit:watch` | Vitest watch mode |
 | `npm run screenshots` | Playwright: regenerate user-guide screenshots into `../docs/user-guide/screenshots/` |
 | `npm run preview` | Serve the production build locally |
+
+Two TypeScript versions are installed on purpose. `typescript-native` is
+TypeScript 7, the native compiler, and type-checks in `npm run build`.
+`typescript` stays on 6.0 because typescript-eslint does not support 7 yet.
+Both packages provide a `tsc` executable, so the build calls the native
+compiler by its package path to avoid ambiguity.
+Once typescript-eslint supports 7, drop the alias, move `typescript` to 7,
+remove its version cap in `renovate.json`, and use plain `tsc -b` in the build.
+
+After pulling dependency changes, run `npm ci`. An existing dev stack keeps
+its dependencies in the `frontend_node_modules` volume; refresh it from the
+repository root with `docker compose -f docker-compose.dev.yml exec frontend npm ci`
+(or `podman compose`). Restarting the frontend container alone does not
+update that volume.
 
 ## Project layout
 

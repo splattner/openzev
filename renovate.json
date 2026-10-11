@@ -47,9 +47,9 @@
       "enabled": false
     },
     {
-      "description": "typescript-eslint has no TypeScript 7 support yet; TS7 crashes typescript-estree at lint time.",
+      "description": "typescript-eslint has no TypeScript 7 support yet; TS7 crashes typescript-estree at lint time. Matched by dep name so the typescript-native alias (TS7, used for type-checking in npm run build) is not capped.",
       "matchManagers": ["npm"],
-      "matchPackageNames": ["typescript"],
+      "matchDepNames": ["typescript"],
       "allowedVersions": "<7.0.0"
     }
   ],

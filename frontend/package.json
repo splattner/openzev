@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node node_modules/typescript-native/bin/tsc -b && vite build",
     "lint": "eslint .",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
@@ -60,6 +60,7 @@
     "stylelint": "^16.26.1",
     "typescript": "~6.0.0",
     "typescript-eslint": "^8.56.1",
+    "typescript-native": "npm:typescript@~7.0.2",
     "vite": "^8.0.0",
     "vitest": "^4.1.5"
   }
