@@ -506,10 +506,10 @@ Rules:
 - Query keys: `queryKeys.tariffs.series(selectedZevId)` and `queryKeys.tariffs.dynamicSources()`; versions and periods are nested in the series response.
 - Structure:
   - summary toolbar at top
-  - category sections in the order `energy`, `grid_fees`, `levies`, `metering`
-  - tariff cards inside each category section
-  - nested tariff-period list inside each tariff card
-- The tariff card heading must place **billing mode** and **energy type** badges directly after the tariff name.
+  - one sheet with a table per category, in the order `energy`, `grid_fees`, `levies`, `metering`, the category named in the table's band
+  - a rate card like the tariff overview PDF: one row per tariff series with the name, energy type and note, a line per price band (applicability, price and unit) and its validity; narrow cards repeat each band as one unit with its own CHF; pricing explanations remain on the narrow bands, and partial percentage bases visibly say “incomplete base average”; the combined band column has a visually hidden header associated through `headers`; the row opens the detail drawer on its displayed version
+  - tariff periods, versions and actions (Edit included) in the detail drawer
+- Badges beside a tariff name are reserved for warnings (a gap, a failed price fetch); validity is plain text in the Valid column, and a row whose version has ended sits on a grey ground. An Upcoming tab lists the series with a version still to start, each showing the nearest upcoming version. `listedVersion` consumes the API’s newest-first order, choosing the current version, otherwise the nearest upcoming version, otherwise the newest expired version; the drawer uses the same default when the URL has no explicit version. A tariff's billing mode is told by its Applies and Unit cells rather than named (SPEC-2026-08 §15.3).
 - Tariff periods remain nested under the parent tariff rather than in a separate global table.
 - Tariff periods are shown only as an active workflow for energy tariffs. Fixed-fee tariffs show a hint instead of a period list CTA.
 
@@ -653,7 +653,7 @@ These pages define the current management-page reference set.
 - [x] Management pages use a documented default shell: header, summary/actions, filters when needed, main content, modals.
 - [x] Visible CRUD actions use icon + text buttons with consistent semantics.
 - [x] The tariff page uses category sections instead of tabs for the four tariff categories.
-- [x] Billing mode and energy type badges render directly after the tariff name on tariff cards.
+- [x] The tariff list is a rate card: a line per price band with when it applies, a bare price under a "Price (CHF)" header and its unit; badges beside the name mark only problems.
 - [x] New page work can reference this spec to choose between sections, tabs, tables, and cards without inventing a new pattern.
 - [x] Shared management-page shells keep one `PageHeader` title across data and scope states; embedded views inherit the host title. Authentication gates and route suspense are outside this contract.
 - [x] Migrated state UI reuses `PageSkeleton`, `Notice`, `EmptyState`, and the `ScopeGuard` contract.

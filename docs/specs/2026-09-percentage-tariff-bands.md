@@ -250,7 +250,10 @@ percentage summary is replaced by this list.
 **Series summary (`useTariffDisplay.ts`)**: the percentage label is the single
 percentage when all bands share one, otherwise `"{min}–{max} %"`. The effective
 price tooltip uses the same min/max logic. Without bands it shows the existing
-`noPeriods` text.
+`noPeriods` text. The list’s `buildRateLines` formatter adds a visible localized
+“incomplete base average” qualification when `percentage_base_summary.dynamic_status`
+is `partial`. Narrow bands retain the same effective-price tooltip as desktop
+price cells, including the coverage explanation.
 
 **Price-history chart (`priceHistory.ts`)**: `percentagePoints` plots one line
 per band, using the same band keys and the same seasonal segmentation as

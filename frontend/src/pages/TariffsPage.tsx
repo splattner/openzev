@@ -9,10 +9,10 @@ import { TariffEmptyState } from '../features/tariffs/TariffEmptyState'
 import { TariffFormModal } from '../features/tariffs/TariffFormModal'
 import { VseTariffImportModal } from '../features/tariffs/VseTariffImportModal'
 import { TariffPeriodFormModal } from '../features/tariffs/TariffPeriodFormModal'
-import { TariffToolbar, type TariffValidityFilter } from '../features/tariffs/TariffToolbar'
+import { TariffToolbar, type TariffListView, type TariffValidityFilter } from '../features/tariffs/TariffToolbar'
 import { TariffVersionModal } from '../features/tariffs/TariffVersionModal'
 import { useTariffVersions } from '../features/tariffs/useTariffVersions'
-import { isTariffCurrentlyValid } from '../features/tariffs/validity'
+import { hasUpcomingVersion, isTariffCurrentlyValid } from '../features/tariffs/validity'
 import { seriesKeyOf } from '../features/tariffs/useTariffDisplay'
 import { tariffOverviewFilename, tariffOverviewParams } from '../features/tariffs/tariffOverview'
 import { fetchTariffSeries } from '../lib/api/tariffs'
@@ -51,10 +51,10 @@ export function TariffsPage() {
     const { isZevScope, canWriteSelectedCommunity } = useCommunityAccess()
     const isManagedScope = isZevScope
     const readOnly = !canWriteSelectedCommunity
-    const [validityFilter, setValidityFilter] = useState<TariffValidityFilter>('valid')
+    const [validityFilter, setValidityFilter] = useState<TariffListView>('valid')
     const [showImportModal, setShowImportModal] = useState(false)
     const [searchParams, setSearchParams] = useSearchParams()
-    // Shared with the validity badge on each card, so the filter and the badge
+    // Shared with the validity badge on each row, so the filter and the badge
     // can never disagree about whether a tariff is in force.
     const today = todayBusinessIso()
 
@@ -91,11 +91,12 @@ export function TariffsPage() {
     }, [allSeries, searchParams])
     const shownVersionId = searchParams.get(VERSION_PARAM)
 
-    function openDetail(series: TariffSeries) {
+    // Keep the drawer on the exact version the user clicked.
+    function openDetail(series: TariffSeries, versionId: string) {
         setSearchParams((previous) => {
             const next = new URLSearchParams(previous)
             next.set(TARIFF_PARAM, seriesKeyOf(series))
-            next.delete(VERSION_PARAM)
+            next.set(VERSION_PARAM, versionId)
             return next
         }, { replace: true })
     }
@@ -143,7 +144,13 @@ export function TariffsPage() {
         )),
         [allSeries, today],
     )
-    const visibleSeries = validityFilter === 'all' ? allSeries : validSeries
+    const upcomingSeries = useMemo(
+        () => allSeries.filter((series) => hasUpcomingVersion(series.versions, today)),
+        [allSeries, today],
+    )
+    const visibleSeries = validityFilter === 'all'
+        ? allSeries
+        : validityFilter === 'upcoming' ? upcomingSeries : validSeries
 
     const tariffSections = useMemo(
         () =>
@@ -226,6 +233,7 @@ export function TariffsPage() {
             ) : <>
             <TariffToolbar
                 validCount={validSeries.length}
+                upcomingCount={upcomingSeries.length}
                 totalCount={allSeries.length}
                 validityFilter={validityFilter}
                 onValidityFilterChange={setValidityFilter}
@@ -297,9 +305,8 @@ export function TariffsPage() {
                     settings={settings}
                     tariffSections={tariffSections}
                     openSeriesKey={openSeries ? seriesKeyOf(openSeries) : null}
-                    onEditTariff={startTariffEdit}
+                    upcoming={validityFilter === 'upcoming'}
                     onOpenDetail={openDetail}
-                    readOnly={readOnly}
                 />
             )}
 

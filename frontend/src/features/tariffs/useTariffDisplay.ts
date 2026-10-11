@@ -5,9 +5,13 @@ import { queryKeys } from '../../lib/api/queryKeys'
 import { formatShortDate } from '../../lib/appSettings'
 import type { AppSettings, DynamicTariffSource, Tariff, TariffSeries, TariffVersion } from '../../types/api'
 import { validityState, type ValidityState } from './validity'
+import { MONTH_KEYS, WEEKDAY_KEYS } from './recurrence'
+import { buildRateLines, kwhPrice, type RateLine } from './rateLines'
+
+export type { RateLine }
 
 // Validity is a state, so it keeps the status colours — scheduled is the blue
-// of "upcoming" everywhere else; the attributes beside it are neutral tags.
+// of "upcoming" everywhere else.
 const VALIDITY_BADGE_CLASS: Record<ValidityState, string> = {
     active: 'badge badge-success',
     scheduled: 'badge badge-info',
@@ -35,13 +39,14 @@ export function percentageRangeLabel(values: number[]): string | null {
 }
 
 /**
- * Pricing/validity display logic shared by the tariff card list and the
- * detail drawer, so the two views can never drift into describing the same
- * version differently. Also owns the dynamic-sources lookup both need —
- * they share its query key, so mounting both costs one request, not two.
+ * Shared tariff formatting and dynamic-source lookup for the list and drawer.
+ * Also owns the dynamic-sources lookup both need — they share its query key,
+ * so mounting both costs one request, not two.
  */
 export function useTariffDisplay(settings: AppSettings, today: string) {
     const { t } = useTranslation()
+    const monthNames = MONTH_KEYS.map((key) => t(`pages.tariffs.monthsShort.${key}` as Parameters<typeof t>[0]))
+    const dayNames = WEEKDAY_KEYS.map((key) => t(`pages.tariffs.weekdaysShort.${key}` as Parameters<typeof t>[0]))
 
     const sourcesQuery = useQuery({
         queryKey: queryKeys.tariffs.dynamicSources(),
@@ -79,25 +84,16 @@ export function useTariffDisplay(settings: AppSettings, today: string) {
     function priceSummary(series: TariffSeries, version: TariffVersion): string {
         if (version.dynamic_source) {
             const source = sourceById.get(version.dynamic_source)
-            const summary = version.dynamic_price_summary
             const sourceLabel = source
                 ? t('pages.tariffs.dynamicPricedFrom', { label: source.label })
                 : t('pages.tariffs.dynamicPriced')
             const minimumSuffix = version.minimum_price_chf_per_kwh
                 ? ` · ${t('pages.tariffs.dynamicMinimum', { price: Number(version.minimum_price_chf_per_kwh).toFixed(3) })}`
                 : ''
-            if (summary?.average_chf_per_kwh) {
-                return `${sourceLabel} · ${t(
-                    summary.status === 'partial'
-                        ? 'pages.tariffs.dynamicAveragePartial'
-                        : 'pages.tariffs.dynamicAverage',
-                    { price: Number(summary.average_chf_per_kwh).toFixed(3) },
-                )}${minimumSuffix}`
-            }
-            return `${sourceLabel} · ${t('pages.tariffs.dynamicPriceUnavailable')}${minimumSuffix}`
+            return `${sourceLabel} · ${dynamicAverageLabel(version)}${minimumSuffix}`
         }
         if (series.billing_mode === 'energy') {
-            const prices = version.periods.map((period) => `${period.price_chf_per_kwh}`)
+            const prices = version.periods.map((period) => (period.price_chf_per_kwh ? kwhPrice.format(Number(period.price_chf_per_kwh)) : '—'))
             return prices.length
                 ? `CHF ${prices.join(' / ')}/kWh`
                 : t('pages.tariffs.noPeriods')
@@ -108,28 +104,18 @@ export function useTariffDisplay(settings: AppSettings, today: string) {
         return `CHF ${version.fixed_price_chf || '0.00'}`
     }
 
-    function pricingLabelFor(series: TariffSeries, version: TariffVersion) {
-        if (version.dynamic_source) return priceSummary(series, version)
-        const energy = t(`pages.tariffs.energyTypes.${series.energy_type || 'local'}`)
-        if (series.billing_mode === 'energy') return energy
-        if (series.billing_mode !== 'percentage_of_energy') return `CHF ${version.fixed_price_chf || '0.00'}`
-        const values = percentageValues(version)
-        const pctLabel = percentageRangeLabel(values)
-        if (pctLabel === null) return `${t('pages.tariffs.noPeriods')} · ${energy}`
-        const label = `${pctLabel} · ${energy}`
-        const base = version.percentage_base_summary
-        if (base?.price_chf_per_kwh != null) {
-            const basePrice = Number(base.price_chf_per_kwh)
-            const min = Math.min(...values)
-            const max = Math.max(...values)
-            const priceKey = min === max ? 'pages.tariffs.approxPrice' : 'pages.tariffs.approxPriceRange'
-            const priceParams = min === max
-                ? { price: (basePrice * min / 100).toFixed(3) }
-                : { min: (basePrice * min / 100).toFixed(3), max: (basePrice * max / 100).toFixed(3) }
-            return `${label} · ${t(priceKey, priceParams)}`
-        }
-        if (base?.dynamic_status === 'unavailable') return `${label} · ${t('pages.tariffs.dynamicBaseUnavailable')}`
-        return label
+    function dynamicAverageLabel(version: TariffVersion): string {
+        const summary = version.dynamic_price_summary
+        if (!summary?.average_chf_per_kwh) return t('pages.tariffs.dynamicPriceUnavailable')
+        return t(
+            summary.status === 'partial' ? 'pages.tariffs.dynamicAveragePartial' : 'pages.tariffs.dynamicAverage',
+            { price: Number(summary.average_chf_per_kwh).toFixed(3) },
+        )
+    }
+
+    /** Display rows for tariff bands, dynamic averages, or fixed fees. */
+    function rateLines(series: TariffSeries, version: TariffVersion): RateLine[] {
+        return buildRateLines(series, version, (key, opts) => t(key, opts), dayNames, monthNames)
     }
 
     function pricingTooltipFor(series: TariffSeries, version: TariffVersion, source?: DynamicTariffSource) {
@@ -167,7 +153,7 @@ export function useTariffDisplay(settings: AppSettings, today: string) {
         return undefined
     }
 
-    return { sourceById, validityBadge, priceSummary, pricingLabelFor, pricingTooltipFor }
+    return { sourceById, validityBadge, priceSummary, rateLines, pricingTooltipFor }
 }
 
 /** Stable identity for a series, independent of any one version — used to key

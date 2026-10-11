@@ -1062,11 +1062,13 @@ contracts are unchanged.
   participants, metering points and tariffs. The first tab is the default
   view; it always shows, and pressing an active tab returns to it. Any other
   tab with a count of 0, or with the default tab's count (it would show the
-  same list), is left out unless it is the active one or an `attention` tab
-  with a count (it still warns), and a default tab left on its own renders no
-  group at all — tabs that cannot change the list would only add clutter. An
+  same list), is left out unless it is the active one, an `attention` tab
+  with a count (it still warns) or a `distinct` tab with a count (not a
+  narrower or wider cut of the default's list, so an equal count does not
+  mean the same list), and a default tab left on its own renders no group
+  at all — tabs that cannot change the list would only add clutter. An
   `attention` tab shows its count in the danger tone while it is above 0
-  (`frontend/tests/filter-tabs.test.ts`, 5 tests). The group is as tall as a field
+  (`frontend/tests/filter-tabs.test.ts`, 6 tests). The group is as tall as a field
   (`--field-height`). `.list-filters` is one wrapping line: a search input
   (full width on phones), further tab groups and compact selects, labelled by
   `aria-label`.
@@ -1077,17 +1079,23 @@ contracts are unchanged.
   Production · Bidirectional, shown when more than one type is present or a
   type is selected) and, with more than one building, the building select.
   The view is stored in the `view` query param (an unknown value reads as
-  All); the type keeps `type`. Tariffs: Valid (default) · All, counting tariff
-  series with a version in force today against all series; the tariff
-  overview PDF's scope is chosen at its download instead
-  (SPEC-2026-09-tariff-overview-pdf §11).
-- Ledger lists: participants, metering points and tariffs render as
+  All); the type keeps `type`. Tariffs: Valid (default) · Upcoming · All,
+  counting tariff series with a version in force today, series with a
+  version that starts after today (`distinct`: its rows show each series'
+  next version, so it differs from Valid even at the same count), and all
+  series; the tariff overview PDF's scope (valid or all) is chosen at its
+  download instead (SPEC-2026-09-tariff-overview-pdf §11).
+- Ledger lists: participants and metering points render as
   hairline-separated rows inside one sheet. Participant rows lead with the
   name (`.participant-card-heading`), then badges, then five labelled detail
   columns; Edit is a secondary action (SPEC-2026-04 §7.3). Metering points
   nest their assignments under a left rule; Assign is `button-outline`.
-  Tariff categories are sheets with a plain heading and a count (the coloured
-  category gradients are gone); Details is `button-outline`.
+- Tariff list (`TariffCategorySections`): a rate card like the tariff overview PDF.
+  - List contents: one sheet with a `.tariff-table` per category; the header shows the category. One row per series with its name, energy type, note first line, applicability, CHF price, unit, and validity. One line per band. No version count.
+  - Pricing and coverage: `buildRateLines` in `rateLines.ts` (tested in `tariff-rate-lines.test.ts`); per-kWh prices carry at least three decimals, fees two. Applies names the band, weekdays (`formatWeekdays`), window and season; a dynamic average reads "Dynamic, average" or "Dynamic, incomplete average"; a percentage names its share and base with the approximate price; fees name their basis. Applies lines carry their full text as tooltip; the price column carries the pricing explanation; a shown (non-upcoming) validity keeps the full range as tooltip.
+  - Band windows: an unnamed `band` uses its window as its name and prints that window once. Non-flat bands without both time bounds say "time window not configured", preserving any weekday/season text, for energy and percentage rates alike. Sibling count never implies complementary coverage; billing retains its first-band fallback (§3.2 of the billing-engine spec).
+  - Interaction and permissions: the name button owns the open action (`aria-expanded`, row click stays for the row); the open row is `.is-selected`. The row has no write actions: Edit and version actions live in the drawer. Warnings beside the name only (gap count, "Price fetch failed"). Ended rows read greyed (`.is-ended`).
+  - Responsive: below 56rem a row is a small card with one block per band, each with its own CHF, so wrapping cannot detach a price from its hours; validity last. The drawer header shows the name, one muted facts line and only the fetch-failure pill.
 - Buttons: the primary `.button` is flat `--brand-deep` with a small forest
   drop shadow, no gradient or inner highlight; hover lightens it to
   `--brand`.
@@ -1096,10 +1104,11 @@ contracts are unchanged.
 - Row actions: see §7.4. `.button-secondary.button-destructive` and compact
   danger buttons are the quiet destructive style (imports' "Delete imports",
   admin invoice/ZEV rows); confirm dialogs keep the solid red.
-- Status pills: fill + hairline of the next tone, sentence case. Colour is reserved for state; attributes (billing mode, energy type,
-  meter type, roles, counts) are outlined `.badge-tag`s (white, `--border-strong`
-  hairline, `--text-body`), so a row shows one coloured pill — its
-  state — among quiet tags. Tariff validity `scheduled` is info (the blue of
+- Status pills: fill + hairline of the next tone, sentence case. Colour is reserved for state; attributes (meter type, roles, counts)
+  are outlined `.badge-tag`s (white, `--border-strong` hairline,
+  `--text-body`), so a row shows one coloured pill — its state — among quiet
+  tags. The tariff list and drawer header set their attributes as a muted
+  text line instead (see the tariff list above). Tariff validity `scheduled` is info (the blue of
   "upcoming" elsewhere); an inactive metering point is neutral, not danger. `.badge-brand` (brand-pale, brand-glow border, brand-mid text) is the
   invoice document's pill; `invoiceStatusBadgeClass('approved')` uses it, so
   "approved" looks the same in the app and on the PDF. The invoice detail page

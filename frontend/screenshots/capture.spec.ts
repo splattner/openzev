@@ -288,19 +288,17 @@ test.describe('User Guide Screenshots', () => {
   // 07 — Tariffs
   test('07-tariffs', async ({ page }) => {
     await navigateTo(page, '/tariffs')
-    await page.waitForSelector('.tariff-card, .empty-state', { timeout: 10_000 })
+    await page.waitForSelector('.tariff-table, .empty-state', { timeout: 10_000 })
     await screenshotFull(page, '07-tariffs')
   })
 
   // 07b — A tariff's version history and price chart, both in its detail
-  // drawer (opened from the card, but rendered as a page-level sibling —
-  // not inside article.tariff-card — so it's located from `page`, not `card`).
+  // drawer (opened from the list row, but rendered as a page-level sibling).
   test('07b-tariff-versions', async ({ page }) => {
     await navigateTo(page, '/tariffs')
-    const card = page.locator('article.tariff-card').filter({ hasText: 'Grid Energy HT/NT' }).first()
-    await card.waitFor({ timeout: 10_000 })
-    // "View details" is the only button on the card carrying aria-expanded.
-    await card.getByRole('button', { expanded: false }).click()
+    const row = page.getByRole('button', { name: 'Grid Energy HT/NT', expanded: false })
+    await row.waitFor({ timeout: 10_000 })
+    await row.click()
     const drawer = page.locator('.tariff-drawer')
     // Waiting on the chart rather than the history: it renders only for a series
     // with more than one version, so it also asserts the seed still has them.
@@ -309,14 +307,14 @@ test.describe('User Guide Screenshots', () => {
     await screenshotFull(page, '07b-tariff-versions')
   })
 
-  // 07d — A dynamic tariff's detail drawer, showing its Dynamic badge and
-  // locally seeded price history (stats, chart and point table render inline).
+  // 07d — A dynamic tariff's detail drawer, showing its source and locally
+  // seeded price history (stats, chart and point table render inline).
   test('07d-tariff-dynamic-source', async ({ page }) => {
     await requireDemoDynamicSource(page)
     await navigateTo(page, '/tariffs')
-    const card = page.locator('article.tariff-card').filter({ hasText: DEMO_DYNAMIC_TARIFF }).first()
-    await card.waitFor({ timeout: 10_000 })
-    await card.getByRole('button', { expanded: false }).click()
+    const row = page.getByRole('button', { name: DEMO_DYNAMIC_TARIFF, expanded: false })
+    await row.waitFor({ timeout: 10_000 })
+    await row.click()
     const drawer = page.locator('.tariff-drawer')
     await expect(drawer.locator('.recharts-surface'), `Dynamic price chart missing — ${SEED_HINT}`).toBeVisible()
     await expect(drawer.locator('tbody tr').first()).toBeVisible()

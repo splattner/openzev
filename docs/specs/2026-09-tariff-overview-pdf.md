@@ -391,7 +391,7 @@ Reuses `_pdf_response(..., disposition="attachment")`.
 
 - `useMutation` over `downloadTariffOverview`, `onSuccess` → `downloadBlob`.
 - The mutation takes the scope chosen at the download. It is not taken from
-  the list's Valid · All tabs: those filter whole series, so "All" often
+  the list's Valid · Upcoming · All tabs: those filter whole series, so "All" often
   changes nothing in the list (and `FilterTabs` then leaves the tabs out)
   while it would still add every superseded version to the PDF.
 - `as_of` is not sent; the backend defaults to today. A date picker is a later
@@ -568,10 +568,12 @@ mapping. `tariffOverviewParams(zevId, validityFilter)` returns `scope: 'valid'`
 and `scope: 'all'` for the two filter values, and the filename helper produces
 `tariff-overview-<date>.pdf`.
 
-### Frontend — `frontend/tests/tariff-toolbar.test.ts` (3 tests)
+### Frontend — `frontend/tests/tariff-toolbar.test.ts` (4 tests)
 
-The toolbar leaves the Valid · All tabs out when both count the same series
-and shows them when All counts more; the download is a full-size scope menu
+The toolbar leaves the Valid · Upcoming · All tabs out when All counts the
+same series as Valid and nothing is still to start, shows them when All
+counts more, and shows Upcoming whenever a version is still to start, even
+at the valid count; the download is a full-size scope menu
 (`aria-haspopup="menu"`, no `button-compact`) whose All item calls
 `onDownloadOverview('all')`.
 
