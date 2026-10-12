@@ -20,9 +20,35 @@ Each tariff has:
 ![Tariffs page](screenshots/07-tariffs.png)
 
 The tabs above the list count the tariffs: **Valid** (the default) shows the
-tariffs with a version in force today, **All** adds the ones with none in force
+tariffs with a version in force today; **Upcoming** shows the tariffs with a
+version that starts later, each with that version's prices (for example next
+year's grid tariff, once imported); **All** adds the ones with none in force
 (only superseded or future versions). The tabs show only when there are such
 tariffs.
+
+Each category is a rate card, set like the tariff overview PDF, with one row
+per tariff:
+
+- **Tariff** — the name, its energy type and the first line of its note
+- **Applies** — when each band applies (for example *High (HT) Mon–Fri,
+  07:00–21:00*, one line per band), the percentage and the grid price used as
+  its base (with “incomplete base average” when dynamic coverage is partial),
+  or a fee’s allocation basis
+- **Price (CHF)** and **Unit** — the displayed version’s rate, per kWh, per
+  month or per year
+- **Valid** — the version's validity: since when it applies (*since 01.07.2026*),
+  until when (*until …*), from when it will (*starts 01.01.2027*, with the year
+  in bold, and the month too when it starts this year), or when it ended
+
+An unnamed band shows its time window once. A non-flat band without a complete
+time window says **time window not configured**; it does not automatically cover
+the other bands' remaining hours. Uncovered hours use the first band in the
+matching season (or the tariff's first band if no season matches).
+
+A red badge next to the name means warnings: a gap between
+versions or a failed price fetch. A tariff whose last version has ended sits on
+a grey row. Click a row to open the tariff's detail panel, where **Edit** and
+the other actions are; from **Upcoming** it opens on the upcoming version.
 
 The list waits for the selected community to load. If loading fails, use **Retry**;
 a failed community refresh keeps the loaded scope and your open draft available.
@@ -179,16 +205,17 @@ moment, negative prices included.
   Enter the correct product name in the preview before importing. Leaving the
   visible product field blank explicitly confirms the endpoint default. V2
   product names returned by discovery are retained with the source.
-- On the Tariffs page, a dynamic tariff shows a **Dynamic** badge next to its
-  energy type. The badge turns red, with the failure shown as a tooltip, if
-  the source's last scheduled fetch failed.
+- On the Tariffs page, a dynamic tariff reads **Dynamic, average** under
+  **Applies**, beside its average price. If the source's last scheduled fetch
+  failed, a red **Price fetch failed** badge appears next to the name, with
+  the failure shown as a tooltip.
 - You can also link a plain energy tariff to an existing dynamic source by
   hand, from the tariff's edit form — useful once a source has already been
   created by an earlier import.
 
 Managers can choose an existing shared source or create a new source from
 the energy-tariff form. Viewers can inspect linked sources and price history.
-Open **View details** on a dynamic tariff to see its source label, endpoint,
+Click a dynamic tariff to see its source label, endpoint,
 protocol, product, fetch status, last successful fetch and stored coverage.
 Usage counts cover the whole platform. A stored date range can
 still contain gaps; check the price history for the period you need.
@@ -550,7 +577,7 @@ months applies to it unchanged. Each period has a type:
 
 To add one:
 
-1. Open the tariff's detail panel (**View details**)
+1. Click the tariff to open its detail panel
 2. Click **Add Period** in the Tariff Periods section
 3. Enter:
    - **Period type** (see above) and, for a time band, a **Band name**
@@ -603,8 +630,7 @@ Local Energy                                    ← one tariff, three versions
 
 ### Adding a New Version
 
-1. Find the tariff, click **View details** to open its detail panel, then
-   click **New version**
+1. Click the tariff to open its detail panel, then click **New version**
 2. Enter the date the new prices take effect (defaults to today)
 3. Adjust the prices (pre-filled from the current version)
 4. Click **Create**
@@ -624,18 +650,19 @@ both sides.
 
 ### Comparing Versions
 
-The Tariffs page shows **one entry per tariff**, displaying what it costs *today*
-rather than one entry per version. A badge tells you how many versions it has.
-Click **View details** to open a panel on the right with everything else:
+The Tariffs page shows **one entry per tariff**, using the version selected by
+the current list view rather than listing every version separately. Click it
+to open a panel on the right with
+everything else:
 version history, the price chart, price bands, and notes.
 
 **Version history** lists every version with its window and price. Click one
 to make the *panel* show that version — its price bands switch to the ones in
-force then, and a **Viewing an older version** badge appears so you can't
-mistake a historical rate for the current one. The entry behind the panel keeps
-showing the active version throughout, so switching versions to look something
-up never changes what the list itself reports. Click the active version to go
-back.
+force then, and a **Viewing an older version** (or, for one that has not
+started yet, **Viewing an upcoming version**) badge appears so you can't
+mistake it for the current rate. Switching versions in the detail panel does
+not change the version shown by the selected list view. Click the active version
+to go back.
 
 Each row has its own edit and delete buttons, because correcting a superseded
 version's end date is a normal follow-up to adding a new one.
@@ -654,7 +681,8 @@ its price moved over time.
   then jumps. A sloped line would suggest it drifted between two Januaries.
 - HT and NT are **separate lines**, so you can see the spread widen or narrow.
 - **Uncovered stretches are shaded red** and the line breaks: nothing was billed
-  there. This is the same problem the gap badge reports, shown on a timeline.
+  there. This is the same problem the list's gap badge reports, shown on a
+  timeline.
 - For a **percentage tariff** the chart shows one line per band, each the
   *effective* price it worked out to, derived from the grid tariffs in force
   at each point — so it moves when those move, even in months this tariff
@@ -751,7 +779,7 @@ the pricing. See [ZEV Export and Import](17-zev-transfer.md).
 
 Edit **future** tariffs freely:
 
-1. Select tariff
+1. Click the tariff to open its detail panel
 2. Click **Edit**
 3. Change prices, periods, validity dates
 4. Click **Save**
@@ -774,7 +802,7 @@ billing mode or energy type, create a separate tariff.
 
 Set **Valid To** to exclude from future invoices:
 
-1. Select tariff
+1. Click the tariff to open its detail panel
 2. Click **Edit**
 3. Set **Valid To** to today or last usage date
 4. Click **Save**

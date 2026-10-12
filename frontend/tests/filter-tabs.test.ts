@@ -49,6 +49,15 @@ describe('FilterTabs', () => {
         expect(container.querySelector('.filter-tab--attention')?.textContent).toBe('Warn 3')
     })
 
+    it('keeps a distinct tab with the default’s count, since its list differs', async () => {
+        const container = await render([
+            { value: 'all', label: 'All', count: 3 },
+            { value: 'next', label: 'Next', count: 3, distinct: true },
+            { value: 'none', label: 'None', count: 0, distinct: true },
+        ])
+        expect(shownTabs(container)).toEqual(['All 3', 'Next 3'])
+    })
+
     it('leaves the group out when only the default is left', async () => {
         const container = await render([
             { value: 'all', label: 'All', count: 4 },

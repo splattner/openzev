@@ -3,6 +3,7 @@ import {
     MONTH_KEYS,
     WEEKDAY_KEYS,
     formatSeason,
+    formatWeekdays,
     monthRanges,
     parseMonths,
     recurrenceValue,
@@ -99,6 +100,25 @@ describe('naming a season', () => {
 
     it('names a single month without a range', () => {
         expect(formatSeason('7', MONTH_NAMES)).toBe('Jul')
+    })
+})
+
+describe('naming the weekdays a band applies on', () => {
+    const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+    it('reads consecutive days as one range', () => {
+        expect(formatWeekdays('0,1,2,3,4', DAY_NAMES)).toBe('Mon–Fri')
+    })
+
+    it('keeps separate runs apart and names a lone day', () => {
+        expect(formatWeekdays('5,6,0', DAY_NAMES)).toBe('Mon, Sat–Sun')
+        expect(formatWeekdays('2', DAY_NAMES)).toBe('Wed')
+    })
+
+    it('has nothing to name for a band that applies every day', () => {
+        // Blank must not parse as Monday.
+        expect(formatWeekdays('', DAY_NAMES)).toBe('')
+        expect(formatWeekdays('0,1,2,3,4,5,6', DAY_NAMES)).toBe('')
     })
 })
 

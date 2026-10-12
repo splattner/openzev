@@ -2,9 +2,7 @@ import { useEffect, useState } from 'react'
 import { Drawer } from '@mantine/core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
-    faBolt,
     faClone,
-    faLayerGroup,
     faPen,
     faPlus,
     faTag,
@@ -19,6 +17,7 @@ import type { AppSettings, TariffPeriod, TariffSeries, TariffVersion } from '../
 import { bandName } from './bands'
 import { MONTH_KEYS, formatSeason } from './recurrence'
 import { useTariffDisplay } from './useTariffDisplay'
+import { listedVersion, validityState } from './validity'
 import { TariffPriceHistoryChart } from './TariffPriceHistoryChart'
 import { DynamicPriceHistoryPanel } from './DynamicPriceHistoryModal'
 import { DynamicSourceSummary } from './DynamicSourceSummary'
@@ -80,7 +79,7 @@ export function TariffDetailDrawer({
         (key) => t(`pages.tariffs.monthsShort.${key}` as Parameters<typeof t>[0]),
     )
     const today = todayBusinessIso()
-    const { sourceById, validityBadge, priceSummary, pricingLabelFor, pricingTooltipFor } = useTariffDisplay(settings, today)
+    const { sourceById, validityBadge, priceSummary, pricingTooltipFor } = useTariffDisplay(settings, today)
 
     // Kept so the closing animation still shows the tariff that was open,
     // instead of the drawer going blank a beat before it slides away.
@@ -115,9 +114,8 @@ export function TariffDetailDrawer({
 
     const versions = displaySeries.versions
     const shown = versions.find((version) => version.id === shownVersionId)
-        ?? versions.find((version) => version.id === displaySeries.active_version_id)
-        ?? versions[0]
-    const isShowingActive = shown.id === displaySeries.active_version_id
+        ?? listedVersion(versions, today)
+    const isShowingActive = validityState(shown, today) === 'active'
 
     // Checked on the shown *version*, not the series: a series can hold both a
     // static and a dynamic version (an operator switching to dynamic pricing
@@ -134,10 +132,18 @@ export function TariffDetailDrawer({
     const baseRate = shown.percentage_base_summary?.price_chf_per_kwh
         ? Number(shown.percentage_base_summary.price_chf_per_kwh)
         : null
-    const pricingLabel = pricingLabelFor(displaySeries, shown)
+    const pricingLabel = priceSummary(displaySeries, shown)
     const pricingTooltip = pricingTooltipFor(displaySeries, shown, dynamicSource)
     const notes = shown.notes?.trim()
-    const badge = validityBadge(shown)
+    // One quiet line of facts under the name; a pill only for what needs a
+    // look (the gap has its own warning below).
+    const meta = [
+        t(`pages.tariffs.billingModes.${displaySeries.billing_mode}` as Parameters<typeof t>[0], { defaultValue: displaySeries.billing_mode }),
+        displaySeries.energy_type && t(`pages.tariffs.energyTypes.${displaySeries.energy_type}` as Parameters<typeof t>[0]),
+        isDynamic && t('pages.tariffs.dynamicBadge'),
+        validityBadge(shown).label,
+        displaySeries.version_count > 1 && t('pages.tariffs.versions.count', { count: displaySeries.version_count }),
+    ].filter(Boolean).join(' · ')
 
     return (
         <Drawer
@@ -165,40 +171,16 @@ export function TariffDetailDrawer({
                 <header className="tariff-drawer-header">
                     <div className="tariff-drawer-heading">
                         <h3>{displaySeries.name}</h3>
-                        <div className="tariff-name-badges">
-                            <span className="badge badge-tag">
-                                {t(`pages.tariffs.billingModes.${displaySeries.billing_mode}` as Parameters<typeof t>[0], { defaultValue: displaySeries.billing_mode })}
+                        <p className="tariff-drawer-meta">{meta}</p>
+                        {dynamicSource?.last_fetch_status === 'failed' && (
+                            <span
+                                className="badge badge-danger"
+                                title={t('pages.tariffs.dynamicFetchFailedTooltip', { error: dynamicSource.last_fetch_error })}
+                            >
+                                <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />{' '}
+                                {t('pages.tariffs.dynamicFetchFailed')}
                             </span>
-                            {displaySeries.energy_type && (
-                                <span className="badge badge-tag">
-                                    {t(`pages.tariffs.energyTypes.${displaySeries.energy_type}` as Parameters<typeof t>[0])}
-                                </span>
-                            )}
-                            {isDynamic && (
-                                <span
-                                    className={
-                                        dynamicSource?.last_fetch_status === 'failed'
-                                            ? 'badge badge-danger'
-                                            : 'badge badge-tag'
-                                    }
-                                    title={dynamicSource?.last_fetch_status === 'failed'
-                                        ? t('pages.tariffs.dynamicFetchFailedTooltip', { error: dynamicSource.last_fetch_error })
-                                        : t('pages.tariffs.dynamicBadgeTooltip')}
-                                >
-                                    <FontAwesomeIcon icon={faBolt} fixedWidth />{' '}
-                                    {t('pages.tariffs.dynamicBadge')}
-                                </span>
-                            )}
-                            <span className={badge.className} title={badge.tooltip}>
-                                {badge.label}
-                            </span>
-                            {displaySeries.version_count > 1 && (
-                                <span className="badge badge-tag" title={t('pages.tariffs.versions.countTooltip')}>
-                                    <FontAwesomeIcon icon={faLayerGroup} fixedWidth />{' '}
-                                    {t('pages.tariffs.versions.count', { count: displaySeries.version_count })}
-                                </span>
-                            )}
-                        </div>
+                        )}
                     </div>
                     <button
                         type="button"
@@ -258,7 +240,9 @@ export function TariffDetailDrawer({
                         )}
                         {!isShowingActive && (
                             <span className="badge badge-warning">
-                                {t('pages.tariffs.versions.viewingOldVersion')}
+                                {t(validityState(shown, today) === 'scheduled'
+                                    ? 'pages.tariffs.versions.viewingUpcomingVersion'
+                                    : 'pages.tariffs.versions.viewingOldVersion')}
                             </span>
                         )}
                     </div>
@@ -301,7 +285,11 @@ export function TariffDetailDrawer({
                                             aria-pressed={isShown}
                                             onClick={() => onShowVersion(version.id)}
                                         >
-                                            <span className={versionBadge.className}>{versionBadge.label}</span>
+                                            {/* A pill stands alone, so it starts with a capital; the label is
+                                                lowercase for the meta line and the list's Valid column. */}
+                                            <span className={versionBadge.className}>
+                                                {versionBadge.label.charAt(0).toUpperCase() + versionBadge.label.slice(1)}
+                                            </span>
                                             <span className="tariff-version-window">
                                                 {formatShortDate(version.valid_from, settings)} –{' '}
                                                 {version.valid_to

@@ -69,6 +69,26 @@ export function formatSeason(raw: string | undefined | null, monthNames: string[
 }
 
 /**
+ * `"Mon–Fri"`, or `''` for a band that applies every day — the weekday half
+ * of how the tariff overview PDF names a band (`Mo–Fr, 07:00–21:00`).
+ */
+export function formatWeekdays(raw: string | undefined | null, dayNames: string[]): string {
+    const days = [...new Set((raw ?? '').split(',').map((part) => part.trim()).filter(Boolean).map(Number))]
+        .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+        .sort((left, right) => left - right)
+    if (days.length === 0 || days.length === 7) return ''
+    const runs: number[][] = []
+    days.forEach((day) => {
+        const last = runs[runs.length - 1]
+        if (last && day === last[last.length - 1] + 1) last.push(day)
+        else runs.push([day])
+    })
+    return runs
+        .map((run) => (run.length === 1 ? dayNames[run[0]] : `${dayNames[run[0]]}\u2013${dayNames[run[run.length - 1]]}`))
+        .join(', ')
+}
+
+/**
  * Sort key putting year-round bands first, then seasons by the month they
  * start in. Without it seasonal siblings fall back to id order, which is
  * creation order and reads as random.

@@ -5,7 +5,7 @@ import { MantineProvider } from '@mantine/core'
 import { TariffToolbar } from '../src/features/tariffs/TariffToolbar'
 import { waitForCondition } from './helpers/waitForCondition'
 
-// The Valid · All tabs filter the list; the overview PDF's scope is chosen at
+// The Valid · Upcoming · All tabs filter the list; the overview PDF's scope is chosen at
 // the download (SPEC-2026-08-ui-redesign-pdf-style §15.3, SPEC-2026-09-tariff-overview-pdf §11).
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
@@ -26,7 +26,7 @@ async function render(element: ReactElement) {
 }
 
 const props = {
-    validCount: 6, totalCount: 6, validityFilter: 'valid' as const,
+    validCount: 6, upcomingCount: 0, totalCount: 6, validityFilter: 'valid' as const,
     onValidityFilterChange: vi.fn(), onOpenCreateTariffModal: vi.fn(), onDownloadOverview: vi.fn(),
 }
 
@@ -39,6 +39,13 @@ describe('TariffToolbar', () => {
     it('shows the validity tabs when All lists more series', async () => {
         const container = await render(createElement(TariffToolbar, { ...props, totalCount: 7 }))
         expect(container.querySelector('.filter-tabs')).not.toBeNull()
+    })
+
+    it('shows Upcoming whenever a version is still to start, even at the valid count', async () => {
+        // Next year's prices often arrive as a new version of every series at once.
+        const container = await render(createElement(TariffToolbar, { ...props, upcomingCount: 6 }))
+        const tabs = [...container.querySelectorAll('.filter-tab')].map((tab) => tab.textContent)
+        expect(tabs).toEqual(['pages.tariffs.filters.validOnly 6', 'pages.tariffs.filters.upcoming 6'])
     })
 
     it('offers the PDF scope as a menu', async () => {

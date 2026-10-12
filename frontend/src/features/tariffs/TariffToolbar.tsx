@@ -5,15 +5,21 @@ import { ActionMenu } from '../../components/ActionMenu'
 import { FilterTabs } from '../../components/FilterTabs'
 import { Toolbar } from '../../components/Toolbar'
 
+/** The overview PDF's scope. */
 export type TariffValidityFilter = 'valid' | 'all'
+/** The list's views: the PDF's scopes, plus the series with a version still
+ * to start. */
+export type TariffListView = TariffValidityFilter | 'upcoming'
 
 type TariffToolbarProps = {
   /** Tariff series with a version in force today. */
   validCount: number
+  /** Tariff series with a version that starts after today. */
+  upcomingCount: number
   /** All tariff series. */
   totalCount: number
-  validityFilter: TariffValidityFilter
-  onValidityFilterChange: (value: TariffValidityFilter) => void
+  validityFilter: TariffListView
+  onValidityFilterChange: (value: TariffListView) => void
   onOpenCreateTariffModal: () => void
   readOnly?: boolean
   /** Absent when no single ZEV is selected — an import needs one target. */
@@ -25,6 +31,7 @@ type TariffToolbarProps = {
 
 export function TariffToolbar({
   validCount,
+  upcomingCount,
   totalCount,
   validityFilter,
   onValidityFilterChange,
@@ -73,6 +80,8 @@ export function TariffToolbar({
           label={t('pages.tariffs.filters.validity')}
           tabs={[
             { value: 'valid', label: t('pages.tariffs.filters.validOnly'), count: validCount },
+            // Not a cut of the valid list: the same series can show the next version here.
+            { value: 'upcoming', label: t('pages.tariffs.filters.upcoming'), count: upcomingCount, distinct: true },
             { value: 'all', label: t('pages.tariffs.filters.all'), count: totalCount },
           ]}
           value={validityFilter}

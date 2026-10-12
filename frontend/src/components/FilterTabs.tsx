@@ -4,6 +4,9 @@ export type FilterTab<T> = {
   count: number
   /** Marks the count in the danger tone while it is above zero. */
   attention?: boolean
+  /** Not a narrower or wider cut of the default's list, so an equal count
+   * does not mean the same list: shown whenever it has a count. */
+  distinct?: boolean
 }
 
 type FilterTabsProps<T> = {
@@ -18,15 +21,15 @@ type FilterTabsProps<T> = {
 
 /** Counted, mutually exclusive views of one list. A tab with nothing to show,
  * or with as many entries as the default (the same list), is left out unless
- * it is the active one, so it can still be cleared, or an attention tab with
- * a count, which still warns; a default tab left on its own offers no choice,
+ * it is the active one, so it can still be cleared, or an attention or
+ * distinct tab with a count; a default tab left on its own offers no choice,
  * so the group is too. */
 export function FilterTabs<T>({ label, tabs, value, onChange }: FilterTabsProps<T>) {
   const defaultValue = tabs[0]?.value
   const defaultCount = tabs[0]?.count
   const shown = tabs.filter((tab, index) => index === 0
     || tab.value === value
-    || (tab.count > 0 && (tab.attention || tab.count !== defaultCount)))
+    || (tab.count > 0 && (tab.attention || tab.distinct || tab.count !== defaultCount)))
   if (shown.length < 2) return null
   return (
     <div className="filter-tabs" role="group" aria-label={label}>

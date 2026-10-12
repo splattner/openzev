@@ -729,14 +729,17 @@ positive coverage and maintenance-link permissions.
   successful save also toasts any `warnings` the create response carries
   (units the endpoint publishes but this source cannot bill), rather than
   leaving them visible only in the audit trail.
-- **`TariffCategorySections`** — `usesPeriods`/`priceSummary`/`pricingLabel`
-  are branched on the *shown version's* `dynamic_source`, not the series:
-  because `dynamic_source` is deliberately not a series-coherence field
-  (§3.1.2 of the billing-engine spec), one series can hold both a static and
-  a dynamic version across a static→dynamic switchover, and the two versions
-  must render differently. A "Dynamic" badge appears next to the energy-type
-  badge; it turns into a danger badge with the fetch error as its tooltip
-  when the source's `last_fetch_status` is `failed`.
+- **`TariffCategorySections`** / **`TariffDetailDrawer`** — the price and
+  the "Dynamic" label are branched on the *shown version's* `dynamic_source`,
+  not the series: because `dynamic_source` is deliberately not a
+  series-coherence field (§3.1.2 of the billing-engine spec), one series can
+  hold both a static and a dynamic version across a static→dynamic
+  switchover, and the two versions must render differently. A dynamic
+  version's list row reads "Dynamic, average" (or "Dynamic, incomplete
+  average") in its Applies column beside the average price (`rateLines`);
+  the drawer shows the source label with it (`priceSummary`). When the source's `last_fetch_status` is `failed`, a
+  danger "Price fetch failed" badge (`pages.tariffs.dynamicFetchFailed`)
+  appears beside the name in both, with the fetch error as its tooltip.
   Its representative number and percentage-of-grid display use the API's
   bounded summary; partial and unavailable data are labelled instead of shown
   as complete or zero.
