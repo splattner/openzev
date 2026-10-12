@@ -4,10 +4,12 @@ import { useTranslation } from 'react-i18next'
 import { FilterTabs } from '../../components/FilterTabs'
 import { Toolbar } from '../../components/Toolbar'
 
-export type ParticipantReadinessFilter = 'all' | 'attention' | 'noMetering'
+export type ParticipantReadinessFilter = 'active' | 'attention' | 'noMetering' | 'ended'
 
 type ParticipantToolbarProps = {
-  totalCount: number
+  /** Current and upcoming participations, the default view. */
+  activeCount: number
+  endedCount: number
   warningCount: number
   noMeteringCount: number
   searchTerm: string
@@ -19,7 +21,8 @@ type ParticipantToolbarProps = {
 }
 
 export function ParticipantToolbar({
-  totalCount,
+  activeCount,
+  endedCount,
   warningCount,
   noMeteringCount,
   searchTerm,
@@ -45,9 +48,10 @@ export function ParticipantToolbar({
           <FilterTabs
             label={t('pages.participants.summaryLabel')}
             tabs={[
-              { value: 'all', label: t('pages.participants.summary.total'), count: totalCount },
+              { value: 'active', label: t('pages.participants.summary.active'), count: activeCount },
               { value: 'attention', label: t('pages.participants.summary.attention'), count: warningCount, attention: true },
               { value: 'noMetering', label: t('pages.participants.summary.noMetering'), count: noMeteringCount },
+              { value: 'ended', label: t('pages.participants.validity.ended'), count: endedCount, distinct: true },
             ]}
             value={readinessFilter}
             onChange={onReadinessFilterChange}

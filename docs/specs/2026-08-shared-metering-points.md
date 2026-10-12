@@ -558,15 +558,18 @@ edit.
   input `allocation_weight` (zod: `.positive()`), shown as a plain decimal
   weight — the input is **never** a percentage, per-mille or "/1000" — with a
   hint; default empty → backend default `1`.
-- Participant cards (`ParticipantCardsSection.tsx`) show today's allocation-weight
-  share, e.g. `"25 % — 1 of 4 weights"` for current weights `1`, `1`, `2`.
+- The participant list (`ParticipantCardsSection.tsx`) shows today's allocation-weight
+  share in its Allocation weight column (`form.allocationWeight`), e.g. `25 %`
+  over `1 / 4`, with the tooltip `"25 % — 1 of 4 weights"`, for current weights
+  `1`, `1`, `2`; the column header's tooltip is `weightShareHint`, which calls
+  it today's share among current participants and warns that invoice shares
+  may differ.
   `ParticipantsPage.tsx` uses `todayBusinessIso()` (Europe/Zurich): membership is
   current when `valid_from <= today` and `valid_to` is null or `>= today`.
   The total includes all current memberships in the selected community;
   search and readiness filters do not affect it.
-- Current cards show weight / current total × 100, weight and total;
-  ended/upcoming memberships show only their weight. Tooltips describe the
-  allocation-weight share or explain its absence. `formatNumber` uses up to
+- Current rows show weight / current total × 100; ended/upcoming memberships
+  show `–` over their weight, with `weightShareUnavailableHint` as tooltip. `formatNumber` uses up to
   two decimals for percentages and four for weights/totals, without trailing zeros.
 - This is a current-membership preview. Energy uses eligibility on each
   reading's date (§7.4); shared fixed fees use each billed month's eligibility (§7.2, §7.5).

@@ -61,12 +61,23 @@ to another flat within it. Name, contact and address are then taken from the
 existing party and stay shared: editing them on one entry changes them on every
 entry of that party.
 
-The participant is added to the list. An entry flagged **Needs attention** is
-missing an email address, a postal address or a metering point. The tabs above
-the list count the entries and narrow the list: **All**, **Needs attention**
-and **No metering point**; a tab with nothing or everything in it is left out, and clicking
-the active tab again shows all. The search field beside them finds a name,
-email address or address.
+The participant is added to the list. Each row shows the name with the
+participant's roles and contact details, the address, the membership dates,
+then four status icons: **Email**, **Address** and **Metering point** carry
+a green check when present and a red mark when missing; **Invitation** is
+checked once the participant has used their onboarding link (see below). A
+row flagged **Needs attention** is missing an email address, a postal
+address or a metering point, and names what is missing in red. Click that
+red text to fix it: a missing email or address opens the participant's
+form, a missing metering point opens **Metering Points**.
+
+The tabs above the list count the rows and narrow the list: **Current &
+upcoming** (the default), **Needs attention**, **No metering point** and
+**Ended**. Participants whose membership has ended appear only under
+**Ended**. A tab with nothing or everything in it is left out, and clicking
+the active tab again returns to the default. The search field beside them
+finds a name, email address or address within the selected tab. To find a
+former participant, select **Ended** before searching.
 
 ## Participant Account Access
 
@@ -82,12 +93,14 @@ Participants **cannot**:
 - Manage ZEV settings
 - Create tariffs or invoices
 
-Each participant entry shows the **Account** it is linked to, or *No account
-yet*, plus an onboarding status badge (*Not invited*, *Invited*, *Active*,
-*Revoked*, *Expired*). While a link is live — or after it has expired — the
-entry also shows its expiry date beside the badge, so you can see when a dead
-link died without resending it. Open **More** on an entry to send or copy the participant's onboarding link
-(which creates the account), or to revoke it. The link stays usable for 30 days and can be
+Every participant gets an account when they are added; the onboarding link
+is how they first sign in to it. The **Invitation** status icon shows that
+link's state: *Not invited* (no link
+sent yet), *Invited* (sent, not used yet, with its expiry date), *Invitation
+link used*, *Expired* (with the expiry date) or *Revoked* (by you, or
+because the participant set their own password). It is optional: invoices
+go out by email either way. Open **⋯** on an entry to send or copy the
+participant's onboarding link, or to revoke it. The link stays usable for 30 days and can be
 reused within that time — copying or resending it hands out the same link,
 unless it has expired, in which case a fresh one is issued automatically. Once
 the participant sets their own password, the link is revoked. Administrators can also **Link existing** — attach
@@ -105,14 +118,14 @@ An entry also shows the roles the participant holds in the community today:
 ### A Participant Forgot Their Password
 
 There is no "forgot password" link on the login page. Send or copy the
-participant's onboarding link again from **More** on their entry: it signs
+participant's onboarding link again from **⋯** on their entry: it signs
 them in, and they then choose a new password. If their invoices carry the
 [participant QR code](02-zev-setup.md#participant-access-from-the-invoice),
 they can also request a sign-in link themselves from the page it opens.
 
 ## Participation Contract
 
-**Contract PDF** on a participant's entry downloads their participation
+**Contract PDF** on a participant's row downloads their participation
 contract, filled from the ZEV settings (including the contract notes on the
 **Documents & emails** tab), the participant's details and the tariffs.
 
@@ -124,7 +137,7 @@ issues a new numbered version, and the earlier ones stay on record.
 ## Editing Participant Details
 
 1. Go to **Participants**
-2. Click **Edit** on the participant's entry
+2. Click the participant's name (or **Edit** in its **⋯** menu)
 3. Update fields as needed
 4. Click **Save Participant**
 
@@ -169,17 +182,13 @@ this setting at all.
 
 ![Allocation weight on the participant form](screenshots/03b-participant-allocation-weight.png)
 
-Current participants' entries show today's allocation-weight share. For example,
-with three current participants weighted `1`, `1`, and `2`, each of the first two
-entries shows:
-
-```
-ALLOCATION WEIGHT
-25 % — 1 of 4 weights
-```
+The **Allocation weight** column shows each current participant's share by
+allocation weight today, with the weight and the total below it. For example,
+with three current participants weighted `1`, `1`, and `2`, the first two rows
+show `25 %` over `1 / 4`.
 
 Shares use memberships valid today in Swiss time, including their first and
-last day. Ended and upcoming memberships show only their configured weight.
+last day. Ended and upcoming memberships show `–` over their weight.
 Search and filters do not affect the total.
 
 Invoice shares may differ: common-area energy uses membership on each reading's
@@ -233,14 +242,14 @@ When someone leaves the community, **end their membership instead of deleting
 them**:
 
 1. Go to **Participants**
-2. Click **Edit** on the participant's entry
+2. Click the participant's name (or **Edit** in its **⋯** menu)
 3. Set **Valid To** to the participant's last active date
 4. Click **Save Participant**
 
 Past invoices and data remain intact. Invoice periods after **Valid To** skip
 the participant.
 
-> **Warning:** **Delete** (under **More**) removes the participant *and every
+> **Warning:** **Delete** (in the **⋯** menu) removes the participant *and every
 > invoice issued to them*, including sent and paid ones. Use it only for a
 > participant created by mistake.
 
@@ -248,7 +257,7 @@ the participant.
 
 ### Onboarding Email
 
-**Send onboarding link** (under **More** on the entry) emails the participant
+**Send onboarding link** (in the entry's **⋯** menu) emails the participant
 their onboarding link. Nothing is sent automatically when you add a
 participant. The email text is an admin-managed template — see
 [Email Configuration](10-email-configuration.md).
@@ -273,8 +282,8 @@ Participant records are kept permanently for:
 
 **Participant cannot login**
 - Check that the participant's email is correct — it is their sign-in name
-- Check the onboarding badge on their entry: *Expired* or *Revoked* links no
-  longer work; send a new one
+- Hover the **Invitation** icon in the **Status** column to check the link's
+  state: *Expired* or *Revoked* links no longer work; send a new one
 - For a forgotten password, see [above](#a-participant-forgot-their-password)
 
 **Participant invoices are wrong**

@@ -55,7 +55,7 @@ without leaving an immortal credential behind.
 | Backend — removed | `send-invitation` and `create-account`'s password-minting behaviour; the `participant_invitation` email template |
 | Backend — audit | `AuditEventSource.ONBOARDING_LINK`; `participant.send_onboarding_link`, `participant.onboarding_link_created`, `participant.revoke_onboarding_link`, `participant_onboarding.consumed` |
 | Frontend | `ParticipantOnboardingPage` at `/join/:prefix`, outside `ProtectedRoute` |
-| Frontend | Participants page: send/copy/revoke actions, an onboarding-status badge |
+| Frontend | Participants page: send/copy/revoke actions, an Invitation status icon |
 | Frontend | Admin Accounts page: "Create account" now creates a passwordless account and shows a copyable link |
 | Docs | This spec; `docs/ROADMAP.md` updated to reference it |
 
@@ -232,11 +232,14 @@ alongside `onboarding_url`, which the Participants page shows under the link
   not an error, so there is no "link already used" state, only "link is
   invalid or revoked."
 - Participants page: the single "Send Invitation" action is replaced by three
-  — send (disabled without an email), copy, and revoke (shown only once a
-  link has been sent). A badge shows `onboarding_status` on every card,
-  with the latest non-revoked link's expiry beside it (`sent`/`active`:
-  "expires on"; `expired`: "expired on") so the operator sees when a dead
-  link died without reopening the notice. Send/copy/revoke operations capture
+  — send (disabled without an email), copy, and revoke (shown only for
+  `sent` or `active` links). The actions live in each row's **⋯** menu. The
+  **Invitation** icon in the Status column exposes `onboarding_status`
+  in its tooltip and visually hidden text: `active` carries a done mark;
+  other states carry no mark. The `sent` and `expired` tooltips include
+  `onboarding_link_expires_at`, formatted as a short date. The icon describes
+  the link's state, not portal access; setting a password revokes the link.
+  Send/copy/revoke operations capture
   the submitting account/community/write-capability scope and recheck it before
   dispatch. Successful requests invalidate that community's participant query;
   obsolete completions do not display a URL or notify. Existing notices clear

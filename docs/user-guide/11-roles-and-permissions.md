@@ -269,9 +269,9 @@ Accounts are attached to participants from the community that the participant
 belongs to:
 
 1. Switch to the community and open **Participants**
-2. On the participant's card, open **More**
-3. Choose **Send onboarding link** or **Copy onboarding link** (creates the
-   account and gives the participant a sign-in link), or — as an admin —
+2. On the participant's row, open **⋯**
+3. Choose **Send onboarding link** or **Copy onboarding link** (gives the
+   participant a sign-in link to the account they got when added), or — as an admin —
    **Link existing** to attach an existing account — any account except an
    admin's, also one that is already a participant in another community, so a
    person who rents in two communities keeps one login
@@ -506,7 +506,7 @@ access under **ZEV settings → People & access**.
 1. Check the account under **Platform → Accounts → Users**: is it active, and
    has it ever signed in?
 2. **Participant:** a manager of the community sends or copies the onboarding link
-   again from the participant's card (**More**). It signs them in, and they
+   again from the **⋯** menu on the participant's row. It signs them in, and they
    choose a new password.
 3. **Manager or admin who forgot their password:** someone with server access
    sets a new one on the command line (the user then signs in with it; the

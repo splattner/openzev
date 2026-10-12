@@ -522,7 +522,7 @@ These pages define the current management-page reference set.
 - File: `frontend/src/pages/ParticipantsPage.tsx`
 - Route: `/participants`
 - Query keys: `queryKeys.zev.participants(selectedZevId)` and `queryKeys.zev.participantGeocodingEnabled()`; scope comes from `queryKeys.zev.list()`.
-- Pattern: summary toolbar, filters, participant cards, primary/secondary/overflow actions, badges, invitation handling.
+- Pattern: summary toolbar, filters, participant rows, primary/secondary/overflow actions, badges, invitation handling.
 
 #### `MeteringPointsPage`
 

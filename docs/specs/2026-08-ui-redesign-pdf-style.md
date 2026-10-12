@@ -1072,8 +1072,10 @@ contracts are unchanged.
   (`--field-height`). `.list-filters` is one wrapping line: a search input
   (full width on phones), further tab groups and compact selects, labelled by
   `aria-label`.
-  Participants: All · Needs attention · No metering point, with the search
-  in the same `.list-filters` row (nothing else narrows them).
+  Participants: Current & upcoming (default) · Needs attention · No metering
+  point · Ended (`distinct`), with the search in the same `.list-filters` row
+  (nothing else narrows them). Ended participations show only under Ended;
+  the attention and metering counts cover current and upcoming ones.
   Metering points: All · Active · Inactive · Unassigned (managers only) ·
   Needs attention; below, search, type tabs (All types · Consumption ·
   Production · Bidirectional, shown when more than one type is present or a
@@ -1085,10 +1087,44 @@ contracts are unchanged.
   next version, so it differs from Valid even at the same count), and all
   series; the tariff overview PDF's scope (valid or all) is chosen at its
   download instead (SPEC-2026-09-tariff-overview-pdf §11).
-- Ledger lists: participants and metering points render as
-  hairline-separated rows inside one sheet. Participant rows lead with the
-  name (`.participant-card-heading`), then badges, then five labelled detail
-  columns; Edit is a secondary action (SPEC-2026-04 §7.3). Metering points
+- Participant list (`ParticipantCardsSection`): the billing period's row
+  table, reusing its classes (`.table-card.invoice-rows.participant-rows`);
+  the legend sits below the sheet, so the sheet's bottom padding is 0.5rem.
+  - Columns: Participant (organisation icon and name, name addition; a muted
+    line with role tags, an Upcoming/Ended pill, email and phone; the missing
+    details in the red issues line), Address (street, then postcode and
+    place), Validity (from, then "– to" or "– Open"), Status, Allocation
+    weight (today's share over `weight / total`; §8.2 of
+    SPEC-2026-08-shared-metering-points) and an unlabelled actions column:
+    Contract PDF and, for a writer, the icon-only ⋯ menu (Edit, onboarding
+    links, account linking, delete).
+  - A writer opens the edit dialog from the name (`.participant-name-button`).
+  - Status: four `ProgressIcon`s (`frontend/src/components/ProgressIcon.tsx`,
+    shared with the invoice progress column; it takes a rendered icon).
+    Email, address and metering point (the sidebar's `PlugIcon`,
+    `frontend/src/components/IconSvg.tsx`) are done or an issue, from the
+    entry's `issues` (`participantIssues`). Invitation is done once the
+    onboarding link has been used (`onboarding_status` `active`) and open
+    otherwise; its tooltip is `status.invitationState.<onboarding_status>`.
+    It shows the link, not portal access: every participant has an account
+    from creation, and setting a password revokes the link. The account's
+    generated username is not shown (participants sign in by email); the
+    unlink confirmation names it. A `ProgressLegend` below the sheet names the icons and
+    the done/missing marks.
+  - Fixing an issue (writers only, `.participant-fix`): the red text is the
+    control, a missing email or address opening the edit dialog and a
+    missing metering point linking to `/metering/points`. The red icon does
+    the same for the mouse but is out of the tab order and hidden from
+    assistive technology (`.participant-fix--icon`). A viewer reads both as
+    plain text.
+  - Empty states: no participants at all offers New participant; when the
+    default tab is empty only because every participation has ended,
+    "Show ended" selects the Ended tab; otherwise "Clear filters".
+  - Below 46rem a row is a card (who and share, address and validity,
+    status beside the actions); below 28rem the status icons and the
+    actions each take a full line.
+- Ledger lists: metering points render as
+  hairline-separated rows inside one sheet. Metering points
   nest their assignments under a left rule; Assign is `button-outline`.
 - Tariff list (`TariffCategorySections`): a rate card like the tariff overview PDF.
   - List contents: one sheet with a `.tariff-table` per category; the header shows the category. One row per series with its name, energy type, note first line, applicability, CHF price, unit, and validity. One line per band. No version count.

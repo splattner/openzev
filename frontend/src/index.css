@@ -2139,7 +2139,7 @@ h3 {
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton-block::after,
-  .participant-card-focus,
+  .participant-row-focus,
   .participant-table tbody tr > td {
     animation: none !important;
     transition: none !important;
@@ -3455,113 +3455,19 @@ input.recurrence-chip-input {
   display: grid;
 }
 
-.participant-card {
-  min-width: 0;
-}
-
-.participant-card + .participant-card {
-  border-top: 1px solid var(--border-default);
-}
 
 /* Deep-link target (`?focus=` from attention links): briefly flash the row. */
-.participant-card-focus {
-  animation: participant-card-flash 2.4s ease-out 1;
-  border-radius: var(--radius-sm);
+.participant-row-focus {
+  animation: participant-row-flash 2.4s ease-out 1;
 }
 
-@keyframes participant-card-flash {
+@keyframes participant-row-flash {
   0% {
-    box-shadow: 0 0 0 3px var(--focus-ring);
     background: var(--brand-pale);
   }
   100% {
-    box-shadow: 0 0 0 0 transparent;
     background: transparent;
   }
-}
-
-.participant-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem 1rem;
-  padding: 0.875rem 0 0.5rem;
-  flex-wrap: wrap;
-}
-
-.participant-card:first-child .participant-card-header {
-  padding-top: 0.125rem;
-}
-
-.participant-card-title {
-  display: grid;
-  gap: 0.375rem;
-  flex: 1 1 320px;
-  min-width: 220px;
-}
-
-.participant-card-heading {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.15rem 0.5rem;
-}
-
-.participant-card-heading strong {
-  font-size: 0.9375rem;
-  font-weight: 650;
-  color: var(--ink);
-}
-
-.participant-card-heading .muted {
-  font-size: 0.875rem;
-}
-
-.participant-card-badges,
-.participant-card-actions,
-.participant-warning-list {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  flex-wrap: wrap;
-}
-
-.participant-card-badges > .muted {
-  font-size: 0.8125rem;
-}
-
-.participant-card-actions {
-  justify-content: flex-end;
-}
-
-.participant-card-body {
-  display: grid;
-  gap: 0.75rem;
-  padding: 0.125rem 0 0.875rem;
-}
-
-.participant-card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
-  gap: 0.75rem 1.25rem;
-}
-
-.participant-card-section {
-  display: grid;
-  align-content: start;
-  gap: 0.15rem;
-  min-width: 0;
-  font-size: 0.875rem;
-  overflow-wrap: anywhere;
-}
-
-.participant-card-label {
-  margin-bottom: 0.1rem;
-  font-size: 0.6875rem;
-  font-weight: 650;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--text-muted);
 }
 
 .invoice-cell-stack {
@@ -3693,6 +3599,14 @@ input.recurrence-chip-input {
   width: 1.6rem;
   height: 1.6rem;
   font-size: 1.05rem;
+}
+
+/* An outline icon (`IconSvg`) draws inside a margin, so it runs larger than
+   the solid Font Awesome glyphs to look the same size. */
+.invoice-progress-icon > svg:not(.svg-inline--fa) {
+  width: 1.3em;
+  height: 1.3em;
+  flex-shrink: 0;
 }
 
 .invoice-progress-icon--done,
@@ -3901,6 +3815,137 @@ input.recurrence-chip-input {
 
 .invoice-actions-cell .invoice-row-actions {
   justify-content: flex-end;
+}
+
+/* ── Participant rows: the invoice rows plus address and validity columns ── */
+
+/* The legend sits below the sheet, so the last row needs no room under it
+   (as the metering sheets). */
+.table-card.participant-rows {
+  padding-bottom: 0.5rem;
+}
+
+.participant-name-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.participant-name-button:hover,
+.participant-name-button:focus-visible {
+  text-decoration: underline;
+}
+
+/* A missing detail is the way to fix it: red text, or its icon, that opens
+   the edit dialog or the metering points. */
+.participant-fix {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+}
+
+:is(a, button).participant-fix {
+  cursor: pointer;
+}
+
+:is(a, button).participant-fix:not(.participant-fix--icon):is(:hover, :focus-visible) {
+  text-decoration: underline;
+}
+
+:is(a, button).participant-fix--icon:hover {
+  background: var(--danger-100);
+}
+
+.participant-fix svg {
+  font-size: 0.75em;
+}
+
+.participant-fix--icon svg {
+  font-size: inherit;
+}
+
+.participant-rows .participant-row-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.participant-row-address,
+.participant-row-validity,
+.participant-rows .invoice-row-total {
+  font-size: 0.875rem;
+}
+
+.participant-row-address > span,
+.participant-row-validity > span,
+.participant-row-weight {
+  display: block;
+}
+
+.participant-row-validity {
+  width: 1%;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.participant-row-weight {
+  font-size: 0.8125rem;
+}
+
+/* Cards: who and share, then where and since when, then status and the menu. */
+@container (max-width: 46rem) {
+  .invoice-rows.participant-rows tbody tr {
+    grid-template:
+      'who total' auto
+      'address validity' auto
+      'progress actions' auto / minmax(0, 1fr) auto;
+  }
+
+  .participant-row-address {
+    grid-area: address;
+  }
+
+  .participant-rows .participant-row-validity {
+    grid-area: validity;
+    width: auto;
+    text-align: end;
+  }
+
+  /* No divider under the last card: the sheet's edge closes it. */
+  .invoice-rows.participant-rows tbody tr:last-child {
+    border-bottom-color: transparent;
+  }
+
+  .invoice-rows.participant-rows .invoice-actions-cell .invoice-row-actions {
+    justify-content: flex-end;
+  }
+}
+
+/* Phones: the status icons and the buttons each take a full line, so the
+   buttons never widen the share column or crowd the icons. */
+@container (max-width: 28rem) {
+  .invoice-rows.participant-rows tbody tr {
+    grid-template:
+      'who total' auto
+      'address validity' auto
+      'progress progress' auto
+      'actions actions' auto / minmax(0, 1fr) auto;
+  }
+
+  .invoice-rows.participant-rows .invoice-actions-cell .invoice-row-actions {
+    justify-content: flex-start;
+  }
 }
 
 .metering-missing-list {
@@ -4600,7 +4645,6 @@ fieldset.form-grid {
   }
 
   .tariff-period-actions,
-  .participant-card-actions,
   .metering-point-actions,
   .metering-assignment-actions {
     justify-content: flex-start;

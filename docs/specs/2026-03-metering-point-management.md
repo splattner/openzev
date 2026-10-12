@@ -459,10 +459,10 @@ direction when no explicit direction column is present.
 
 Readiness/attention links for participant-validity warnings open the
 participants page with `?focus=<participant id>&field=valid_to`. The page
-consumes the parameters once: it clears any search/readiness filter that
-would hide the card, opens the edit modal with the validity focused, scrolls
-the participant card into view and flashes it (`.participant-card-focus`, a
-CSS-only highlight), then drops the parameters from the URL so a later
+consumes the parameters once: it clears the search and selects the
+Ended tab for an ended participation, otherwise the default tab, opens the
+edit modal with the validity focused, scrolls the participant row into view
+and flashes it (`.participant-row-focus`, a CSS-only highlight), then drops the parameters from the URL so a later
 refresh or another deep link re-triggers cleanly. URL consumption and the
 scroll/flash lifecycle are separate effects, so removing the parameters
 never cancels the highlight timers. Edit-intent links wait for community loading
@@ -486,9 +486,9 @@ missing selection as all communities. Covered by
 
 ### 8.6 Participant allocation-weight display
 
-Participant cards (`ParticipantCardsSection.tsx`) show today's allocation-weight
-share among current members. Ended and upcoming memberships show only their
-configured weight. See
+The participant list (`ParticipantCardsSection.tsx`) shows today's allocation-weight
+share among current members. Ended and upcoming memberships show `–` over
+their configured weight. See
 [shared metering points §8.2](2026-08-shared-metering-points.md#82-participants)
 for eligibility, filtering, formatting and billing rules.
 

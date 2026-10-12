@@ -1,8 +1,6 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
     type IconDefinition,
-    faCircleCheck,
-    faCircleExclamation,
     faChartColumn,
     faClipboardCheck,
     faEnvelope,
@@ -10,11 +8,11 @@ import {
     faLock,
     faMoneyBillWave,
     faReceipt,
-    faSpinner,
 } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 import { invoiceStepReasonText } from './invoiceRowText'
 import { InvoiceLink } from '../../components/InvoicePresentation'
+import { ProgressIcon, ProgressLegend } from '../../components/ProgressIcon'
 import type { InvoicePeriodParticipantRow } from '../../types/api'
 import {
     INVOICE_PROGRESS_STEPS,
@@ -34,29 +32,9 @@ const STEP_ICONS: Record<InvoiceProgressStep, IconDefinition> = {
     paid: faMoneyBillWave,
 }
 
-/** The small mark on a step's corner; an open step carries none. */
-const STATE_MARKS: Partial<Record<InvoiceStepState, IconDefinition>> = {
-    done: faCircleCheck,
-    active: faSpinner,
-    issue: faCircleExclamation,
-}
-
-const LEGEND_STATES: InvoiceStepState[] = ['done', 'active', 'issue']
-
 function StepIcon({ step, state, reason }: { step: InvoiceProgressStep; state: InvoiceStepState; reason?: InvoiceStepReason }) {
-    const mark = STATE_MARKS[state]
     // A blocked invoice step is locked by another invoice, not merely late.
-    const icon = reason === 'conflict' ? faLock : STEP_ICONS[step]
-    return (
-        <span className={`invoice-progress-icon invoice-progress-icon--${state}`} aria-hidden="true">
-            <FontAwesomeIcon icon={icon} fixedWidth />
-            {mark && (
-                <span className="invoice-progress-mark">
-                    <FontAwesomeIcon icon={mark} spin={state === 'active'} />
-                </span>
-            )}
-        </span>
-    )
+    return <ProgressIcon icon={<FontAwesomeIcon icon={reason === 'conflict' ? faLock : STEP_ICONS[step]} fixedWidth />} state={state} />
 }
 
 type InvoiceRowProgressProps = {
@@ -111,28 +89,13 @@ export function InvoiceRowProgress({ row, period, work }: InvoiceRowProgressProp
 export function InvoiceProgressLegend() {
     const { t } = useTranslation()
     return (
-        <div className="invoice-progress-legend">
-            <ul>
-                {INVOICE_PROGRESS_STEPS.map((step) => (
-                    <li key={step}>
-                        <StepIcon step={step} state="open" />
-                        {t(`pages.invoices.progress.steps.${step}`)}
-                    </li>
-                ))}
-            </ul>
-            <ul>
-                {LEGEND_STATES.map((state) => {
-                    const mark = STATE_MARKS[state]
-                    return (
-                        <li key={state}>
-                            <span className={`invoice-progress-legend-mark invoice-progress-legend-mark--${state}`} aria-hidden="true">
-                                {mark && <FontAwesomeIcon icon={mark} fixedWidth />}
-                            </span>
-                            {t(`pages.invoices.progress.states.${state}`)}
-                        </li>
-                    )
-                })}
-            </ul>
-        </div>
+        <ProgressLegend
+            steps={INVOICE_PROGRESS_STEPS.map((step) => ({
+                key: step,
+                icon: <FontAwesomeIcon icon={STEP_ICONS[step]} fixedWidth />,
+                label: t(`pages.invoices.progress.steps.${step}`),
+            }))}
+            states={(['done', 'active', 'issue'] as const).map((state) => ({ state, label: t(`pages.invoices.progress.states.${state}`) }))}
+        />
     )
 }

@@ -3,6 +3,7 @@ import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useState } from 'r
 import { useSearchParams } from 'react-router-dom'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { ParticipantCardsSection } from '../features/participants/ParticipantCardsSection'
+import { participantIssues } from '../features/participants/participantIssues'
 import type { ParticipantValidityState } from '../features/participants/types'
 import {
     ParticipantOnboardingNotice,
@@ -89,7 +90,7 @@ export function ParticipantsPage() {
     const [editingId, setEditingId] = useState<string | null>(null)
     const [showModal, setShowModal] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
-    const [readinessFilter, setReadinessFilter] = useState<ParticipantReadinessFilter>('all')
+    const [readinessFilter, setReadinessFilter] = useState<ParticipantReadinessFilter>('active')
     const [onboardingNotice, setOnboardingNotice] = useState<ParticipantOnboardingNoticeData | null>(null)
     const [modalFocusField, setModalFocusField] = useState<'valid_to' | null>(null)
 
@@ -254,23 +255,20 @@ export function ParticipantsPage() {
     useEffect(() => {
         if (!focusId || isLoading) return
         if (focusField === 'valid_to' && (scopeLoading || (!!selectedZevId && !selectedZev))) return
-        const inScope = (data ?? []).some(
+        const target = (data ?? []).find(
             (participant) =>
                 participant.id === focusId
                 && (!isManagedScope || participant.zev === selectedZevId),
         )
-        if (!inScope) return
-        // A stale search/readiness filter may keep the card off the page.
+        if (!target) return
+        // A stale search/readiness filter may keep the row off the page.
         setSearchTerm('')
-        setReadinessFilter('all')
+        setReadinessFilter(getParticipantValidityState(target, todayBusinessIso()) === 'ended' ? 'ended' : 'active')
         setHighlightedId(focusId)
         if (focusField === 'valid_to' && canWriteSelectedCommunity) {
-            const target = (data ?? []).find((participant) => participant.id === focusId)
-            if (target) {
-                setEditingId(target.id)
-                setModalFocusField('valid_to')
-                setShowModal(true)
-            }
+            setEditingId(target.id)
+            setModalFocusField('valid_to')
+            setShowModal(true)
         }
         // Drop the params so the deep link is consumed (and re-linking works):
         // the focusId dependency goes null and this effect stops re-running.
@@ -286,7 +284,7 @@ export function ParticipantsPage() {
         const timers = [
             window.setTimeout(() => {
                 document
-                    .getElementById(`participant-card-${highlightedId}`)
+                    .getElementById(`participant-row-${highlightedId}`)
                     ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
             }, 0),
             window.setTimeout(() => setHighlightedId(null), 4000),
@@ -307,15 +305,6 @@ export function ParticipantsPage() {
         }
 
         createMutation.mutate({ payload: { ...payload, zev: selectedZevId }, scope })
-    }
-
-    function participantWarnings(participant: Participant): string[] {
-        const warnings: string[] = []
-        if (!participant.email) warnings.push(t('pages.participants.warnings.noEmail'))
-        const hasAddress = !!(participant.address_line1 && participant.postal_code && participant.city)
-        if (!hasAddress) warnings.push(t('pages.participants.warnings.noAddress'))
-        if (!participant.has_metering_point_assignment) warnings.push(t('pages.participants.warnings.noMeteringPoint'))
-        return warnings
     }
 
     function formatParticipantAddress(participant: Participant): string {
@@ -341,7 +330,7 @@ export function ParticipantsPage() {
     const todayIso = todayBusinessIso()
     const participantCards = [...participants]
         .map((participant) => {
-            const warnings = participantWarnings(participant)
+            const issues = participantIssues(participant)
             // The party's roles held today (#761): issuer, representative, landowner.
             const roles = [...new Set((participant.roles ?? [])
                 .filter((role) => role.valid_from <= todayIso)
@@ -350,7 +339,7 @@ export function ParticipantsPage() {
 
             return {
                 participant,
-                warnings,
+                issues,
                 roles,
                 validityState,
                 displayName: formatParticipantNameWithTitle(participant),
@@ -365,9 +354,12 @@ export function ParticipantsPage() {
             return left.displayName.localeCompare(right.displayName)
         })
     const normalizedSearch = searchTerm.trim().toLowerCase()
-    const filteredParticipants = participantCards.filter((entry) => {
-        const matchesReadiness = readinessFilter === 'all'
-            || (readinessFilter === 'attention' && entry.warnings.length > 0)
+    // Ended participations stay out of every view but their own.
+    const activeCards = participantCards.filter((entry) => entry.validityState !== 'ended')
+    const endedCards = participantCards.filter((entry) => entry.validityState === 'ended')
+    const filteredParticipants = (readinessFilter === 'ended' ? endedCards : activeCards).filter((entry) => {
+        const matchesReadiness = readinessFilter === 'active' || readinessFilter === 'ended'
+            || (readinessFilter === 'attention' && entry.issues.length > 0)
             || (readinessFilter === 'noMetering' && !entry.participant.has_metering_point_assignment)
         const matchesSearch = !normalizedSearch
             || entry.displayName.toLowerCase().includes(normalizedSearch)
@@ -376,12 +368,12 @@ export function ParticipantsPage() {
 
         return matchesReadiness && matchesSearch
     })
-    const warningCount = participantCards.filter((entry) => entry.warnings.length > 0).length
-    const noMeteringCount = participantCards.filter((entry) => !entry.participant.has_metering_point_assignment).length
+    const warningCount = activeCards.filter((entry) => entry.issues.length > 0).length
+    const noMeteringCount = activeCards.filter((entry) => !entry.participant.has_metering_point_assignment).length
 
     function clearFilters() {
         setSearchTerm('')
-        setReadinessFilter('all')
+        setReadinessFilter('active')
     }
 
     function downloadContract(participant: Participant) {
@@ -410,13 +402,14 @@ export function ParticipantsPage() {
         <div className="page-stack">
             {header}
             <ScopeGuard>
-            {isLoading ? <PageSkeleton variant="cardList" /> : isError ? (
+            {isLoading ? <PageSkeleton variant="tableRows" /> : isError ? (
                 <Notice tone="error" onRetry={() => void refetch()} isRetrying={isFetching}>{t('common.error')}</Notice>
             ) : <>
             {onboardingNotice && <ParticipantOnboardingNotice notice={onboardingNotice} onDismiss={() => setOnboardingNotice(null)} />}
 
             <ParticipantToolbar
-                totalCount={participantCards.length}
+                activeCount={activeCards.length}
+                endedCount={endedCards.length}
                 warningCount={warningCount}
                 noMeteringCount={noMeteringCount}
                 searchTerm={searchTerm}
@@ -451,6 +444,9 @@ export function ParticipantsPage() {
                 settings={settings}
                 onOpenCreateModal={openCreateModal}
                 onClearFilters={clearFilters}
+                onShowEnded={readinessFilter === 'active' && activeCards.length === 0 && endedCards.length > 0
+                    ? () => setReadinessFilter('ended')
+                    : undefined}
                 onStartEdit={startEdit}
                 onDownloadContract={downloadContract}
                 onSendOnboardingLink={(participantId) => sendLinkMutation.mutate({ participantId, scope })}
