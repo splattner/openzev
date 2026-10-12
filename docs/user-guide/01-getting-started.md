@@ -11,6 +11,7 @@ account, and a first tour of the interface.
 | Try OpenZEV with sample data | `scripts/start-demo-environment.sh` | [Demo and local development](#demo-and-local-development) |
 | Work on the code | `docker-compose.dev.yml` | [Demo and local development](#demo-and-local-development) |
 | Run it for a real community on one server | `docker-compose.yml` from the release | [Production with Docker Compose](#production-with-docker-compose) |
+| Run it on a Synology NAS | Release `docker-compose.yml` in Container Manager | [Synology NAS](#synology-nas-container-manager) |
 | Build the production stack from source | `docker-compose.yml` or `docker-compose.fullstack.yml` | [Building from source](#building-from-source) |
 | Run it on Kubernetes | Helm chart `charts/openzev` | [Production on Kubernetes (Helm)](#production-on-kubernetes-helm) |
 
@@ -197,6 +198,49 @@ See [Creating the first admin account](#creating-the-first-admin-account) below.
   docker compose pull
   docker compose up -d
   ```
+
+### Synology NAS (Container Manager)
+
+On a Synology NAS the release file runs as a *Project* in **Container Manager**
+(called *Docker* before DSM 7.2). You need DSM 7.2 or later on a model that
+supports Container Manager.
+
+1. In **File Station**, create a folder for the stack, for example
+   `docker/openzev`, and copy `docker-compose.yml` into it (download it as in
+   [step 1](#1-download-the-release-files)).
+2. Fill in the settings from [step 2](#2-configure-env) and save them as a file
+   named `.env` in the same folder — for example by editing
+   `env.production.example` on your computer and uploading it as `.env`.
+   File Station hides names that start with a dot; the file is still there.
+3. Open **Container Manager → Project → Create**, enter a name such as
+   `openzev`, choose the folder as the **Path**, and pick **Use existing
+   docker-compose.yml**. Click through the remaining pages and finish with
+   **Done**. DSM pulls the images and starts the stack.
+4. Create the first admin account as in
+   [Creating the first admin account](#creating-the-first-admin-account). Use
+   the project's `app` container: SSH into the NAS and run
+   `sudo docker compose exec app …` from the project folder, or open a
+   terminal on the `app` container under **Container Manager → Container**.
+
+Things that differ from a plain Linux server:
+
+- **Port.** The stack publishes `8080`. If another package already uses it,
+  change the left-hand number of `"8080:80"` in `docker-compose.yml`, for
+  example `"8088:80"`, and use that port below.
+- **HTTPS.** Let DSM terminate TLS: get a certificate under **Control Panel →
+  Security → Certificate**, then add a rule under **Control Panel → Login
+  Portal → Advanced → Reverse Proxy** from `https://zev.example.ch` (port 443)
+  to `http://localhost:8080`. Set `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`,
+  `FRONTEND_URL` and the passkey settings in `.env` to that address as in
+  step 2, and forward the name and ports from your router.
+- **Updating.** Replace `docker-compose.yml` with the new release's file (or
+  set `OPENZEV_VERSION` in `.env`), then over SSH run `sudo docker compose pull`
+  followed by `sudo docker compose up -d` in the project folder. Make a backup
+  first.
+- **Backups.** The database and invoice files live in Docker volumes, which
+  DSM's own backup tools do not include by default. Set up the backups
+  described in [Backups](18-backups.md), and send them to a location outside
+  the NAS.
 
 ### Building from source
 
