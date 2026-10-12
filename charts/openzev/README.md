@@ -28,7 +28,7 @@ helm upgrade --install openzev ./charts/openzev -n openzev --create-namespace
 
 ## Use as a Helm repo
 
-After enabling GitHub Pages on the `gh-pages` branch, add this repository as a Helm repo:
+The chart packages and `index.yaml` are served by GitHub Pages (deployed by the `Publish Site` workflow from the `gh-pages` branch plus the built site). Add this repository as a Helm repo:
 
 ```bash
 helm repo add openzev https://splattner.github.io/openzev
