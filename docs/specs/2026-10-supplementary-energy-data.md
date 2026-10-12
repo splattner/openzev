@@ -8,7 +8,7 @@
 - Created: 2026-10-08
 - Target Release: TBD
 - Related Issues: [#925](https://github.com/splattner/openzev/issues/925), [#944](https://github.com/splattner/openzev/issues/944) (discoverability, §14)
-- Related ADRs: [0030](../adr/0030-supplementary-energy-data-is-not-billing-input.md) (never billing input), [0031](../adr/0031-integration-credentials-encrypted-under-a-dedicated-key.md) (connector credentials), [0032](../adr/0032-energy-data-flag-follows-the-integration-key.md) (the flag follows the key); builds on [0013](../adr/0013-shared-allocation-service.md), [0021](../adr/0021-mfa-secret-encryption-key.md), [0024](../adr/0024-backup-encryption-key.md), [0026](../adr/0026-swiss-civil-time-for-billing.md), [0027](../adr/0027-per-zev-access-grants.md)
+- Related ADRs: [0030](../adr/0030-supplementary-energy-data-is-not-billing-input.md) (never billing input), [0031](../adr/0031-integration-credentials-encrypted-under-a-dedicated-key.md) (connector credentials), [0033](../adr/0033-energy-data-flag-follows-the-integration-key.md) (the flag follows the key); builds on [0013](../adr/0013-shared-allocation-service.md), [0021](../adr/0021-mfa-secret-encryption-key.md), [0024](../adr/0024-backup-encryption-key.md), [0026](../adr/0026-swiss-civil-time-for-billing.md), [0027](../adr/0027-per-zev-access-grants.md)
 - Related specs: [behind-the-meter generation](2026-09-behind-the-meter-generation.md) (the flag this feature hangs off)
 - Impacted Areas: backend | frontend | async jobs | docs
 
@@ -124,7 +124,7 @@ on Profile like any unknown tab.
 (`"supplementary_energy_data_enabled"`, registered with a description, env override
 `FEATURE_SUPPLEMENTARY_ENERGY_DATA_ENABLED`). Its default is computed: **on while
 `INTEGRATION_ENCRYPTION_KEYS` is configured, off otherwise**, until an admin chooses a value, after
-which the choice stands whatever the key (ADR 0032, §14). While off: source and ingest endpoints
+which the choice stands whatever the key (ADR 0033, §14). While off: source and ingest endpoints
 answer `404`, beat tasks skip, and every statistics surface behaves exactly as in 1.21.0
 (`gross_energy` is `null`). Existing data is kept, not deleted.
 
@@ -1128,7 +1128,7 @@ meter, set up the source in account settings, import). Decisions, and what each 
 2. **No notification after flagging.** Energy data is optional; nobody gets an email. The manager
    sees "No energy data source" on the meter (§7.2); the participant finds the option on their own
    page.
-3. **The platform flag follows the key** ([ADR 0032](../adr/0032-energy-data-flag-follows-the-integration-key.md)).
+3. **The platform flag follows the key** ([ADR 0033](../adr/0033-energy-data-flag-follows-the-integration-key.md)).
    `FeatureFlag` gains `follows_default` (bool, default `False`): set when a flag with a computed
    default (`FeatureFlag.register(..., dynamic_default=fn)`, listed in `DYNAMIC_DEFAULTS`) is
    seeded, cleared by `PATCH /auth/feature-flags/{id}/` as soon as the request carries `enabled`.

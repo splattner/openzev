@@ -498,7 +498,7 @@ link the invoice breakdown to `/admin/invoices` and email statistics to
 - **Features tab:**
     - Uses `fetchFeatureFlags` with query key `['feature-flags']`.
     - Displays the registered feature flags in a table with toggle switches.
-    - A flag whose row has `follows_default` (a flag with a computed default, such as `supplementary_energy_data_enabled`, until an admin chooses) shows its current effective value and a hint that it follows the instance's default; toggling it stores a choice (`follows_default` becomes `false`). Every flag reads as its effective value, so a flag whose `controlled_by_env` is true (a `FEATURE_<NAME>` variable is set) shows the variable's name and a disabled switch. A toggle also invalidates the system health and energy data queries. See [ADR 0032](../adr/0032-energy-data-flag-follows-the-integration-key.md).
+    - A flag whose row has `follows_default` (a flag with a computed default, such as `supplementary_energy_data_enabled`, until an admin chooses) shows its current effective value and a hint that it follows the instance's default; toggling it stores a choice (`follows_default` becomes `false`). Every flag reads as its effective value, so a flag whose `controlled_by_env` is true (a `FEATURE_<NAME>` variable is set) shows the variable's name and a disabled switch. A toggle also invalidates the system health and energy data queries. See [ADR 0033](../adr/0033-energy-data-flag-follows-the-integration-key.md).
     - Toggling uses `updateFeatureFlag` and invalidates `['feature-flags']` after success.
 - **OAuth tab:**
     - Uses `fetchOAuthProviderConfigs` with query key `['oauth-provider-configs']`.

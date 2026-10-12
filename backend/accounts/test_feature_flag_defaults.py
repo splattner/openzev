@@ -1,4 +1,4 @@
-"""A feature flag whose default follows the instance's configuration (ADR 0032).
+"""A feature flag whose default follows the instance's configuration (ADR 0033).
 
 The energy data flag is on once ``INTEGRATION_ENCRYPTION_KEYS`` is set, unless an admin has
 switched it off. "Not chosen yet" and "chosen off" must stay distinguishable.

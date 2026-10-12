@@ -6,7 +6,7 @@ SUPPLEMENTARY_FLAG = "supplementary_energy_data_enabled"
 def untouched_supplementary_follows_default(apps, schema_editor):
     """A stored "off" on the energy data flag is the seeded default, not a decision.
 
-    The flag now defaults to on once ``INTEGRATION_ENCRYPTION_KEYS`` is configured (ADR 0032).
+    The flag now defaults to on once ``INTEGRATION_ENCRYPTION_KEYS`` is configured (ADR 0033).
     An existing "off" row cannot be told apart from an admin's own choice, and the flag shipped
     off, so it is treated as unchosen. A stored "on" stays a choice.
     """

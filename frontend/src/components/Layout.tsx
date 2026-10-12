@@ -5,6 +5,7 @@ import { Link, NavLink, Outlet, matchPath, useLocation, useMatch, useNavigate } 
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useCommunityAccess } from '../lib/communityAccess'
+import { useOptionalManagedZev } from '../lib/managedZev'
 import { useEnergyDataEligibility } from '../lib/supplementary'
 import { fetchFeasibilityCalculatorEnabled } from '../lib/api/feasibility'
 import { queryKeys } from '../lib/api/queryKeys'
@@ -53,6 +54,7 @@ export function Layout() {
     const { shellRole, isZevScope, isParticipantScope } = useCommunityAccess()
     // A manager or viewer who also holds a flagged meter themselves sets up their own energy data there.
     const energyData = useEnergyDataEligibility()
+    const selectedZevId = useOptionalManagedZev()?.selectedZevId
     const holdsOwnFlaggedMeter = energyData.eligible.some((point) => point.zev === selectedZevId)
     // Query the flag only for accounts with community-wide access.
     const feasibilityEnabledQuery = useQuery({
