@@ -2367,7 +2367,7 @@ appears once the invoice has a stored document.</p>
 <strong>Approved</strong>, <strong>Sent</strong> and <strong>Issues</strong> (rows with missing metering data, a
 generation conflict, a failed PDF, a failed email or no email address). Select one to show just
 those rows; select it again, <strong>All</strong> or <strong>Show all rows</strong> to clear it. A
-category with no rows cannot be selected. If the selected category empties,
+category with no rows, or with all of them, is left out. If the selected category empties,
 the page explains why and offers <strong>Show all rows</strong>. Paid invoices appear
 under <strong>All</strong> only. Changing period or community clears the filter.</p>
 <p>The <strong>batch actions</strong> in the command bar always act on the whole period,
@@ -2384,7 +2384,7 @@ while that invoice's delivery is checked.</p>
 <h2 id="generating-invoices">Generating Invoices<a class="headerlink" href="#generating-invoices" title="Permanent link">&para;</a></h2>
 <ol>
 <li>Navigate to the desired billing period.</li>
-<li>Check the <strong>Issues</strong> filter — ensure metering data is complete for the participants you want to invoice.</li>
+<li>Check the <strong>Issues</strong> filter (shown only while there are issues) — ensure metering data is complete for the participants you want to invoice.</li>
 <li>Click <strong>Generate invoice</strong> on a participant's row, or the recommended batch
    action (<em>Generate n invoices</em>) in the command bar. Generating all runs in
    the background: each row shows <em>Creating invoice…</em> until its invoice
@@ -2408,10 +2408,12 @@ regenerated.</p>
 <p>Click the invoice number in the <strong>Participant</strong> column to view the invoice detail page.</p>
 <h3 id="invoice-detail-page">Invoice Detail Page<a class="headerlink" href="#invoice-detail-page" title="Permanent link">&para;</a></h3>
 <p><img alt="Invoice detail page" src="../screenshots/08b-invoice-detail.png" /></p>
-<p>The detail page shows:</p>
+<p>The page header names the invoice and, next to the recipient and the billing
+period, its current <strong>status</strong> — the same status pill the invoice document
+prints. Below it, two rows of figure tiles summarise the invoice the way its
+PDF does:</p>
 <ul>
-<li><strong>Status card</strong> — current invoice status as a badge.</li>
-<li><strong>Total CHF</strong> — the final invoiced amount.</li>
+<li><strong>Total CHF</strong> (the dark tile) — the final invoiced amount.</li>
 <li><strong>Subtotal CHF</strong> — amount before VAT.</li>
 <li><strong>VAT CHF</strong> — the VAT portion.</li>
 </ul>
@@ -2438,7 +2440,7 @@ regenerated.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>The invoice document</strong> — the stored PDF itself is embedded below the summary cards in a full document viewer (the same file the participant receives by email). It contains the line items, grouped by <strong>tariff category</strong> (e.g. Energy, Fee),
+<p><strong>The invoice document</strong> — the stored PDF itself is embedded below the figure tiles in a full document viewer (the same file the participant receives by email). It contains the line items, grouped by <strong>tariff category</strong> (e.g. Energy, Fee),
 with each line's type, description, quantity (kWh), unit price (CHF), and
 total, plus a subtotal per group. If no PDF has been generated yet, the page shows a <strong>Generate PDF</strong> button instead (managers and admins only — a participant sees a plain document-unavailable message, since the API rejects their generation attempt); the viewer appears once the document exists.</p>
 <blockquote>
@@ -2575,7 +2577,7 @@ available after billing. The selected community appears above the page title.</p
 </ul>
 <p><strong>Fix:</strong></p>
 <ol>
-<li>Check the ZEV switcher at the top of the sidebar (or the community name above the page title).</li>
+<li>Check the community name above the page title (click it to choose another).</li>
 <li>Verify that <a href="../03-participant-management/">Participants</a> exist and have <a href="../04-metering-points/">metering-point assignments</a> covering the period.</li>
 </ol>
 <h3 id="invoice-totals-look-wrong">Invoice totals look wrong<a class="headerlink" href="#invoice-totals-look-wrong" title="Permanent link">&para;</a></h3>

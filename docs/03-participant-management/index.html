@@ -1921,11 +1921,14 @@ the original community; its completion leaves a new draft in another community o
 <p><strong>Same person or organisation as</strong> (at the top of the form) adds a second
 participation of someone already in the community — for example after a move
 to another flat within it. Name, contact and address are then taken from the
-existing party and stay shared: editing them on one card changes them on every
-card of that party.</p>
-<p>The participant is added to the list. A card flagged <strong>Needs attention</strong> is
-missing an email address, a postal address or a metering point; the
-<strong>Readiness</strong> filter narrows the list to those cards.</p>
+existing party and stay shared: editing them on one entry changes them on every
+entry of that party.</p>
+<p>The participant is added to the list. An entry flagged <strong>Needs attention</strong> is
+missing an email address, a postal address or a metering point. The tabs above
+the list count the entries and narrow the list: <strong>All</strong>, <strong>Needs attention</strong>
+and <strong>No metering point</strong>; a tab with nothing or everything in it is left out, and clicking
+the active tab again shows all. The search field beside them finds a name,
+email address or address.</p>
 <h2 id="participant-account-access">Participant Account Access<a class="headerlink" href="#participant-account-access" title="Permanent link">&para;</a></h2>
 <p>Participants can:</p>
 <ul>
@@ -1941,11 +1944,11 @@ missing an email address, a postal address or a metering point; the
 <li>Manage ZEV settings</li>
 <li>Create tariffs or invoices</li>
 </ul>
-<p>Each participant card shows the <strong>Account</strong> it is linked to, or <em>No account
+<p>Each participant entry shows the <strong>Account</strong> it is linked to, or <em>No account
 yet</em>, plus an onboarding status badge (<em>Not invited</em>, <em>Invited</em>, <em>Active</em>,
 <em>Revoked</em>, <em>Expired</em>). While a link is live — or after it has expired — the
-card also shows its expiry date beside the badge, so you can see when a dead
-link died without resending it. Open <strong>More</strong> on a card to send or copy the participant's onboarding link
+entry also shows its expiry date beside the badge, so you can see when a dead
+link died without resending it. Open <strong>More</strong> on an entry to send or copy the participant's onboarding link
 (which creates the account), or to revoke it. The link stays usable for 30 days and can be
 reused within that time — copying or resending it hands out the same link,
 unless it has expired, in which case a fresh one is issued automatically. Once
@@ -1955,17 +1958,17 @@ participant elsewhere, so one person keeps one login — or <strong>Unlink</stro
 it belongs to; see <a href="../11-roles-and-permissions/">Roles and Permissions</a>.</p>
 <p>If unlinking fails, an error notification appears even if you closed the
 confirmation while it was processing. Open <strong>Unlink</strong> again to retry.</p>
-<p>A card also shows the roles the participant holds in the community today:
+<p>An entry also shows the roles the participant holds in the community today:
 <strong>Issuer</strong> (the invoices and contracts are from them), <strong>Representative</strong>
-(toward the grid operator) and <strong>Landowner</strong>. The issuer's card comes first.</p>
+(toward the grid operator) and <strong>Landowner</strong>. The issuer's entry comes first.</p>
 <h3 id="a-participant-forgot-their-password">A Participant Forgot Their Password<a class="headerlink" href="#a-participant-forgot-their-password" title="Permanent link">&para;</a></h3>
 <p>There is no "forgot password" link on the login page. Send or copy the
-participant's onboarding link again from <strong>More</strong> on their card: it signs
+participant's onboarding link again from <strong>More</strong> on their entry: it signs
 them in, and they then choose a new password. If their invoices carry the
 <a href="../02-zev-setup/#participant-access-from-the-invoice">participant QR code</a>,
 they can also request a sign-in link themselves from the page it opens.</p>
 <h2 id="participation-contract">Participation Contract<a class="headerlink" href="#participation-contract" title="Permanent link">&para;</a></h2>
-<p><strong>Contract PDF</strong> on a participant's card downloads their participation
+<p><strong>Contract PDF</strong> on a participant's entry downloads their participation
 contract, filled from the ZEV settings (including the contract notes on the
 <strong>Documents &amp; emails</strong> tab), the participant's details and the tariffs.</p>
 <p>Every contract is kept exactly as issued, with a document number. Downloading
@@ -1975,7 +1978,7 @@ issues a new numbered version, and the earlier ones stay on record.</p>
 <h2 id="editing-participant-details">Editing Participant Details<a class="headerlink" href="#editing-participant-details" title="Permanent link">&para;</a></h2>
 <ol>
 <li>Go to <strong>Participants</strong></li>
-<li>Click <strong>Edit</strong> on the participant's card</li>
+<li>Click <strong>Edit</strong> on the participant's entry</li>
 <li>Update fields as needed</li>
 <li>Click <strong>Save Participant</strong></li>
 </ol>
@@ -2016,9 +2019,9 @@ number.</p>
 member shares common costs equally — the behaviour you get if you never touch
 this setting at all.</p>
 <p><img alt="Allocation weight on the participant form" src="../screenshots/03b-participant-allocation-weight.png" /></p>
-<p>Current participants' cards show today's allocation-weight share. For example,
+<p>Current participants' entries show today's allocation-weight share. For example,
 with three current participants weighted <code>1</code>, <code>1</code>, and <code>2</code>, each of the first two
-cards shows:</p>
+entries shows:</p>
 <div class="highlight"><pre><span></span><code>ALLOCATION WEIGHT
 25 % — 1 of 4 weights
 </code></pre></div>
@@ -2087,7 +2090,7 @@ under <strong>Platform → Settings → Functions</strong> (<code>participant_ge
 them</strong>:</p>
 <ol>
 <li>Go to <strong>Participants</strong></li>
-<li>Click <strong>Edit</strong> on the participant's card</li>
+<li>Click <strong>Edit</strong> on the participant's entry</li>
 <li>Set <strong>Valid To</strong> to the participant's last active date</li>
 <li>Click <strong>Save Participant</strong></li>
 </ol>
@@ -2100,7 +2103,7 @@ participant created by mistake.</p>
 </blockquote>
 <h2 id="participant-communication">Participant Communication<a class="headerlink" href="#participant-communication" title="Permanent link">&para;</a></h2>
 <h3 id="onboarding-email">Onboarding Email<a class="headerlink" href="#onboarding-email" title="Permanent link">&para;</a></h3>
-<p><strong>Send onboarding link</strong> (under <strong>More</strong> on the card) emails the participant
+<p><strong>Send onboarding link</strong> (under <strong>More</strong> on the entry) emails the participant
 their onboarding link. Nothing is sent automatically when you add a
 participant. The email text is an admin-managed template — see
 <a href="../10-email-configuration/">Email Configuration</a>.</p>
@@ -2121,7 +2124,7 @@ How often invoices go out depends on your ZEV's
 <p><strong>Participant cannot login</strong></p>
 <ul>
 <li>Check that the participant's email is correct — it is their sign-in name</li>
-<li>Check the onboarding badge on their card: <em>Expired</em> or <em>Revoked</em> links no
+<li>Check the onboarding badge on their entry: <em>Expired</em> or <em>Revoked</em> links no
   longer work; send a new one</li>
 <li>For a forgotten password, see <a href="#a-participant-forgot-their-password">above</a></li>
 </ul>

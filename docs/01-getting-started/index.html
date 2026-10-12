@@ -2497,7 +2497,7 @@ password through the environment:</p>
 with <code>scripts/start-demo-environment.sh</code>, or by running <code>seed_demo</code> on an
 already-running stack (see below). It contains two communities with the
 same issuer — the flagship <strong>ZEV STWEG Sonnenhof</strong> and the smaller
-<strong>ZEV Sonnenfirma AG</strong> — so both sides of the community switcher have real
+<strong>ZEV Sonnenfirma AG</strong> — so both sides of the community choice have real
 data to show. It also has a viewer of the flagship community and a property
 manager who manages both, to show per-community access. Credentials and the full list of what the seed creates are in
 the root <a href="https://github.com/splattner/openzev/blob/main/README.md#seed-data--demo-accounts"><code>README.md</code></a>.</p>
@@ -2523,8 +2523,9 @@ pages look the same, just without data.</p>
    Unlinked guest accounts see an explanation and a link to <strong>Account settings</strong>.</li>
 </ol>
 <p>The interface follows your browser's language (German, French, Italian or
-English). To change it, open the account menu at the top right
-and pick a <strong>Language</strong>; the choice is remembered in this browser. Invoice and
+English). To change it, open the account menu at the foot of the sidebar
+(your name) and pick a <strong>Language</strong>; the choice is remembered in this browser.
+The same menu leads to <strong>Account</strong> settings and <strong>Log out</strong>, and its last line shows the OpenZEV version with a link to the source code. Invoice and
 contract PDFs use the community's own <strong>Invoice language</strong> instead.</p>
 <p><img alt="Login page" src="../screenshots/01-login.png" /></p>
 <p>Overview, Energy balance, Reports, Billing, community Settings and Metering
@@ -2537,9 +2538,9 @@ account without community access should ask an administrator to grant it.</p>
 <ul>
 <li>Go to <strong>Platform → Overview</strong> to see system-wide KPIs</li>
 <li>View <strong>ZEVs</strong>, <strong>Accounts</strong>, <strong>Invoices</strong>, and <strong>Settings</strong> (regional/VAT)</li>
-<li>To work inside a community: open <strong>Platform → Overview → ZEVs</strong> and click <strong>Manage</strong> on a row — this selects the ZEV and takes you to its operational Overview. (While under <code>/admin</code> the shell shows the <strong>Platform administration</strong> indicator instead of the switcher.)</li>
-<li>The sidebar ZEV switcher (top-left) selects the working community anywhere else; the selected community is shown above the page title on every page, so it stays visible even when the navigation scrolls, the sidebar is collapsed, or you are on mobile. With read-only access it reads e.g. <em>Sonnenhof · Viewer (read only)</em></li>
-<li>For keyboard access, open the switcher or account button with Enter or Space, use Tab to move through its options, and press Escape to close it. After selecting a community, focus returns to the switcher. On mobile, Escape closes the navigation drawer and returns focus to its menu button.</li>
+<li>To work inside a community: open <strong>Platform → Overview → ZEVs</strong> and click <strong>Manage</strong> on a row — this selects the ZEV and takes you to its operational Overview. (Under <code>/admin</code> pages show <strong>Platform administration</strong> above the title instead of a community.)</li>
+<li>Anywhere else, the community name above the page title shows the working community and, when you have more than one, opens the list to choose another — so it stays visible and in reach when the navigation scrolls, the sidebar is collapsed, or you are on mobile. With more than one community it is set as a small button with an arrow. With read-only access it reads e.g. <em>Sonnenhof · Viewer (read only)</em></li>
+<li>For keyboard access, open the community name or the account button with Enter or Space, move through the options with the arrow keys (community list) or Tab (account menu), and press Escape to close it. After choosing a community, focus returns to its name. On mobile, Escape closes the navigation drawer and returns focus to its menu button.</li>
 <li>Once signed in, the first Tab on a page reaches <strong>Skip to main content</strong>, which jumps past the navigation. After you open another page, focus starts at its title; switching tabs or changing filters keeps focus where it was. The browser tab shows the page and the community, e.g. <em>Billing · Muster ZEV – OpenZEV</em>.</li>
 </ul>
 <h3 id="3-explore-as-a-manager">3. Explore as a Manager<a class="headerlink" href="#3-explore-as-a-manager" title="Permanent link">&para;</a></h3>

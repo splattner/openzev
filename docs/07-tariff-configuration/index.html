@@ -2451,6 +2451,10 @@
 </li>
 </ul>
 <p><img alt="Tariffs page" src="../screenshots/07-tariffs.png" /></p>
+<p>The tabs above the list count the tariffs: <strong>Valid</strong> (the default) shows the
+tariffs with a version in force today, <strong>All</strong> adds the ones with none in force
+(only superseded or future versions). The tabs show only when there are such
+tariffs.</p>
 <p>The list waits for the selected community to load. If loading fails, use <strong>Retry</strong>;
 a failed community refresh keeps the loaded scope and your open draft available.</p>
 <h2 id="creating-a-tariff">Creating a Tariff<a class="headerlink" href="#creating-a-tariff" title="Permanent link">&para;</a></h2>
@@ -3095,19 +3099,19 @@ the closing date it will use as you pick the start date.</p>
 for it. The energy still appears on the invoice but is <strong>charged at nothing</strong> —
 a whole month can be given away without any warning. Letting OpenZEV compute
 the end date removes the off-by-one that causes this. Any series that already
-has a gap is flagged on the tariff card.</p>
+has a gap is flagged on the tariff entry.</p>
 </blockquote>
 <p>You can also insert a version <em>between</em> two existing ones; OpenZEV bounds it on
 both sides.</p>
 <h3 id="comparing-versions">Comparing Versions<a class="headerlink" href="#comparing-versions" title="Permanent link">&para;</a></h3>
-<p>The Tariffs page shows <strong>one card per tariff</strong>, displaying what it costs <em>today</em>
-rather than a card per version. A badge tells you how many versions it has.
+<p>The Tariffs page shows <strong>one entry per tariff</strong>, displaying what it costs <em>today</em>
+rather than one entry per version. A badge tells you how many versions it has.
 Click <strong>View details</strong> to open a panel on the right with everything else:
 version history, the price chart, price bands, and notes.</p>
 <p><strong>Version history</strong> lists every version with its window and price. Click one
 to make the <em>panel</em> show that version — its price bands switch to the ones in
 force then, and a <strong>Viewing an older version</strong> badge appears so you can't
-mistake a historical rate for the current one. The card behind the panel keeps
+mistake a historical rate for the current one. The entry behind the panel keeps
 showing the active version throughout, so switching versions to look something
 up never changes what the list itself reports. Click the active version to go
 back.</p>
@@ -3286,8 +3290,8 @@ mistake — one you have not billed against.</p>
 <p><strong>See also:</strong> <a href="../08-billing-allocation-explained/">How Energy Allocation Works</a> for detailed billing logic.</p>
 </blockquote>
 <h2 id="printing-a-tariff-overview">Printing a Tariff Overview<a class="headerlink" href="#printing-a-tariff-overview" title="Permanent link">&para;</a></h2>
-<p>Click <strong>Tariff overview (PDF)</strong> on the Tariffs page toolbar to download every
-tariff in force today, grouped by category (Energy, Grid Fees, Levies,
+<p>Click <strong>Tariff overview (PDF)</strong> on the Tariffs page toolbar and choose
+<strong>Valid tariffs</strong> to download every tariff in force today, grouped by category (Energy, Grid Fees, Levies,
 Metering) — the same grouping and order as an invoice's line items.</p>
 <ul>
 <li>Each price band is listed and named on its own line, using the exact same
@@ -3308,9 +3312,9 @@ Metering) — the same grouping and order as an invoice's line items.</p>
   explicit note says the prices shown are net and that VAT is added on the
   invoice — the number on this document is deliberately not the number a
   participant is billed.</li>
-<li>Switch the page's own <strong>Valid now / All versions</strong> filter before
-  downloading to include superseded and future tariff versions, shown
-  greyed out with their full validity span instead of "from …".</li>
+<li><strong>All versions, including superseded and future ones</strong> adds the tariff
+  versions not in force today, shown greyed out with their full validity span
+  instead of "from …".</li>
 </ul>
 <p>There is no date picker (yet) — the overview always reflects today. Only the
 community's managers and viewers, and admins, can download it; there is nothing on this document a
