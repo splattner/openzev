@@ -2760,6 +2760,26 @@ For custom templates, insert this after the first address line, or reset the
 template to the default:</p>
 <div class="highlight"><pre><span></span><code>{% if participant.address_line2 %}{{ participant.address_line2 }}<span class="p">&lt;</span><span class="nt">br</span><span class="p">&gt;</span>{% endif %}
 </code></pre></div>
+<p>For a VAT-registered ZEV that pays producers for their electricity, the VAT is
+charged on what the ZEV supplies, not on the subtotal net of the producer
+credit. A custom template prints "Subtotal" and "VAT" side by side and so shows
+a VAT amount that does not match the subtotal. Show <code>producer_credit_chf</code> as its
+own row after the VAT, with <code>invoice.vat_base_chf</code> as the supplies subtotal, or
+reset the template to the default:</p>
+<div class="highlight"><pre><span></span><code><span class="p">&lt;</span><span class="nt">tr</span><span class="p">&gt;</span>
+  {% if producer_credit_chf %}
+  <span class="p">&lt;</span><span class="nt">td</span><span class="p">&gt;</span>{{ tr.supplies_subtotal }}<span class="p">&lt;/</span><span class="nt">td</span><span class="p">&gt;&lt;</span><span class="nt">td</span><span class="p">&gt;</span>CHF {{ invoice.vat_base_chf|floatformat:2 }}<span class="p">&lt;/</span><span class="nt">td</span><span class="p">&gt;</span>
+  {% else %}
+  <span class="p">&lt;</span><span class="nt">td</span><span class="p">&gt;</span>{{ tr.subtotal }}<span class="p">&lt;/</span><span class="nt">td</span><span class="p">&gt;&lt;</span><span class="nt">td</span><span class="p">&gt;</span>CHF {{ invoice.subtotal_chf|floatformat:2 }}<span class="p">&lt;/</span><span class="nt">td</span><span class="p">&gt;</span>
+  {% endif %}
+<span class="p">&lt;/</span><span class="nt">tr</span><span class="p">&gt;</span>
+{% if invoice.vat_rate &gt; 0 %}
+<span class="p">&lt;</span><span class="nt">tr</span><span class="p">&gt;&lt;</span><span class="nt">td</span><span class="p">&gt;</span>{{ tr.vat }} ({{ vat_rate_percent|floatformat:1 }}%)<span class="p">&lt;/</span><span class="nt">td</span><span class="p">&gt;&lt;</span><span class="nt">td</span><span class="p">&gt;</span>CHF {{ invoice.vat_chf|floatformat:2 }}<span class="p">&lt;/</span><span class="nt">td</span><span class="p">&gt;&lt;/</span><span class="nt">tr</span><span class="p">&gt;</span>
+{% endif %}
+{% if producer_credit_chf %}
+<span class="p">&lt;</span><span class="nt">tr</span><span class="p">&gt;&lt;</span><span class="nt">td</span><span class="p">&gt;</span>{{ tr.producer_credit }}<span class="p">&lt;/</span><span class="nt">td</span><span class="p">&gt;&lt;</span><span class="nt">td</span><span class="p">&gt;</span>CHF {{ producer_credit_chf|floatformat:2 }}<span class="p">&lt;/</span><span class="nt">td</span><span class="p">&gt;&lt;/</span><span class="nt">tr</span><span class="p">&gt;</span>
+{% endif %}
+</code></pre></div>
 <h2 id="email-templates">Email Templates<a class="headerlink" href="#email-templates" title="Permanent link">&para;</a></h2>
 <p>Admins manage system-wide default email templates in <strong>Platform → Templates → Email templates</strong> (<code>/admin/templates/email</code>).</p>
 <blockquote>
