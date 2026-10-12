@@ -172,6 +172,49 @@ front of port `8080` — for example Caddy, Traefik, or an nginx with a Let's
 Encrypt certificate — forwarding `https://zev.example.ch` to
 `http://127.0.0.1:8080`. Open the app at that `https://` URL.
 
+**Caddy** obtains and renews the certificate on its own. With Caddy installed
+on the same host, this is the whole `Caddyfile`:
+
+```caddyfile
+zev.example.ch {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+If Caddy runs as a container in this compose project instead, put it on the
+same network and point it at the service: `reverse_proxy app:80`.
+
+**Traefik** (v2 or v3, with the Docker provider, an HTTPS entry point and a
+certificate resolver you already run) routes by container labels. Add a
+`docker-compose.override.yml` next to `docker-compose.yml`; Compose merges it
+automatically. It joins `app` to Traefik's network and stops publishing port
+`8080`, so the only way in is through Traefik:
+
+```yaml
+services:
+  app:
+    ports: !reset []            # needs Docker Compose 2.24 or later
+    networks:
+      - default
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.openzev.rule=Host(`zev.example.ch`)
+      - traefik.http.routers.openzev.entrypoints=websecure
+      - traefik.http.routers.openzev.tls.certresolver=letsencrypt
+      - traefik.http.services.openzev.loadbalancer.server.port=80
+
+networks:
+  proxy:
+    external: true              # the network Traefik is attached to
+```
+
+Replace `proxy`, `websecure` and `letsencrypt` with the network, entry point
+and resolver names from your Traefik setup, and `zev.example.ch` with your
+domain. On older Compose versions, delete the `ports` line and remove the
+`8080:80` mapping from `docker-compose.yml` by hand.
+
 The shipped nginx sanitizes `X-Forwarded-For` and the production stack keeps
 `NUM_PROXIES=1`. If another proxy sits in front of it, audit and rate-limit
 identity is therefore the immediate outer-proxy address; do not increase
