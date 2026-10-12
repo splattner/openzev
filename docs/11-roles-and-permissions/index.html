@@ -3017,8 +3017,9 @@ access under <strong>ZEV settings → People &amp; access</strong>.</p>
    choose a new password.</li>
 <li>
 <p><strong>Manager or admin who forgot their password:</strong> someone with server access
-   sets a new one on the command line (the user then signs in with it):</p>
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>backend<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>changepassword<span class="w"> </span>&lt;username&gt;
+   sets a new one on the command line (the user then signs in with it; the
+   service is <code>backend</code> instead of <code>app</code> in a two-container source build):</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>app<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>changepassword<span class="w"> </span>&lt;username&gt;
 </code></pre></div>
 <p>The username is shown in the <strong>Account</strong> column of the accounts list.</p>
 </li>

@@ -2260,9 +2260,9 @@
 <td><code>lsof -i :8080</code> and stop the conflicting process, or change the port mapping in the compose file</td>
 </tr>
 <tr>
-<td>Backend exits right after starting, log names <code>accounts.E0xx</code> or <code>SECRET_KEY</code></td>
-<td>A required production setting in <code>backend/.env</code> is missing or wrong</td>
-<td>Fix the named setting — see <a href="../01-getting-started/#2-configure-backendenv">Production with Docker Compose</a></td>
+<td>App exits right after starting, log names <code>accounts.E0xx</code> or <code>SECRET_KEY</code></td>
+<td>A required production setting in <code>.env</code> (<code>backend/.env</code> when built from source) is missing or wrong</td>
+<td>Fix the named setting — see <a href="../01-getting-started/#2-configure-env">Production with Docker Compose</a></td>
 </tr>
 <tr>
 <td>Database connection error</td>
@@ -2272,7 +2272,7 @@
 <tr>
 <td>"permission denied"</td>
 <td>File permissions issue</td>
-<td><code>docker compose down &amp;&amp; docker compose up --build</code></td>
+<td><code>docker compose down &amp;&amp; docker compose up -d</code></td>
 </tr>
 </tbody>
 </table>
@@ -2280,9 +2280,9 @@
 <p><strong>Problem:</strong> http://localhost:8080 doesn't load.</p>
 <p><strong>Checks:</strong></p>
 <ol>
-<li>Is frontend container running? <code>docker compose ps</code></li>
-<li>Try restarting: <code>docker compose restart frontend</code></li>
-<li>Check logs: <code>docker compose logs frontend</code></li>
+<li>Is the application container running? <code>docker compose ps</code></li>
+<li>Try restarting: <code>docker compose restart app</code></li>
+<li>Check logs: <code>docker compose logs app</code></li>
 <li>Port conflict? Is port 8080 in use? <code>lsof -i :8080</code></li>
 </ol>
 <h3 id="cant-access-api">Can't Access API<a class="headerlink" href="#cant-access-api" title="Permanent link">&para;</a></h3>
@@ -2291,7 +2291,7 @@
 <p><strong>Checks:</strong></p>
 <ol>
 <li>Backend running? <code>docker compose ps</code></li>
-<li>Check logs: <code>docker compose logs backend</code></li>
+<li>Check logs: <code>docker compose logs app</code> (<code>backend</code> on the two-container source build)</li>
 <li>Database connected? <code>docker compose logs db</code></li>
 <li>More troubleshooting: Check Redis for celery</li>
 </ol>

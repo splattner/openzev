@@ -1991,8 +1991,10 @@ DEFAULT_FROM_EMAIL=openzev@example.com
 configuration without <code>EMAIL_HOST</code> or <code>DEFAULT_FROM_EMAIL</code>. The production
 template includes these variables so mail delivery cannot silently fall back to
 container logs.</p>
-<p>After changing email settings, restart the backend and Celery worker:</p>
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>restart<span class="w"> </span>backend<span class="w"> </span>worker
+<p>After changing email settings, restart the application and Celery worker (the
+service is called <code>app</code> in the release stack, <code>backend</code> in the dev and
+source-build stacks):</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>restart<span class="w"> </span>app<span class="w"> </span>worker
 </code></pre></div>
 <h2 id="email-templates">Email Templates<a class="headerlink" href="#email-templates" title="Permanent link">&para;</a></h2>
 <p><strong>Managers</strong> customize email templates in <strong>ZEV Settings → Documents &amp; emails</strong>.</p>

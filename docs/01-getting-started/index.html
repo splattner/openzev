@@ -448,10 +448,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-get-the-code" class="md-nav__link">
+  <a href="#1-download-the-release-files" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Get the code
+        1. Download the release files
       
     </span>
   </a>
@@ -459,10 +459,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-configure-backendenv" class="md-nav__link">
+  <a href="#2-configure-env" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Configure backend/.env
+        2. Configure .env
       
     </span>
   </a>
@@ -514,10 +514,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#single-container-variant" class="md-nav__link">
+  <a href="#synology-nas-container-manager" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Single-container variant
+        Synology NAS (Container Manager)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-from-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building from source
       
     </span>
   </a>
@@ -1806,10 +1817,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-get-the-code" class="md-nav__link">
+  <a href="#1-download-the-release-files" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Get the code
+        1. Download the release files
       
     </span>
   </a>
@@ -1817,10 +1828,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-configure-backendenv" class="md-nav__link">
+  <a href="#2-configure-env" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Configure backend/.env
+        2. Configure .env
       
     </span>
   </a>
@@ -1872,10 +1883,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#single-container-variant" class="md-nav__link">
+  <a href="#synology-nas-container-manager" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Single-container variant
+        Synology NAS (Container Manager)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-from-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building from source
       
     </span>
   </a>
@@ -2182,13 +2204,18 @@ account, and a first tour of the interface.</p>
 </tr>
 <tr>
 <td>Run it for a real community on one server</td>
-<td><code>docker-compose.yml</code></td>
+<td><code>docker-compose.yml</code> from the release</td>
 <td><a href="#production-with-docker-compose">Production with Docker Compose</a></td>
 </tr>
 <tr>
-<td>Run it as one application container</td>
-<td><code>docker-compose.fullstack.yml</code></td>
-<td><a href="#single-container-variant">Single-container variant</a></td>
+<td>Run it on a Synology NAS</td>
+<td>Release <code>docker-compose.yml</code> in Container Manager</td>
+<td><a href="#synology-nas-container-manager">Synology NAS</a></td>
+</tr>
+<tr>
+<td>Build the production stack from source</td>
+<td><code>docker-compose.yml</code> or <code>docker-compose.fullstack.yml</code></td>
+<td><a href="#building-from-source">Building from source</a></td>
 </tr>
 <tr>
 <td>Run it on Kubernetes</td>
@@ -2202,8 +2229,8 @@ installing, <a href="#creating-the-first-admin-account">create the first admin a
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <ul>
 <li>For Docker Compose: Docker with the Compose plugin (or Podman with
-  <code>podman compose</code>), and a copy of this repository (<code>git clone
-  https://github.com/splattner/openzev.git</code>)</li>
+  <code>podman compose</code>). Building from source also needs a copy of this repository
+  (<code>git clone https://github.com/splattner/openzev.git</code>)</li>
 <li>For Kubernetes: a cluster, <code>helm</code>, <code>kubectl</code>, and a PostgreSQL database and
   Redis instance the cluster can reach</li>
 <li>For a public instance: a domain name, TLS termination (a reverse proxy or
@@ -2236,21 +2263,30 @@ docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> 
 <p>Never use either of these for real data: they run with <code>DEBUG=True</code>, and the
 demo seed ships well-known passwords.</p>
 <h2 id="production-with-docker-compose">Production with Docker Compose<a class="headerlink" href="#production-with-docker-compose" title="Permanent link">&para;</a></h2>
-<p><code>docker-compose.yml</code> runs the frontend (nginx), the backend (Django +
-gunicorn), a Celery worker, one Celery Beat scheduler, PostgreSQL and Redis on
-one host. Only the frontend port <code>8080</code> is published; nginx proxies <code>/api/</code> to
-the backend, and PostgreSQL and Redis are reachable only on the compose
-network. The images are built from your checkout of the repository.
+<p>Each release ships a ready-made <code>docker-compose.yml</code> that runs the published
+OpenZEV images — nothing is built on your server. It starts the application
+(<code>app</code>: nginx serving the frontend and proxying <code>/api/</code> to Django/gunicorn in
+the same container), a Celery worker, one Celery Beat scheduler, PostgreSQL and
+Redis on one host. Only port <code>8080</code> is published; PostgreSQL and Redis are
+reachable only on the compose network. The images are signed with cosign and
+come with an SBOM.
 Keep the shared Redis cache supplied by Compose: registration reservations and
 throttles must be shared across backend workers; an in-memory cache is local to
 each process.</p>
-<h3 id="1-get-the-code">1. Get the code<a class="headerlink" href="#1-get-the-code" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/splattner/openzev.git
-<span class="nb">cd</span><span class="w"> </span>openzev
-git<span class="w"> </span>checkout<span class="w"> </span>vX.Y.Z<span class="w">   </span><span class="c1"># pick the newest release tag; main may be unstable</span>
+<h3 id="1-download-the-release-files">1. Download the release files<a class="headerlink" href="#1-download-the-release-files" title="Permanent link">&para;</a></h3>
+<p>Pick the newest release on the
+<a href="https://github.com/splattner/openzev/releases">releases page</a> and download
+<code>docker-compose.yml</code> and <code>env.production.example</code> into an empty directory:</p>
+<div class="highlight"><pre><span></span><code>mkdir<span class="w"> </span>openzev<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>openzev
+<span class="nv">VERSION</span><span class="o">=</span>vX.Y.Z<span class="w">   </span><span class="c1"># the newest release tag</span>
+curl<span class="w"> </span>-LO<span class="w"> </span>https://github.com/splattner/openzev/releases/download/<span class="nv">$VERSION</span>/docker-compose.yml
+curl<span class="w"> </span>-LO<span class="w"> </span>https://github.com/splattner/openzev/releases/download/<span class="nv">$VERSION</span>/env.production.example
 </code></pre></div>
-<h3 id="2-configure-backendenv">2. Configure <code>backend/.env</code><a class="headerlink" href="#2-configure-backendenv" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>backend/.env.production.example<span class="w"> </span>backend/.env
+<p>The compose file pulls the image of the release it was published with, so the
+version is pinned by the file you download. To run a different version without
+changing the file, add <code>OPENZEV_VERSION=vX.Y.Z</code> to <code>.env</code>.</p>
+<h3 id="2-configure-env">2. Configure <code>.env</code><a class="headerlink" href="#2-configure-env" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>env.production.example<span class="w"> </span>.env
 </code></pre></div>
 <p>Fill in every value. The examples below assume the instance is reached at
 <code>https://zev.example.ch</code>:</p>
@@ -2374,12 +2410,12 @@ python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">"impor
 value is missing or still points at a development host, the database
 migration step stops with an error such as <code>accounts.E003</code> (hosts),
 <code>accounts.E005</code> (trusted origins) or <code>accounts.E006</code> (email backend), and the
-backend container exits — read it with <code>docker compose logs backend</code>.</p>
+<code>app</code> container exits — read it with <code>docker compose logs app</code>.</p>
 <h3 id="3-start-the-stack">3. Start the stack<a class="headerlink" href="#3-start-the-stack" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--build
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
 docker<span class="w"> </span>compose<span class="w"> </span>ps
 </code></pre></div>
-<p>The backend applies database migrations on every start. The <code>beat</code> container
+<p>The first start pulls the images. The application applies database migrations on every start. The <code>beat</code> container
 may exit once on the very first start, before those migrations have created
 its tables; it restarts on its own.</p>
 <h3 id="4-put-https-in-front-of-it">4. Put HTTPS in front of it<a class="headerlink" href="#4-put-https-in-front-of-it" title="Permanent link">&para;</a></h3>
@@ -2389,6 +2425,42 @@ check on the server itself, but a public instance needs TLS termination in
 front of port <code>8080</code> — for example Caddy, Traefik, or an nginx with a Let's
 Encrypt certificate — forwarding <code>https://zev.example.ch</code> to
 <code>http://127.0.0.1:8080</code>. Open the app at that <code>https://</code> URL.</p>
+<p><strong>Caddy</strong> obtains and renews the certificate on its own. With Caddy installed
+on the same host, this is the whole <code>Caddyfile</code>:</p>
+<div class="highlight"><pre><span></span><code>zev.example.ch<span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">reverse_proxy</span><span class="w"> </span>127.0.0.1:8080
+<span class="p">}</span>
+</code></pre></div>
+<p>If Caddy runs as a container in this compose project instead, put it on the
+same network and point it at the service: <code>reverse_proxy app:80</code>.</p>
+<p><strong>Traefik</strong> (v2 or v3, with the Docker provider, an HTTPS entry point and a
+certificate resolver you already run) routes by container labels. Add a
+<code>docker-compose.override.yml</code> next to <code>docker-compose.yml</code>; Compose merges it
+automatically. It joins <code>app</code> to Traefik's network and stops publishing port
+<code>8080</code>, so the only way in is through Traefik:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">services</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">app</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w"> </span><span class="kt">!reset</span><span class="w"> </span><span class="p p-Indicator">[]</span><span class="w">            </span><span class="c1"># needs Docker Compose 2.24 or later</span>
+<span class="w">    </span><span class="nt">networks</span><span class="p">:</span>
+
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">proxy</span>
+<span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">traefik.enable=true</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">traefik.docker.network=proxy</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">traefik.http.routers.openzev.rule=Host(`zev.example.ch`)</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">traefik.http.routers.openzev.entrypoints=websecure</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">traefik.http.routers.openzev.tls.certresolver=letsencrypt</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">traefik.http.services.openzev.loadbalancer.server.port=80</span>
+
+<span class="nt">networks</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">proxy</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">external</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">              </span><span class="c1"># the network Traefik is attached to</span>
+</code></pre></div>
+<p>Replace <code>proxy</code>, <code>websecure</code> and <code>letsencrypt</code> with the network, entry point
+and resolver names from your Traefik setup, and <code>zev.example.ch</code> with your
+domain. On older Compose versions, delete the <code>ports</code> line and remove the
+<code>8080:80</code> mapping from <code>docker-compose.yml</code> by hand.</p>
 <p>The shipped nginx sanitizes <code>X-Forwarded-For</code> and the production stack keeps
 <code>NUM_PROXIES=1</code>. If another proxy sits in front of it, audit and rate-limit
 identity is therefore the immediate outer-proxy address; do not increase
@@ -2405,26 +2477,73 @@ only through authenticated API endpoints.</p>
 <li>Set up backups of the database <strong>and</strong> the <code>backend_media</code> volume (invoice
   PDFs) before billing real participants — see <a href="../18-backups/">Backups</a>.</li>
 <li>
-<p>To update, check out the new release tag and rebuild; migrations run
-  automatically when the backend starts:</p>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>fetch<span class="w"> </span>--tags
-git<span class="w"> </span>checkout<span class="w"> </span>vX.Y.Z
-docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--build
+<p>To update, download <code>docker-compose.yml</code> of the new release over the old
+  one (or set <code>OPENZEV_VERSION=vX.Y.Z</code> in <code>.env</code>), then pull and restart;
+  migrations run automatically when the application starts. Read the release
+  notes first, and make a backup before upgrading:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>pull
+docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
 </code></pre></div>
 </li>
 </ul>
-<h3 id="single-container-variant">Single-container variant<a class="headerlink" href="#single-container-variant" title="Permanent link">&para;</a></h3>
-<p><code>docker-compose.fullstack.yml</code> runs the frontend and backend in one <code>app</code>
-container (nginx and gunicorn together); the worker, Beat scheduler,
-PostgreSQL and Redis stay separate services. Configuration and HTTPS work
-exactly as above:</p>
-<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>backend/.env.production.example<span class="w"> </span>backend/.env<span class="w">   </span><span class="c1"># then fill it in as in step 2</span>
+<h3 id="synology-nas-container-manager">Synology NAS (Container Manager)<a class="headerlink" href="#synology-nas-container-manager" title="Permanent link">&para;</a></h3>
+<p>On a Synology NAS the release file runs as a <em>Project</em> in <strong>Container Manager</strong>
+(called <em>Docker</em> before DSM 7.2). You need DSM 7.2 or later on a model that
+supports Container Manager.</p>
+<ol>
+<li>In <strong>File Station</strong>, create a folder for the stack, for example
+   <code>docker/openzev</code>, and copy <code>docker-compose.yml</code> into it (download it as in
+   <a href="#1-download-the-release-files">step 1</a>).</li>
+<li>Fill in the settings from <a href="#2-configure-env">step 2</a> and save them as a file
+   named <code>.env</code> in the same folder — for example by editing
+   <code>env.production.example</code> on your computer and uploading it as <code>.env</code>.
+   File Station hides names that start with a dot; the file is still there.</li>
+<li>Open <strong>Container Manager → Project → Create</strong>, enter a name such as
+   <code>openzev</code>, choose the folder as the <strong>Path</strong>, and pick <strong>Use existing
+   docker-compose.yml</strong>. Click through the remaining pages and finish with
+   <strong>Done</strong>. DSM pulls the images and starts the stack.</li>
+<li>Create the first admin account as in
+   <a href="#creating-the-first-admin-account">Creating the first admin account</a>. Use
+   the project's <code>app</code> container: SSH into the NAS and run
+   <code>sudo docker compose exec app …</code> from the project folder, or open a
+   terminal on the <code>app</code> container under <strong>Container Manager → Container</strong>.</li>
+</ol>
+<p>Things that differ from a plain Linux server:</p>
+<ul>
+<li><strong>Port.</strong> The stack publishes <code>8080</code>. If another package already uses it,
+  change the left-hand number of <code>"8080:80"</code> in <code>docker-compose.yml</code>, for
+  example <code>"8088:80"</code>, and use that port below.</li>
+<li><strong>HTTPS.</strong> Let DSM terminate TLS: get a certificate under <strong>Control Panel →
+  Security → Certificate</strong>, then add a rule under <strong>Control Panel → Login
+  Portal → Advanced → Reverse Proxy</strong> from <code>https://zev.example.ch</code> (port 443)
+  to <code>http://localhost:8080</code>. Set <code>ALLOWED_HOSTS</code>, <code>CSRF_TRUSTED_ORIGINS</code>,
+  <code>FRONTEND_URL</code> and the passkey settings in <code>.env</code> to that address as in
+  step 2, and forward the name and ports from your router.</li>
+<li><strong>Updating.</strong> Replace <code>docker-compose.yml</code> with the new release's file (or
+  set <code>OPENZEV_VERSION</code> in <code>.env</code>), then over SSH run <code>sudo docker compose pull</code>
+  followed by <code>sudo docker compose up -d</code> in the project folder. Make a backup
+  first.</li>
+<li><strong>Backups.</strong> The database and invoice files live in Docker volumes, which
+  DSM's own backup tools do not include by default. Set up the backups
+  described in <a href="../18-backups/">Backups</a>, and send them to a location outside
+  the NAS.</li>
+</ul>
+<h3 id="building-from-source">Building from source<a class="headerlink" href="#building-from-source" title="Permanent link">&para;</a></h3>
+<p>To build the images yourself — for a patched checkout, or a platform the
+published images do not cover — use a copy of the repository instead:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/splattner/openzev.git
+<span class="nb">cd</span><span class="w"> </span>openzev
+git<span class="w"> </span>checkout<span class="w"> </span>vX.Y.Z<span class="w">   </span><span class="c1"># pick the newest release tag; main may be unstable</span>
+cp<span class="w"> </span>backend/.env.production.example<span class="w"> </span>backend/.env<span class="w">   </span><span class="c1"># then fill it in as in step 2</span>
 docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.fullstack.yml<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--build
 </code></pre></div>
-<p>The frontend is on http://localhost:8080. Stop it with
-<code>docker compose -f docker-compose.fullstack.yml down</code>. Pass
-<code>-f docker-compose.fullstack.yml</code> to every <code>docker compose</code> command for this
-stack, and use the service name <code>app</code> where the default stack uses <code>backend</code>.</p>
+<p><code>docker-compose.fullstack.yml</code> is the same single-application-container stack
+as the release file, built locally and reading <code>backend/.env</code>. The repository
+also contains <code>docker-compose.yml</code>, which builds the frontend (nginx) and the
+backend as two containers — use the service name <code>backend</code> instead of <code>app</code>
+there. Pass <code>-f docker-compose.fullstack.yml</code> to every <code>docker compose</code> command
+for the fullstack stack. To update, check out the new tag and run the <code>up</code>
+command again.</p>
 <h2 id="production-on-kubernetes-helm">Production on Kubernetes (Helm)<a class="headerlink" href="#production-on-kubernetes-helm" title="Permanent link">&para;</a></h2>
 <p>The Helm chart deploys the frontend, backend, a Celery worker, one Celery Beat
 scheduler, an Ingress and a volume for invoice files. It does <strong>not</strong> deploy
@@ -2433,7 +2552,7 @@ chart).</p>
 <ol>
 <li>Create secrets for the database URL, Django <code>SECRET_KEY</code>, the SMTP password
    and the encryption keys (generate the keys as shown in
-   <a href="#2-configure-backendenv">step 2</a> above).</li>
+   <a href="#2-configure-env">step 2</a> above).</li>
 <li>Write a <code>values-prod.yaml</code> with your domain, trusted origins, passkey
    domain, database and Redis endpoints, SMTP settings and ingress. The
    <a href="https://github.com/splattner/openzev/blob/main/charts/openzev/README.md#example-values">chart README</a> has a
@@ -2458,11 +2577,11 @@ including TLS, existing secrets and <code>NUM_PROXIES</code> behind an ingress, 
 create an admin. Create the first one from the command line with Django's
 <code>createsuperuser</code> command, run inside the backend container. It asks for a
 username, an email address and a password:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Docker Compose (docker-compose.yml)</span>
-docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>backend<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>createsuperuser
+<div class="highlight"><pre><span></span><code><span class="c1"># Docker Compose (release docker-compose.yml)</span>
+docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>app<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>createsuperuser
 
-<span class="c1"># Single container (docker-compose.fullstack.yml)</span>
-docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.fullstack.yml<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>app<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>createsuperuser
+<span class="c1"># Built from source with the two-container docker-compose.yml</span>
+docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>backend<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>createsuperuser
 
 <span class="c1"># Kubernetes (release "openzev" in namespace "openzev")</span>
 kubectl<span class="w"> </span>-n<span class="w"> </span>openzev<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-it<span class="w"> </span>deploy/openzev-backend<span class="w"> </span>--<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>createsuperuser
@@ -2472,7 +2591,7 @@ not the username. The password must pass the usual strength checks (at least
 8 characters, not entirely numeric, not a common password).</p>
 <p>To create the account from a script instead of interactively, pass the
 password through the environment:</p>
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-e<span class="w"> </span><span class="nv">DJANGO_SUPERUSER_PASSWORD</span><span class="o">=</span><span class="s1">'choose-a-strong-password'</span><span class="w"> </span>backend<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-e<span class="w"> </span><span class="nv">DJANGO_SUPERUSER_PASSWORD</span><span class="o">=</span><span class="s1">'choose-a-strong-password'</span><span class="w"> </span>app<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>python<span class="w"> </span>manage.py<span class="w"> </span>createsuperuser<span class="w"> </span>--noinput<span class="w"> </span>--username<span class="w"> </span>admin<span class="w"> </span>--email<span class="w"> </span>admin@example.ch
 </code></pre></div>
 <p>Then:</p>
@@ -2488,7 +2607,7 @@ password through the environment:</p>
    default</strong>: anyone who can reach the login page can register an account
    and create a community, which makes them its issuer and manager. On a public instance you run only for your
    own community, turn it off under <strong>Platform → Settings → Functions</strong>,
-   or set <code>FEATURE_ZEV_SELF_REGISTRATION_ENABLED=false</code> in <code>backend/.env</code>.</li>
+   or set <code>FEATURE_ZEV_SELF_REGISTRATION_ENABLED=false</code> in <code>.env</code>.</li>
 </ol>
 <p>Use <code>createsuperuser</code> again whenever you need another admin and cannot sign in
 — for example, if the only admin account was locked out.</p>
