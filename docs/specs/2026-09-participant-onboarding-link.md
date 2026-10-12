@@ -56,7 +56,6 @@ without leaving an immortal credential behind.
 | Backend — audit | `AuditEventSource.ONBOARDING_LINK`; `participant.send_onboarding_link`, `participant.onboarding_link_created`, `participant.revoke_onboarding_link`, `participant_onboarding.consumed` |
 | Frontend | `ParticipantOnboardingPage` at `/join/:prefix`, outside `ProtectedRoute` |
 | Frontend | Participants page: send/copy/revoke actions, an Invitation status icon |
-| Frontend | Admin Accounts page: "Create account" now creates a passwordless account and shows a copyable link |
 | Docs | This spec; `docs/ROADMAP.md` updated to reference it |
 
 ### Out of scope (phase 2, not built here)
@@ -269,8 +268,7 @@ Send/copy return 400 `{"code": "own_login_required", "error": "This account must
 
 `onboarding-link` is available to managers for participant-only accounts;
 `link-account` remains admin-only. The Participants page's "copy onboarding
-link" and the Admin Accounts page's "create account" button call the same
-action.
+link" action calls `onboarding-link`.
 
 `unlink-account` revoking the active token is new behaviour, not carried over
 from the old action: without it, detaching the account would not actually cut
@@ -331,8 +329,7 @@ alongside `onboarding_url`, which the Participants page shows under the link
   instructions; revoke uses its ordinary failure handler.
 - `ParticipantOnboardingNotice` replaces `ParticipantCredentialsNotice`
   (deleted): shows the link with a copy button instead of a
-  username/password pair, used identically from both the Participants page
-  and the Admin Accounts page.
+  username/password pair on the Participants page.
 - Admin console email templates: `participant_invitation` tab replaced by
   `participant_onboarding`, with `{link_url}` instead of
   `{username}`/`{temporary_password}`.

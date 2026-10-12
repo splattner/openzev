@@ -100,7 +100,7 @@ export interface AdminUser extends User {
     last_login: string | null
 }
 
-/** Admin: create-account payload. No password field — the server always mints one for a console-created account. */
+/** Admin: platform account creation payload (`POST /auth/users/`). No password field — the server always mints one for a console-created account. */
 export interface CreateUserInput {
     username: string
     email: string
@@ -109,7 +109,7 @@ export interface CreateUserInput {
     role: UserRole
 }
 
-/** Admin: create-account response. `generated_password` is present only once, in this response. */
+/** Admin: platform account creation response (`POST /auth/users/`). `generated_password` is present only once, in this response. */
 export interface CreatedUser extends Pick<AdminUser, 'id' | 'username' | 'email' | 'first_name' | 'last_name' | 'role'> {
     generated_password?: string
 }

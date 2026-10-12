@@ -791,10 +791,9 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
     def onboarding_link(self, request, pk=None):
         """Ensure an account and onboarding link exist, without emailing it.
 
-        Backs the "copy onboarding link" action on the participants page, and
-        the admin console's account-linking action, which never required an
-        email address either — an operator handing the link over in person or
-        by some other channel needs no address on file.
+        Backs the "copy onboarding link" action on the participants page — an
+        operator handing the link over in person or by some other channel
+        needs no email address on file.
         """
         participant = self.get_object()
         try:

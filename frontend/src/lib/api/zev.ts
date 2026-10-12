@@ -105,9 +105,8 @@ export async function sendOnboardingLink(id: string): Promise<SendOnboardingLink
 /**
  * Ensure an account and onboarding link exist, without emailing it.
  *
- * Backs "copy onboarding link" — no address required, since nothing is sent —
- * and also the admin console's account-linking action, which never required
- * one either.
+ * Backs "copy onboarding link" on the Participants page — no address required,
+ * since nothing is sent.
  */
 export async function getOnboardingLink(id: string): Promise<ParticipantOnboardingLinkResult> {
   const { data } = await api.post<ParticipantOnboardingLinkResult>(`/zev/participants/${id}/onboarding-link/`)

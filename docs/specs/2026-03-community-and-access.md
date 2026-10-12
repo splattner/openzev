@@ -2034,7 +2034,7 @@ interface ZevWizardInput extends Omit<ZevInput, 'owner'> {
 interface ZevWizardResult { zev: {id, name}; owner: {id, username, temporary_password}; owner_participant_id: string; metering_points: {id, meter_id}[] }
 
 interface Participant { id: string; zev: string; user: number|null; /* + contacts, validity, metering_points */ }
-interface ParticipantAccountCreateResult { participant: Participant; account: User; temporary_password: string }
+interface ParticipantOnboardingLinkResult { onboarding_url: string; onboarding_expires_at: string; participant: Participant }
 ```
 
 ---
@@ -2124,7 +2124,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `ZevSelfSetupTests` | 3 | Self-setup persists `bank_iban` + `bank_name` on the created ZEV (owner participant created); an IBAN without the required owner address is rejected without creating the ZEV; falsy-but-valid JSON address values reach serializer validation without being replaced as missing |
 | `ParticipantAccountLifecycleTests` | 3 | `test_create_participant_creates_a_passwordless_account`; `test_update_participant_saves_contact_details`; `test_send_onboarding_link_emails_a_link_and_stays_passwordless` |
 | `AdminCanEditOwnerParticipantTests` | 4 | `test_admin_can_edit_the_owner_participant_address` preserves access; `test_editing_the_participant_leaves_a_privileged_login_alone` preserves account identity; `test_onboarding_link_leaves_roles_alone_and_keeps_privileged_logins` refuses protected accounts and emails eligible ones; `test_zev_owner_cannot_edit_their_own_owner_participant_record` enforces the admin edit guard |
-| `ParticipantAccountLinkingTests` | 8 | Admin can link/unlink accounts (unlink leaves the role); an account may hold several participant rows; an admin account cannot be linked; admin can create-and-link; non-admin cannot link/create |
+| `ParticipantAccountLinkingTests` | 8 | Admin can link/unlink accounts (unlink leaves the role); an account may hold several participant rows; an admin account cannot be linked; admin can create-and-link a passwordless account via onboarding link, even without email; owner can obtain an onboarding link for their participant; non-admin cannot link existing accounts |
 | `ZevOwnerRoleSyncTests` | 1 | Owner transfer promotes new owner, demotes previous |
 | `MeteringPointAssignmentValidationTests` | 9 | Unique assignment, no overlaps, historical OK, open-end blocks future, dates within participant window, self-update OK |
 | `AssignmentSaveOverlapGuardTests` | 5 | Overlap guard on save path |
