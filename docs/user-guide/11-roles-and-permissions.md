@@ -509,10 +509,11 @@ access under **ZEV settings → People & access**.
    again from the participant's card (**More**). It signs them in, and they
    choose a new password.
 3. **Manager or admin who forgot their password:** someone with server access
-   sets a new one on the command line (the user then signs in with it):
+   sets a new one on the command line (the user then signs in with it; the
+   service is `backend` instead of `app` in a two-container source build):
 
    ```bash
-   docker compose exec backend python manage.py changepassword <username>
+   docker compose exec app python manage.py changepassword <username>
    ```
 
    The username is shown in the **Account** column of the accounts list.

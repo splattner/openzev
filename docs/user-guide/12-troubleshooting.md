@@ -18,18 +18,18 @@ docker compose logs
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | Port already in use | Another app on 8080 (dev stack: 5173, 8001, 5432, 6379) | `lsof -i :8080` and stop the conflicting process, or change the port mapping in the compose file |
-| Backend exits right after starting, log names `accounts.E0xx` or `SECRET_KEY` | A required production setting in `backend/.env` is missing or wrong | Fix the named setting — see [Production with Docker Compose](01-getting-started.md#2-configure-backendenv) |
+| App exits right after starting, log names `accounts.E0xx` or `SECRET_KEY` | A required production setting in `.env` (`backend/.env` when built from source) is missing or wrong | Fix the named setting — see [Production with Docker Compose](01-getting-started.md#2-configure-env) |
 | Database connection error | PostgreSQL not running | `docker compose ps` to check db service |
-| "permission denied" | File permissions issue | `docker compose down && docker compose up --build` |
+| "permission denied" | File permissions issue | `docker compose down && docker compose up -d` |
 
 ### Can't Access Frontend
 
 **Problem:** http://localhost:8080 doesn't load.
 
 **Checks:**
-1. Is frontend container running? `docker compose ps`
-2. Try restarting: `docker compose restart frontend`
-3. Check logs: `docker compose logs frontend`
+1. Is the application container running? `docker compose ps`
+2. Try restarting: `docker compose restart app`
+3. Check logs: `docker compose logs app`
 4. Port conflict? Is port 8080 in use? `lsof -i :8080`
 
 ### Can't Access API
@@ -40,7 +40,7 @@ Development stack (`docker-compose.dev.yml`) uses port 8001 instead.
 
 **Checks:**
 1. Backend running? `docker compose ps`
-2. Check logs: `docker compose logs backend`
+2. Check logs: `docker compose logs app` (`backend` on the two-container source build)
 3. Database connected? `docker compose logs db`
 4. More troubleshooting: Check Redis for celery
 

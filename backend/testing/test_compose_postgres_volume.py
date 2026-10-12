@@ -1,6 +1,6 @@
 """The compose files must agree on where the Postgres cluster lives.
 
-All three stacks share the named volume ``postgres_data``. When they mount it
+All four stacks share the named volume ``postgres_data``. When they mount it
 at different paths, each gets a cluster the others cannot see: starting one,
 then another, looks like the database was silently wiped, with nothing in the
 logs pointing at the cause (#492).
@@ -23,6 +23,7 @@ COMPOSE_FILES = (
     "docker-compose.yml",
     "docker-compose.dev.yml",
     "docker-compose.fullstack.yml",
+    "deploy/docker-compose.yml",
 )
 VOLUME_NAME = "postgres_data"
 

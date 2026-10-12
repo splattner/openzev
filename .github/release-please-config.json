@@ -6,6 +6,7 @@
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         "frontend/package.json",
+        "deploy/docker-compose.yml",
         {
           "type": "yaml",
           "path": "charts/openzev/Chart.yaml",

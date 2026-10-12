@@ -52,10 +52,12 @@ configuration without `EMAIL_HOST` or `DEFAULT_FROM_EMAIL`. The production
 template includes these variables so mail delivery cannot silently fall back to
 container logs.
 
-After changing email settings, restart the backend and Celery worker:
+After changing email settings, restart the application and Celery worker (the
+service is called `app` in the release stack, `backend` in the dev and
+source-build stacks):
 
 ```bash
-docker compose restart backend worker
+docker compose restart app worker
 ```
 
 ## Email Templates

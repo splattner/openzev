@@ -10,8 +10,8 @@ account, and a first tour of the interface.
 |---|---|---|
 | Try OpenZEV with sample data | `scripts/start-demo-environment.sh` | [Demo and local development](#demo-and-local-development) |
 | Work on the code | `docker-compose.dev.yml` | [Demo and local development](#demo-and-local-development) |
-| Run it for a real community on one server | `docker-compose.yml` | [Production with Docker Compose](#production-with-docker-compose) |
-| Run it as one application container | `docker-compose.fullstack.yml` | [Single-container variant](#single-container-variant) |
+| Run it for a real community on one server | `docker-compose.yml` from the release | [Production with Docker Compose](#production-with-docker-compose) |
+| Build the production stack from source | `docker-compose.yml` or `docker-compose.fullstack.yml` | [Building from source](#building-from-source) |
 | Run it on Kubernetes | Helm chart `charts/openzev` | [Production on Kubernetes (Helm)](#production-on-kubernetes-helm) |
 
 A production instance starts empty: no accounts, no communities. After
@@ -20,8 +20,8 @@ installing, [create the first admin account](#creating-the-first-admin-account).
 ## Prerequisites
 
 - For Docker Compose: Docker with the Compose plugin (or Podman with
-  `podman compose`), and a copy of this repository (`git clone
-  https://github.com/splattner/openzev.git`)
+  `podman compose`). Building from source also needs a copy of this repository
+  (`git clone https://github.com/splattner/openzev.git`)
 - For Kubernetes: a cluster, `helm`, `kubectl`, and a PostgreSQL database and
   Redis instance the cluster can reach
 - For a public instance: a domain name, TLS termination (a reverse proxy or
@@ -66,27 +66,38 @@ demo seed ships well-known passwords.
 
 ## Production with Docker Compose
 
-`docker-compose.yml` runs the frontend (nginx), the backend (Django +
-gunicorn), a Celery worker, one Celery Beat scheduler, PostgreSQL and Redis on
-one host. Only the frontend port `8080` is published; nginx proxies `/api/` to
-the backend, and PostgreSQL and Redis are reachable only on the compose
-network. The images are built from your checkout of the repository.
+Each release ships a ready-made `docker-compose.yml` that runs the published
+OpenZEV images — nothing is built on your server. It starts the application
+(`app`: nginx serving the frontend and proxying `/api/` to Django/gunicorn in
+the same container), a Celery worker, one Celery Beat scheduler, PostgreSQL and
+Redis on one host. Only port `8080` is published; PostgreSQL and Redis are
+reachable only on the compose network. The images are signed with cosign and
+come with an SBOM.
 Keep the shared Redis cache supplied by Compose: registration reservations and
 throttles must be shared across backend workers; an in-memory cache is local to
 each process.
 
-### 1. Get the code
+### 1. Download the release files
+
+Pick the newest release on the
+[releases page](https://github.com/splattner/openzev/releases) and download
+`docker-compose.yml` and `env.production.example` into an empty directory:
 
 ```bash
-git clone https://github.com/splattner/openzev.git
-cd openzev
-git checkout vX.Y.Z   # pick the newest release tag; main may be unstable
+mkdir openzev && cd openzev
+VERSION=vX.Y.Z   # the newest release tag
+curl -LO https://github.com/splattner/openzev/releases/download/$VERSION/docker-compose.yml
+curl -LO https://github.com/splattner/openzev/releases/download/$VERSION/env.production.example
 ```
 
-### 2. Configure `backend/.env`
+The compose file pulls the image of the release it was published with, so the
+version is pinned by the file you download. To run a different version without
+changing the file, add `OPENZEV_VERSION=vX.Y.Z` to `.env`.
+
+### 2. Configure `.env`
 
 ```bash
-cp backend/.env.production.example backend/.env
+cp env.production.example .env
 ```
 
 Fill in every value. The examples below assume the instance is reached at
@@ -138,16 +149,16 @@ The backend checks this configuration every time it starts. If a required
 value is missing or still points at a development host, the database
 migration step stops with an error such as `accounts.E003` (hosts),
 `accounts.E005` (trusted origins) or `accounts.E006` (email backend), and the
-backend container exits — read it with `docker compose logs backend`.
+`app` container exits — read it with `docker compose logs app`.
 
 ### 3. Start the stack
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 docker compose ps
 ```
 
-The backend applies database migrations on every start. The `beat` container
+The first start pulls the images. The application applies database migrations on every start. The `beat` container
 may exit once on the very first start, before those migrations have created
 its tables; it restarts on its own.
 
@@ -177,31 +188,36 @@ See [Creating the first admin account](#creating-the-first-admin-account) below.
 
 - Set up backups of the database **and** the `backend_media` volume (invoice
   PDFs) before billing real participants — see [Backups](18-backups.md).
-- To update, check out the new release tag and rebuild; migrations run
-  automatically when the backend starts:
+- To update, download `docker-compose.yml` of the new release over the old
+  one (or set `OPENZEV_VERSION=vX.Y.Z` in `.env`), then pull and restart;
+  migrations run automatically when the application starts. Read the release
+  notes first, and make a backup before upgrading:
 
   ```bash
-  git fetch --tags
-  git checkout vX.Y.Z
-  docker compose up -d --build
+  docker compose pull
+  docker compose up -d
   ```
 
-### Single-container variant
+### Building from source
 
-`docker-compose.fullstack.yml` runs the frontend and backend in one `app`
-container (nginx and gunicorn together); the worker, Beat scheduler,
-PostgreSQL and Redis stay separate services. Configuration and HTTPS work
-exactly as above:
+To build the images yourself — for a patched checkout, or a platform the
+published images do not cover — use a copy of the repository instead:
 
 ```bash
+git clone https://github.com/splattner/openzev.git
+cd openzev
+git checkout vX.Y.Z   # pick the newest release tag; main may be unstable
 cp backend/.env.production.example backend/.env   # then fill it in as in step 2
 docker compose -f docker-compose.fullstack.yml up -d --build
 ```
 
-The frontend is on http://localhost:8080. Stop it with
-`docker compose -f docker-compose.fullstack.yml down`. Pass
-`-f docker-compose.fullstack.yml` to every `docker compose` command for this
-stack, and use the service name `app` where the default stack uses `backend`.
+`docker-compose.fullstack.yml` is the same single-application-container stack
+as the release file, built locally and reading `backend/.env`. The repository
+also contains `docker-compose.yml`, which builds the frontend (nginx) and the
+backend as two containers — use the service name `backend` instead of `app`
+there. Pass `-f docker-compose.fullstack.yml` to every `docker compose` command
+for the fullstack stack. To update, check out the new tag and run the `up`
+command again.
 
 ## Production on Kubernetes (Helm)
 
@@ -212,7 +228,7 @@ chart).
 
 1. Create secrets for the database URL, Django `SECRET_KEY`, the SMTP password
    and the encryption keys (generate the keys as shown in
-   [step 2](#2-configure-backendenv) above).
+   [step 2](#2-configure-env) above).
 2. Write a `values-prod.yaml` with your domain, trusted origins, passkey
    domain, database and Redis endpoints, SMTP settings and ingress. The
    [chart README](../../charts/openzev/README.md#example-values) has a
@@ -240,11 +256,11 @@ create an admin. Create the first one from the command line with Django's
 username, an email address and a password:
 
 ```bash
-# Docker Compose (docker-compose.yml)
-docker compose exec backend python manage.py createsuperuser
+# Docker Compose (release docker-compose.yml)
+docker compose exec app python manage.py createsuperuser
 
-# Single container (docker-compose.fullstack.yml)
-docker compose -f docker-compose.fullstack.yml exec app python manage.py createsuperuser
+# Built from source with the two-container docker-compose.yml
+docker compose exec backend python manage.py createsuperuser
 
 # Kubernetes (release "openzev" in namespace "openzev")
 kubectl -n openzev exec -it deploy/openzev-backend -- python manage.py createsuperuser
@@ -258,7 +274,7 @@ To create the account from a script instead of interactively, pass the
 password through the environment:
 
 ```bash
-docker compose exec -e DJANGO_SUPERUSER_PASSWORD='choose-a-strong-password' backend \
+docker compose exec -e DJANGO_SUPERUSER_PASSWORD='choose-a-strong-password' app \
   python manage.py createsuperuser --noinput --username admin --email admin@example.ch
 ```
 
@@ -275,7 +291,7 @@ Then:
    default**: anyone who can reach the login page can register an account
    and create a community, which makes them its issuer and manager. On a public instance you run only for your
    own community, turn it off under **Platform → Settings → Functions**,
-   or set `FEATURE_ZEV_SELF_REGISTRATION_ENABLED=false` in `backend/.env`.
+   or set `FEATURE_ZEV_SELF_REGISTRATION_ENABLED=false` in `.env`.
 
 Use `createsuperuser` again whenever you need another admin and cannot sign in
 — for example, if the only admin account was locked out.

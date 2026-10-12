@@ -42,6 +42,13 @@ class ProxyTrustBoundaryTests(SimpleTestCase):
         self.assertIn("proxy_set_header X-Forwarded-For $remote_addr;", nginx)
         self.assertNotIn("$proxy_add_x_forwarded_for", nginx)
 
+    def test_release_compose_matches_fullstack_trust_boundary(self):
+        compose = read("deploy/docker-compose.yml")
+        self.assertIn("NUM_PROXIES: 1", compose)
+        # Only the app's nginx port is published, never gunicorn's.
+        self.assertIn('"8080:80"', compose)
+        self.assertNotIn("8000", compose)
+
     def test_helm_defaults_safe_and_worker_has_no_num_proxies(self):
         values = read("charts/openzev/values.yaml")
         self.assertIn("numProxies: 0", values)

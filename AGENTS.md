@@ -10,6 +10,7 @@ This file gives coding agents the minimum project-specific context needed to wor
 - `frontend/` — React + TypeScript + Vite frontend
 - `docker-compose.dev.yml` — the development stack (backend with live reload, Vite dev server with HMR, Celery worker + beat, Postgres, Redis); this is the one used day to day
 - `docker-compose.yml` — production-like local stack (built frontend behind nginx)
+- `deploy/docker-compose.yml` — the production stack from the published fullstack image; attached to every release (release-please bumps its default image tag, so don't edit that tag by hand)
 - `docs/specs/`, `docs/adr/` — feature specs and architecture decisions
 - `docs/user-guide/` — end-user documentation, also published at https://www.openzev.ch/docs/ (MkDocs Material, `mkdocs.yml`); preview with `pip install -r scripts/site/requirements-docs.txt && mkdocs serve`, and `mkdocs build --strict` must pass (CI checks it)
 - `docs/release-notes/` — hand-written release notes for minor/major releases

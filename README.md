@@ -170,33 +170,38 @@ Services: Frontend <http://localhost:8080> · Backend API <http://localhost:8080
 
 ### Self-hosting
 
-For a production-like deployment, copy the production template and configure
-it for this host (leave `CORS_ALLOWED_ORIGINS` empty for same-origin
-deployments where nginx proxies `/api/`):
+Every release ships a `docker-compose.yml` that runs the published
+[images](#prebuilt-container-images) — no checkout or build needed. Download it
+and the production template from the
+[latest release](https://github.com/splattner/openzev/releases/latest), then
+configure the template for this host (leave `CORS_ALLOWED_ORIGINS` empty for
+same-origin deployments where nginx proxies `/api/`):
 
 ```bash
-cp backend/.env.production.example backend/.env
+cp env.production.example .env
 ```
 
 Then start without demo data:
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
 The instance starts without any accounts. Create the first admin (you sign in
 with its email address):
 
 ```bash
-docker compose exec backend python manage.py createsuperuser
+docker compose exec app python manage.py createsuperuser
 ```
 
-The stack requires `backend/.env` before starting. Only the frontend (`8080`)
-is reachable from the host; the backend is not published and is reachable only
-through the frontend's `/api/` proxy, while PostgreSQL and Redis talk over the
-compose network only.
+The stack requires `.env` before starting. Only the application (`8080`) is
+reachable from the host; gunicorn is not published and is reachable only through
+the bundled nginx's `/api/` proxy, while PostgreSQL and Redis talk over the
+compose network only. To update, download the new release's `docker-compose.yml`
+and run `docker compose pull && docker compose up -d`. To build from source
+instead, see [Building from source](#building-from-source-with-compose).
 
-Configure the SMTP settings and sender address in `backend/.env` before using
+Configure the SMTP settings and sender address in `.env` before using
 registration, onboarding, invoice, or security emails; see the [Email
 Configuration guide](docs/user-guide/10-email-configuration.md).
 
@@ -242,10 +247,11 @@ Services: Frontend <http://localhost:8080> · Backend API <http://localhost:8080
 
 For a step-by-step walkthrough — production setup, the first admin account, roles, exploring each interface, demo accounts, and resetting demo data — see the [Getting Started guide](docs/user-guide/01-getting-started.md).
 
-## Optional: Fullstack Container Mode
+## Building from source with Compose
 
-For a single application container (frontend + backend together), first copy
-and fill the production checklist as above, then use:
+To build the production stack from a checkout instead of using the release
+images, fill in the production checklist as above (as `backend/.env`), then use
+the single application container build:
 
 ```bash
 cp backend/.env.production.example backend/.env
@@ -254,7 +260,7 @@ docker compose -f docker-compose.fullstack.yml up -d --build
 
 `app` serves the frontend and proxies API requests to Django inside the same container; `worker`, `db`, and `redis` stay separate. Frontend URL: <http://localhost:8080>. Stop with `docker compose -f docker-compose.fullstack.yml down`.
 
-See the [Getting Started guide](docs/user-guide/01-getting-started.md#single-container-variant) for details.
+See the [Getting Started guide](docs/user-guide/01-getting-started.md#building-from-source) for details.
 
 ## Helm Installation (Kubernetes)
 

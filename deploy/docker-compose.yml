@@ -1,0 +1,81 @@
+# Production stack from the published release images — nothing is built here.
+# Download this file and env.production.example from the GitHub release into one
+# directory (from a checkout, the template is backend/.env.production.example),
+# then:
+#
+#   cp env.production.example .env      # fill it in — see the user guide
+#   docker compose up -d
+#
+# The image tag below is the release this file belongs to. To pin another
+# version set OPENZEV_VERSION in .env (e.g. OPENZEV_VERSION=v1.2.3); to update,
+# download the newer release's file (or change OPENZEV_VERSION), then
+# `docker compose pull && docker compose up -d`.
+# To build from source instead, use ../docker-compose.fullstack.yml.
+x-openzev: &openzev
+  image: ghcr.io/splattner/openzev-fullstack:${OPENZEV_VERSION:-v1.22.1} # x-release-please-version
+  env_file:
+    - .env
+  environment:
+    DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
+    CELERY_BROKER_URL: redis://redis:6379/0
+    CACHE_URL: redis://redis:6379/1
+
+services:
+  app:
+    <<: *openzev
+    environment:
+      DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CACHE_URL: redis://redis:6379/1
+      # One trusted proxy hop: the bundled nginx overwrites X-Forwarded-For.
+      NUM_PROXIES: 1
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8080:80"
+    volumes:
+      - backend_media:/app/media
+
+  worker:
+    <<: *openzev
+    command: celery -A config worker -l info
+    depends_on:
+      - app
+      - redis
+    volumes:
+      - backend_media:/app/media
+
+  beat:
+    <<: *openzev
+    command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    depends_on:
+      - app
+      - redis
+    # On a fresh stack, migrations run inside the app container's own
+    # startup command and this container can win the race and start before
+    # they land — django_celery_beat's scheduler tables won't exist yet and
+    # it exits. Unlike every other service here, that first failure is
+    # expected rather than a bug, so unlike them beat gets a restart policy.
+    restart: on-failure
+
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: openzev
+      POSTGRES_USER: openzev
+      # Fixed password is deliberate — this port is never published.
+      POSTGRES_PASSWORD: openzev
+      # Keep in step with docker-compose.yml — see the note there.
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      # Same mount path as the other compose files — see the note in
+      # docker-compose.yml (#492).
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8-alpine
+
+volumes:
+  postgres_data:
+  backend_media:
