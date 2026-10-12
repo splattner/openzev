@@ -302,6 +302,13 @@ label > small.muted {
   position: sticky;
   top: 0;
   z-index: 1;
+}
+
+/* The band itself: deep forest, white small caps. The metering points list's
+   column heads wear it too, so the two stay one style. */
+.page-stack thead th,
+.data-table thead th,
+.metering-point-columns {
   padding-block: 0.55rem;
   border-bottom-color: var(--brand-deep);
   font-size: 0.6875rem;
@@ -3033,16 +3040,9 @@ div.building-header-toggle .building-header-chevron {
   padding-inline: 1rem;
 }
 
-/* The tables' band (`.data-table thead th`): deep forest, white small caps. */
+/* Its look is the tables' band (see `.data-table thead th`). */
 .metering-point-columns {
-  padding-block: 0.55rem;
-  background: var(--brand-deep);
-  font-size: 0.6875rem;
-  font-weight: 650;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   white-space: nowrap;
-  color: var(--white);
 }
 
 .metering-point-card {

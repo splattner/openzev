@@ -1131,7 +1131,8 @@ contracts are unchanged.
     folded state is kept in `MeteringPointsList` for the visit only. Beside it: the
     **roll-up** (`.building-rollup`: a dot and a count for each of the building's
     meters that need action, have data gaps or have no data yet, worst first, or
-    "All good"; healthy and inactive meters are not counted), "Add metering
+    "All good"; healthy and inactive meters are not counted; it sums up all of
+    the building's meters, whatever the filters leave in the list), "Add metering
     point" and an `ActionMenu` with "Edit building" (and "Delete building" while
     the building is empty). While a filter is active the header is not a button
     and the matches stay open, so a search never hides its own results.
@@ -1143,7 +1144,8 @@ contracts are unchanged.
   - **Row** (`MeteringPointRow`, grid `.metering-point-row`; columns Meter,
     Holder (managers), Last reading, actions, all fixed or fractional so the
     column heads stay over their columns; the heads are the tables' band —
-    `--brand-deep`, white 11px small caps — as `.data-table thead th`): a status dot
+    `--brand-deep`, white 11px small caps — in the one rule `.data-table thead th`
+    shares with `.metering-point-columns`): a status dot
     (`MeteringPointStatusDot`; `getMeteringPointStatus`: inactive, else danger when
     the meter is holder-less or its data health is red, warning for yellow,
     pending for no data, ok otherwise; the label is its accessible name),
@@ -1159,7 +1161,8 @@ contracts are unchanged.
     meter with no holder today that is active shows the one primary
     action inline in the holder column: **Assign participant**
     (`button-primary button-outline`). A row with a danger status has a faint
-    red wash. The row opens on a click anywhere outside its controls.
+    red wash. The row opens on a click anywhere outside its controls, except one that ends a
+    text selection (copying the meter ID).
   - **Details** (`.metering-point-detail`, three `.metering-detail-card`s;
     two without the Participants card for a role that has no assignment data):
     Participants (every assignment, current first, with state badge, dates,
@@ -1231,13 +1234,16 @@ contracts are unchanged.
   narrow-tile fixture (`screenshots/fixtures/page-layout.tsx`) includes a
   date-and-time tile, so a tile that spills fails the `.stat-grid` overflow
   check.
-- `tests/metering-points-list.test.ts` (23): the status mapping and its label,
+- `tests/metering-points-list.test.ts` (29): the status mapping and its label,
   the sorts (worst first with numeric tie-breaks, unset locations last,
   stalest reading first, the unknown URL value), the status tally, the
   one-meter-per-building rule, and the list itself: "Assign participant" only on
   a meter nobody holds, a holder with "+1", rows opening from their button and
-  from their blank area but not from a control, a building folding away from
-  its header, no folding while a filter is active, the header roll-up, the
+  from their blank area but not from a control or the end of a text selection,
+  a building folding away from its header, no folding while a filter is active,
+  the header roll-up (also from the meters a filter hides), an upcoming-only
+  holder, the "N earlier" count, no prompt for an inactive meter nobody holds,
+  a viewer's list without Assign, menu or assignment controls, the
   building named under each row of a flat list, and no holder column for a role
   without assignments.
 - `screenshots/field-geometry.spec.ts`: the field contract is now 16px values,

@@ -22,6 +22,8 @@ export type BuildingGroupHeaderState = {
 
 type MeteringPointsListProps = {
   meteringPoints: MeteringPoint[]
+  /** Every meter of the community, filters aside: a building's roll-up sums up the building, not just what the filters leave. */
+  allMeteringPoints?: MeteringPoint[]
   assignmentsByMeteringPoint: Map<string, MeteringPointAssignment[]>
   participantNameById: Map<string, string>
   healthByMeteringPoint: Map<string, MeteringPointHealth>
@@ -63,6 +65,7 @@ function toggled(set: Set<string>, id: string): Set<string> {
 
 export function MeteringPointsList({
   meteringPoints,
+  allMeteringPoints,
   assignmentsByMeteringPoint,
   participantNameById,
   healthByMeteringPoint,
@@ -149,7 +152,10 @@ export function MeteringPointsList({
                 collapsed,
                 onToggle: filtersActive ? undefined : () => setCollapsedBuildingIds((current) => toggled(current, group.building.id)),
                 panelId,
-                statusCounts: countMeteringPointStatuses(group.points, statusByMeteringPoint),
+                statusCounts: countMeteringPointStatuses(
+                  (allMeteringPoints ?? meteringPoints).filter((candidate) => candidate.building === group.building.id),
+                  statusByMeteringPoint,
+                ),
               })}
               <div id={panelId} hidden={collapsed}>
                 {group.points.length === 0 ? (

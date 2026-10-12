@@ -266,6 +266,69 @@ describe('MeteringPointsList', () => {
         expect(second.textContent).toBe('pages.meteringPoints.buildings.rollup.allGood')
     })
 
+    it('sums a building up from all its meters, whatever the filters leave in the list', () => {
+        // Only the healthy meter of Haus A matches the filter; its red one is filtered out.
+        const view = render({
+            points: [points[1], points[2]],
+            allMeteringPoints: points,
+            statusByMeteringPoint: new Map<string, MeteringPointStatus>([['m1', 'danger'], ['m2', 'ok'], ['m3', 'ok']]),
+        })
+        const [first, second] = Array.from(view.querySelectorAll('.building-rollup'))
+        expect(first.textContent).toContain('pages.meteringPoints.buildings.rollup.danger:1')
+        expect(second.textContent).toBe('pages.meteringPoints.buildings.rollup.allGood')
+    })
+
+    it('shows a holder who has not started yet with an Upcoming badge, and no Assign button', () => {
+        const view = render({
+            points,
+            assignmentsByMeteringPoint: new Map([['m2', [assignment('a4', 'm2', 'p2', { valid_from: '2999-01-01' })]]]),
+        })
+        const holder = view.querySelectorAll('.metering-point-card')[1].querySelector('.metering-point-holder')!
+        expect(holder.textContent).toContain('Ben Consumer')
+        expect(holder.textContent).toContain('pages.meteringPoints.assignmentState.upcoming')
+        expect(holder.querySelector('button')).toBeNull()
+    })
+
+    it('counts the assignments that ended behind the current holder', () => {
+        const view = render({
+            points,
+            assignmentsByMeteringPoint: new Map([['m1', [
+                assignment('a1', 'm1', 'p1'),
+                assignment('a5', 'm1', 'p2', { valid_from: '2019-01-01', valid_to: '2020-12-31' }),
+            ]]]),
+        })
+        const holder = view.querySelectorAll('.metering-point-card')[0].querySelector('.metering-point-holder')!
+        expect(holder.textContent).toContain('Anna Consumer')
+        expect(holder.textContent).toContain('pages.meteringPoints.earlierAssignments:1')
+    })
+
+    it('asks nothing for an inactive meter nobody holds', () => {
+        const view = render({ points: [point('m4', { is_active: false })], groups: null })
+        const holder = view.querySelector('.metering-point-holder')!
+        expect(holder.querySelector('button')).toBeNull()
+        expect(holder.textContent).toBe('—')
+    })
+
+    it('offers a viewer neither an Assign button, a menu nor assignment controls', () => {
+        const view = render({ points, readOnly: true })
+        expect(view.querySelector('.metering-point-holder .button-primary')).toBeNull()
+        expect(view.querySelector('.metering-point-actions [aria-haspopup="menu"]')).toBeNull()
+        act(() => view.querySelector<HTMLButtonElement>('.metering-point-expand')!.click())
+        expect(view.querySelector('.metering-point-detail')).not.toBeNull()
+        expect(view.querySelector('.metering-point-detail')!.textContent).not.toContain('pages.meteringPoints.detail.addAssignment')
+    })
+
+    it('does not open the row when the click ends a text selection', () => {
+        const selection = vi.spyOn(window, 'getSelection').mockReturnValue({ toString: () => 'CH-1' } as Selection)
+        try {
+            const view = render({ points })
+            act(() => view.querySelector<HTMLElement>('.metering-point-subtitle')!.click())
+            expect(view.querySelector('.metering-point-detail')).toBeNull()
+        } finally {
+            selection.mockRestore()
+        }
+    })
+
     it('names the building under each meter of an ungrouped list', () => {
         const view = render({ points: [points[0], points[2]], groups: null, showBuilding: true })
         expect(view.querySelector('.building-group')).toBeNull()

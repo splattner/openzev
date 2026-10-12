@@ -260,6 +260,7 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                     <MeteringPointsList
                         settings={settings}
                         meteringPoints={meteringPoints}
+                        allMeteringPoints={scopedMeteringPoints}
                         assignmentsByMeteringPoint={filteredAssignmentsByMeteringPoint}
                         participantNameById={participantNameById}
                         healthByMeteringPoint={meteringPointHealthById}

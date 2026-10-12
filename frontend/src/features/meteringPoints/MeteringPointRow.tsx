@@ -204,10 +204,12 @@ export function MeteringPointRow({
   }
 
   // The whole line opens the details, but a click on a control inside it (or in its menu, which
-  // React still bubbles through the portal) belongs to that control.
+  // React still bubbles through the portal) belongs to that control, and so does the end of a drag
+  // that selected the meter ID to copy it.
   function handleRowClick(event: MouseEvent<HTMLDivElement>) {
     const target = event.target as HTMLElement
     if (!event.currentTarget.contains(target) || target.closest('a, button, input, select, [role="menu"]')) return
+    if (window.getSelection()?.toString()) return
     onToggle()
   }
 
