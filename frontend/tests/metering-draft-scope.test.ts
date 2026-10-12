@@ -69,7 +69,7 @@ async function openDraft(mode: 'create' | 'edit' | 'assignment' | 'delete') {
         const button = mode === 'create'
             ? container.querySelector<HTMLButtonElement>('.metering-toolbar .toolbar-actions button')!
             : mode === 'assignment'
-                ? container.querySelector<HTMLButtonElement>('.metering-point-actions .button-primary')!
+                ? container.querySelector<HTMLButtonElement>('.metering-point-holder .button-primary')!
                 : container.querySelector<HTMLButtonElement>('.metering-point-actions [aria-haspopup="menu"]')!
         button.click()
     })

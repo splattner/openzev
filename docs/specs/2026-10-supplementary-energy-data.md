@@ -606,7 +606,9 @@ admin gets `[]` unless linked to a participant), the flagged meters they hold pe
 **File:** `frontend/src/features/meteringPoints/MeteringPointsList.tsx`; new
 `SupplementarySourceStatus.tsx` (a button-styled badge, `badge-button` in `index.css`, and the panel).
 
-Flagged metering points show a status chip from `supplementary_source_status`; a flagged one with no
+Flagged metering points show a status chip from `supplementary_source_status`: on the row when the
+source is in trouble (`error`, `reconnect_required`), otherwise in the row's expanded Measurement card
+(`MeteringPointRow`); a flagged one with no
 source shows a quiet neutral "No energy data source" marker instead (only while the feature is on,
 known from `useEnergyDataEligibility`, never a warning: the data is optional). On a meter the
 signed-in manager holds themselves the marker is a link to "My metering points" (**Connect your energy

@@ -544,8 +544,9 @@ edit.
   new select `allocation_mode` (personal/community) in the controlled form
   state and layout, default `personal` (the modal is a controlled MUI form —
   `form`/`setForm` props, no zod/react-hook-form).
-- **`frontend/src/features/meteringPoints/MeteringPointsList.tsx`:** badge on
-  assignment rows where the current assignment is community.
+- **`frontend/src/features/meteringPoints/MeteringPointRow.tsx`:** badge on
+  the holder of a meter whose current assignment is community, and on its
+  assignment in the expanded Participants card.
 - i18n (4 locales, `frontend/src/i18n/locales/{de,fr,it,en}.ts`), under the
   `pages.meteringPoints.assignForm` block: `allocationMode`,
   `allocationModePersonal`, `allocationModeCommunity`, `allocationModeHint`,

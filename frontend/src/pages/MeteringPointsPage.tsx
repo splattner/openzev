@@ -11,7 +11,7 @@ import { MeteringPointsList } from '../features/meteringPoints/MeteringPointsLis
 import { MeteringPointFormModal } from '../features/meteringPoints/MeteringPointFormModal'
 import { BuildingFormModal } from '../features/zev/BuildingFormModal'
 import { BuildingHeader } from '../features/meteringPoints/BuildingHeader'
-import { groupMeteringPointsByBuilding } from '../features/meteringPoints/useMeteringPointForms'
+import { groupMeteringPointsByBuilding, isBuildingLevelRedundant } from '../features/meteringPoints/useMeteringPointForms'
 import { MeteringPointsToolbar } from '../features/meteringPoints/MeteringPointsToolbar'
 import { useMeteringPointActions } from '../features/meteringPoints/useMeteringPointActions'
 import { useAppSettings } from '../lib/appSettings'
@@ -88,6 +88,8 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
         setTypeFilter,
         buildingFilter,
         setBuildingFilter,
+        sort,
+        setSort,
         buildings,
         landownersOf,
         editingBuilding,
@@ -124,6 +126,7 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
         hasFilters,
         meteringPointHealthById,
         meteringPointHolderLessById,
+        meteringPointStatusById,
         dialog,
         confirm,
         dialogLoading,
@@ -136,8 +139,9 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
         canDeleteData,
     })
 
-    // Several buildings: cards grouped by building (a one-building ZEV keeps the flat list).
-    const groups = isManagedScope && buildings.length > 1
+    // Several buildings: the meters grouped by building. A one-building ZEV keeps the flat list, and so
+    // does a ZEV whose buildings hold one meter each: a group header per meter would only repeat it.
+    const groups = isManagedScope && buildings.length > 1 && !isBuildingLevelRedundant(buildings)
         ? groupMeteringPointsByBuilding(buildings, meteringPoints, { filtersActive: hasFilters })
         : null
     // An empty building still shows its header, so the page is not "empty".
@@ -171,6 +175,7 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                     needsAttentionCount={needsAttentionCount}
                     searchTerm={searchTerm}
                     view={view}
+                    sort={sort}
                     typeFilter={typeFilter}
                     typeCounts={typeCounts}
                     buildings={buildings}
@@ -178,6 +183,7 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                     onChangeBuildingFilter={setBuildingFilter}
                     onChangeSearchTerm={setSearchTerm}
                     onChangeView={setView}
+                    onChangeSort={setSort}
                     onChangeTypeFilter={setTypeFilter}
                     onOpenCreateModal={openCreateMpModal}
                     onOpenCreateBuildingModal={openCreateBuildingModal}
@@ -230,8 +236,8 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                         onEdit={openEditBuildingModal}
                     />
                 )}
-                <div className="table-card">
-                    {scopedMeteringPoints.length === 0 && !hasGroups ? (
+                {scopedMeteringPoints.length === 0 && !hasGroups ? (
+                    <div className="table-card">
                         <MeteringPointsEmptyState
                             isManagedScope={isManagedScope}
                             readOnly={readOnly}
@@ -239,7 +245,9 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                             onOpenCreateModal={openCreateMpModal}
                             onClearFilters={() => undefined}
                         />
-                    ) : meteringPoints.length === 0 && !hasGroups ? (
+                    </div>
+                ) : meteringPoints.length === 0 && !hasGroups ? (
+                    <div className="table-card">
                         <MeteringPointsEmptyState
                             isManagedScope={isManagedScope}
                             readOnly={readOnly}
@@ -247,44 +255,52 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                             onOpenCreateModal={openCreateMpModal}
                             onClearFilters={clearFilters}
                         />
-                    ) : (
-                        <MeteringPointsList
-                            settings={settings}
-                            meteringPoints={meteringPoints}
-                            assignmentsByMeteringPoint={filteredAssignmentsByMeteringPoint}
-                            participantNameById={participantNameById}
-                            healthByMeteringPoint={meteringPointHealthById}
-                            holderLessByMeteringPoint={meteringPointHolderLessById}
-                            isManagedScope={isManagedScope}
-                            showBuilding={isManagedScope && buildings.length > 1}
-                            groups={groups}
-                            renderGroupHeader={(group) => (
-                                <BuildingHeader
-                                    building={group.building}
-                                    landowners={landownersOf(group.building)}
-                                    variant="group"
-                                    canManage={canWrite}
-                                    deletePending={deleteBuildingMutation.isPending}
-                                    onEdit={openEditBuildingModal}
-                                    onDelete={confirmDeleteBuilding}
-                                    onAddMeteringPoint={(building) => openCreateMpModalInBuilding(building.id)}
-                                />
-                            )}
-                            readOnly={readOnly}
-                            canDeleteData={canDeleteData}
-                            deleteMeteringPointPending={deleteMpMutation.isPending}
-                            deleteAssignmentPending={deleteAssignMutation.isPending}
-                            dialogLoading={dialogLoading}
-                            confirm={confirm}
-                            onOpenCreateAssignModal={openCreateAssignModal}
-                            onOpenEditMeteringPoint={openEditMpModal}
-                            onOpenDeleteDataModal={openDeleteDataModal}
-                            onOpenEditAssignment={openEditAssignModal}
-                            onDeleteMeteringPoint={(id) => deleteMpMutation.mutate({ id, scope })}
-                            onDeleteAssignment={(id) => deleteAssignMutation.mutate({ id, scope })}
-                        />
-                    )}
-                </div>
+                    </div>
+                ) : (
+                    <MeteringPointsList
+                        settings={settings}
+                        meteringPoints={meteringPoints}
+                        assignmentsByMeteringPoint={filteredAssignmentsByMeteringPoint}
+                        participantNameById={participantNameById}
+                        healthByMeteringPoint={meteringPointHealthById}
+                        statusByMeteringPoint={meteringPointStatusById}
+                        holderLessByMeteringPoint={meteringPointHolderLessById}
+                        isManagedScope={isManagedScope}
+                        showBuilding={isManagedScope && buildings.length > 1}
+                        buildings={buildings}
+                        groups={groups}
+                        filtersActive={hasFilters}
+                        renderGroupHeader={(group, headerState) => (
+                            <BuildingHeader
+                                building={group.building}
+                                landowners={landownersOf(group.building)}
+                                variant="group"
+                                canManage={canWrite}
+                                statusCounts={headerState.statusCounts}
+                                collapsed={headerState.collapsed}
+                                onToggleCollapsed={headerState.onToggle}
+                                panelId={headerState.panelId}
+                                deletePending={deleteBuildingMutation.isPending}
+                                onEdit={openEditBuildingModal}
+                                onDelete={confirmDeleteBuilding}
+                                onAddMeteringPoint={(building) => openCreateMpModalInBuilding(building.id)}
+                            />
+                        )}
+                        readOnly={readOnly}
+                        canDeleteData={canDeleteData}
+                        deleteMeteringPointPending={deleteMpMutation.isPending}
+                        deleteAssignmentPending={deleteAssignMutation.isPending}
+                        dialogLoading={dialogLoading}
+                        confirm={confirm}
+                        onOpenCreateAssignModal={openCreateAssignModal}
+                        onOpenEditMeteringPoint={openEditMpModal}
+                        onOpenDeleteDataModal={openDeleteDataModal}
+                        onOpenEditAssignment={openEditAssignModal}
+                        onDeleteMeteringPoint={(id) => deleteMpMutation.mutate({ id, scope })}
+                        onDeleteAssignment={(id) => deleteAssignMutation.mutate({ id, scope })}
+                        onEditBuilding={openEditBuildingModal}
+                    />
+                )}
 
                 <MeteringDeleteDataModal
                     settings={settings}

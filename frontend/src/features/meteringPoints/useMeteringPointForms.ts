@@ -46,6 +46,17 @@ export function groupMeteringPointsByBuilding(
     .filter((group) => group.points.length > 0 || (!filtersActive && group.building.metering_point_count === 0))
 }
 
+/**
+ * Whether the building level adds nothing: several buildings, each holding
+ * exactly one meter. A group header per single meter only repeats the meter,
+ * so the list stays flat and each row names its building instead. A building
+ * with no meters keeps the grouped layout, so it stays reachable (its header
+ * is where a meter is added to it).
+ */
+export function isBuildingLevelRedundant(buildings: Building[]): boolean {
+  return buildings.length > 1 && buildings.every((building) => building.metering_point_count === 1)
+}
+
 export type AssignmentState = 'current' | 'upcoming' | 'ended'
 
 export function getAssignmentState(assignment: MeteringPointAssignment, todayIso: string): AssignmentState {
@@ -169,6 +180,87 @@ export function meteringPointHealthBadgeClass(health: MeteringPointHealth): stri
   return 'badge badge-neutral'
 }
 
+/**
+ * One glance at a meter: the data health, with a missing holder counted as the
+ * worst case and an inactive meter set apart (it is out of billing scope, so
+ * its health is not a problem to act on).
+ */
+export type MeteringPointStatus = 'ok' | 'warning' | 'danger' | 'pending' | 'inactive'
+
+export function getMeteringPointStatus(
+  point: Pick<MeteringPoint, 'is_active'>,
+  health: MeteringPointHealth,
+  holderLess: boolean,
+): MeteringPointStatus {
+  if (!point.is_active) return 'inactive'
+  if (holderLess || health === 'red') return 'danger'
+  if (health === 'yellow') return 'warning'
+  if (health === 'no_data') return 'pending'
+  return 'ok'
+}
+
+/** The status's key under `pages.meteringPoints.health`, for its label. */
+export function meteringPointStatusLabelKey(
+  status: MeteringPointStatus,
+  health: MeteringPointHealth,
+  holderLess: boolean,
+): string {
+  if (status === 'inactive') return 'pages.meteringPoints.inactive'
+  if (holderLess) return 'pages.meteringPoints.holderLessBadge'
+  return `pages.meteringPoints.health.${health}`
+}
+
+/** How many of `points` are in each status. */
+export function countMeteringPointStatuses(
+  points: MeteringPoint[],
+  statusById: Map<string, MeteringPointStatus>,
+): Record<MeteringPointStatus, number> {
+  const counts: Record<MeteringPointStatus, number> = { ok: 0, warning: 0, danger: 0, pending: 0, inactive: 0 }
+  for (const point of points) counts[statusById.get(point.id) ?? 'pending'] += 1
+  return counts
+}
+
+// ── Sort ────────────────────────────────────────────────────────────────────
+
+/** `attention`: the meters to act on first; the rest order by the field they name. */
+export type MeteringPointSort = 'attention' | 'meter_id' | 'location' | 'last_reading'
+
+const STATUS_RANK: Record<MeteringPointStatus, number> = { danger: 0, warning: 1, pending: 2, ok: 3, inactive: 4 }
+
+export function readMeteringPointSort(value: string | null): MeteringPointSort {
+  return value === 'meter_id' || value === 'location' || value === 'last_reading' ? value : 'attention'
+}
+
+/** A new array: `last_reading` puts the stalest first (a meter that never reported leads), because that is the one to look at. */
+export function sortMeteringPoints(
+  points: MeteringPoint[],
+  sort: MeteringPointSort,
+  statusById: Map<string, MeteringPointStatus>,
+): MeteringPoint[] {
+  const byMeterId = (left: MeteringPoint, right: MeteringPoint) =>
+    left.meter_id.localeCompare(right.meter_id, undefined, { numeric: true })
+  const compare = (left: MeteringPoint, right: MeteringPoint): number => {
+    if (sort === 'attention') {
+      const delta = STATUS_RANK[statusById.get(left.id) ?? 'pending'] - STATUS_RANK[statusById.get(right.id) ?? 'pending']
+      return delta || byMeterId(left, right)
+    }
+    if (sort === 'location') {
+      const leftLocation = left.location_description?.trim() ?? ''
+      const rightLocation = right.location_description?.trim() ?? ''
+      // An unset location sorts last, not first.
+      if (!leftLocation !== !rightLocation) return leftLocation ? -1 : 1
+      return leftLocation.localeCompare(rightLocation, undefined, { numeric: true }) || byMeterId(left, right)
+    }
+    if (sort === 'last_reading') {
+      const leftAt = left.last_reading_at ?? ''
+      const rightAt = right.last_reading_at ?? ''
+      return leftAt.localeCompare(rightAt) || byMeterId(left, right)
+    }
+    return byMeterId(left, right)
+  }
+  return [...points].sort(compare)
+}
+
 // ── Filters as URL state (#625) ─────────────────────────────────────────────
 //
 // Each `read*` function turns a raw `?param=` value (or a hand-edited/stale
@@ -182,6 +274,9 @@ export const METERING_POINT_FILTER_KEYS = {
   type: 'type',
   building: 'building',
 } as const
+
+/** Not one of the filters: "Clear filters" leaves the sort as it is. */
+export const METERING_POINT_SORT_KEY = 'sort'
 
 export function readMeteringPointBuildingFilter(value: string | null): MeteringPointBuildingFilter {
   return value || 'all'

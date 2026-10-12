@@ -270,15 +270,24 @@ ZEV settings.
   "Add metering point" (managers only); a building filter when the ZEV has more than one building.
 - **One building:** a compact building line above the metering-point list (`BuildingHeader`):
   name, address on one line, EGID when set, landowners whose role names it, and an edit action
-  for managers. The cards are otherwise unchanged.
-- **Several buildings:** `MeteringPointsList` groups the cards by building (ordered by building
-  name). Each group starts with a `BuildingHeader` (name, address, EGID, landowners, metering-point
-  count) with "Add metering point" and edit actions for managers; delete sits in an
-  `ActionMenu` ("More" → "Delete building", confirm) that appears only while the building has
-  no metering points. A building with no metering points still shows its header with
+  for managers. The meters are one sheet of rows (SPEC-2026-08-ui-redesign-pdf-style §15.4).
+- **Several buildings:** `MeteringPointsList` groups the meters by building (ordered by building
+  name), each group its own sheet. A group starts with a tinted `BuildingHeader`
+  (`variant="group"`): name and address (the toggle that folds the group's meters away),
+  EGID, landowners, metering-point count and a health roll-up (how many of its meters need
+  action, have data gaps or have no data yet, or "All good"), with "Add metering point" for
+  managers and an `ActionMenu` ("More"): "Edit building" and, only while the building has
+  no metering points, "Delete building" (confirm). A building with no metering points still
+  shows its header with
   "No metering points in this building yet". Filtering by building shows only that group; search
   and the other filters apply within groups, and a group with no matching card is hidden unless
-  it has no metering points at all and no filter is active.
+  it has no metering points at all and no filter is active. While a filter is active the
+  groups are not foldable: the matches stay open.
+- **Several buildings with one meter each** (`isBuildingLevelRedundant`: every building's
+  `metering_point_count` is 1): no group headers, since a header per meter would repeat it.
+  The meters are one flat sheet, each row names its building under the meter ID, and its
+  "More" menu has "Edit building". A building with none or several meters keeps the grouped
+  layout, so every building stays reachable.
 - **Building form** (`BuildingFormModal`): name, address (line 1, line 2, postal code, city),
   EGID (number input), notes; on create, a "Copy address from participant" select (participants'
   parties with an address) that fills the address and, when the name is empty, the name. A short

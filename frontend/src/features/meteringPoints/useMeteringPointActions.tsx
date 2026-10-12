@@ -33,16 +33,22 @@ import {
     defaultMeteringPointForm,
     getMeteringPointHealth,
     getMeteringPointHealthWindow,
+    getMeteringPointStatus,
     getNextAssignmentGuidance,
     isAssignmentCurrent,
     isMeteringPointHolderLess,
     METERING_POINT_FILTER_KEYS,
+    METERING_POINT_SORT_KEY,
     meteringPointNeedsAttention,
     readMeteringPointBuildingFilter,
+    readMeteringPointSort,
     readMeteringPointTypeFilter,
     readMeteringPointView,
+    sortMeteringPoints,
     type MeteringPointBuildingFilter,
     type MeteringPointHealth,
+    type MeteringPointSort,
+    type MeteringPointStatus,
     type MeteringPointTypeFilter,
     type MeteringPointView,
 } from './useMeteringPointForms'
@@ -198,6 +204,7 @@ export function useMeteringPointActions({
     const [buildingFilter, setBuildingFilterState] = useState<MeteringPointBuildingFilter>(
         () => readMeteringPointBuildingFilter(searchParams.get(FILTER.building)),
     )
+    const [sort, setSortState] = useState<MeteringPointSort>(() => readMeteringPointSort(searchParams.get(METERING_POINT_SORT_KEY)))
 
     /** Sets or removes one query param, without touching the others already there. */
     function writeFilterParam(key: string, value: string, isDefault: boolean) {
@@ -225,6 +232,10 @@ export function useMeteringPointActions({
     function setBuildingFilter(value: MeteringPointBuildingFilter) {
         setBuildingFilterState(value)
         writeFilterParam(FILTER.building, value, value === 'all')
+    }
+    function setSort(value: MeteringPointSort) {
+        setSortState(value)
+        writeFilterParam(METERING_POINT_SORT_KEY, value, value === 'attention')
     }
 
     function clearFilters() {
@@ -752,7 +763,19 @@ export function useMeteringPointActions({
         return map
     }, [assignmentsByMeteringPoint, participantNameById])
 
-    const { scopedMeteringPoints, meteringPoints } = getScopedAndFilteredMeteringPoints(meteringPointsQuery.data ?? [], {
+    const meteringPointStatusById = useMemo(() => {
+        const map = new Map<string, MeteringPointStatus>()
+        for (const point of meteringPointsQuery.data ?? []) {
+            map.set(point.id, getMeteringPointStatus(
+                point,
+                meteringPointHealthById.get(point.id) ?? 'no_data',
+                meteringPointHolderLessById.get(point.id) ?? false,
+            ))
+        }
+        return map
+    }, [meteringPointsQuery.data, meteringPointHealthById, meteringPointHolderLessById])
+
+    const { scopedMeteringPoints, meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPointsQuery.data ?? [], {
         selectedZevId,
         isManagedScope,
         searchTerm,
@@ -763,6 +786,9 @@ export function useMeteringPointActions({
         isAssignedByMeteringPoint,
         participantNamesByMeteringPoint,
     })
+
+    // Sorted after filtering; the building groups keep this order within each group.
+    const meteringPoints = sortMeteringPoints(filteredMeteringPoints, sort, meteringPointStatusById)
 
     const filteredAssignmentsByMeteringPoint = new Map(
         Array.from(assignmentsByMeteringPoint.entries()).filter(([meteringPointId]) =>
@@ -821,6 +847,8 @@ export function useMeteringPointActions({
         setTypeFilter,
         buildingFilter,
         setBuildingFilter,
+        sort,
+        setSort,
         buildings,
         landownersOf,
         editingBuilding,
@@ -861,6 +889,7 @@ export function useMeteringPointActions({
         // Data health (#623)
         meteringPointHealthById,
         meteringPointHolderLessById,
+        meteringPointStatusById,
         needsAttentionByMeteringPoint,
         // Dialog
         dialog,

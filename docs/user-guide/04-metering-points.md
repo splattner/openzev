@@ -24,8 +24,11 @@ The tabs above the list count the metering points and show one view at a time:
 **Needs attention**; click the active tab again to show all. A tab with nothing
 in it, or with everything in it, is left out. Below them, the search finds a meter ID, location, building
 or participant, and, when the community has more than one metering point
-type, a second row of tabs narrows to one type. The filters are kept in the
-page address, so a bookmark or shared link opens the same view.
+type, a second row of tabs narrows to one type. A **Sort** menu orders the
+list: **Problems first** (the default: meters without a holder or with data at
+risk, then data gaps, then meters without data yet), **Meter ID**, **Location**
+or **Oldest reading first**. The filters and the sort are kept in the page
+address, so a bookmark or shared link opens the same view.
 
 If a refresh fails, the last loaded list and any open form stay available.
 Use **Retry** in the warning to refresh the list.
@@ -56,11 +59,20 @@ are, and both are recorded. Buildings are managed on this page.
   building (see [People & access](02-zev-setup.md#people-and-access-tab)) are
   named in its header.
 - With several buildings, the metering points are **grouped by building**, ordered by
-  name. Each group's header shows the address, EGID, landowners and number of
-  metering points, with **Add metering point** (that building preselected)
-  and **Edit**. A building without metering points shows "No
-  metering points in this building yet". Search and the other filters apply
-  within the groups; the **Building** filter shows one group.
+  name, each building in a card of its own. The tinted header shows the address,
+  EGID, landowners and number of metering points, and sums up the building's
+  health: how many of its meters need action, have data gaps or have no data
+  yet, or "All good". Click the header to fold the building's meters away —
+  the summary stays visible, so you still see whether a folded building needs a
+  look. **Add metering point** (that building preselected) is in the header, and
+  **More → Edit building** next to it. A building without metering points shows
+  "No metering points in this building yet". Search and the other filters apply
+  within the groups, which stay open while a filter is active; the **Building**
+  filter shows one group.
+- When every building holds exactly **one** metering point, the buildings add
+  no grouping: the page shows the metering points as one list, with the building
+  named under each meter ID, and **Edit building** is in each meter's **More**
+  menu.
 - A building can be deleted only once it is empty: move or delete its meters
   first, then **More → Delete building** appears in its header. Landowner rows that pointed at a deleted building are
   kept, without a building.
@@ -136,7 +148,7 @@ generation behind it). Once ticked:
   energy is real, and billing depends on it. Instead, wherever the ZEV has a
   flagged meter, an explanatory note appears next to the ZEV-wide figures.
 - Metering-point lists and tables show a **Surplus metering** badge next to
-  the meter type.
+  the meter ID.
 
 If you later add a true production meter (measuring everything the PV system
 generates, not just the surplus), leave this box unticked on that separate
@@ -213,7 +225,7 @@ the metering points list — visible on the common-area meter in the
 ### Switching a meter to Community
 
 1. Go to **Metering Points**
-2. Find the meter and click **Edit** on its assignment row
+2. Open the meter's details (click its row) and click **Edit** on its assignment
 3. Set **Allocation** to `Community`
 4. Click **Save Assignment**
 
@@ -253,25 +265,45 @@ join date, and a leaver's share stops on their leave date.
 > for per-metering-point fees, exactly like an inactive personal meter. Its
 > historical readings still count towards the community energy pool.
 
-## What a Metering Point Card Shows
+## What a Metering Point Row Shows
 
-Each entry on the **Metering Points** page shows, at a glance:
+Each meter on the **Metering Points** page is one row that shows, at a glance:
 
-- The **meter ID**, its **building** (when the community has several) and
-  its **location** within the building (or "No location set")
-- **Active**/**Inactive** and meter-**type** badges, plus a **Surplus
-  metering** badge when [Generation behind the meter](#generation-behind-the-meter)
-  is ticked
-- A **data-health badge** — `Healthy`, `Data gaps`, `Data at risk`, or `No
-  data yet`, based on the last 30 complete days (up to yesterday); click it to open the
-  metering point's data-quality view
-- **Last reading** date, or "No readings received yet"
-- A **No current holder** warning if the meter has readings but no
-  participant is currently assigned to it
-- Its current assignment (holder and validity window), or its full
-  assignment history if it has more than one
+- A **status dot** — green when all is well, yellow for data gaps, red when the
+  meter needs action (no current holder, or data at risk), an empty ring when no
+  data has arrived yet, grey when the meter is inactive. Hover the dot for the
+  reason.
+- The **meter ID**, an icon for its **type** (hover for *Consumption*,
+  *Production* or *Bidirectional*), its **location** within the building (or
+  "No location set") and, when the community has several buildings and they are
+  not grouped, its **building**
+- Badges only for what is unusual: **Inactive**, **No current holder** (the meter
+  has readings but nobody is assigned to it), **Surplus metering** when
+  [Generation behind the meter](#generation-behind-the-meter) is ticked, and the
+  status of a connected energy data source when it needs attention
+- The **holder** — the participant who holds the meter today, with the start date,
+  a **Community** badge for a shared meter, and "+1" when several participants
+  hold it. A meter nobody holds shows **Assign participant**; click it to set the
+  assignment's validity window.
+- The **last reading** date, or "Never"
 
-Click **Chart** on an entry for the metering point's full reading history.
+**Chart** (the chart icon) opens the metering point's full reading history, and
+**⋯ More** has **Assign participant**, **Edit**, **Delete data** (admins) and
+**Delete**.
+
+Click a row, or the arrow at its end, to open its details in place:
+
+- **Participants** — every assignment, current first, with its validity window
+  and its state (*Upcoming* or *Ended* for the others). Use **Add assignment**,
+  **Edit** and **⋯ → Remove** here, for example to end a tenant's assignment
+  when they move out.
+- **Measurement** — last and first reading, how many readings there are, and the
+  **data-health** badge (`Healthy`, `Data gaps`, `Data at risk` or `No data yet`,
+  based on the last 30 complete days up to yesterday); click it to open the
+  metering point's data-quality view. A connected energy data source shows its
+  status here too.
+- **Location** — building, location within the building, type and whether
+  generation sits behind the meter.
 
 ## Meter Maintenance
 
@@ -289,7 +321,8 @@ Click **Chart** on an entry for the metering point's full reading history.
 
 To stop billing a meter:
 
-1. Click **Edit** on its current assignment row
+1. Open the meter's details (click its row) and click **Edit** on its current
+   assignment
 2. Set **Valid To** to the last day it should be billed
 3. Click **Save Assignment**
 

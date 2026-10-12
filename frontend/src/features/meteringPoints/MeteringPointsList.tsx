@@ -1,37 +1,23 @@
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import {
-  faChartLine,
-  faDatabase,
-  faEllipsis,
-  faPen,
-  faTrash,
-  faTriangleExclamation,
-  faUserPlus,
-} from '@fortawesome/free-solid-svg-icons'
-import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
-import { BehindMeterBadge } from '../../components/BehindMeterBadge'
-import { formatDateTime, formatShortDate } from '../../lib/appSettings'
 import { todayBusinessIso } from '../../lib/dates'
-import { SupplementarySourceStatus } from './SupplementarySourceStatus'
-import type { AppSettings, MeteringPoint, MeteringPointAssignment } from '../../types/api'
+import type { AppSettings, Building, MeteringPoint, MeteringPointAssignment } from '../../types/api'
+import { MeteringPointRow, type ConfirmOptions } from './MeteringPointRow'
 import {
-  assignmentStateBadgeClass,
-  assignmentStateSortOrder,
-  getAssignmentState,
-  meteringPointHealthBadgeClass,
+  countMeteringPointStatuses,
   type BuildingGroup,
   type MeteringPointHealth,
+  type MeteringPointStatus,
 } from './useMeteringPointForms'
 
-type ConfirmOptions = {
-  title: string
-  message: string
-  confirmText: string
-  isDangerous: boolean
-  onConfirm: () => void | Promise<void>
+/** What a group's header needs to be the toggle of its meters and to summarise them. */
+export type BuildingGroupHeaderState = {
+  collapsed: boolean
+  /** Absent while a filter is active: the matches are then always shown. */
+  onToggle?: () => void
+  /** The id of the element holding the group's meters. */
+  panelId: string
+  statusCounts: Record<MeteringPointStatus, number>
 }
 
 type MeteringPointsListProps = {
@@ -39,15 +25,19 @@ type MeteringPointsListProps = {
   assignmentsByMeteringPoint: Map<string, MeteringPointAssignment[]>
   participantNameById: Map<string, string>
   healthByMeteringPoint: Map<string, MeteringPointHealth>
+  statusByMeteringPoint: Map<string, MeteringPointStatus>
   /** Empty for a role that has no assignment data loaded (see the hook) — never render a false positive from a missing entry. */
   holderLessByMeteringPoint: Map<string, boolean>
   settings: AppSettings
   isManagedScope: boolean
-  /** Name the building on each card; only for a ZEV with several buildings (#890). */
+  /** Name the building under each meter; only for a ZEV with several buildings and no group headers (#890). */
   showBuilding?: boolean
-  /** Several buildings: the cards grouped by building, each group headed by `renderGroupHeader`. */
+  buildings?: Building[]
+  /** Several buildings: the meters grouped by building, each group headed by `renderGroupHeader`. */
   groups?: BuildingGroup[] | null
-  renderGroupHeader?: (group: BuildingGroup) => ReactNode
+  renderGroupHeader?: (group: BuildingGroup, state: BuildingGroupHeaderState) => ReactNode
+  /** Whether a filter narrows the list; the matches are never folded away. */
+  filtersActive?: boolean
   /** A viewer reads only (#761): no edit, assign, delete. */
   readOnly?: boolean
   canDeleteData: boolean
@@ -61,6 +51,14 @@ type MeteringPointsListProps = {
   onOpenEditAssignment: (assignment: MeteringPointAssignment) => void
   onDeleteMeteringPoint: (id: string) => void
   onDeleteAssignment: (id: string) => void
+  onEditBuilding?: (building: Building) => void
+}
+
+function toggled(set: Set<string>, id: string): Set<string> {
+  const next = new Set(set)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  return next
 }
 
 export function MeteringPointsList({
@@ -68,12 +66,15 @@ export function MeteringPointsList({
   assignmentsByMeteringPoint,
   participantNameById,
   healthByMeteringPoint,
+  statusByMeteringPoint,
   holderLessByMeteringPoint,
   settings,
   isManagedScope,
   showBuilding = false,
+  buildings = [],
   groups = null,
   renderGroupHeader,
+  filtersActive = false,
   readOnly = false,
   canDeleteData,
   deleteMeteringPointPending,
@@ -86,262 +87,91 @@ export function MeteringPointsList({
   onOpenEditAssignment,
   onDeleteMeteringPoint,
   onDeleteAssignment,
+  onEditBuilding,
 }: MeteringPointsListProps) {
   const { t } = useTranslation()
   const todayIso = todayBusinessIso()
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
+  const [collapsedBuildingIds, setCollapsedBuildingIds] = useState<Set<string>>(() => new Set())
 
-  // Shared by both the compact (single current holder) and expanded assignment
-  // rendering below — Remove lives in the overflow menu everywhere, matching
-  // the meter-level Edit/Delete pattern instead of a standalone danger button.
-  function assignmentMenuItems(assignment: MeteringPointAssignment): ActionMenuItem[] {
-    return [
-      {
-        key: 'remove',
-        label: t('pages.meteringPoints.removeAssignment'),
-        icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
-        disabled: deleteAssignmentPending || dialogLoading,
-        danger: true,
-        onClick: () =>
-          confirm({
-            title: t('pages.meteringPoints.removeAssignTitle'),
-            message: t('pages.meteringPoints.removeAssignMessage', {
-              name: participantNameById.get(assignment.participant) ?? assignment.participant,
-            }),
-            confirmText: t('pages.meteringPoints.removeAssignConfirm'),
-            isDangerous: true,
-            onConfirm: () => onDeleteAssignment(assignment.id),
-          }),
-      },
-    ]
-  }
+  const renderRow = (point: MeteringPoint) => (
+    <MeteringPointRow
+      key={point.id}
+      point={point}
+      assignments={assignmentsByMeteringPoint.get(point.id) ?? []}
+      participantNameById={participantNameById}
+      settings={settings}
+      todayIso={todayIso}
+      health={healthByMeteringPoint.get(point.id) ?? 'no_data'}
+      holderLess={holderLessByMeteringPoint.get(point.id) ?? false}
+      status={statusByMeteringPoint.get(point.id) ?? 'pending'}
+      isManagedScope={isManagedScope}
+      readOnly={readOnly}
+      canDeleteData={canDeleteData}
+      buildingLabel={showBuilding && !groups ? point.building_name : null}
+      building={showBuilding && !groups ? buildings.find((candidate) => candidate.id === point.building) ?? null : null}
+      expanded={expandedIds.has(point.id)}
+      onToggle={() => setExpandedIds((current) => toggled(current, point.id))}
+      deleteMeteringPointPending={deleteMeteringPointPending}
+      deleteAssignmentPending={deleteAssignmentPending}
+      dialogLoading={dialogLoading}
+      confirm={confirm}
+      onOpenCreateAssignModal={onOpenCreateAssignModal}
+      onOpenEditMeteringPoint={onOpenEditMeteringPoint}
+      onOpenDeleteDataModal={onOpenDeleteDataModal}
+      onOpenEditAssignment={onOpenEditAssignment}
+      onDeleteMeteringPoint={onDeleteMeteringPoint}
+      onDeleteAssignment={onDeleteAssignment}
+      onEditBuilding={onEditBuilding}
+    />
+  )
 
-  const renderCard = (point: MeteringPoint) => {
-        const assignments = assignmentsByMeteringPoint.get(point.id) ?? []
-        const sortedAssignments = [...assignments].sort((left, right) => {
-          const leftState = getAssignmentState(left, todayIso)
-          const rightState = getAssignmentState(right, todayIso)
-          const stateDelta = assignmentStateSortOrder(leftState) - assignmentStateSortOrder(rightState)
+  const sheetClass = `metering-sheet${isManagedScope ? ' metering-sheet-holders' : ''}`
+  const columns = (
+    <div className="metering-point-columns" aria-hidden="true">
+      <span />
+      <span>{t('pages.meteringPoints.columns.meter')}</span>
+      {isManagedScope && <span>{t('pages.meteringPoints.columns.holder')}</span>}
+      <span>{t('pages.meteringPoints.columns.lastReading')}</span>
+      <span />
+    </div>
+  )
 
-          if (stateDelta !== 0) return stateDelta
-          return right.valid_from.localeCompare(left.valid_from)
-        })
-
-        const health = healthByMeteringPoint.get(point.id) ?? 'no_data'
-        const isHolderLess = holderLessByMeteringPoint.get(point.id) ?? false
-        // The common case (one tenant, ongoing) doesn't need the full
-        // history layout — collapse it to a single line (#624).
-        const isSingleCurrentHolder = sortedAssignments.length === 1
-          && getAssignmentState(sortedAssignments[0], todayIso) === 'current'
-
-        const pointMenuItems: ActionMenuItem[] = []
-        if (isManagedScope && !readOnly) {
-          pointMenuItems.push({
-            key: 'edit',
-            label: t('common.edit'),
-            icon: <FontAwesomeIcon icon={faPen} fixedWidth />,
-            onClick: () => onOpenEditMeteringPoint(point),
-          })
-
-          if (canDeleteData) {
-            pointMenuItems.push({
-              key: 'delete-data',
-              label: t('pages.meteringPoints.deleteData.button'),
-              icon: <FontAwesomeIcon icon={faDatabase} fixedWidth />,
-              onClick: () => onOpenDeleteDataModal(point),
-            })
-          }
-
-          pointMenuItems.push({
-            key: 'delete',
-            label: t('common.delete'),
-            icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
-            disabled: deleteMeteringPointPending || dialogLoading,
-            danger: true,
-            onClick: () =>
-              confirm({
-                title: t('pages.meteringPoints.deleteTitle'),
-                message: t('pages.meteringPoints.deleteMessage', {
-                  meterId: point.meter_id,
-                  readingCount: point.reading_count,
-                  assignmentCount: point.assignment_count,
-                }),
-                confirmText: t('pages.meteringPoints.deleteConfirm'),
-                isDangerous: true,
-                onConfirm: () => onDeleteMeteringPoint(point.id),
-              }),
-          })
-        }
-
-        return (
-          <article key={point.id} className="metering-point-card">
-            <div className="metering-point-card-header">
-              <div className="metering-point-title">
-                <strong>{point.meter_id}</strong>
-                {showBuilding && !groups && <span className="muted">{point.building_name}</span>}
-                <span className="muted">{point.location_description || t('pages.meteringPoints.noLocation')}</span>
-                <div className="metering-point-badges">
-                  <span className={point.is_active ? 'badge badge-success' : 'badge badge-neutral'}>
-                    {point.is_active ? t('pages.meteringPoints.active') : t('pages.meteringPoints.inactive')}
-                  </span>
-                  <span className="badge badge-tag">{t(`pages.meteringPoints.meterTypes.${point.meter_type}`)}</span>
-                  {point.has_behind_meter_generation && <BehindMeterBadge />}
-                  {isManagedScope && (
-                    <SupplementarySourceStatus point={point} canManage={!readOnly} confirm={confirm} />
-                  )}
-                  <Link
-                    className={meteringPointHealthBadgeClass(health)}
-                    style={{ textDecoration: 'none' }}
-                    to={`/metering-data?metering_point=${point.id}&tab=quality`}
-                    title={t('pages.meteringPoints.health.linkHint')}
-                  >
-                    {t(`pages.meteringPoints.health.${health}`)}
-                  </Link>
-                  {isHolderLess && (
-                    <span className="badge badge-danger" title={t('pages.meteringPoints.holderLessHint')}>
-                      <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />
-                      {t('pages.meteringPoints.holderLessBadge')}
-                    </span>
-                  )}
-                </div>
-                <span className="muted">
-                  {point.last_reading_at
-                    ? t('pages.meteringPoints.lastReading', { date: formatDateTime(point.last_reading_at, settings) })
-                    : t('pages.meteringPoints.neverReceivedData')}
-                </span>
-              </div>
-
-              <div className="metering-point-actions">
-                {isManagedScope && !readOnly && (
-                  <button
-                    className="button button-primary button-outline button-compact"
-                    type="button"
-                    onClick={() => onOpenCreateAssignModal(point.id)}
-                  >
-                    <FontAwesomeIcon icon={faUserPlus} fixedWidth />
-                    {t('pages.meteringPoints.assign')}
-                  </button>
-                )}
-                <Link
-                  className="button button-secondary button-compact"
-                  style={{ textDecoration: 'none' }}
-                  to={`/metering/chart?metering_point=${point.id}`}
-                >
-                  <FontAwesomeIcon icon={faChartLine} fixedWidth />
-                  {t('pages.meteringPoints.chart')}
-                </Link>
-                {isManagedScope && !readOnly && (
-                  <ActionMenu
-                    label={t('pages.meteringPoints.moreActions')}
-                    icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
-                    items={pointMenuItems}
-                  />
-                )}
-              </div>
-            </div>
-
-            {isManagedScope && (
-              <div className="metering-point-body">
-                {isSingleCurrentHolder ? (
-                  <div className="metering-assignment-compact">
-                    <span>
-                      {t('pages.meteringPoints.heldBySince', {
-                        name: participantNameById.get(sortedAssignments[0].participant) ?? sortedAssignments[0].participant,
-                        date: formatShortDate(sortedAssignments[0].valid_from, settings),
-                      })}
-                      {sortedAssignments[0].allocation_mode === 'community' && (
-                        <span className="badge badge-tag metering-assignment-compact-badge">
-                          {t('pages.meteringPoints.communityBadge')}
-                        </span>
-                      )}
-                    </span>
-                    {!readOnly && (
-                    <div className="metering-assignment-actions">
-                      <button
-                        className="button button-secondary button-compact"
-                        type="button"
-                        onClick={() => onOpenEditAssignment(sortedAssignments[0])}
-                      >
-                        <FontAwesomeIcon icon={faPen} fixedWidth />
-                        {t('common.edit')}
-                      </button>
-                      <ActionMenu
-                        label={t('pages.meteringPoints.moreActions')}
-                        icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
-                        items={assignmentMenuItems(sortedAssignments[0])}
-                      />
-                    </div>
-                    )}
-                  </div>
-                ) : sortedAssignments.length > 0 ? (
-                  <div className="metering-assignment-list">
-                    {sortedAssignments.map((assignment) => {
-                      const assignmentState = getAssignmentState(assignment, todayIso)
-                      return (
-                        <div key={assignment.id} className="metering-assignment-row">
-                          <div className="metering-assignment-main">
-                            <div className="metering-assignment-line">
-                              <strong>{participantNameById.get(assignment.participant) ?? assignment.participant}</strong>
-                              <span className={assignmentStateBadgeClass(assignmentState)}>
-                                {t(`pages.meteringPoints.assignmentState.${assignmentState}`)}
-                              </span>
-                              {assignment.allocation_mode === 'community' && (
-                                <span className="badge badge-tag">
-                                  {t('pages.meteringPoints.communityBadge')}
-                                </span>
-                              )}
-                            </div>
-                            <div className="muted">
-                              {formatShortDate(assignment.valid_from, settings)} -{' '}
-                              {assignment.valid_to ? formatShortDate(assignment.valid_to, settings) : t('pages.meteringPoints.openEnded')}
-                            </div>
-                          </div>
-
-                          {!readOnly && (
-                          <div className="metering-assignment-actions">
-                            <button
-                              className="button button-secondary button-compact"
-                              type="button"
-                              onClick={() => onOpenEditAssignment(assignment)}
-                            >
-                              <FontAwesomeIcon icon={faPen} fixedWidth />
-                              {t('common.edit')}
-                            </button>
-                            <ActionMenu
-                              label={t('pages.meteringPoints.moreActions')}
-                              icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
-                              items={assignmentMenuItems(assignment)}
-                            />
-                          </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <p className="muted metering-no-assignments">{t('pages.meteringPoints.noAssignments')}</p>
-                )}
-              </div>
-            )}
-          </article>
-        )
-  }
-
-  if (groups) {
+  if (groups && renderGroupHeader) {
     return (
       <div className="building-groups">
-        {groups.map((group) => (
-          <section key={group.building.id} className="building-group">
-            {renderGroupHeader?.(group)}
-            {group.points.length === 0 ? (
-              <p className="muted building-group-empty">{t('pages.meteringPoints.buildings.emptyGroup')}</p>
-            ) : (
-              <div className="metering-point-list">{group.points.map(renderCard)}</div>
-            )}
-          </section>
-        ))}
+        {groups.map((group) => {
+          const panelId = `building-panel-${group.building.id}`
+          const collapsed = collapsedBuildingIds.has(group.building.id) && !filtersActive
+          return (
+            <section key={group.building.id} className={`building-group ${sheetClass}`}>
+              {renderGroupHeader(group, {
+                collapsed,
+                onToggle: filtersActive ? undefined : () => setCollapsedBuildingIds((current) => toggled(current, group.building.id)),
+                panelId,
+                statusCounts: countMeteringPointStatuses(group.points, statusByMeteringPoint),
+              })}
+              <div id={panelId} hidden={collapsed}>
+                {group.points.length === 0 ? (
+                  <p className="muted building-group-empty">{t('pages.meteringPoints.buildings.emptyGroup')}</p>
+                ) : (
+                  <>
+                    {columns}
+                    <div className="metering-point-list">{group.points.map(renderRow)}</div>
+                  </>
+                )}
+              </div>
+            </section>
+          )
+        })}
       </div>
     )
   }
 
-  return <div className="metering-point-list">{meteringPoints.map(renderCard)}</div>
+  return (
+    <div className={sheetClass}>
+      {columns}
+      <div className="metering-point-list">{meteringPoints.map(renderRow)}</div>
+    </div>
+  )
 }
