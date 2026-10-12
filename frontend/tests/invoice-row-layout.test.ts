@@ -75,6 +75,7 @@ describe('invoice period row layout', () => {
         expect(rowsOf(container)[0].children[2].textContent).toBe('CHF 12.30')
         // The legend explains the step icons once, below the rows.
         expect(container.querySelector('.invoice-progress-legend')?.textContent).toContain('pages.invoices.progress.steps.metering')
+        expect(container.querySelector('.invoice-rows .invoice-progress-legend')).toBeNull()
     })
 
     it('puts the invoice number in the identity cell as the row\'s only detail link', async () => {

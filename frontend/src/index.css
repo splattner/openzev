@@ -1697,6 +1697,18 @@ label > small.muted {
   border-top-right-radius: calc(var(--radius-lg) - 1px);
 }
 
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table):last-child {
+  margin-bottom: calc(-1 * var(--sheet-pad-block));
+}
+
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table):last-child tbody tr:last-child > td:first-child {
+  border-bottom-left-radius: calc(var(--radius-lg) - 1px);
+}
+
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table):last-child tbody tr:last-child > td:last-child {
+  border-bottom-right-radius: calc(var(--radius-lg) - 1px);
+}
+
 /* A sheet's title: the documents' section heading (invoice page 3
    `.section-title`). Also when a toolbar or a card header carries the title
    beside the sheet's controls. */
@@ -3807,6 +3819,10 @@ input.recurrence-chip-input {
 
   .invoice-rows tbody tr:first-child {
     padding-top: 0.2rem;
+  }
+
+  .invoice-rows tbody tr:last-child {
+    border-bottom: 0;
   }
 
   /* No band to meet the sheet's top: the cards start at its inset, their

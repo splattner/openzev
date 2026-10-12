@@ -1230,7 +1230,7 @@ the cockpit readiness and attention caches.
 - Full coverage can come from one or more sent/paid invoices in other periods.
   Such a row shows **Already billed** and a representative invoice link in
   Progress, retaining the viewed period for return navigation.
-- The progress legend explains the icons and completion marks. Steps have
+- The progress legend sits outside the table sheet, below the rows, and explains the icons and completion marks. Steps have
   textual accessible labels and tooltips. Delivery shows the latest attempt
   only; Billing Emails owns attempt history and retries.
 - The compact period selector and batch actions share the command bar.

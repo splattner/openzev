@@ -200,7 +200,7 @@ Each row in the table represents one **participant** who had active metering-poi
 | Column | Description |
 |---|---|
 | **Participant** | Current participant name, invoice link and relevant participation dates. Meter locations distinguish several participations held by the same party. Problems appear below the name. |
-| **Progress** | Metering data → Invoice → Approved → Sent → Paid. Checks show completed steps, spinners show pending work, and warning marks show problems. The legend explains the icons. |
+| **Progress** | Metering data → Invoice → Approved → Sent → Paid. Checks show completed steps, spinners show pending work, and warning marks show problems. The legend below the table sheet explains the icons. |
 | **Amount (CHF)** | The invoice amount; *-* without a live invoice. |
 | **Actions** | The next step and **More**. Viewers and managers of disabled communities retain **Review conflict** and **Open PDF**. |
 
