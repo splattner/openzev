@@ -46,17 +46,6 @@ export function groupMeteringPointsByBuilding(
     .filter((group) => group.points.length > 0 || (!filtersActive && group.building.metering_point_count === 0))
 }
 
-/**
- * Whether the building level adds nothing: several buildings, each holding
- * exactly one meter. A group header per single meter only repeats the meter,
- * so the list stays flat and each row names its building instead. A building
- * with no meters keeps the grouped layout, so it stays reachable (its header
- * is where a meter is added to it).
- */
-export function isBuildingLevelRedundant(buildings: Building[]): boolean {
-  return buildings.length > 1 && buildings.every((building) => building.metering_point_count === 1)
-}
-
 export type AssignmentState = 'current' | 'upcoming' | 'ended'
 
 export function getAssignmentState(assignment: MeteringPointAssignment, todayIso: string): AssignmentState {

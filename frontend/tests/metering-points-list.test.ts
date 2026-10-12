@@ -19,7 +19,6 @@ import {
     countMeteringPointStatuses,
     getMeteringPointStatus,
     groupMeteringPointsByBuilding,
-    isBuildingLevelRedundant,
     meteringPointStatusLabelKey,
     readMeteringPointSort,
     sortMeteringPoints,
@@ -115,21 +114,6 @@ describe('countMeteringPointStatuses', () => {
     })
 })
 
-describe('isBuildingLevelRedundant', () => {
-    it('is true for several buildings with one meter each', () => {
-        expect(isBuildingLevelRedundant([building('a', 'A', 1), building('b', 'B', 1)])).toBe(true)
-    })
-
-    it('is false when a building holds several meters or none, so it stays reachable', () => {
-        expect(isBuildingLevelRedundant([building('a', 'A', 2), building('b', 'B', 1)])).toBe(false)
-        expect(isBuildingLevelRedundant([building('a', 'A', 1), building('b', 'B', 0)])).toBe(false)
-    })
-
-    it('is false for a single building, which has its own one-line header', () => {
-        expect(isBuildingLevelRedundant([building('a', 'A', 1)])).toBe(false)
-    })
-})
-
 describe('MeteringPointsList', () => {
     let root: ReturnType<typeof createRoot> | null = null
     let container: HTMLDivElement | null = null
@@ -165,11 +149,9 @@ describe('MeteringPointsList', () => {
             holderLessByMeteringPoint: new Map(),
             settings: {} as never,
             isManagedScope: true,
-            buildings,
             groups,
             renderGroupHeader: (group, state) => createElement(BuildingHeader, {
-                building: group.building, landowners: [], variant: 'group', canManage: true, onEdit: noop,
-                statusCounts: state.statusCounts, collapsed: state.collapsed, onToggleCollapsed: state.onToggle, panelId: state.panelId,
+                building: group.building, landowners: [], canManage: true, onEdit: noop, statusCounts: state.statusCounts,
             }),
             canDeleteData: false,
             deleteMeteringPointPending: false,
@@ -234,25 +216,6 @@ describe('MeteringPointsList', () => {
         expect(view.querySelector('.metering-point-detail')).toBeNull()
         act(() => row.querySelector<HTMLElement>('a')!.click())
         expect(view.querySelector('.metering-point-detail')).toBeNull()
-    })
-
-    it('folds a building away from its header, keeping the header', () => {
-        const view = render({ points })
-        const toggle = view.querySelector<HTMLButtonElement>('.building-header-toggle')!
-        const panel = view.querySelector<HTMLElement>(`#${toggle.getAttribute('aria-controls')}`)!
-        expect(toggle.getAttribute('aria-expanded')).toBe('true')
-        expect(panel.hidden).toBe(false)
-        act(() => toggle.click())
-        expect(toggle.getAttribute('aria-expanded')).toBe('false')
-        expect(panel.hidden).toBe(true)
-        expect(view.querySelectorAll('.building-group').length).toBe(2)
-    })
-
-    it('never folds the matches away while a filter is active', () => {
-        const view = render({ points, filtersActive: true })
-        expect(view.querySelector('button.building-header-toggle')).toBeNull()
-        expect(view.querySelector('div.building-header-toggle')).not.toBeNull()
-        expect(Array.from(view.querySelectorAll<HTMLElement>('.building-group > div[id]')).every((panel) => !panel.hidden)).toBe(true)
     })
 
     it('sums a building up in its header: what needs a look, or that all is well', () => {
@@ -329,11 +292,23 @@ describe('MeteringPointsList', () => {
         }
     })
 
-    it('names the building under each meter of an ungrouped list', () => {
-        const view = render({ points: [points[0], points[2]], groups: null, showBuilding: true })
-        expect(view.querySelector('.building-group')).toBeNull()
+    it('gives every building the same header, one or several', () => {
+        const single = render({ points: [points[0]], groups: groupMeteringPointsByBuilding([building('b1', 'Haus A', 1)], [points[0]], { filtersActive: false }) })
+        expect(single.querySelectorAll('.building-header').length).toBe(1)
+        expect(single.querySelector('.building-header-name')!.textContent).toBe('Haus A')
+    })
+
+    it('has nothing to fold: a building header is not a button', () => {
+        const view = render({ points })
+        expect(view.querySelector('.building-header-toggle, .building-header-chevron')).toBeNull()
+        const headerName = view.querySelector('.building-header-name')!
+        expect(headerName.closest('button')).toBeNull()
+    })
+
+    it('names no building under the meters: the group header already does', () => {
+        const view = render({ points })
         const subtitles = Array.from(view.querySelectorAll('.metering-point-subtitle')).map((node) => node.textContent)
-        expect(subtitles).toEqual(['Haus A', 'Haus A'])
+        expect(subtitles.some((text) => text?.includes('Haus'))).toBe(false)
     })
 
     it('leaves out the holder column for a role that has no assignments', () => {

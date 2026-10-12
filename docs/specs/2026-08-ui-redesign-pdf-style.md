@@ -1124,23 +1124,17 @@ contracts are unchanged.
   `.pdf-preview-link`) are paper strips around the document.
 - Metering points (`features/meteringPoints/*`): buildings are sheets, meters
   are rows, so the page shows what is wrong first and the rest on request.
-  - **Building sheet** (`.metering-sheet` + `.building-group`, several buildings): a
-    `--brand-pale` header band with a `--brand-mid` left edge (`BuildingHeader`
-    `variant="group"`). Its name and address are a `button.building-header-toggle`
-    (`aria-expanded`, `aria-controls` the meters' panel) that folds the meters away;
-    folded state is kept in `MeteringPointsList` for the visit only. Beside it: the
-    **roll-up** (`.building-rollup`: a dot and a count for each of the building's
-    meters that need action, have data gaps or have no data yet, worst first, or
-    "All good"; healthy and inactive meters are not counted; it sums up all of
-    the building's meters, whatever the filters leave in the list), "Add metering
-    point" and an `ActionMenu` with "Edit building" (and "Delete building" while
-    the building is empty). While a filter is active the header is not a button
-    and the matches stay open, so a search never hides its own results.
-  - **Flat list:** one building, or several that hold exactly one meter each
-    (`isBuildingLevelRedundant`: every `metering_point_count === 1`), render
-    one sheet of rows without group headers; with several buildings each row
-    names its building under the ID and its menu has "Edit building". A building
-    with no meters keeps the grouped layout, so it stays reachable.
+  - **Building sheet** (`.metering-sheet` + `.building-group`; one per building, for one
+    building as for several): a `--brand-pale` header band with a `--brand-mid` left edge
+    (`BuildingHeader`): name, address, EGID, landowners and the meter count, the **roll-up**
+    (`.building-rollup`: a dot and a text for each of the building's meters that need
+    action, have data gaps or have no data yet, worst first, or "All good"; healthy and
+    inactive meters are not counted; it sums up all of the building's meters, whatever the
+    filters leave in the list), "Add metering point" and an `ActionMenu` with "Edit building"
+    (and "Delete building" while the building is empty); the last two for managers only.
+    The header is not a toggle: buildings do not fold. A role that has no buildings loaded
+    (participants), or a community whose buildings have not arrived yet, gets one plain sheet
+    of rows without a header.
   - **Row** (`MeteringPointRow`, grid `.metering-point-row`; columns Meter,
     Holder (managers), Last reading, actions, all fixed or fractional so the
     column heads stay over their columns; the heads are the tables' band —
@@ -1151,13 +1145,13 @@ contracts are unchanged.
     pending for no data, ok otherwise; the label is its accessible name),
     the meter ID with badges only for the unusual (Inactive, No current holder,
     Surplus metering, a supplementary source in `error` / `reconnect_required`),
-    the location (or, in a flat multi-building list, `building · location`), the
+    the location (or "No location set"), the
     meter type only as a muted icon before the ID (`.metering-point-type`; its
     name is the tooltip and the `aria-label`, and the details name it), the holder (name, "+N" for further current
     holders, "since", Community badge, "N earlier"; an upcoming-only holder
     shows its Upcoming badge), the last reading's date ("Never") and a quiet
-    action cluster: Chart link, `⋯` menu (Assign participant, Edit, Edit
-    building in a flat list, Delete data, Delete) and the expand button. A
+    action cluster: Chart link, `⋯` menu (Assign participant, Edit, Delete data,
+    Delete) and the expand button. A
     meter with no holder today that is active shows the one primary
     action inline in the holder column: **Assign participant**
     (`button-primary button-outline`). A row with a danger status has a faint
@@ -1234,18 +1228,16 @@ contracts are unchanged.
   narrow-tile fixture (`screenshots/fixtures/page-layout.tsx`) includes a
   date-and-time tile, so a tile that spills fails the `.stat-grid` overflow
   check.
-- `tests/metering-points-list.test.ts` (29): the status mapping and its label,
+- `tests/metering-points-list.test.ts` (26): the status mapping and its label,
   the sorts (worst first with numeric tie-breaks, unset locations last,
-  stalest reading first, the unknown URL value), the status tally, the
-  one-meter-per-building rule, and the list itself: "Assign participant" only on
+  stalest reading first, the unknown URL value), the status tally, and the list itself: "Assign participant" only on
   a meter nobody holds, a holder with "+1", rows opening from their button and
   from their blank area but not from a control or the end of a text selection,
-  a building folding away from its header, no folding while a filter is active,
+  every building, one or several, getting the same header, which is not a toggle,
   the header roll-up (also from the meters a filter hides), an upcoming-only
   holder, the "N earlier" count, no prompt for an inactive meter nobody holds,
-  a viewer's list without Assign, menu or assignment controls, the
-  building named under each row of a flat list, and no holder column for a role
-  without assignments.
+  a viewer's list without Assign, menu or assignment controls, no building
+  named under the rows, and no holder column for a role without assignments.
 - `screenshots/field-geometry.spec.ts`: the field contract is now 16px values,
   14px/500 labels, 13px helpers, 8px radius, 40px height (the buttons').
 - Backend: the full suite passes against PostgreSQL with Inter installed

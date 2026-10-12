@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { todayBusinessIso } from '../../lib/dates'
-import type { AppSettings, Building, MeteringPoint, MeteringPointAssignment } from '../../types/api'
+import type { AppSettings, MeteringPoint, MeteringPointAssignment } from '../../types/api'
 import { MeteringPointRow, type ConfirmOptions } from './MeteringPointRow'
 import {
   countMeteringPointStatuses,
@@ -10,13 +10,8 @@ import {
   type MeteringPointStatus,
 } from './useMeteringPointForms'
 
-/** What a group's header needs to be the toggle of its meters and to summarise them. */
+/** What a group's header needs to sum its meters up. */
 export type BuildingGroupHeaderState = {
-  collapsed: boolean
-  /** Absent while a filter is active: the matches are then always shown. */
-  onToggle?: () => void
-  /** The id of the element holding the group's meters. */
-  panelId: string
   statusCounts: Record<MeteringPointStatus, number>
 }
 
@@ -32,14 +27,9 @@ type MeteringPointsListProps = {
   holderLessByMeteringPoint: Map<string, boolean>
   settings: AppSettings
   isManagedScope: boolean
-  /** Name the building under each meter; only for a ZEV with several buildings and no group headers (#890). */
-  showBuilding?: boolean
-  buildings?: Building[]
-  /** Several buildings: the meters grouped by building, each group headed by `renderGroupHeader`. */
+  /** The meters grouped by building, each group headed by `renderGroupHeader`; without them (a role that has no buildings) one plain list. */
   groups?: BuildingGroup[] | null
   renderGroupHeader?: (group: BuildingGroup, state: BuildingGroupHeaderState) => ReactNode
-  /** Whether a filter narrows the list; the matches are never folded away. */
-  filtersActive?: boolean
   /** A viewer reads only (#761): no edit, assign, delete. */
   readOnly?: boolean
   canDeleteData: boolean
@@ -53,14 +43,6 @@ type MeteringPointsListProps = {
   onOpenEditAssignment: (assignment: MeteringPointAssignment) => void
   onDeleteMeteringPoint: (id: string) => void
   onDeleteAssignment: (id: string) => void
-  onEditBuilding?: (building: Building) => void
-}
-
-function toggled(set: Set<string>, id: string): Set<string> {
-  const next = new Set(set)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  return next
 }
 
 export function MeteringPointsList({
@@ -73,11 +55,8 @@ export function MeteringPointsList({
   holderLessByMeteringPoint,
   settings,
   isManagedScope,
-  showBuilding = false,
-  buildings = [],
   groups = null,
   renderGroupHeader,
-  filtersActive = false,
   readOnly = false,
   canDeleteData,
   deleteMeteringPointPending,
@@ -90,12 +69,10 @@ export function MeteringPointsList({
   onOpenEditAssignment,
   onDeleteMeteringPoint,
   onDeleteAssignment,
-  onEditBuilding,
 }: MeteringPointsListProps) {
   const { t } = useTranslation()
   const todayIso = todayBusinessIso()
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
-  const [collapsedBuildingIds, setCollapsedBuildingIds] = useState<Set<string>>(() => new Set())
 
   const renderRow = (point: MeteringPoint) => (
     <MeteringPointRow
@@ -111,10 +88,12 @@ export function MeteringPointsList({
       isManagedScope={isManagedScope}
       readOnly={readOnly}
       canDeleteData={canDeleteData}
-      buildingLabel={showBuilding && !groups ? point.building_name : null}
-      building={showBuilding && !groups ? buildings.find((candidate) => candidate.id === point.building) ?? null : null}
       expanded={expandedIds.has(point.id)}
-      onToggle={() => setExpandedIds((current) => toggled(current, point.id))}
+      onToggle={() => setExpandedIds((current) => {
+        const next = new Set(current)
+        if (!next.delete(point.id)) next.add(point.id)
+        return next
+      })}
       deleteMeteringPointPending={deleteMeteringPointPending}
       deleteAssignmentPending={deleteAssignmentPending}
       dialogLoading={dialogLoading}
@@ -125,7 +104,6 @@ export function MeteringPointsList({
       onOpenEditAssignment={onOpenEditAssignment}
       onDeleteMeteringPoint={onDeleteMeteringPoint}
       onDeleteAssignment={onDeleteAssignment}
-      onEditBuilding={onEditBuilding}
     />
   )
 
@@ -143,33 +121,24 @@ export function MeteringPointsList({
   if (groups && renderGroupHeader) {
     return (
       <div className="building-groups">
-        {groups.map((group) => {
-          const panelId = `building-panel-${group.building.id}`
-          const collapsed = collapsedBuildingIds.has(group.building.id) && !filtersActive
-          return (
-            <section key={group.building.id} className={`building-group ${sheetClass}`}>
-              {renderGroupHeader(group, {
-                collapsed,
-                onToggle: filtersActive ? undefined : () => setCollapsedBuildingIds((current) => toggled(current, group.building.id)),
-                panelId,
-                statusCounts: countMeteringPointStatuses(
-                  (allMeteringPoints ?? meteringPoints).filter((candidate) => candidate.building === group.building.id),
-                  statusByMeteringPoint,
-                ),
-              })}
-              <div id={panelId} hidden={collapsed}>
-                {group.points.length === 0 ? (
-                  <p className="muted building-group-empty">{t('pages.meteringPoints.buildings.emptyGroup')}</p>
-                ) : (
-                  <>
-                    {columns}
-                    <div className="metering-point-list">{group.points.map(renderRow)}</div>
-                  </>
-                )}
-              </div>
-            </section>
-          )
-        })}
+        {groups.map((group) => (
+          <section key={group.building.id} className={`building-group ${sheetClass}`}>
+            {renderGroupHeader(group, {
+              statusCounts: countMeteringPointStatuses(
+                (allMeteringPoints ?? meteringPoints).filter((candidate) => candidate.building === group.building.id),
+                statusByMeteringPoint,
+              ),
+            })}
+            {group.points.length === 0 ? (
+              <p className="muted building-group-empty">{t('pages.meteringPoints.buildings.emptyGroup')}</p>
+            ) : (
+              <>
+                {columns}
+                <div className="metering-point-list">{group.points.map(renderRow)}</div>
+              </>
+            )}
+          </section>
+        ))}
       </div>
     )
   }

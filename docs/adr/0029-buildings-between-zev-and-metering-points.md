@@ -63,8 +63,8 @@ whether a participant's billing address is where its meter is. The cases this AD
 **7. Buildings are managed on the metering points page.** A building only matters as where
 its meters are, and that page is where meters are added: a vZEV operator onboarding a new
 participant's house adds the building and its meters in one place. With several buildings the
-list is grouped by building, each group headed by the building with its actions; with one, a
-compact building line sits above the list. Only the landowner link stays in People & access,
+list is grouped by building, each group headed by the building with its actions, whether the
+ZEV has one building or several. Only the landowner link stays in People & access,
 because it belongs to the role. The participant form can copy a building's address as the
 billing address.
 

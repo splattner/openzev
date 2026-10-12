@@ -2895,55 +2895,18 @@ input.recurrence-chip-input {
   justify-content: space-between;
   gap: 0.75rem 1rem;
   flex-wrap: wrap;
-}
-
-/* One building: a quiet line naming it above the sheet. */
-.building-header-line {
-  padding: 0 0.125rem;
-}
-
-.building-header-group {
   padding: 0.75rem 1rem;
   background: var(--brand-pale);
   border-bottom: 1px solid var(--brand-muted);
   box-shadow: inset 4px 0 0 var(--brand-mid);
 }
 
-.building-header-group.is-collapsed {
-  border-bottom: 0;
-}
-
-/* The name and address are the toggle that folds the building's meters away. */
-.building-header-toggle {
+.building-header-id {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   flex: 1 1 16rem;
   min-width: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-}
-
-button.building-header-toggle {
-  cursor: pointer;
-}
-
-/* With a filter active the matches stay open, so there is nothing to toggle. */
-div.building-header-toggle .building-header-chevron {
-  display: none;
-}
-
-.building-header-chevron {
-  color: var(--brand-mid);
-  transition: transform 0.15s ease;
-}
-
-.is-collapsed .building-header-chevron {
-  transform: rotate(-90deg);
 }
 
 .building-header-icon {
@@ -2967,7 +2930,7 @@ div.building-header-toggle .building-header-chevron {
   margin-left: auto;
 }
 
-/* What needs a look in the building, still visible when it is folded away. */
+/* What needs a look in the building. */
 .building-rollup {
   display: inline-flex;
   align-items: center;
@@ -2990,12 +2953,8 @@ div.building-header-toggle .building-header-chevron {
 .building-header-main {
   display: grid;
   gap: 0.15rem;
-  flex: 1 1 260px;
-  min-width: 0;
-}
-
-.building-header-toggle .building-header-main {
   flex: 1 1 auto;
+  min-width: 0;
 }
 
 .building-header-name {
@@ -3006,10 +2965,6 @@ div.building-header-toggle .building-header-chevron {
   font-size: 1.0625rem;
   font-weight: 650;
   color: var(--text-heading);
-}
-
-.building-header-line .building-header-name {
-  font-size: 0.9375rem;
 }
 
 .building-header-meta {

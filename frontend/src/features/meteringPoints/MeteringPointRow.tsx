@@ -13,7 +13,6 @@ import {
   faTrash,
   faTriangleExclamation,
   faUserPlus,
-  faBuilding,
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons'
 import { Link } from 'react-router-dom'
@@ -24,7 +23,7 @@ import { formatDateTime, formatShortDate } from '../../lib/appSettings'
 import { formatBusinessIsoDate } from '../../lib/dates'
 import { formatNumber } from '../../lib/numbers'
 import { statusTone } from '../../lib/supplementary'
-import type { AppSettings, Building, MeteringPoint, MeteringPointAssignment } from '../../types/api'
+import type { AppSettings, MeteringPoint, MeteringPointAssignment } from '../../types/api'
 import { MeteringPointStatusDot } from './MeteringPointStatusDot'
 import { SupplementarySourceStatus } from './SupplementarySourceStatus'
 import {
@@ -63,10 +62,6 @@ type MeteringPointRowProps = {
   isManagedScope: boolean
   readOnly: boolean
   canDeleteData: boolean
-  /** The meter's building, named under its ID when the list is not grouped by building. */
-  buildingLabel: string | null
-  /** A list of buildings with one meter each has no group header, so the row's menu edits the building. */
-  building: Building | null
   expanded: boolean
   onToggle: () => void
   deleteMeteringPointPending: boolean
@@ -79,7 +74,6 @@ type MeteringPointRowProps = {
   onOpenEditAssignment: (assignment: MeteringPointAssignment) => void
   onDeleteMeteringPoint: (id: string) => void
   onDeleteAssignment: (id: string) => void
-  onEditBuilding?: (building: Building) => void
 }
 
 /**
@@ -99,8 +93,6 @@ export function MeteringPointRow({
   isManagedScope,
   readOnly,
   canDeleteData,
-  buildingLabel,
-  building,
   expanded,
   onToggle,
   deleteMeteringPointPending,
@@ -113,7 +105,6 @@ export function MeteringPointRow({
   onOpenEditAssignment,
   onDeleteMeteringPoint,
   onDeleteAssignment,
-  onEditBuilding,
 }: MeteringPointRowProps) {
   const { t } = useTranslation()
   const canWrite = isManagedScope && !readOnly
@@ -134,9 +125,7 @@ export function MeteringPointRow({
   const statusLabel = t(meteringPointStatusLabelKey(status, health, holderLess))
   const typeLabel = t(`pages.meteringPoints.meterTypes.${point.meter_type}`)
   const location = point.location_description?.trim() ?? ''
-  const subtitle = buildingLabel
-    ? [buildingLabel, location].filter(Boolean).join(' · ')
-    : location || t('pages.meteringPoints.noLocation')
+  const subtitle = location || t('pages.meteringPoints.noLocation')
   const lastReadingDate = point.last_reading_at ? formatShortDate(formatBusinessIsoDate(new Date(point.last_reading_at)), settings) : null
   // A source in trouble is worth a badge on the row; a healthy or pending one sits in the details.
   const sourceTone = statusTone(point.supplementary_source_status)
@@ -166,14 +155,6 @@ export function MeteringPointRow({
       icon: <FontAwesomeIcon icon={faPen} fixedWidth />,
       onClick: () => onOpenEditMeteringPoint(point),
     })
-    if (building && onEditBuilding) {
-      pointMenuItems.push({
-        key: 'edit-building',
-        label: t('pages.meteringPoints.buildings.edit'),
-        icon: <FontAwesomeIcon icon={faBuilding} fixedWidth />,
-        onClick: () => onEditBuilding(building),
-      })
-    }
     if (canDeleteData) {
       pointMenuItems.push({
         key: 'delete-data',

@@ -1,5 +1,5 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faBuilding, faChevronDown, faEllipsis, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faBuilding, faEllipsis, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
 import type { Building } from '../../types/api'
@@ -10,17 +10,10 @@ type BuildingHeaderProps = {
   building: Building
   /** Names of the landowners whose role names this building, active today. */
   landowners: string[]
-  /** `line`: the compact line above the list of a one-building ZEV; `group`: the header of a building's group. */
-  variant: 'line' | 'group'
-  /** Managers only: edit (and, in a group, delete and add a metering point). */
+  /** Managers only: add a metering point, edit, and delete an empty building. */
   canManage: boolean
-  /** Group only: how many of the building's meters are in each status, for the roll-up. */
-  statusCounts?: Record<MeteringPointStatus, number>
-  /** Group only: whether the meters are folded away; the header is the toggle, unless `onToggleCollapsed` is absent. */
-  collapsed?: boolean
-  onToggleCollapsed?: () => void
-  /** Group only: the id of the element holding the meters, for `aria-controls`. */
-  panelId?: string
+  /** How many of the building's meters are in each status, for the roll-up. */
+  statusCounts: Record<MeteringPointStatus, number>
   deletePending?: boolean
   onEdit: (building: Building) => void
   onDelete?: (building: Building) => void
@@ -37,7 +30,7 @@ function buildingAddress(building: Building): string {
 /** The statuses worth a number in the header, worst first; healthy and inactive meters are not counted. */
 const ROLLUP_STATUSES = ['danger', 'warning', 'pending'] as const
 
-/** What is wrong in the building at a glance, so a folded header still says whether to open it. */
+/** What is wrong in the building at a glance. */
 function BuildingRollup({ counts }: { counts: Record<MeteringPointStatus, number> }) {
   const { t } = useTranslation()
   const flagged = ROLLUP_STATUSES.filter((status) => counts[status] > 0)
@@ -46,33 +39,26 @@ function BuildingRollup({ counts }: { counts: Record<MeteringPointStatus, number
   }
   return (
     <span className="building-rollup">
-      {flagged.map((status) => {
-        const label = t(`pages.meteringPoints.buildings.rollup.${status}`, { count: counts[status] })
-        return (
-          <span key={status} className="building-rollup-count">
-            <MeteringPointStatusDot status={status} />
-            {label}
-          </span>
-        )
-      })}
+      {flagged.map((status) => (
+        <span key={status} className="building-rollup-count">
+          <MeteringPointStatusDot status={status} />
+          {t(`pages.meteringPoints.buildings.rollup.${status}`, { count: counts[status] })}
+        </span>
+      ))}
     </span>
   )
 }
 
 /**
  * The building a group of metering points is in (#890, ADR 0029): name,
- * address, EGID, landowners and how many meters it holds. In a group it is
- * also the toggle that folds the meters away, and carries the health roll-up.
+ * address, EGID, landowners, how many meters it holds and how they are doing.
+ * Every building has this header, whether the community has one or several.
  */
 export function BuildingHeader({
   building,
   landowners,
-  variant,
   canManage,
   statusCounts,
-  collapsed = false,
-  onToggleCollapsed,
-  panelId,
   deletePending = false,
   onEdit,
   onDelete,
@@ -80,20 +66,6 @@ export function BuildingHeader({
 }: BuildingHeaderProps) {
   const { t } = useTranslation()
   const address = buildingAddress(building)
-  const hasMeters = building.metering_point_count > 0
-  const isGroup = variant === 'group'
-
-  const main = (
-    <>
-      <strong className="building-header-name">{building.name}</strong>
-      <span className="building-header-meta muted">
-        {address && <span>{address}</span>}
-        {building.egid !== null && <span>{t('pages.meteringPoints.buildings.egidBadge', { egid: building.egid })}</span>}
-        {landowners.length > 0 && <span>{t('pages.meteringPoints.buildings.landowners', { names: landowners.join(', ') })}</span>}
-        {isGroup && <span>{t('pages.meteringPoints.buildings.meteringPoints', { count: building.metering_point_count })}</span>}
-      </span>
-    </>
-  )
 
   const menuItems: ActionMenuItem[] = [{
     key: 'edit',
@@ -102,7 +74,7 @@ export function BuildingHeader({
     onClick: () => onEdit(building),
   }]
   // Rare and destructive: overflow + confirm, and only once nothing is left in it.
-  if (isGroup && onDelete && !hasMeters) {
+  if (onDelete && building.metering_point_count === 0) {
     menuItems.push({
       key: 'delete',
       label: t('pages.meteringPoints.buildings.deleteTitle'),
@@ -113,49 +85,24 @@ export function BuildingHeader({
     })
   }
 
-  if (!isGroup) {
-    return (
-      <div className="building-header building-header-line">
-        <div className="building-header-main">{main}</div>
-        {canManage && (
-          <div className="building-header-actions actions-row actions-row-wrap">
-            <button type="button" className="button button-secondary button-compact" onClick={() => onEdit(building)}>
-              <FontAwesomeIcon icon={faPen} fixedWidth />
-              {t('common.edit')}
-            </button>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  const toggleContent = (
-    <>
-      <FontAwesomeIcon icon={faChevronDown} className="building-header-chevron" fixedWidth />
-      <span className="building-header-icon" aria-hidden="true">
-        <FontAwesomeIcon icon={faBuilding} fixedWidth />
-      </span>
-      <span className="building-header-main">{main}</span>
-    </>
-  )
-
   return (
-    <div className={`building-header building-header-group${collapsed ? ' is-collapsed' : ''}`}>
-      {onToggleCollapsed ? (
-        <button
-          type="button"
-          className="building-header-toggle"
-          aria-expanded={!collapsed}
-          aria-controls={panelId}
-          onClick={onToggleCollapsed}
-        >
-          {toggleContent}
-        </button>
-      ) : (
-        <div className="building-header-toggle">{toggleContent}</div>
-      )}
+    <div className="building-header">
+      <div className="building-header-id">
+        <span className="building-header-icon" aria-hidden="true">
+          <FontAwesomeIcon icon={faBuilding} fixedWidth />
+        </span>
+        <div className="building-header-main">
+          <strong className="building-header-name">{building.name}</strong>
+          <span className="building-header-meta muted">
+            {address && <span>{address}</span>}
+            {building.egid !== null && <span>{t('pages.meteringPoints.buildings.egidBadge', { egid: building.egid })}</span>}
+            {landowners.length > 0 && <span>{t('pages.meteringPoints.buildings.landowners', { names: landowners.join(', ') })}</span>}
+            <span>{t('pages.meteringPoints.buildings.meteringPoints', { count: building.metering_point_count })}</span>
+          </span>
+        </div>
+      </div>
       <div className="building-header-side">
-        {statusCounts && <BuildingRollup counts={statusCounts} />}
+        <BuildingRollup counts={statusCounts} />
         {canManage && (
           <div className="building-header-actions actions-row">
             {onAddMeteringPoint && (

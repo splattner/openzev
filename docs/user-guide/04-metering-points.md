@@ -14,8 +14,8 @@ A single participant can be assigned multiple metering points (e.g., PV on roof 
 
 Every metering point also belongs to a **building**, the site where it is — see
 [Buildings](#buildings). The metering point's own
-location text says which unit within the building it measures. With several
-buildings, the page groups the metering points by building and the toolbar offers a **Building** filter.
+location text says which unit within the building it measures. The page groups
+the metering points by building and, with several buildings, the toolbar offers a **Building** filter.
 
 ![Metering points page](screenshots/04-metering-points.png)
 
@@ -52,27 +52,20 @@ are, and both are recorded. Buildings are managed on this page.
 
 - A new ZEV starts with one building, taking the issuer's address when the
   issuer lives at the grid connection's postal code. With a single building
-  the page shows it as one line above the list, with **Edit**, and the meter
-  form does not ask for a building.
+  the meter form does not ask for a building.
 - **Add building** (next to **New Metering Point**) creates one; you can copy
   the address of a participant or other contact. Landowners linked to a
   building (see [People & access](02-zev-setup.md#people-and-access-tab)) are
   named in its header.
-- With several buildings, the metering points are **grouped by building**, ordered by
-  name, each building in a card of its own. The tinted header shows the address,
-  EGID, landowners and number of metering points, and sums up the building's
-  health: how many of its meters need action, have data gaps or have no data
-  yet, or "All good". Click the header to fold the building's meters away —
-  the summary stays visible, so you still see whether a folded building needs a
-  look. **Add metering point** (that building preselected) is in the header, and
+- The metering points are **grouped by building**, ordered by name, each
+  building in a card of its own, whether the community has one building or
+  several. The tinted header shows the address, EGID, landowners and number of
+  metering points, and sums up the building's health: how many of its meters
+  need action, have data gaps or have no data yet, or "All good". **Add
+  metering point** (that building preselected) is in the header, and
   **More → Edit building** next to it. A building without metering points shows
   "No metering points in this building yet". Search and the other filters apply
-  within the groups, which stay open while a filter is active; the **Building**
-  filter shows one group.
-- When every building holds exactly **one** metering point, the buildings add
-  no grouping: the page shows the metering points as one list, with the building
-  named under each meter ID, and **Edit building** is in each meter's **More**
-  menu.
+  within the groups; the **Building** filter shows one group.
 - A building can be deleted only once it is empty: move or delete its meters
   first, then **More → Delete building** appears in its header. Landowner rows that pointed at a deleted building are
   kept, without a building.
@@ -275,8 +268,7 @@ Each meter on the **Metering Points** page is one row that shows, at a glance:
   reason.
 - The **meter ID**, an icon for its **type** (hover for *Consumption*,
   *Production* or *Bidirectional*), its **location** within the building (or
-  "No location set") and, when the community has several buildings and they are
-  not grouped, its **building**
+  "No location set")
 - Badges only for what is unusual: **Inactive**, **No current holder** (the meter
   has readings but nobody is assigned to it), **Surplus metering** when
   [Generation behind the meter](#generation-behind-the-meter) is ticked, and the
