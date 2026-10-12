@@ -3183,8 +3183,9 @@ export const en = {
                 supplementary: {
                     title: 'Energy data',
                     off: 'Switched off.',
-                    sources_one: '{{count}} connected source',
-                    sources_other: '{{count}} connected sources',
+                    sources_one: '{{count}} configured source',
+                    sources_other: '{{count}} configured sources',
+                    unavailable: 'The check could not run.',
                     noKey: 'INTEGRATION_ENCRYPTION_KEYS is not set: Solar Manager keys cannot be stored.',
                     stale_one: '{{count}} source has not synced for a long time.',
                     stale_other: '{{count}} sources have not synced for a long time.',
@@ -3319,6 +3320,7 @@ export const en = {
             notConnected: 'No energy data source is connected to this metering point yet.',
             connect: 'Connect',
             loadError: 'The energy data sources could not be loaded.',
+            eligibilityError: 'Could not check whether energy data is available.',
         },
         card: {
             smId: 'Solar Manager ID',
@@ -3466,6 +3468,7 @@ export const en = {
         off: 'Off',
         updated: 'Feature flag updated.',
         followsDefault: 'Following this instance\'s default. Changing it makes your choice permanent.',
+        controlledByEnv: 'Set by the {{variable}} environment variable on the server; the switch here has no effect.',
     },
     mfaGate: {
         title: 'Set up two-factor authentication',

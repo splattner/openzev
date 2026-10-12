@@ -3172,8 +3172,9 @@ export const de = {
                 supplementary: {
                     title: 'Energiedaten',
                     off: 'Ausgeschaltet.',
-                    sources_one: '{{count}} verbundene Quelle',
-                    sources_other: '{{count}} verbundene Quellen',
+                    sources_one: '{{count}} eingerichtete Quelle',
+                    sources_other: '{{count}} eingerichtete Quellen',
+                    unavailable: 'Die Prüfung konnte nicht ausgeführt werden.',
                     noKey: 'INTEGRATION_ENCRYPTION_KEYS ist nicht gesetzt: Solar-Manager-Schlüssel können nicht gespeichert werden.',
                     stale_one: '{{count}} Quelle wurde seit längerer Zeit nicht synchronisiert.',
                     stale_other: '{{count}} Quellen wurden seit längerer Zeit nicht synchronisiert.',
@@ -3308,6 +3309,7 @@ export const de = {
             notConnected: 'Mit diesem Messpunkt ist noch keine Energiedatenquelle verbunden.',
             connect: 'Verbinden',
             loadError: 'Die Energiedatenquellen konnten nicht geladen werden.',
+            eligibilityError: 'Es konnte nicht geprüft werden, ob Energiedaten verfügbar sind.',
         },
         card: {
             smId: 'Solar-Manager-ID',
@@ -3455,6 +3457,7 @@ export const de = {
         off: 'Aus',
         updated: 'Feature-Flag aktualisiert.',
         followsDefault: 'Folgt der Voreinstellung dieser Instanz. Eine Änderung macht Ihre Wahl dauerhaft.',
+        controlledByEnv: 'Gesetzt durch die Umgebungsvariable {{variable}} auf dem Server; der Schalter hier hat keine Wirkung.',
     },
     mfaGate: {
         title: 'Zwei-Faktor-Authentifizierung einrichten',

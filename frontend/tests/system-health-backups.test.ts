@@ -126,6 +126,12 @@ describe('the energy data card on the system health tab', () => {
         expect(c.querySelector('a')?.getAttribute('href')).toBe('/admin/system-settings?tab=features')
     })
 
+    it('says the check could not run when the probe reports nothing about the feature', async () => {
+        const c = energyCard(await render({ status: 'unknown' }, { status: 'unknown' }))
+        expect(c.textContent).toContain('pages.adminOverview.health.supplementary.unavailable')
+        expect(c.textContent).not.toContain('pages.adminOverview.health.supplementary.off')
+    })
+
     it('flags a missing key and stale sources', async () => {
         const c = energyCard(await render({ status: 'unknown' }, {
             status: 'degraded', feature_enabled: true, encryption_key_configured: false,

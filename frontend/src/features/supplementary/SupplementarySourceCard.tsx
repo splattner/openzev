@@ -55,6 +55,8 @@ export function SupplementarySourceCard({ point, source, confirm }: Props) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.metering.supplementarySources() })
         void queryClient.invalidateQueries({ queryKey: queryKeys.metering.supplementaryEligible() })
         void queryClient.invalidateQueries({ queryKey: ['metering', 'dashboard-summary'] })
+        // The status chip on the metering-point list comes from the point itself.
+        void queryClient.invalidateQueries({ queryKey: ['metering', 'points'] })
     }
     const onError = (error: unknown) => pushToast(formatApiError(error, t('common.error')), 'error')
 
@@ -127,7 +129,10 @@ export function SupplementarySourceCard({ point, source, confirm }: Props) {
                         {source.label ? ` · ${source.label}` : ''}
                     </small>
                 </div>
-                <SourceStatusBadge status={source.status} />
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <MeteringDataLink meteringPointId={point.metering_point} />
+                    <SourceStatusBadge status={source.status} />
+                </div>
             </header>
 
             {source.status === 'reconnect_required' && (
@@ -211,7 +216,6 @@ export function SupplementarySourceCard({ point, source, confirm }: Props) {
             {showCsv && !disconnected && <CsvImport sourceId={source.id} />}
 
             <div className="actions-row actions-row-wrap">
-                <MeteringDataLink meteringPointId={point.metering_point} />
                 {isSolar && !disconnected && (
                     <>
                         <button type="button" className="button button-secondary button-compact" disabled={busy} onClick={() => test.mutate()}>

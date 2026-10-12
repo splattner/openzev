@@ -31,9 +31,10 @@ configuration needs.
   unless the row follows its default, then the default. An explicit "off" therefore stays off with
   the key configured, and an explicit "on" stays on without it (push and file sources need no key).
 - **The admin API reports the effective value.** `GET /auth/feature-flags/` returns `enabled` as
-  what the flag currently resolves to and adds read-only `follows_default`, so the toggle shows the
-  truth and the page can say "on because the key is configured". The audit diff of an update
-  compares effective values.
+  what the flag currently resolves to, for every row and including an environment override, and adds
+  read-only `follows_default` and `controlled_by_env`, so the toggle shows the truth and the page can
+  say "on because the key is configured" or "set by the environment". The audit diff of an update
+  covers the effective value and `follows_default`.
 - **Existing rows.** A stored "off" for this flag is migrated to `follows_default = true`: the flag
   has only ever shipped off, and an existing "off" cannot be told from the seeded default. A stored
   "on" is kept as a choice. An admin who had deliberately switched it off and has a key configured

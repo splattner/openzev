@@ -96,6 +96,55 @@ describe('MeteringPointEnergyData without a source', () => {
     })
 })
 
+describe('a push source\'s one-time token', () => {
+    it('stays on screen when the refreshed source list replaces the not-connected card', async () => {
+        const created = source({ provider: 'push', external_id: '', has_credential: false, push_token_prefix: 'abcd' })
+        api.createSupplementarySource.mockResolvedValue({ ...created, push_token: 'ozs_abcd_secret' })
+        const { container } = await mount()
+        await click(buttonWith(container, 'supplementary.section.connect'))
+        const modal = dialog()!
+        await click(Array.from(modal.querySelectorAll<HTMLInputElement>('input[type="radio"]'))[1])
+        await click(modal.querySelector<HTMLInputElement>('input[type="checkbox"]')!)
+        // The list now contains the new source, as it does once the invalidation has refetched it.
+        api.listSupplementarySources.mockResolvedValue([created])
+
+        await act(async () => { buttonWith(modal, 'supplementary.modal.connect').click() })
+        await waitForCondition(() => document.querySelector('[data-testid="push-token"]') !== null, 'the token')
+        await waitForCondition(() => container.textContent?.includes('supplementary.status.ok') ?? false, 'the connected card')
+
+        expect(document.querySelector('[data-testid="push-token"]')?.textContent).toBe('ozs_abcd_secret')
+        await click(buttonWith(dialog()!, 'supplementary.push.dismiss'))
+        expect(document.querySelector('[data-testid="push-token"]')).toBeNull()
+    })
+})
+
+describe('a source that eligibility knows about but whose details are missing', () => {
+    const render = (props: { sourcesUnavailable?: 'loading' | 'error' }) =>
+        renderWithProviders(createElement(MeteringPointEnergyData, { point: { ...point, source: 'src-1' }, source: undefined, confirm: vi.fn(), ...props }), cleanups)
+
+    it.each(['loading', 'error'] as const)('does not offer Connect while the details are %s', async (state) => {
+        const { container } = await render({ sourcesUnavailable: state })
+
+        expect(buttons(container).some((b) => b.textContent?.includes('supplementary.section.connect'))).toBe(false)
+        expect(container.querySelector('a')?.getAttribute('href')).toBe('/metering/chart?metering_point=mp-1')
+    })
+
+    it('offers a retry when they failed to load', async () => {
+        const retry = vi.fn()
+        const { container } = await renderWithProviders(
+            createElement(MeteringPointEnergyData, { point: { ...point, source: 'src-1' }, source: undefined, sourcesUnavailable: 'error', onRetrySources: retry, confirm: vi.fn() }), cleanups)
+
+        await click(buttonWith(container, 'common.retry'))
+        expect(retry).toHaveBeenCalledOnce()
+    })
+
+    it('offers Connect again once the list is known not to contain the source', async () => {
+        const { container } = await render({})
+
+        expect(buttonWith(container, 'supplementary.section.connect')).toBeDefined()
+    })
+})
+
 describe('metering data link', () => {
     it('is offered on a meter without a source and on one with a source', async () => {
         const unconnected = await mount()

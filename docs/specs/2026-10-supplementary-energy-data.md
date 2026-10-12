@@ -275,7 +275,7 @@ All answer `404` while the feature flag is off.
 |---|---|---|---|
 | `/sources/` | GET | `SupplementarySourcePermission` | Scoped list (admin all; manager/viewer their ZEVs; participant their own). Filter `?zev_id=` (as on every ZEV-scoped list), `?metering_point=` |
 | `/sources/` | POST | holder or admin | Create. Requires `consent: true`, a flagged metering point, a free metering point (one source each). `solar_manager`: needs `external_id` and `api_key`; the key is exchanged and one interval fetched **before** anything is saved, so a wrong key is a `400` with a safe message, not a broken row. Without a configured `INTEGRATION_ENCRYPTION_KEYS`: `503` naming the setting. `push`: returns the push token **once** in `push_token`. A provider that is not registered is refused with `400`. After the commit a backfill sync is queued (`backfill=True`, §6.3); a broker outage is logged and does not fail the request. A manager gets `403`; someone who cannot see the metering point gets `400 Invalid pk`, so its existence is not revealed. Audited `supplementary_source.create` |
-| `/sources/eligible/` | GET | authenticated | The flagged metering points the caller personally holds today (enabled ZEVs only), each with its `source` id or `null`; `[]` for anyone else, an admin included. What "My metering points" offers to connect, and what tells the frontend whether the feature is on (`404` = off) |
+| `/sources/eligible/` | GET | authenticated | The flagged metering points the caller personally holds today (enabled ZEVs only), each with its `source` id or `null`; `[]` for anyone who holds none (an admin included, unless they are also linked to a participant). What "My metering points" offers to connect, and what tells the frontend whether the feature is on (`404` = off) |
 | `/sources/{id}/` | GET | scoped | Detail |
 | `/sources/{id}/` | PATCH | holder or admin; manager only for `enabled` | `label`, `enabled`, `external_id`, write-only `api_key`. An absent `api_key` keeps the stored one. A new key, or switching a disabled source back on, queues a sync. Audited `supplementary_source.update` with a diff over the tracked fields and `credential_changed` in metadata, never the value |
 | `/sources/{id}/` | DELETE | holder, manager, admin | Deletes the source **and all its readings**. Audited `supplementary_source.delete` |
@@ -527,7 +527,7 @@ Result stored in `SupplementarySource.reconciliation` (the on-demand view adds `
   pull source (not `pending` or `reconnect_required`, which are the participant's to fix) has not
   succeeded for six sync intervals, else `ok`. It carries `feature_enabled`,
   `encryption_key_configured`, `sources_by_status`, `stale_sources` and `oldest_last_success_at`
-  (the admin System health tab shows it as an "Energy data" card: switched off, connected sources,
+  (the admin System health tab shows it as an "Energy data" card: switched off or the check could not run, configured sources (disconnected ones included),
   a missing key, stale sources, the oldest successful sync, and a link to the Functions tab).
 - **System check:** `metering.W001` warns when the feature flag is forced on through the
   environment (`FEATURE_SUPPLEMENTARY_ENERGY_DATA_ENABLED`) and no key is configured. Environment
@@ -571,6 +571,13 @@ community's, so there the page shows only the meters the user holds with generat
 - Every card, plain or energy data, has a **View metering data** button (`MeteringDataLink`) to
   `/metering/chart?metering_point=<id>`: the chart page was already open to participants and the
   backend scopes the readings to the time they hold the meter, so no new access is granted.
+- A failed eligibility check (anything but the `404` that means "off") shows an error with a retry
+  instead of an empty or feature-off page (`useEnergyDataEligibility` exposes `isError` and `refetch`).
+  While the source list is loading or failed, a meter whose eligible entry names a `source` shows a
+  loading or error state with a retry rather than **Connect**; the **View metering data** button sits
+  in the connected card's header, not its action row.
+- The connect modal is rendered next to the card, never inside it, so a push source's one-time token
+  stays on screen when the refreshed source list swaps the "not connected" card for the connected one.
 - A closing hint, shown only while the feature is on and only to a participant, says who flags a
   meter: the community's manager (§14). Participants cannot set the flag.
 - While the feature is off (`eligible` answers `404`) the page is a plain meter list: no energy data
@@ -579,7 +586,7 @@ community's, so there the page shows only the meters the user holds with generat
 **Visibility of the feature.** The frontend asks `GET /metering/supplementary/sources/eligible/`
 (`useEnergyDataEligibility` in `lib/supplementary.ts`): `404` means the feature is off, an empty
 list means nothing to connect (`canConnect` is false). It returns, for the signed-in user only (an
-admin gets `[]`), the flagged meters they hold personally today in an enabled ZEV, each with its
+admin gets `[]` unless linked to a participant), the flagged meters they hold personally today in an enabled ZEV, each with its
 `source` id or `null`: `{metering_point, meter_id, zev, zev_name, participant, source}`.
 
 - Query: `useQuery({ queryKey: queryKeys.metering.supplementarySources(), queryFn: listSupplementarySources })`,
@@ -927,7 +934,7 @@ CI runs `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-he
   a dash and the reason for low coverage and no data while the energy is still shown; the
   participant's name for an owner; the call to action links to "My metering points"; `NetMeteredRate` with a
   rate, without a source and withheld.
-- **`tests/metering-point-energy-data.test.ts`** (18): connect offered for the meter; the modal's write-only
+- **`tests/metering-point-energy-data.test.ts`** (23): connect offered for the meter; the modal's write-only
   key field, consent gate and consent text; the create payload; a vendor rejection next to the key
   field; a push source ends on a one-time token screen; the card per status (ok, reconnect required,
   disconnected, push); test, sync (cooldown), replace key, disconnect, delete data, remove and
@@ -939,15 +946,16 @@ CI runs `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-he
   participant table's rate cell with a rate, without one, withheld, and for a non-net-metered row.
 - **`tests/account-tabs.test.ts`**: three tabs only; a link to the former `energy-data` tab lands on
   Profile (Security for a forced password change).
-- **`tests/my-metering-points-page.test.ts`** (9), added with §14: the energy data card on the
+- **`tests/my-metering-points-page.test.ts`** (12), added with §14: the energy data card on the
   held flagged meter and plain cards for the rest; the note on a flagged meter the participant does
   not hold; the hint on who flags a meter; nothing about energy data while the feature is off; only
   the selected community's meters; a manager sees only their own flagged meters and no community
   list; the empty state per audience.
-- **`tests/metering-point-energy-data.test.ts`** (+1): the metering data link on an unconnected and a connected card. The page test also covers the link on plain meters and a manager not seeing the community list left in the cache.
+- **`tests/metering-point-energy-data.test.ts`** (included in the 23): the metering data link; a push source's one-time token surviving the refreshed source list; a meter whose source details are loading or failed offering a retry, not Connect. The page test also covers the link on plain meters, a manager not seeing the community list or its error left in the shared cache, and a failed eligibility check with retry.
 - **`tests/layout-nav.test.ts`** (+2) and **`tests/supplementary-owner-status.test.ts`** (+2): the sidebar entry for a
   manager or viewer who holds a flagged meter, and not otherwise; the marker link and panel link on one's own meter.
-- **`tests/system-health-backups.test.ts`** (+3): the "Energy data" health card switched off, with
+- **`tests/system-settings-tabs.test.ts`** (+3): the Functions hint that a flag follows the default, the environment-controlled note with a disabled switch, and the cache invalidation after a toggle. **`tests/route-guard-matrix.test.ts`**: `/me/metering-points` for every role.
+- **`tests/system-health-backups.test.ts`** (+4): the "Energy data" health card switched off, with
   sources, and with a missing key and stale sources.
 - **Backend** `metering/test_supplementary_api.py::EligibleMeteringPointTests` (7): the holder gets
   their flagged meter and, once connected, the source id; nobody else gets anything, an admin
@@ -1126,8 +1134,14 @@ meter, set up the source in account settings, import). Decisions, and what each 
    seeded, cleared by `PATCH /auth/feature-flags/{id}/` as soon as the request carries `enabled`.
    `FeatureFlag.is_enabled` resolves: environment override, then the stored value unless the row
    follows its default, then `default_for(name)` (the computed default, else `DEFAULTS`).
-   `GET /auth/feature-flags/` returns `enabled` as the effective value and a read-only
-   `follows_default`; the Functions tab shows a hint under such a flag. Migration
+   `GET /auth/feature-flags/` returns `enabled` as the effective value for every row (the
+   `FEATURE_<NAME>` environment value where set, else the default for a row that follows it, else the
+   stored value; `FeatureFlag.effective_enabled`, which agrees with `is_enabled`), plus read-only
+   `follows_default` and `controlled_by_env`. The Functions tab hints that a flag follows the
+   default, and for an environment-controlled flag names the variable and disables the switch, since
+   the stored value has no effect. The audit diff of an update covers `enabled` (effective) and
+   `follows_default`, so choosing the value a flag already had is still recorded. A toggle also
+   refreshes the system health, eligibility, source and metering-point queries. Migration
    `accounts.0023_featureflag_follows_default` marks a stored "off" for this flag as unchosen (a stored
    "on" stays a choice). While the flag is off nothing is shown to participants.
 4. **Only managers flag a meter**, with a static hint on the page saying who to ask. A request flow
@@ -1135,10 +1149,12 @@ meter, set up the source in account settings, import). Decisions, and what each 
 5. **Visibility for admins and managers:** the `supplementary` health probe in the System health
    tab (§6.6) and the marker above. No ZEV-wide overview.
 
-**Tests.** Backend `accounts/test_feature_flag_defaults.py` (12): off without a key, on with one
+**Tests.** Backend `accounts/test_feature_flag_defaults.py` (15): off without a key, on with one
 before and after the row exists, tracking the key without touching the row, an explicit off beating
 the default, an explicit on without a key, the environment override, other flags unchanged, the
 admin list's effective value and `follows_default`, a chosen off remembered, the audit diff over
-effective values, an unrelated edit keeping the default, and the migration. Frontend as listed in §9.
+effective values and `follows_default` (also when the chosen value equals the default), the
+environment override reported for every kind of row, `effective_enabled` agreeing with `is_enabled`,
+an unrelated edit keeping the default, and the migration (15 in all). Frontend as listed in §9.
 
 **Deferred:** the request-activation flow for participants, and the ZEV-wide overview.

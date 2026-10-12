@@ -285,9 +285,10 @@ snapshot of platform infrastructure:
   Redis reports unknown, which is a valid state, not an outage)
 - **Email** — the configured backend mode (SMTP, console, in-memory, custom)
 - **Energy data** — whether participants' [own energy data](20-energy-data.md) is
-  switched on, how many sources are connected, whether the encryption key is set,
-  and sources that have not synced for a long time; `unknown` means the feature
-  is switched off
+  switched on, how many sources are configured (disconnected ones included),
+  whether the encryption key is set, and sources that have not synced for a long
+  time; `unknown` means either that the feature is switched off or that the check
+  itself could not run, and the card says which
 
 The snapshot is taken when the tab is opened (no auto-refresh). Probes are
 best-effort — a failing probe never breaks the page.
@@ -556,7 +557,7 @@ When you toggle a flag, OpenZEV applies the new value immediately.
 
 ### Environment Variable Override
 
-Use environment variables when you want an ops-level override that should win over UI settings.
+Use environment variables when you want an ops-level override that should win over UI settings. A flag set this way shows the variable's name in **Functions** and its switch is disabled, because changing it there would have no effect.
 
 Example:
 

@@ -76,11 +76,23 @@ function MyMeteringPointsView() {
 
     const loading = energyData.isLoading || (isParticipantScope && pointsQuery.isLoading)
     if (loading) return <PageSkeleton variant="cardList" />
-    if (pointsQuery.isError && !pointsQuery.data) {
+    // The list query shares its key with the metering points page, so only a participant's own
+    // request may fail this page: a manager's disabled one can still carry that page's error.
+    if (isParticipantScope && pointsQuery.isError && !pointsQuery.data) {
         return <Notice tone="error" onRetry={() => void pointsQuery.refetch()} isRetrying={pointsQuery.isFetching}>{t('pages.myMeteringPoints.loadFailed')}</Notice>
     }
 
+    // A failed eligibility check says nothing about the feature: it must not read as "off" or "nothing to connect".
+    if (energyData.isError) {
+        return (
+            <Notice tone="error" onRetry={() => void energyData.refetch()} isRetrying={energyData.isFetching}>
+                {t('supplementary.section.eligibilityError')}
+            </Notice>
+        )
+    }
+
     const isEmpty = eligible.length === 0 && plainPoints.length === 0
+    const sourcesUnavailable = sourcesQuery.isLoading ? 'loading' : sourcesQuery.isError ? 'error' : undefined
 
     return (
         <>
@@ -104,6 +116,8 @@ function MyMeteringPointsView() {
                     key={point.metering_point}
                     point={point}
                     source={sources.find((candidate) => candidate.metering_point === point.metering_point)}
+                    sourcesUnavailable={sourcesUnavailable}
+                    onRetrySources={() => void sourcesQuery.refetch()}
                     confirm={confirm}
                 />
             ))}

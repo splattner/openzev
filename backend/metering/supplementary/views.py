@@ -189,8 +189,10 @@ class SupplementarySourceViewSet(
     def eligible(self, request):
         """The flagged metering points the signed-in user personally holds today, each with its source id.
 
-        This is what the Account page offers to connect; it is empty for everyone else, an admin
-        included (an admin connects on a participant's behalf from the support view).
+        This is what "My metering points" offers to connect. It lists what the signed-in user holds as
+        a participant, whatever their role: an admin who is also linked to a participant gets those
+        meters too, and one who is not gets nothing (an admin otherwise connects on a participant's
+        behalf from the support view).
         """
         assignments = (
             active_on(

@@ -649,7 +649,7 @@ export const it = {
             },
             flagHint: 'Un impianto FV si trova dietro il suo contatore, ma il punto di misura non è contrassegnato come tale? Chieda alla gestione della sua comunità di contrassegnarlo come «Produzione dietro il contatore». Potrà poi collegare qui i suoi dati energetici.',
             notHolder: 'Solo la persona che detiene personalmente questo punto di misura può collegarvi dati energetici.',
-            viewData: 'Visualizza i dati di misura',
+            viewData: 'Dati di misura',
         },
         myInvoices: {
             title: 'Le mie fatture',
@@ -3172,8 +3172,9 @@ export const it = {
                 supplementary: {
                     title: 'Dati energetici',
                     off: 'Disattivato.',
-                    sources_one: '{{count}} fonte collegata',
-                    sources_other: '{{count}} fonti collegate',
+                    sources_one: '{{count}} fonte configurata',
+                    sources_other: '{{count}} fonti configurate',
+                    unavailable: 'Il controllo non ha potuto essere eseguito.',
                     noKey: 'INTEGRATION_ENCRYPTION_KEYS non è impostata: le chiavi Solar Manager non possono essere salvate.',
                     stale_one: '{{count}} fonte non si sincronizza da tempo.',
                     stale_other: '{{count}} fonti non si sincronizzano da tempo.',
@@ -3308,6 +3309,7 @@ export const it = {
             notConnected: 'A questo punto di misura non è ancora collegata alcuna fonte di dati energetici.',
             connect: 'Collega',
             loadError: 'Impossibile caricare le fonti di dati energetici.',
+            eligibilityError: 'Impossibile verificare se i dati energetici sono disponibili.',
         },
         card: {
             smId: 'ID Solar Manager',
@@ -3402,9 +3404,9 @@ export const it = {
             chipHint: 'Apri lo stato della fonte di dati energetici di questo punto di misura',
             noSource: 'Nessuna fonte di dati energetici',
             noSourceHint: 'Il partecipante può collegarne una in «I miei punti di misura». I dati energetici sono facoltativi.',
-            connectOwn: 'Collega i suoi dati energetici',
+            connectOwn: 'Collegamento dei dati energetici',
             connectOwnHint: 'È il suo punto di misura: configuri i dati energetici in «I miei punti di misura»',
-            manageOwn: 'Gestisci in «I miei punti di misura»',
+            manageOwn: 'Gestione in «I miei punti di misura»',
             title: 'Fonte di dati energetici di {{meter}}',
             readOnlyNote: '{{name}} ha collegato questa fonte. Vedete lo stato, non l\'accesso, e non potete modificare il collegamento stesso.',
             provider: 'Fonte',
@@ -3455,6 +3457,7 @@ export const it = {
         off: 'Disattivo',
         updated: 'Feature flag aggiornato.',
         followsDefault: 'Segue l\'impostazione predefinita di questa istanza. Una modifica rende definitiva la sua scelta.',
+        controlledByEnv: 'Impostato dalla variabile d\'ambiente {{variable}} sul server; l\'interruttore qui non ha effetto.',
     },
     mfaGate: {
         title: 'Configura l\'autenticazione a due fattori',

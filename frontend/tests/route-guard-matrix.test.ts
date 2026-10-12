@@ -84,6 +84,7 @@ vi.mock('../src/pages/MeteringChartPage', () => ({ MeteringChartPage: marker('me
 vi.mock('../src/pages/TariffsPage', () => ({ TariffsPage: marker('tariffs') }))
 vi.mock('../src/pages/InvoicesPage', () => ({ InvoicesContent: marker('invoices') }))
 vi.mock('../src/pages/MyInvoicesPage', () => ({ MyInvoicesPage: marker('my-invoices') }))
+vi.mock('../src/pages/MyMeteringPointsPage', () => ({ MyMeteringPointsPage: marker('my-metering-points') }))
 vi.mock('../src/pages/InvoiceDetailPage', () => ({ InvoiceDetailPage: marker('invoice-detail') }))
 vi.mock('../src/pages/ReportsPage', () => ({ ReportsPage: marker('reports') }))
 vi.mock('../src/pages/FeasibilityCalculatorPage', () => ({ FeasibilityCalculatorPage: marker('feasibility') }))
@@ -176,6 +177,8 @@ const MATRIX: Array<{ path: string; marker: string; allow: Record<ShellRole, boo
     { path: '/billing/invoices/42', marker: 'invoice-detail', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: false } },
     { path: '/me/statement', marker: 'reports', allow: { admin: false, manager: false, viewer: false, participant: true, former: false, none: false } },
     { path: '/me/invoices', marker: 'my-invoices', allow: { admin: false, manager: false, viewer: false, participant: true, former: true, none: false } },
+    // Open to management shells too: a manager who is also a participant sets up their own energy data there.
+    { path: '/me/metering-points', marker: 'my-metering-points', allow: { admin: true, manager: true, viewer: true, participant: true, former: false, none: false } },
     { path: '/reports', marker: 'reports', allow: { admin: true, manager: true, viewer: true, participant: true, former: false, none: false } },
     { path: '/participants', marker: 'participants', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },
     { path: '/tariffs', marker: 'tariffs', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },

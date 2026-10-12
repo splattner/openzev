@@ -55,6 +55,7 @@ export function SupplementarySourceModal({ point, onClose }: Props) {
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.supplementarySources() })
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.supplementaryEligible() })
             void queryClient.invalidateQueries({ queryKey: ['metering', 'dashboard-summary'] })
+            void queryClient.invalidateQueries({ queryKey: ['metering', 'points'] })
             if (created.push_token) {
                 setToken(created.push_token)
                 return

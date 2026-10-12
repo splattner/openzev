@@ -110,6 +110,12 @@ export function AdminSystemSettingsPage() {
         mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) => updateFeatureFlag(id, { enabled }),
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: queryKeys.auth.featureFlags() })
+            // A flag decides what the shell offers and what the health tab reports; the energy data
+            // flag in particular drives the eligibility check, the sources and the meters' status chip.
+            void queryClient.invalidateQueries({ queryKey: queryKeys.auth.systemHealth() })
+            void queryClient.invalidateQueries({ queryKey: queryKeys.metering.supplementaryEligible() })
+            void queryClient.invalidateQueries({ queryKey: queryKeys.metering.supplementarySources() })
+            void queryClient.invalidateQueries({ queryKey: ['metering', 'points'] })
             pushToast(t('features.updated'), 'success')
         },
         onError: (error) => pushToast(formatApiError(error), 'error'),
@@ -366,13 +372,19 @@ export function AdminSystemSettingsPage() {
                                         <td><code>{flag.name}</code></td>
                                         <td>
                                             {flag.description || <span className="muted">—</span>}
-                                            {flag.follows_default && <small className="muted" style={{ display: 'block' }}>{t('features.followsDefault')}</small>}
+                                            {flag.controlled_by_env ? (
+                                                <small className="muted" style={{ display: 'block' }}>
+                                                    {t('features.controlledByEnv', { variable: `FEATURE_${flag.name.toUpperCase()}` })}
+                                                </small>
+                                            ) : flag.follows_default ? (
+                                                <small className="muted" style={{ display: 'block' }}>{t('features.followsDefault')}</small>
+                                            ) : null}
                                         </td>
                                         <td>
                                             {/* The app's one switch (Mantine), as in every other settings form. */}
                                             <Switch
                                                 checked={flag.enabled}
-                                                disabled={featureToggleMutation.isPending}
+                                                disabled={featureToggleMutation.isPending || flag.controlled_by_env}
                                                 onChange={() => featureToggleMutation.mutate({ id: flag.id, enabled: !flag.enabled })}
                                                 label={flag.enabled ? t('features.on') : t('features.off')}
                                                 aria-label={`${flag.name}: ${flag.enabled ? t('features.on') : t('features.off')}`}

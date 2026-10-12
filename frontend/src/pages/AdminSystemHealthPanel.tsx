@@ -120,7 +120,7 @@ export function AdminSystemHealthPanel() {
                               ? t('pages.adminOverview.health.supplementary.sources', {
                                     count: Object.values(health.supplementary.sources_by_status ?? {}).reduce((sum, n) => sum + n, 0),
                                 })
-                              : null}
+                              : t('pages.adminOverview.health.supplementary.unavailable')}
                     </p>
                     {health.supplementary.feature_enabled && !health.supplementary.encryption_key_configured && (
                         <p className="muted text-error">{t('pages.adminOverview.health.supplementary.noKey')}</p>

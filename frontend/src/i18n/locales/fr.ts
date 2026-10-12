@@ -3172,8 +3172,9 @@ export const fr = {
                 supplementary: {
                     title: 'Données énergétiques',
                     off: 'Désactivé.',
-                    sources_one: '{{count}} source connectée',
-                    sources_other: '{{count}} sources connectées',
+                    sources_one: '{{count}} source configurée',
+                    sources_other: '{{count}} sources configurées',
+                    unavailable: 'La vérification n\'a pas pu être exécutée.',
                     noKey: 'INTEGRATION_ENCRYPTION_KEYS n\'est pas définie : les clés Solar Manager ne peuvent pas être enregistrées.',
                     stale_one: '{{count}} source n\'a pas été synchronisée depuis longtemps.',
                     stale_other: '{{count}} sources n\'ont pas été synchronisées depuis longtemps.',
@@ -3308,6 +3309,7 @@ export const fr = {
             notConnected: 'Aucune source de données énergétiques n\'est encore connectée à ce point de mesure.',
             connect: 'Connecter',
             loadError: 'Les sources de données énergétiques n\'ont pas pu être chargées.',
+            eligibilityError: 'Impossible de vérifier si les données énergétiques sont disponibles.',
         },
         card: {
             smId: 'ID Solar Manager',
@@ -3455,6 +3457,7 @@ export const fr = {
         off: 'Désactivé',
         updated: 'Fonctionnalité mise à jour.',
         followsDefault: 'Suit la valeur par défaut de cette instance. Une modification rend votre choix définitif.',
+        controlledByEnv: 'Défini par la variable d\'environnement {{variable}} sur le serveur ; l\'interrupteur ici n\'a aucun effet.',
     },
     mfaGate: {
         title: 'Configurer l\'authentification à deux facteurs',

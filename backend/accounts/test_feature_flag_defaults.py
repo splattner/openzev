@@ -124,7 +124,44 @@ def test_the_audit_diff_compares_effective_values(client):
         client.patch(f"/api/v1/auth/feature-flags/{flag.pk}/", {"enabled": False}, format="json")
 
     event = AuditEvent.objects.filter(action_type="feature_flag.update").latest("created_at")
-    assert event.changes_json == {"enabled": {"before": True, "after": False}}
+    assert event.changes_json == {
+        "enabled": {"before": True, "after": False},
+        "follows_default": {"before": True, "after": False},
+    }
+
+
+@override_settings(INTEGRATION_ENCRYPTION_KEYS=[KEY])
+def test_choosing_the_value_it_already_has_still_records_that_the_default_is_now_a_choice(client):
+    from audit.models import AuditEvent
+
+    authenticate(client, make_user("flag_admin", UserRole.ADMIN))
+    flag = _flag()
+
+    client.patch(f"/api/v1/auth/feature-flags/{flag.pk}/", {"enabled": True}, format="json")
+
+    event = AuditEvent.objects.filter(action_type="feature_flag.update").latest("created_at")
+    assert event.changes_json == {"follows_default": {"before": True, "after": False}}
+
+
+@override_settings(INTEGRATION_ENCRYPTION_KEYS=[KEY])
+def test_an_environment_override_is_reported_for_every_kind_of_row(client):
+    authenticate(client, make_user("flag_admin", UserRole.ADMIN))
+    _flag()
+    FeatureFlag.objects.filter(name=FeatureFlag.MCP_SERVER_ENABLED).update(enabled=False)
+    with mock.patch.dict(os.environ, {ENV: "false", f"FEATURE_{FeatureFlag.MCP_SERVER_ENABLED.upper()}": "true"}):
+        rows = {row["name"]: row for row in client.get("/api/v1/auth/feature-flags/").json()}
+
+    # A row that follows its default and one with a stored value read the same way.
+    assert (rows[NAME]["enabled"], rows[NAME]["controlled_by_env"]) == (False, True)
+    assert (rows[FeatureFlag.MCP_SERVER_ENABLED]["enabled"], rows[FeatureFlag.MCP_SERVER_ENABLED]["controlled_by_env"]) == (True, True)
+    assert rows[FeatureFlag.ZEV_SELF_REGISTRATION_ENABLED]["controlled_by_env"] is False
+
+
+def test_effective_enabled_agrees_with_is_enabled_for_every_flag():
+    FeatureFlag.sync_defaults()
+    with override_settings(INTEGRATION_ENCRYPTION_KEYS=[KEY]), mock.patch.dict(os.environ, {f"FEATURE_{FeatureFlag.MCP_SERVER_ENABLED.upper()}": "true"}):
+        for flag in FeatureFlag.objects.all():
+            assert flag.effective_enabled is FeatureFlag.is_enabled(flag.name), flag.name
 
 
 def test_an_unrelated_edit_keeps_following_the_default(client):

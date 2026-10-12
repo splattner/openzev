@@ -499,8 +499,16 @@ class FeatureFlag(models.Model):
 
     @property
     def effective_enabled(self) -> bool:
-        """What the flag resolves to for this row (the stored value unless it follows its default)."""
-        return self.is_enabled(self.name) if self.follows_default else self.enabled
+        """What the flag resolves to for this row, as ``is_enabled`` would, without another query."""
+        override = self.env_override(self.name)
+        if override is not None:
+            return override
+        return self.default_for(self.name) if self.follows_default else self.enabled
+
+    @property
+    def controlled_by_env(self) -> bool:
+        """Whether ``FEATURE_<NAME>`` decides this flag, so the stored value has no effect."""
+        return self.env_override(self.name) is not None
 
     # ---- registry of known flags with code defaults ----
 
@@ -528,6 +536,14 @@ class FeatureFlag(models.Model):
         cls.DESCRIPTIONS[name] = description
         if dynamic_default is not None:
             cls.DYNAMIC_DEFAULTS[name] = dynamic_default
+
+    @classmethod
+    def env_override(cls, name: str) -> bool | None:
+        """The ``FEATURE_<UPPER_NAME>`` environment value, or ``None`` when it is not set."""
+        import os
+
+        env_val = os.environ.get(f"FEATURE_{name.upper()}")
+        return None if env_val is None else env_val.lower() in ("1", "true", "yes")
 
     @classmethod
     def default_for(cls, name: str) -> bool:
@@ -575,12 +591,9 @@ class FeatureFlag(models.Model):
         3. Code default: ``DYNAMIC_DEFAULTS`` or ``DEFAULTS``.
         4. ``False``.
         """
-        import os
-
-        env_key = f"FEATURE_{name.upper()}"
-        env_val = os.environ.get(env_key)
-        if env_val is not None:
-            return env_val.lower() in ("1", "true", "yes")
+        override = cls.env_override(name)
+        if override is not None:
+            return override
 
         row = cls.objects.filter(name=name).values("enabled", "follows_default").first()
         if row is None or row["follows_default"]:

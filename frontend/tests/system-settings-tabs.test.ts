@@ -1,21 +1,25 @@
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MantineProvider } from '@mantine/core'
 import { AdminSystemSettingsPage } from '../src/pages/AdminSystemSettingsPage'
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+const flagApi = vi.hoisted(() => ({ fetchFeatureFlags: vi.fn(), updateFeatureFlag: vi.fn() }))
+
+vi.mock('react-i18next', () => ({
+    useTranslation: () => ({ t: (key: string, options?: Record<string, unknown>) => (options?.variable ? `${key}:${options.variable}` : key) }),
+}))
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: vi.fn() }) }))
 vi.mock('../src/lib/api/auth', () => ({
     createOAuthProviderConfig: vi.fn(),
     deleteOAuthProviderConfig: vi.fn(),
-    fetchFeatureFlags: vi.fn().mockResolvedValue([]),
+    fetchFeatureFlags: flagApi.fetchFeatureFlags,
     fetchOAuthProviderConfigs: vi.fn().mockResolvedValue([]),
     fetchSystemHealth: vi.fn().mockResolvedValue({ mfa: { status: 'ok', encryption_key_configured: true } }),
     updateAppSettings: vi.fn(),
-    updateFeatureFlag: vi.fn(),
+    updateFeatureFlag: flagApi.updateFeatureFlag,
     updateOAuthProviderConfig: vi.fn(),
 }))
 vi.mock('../src/lib/appSettings', async (importOriginal) => {
@@ -51,6 +55,8 @@ function RoutedPage() {
 }
 
 const cleanups: (() => void)[] = []
+let lastClient: QueryClient
+beforeEach(() => flagApi.fetchFeatureFlags.mockResolvedValue([]))
 afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
 
 async function render(url: string) {
@@ -58,6 +64,7 @@ async function render(url: string) {
     document.body.append(container)
     const root = createRoot(container)
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    lastClient = client
     cleanups.push(() => { act(() => root.unmount()); client.clear(); container.remove() })
     await act(async () => root.render(
         createElement(QueryClientProvider, { client },
@@ -127,5 +134,55 @@ describe('system settings tab strip', () => {
         expect(container.querySelector('output')?.textContent).toBe('/admin/system-settings?tab=security&source=bookmark#settings')
         await act(async () => tab(container, 'regional').click())
         expect(container.querySelector('output')?.textContent).toBe('/admin/system-settings?source=bookmark#settings')
+    })
+})
+
+describe('the Functions tab', () => {
+    const flag = (overrides: Record<string, unknown> = {}) => ({
+        id: 1, name: 'supplementary_energy_data_enabled', description: 'Energy data', enabled: true,
+        follows_default: false, controlled_by_env: false, updated_at: '2026-10-12T00:00:00Z', ...overrides,
+    })
+    const switchOf = (container: Element) => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!
+
+    async function renderFeatures(flags: unknown[]) {
+        flagApi.fetchFeatureFlags.mockResolvedValue(flags)
+        const container = await render('/admin/system-settings?tab=features')
+        for (let i = 0; i < 20 && !container.querySelector('input[type="checkbox"]'); i++) {
+            await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)) })
+        }
+        return container
+    }
+
+    it('says that a flag follows the instance default, and leaves the switch usable', async () => {
+        const container = await renderFeatures([flag({ follows_default: true })])
+
+        expect(container.textContent).toContain('features.followsDefault')
+        expect(container.textContent).not.toContain('features.controlledByEnv')
+        expect(switchOf(container).disabled).toBe(false)
+    })
+
+    it('explains a flag the server environment decides, and does not offer a switch that has no effect', async () => {
+        const container = await renderFeatures([flag({ follows_default: true, controlled_by_env: true })])
+
+        expect(container.textContent).toContain('features.controlledByEnv:FEATURE_SUPPLEMENTARY_ENERGY_DATA_ENABLED')
+        expect(container.textContent).not.toContain('features.followsDefault')
+        expect(switchOf(container).disabled).toBe(true)
+    })
+
+    it('refreshes what depends on a flag after it is toggled: health, eligibility, sources and meters', async () => {
+        flagApi.updateFeatureFlag.mockResolvedValue(flag({ enabled: false }))
+        const container = await renderFeatures([flag()])
+        const invalidate = vi.spyOn(lastClient, 'invalidateQueries')
+
+        await act(async () => { switchOf(container).click() })
+        await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)) })
+
+        const keys = invalidate.mock.calls.map(([filters]) => JSON.stringify(filters?.queryKey))
+        for (const expected of [
+            ['auth', 'feature-flags'], ['auth', 'system-health'], ['metering', 'supplementary-eligible'],
+            ['metering', 'supplementary-sources'], ['metering', 'points'],
+        ]) {
+            expect(keys, expected.join('/')).toContain(JSON.stringify(expected))
+        }
     })
 })

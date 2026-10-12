@@ -36,7 +36,8 @@ vi.mock('../src/lib/api/supplementary', () => ({
 }))
 // The connected-source card and the connect modal have their own tests.
 vi.mock('../src/features/supplementary/MeteringPointEnergyData', () => ({
-    MeteringPointEnergyData: ({ point }: { point: EligibleMeteringPoint }) => createElement('article', { 'data-testid': 'energy-data' }, `energy:${point.meter_id}`),
+    MeteringPointEnergyData: ({ point, sourcesUnavailable }: { point: EligibleMeteringPoint; sourcesUnavailable?: string }) =>
+        createElement('article', { 'data-testid': 'energy-data', 'data-unavailable': sourcesUnavailable ?? '' }, `energy:${point.meter_id}`),
 }))
 
 const point = (id: string, flagged: boolean): MeteringPoint => ({
@@ -138,6 +139,46 @@ describe('MyMeteringPointsPage', () => {
 
         expect(container.querySelectorAll('article')).toHaveLength(1)
         expect(container.querySelector('article[aria-label="CH-2"]')).toBeNull()
+    })
+
+    it('does not let the metering points page\'s failed list request replace a manager\'s own meters', async () => {
+        access.participantScope = false
+        const { container, client } = await mount()
+
+        await act(async () => {
+            await client.fetchQuery({ queryKey: queryKeys.metering.points('zev-1'), queryFn: () => Promise.reject(new Error('boom')), retry: false }).catch(() => undefined)
+        })
+
+        expect(container.querySelectorAll('[data-testid="energy-data"]')).toHaveLength(1)
+        expect(container.textContent).not.toContain('pages.myMeteringPoints.loadFailed')
+    })
+
+    it('still reports a failed list request to a participant', async () => {
+        api.fetchMeteringPoints.mockRejectedValue(new Error('boom'))
+        const view = await renderWithProviders(createElement(MyMeteringPointsPage), cleanups)
+        await waitForCondition(() => (view.container.textContent ?? '').includes('pages.myMeteringPoints.loadFailed'), 'the error')
+    })
+
+    it('reports a failed eligibility check instead of reading it as the feature being off, and can retry', async () => {
+        api.fetchEligibleOrNull.mockRejectedValueOnce(new Error('boom'))
+        const view = await renderWithProviders(createElement(MyMeteringPointsPage), cleanups)
+        await waitForCondition(() => (view.container.textContent ?? '').includes('supplementary.section.eligibilityError'), 'the error')
+
+        expect(view.container.textContent).not.toContain('pages.myMeteringPoints.empty')
+        expect(view.container.querySelector('article')).toBeNull()
+
+        await act(async () => { Array.from(view.container.querySelectorAll('button')).find((b) => b.textContent?.includes('common.retry'))?.click() })
+        await waitForCondition(() => view.container.querySelector('[data-testid="energy-data"]') !== null, 'the page after the retry')
+    })
+
+    it.each([
+        ['is still loading', () => new Promise(() => undefined), 'loading'],
+        ['failed', () => Promise.reject(new Error('boom')), 'error'],
+    ])('tells the card when the source list %s, so it cannot offer Connect for a meter that has a source', async (_label, pending, expected) => {
+        api.fetchEligibleOrNull.mockResolvedValue([{ ...eligible('1'), source: 'src-1' }])
+        api.listSupplementarySources.mockImplementation(pending)
+        const { container } = await mount()
+        await waitForCondition(() => container.querySelector('[data-testid="energy-data"]')?.getAttribute('data-unavailable') === expected, `the ${expected} state`)
     })
 
     it('has a sensible empty state for each audience', async () => {
