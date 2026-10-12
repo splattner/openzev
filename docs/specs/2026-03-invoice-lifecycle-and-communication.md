@@ -851,7 +851,7 @@ The invoice PDF template receives:
 |---|---|
 | `invoice` | Invoice model instance |
 | `vat_rate_percent` | `invoice.vat_rate × 100` as a `Decimal`; formatted to one decimal place in the VAT label |
-| `producer_credit_chf` | `subtotal_chf − vat_base_chf` (negative) when the invoice charges VAT and has a recorded VAT base that differs from the subtotal; otherwise `None`. When set, the totals block lists the supplies subtotal (`vat_base_chf`, `tr.supplies_subtotal`), the VAT line, then the producer remuneration (`tr.producer_credit`) before the total; when `None` it shows the plain subtotal and VAT lines |
+| `producer_credit_chf` | `subtotal_chf − vat_base_chf` (negative) when the invoice has a recorded VAT base that differs from the subtotal; otherwise `None`. When set, the totals block shows the supplies subtotal (`vat_base_chf`, `tr.supplies_subtotal`) in place of the subtotal, and the producer remuneration (`tr.producer_credit`) after the VAT line (itself shown only when `vat_rate > 0`); when `None` it shows the plain subtotal |
 | `grouped_items` | Items grouped by `TariffCategory` (energy → grid_fees → levies → metering), each with category subtotal |
 | `issuer` | The invoice's issuer copy (§3.1a) |
 | `recipient` | The invoice's recipient copy (§3.1a) |

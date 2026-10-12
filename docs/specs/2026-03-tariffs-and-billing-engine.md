@@ -1011,7 +1011,7 @@ windows, and the rate active on `period_end` applies to the whole invoice.
 | `registered` | active rate | `vat_base × rate` | net (as entered) | null |
 | `inclusive` | 0 | 0 | VAT-bearing lines grossed by `1 + rate` | non-recoverable VAT folded in |
 
-**`registered`** is the old behaviour, and the data migration moves every ZEV
+**`registered`** adds the active rate on top of net prices, and the data migration moves every ZEV
 that had a non-empty `vat_number` into it (the number is now required in this
 mode and forbidden in the other two).
 
@@ -1030,12 +1030,20 @@ participant still settles one balance), but the VAT is charged on
 | Producer credit | −CHF 40.00 |
 | `subtotal_chf` / `total_chf` | CHF 60.00 / CHF 68.10 |
 
-A producer-only participant therefore has `vat_base_chf = 0` and no VAT (it was
-negative before). Genuine price reductions on the ZEV's own supply — negative
-fee lines (`ItemType.CREDIT`) — are not producer-credit groups and still reduce
-the base. The feed-in credit (`ItemType.FEED_IN`) is *not* a producer-credit
-bucket and still reduces the base; whether it is a purchase by the ZEV or a
-pass-through of the grid operator's payment is open. The producer's own VAT
+A participant whose only lines are local producer credits therefore has
+`vat_base_chf = 0` and no VAT (it was negative before). Genuine price
+reductions on the ZEV's own supply — negative fee lines (`ItemType.CREDIT`) —
+are not producer-credit groups and still reduce the base. The feed-in credit
+(`ItemType.FEED_IN`) is *not* a producer-credit bucket and still reduces the
+base, so a registered producer who also exports can still get negative VAT
+(−0.81 on a −10.00 base); whether it is a purchase by the ZEV or a
+pass-through of the grid operator's payment is open (#969, pinned by
+`test_feed_in_credit_still_reduces_the_vat_base`).
+
+This rests on the assumption that the ZEV buys the locally consumed production
+from the producer. The contract template does not say so (its production clause
+covers exported energy only), and the engine does not check it: the operator's
+agreements decide. The producer's own VAT
 treatment (a VAT-registered producer's supply) is not modelled: it needs a VAT
 status with effective dates on the party (#515). Invoices issued before
 `vat_base_chf` existed keep their stored VAT (null base, so `subtotal × rate`).
@@ -1075,7 +1083,7 @@ Rationale and alternatives: ADR 0016.
 | Line-item `total_chf` | 2 decimal places (`0.01`) | `ROUND_HALF_UP` |
 | Line-item `unit_price_chf` | 5 decimal places (`0.00001`) | `ROUND_HALF_UP` |
 | `subtotal_chf` | 2 decimal places | `ROUND_HALF_UP` |
-| `vat_base_chf` | 2 decimal places | `ROUND_HALF_UP` (a difference of rounded values) |
+| `vat_base_chf` | exact: `subtotal_chf` minus the producer-credit groups | (already rounded) |
 | `vat_chf` | 2 decimal places | `ROUND_HALF_UP` |
 | `total_chf` | exact: `subtotal_chf + vat_chf` | (already rounded) |
 
@@ -1545,7 +1553,7 @@ community energy to a single participant.
 | `InvoiceVatRateSelectionTests` | `registered`: rate resolved at `period_end`, VAT line added; missing rate → 0% (class clears the migration-installed defaults and owns its history) |
 | `TariffBearsInputVatTests` | classifier: grid energy / grid fees / levies / metering bear VAT; local energy and feed-in do not |
 | `InvoiceVatInclusiveModeTests` | `inclusive`: VAT-bearing lines grossed by `1 + rate`, `embedded_vat_chf` recorded, no VAT line; no active rate → prices unchanged; `not_registered` bills verbatim (class clears the migration-installed defaults) |
-| `ProducerCreditVatRegisteredTests` (`invoices/test_engine_vat_producer_credit.py`, 5 tests) | #957, `registered`: VAT on the ZEV's supplies (100.00 fee − 40.00 credit → VAT 8.10, total 68.10); consumer unchanged; producer-only owes no VAT; `shared_producer_credit` also kept out of the base; a negative fee line still reduces the base |
+| `ProducerCreditVatRegisteredTests` (`invoices/test_engine_vat_producer_credit.py`, 6 tests) | #957, `registered`: VAT on the ZEV's supplies (100.00 fee − 40.00 credit → VAT 8.10, total 68.10); consumer unchanged; a participant with only local producer credits owes no VAT; a producer who exports still gets negative VAT from the feed-in credit (#969); `shared_producer_credit` also kept out of the base; a negative fee line still reduces the base |
 | `ProducerCreditVatNotRegisteredTests`, `ProducerCreditVatInclusiveTests` | no VAT base recorded, no VAT, credit nets off verbatim (inclusive: fee grossed, credit not) |
 | `InvoiceSeededVatHistoryTests` (5 tests, seeded via the real migration function) | `registered` 2023 → VAT 0.77/total 10.77 and 2024 → 0.81/10.81 on CHF 10.00 net; `inclusive` 2023/2024 gross 10.77/10.81 with embedded 0.77/0.81 and zero explicit VAT; cross-year period ending 2024 uses `0.0810` for the whole invoice; `not_registered` ignores seeds (10.00, null embedded); pre-2018 periods use the zero fallback in `registered` and `inclusive` |
 

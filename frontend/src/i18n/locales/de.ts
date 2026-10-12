@@ -2583,7 +2583,6 @@ export const de = {
             total: 'Gesamt',
             subtotal: 'Zwischensumme',
             vat: 'MWST',
-            vatOnBase: 'auf CHF {{base}}',
             energyTotals: 'Energietotale',
             local: 'Intern',
             grid: 'Netz',

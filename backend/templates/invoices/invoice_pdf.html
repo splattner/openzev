@@ -845,23 +845,14 @@
                 </div>
                 <div class="totals">
                     <table>
-                        {% if producer_credit_chf %}
                         <tr>
+                            {% if producer_credit_chf %}
                             <td>{{ tr.supplies_subtotal }}</td>
                             <td class="numeric">CHF {{ invoice.vat_base_chf|floatformat:2 }}</td>
-                        </tr>
-                        <tr>
-                            <td>{{ tr.vat }} ({{ vat_rate_percent|floatformat:1 }}%)</td>
-                            <td class="numeric">CHF {{ invoice.vat_chf|floatformat:2 }}</td>
-                        </tr>
-                        <tr>
-                            <td>{{ tr.producer_credit }}</td>
-                            <td class="numeric">CHF {{ producer_credit_chf|floatformat:2 }}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
+                            {% else %}
                             <td>{{ tr.subtotal }}</td>
                             <td class="numeric">CHF {{ invoice.subtotal_chf|floatformat:2 }}</td>
+                            {% endif %}
                         </tr>
                         {% if invoice.vat_rate > 0 %}
                         <tr>
@@ -869,6 +860,11 @@
                             <td class="numeric">CHF {{ invoice.vat_chf|floatformat:2 }}</td>
                         </tr>
                         {% endif %}
+                        {% if producer_credit_chf %}
+                        <tr>
+                            <td>{{ tr.producer_credit }}</td>
+                            <td class="numeric">CHF {{ producer_credit_chf|floatformat:2 }}</td>
+                        </tr>
                         {% endif %}
                         <tr class="grand-total">
                             <td>{{ tr.total }}</td>

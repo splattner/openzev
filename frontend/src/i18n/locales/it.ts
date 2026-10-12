@@ -2583,7 +2583,6 @@ export const it = {
             total: 'Totale',
             subtotal: 'Subtotale',
             vat: 'IVA',
-            vatOnBase: 'su CHF {{base}}',
             energyTotals: 'Totali energetici',
             local: 'Locale',
             grid: 'Rete',

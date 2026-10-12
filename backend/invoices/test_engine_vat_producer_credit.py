@@ -1,12 +1,7 @@
 """VAT on invoices that carry a producer credit (#957).
 
-For ``vat_mode = registered`` the ZEV's output VAT is charged on what the ZEV
-supplies. What it pays a producer for the solar electricity it takes over is a
-second supply: it is settled against the invoice but must not reduce the VAT.
-
-The fixture is small enough to check by hand. At CHF 0.20/kWh, a producer's
-200 kWh sold locally earn a credit of CHF 40.00; a monthly fee of CHF 100.00
-is what the ZEV charges them. VAT is 8.1 %.
+See tariffs spec §4.8. At CHF 0.20/kWh a producer's 200 kWh sold locally earn
+CHF 40.00; the ZEV charges a monthly fee of CHF 100.00. VAT is 8.1 %.
 """
 
 from datetime import date, datetime, timezone as dt_timezone
@@ -98,7 +93,7 @@ class ProducerCreditVatRegisteredTests(_ProducerCreditVatBase, TestCase):
         self.assertEqual(invoice.vat_chf, Decimal("11.34"))
         self.assertEqual(invoice.total_chf, Decimal("151.34"))
 
-    def test_producer_only_participant_owes_no_vat_and_gets_no_negative_vat(self):
+    def test_participant_with_only_local_producer_credits_owes_no_vat(self):
         producer, _ = self._producer_and_consumer()
         self.fee.delete()
 
@@ -108,6 +103,22 @@ class ProducerCreditVatRegisteredTests(_ProducerCreditVatBase, TestCase):
         self.assertEqual(invoice.vat_base_chf, Decimal("0.00"))
         self.assertEqual(invoice.vat_chf, Decimal("0.00"))
         self.assertEqual(invoice.total_chf, Decimal("-40.00"))
+
+    def test_feed_in_credit_still_reduces_the_vat_base(self):
+        # Open question #969: the feed-in credit is not a producer-credit bucket.
+        producer = self._participant("Paula", "Producer")
+        consumer = self._participant("Carl", "Consumer")
+        self._meter(producer, MeteringPointType.PRODUCTION, "CH-PCV-FP", "200", ReadingDirection.OUT)
+        self._meter(consumer, MeteringPointType.CONSUMPTION, "CH-PCV-FC", "100", ReadingDirection.IN)
+        factories.flat_tariff(self.zev, energy_type=EnergyType.FEED_IN, price="0.10000")
+        self.fee.delete()
+
+        invoice = self._generate(producer)
+
+        # 100 kWh sold locally (-20.00) and 100 kWh exported (-10.00).
+        self.assertEqual(invoice.subtotal_chf, Decimal("-30.00"))
+        self.assertEqual(invoice.vat_base_chf, Decimal("-10.00"))
+        self.assertEqual(invoice.vat_chf, Decimal("-0.81"))
 
     def test_shared_producer_credit_does_not_reduce_vat_either(self):
         alice = self._participant("Alice", "Member")

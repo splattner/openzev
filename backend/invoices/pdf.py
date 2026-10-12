@@ -331,14 +331,11 @@ def _build_template_context(
     # Convert the stored fraction (0.0810) to percent form (8.1).
     vat_rate_percent = Decimal(invoice.vat_rate or 0) * 100
 
-    # A registered ZEV charges VAT on its own supplies only; what it pays a
-    # producer is settled after the VAT, so the totals block lists the two
-    # apart. None when there is nothing to separate (including invoices issued
-    # before the VAT base was recorded).
+    # Producer credits, listed after the VAT (#957); None when there are none
+    # or the invoice has no recorded VAT base.
     producer_credit_chf = None
-    if invoice.vat_rate and invoice.vat_base_chf is not None:
-        difference = invoice.subtotal_chf - invoice.vat_base_chf
-        producer_credit_chf = difference or None
+    if invoice.vat_base_chf is not None:
+        producer_credit_chf = (invoice.subtotal_chf - invoice.vat_base_chf) or None
 
     return {
         "invoice": invoice,

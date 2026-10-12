@@ -126,13 +126,7 @@ export function InvoiceDetailPage() {
                 <div className="card"><strong>{t('pages.invoiceDetail.status')}</strong><div><span className={`badge badge-${inv.status}`}>{t(`invoice.status.${inv.status}`)}</span></div></div>
                 <div className="card"><strong>{t('pages.invoiceDetail.total')}</strong><div>CHF {inv.total_chf}</div></div>
                 <div className="card"><strong>{t('pages.invoiceDetail.subtotal')}</strong><div>CHF {inv.subtotal_chf ?? '-'}</div></div>
-                <div className="card">
-                    <strong>{t('pages.invoiceDetail.vat')}</strong>
-                    <div>CHF {inv.vat_chf ?? '-'}</div>
-                    {inv.vat_base_chf != null && inv.vat_base_chf !== inv.subtotal_chf && (
-                        <div className="muted">{t('pages.invoiceDetail.vatOnBase', { base: inv.vat_base_chf })}</div>
-                    )}
-                </div>
+                <div className="card"><strong>{t('pages.invoiceDetail.vat')}</strong><div>CHF {inv.vat_chf ?? '-'}</div></div>
             </section>
 
             <section className="card">

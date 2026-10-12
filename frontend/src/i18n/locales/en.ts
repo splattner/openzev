@@ -2594,7 +2594,6 @@ export const en = {
             total: 'Total',
             subtotal: 'Subtotal',
             vat: 'VAT',
-            vatOnBase: 'on CHF {{base}}',
             energyTotals: 'Energy Totals',
             local: 'Local',
             grid: 'Grid',

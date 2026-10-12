@@ -63,11 +63,9 @@ class Invoice(models.Model):
     total_feed_in_kwh = models.DecimalField(max_digits=12, decimal_places=4, default=0)
     subtotal_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     vat_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0)
-    # What ``vat_chf`` was charged on, for a ZEV on VatMode.REGISTERED: the
-    # subtotal without producer remuneration, which is a separate supply and
-    # does not reduce the ZEV's output VAT (#957). Null for the other VAT modes
-    # and for invoices issued before the field existed, whose VAT base is the
-    # subtotal.
+    # What ``vat_chf`` was charged on (#957): the subtotal without producer
+    # credits. Null outside VatMode.REGISTERED and on older invoices, whose
+    # base is the subtotal.
     vat_base_chf = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )

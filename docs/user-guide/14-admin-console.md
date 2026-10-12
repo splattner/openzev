@@ -351,6 +351,29 @@ template to the default:
 {% if participant.address_line2 %}{{ participant.address_line2 }}<br>{% endif %}
 ```
 
+For a VAT-registered ZEV that pays producers for their electricity, the VAT is
+charged on what the ZEV supplies, not on the subtotal net of the producer
+credit. A custom template prints "Subtotal" and "VAT" side by side and so shows
+a VAT amount that does not match the subtotal. Show `producer_credit_chf` as its
+own row after the VAT, with `invoice.vat_base_chf` as the supplies subtotal, or
+reset the template to the default:
+
+```html
+<tr>
+  {% if producer_credit_chf %}
+  <td>{{ tr.supplies_subtotal }}</td><td>CHF {{ invoice.vat_base_chf|floatformat:2 }}</td>
+  {% else %}
+  <td>{{ tr.subtotal }}</td><td>CHF {{ invoice.subtotal_chf|floatformat:2 }}</td>
+  {% endif %}
+</tr>
+{% if invoice.vat_rate > 0 %}
+<tr><td>{{ tr.vat }} ({{ vat_rate_percent|floatformat:1 }}%)</td><td>CHF {{ invoice.vat_chf|floatformat:2 }}</td></tr>
+{% endif %}
+{% if producer_credit_chf %}
+<tr><td>{{ tr.producer_credit }}</td><td>CHF {{ producer_credit_chf|floatformat:2 }}</td></tr>
+{% endif %}
+```
+
 ## Email Templates
 
 Admins manage system-wide default email templates in **Platform → Templates → Email templates** (`/admin/templates/email`).

@@ -903,6 +903,20 @@ class InvoicePdfVatLabelTests(TestCase):
         self.assertIn("CHF -40.00", markup)
         self.assertNotIn(f"<td>{tr['subtotal']}</td>", markup)
 
+    def test_producer_credit_is_listed_without_a_vat_row_at_zero_rate(self):
+        invoice = self._invoice(
+            vat_rate=Decimal("0"), vat_chf=Decimal("0.00"),
+            subtotal_chf=Decimal("60.00"), vat_base_chf=Decimal("100.00"),
+            total_chf=Decimal("60.00"),
+        )
+        tr = INVOICE_TRANSLATIONS["de"]
+
+        markup = _render_invoice_markup(invoice)
+
+        self.assertIn(tr["supplies_subtotal"], markup)
+        self.assertIn(tr["producer_credit"], markup)
+        self.assertNotIn(f"<td>{tr['vat']} (", markup)
+
     def test_totals_keep_the_plain_layout_without_a_producer_credit(self):
         for number, vat_base in (("V-00002", None), ("V-00003", Decimal("120.00"))):
             with self.subTest(vat_base=vat_base):
