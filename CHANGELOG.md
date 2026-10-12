@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.23.0](https://github.com/splattner/openzev/compare/v1.22.1...v1.23.0) (2026-10-12)
+
+
+### Features
+
+* **deploy:** ship a release compose file that runs the published images ([#970](https://github.com/splattner/openzev/issues/970)) ([b18d018](https://github.com/splattner/openzev/commit/b18d018fc40fe75566a1740b8af7f399e17855ae))
+* **energy-data:** set up energy data on "My metering points" and default the flag to the key ([#964](https://github.com/splattner/openzev/issues/964)) ([166d759](https://github.com/splattner/openzev/commit/166d7599b290ffb2fbfc228bd5d7a7476a4842b8))
+* **privacy:** sweep audit IPs, email recipients and spent tokens ([#795](https://github.com/splattner/openzev/issues/795)) ([#952](https://github.com/splattner/openzev/issues/952)) ([30dc8b4](https://github.com/splattner/openzev/commit/30dc8b49e95e064ea75552e2852a0e9bf74a23d8))
+* **ui:** redesign the app layout ([#951](https://github.com/splattner/openzev/issues/951)) ([e19bd5a](https://github.com/splattner/openzev/commit/e19bd5a64fd658d1d9aac2d7e34625bbfcb73bcc))
+
+
+### Bug Fixes
+
+* **accounts:** prevent getting stuck in impersonation ([#966](https://github.com/splattner/openzev/issues/966)) ([2aa471b](https://github.com/splattner/openzev/commit/2aa471bd22a4ffdde916aa0dc59b3c422d259560))
+* **invoices:** keep producer credits out of the registered ZEV's VAT base ([#962](https://github.com/splattner/openzev/issues/962)) ([5dbac66](https://github.com/splattner/openzev/commit/5dbac667cceb9d70b4ab8589dc9b7d5d2310445f))
+* **metering:** check meter health up to yesterday, not today ([#947](https://github.com/splattner/openzev/issues/947)) ([e5909b0](https://github.com/splattner/openzev/commit/e5909b0a4e2724b5002b0beb80aa97ee428921cf))
+* **settings:** use the app's switch for feature flags ([#946](https://github.com/splattner/openzev/issues/946)) ([65c4867](https://github.com/splattner/openzev/commit/65c4867b77e7a222dc119b01e6ea20ebaae45cd0))
+
+
+### Performance Improvements
+
+* **billing:** speed up invoice generation and the demo seed ([#950](https://github.com/splattner/openzev/issues/950)) ([fe46a37](https://github.com/splattner/openzev/commit/fe46a37e5961e3e1e8570db2021e0b50be494c5f))
+
 ## [1.22.1](https://github.com/splattner/openzev/compare/v1.22.0...v1.22.1) (2026-10-09)
 
 
