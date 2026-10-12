@@ -1775,9 +1775,10 @@ operator's meter data alone, exactly as before. A wrong or missing value in
 your own system can at worst make a statistic wrong or empty; it cannot change
 an amount.</p>
 </div>
-<p>The feature is switched on by an administrator (<strong>Platform → Settings →
-Functions → Supplementary energy data</strong>). Until then none of what follows is
-visible.</p>
+<p>The feature is on as soon as the platform administrator has set up the
+encryption key for integrations (<code>INTEGRATION_ENCRYPTION_KEYS</code>), and can be
+switched off again under <strong>Platform → Settings → Functions → Supplementary energy
+data</strong>. While it is off none of what follows is visible.</p>
 <h2 id="who-can-connect-what">Who can connect what<a class="headerlink" href="#who-can-connect-what" title="Permanent link">&para;</a></h2>
 <p>Only the <strong>participant who personally holds</strong> the metering point can connect a
 source for it. It is their account and their household, so a ZEV manager cannot
@@ -1818,16 +1819,22 @@ must be marked <strong>Generation behind the meter</strong>, and you must hold i
 </tr>
 </tbody>
 </table>
+<p>Each metering point on that page has a <strong>View metering data</strong> button that opens
+the chart of its readings.</p>
+<p>If you are a ZEV manager and hold a metering point yourself, you connect it the
+same way as any participant: <strong>My metering points</strong> appears in your menu, and the
+metering point list links your own meter there.</p>
 <p>When you no longer hold the metering point (the assignment ends), the connection
 is switched off by itself, the key is deleted, and nothing new is collected. The
 data already collected is kept until you or a manager deletes it.</p>
 <h2 id="connect-solar-manager">Connect Solar Manager<a class="headerlink" href="#connect-solar-manager" title="Permanent link">&para;</a></h2>
-<p><img alt="Account Energy data tab" src="../screenshots/24-energy-data-account.png" /></p>
+<p><img alt="My metering points" src="../screenshots/24-energy-data-metering-points.png" /></p>
 <ol>
 <li>Create an <strong>API key</strong> in your Solar Manager account.</li>
-<li>In OpenZEV open <strong>Account → Energy data</strong>. The tab appears when you hold a
-   metering point with generation behind it.</li>
-<li>Choose <strong>Connect</strong> next to the metering point.</li>
+<li>In OpenZEV open <strong>My metering points</strong> in the menu. The metering points that
+   are marked <em>Generation behind the meter</em> and that you hold yourself carry the
+   energy data setup.</li>
+<li>Choose <strong>Connect</strong> on the metering point.</li>
 <li>Pick <strong>Solar Manager</strong>, enter your <strong>Solar Manager ID</strong> (3 to 24 letters or
    digits) and the <strong>API key</strong>, and read what you agree to.</li>
 <li>Tick the consent box and choose <strong>Connect</strong>.</li>
@@ -2015,8 +2022,10 @@ meter always wins and nothing is corrected. The result shows on the source:</p>
 ones that touch the key. Deleting a participant or a metering point deletes their
 sources and readings with them.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
-<p><strong>The Energy data tab is missing.</strong> The feature is off, or you do not personally
-hold a metering point marked <em>Generation behind the meter</em>. Ask your ZEV manager.</p>
+<p><strong>There is no Connect button on my metering point.</strong> The feature is off, you do
+not personally hold the metering point (a shared community allocation does not
+count), or it is not marked <em>Generation behind the meter</em>. Only a ZEV manager can
+set that mark, so ask them; <strong>My metering points</strong> says so too.</p>
 <p><strong>"Not accepted" when connecting.</strong> The key or the Solar Manager ID is wrong. The
 ID is the one of your installation, not your login name.</p>
 <p><strong>The server says the key cannot be stored.</strong> The platform administrator has not
