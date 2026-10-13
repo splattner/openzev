@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.24.0](https://github.com/splattner/openzev/compare/v1.23.0...v1.24.0) (2026-10-13)
+
+
+### Features
+
+* **metering-points:** building sheets, status-first rows and details in place ([#978](https://github.com/splattner/openzev/issues/978)) ([f0fb344](https://github.com/splattner/openzev/commit/f0fb344c2f2b091187b9ac8bfd881846d26893dc))
+* **metering:** show data gaps in a drawer ([#981](https://github.com/splattner/openzev/issues/981)) ([c426d24](https://github.com/splattner/openzev/commit/c426d24d1b96b52c040a92cd5f32222268914f4a))
+* **participants:** restyle the participant list as table rows ([#982](https://github.com/splattner/openzev/issues/982)) ([35cbbdf](https://github.com/splattner/openzev/commit/35cbbdfe9f1d88d67bfd82e00f5accbc2be2d0d5))
+* **ui:** present tariffs as responsive rate cards ([#977](https://github.com/splattner/openzev/issues/977)) ([4d41d74](https://github.com/splattner/openzev/commit/4d41d742a316681ce302b13c287279a47ed159f1))
+
+
+### Bug Fixes
+
+* **auth:** block participant links for accounts with their own login ([#983](https://github.com/splattner/openzev/issues/983)) ([d77300f](https://github.com/splattner/openzev/commit/d77300f839e8c3b1f942c7184439fe905ac11d2b))
+* **invoices:** move the progress legend below the table sheet ([#980](https://github.com/splattner/openzev/issues/980)) ([f1ff7cb](https://github.com/splattner/openzev/commit/f1ff7cb359270894cb968f1026650ecb4cdf32d2))
+
 ## [1.23.0](https://github.com/splattner/openzev/compare/v1.22.1...v1.23.0) (2026-10-12)
 
 
