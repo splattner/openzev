@@ -1969,11 +1969,6 @@ export const en = {
                 firstReading: 'First reading',
                 readings: 'Readings',
                 dataQuality: 'Data quality',
-                location: 'Location',
-                building: 'Building',
-                description: 'Description',
-                type: 'Type',
-                generation: 'Generation',
                 editMeteringPoint: 'Edit metering point',
             },
             buildings: {

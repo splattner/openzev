@@ -1958,11 +1958,6 @@ export const it = {
                 firstReading: 'Prima lettura',
                 readings: 'Letture',
                 dataQuality: 'Qualità dei dati',
-                location: 'Posizione',
-                building: 'Edificio',
-                description: 'Descrizione',
-                type: 'Tipo',
-                generation: 'Produzione',
                 editMeteringPoint: 'Modifica punto di misura',
             },
             buildings: {

@@ -150,7 +150,7 @@ describe('MeteringPointsList', () => {
         expect(view.querySelector('.metering-point-detail')).toBeNull()
     })
 
-    it('opens a row in place with its participants, measurement and location, and closes it again', () => {
+    it('opens a row in place with its participants and measurement, and closes it again', () => {
         const view = render({ points })
         const toggle = view.querySelector<HTMLButtonElement>('.metering-point-expand')!
         expect(toggle.getAttribute('aria-expanded')).toBe('false')
@@ -159,7 +159,7 @@ describe('MeteringPointsList', () => {
         const detail = view.querySelector('.metering-point-detail')!
         expect(detail.textContent).toContain('pages.meteringPoints.detail.participants')
         expect(detail.textContent).toContain('pages.meteringPoints.detail.measurement')
-        expect(detail.textContent).toContain('pages.meteringPoints.detail.location')
+        expect(detail.textContent).not.toContain('pages.meteringPoints.detail.location')
         expect(detail.textContent).toContain('Anna Consumer')
         act(() => toggle.click())
         expect(view.querySelector('.metering-point-detail')).toBeNull()

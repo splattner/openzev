@@ -288,8 +288,7 @@ Click a row, or the arrow at its end, to open its details in place:
   based on the last 30 complete days up to yesterday); click it to open the
   metering point's data-quality view. A connected energy data source shows its
   status here too.
-- **Location** — building, location within the building, type and whether
-  generation sits behind the meter.
+
 
 ## Meter Maintenance
 

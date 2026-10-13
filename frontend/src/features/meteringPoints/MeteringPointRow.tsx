@@ -403,32 +403,6 @@ export function MeteringPointRow({
                 </div>
               )}
             </section>
-
-            <section className="metering-detail-card">
-              <header><h4>{t('pages.meteringPoints.detail.location')}</h4></header>
-              <dl className="metering-detail-facts">
-                {point.building_name && (
-                  <div>
-                    <dt>{t('pages.meteringPoints.detail.building')}</dt>
-                    <dd>{point.building_name}</dd>
-                  </div>
-                )}
-                <div>
-                  <dt>{t('pages.meteringPoints.detail.description')}</dt>
-                  <dd>{location || <span className="muted">{t('pages.meteringPoints.noLocation')}</span>}</dd>
-                </div>
-                <div>
-                  <dt>{t('pages.meteringPoints.detail.type')}</dt>
-                  <dd>{typeLabel}</dd>
-                </div>
-                {point.has_behind_meter_generation && (
-                  <div>
-                    <dt>{t('pages.meteringPoints.detail.generation')}</dt>
-                    <dd><BehindMeterBadge /></dd>
-                  </div>
-                )}
-              </dl>
-            </section>
           </div>
           {canWrite && (
             <div className="metering-detail-actions actions-row actions-row-wrap">

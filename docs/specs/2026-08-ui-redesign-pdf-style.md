@@ -1160,13 +1160,14 @@ contracts are unchanged.
     action inline in the holder column: **Assign participant**
     (`button-primary button-outline`). Neither a row nor the header is tinted. The row opens on a click anywhere outside its controls, except one that ends a
     text selection (copying the meter ID).
-  - **Details** (`.metering-point-detail`, three `.metering-detail-card`s;
-    two without the Participants card for a role that has no assignment data):
-    Participants (every assignment, current first, with state badge, dates,
-    Edit and a Remove menu, and "Add assignment"), Measurement (last and
-    first reading, reading count, data quality link with the health badge, and
-    the supplementary source chip unless it already sits on the row) and
-    Location (building, description, type, behind-the-meter).
+  - **Details** (`.metering-point-detail`, two `.metering-detail-card`s, the
+    assignments twice as wide as the measurement; the Measurement card alone for a
+    role that has no assignment data): Participants (every assignment, current
+    first, with state badge, dates, Edit and a Remove menu, and "Add
+    assignment") and Measurement (last and first reading, reading count, data
+    quality link with the health badge, and the supplementary source chip unless
+    it already sits on the row). The building, the location, the type and
+    behind-the-meter are not repeated: the header, the row and its badges show them.
   - **Sort** (`MeteringPointSort` in the `sort` query param, `readMeteringPointSort`,
     `sortMeteringPoints`; not cleared by "Clear filters"): meter ID (default,
     numbers by value), location (unset last) and oldest reading first (a meter that
