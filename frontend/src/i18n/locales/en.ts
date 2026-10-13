@@ -2026,6 +2026,7 @@ export const en = {
                 behindMeterGeneration: 'Generation behind the meter (surplus metering)',
                 behindMeterGenerationHelp: 'Tick this when a PV system sits behind this meter, so the meter only records the surplus fed in and the grid draw.',
             },
+            typeLegend: 'Meter type',
             meterTypes: {
                 consumption: 'Consumption',
                 production: 'Production',

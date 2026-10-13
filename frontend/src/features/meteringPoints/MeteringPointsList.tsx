@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { todayBusinessIso } from '../../lib/dates'
 import type { AppSettings, MeteringPoint, MeteringPointAssignment } from '../../types/api'
 import { MeteringPointRow, type ConfirmOptions } from './MeteringPointRow'
+import { MeteringPointTypeLegend } from './MeteringPointTypeLegend'
 import type { BuildingGroup, MeteringPointHealth } from './useMeteringPointForms'
 
 type MeteringPointsListProps = {
@@ -104,6 +105,7 @@ export function MeteringPointsList({
   if (groups && renderGroupHeader) {
     return (
       <div className="building-groups">
+        <MeteringPointTypeLegend meteringPoints={meteringPoints} />
         {groups.map((group) => (
           <section key={group.building.id} className={`building-group ${sheetClass}`}>
             {renderGroupHeader(group)}
@@ -122,9 +124,12 @@ export function MeteringPointsList({
   }
 
   return (
-    <div className={sheetClass}>
-      {columns}
-      <div className="metering-point-list">{meteringPoints.map(renderRow)}</div>
-    </div>
+    <>
+      <MeteringPointTypeLegend meteringPoints={meteringPoints} />
+      <div className={sheetClass}>
+        {columns}
+        <div className="metering-point-list">{meteringPoints.map(renderRow)}</div>
+      </div>
+    </>
   )
 }

@@ -2015,6 +2015,7 @@ export const it = {
                 behindMeterGeneration: 'Produzione dietro il contatore (misurazione del surplus)',
                 behindMeterGenerationHelp: 'Attivare quando dietro questo contatore si trova un impianto fotovoltaico, così il contatore registra solo il surplus immesso e il prelievo dalla rete.',
             },
+            typeLegend: 'Tipo di contatore',
             meterTypes: {
                 consumption: 'Consumo',
                 production: 'Produzione',

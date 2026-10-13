@@ -257,4 +257,22 @@ describe('MeteringPointsList', () => {
         expect(view.querySelector('.metering-point-holder')).toBeNull()
         expect(view.querySelector('.metering-sheet-holders')).toBeNull()
     })
+
+    it('explains the type icons once above the sheets, naming only the types on the page', () => {
+        const view = render({ points: [...points, point('m4', { building: 'b2', meter_type: 'production' })] })
+        const legend = view.querySelectorAll('.metering-type-legend')
+        expect(legend).toHaveLength(1)
+        expect(Array.from(legend[0].querySelectorAll('li')).map((item) => item.textContent)).toEqual([
+            'pages.meteringPoints.meterTypes.consumption',
+            'pages.meteringPoints.meterTypes.production',
+        ])
+        expect(legend[0].nextElementSibling?.classList.contains('building-group')).toBe(true)
+    })
+
+    it('has no legend without meters, and keeps it on the plain list of a role without buildings', () => {
+        expect(render({ points: [] }).querySelector('.metering-type-legend')).toBeNull()
+        act(() => root?.unmount())
+        container?.remove()
+        expect(render({ points, isManagedScope: false, groups: null }).querySelector('.metering-type-legend')).not.toBeNull()
+    })
 })

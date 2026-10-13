@@ -41,7 +41,7 @@ export type ConfirmOptions = {
   onConfirm: () => void | Promise<void>
 }
 
-const METER_TYPE_ICON: Record<MeteringPoint['meter_type'], IconDefinition> = {
+export const METER_TYPE_ICON: Record<MeteringPoint['meter_type'], IconDefinition> = {
   consumption: faBolt,
   production: faSolarPanel,
   bidirectional: faRightLeft,

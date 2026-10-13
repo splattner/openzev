@@ -2015,6 +2015,7 @@ export const fr = {
                 behindMeterGeneration: 'Production derrière le compteur (comptage du surplus)',
                 behindMeterGenerationHelp: 'Cochez cette case lorsqu’une installation photovoltaïque se trouve derrière ce compteur, qui n’enregistre alors que le surplus injecté et le soutirage du réseau.',
             },
+            typeLegend: 'Type de compteur',
             meterTypes: {
                 consumption: 'Consommation',
                 production: 'Production',

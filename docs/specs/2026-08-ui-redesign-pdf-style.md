@@ -1151,7 +1151,9 @@ contracts are unchanged.
     Surplus metering, a supplementary source in `error` / `reconnect_required`),
     the location (or "No location set"), the
     meter type only as a muted icon before the ID (`.metering-point-type`; its
-    name is the tooltip and the `aria-label`, and the details name it), the holder (name, "+N" for further current
+    name is the tooltip and the `aria-label`; one quiet legend line above the
+    sheets, `MeteringPointTypeLegend`, pairs each icon with its name for the types
+    on the page, `pages.meteringPoints.typeLegend` labelling the list), the holder (name, "+N" for further current
     holders, "since", Community badge, "N earlier"; an upcoming-only holder
     shows its Upcoming badge), the last reading's date ("Never") and a quiet
     action cluster: Chart link, `⋯` menu (Assign participant, Edit, Delete data,
@@ -1232,7 +1234,7 @@ contracts are unchanged.
   narrow-tile fixture (`screenshots/fixtures/page-layout.tsx`) includes a
   date-and-time tile, so a tile that spills fails the `.stat-grid` overflow
   check.
-- `tests/metering-points-list.test.ts` (19): the sorts (meter ID with numbers by
+- `tests/metering-points-list.test.ts` (21): the sorts (meter ID with numbers by
   value, unset locations last, stalest reading first, the unknown or removed URL
   value), and the list itself: "Assign participant" only on
   a meter nobody holds, a holder with "+1", rows opening from their button and
@@ -1241,7 +1243,9 @@ contracts are unchanged.
   no status dot or health summary on rows or header, an upcoming-only
   holder, the "N earlier" count, no prompt for an inactive meter nobody holds,
   a viewer's list without Assign, menu or assignment controls, no building
-  named under the rows, and no holder column for a role without assignments.
+  named under the rows, no holder column for a role without assignments, and
+  the type legend: once above the sheets, only the types on the page, none for an
+  empty list.
 - `screenshots/field-geometry.spec.ts`: the field contract is now 16px values,
   14px/500 labels, 13px helpers, 8px radius, 40px height (the buttons').
 - Backend: the full suite passes against PostgreSQL with Inter installed

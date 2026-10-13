@@ -2015,6 +2015,7 @@ export const de = {
                 behindMeterGeneration: 'Erzeugung hinter dem Zähler (Überschussmessung)',
                 behindMeterGenerationHelp: 'Aktivieren, wenn hinter diesem Zähler eine PV-Anlage liegt, sodass der Zähler nur den eingespeisten Überschuss und den Netzbezug erfasst.',
             },
+            typeLegend: 'Zählertyp',
             meterTypes: {
                 consumption: 'Verbrauch',
                 production: 'Produktion',
