@@ -805,10 +805,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-a-metering-point-card-shows" class="md-nav__link">
+  <a href="#what-a-metering-point-row-shows" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What a Metering Point Card Shows
+        What a Metering Point Row Shows
       
     </span>
   </a>
@@ -1750,10 +1750,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-a-metering-point-card-shows" class="md-nav__link">
+  <a href="#what-a-metering-point-row-shows" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What a Metering Point Card Shows
+        What a Metering Point Row Shows
       
     </span>
   </a>
@@ -1859,16 +1859,18 @@
 <p>A single participant can be assigned multiple metering points (e.g., PV on roof + home consumption).</p>
 <p>Every metering point also belongs to a <strong>building</strong>, the site where it is — see
 <a href="#buildings">Buildings</a>. The metering point's own
-location text says which unit within the building it measures. With several
-buildings, the page groups the metering points by building and the toolbar offers a <strong>Building</strong> filter.</p>
+location text says which unit within the building it measures. The page groups
+the metering points by building and, with several buildings, the toolbar offers a <strong>Building</strong> filter.</p>
 <p><img alt="Metering points page" src="../screenshots/04-metering-points.png" /></p>
 <p>The tabs above the list count the metering points and show one view at a time:
-<strong>All</strong>, <strong>Active</strong>, <strong>Inactive</strong>, <strong>Unassigned</strong> (no participant today) and
-<strong>Needs attention</strong>; click the active tab again to show all. A tab with nothing
+<strong>All</strong>, <strong>Active</strong>, <strong>Inactive</strong> and <strong>Unassigned</strong> (no participant today);
+click the active tab again to show all. A tab with nothing
 in it, or with everything in it, is left out. Below them, the search finds a meter ID, location, building
 or participant, and, when the community has more than one metering point
-type, a second row of tabs narrows to one type. The filters are kept in the
-page address, so a bookmark or shared link opens the same view.</p>
+type, a second row of tabs narrows to one type. A <strong>Sort</strong> menu orders the
+list by <strong>Meter ID</strong> (the default), <strong>Location</strong> or <strong>Oldest reading first</strong>
+(meters that never reported come first). The filters and the sort are kept in the page
+address, so a bookmark or shared link opens the same view.</p>
 <p>If a refresh fails, the last loaded list and any open form stay available.
 Use <strong>Retry</strong> in the warning to refresh the list.</p>
 <h2 id="metering-point-types">Metering Point Types<a class="headerlink" href="#metering-point-types" title="Permanent link">&para;</a></h2>
@@ -1907,17 +1909,17 @@ are, and both are recorded. Buildings are managed on this page.</p>
 <ul>
 <li>A new ZEV starts with one building, taking the issuer's address when the
   issuer lives at the grid connection's postal code. With a single building
-  the page shows it as one line above the list, with <strong>Edit</strong>, and the meter
-  form does not ask for a building.</li>
+  the meter form does not ask for a building.</li>
 <li><strong>Add building</strong> (next to <strong>New Metering Point</strong>) creates one; you can copy
   the address of a participant or other contact. Landowners linked to a
   building (see <a href="../02-zev-setup/#people-and-access-tab">People &amp; access</a>) are
   named in its header.</li>
-<li>With several buildings, the metering points are <strong>grouped by building</strong>, ordered by
-  name. Each group's header shows the address, EGID, landowners and number of
-  metering points, with <strong>Add metering point</strong> (that building preselected)
-  and <strong>Edit</strong>. A building without metering points shows "No
-  metering points in this building yet". Search and the other filters apply
+<li>The metering points are <strong>grouped by building</strong>, ordered by name, each
+  building in a card of its own, whether the community has one building or
+  several. The header shows the address, EGID, landowners and number of
+  metering points. <strong>Add metering point</strong> (that building preselected) is in the header, and
+  <strong>More → Edit building</strong> next to it. A building without metering points shows
+  "No metering points in this building yet". Search and the other filters apply
   within the groups; the <strong>Building</strong> filter shows one group.</li>
 <li>A building can be deleted only once it is empty: move or delete its meters
   first, then <strong>More → Delete building</strong> appears in its header. Landowner rows that pointed at a deleted building are
@@ -1998,7 +2000,7 @@ generation behind it). Once ticked:</p>
   energy is real, and billing depends on it. Instead, wherever the ZEV has a
   flagged meter, an explanatory note appears next to the ZEV-wide figures.</li>
 <li>Metering-point lists and tables show a <strong>Surplus metering</strong> badge next to
-  the meter type.</li>
+  the meter ID.</li>
 </ul>
 <p>If you later add a true production meter (measuring everything the PV system
 generates, not just the surplus), leave this box unticked on that separate
@@ -2083,7 +2085,7 @@ the metering points list — visible on the common-area meter in the
 <h3 id="switching-a-meter-to-community">Switching a meter to Community<a class="headerlink" href="#switching-a-meter-to-community" title="Permanent link">&para;</a></h3>
 <ol>
 <li>Go to <strong>Metering Points</strong></li>
-<li>Find the meter and click <strong>Edit</strong> on its assignment row</li>
+<li>Open the meter's details (click its row) and click <strong>Edit</strong> on its assignment</li>
 <li>Set <strong>Allocation</strong> to <code>Community</code></li>
 <li>Click <strong>Save Assignment</strong></li>
 </ol>
@@ -2117,24 +2119,39 @@ join date, and a leaver's share stops on their leave date.</p>
 for per-metering-point fees, exactly like an inactive personal meter. Its
 historical readings still count towards the community energy pool.</p>
 </blockquote>
-<h2 id="what-a-metering-point-card-shows">What a Metering Point Card Shows<a class="headerlink" href="#what-a-metering-point-card-shows" title="Permanent link">&para;</a></h2>
-<p>Each entry on the <strong>Metering Points</strong> page shows, at a glance:</p>
+<h2 id="what-a-metering-point-row-shows">What a Metering Point Row Shows<a class="headerlink" href="#what-a-metering-point-row-shows" title="Permanent link">&para;</a></h2>
+<p>Each meter on the <strong>Metering Points</strong> page is one row that shows, at a glance
+(the data health of a meter is in its details, below):</p>
 <ul>
-<li>The <strong>meter ID</strong>, its <strong>building</strong> (when the community has several) and
-  its <strong>location</strong> within the building (or "No location set")</li>
-<li><strong>Active</strong>/<strong>Inactive</strong> and meter-<strong>type</strong> badges, plus a <strong>Surplus
-  metering</strong> badge when <a href="#generation-behind-the-meter">Generation behind the meter</a>
-  is ticked</li>
-<li>A <strong>data-health badge</strong> — <code>Healthy</code>, <code>Data gaps</code>, <code>Data at risk</code>, or <code>No
-  data yet</code>, based on the last 30 complete days (up to yesterday); click it to open the
-  metering point's data-quality view</li>
-<li><strong>Last reading</strong> date, or "No readings received yet"</li>
-<li>A <strong>No current holder</strong> warning if the meter has readings but no
-  participant is currently assigned to it</li>
-<li>Its current assignment (holder and validity window), or its full
-  assignment history if it has more than one</li>
+<li>The <strong>meter ID</strong>, an icon for its <strong>type</strong>, its <strong>location</strong> within the building
+  (or "No location set"). A legend below the list names the icons: a bolt is
+  <em>Consumption</em>, a solar panel <em>Production</em>, left-right arrows <em>Bidirectional</em>
+  (only the types you have are listed)</li>
+<li>Badges only for what is unusual: <strong>Inactive</strong>, <strong>No current holder</strong> (the meter
+  has readings but nobody is assigned to it), <strong>Surplus metering</strong> when
+  <a href="#generation-behind-the-meter">Generation behind the meter</a> is ticked, and the
+  status of a connected energy data source when it needs attention</li>
+<li>The <strong>holder</strong> — the participant who holds the meter today, with the start date,
+  a <strong>Community</strong> badge for a shared meter, and "+1" when several participants
+  hold it. A meter nobody holds shows <strong>Assign participant</strong>; click it to set the
+  assignment's validity window.</li>
+<li>The <strong>last reading</strong> date, or "Never"</li>
 </ul>
-<p>Click <strong>Chart</strong> on an entry for the metering point's full reading history.</p>
+<p><strong>Chart</strong> (the chart icon) opens the metering point's full reading history, and
+<strong>⋯ More</strong> has <strong>Assign participant</strong>, <strong>Edit</strong>, <strong>Delete data</strong> (admins) and
+<strong>Delete</strong>.</p>
+<p>Click a row, or the arrow at its end, to open its details in place:</p>
+<ul>
+<li><strong>Participants</strong> — every assignment, current first, with its validity window
+  and its state (<em>Upcoming</em> or <em>Ended</em> for the others). Use <strong>Add assignment</strong>,
+  <strong>Edit</strong> and <strong>⋯ → Remove</strong> here, for example to end a tenant's assignment
+  when they move out.</li>
+<li><strong>Measurement</strong> — last and first reading, how many readings there are, and the
+  <strong>data-health</strong> badge (<code>Healthy</code>, <code>Data gaps</code>, <code>Data at risk</code> or <code>No data yet</code>,
+  based on the last 30 complete days up to yesterday); click it to open the
+  metering point's data-quality view. A connected energy data source shows its
+  status here too.</li>
+</ul>
 <h2 id="meter-maintenance">Meter Maintenance<a class="headerlink" href="#meter-maintenance" title="Permanent link">&para;</a></h2>
 <h3 id="updating-a-metering-point">Updating a Metering Point<a class="headerlink" href="#updating-a-metering-point" title="Permanent link">&para;</a></h3>
 <ol>
@@ -2150,13 +2167,14 @@ historical readings still count towards the community energy pool.</p>
 <h3 id="decommissioning-a-meter">Decommissioning a Meter<a class="headerlink" href="#decommissioning-a-meter" title="Permanent link">&para;</a></h3>
 <p>To stop billing a meter:</p>
 <ol>
-<li>Click <strong>Edit</strong> on its current assignment row</li>
+<li>Open the meter's details (click its row) and click <strong>Edit</strong> on its current
+   assignment</li>
 <li>Set <strong>Valid To</strong> to the last day it should be billed</li>
 <li>Click <strong>Save Assignment</strong></li>
 </ol>
 <p>Then, if the meter is physically gone, open its <strong>⋯ More</strong> menu, click
 <strong>Edit</strong>, set <strong>Active</strong> to off and click <strong>Save Changes</strong>. Deactivating
-removes it from data-health and "needs attention" monitoring and stops
+removes it from data-health monitoring and stops
 per-metering-point fees; on its own it does not stop energy billing.
 Historical data remains available either way.</p>
 <h2 id="metering-point-and-billing">Metering Point and Billing<a class="headerlink" href="#metering-point-and-billing" title="Permanent link">&para;</a></h2>
