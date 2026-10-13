@@ -3,33 +3,20 @@ import { useTranslation } from 'react-i18next'
 import { todayBusinessIso } from '../../lib/dates'
 import type { AppSettings, MeteringPoint, MeteringPointAssignment } from '../../types/api'
 import { MeteringPointRow, type ConfirmOptions } from './MeteringPointRow'
-import {
-  countMeteringPointStatuses,
-  type BuildingGroup,
-  type MeteringPointHealth,
-  type MeteringPointStatus,
-} from './useMeteringPointForms'
-
-/** What a group's header needs to sum its meters up. */
-export type BuildingGroupHeaderState = {
-  statusCounts: Record<MeteringPointStatus, number>
-}
+import type { BuildingGroup, MeteringPointHealth } from './useMeteringPointForms'
 
 type MeteringPointsListProps = {
   meteringPoints: MeteringPoint[]
-  /** Every meter of the community, filters aside: a building's roll-up sums up the building, not just what the filters leave. */
-  allMeteringPoints?: MeteringPoint[]
   assignmentsByMeteringPoint: Map<string, MeteringPointAssignment[]>
   participantNameById: Map<string, string>
   healthByMeteringPoint: Map<string, MeteringPointHealth>
-  statusByMeteringPoint: Map<string, MeteringPointStatus>
   /** Empty for a role that has no assignment data loaded (see the hook) — never render a false positive from a missing entry. */
   holderLessByMeteringPoint: Map<string, boolean>
   settings: AppSettings
   isManagedScope: boolean
   /** The meters grouped by building, each group headed by `renderGroupHeader`; without them (a role that has no buildings) one plain list. */
   groups?: BuildingGroup[] | null
-  renderGroupHeader?: (group: BuildingGroup, state: BuildingGroupHeaderState) => ReactNode
+  renderGroupHeader?: (group: BuildingGroup) => ReactNode
   /** A viewer reads only (#761): no edit, assign, delete. */
   readOnly?: boolean
   canDeleteData: boolean
@@ -47,11 +34,9 @@ type MeteringPointsListProps = {
 
 export function MeteringPointsList({
   meteringPoints,
-  allMeteringPoints,
   assignmentsByMeteringPoint,
   participantNameById,
   healthByMeteringPoint,
-  statusByMeteringPoint,
   holderLessByMeteringPoint,
   settings,
   isManagedScope,
@@ -84,7 +69,6 @@ export function MeteringPointsList({
       todayIso={todayIso}
       health={healthByMeteringPoint.get(point.id) ?? 'no_data'}
       holderLess={holderLessByMeteringPoint.get(point.id) ?? false}
-      status={statusByMeteringPoint.get(point.id) ?? 'pending'}
       isManagedScope={isManagedScope}
       readOnly={readOnly}
       canDeleteData={canDeleteData}
@@ -110,7 +94,6 @@ export function MeteringPointsList({
   const sheetClass = `metering-sheet${isManagedScope ? ' metering-sheet-holders' : ''}`
   const columns = (
     <div className="metering-point-columns" aria-hidden="true">
-      <span />
       <span>{t('pages.meteringPoints.columns.meter')}</span>
       {isManagedScope && <span>{t('pages.meteringPoints.columns.holder')}</span>}
       <span>{t('pages.meteringPoints.columns.lastReading')}</span>
@@ -123,12 +106,7 @@ export function MeteringPointsList({
       <div className="building-groups">
         {groups.map((group) => (
           <section key={group.building.id} className={`building-group ${sheetClass}`}>
-            {renderGroupHeader(group, {
-              statusCounts: countMeteringPointStatuses(
-                (allMeteringPoints ?? meteringPoints).filter((candidate) => candidate.building === group.building.id),
-                statusByMeteringPoint,
-              ),
-            })}
+            {renderGroupHeader(group)}
             {group.points.length === 0 ? (
               <p className="muted building-group-empty">{t('pages.meteringPoints.buildings.emptyGroup')}</p>
             ) : (

@@ -3,8 +3,6 @@ import { faBuilding, faEllipsis, faPen, faPlus, faTrash } from '@fortawesome/fre
 import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
 import type { Building } from '../../types/api'
-import { MeteringPointStatusDot } from './MeteringPointStatusDot'
-import type { MeteringPointStatus } from './useMeteringPointForms'
 
 type BuildingHeaderProps = {
   building: Building
@@ -12,8 +10,6 @@ type BuildingHeaderProps = {
   landowners: string[]
   /** Managers only: add a metering point, edit, and delete an empty building. */
   canManage: boolean
-  /** How many of the building's meters are in each status, for the roll-up. */
-  statusCounts: Record<MeteringPointStatus, number>
   deletePending?: boolean
   onEdit: (building: Building) => void
   onDelete?: (building: Building) => void
@@ -27,38 +23,15 @@ function buildingAddress(building: Building): string {
     .join(', ')
 }
 
-/** The statuses worth a number in the header, worst first; healthy and inactive meters are not counted. */
-const ROLLUP_STATUSES = ['danger', 'warning', 'pending'] as const
-
-/** What is wrong in the building at a glance. */
-function BuildingRollup({ counts }: { counts: Record<MeteringPointStatus, number> }) {
-  const { t } = useTranslation()
-  const flagged = ROLLUP_STATUSES.filter((status) => counts[status] > 0)
-  if (flagged.length === 0) {
-    return counts.ok > 0 ? <span className="building-rollup building-rollup-ok">{t('pages.meteringPoints.buildings.rollup.allGood')}</span> : null
-  }
-  return (
-    <span className="building-rollup">
-      {flagged.map((status) => (
-        <span key={status} className="building-rollup-count">
-          <MeteringPointStatusDot status={status} />
-          {t(`pages.meteringPoints.buildings.rollup.${status}`, { count: counts[status] })}
-        </span>
-      ))}
-    </span>
-  )
-}
-
 /**
  * The building a group of metering points is in (#890, ADR 0029): name,
- * address, EGID, landowners, how many meters it holds and how they are doing.
+ * address, EGID, landowners and how many meters it holds.
  * Every building has this header, whether the community has one or several.
  */
 export function BuildingHeader({
   building,
   landowners,
   canManage,
-  statusCounts,
   deletePending = false,
   onEdit,
   onDelete,
@@ -102,7 +75,6 @@ export function BuildingHeader({
         </div>
       </div>
       <div className="building-header-side">
-        <BuildingRollup counts={statusCounts} />
         {canManage && (
           <div className="building-header-actions actions-row">
             {onAddMeteringPoint && (

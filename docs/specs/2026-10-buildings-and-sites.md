@@ -270,9 +270,8 @@ ZEV settings.
   "Add metering point" (managers only); a building filter when the ZEV has more than one building.
 - **Every building is a group with the same header**, one building or several
   (`MeteringPointsList`, SPEC-2026-08-ui-redesign-pdf-style §15.4): its own sheet, ordered by
-  building name, starting with a tinted `BuildingHeader`: name, address, EGID, landowners whose
-  role names it, metering-point count and a health roll-up (how many of its meters need action,
-  have data gaps or have no data yet, or "All good"), with "Add metering point" and an
+  building name, starting with a `BuildingHeader`: name, address, EGID, landowners whose
+  role names it and the metering-point count, with "Add metering point" and an
   `ActionMenu` ("More") for managers: "Edit building" and, only while the building has no
   metering points, "Delete building" (confirm). Buildings do not fold. A building with no
   metering points still shows its header with "No metering points in this building yet".

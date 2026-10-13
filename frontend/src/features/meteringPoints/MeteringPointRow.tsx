@@ -24,16 +24,13 @@ import { formatBusinessIsoDate } from '../../lib/dates'
 import { formatNumber } from '../../lib/numbers'
 import { statusTone } from '../../lib/supplementary'
 import type { AppSettings, MeteringPoint, MeteringPointAssignment } from '../../types/api'
-import { MeteringPointStatusDot } from './MeteringPointStatusDot'
 import { SupplementarySourceStatus } from './SupplementarySourceStatus'
 import {
   assignmentStateBadgeClass,
   assignmentStateSortOrder,
   getAssignmentState,
   meteringPointHealthBadgeClass,
-  meteringPointStatusLabelKey,
   type MeteringPointHealth,
-  type MeteringPointStatus,
 } from './useMeteringPointForms'
 
 export type ConfirmOptions = {
@@ -58,7 +55,6 @@ type MeteringPointRowProps = {
   todayIso: string
   health: MeteringPointHealth
   holderLess: boolean
-  status: MeteringPointStatus
   isManagedScope: boolean
   readOnly: boolean
   canDeleteData: boolean
@@ -77,9 +73,9 @@ type MeteringPointRowProps = {
 }
 
 /**
- * One metering point as a line of facts — status, ID, type, holder, last
- * reading — that opens in place to its participants, measurement and location.
- * Badges are for what is unusual; the status is a dot.
+ * One metering point as a line of facts — ID, type, holder, last reading — that
+ * opens in place to its participants, measurement and location. Badges are for
+ * what is unusual about the meter itself; its data health is in the details.
  */
 export function MeteringPointRow({
   point,
@@ -89,7 +85,6 @@ export function MeteringPointRow({
   todayIso,
   health,
   holderLess,
-  status,
   isManagedScope,
   readOnly,
   canDeleteData,
@@ -122,7 +117,6 @@ export function MeteringPointRow({
   const upcoming = sortedAssignments.filter((assignment) => getAssignmentState(assignment, todayIso) === 'upcoming')
   const earlierCount = sortedAssignments.length - current.length - upcoming.length
 
-  const statusLabel = t(meteringPointStatusLabelKey(status, health, holderLess))
   const typeLabel = t(`pages.meteringPoints.meterTypes.${point.meter_type}`)
   const location = point.location_description?.trim() ?? ''
   const subtitle = location || t('pages.meteringPoints.noLocation')
@@ -242,9 +236,8 @@ export function MeteringPointRow({
   const detailId = `metering-point-detail-${point.id}`
 
   return (
-    <article className={`metering-point-card${expanded ? ' is-expanded' : ''}${status === 'danger' ? ' is-flagged' : ''}`}>
+    <article className={`metering-point-card${expanded ? ' is-expanded' : ''}`}>
       <div className="metering-point-row" onClick={handleRowClick}>
-        <MeteringPointStatusDot status={status} label={statusLabel} />
         <div className="metering-point-title">
           <div className="metering-point-id">
             <span className="metering-point-id-main">

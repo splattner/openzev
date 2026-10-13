@@ -1132,14 +1132,12 @@ contracts are unchanged.
   secondary. The PDF frame's bars (`.pdf-preview-actions`,
   `.pdf-preview-link`) are paper strips around the document.
 - Metering points (`features/meteringPoints/*`): buildings are sheets, meters
-  are rows, so the page shows what is wrong first and the rest on request.
+  are rows. The page is about the meters, not their data: the rows carry no data
+  indicator, and the data health sits in the details.
   - **Building sheet** (`.metering-sheet` + `.building-group`; one per building, for one
-    building as for several): a `--brand-pale` header band with a `--brand-mid` left edge
-    (`BuildingHeader`): name, address, EGID, landowners and the meter count, the **roll-up**
-    (`.building-rollup`: a dot and a text for each of the building's meters that need
-    action, have data gaps or have no data yet, worst first, or "All good"; healthy and
-    inactive meters are not counted; it sums up all of the building's meters, whatever the
-    filters leave in the list), "Add metering point" and an `ActionMenu` with "Edit building"
+    building as for several): a plain header on the sheet with a hairline below it
+    (`BuildingHeader`): name, address, EGID, landowners and the meter count, "Add metering point"
+    and an `ActionMenu` with "Edit building"
     (and "Delete building" while the building is empty); the last two for managers only.
     The header is not a toggle: buildings do not fold. A role that has no buildings loaded
     (participants), or a community whose buildings have not arrived yet, gets one plain sheet
@@ -1148,11 +1146,7 @@ contracts are unchanged.
     Holder (managers), Last reading, actions, all fixed or fractional so the
     column heads stay over their columns; the heads are the tables' band —
     `--brand-deep`, white 11px small caps — in the one rule `.data-table thead th`
-    shares with `.metering-point-columns`): a status dot
-    (`MeteringPointStatusDot`; `getMeteringPointStatus`: inactive, else danger when
-    the meter is holder-less or its data health is red, warning for yellow,
-    pending for no data, ok otherwise; the label is its accessible name),
-    the meter ID with badges only for the unusual (Inactive, No current holder,
+    shares with `.metering-point-columns`): the meter ID with badges only for the unusual (Inactive, No current holder,
     Surplus metering, a supplementary source in `error` / `reconnect_required`),
     the location (or "No location set"), the
     meter type only as a muted icon before the ID (`.metering-point-type`; its
@@ -1163,8 +1157,7 @@ contracts are unchanged.
     Delete) and the expand button. A
     meter with no holder today that is active shows the one primary
     action inline in the holder column: **Assign participant**
-    (`button-primary button-outline`). A row with a danger status has a faint
-    red wash. The row opens on a click anywhere outside its controls, except one that ends a
+    (`button-primary button-outline`). Neither a row nor the header is tinted. The row opens on a click anywhere outside its controls, except one that ends a
     text selection (copying the meter ID).
   - **Details** (`.metering-point-detail`, three `.metering-detail-card`s;
     two without the Participants card for a role that has no assignment data):
@@ -1175,10 +1168,11 @@ contracts are unchanged.
     Location (building, description, type, behind-the-meter).
   - **Sort** (`MeteringPointSort` in the `sort` query param, `readMeteringPointSort`,
     `sortMeteringPoints`; not cleared by "Clear filters"): problems first (default;
-    danger, warning, no data, ok, inactive; ties by meter ID), meter ID, location
+    `getMeteringPointStatus` ranks meters without a holder or with data at risk, then
+    data gaps, then no data yet, then healthy, then inactive ones; ties by meter ID), meter ID, location
     (unset last) and oldest reading first (a meter that never reported leads).
     Applied after filtering; the groups keep the order within each building.
-  - Narrow screens (≤ 760px): the row is three columns (dot, title, actions) with
+  - Narrow screens (≤ 760px): the row is two columns (title, actions) with
     the holder and last reading beneath; the details stack.
 - Imports: the start sheet uses `.card-header` (title + actions) with the
   description below; "Delete imports" is the quiet destructive button.
@@ -1237,13 +1231,13 @@ contracts are unchanged.
   narrow-tile fixture (`screenshots/fixtures/page-layout.tsx`) includes a
   date-and-time tile, so a tile that spills fails the `.stat-grid` overflow
   check.
-- `tests/metering-points-list.test.ts` (26): the status mapping and its label,
+- `tests/metering-points-list.test.ts` (23): the status mapping used by the sort,
   the sorts (worst first with numeric tie-breaks, unset locations last,
-  stalest reading first, the unknown URL value), the status tally, and the list itself: "Assign participant" only on
+  stalest reading first, the unknown URL value), and the list itself: "Assign participant" only on
   a meter nobody holds, a holder with "+1", rows opening from their button and
   from their blank area but not from a control or the end of a text selection,
   every building, one or several, getting the same header, which is not a toggle,
-  the header roll-up (also from the meters a filter hides), an upcoming-only
+  no status dot or health summary on rows or header, an upcoming-only
   holder, the "N earlier" count, no prompt for an inactive meter nobody holds,
   a viewer's list without Assign, menu or assignment controls, no building
   named under the rows, and no holder column for a role without assignments.

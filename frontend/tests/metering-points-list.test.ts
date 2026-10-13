@@ -16,10 +16,8 @@ vi.mock('../src/features/meteringPoints/SupplementarySourceStatus', () => ({ Sup
 import { BuildingHeader } from '../src/features/meteringPoints/BuildingHeader'
 import { MeteringPointsList } from '../src/features/meteringPoints/MeteringPointsList'
 import {
-    countMeteringPointStatuses,
     getMeteringPointStatus,
     groupMeteringPointsByBuilding,
-    meteringPointStatusLabelKey,
     readMeteringPointSort,
     sortMeteringPoints,
     type MeteringPointStatus,
@@ -58,11 +56,6 @@ describe('getMeteringPointStatus', () => {
         expect(getMeteringPointStatus({ is_active: true }, 'green', false)).toBe('ok')
     })
 
-    it('labels the status by what explains it', () => {
-        expect(meteringPointStatusLabelKey('danger', 'green', true)).toBe('pages.meteringPoints.holderLessBadge')
-        expect(meteringPointStatusLabelKey('danger', 'red', false)).toBe('pages.meteringPoints.health.red')
-        expect(meteringPointStatusLabelKey('inactive', 'green', false)).toBe('pages.meteringPoints.inactive')
-    })
 })
 
 describe('sortMeteringPoints', () => {
@@ -104,16 +97,6 @@ describe('sortMeteringPoints', () => {
     })
 })
 
-describe('countMeteringPointStatuses', () => {
-    it('tallies each status, reading a meter with no status as pending', () => {
-        const counts = countMeteringPointStatuses(
-            [point('a'), point('b'), point('c')],
-            new Map<string, MeteringPointStatus>([['a', 'danger'], ['b', 'danger']]),
-        )
-        expect(counts).toEqual({ ok: 0, warning: 0, danger: 2, pending: 1, inactive: 0 })
-    })
-})
-
 describe('MeteringPointsList', () => {
     let root: ReturnType<typeof createRoot> | null = null
     let container: HTMLDivElement | null = null
@@ -145,13 +128,12 @@ describe('MeteringPointsList', () => {
             ]),
             participantNameById: names,
             healthByMeteringPoint: new Map(),
-            statusByMeteringPoint: new Map(),
             holderLessByMeteringPoint: new Map(),
             settings: {} as never,
             isManagedScope: true,
             groups,
-            renderGroupHeader: (group, state) => createElement(BuildingHeader, {
-                building: group.building, landowners: [], canManage: true, onEdit: noop, statusCounts: state.statusCounts,
+            renderGroupHeader: (group) => createElement(BuildingHeader, {
+                building: group.building, landowners: [], canManage: true, onEdit: noop,
             }),
             canDeleteData: false,
             deleteMeteringPointPending: false,
@@ -218,29 +200,6 @@ describe('MeteringPointsList', () => {
         expect(view.querySelector('.metering-point-detail')).toBeNull()
     })
 
-    it('sums a building up in its header: what needs a look, or that all is well', () => {
-        const view = render({
-            points,
-            statusByMeteringPoint: new Map<string, MeteringPointStatus>([['m1', 'danger'], ['m2', 'warning'], ['m3', 'ok']]),
-        })
-        const [first, second] = Array.from(view.querySelectorAll('.building-rollup'))
-        expect(first.textContent).toContain('pages.meteringPoints.buildings.rollup.danger:1')
-        expect(first.textContent).toContain('pages.meteringPoints.buildings.rollup.warning:1')
-        expect(second.textContent).toBe('pages.meteringPoints.buildings.rollup.allGood')
-    })
-
-    it('sums a building up from all its meters, whatever the filters leave in the list', () => {
-        // Only the healthy meter of Haus A matches the filter; its red one is filtered out.
-        const view = render({
-            points: [points[1], points[2]],
-            allMeteringPoints: points,
-            statusByMeteringPoint: new Map<string, MeteringPointStatus>([['m1', 'danger'], ['m2', 'ok'], ['m3', 'ok']]),
-        })
-        const [first, second] = Array.from(view.querySelectorAll('.building-rollup'))
-        expect(first.textContent).toContain('pages.meteringPoints.buildings.rollup.danger:1')
-        expect(second.textContent).toBe('pages.meteringPoints.buildings.rollup.allGood')
-    })
-
     it('shows a holder who has not started yet with an Upcoming badge, and no Assign button', () => {
         const view = render({
             points,
@@ -290,6 +249,12 @@ describe('MeteringPointsList', () => {
         } finally {
             selection.mockRestore()
         }
+    })
+
+    it('shows no status dot and no health summary on the rows or in the building header', () => {
+        const view = render({ points })
+        expect(view.querySelector('.dot')).toBeNull()
+        expect(view.querySelector('.building-rollup')).toBeNull()
     })
 
     it('gives every building the same header, one or several', () => {

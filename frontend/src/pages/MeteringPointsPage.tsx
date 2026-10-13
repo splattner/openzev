@@ -126,7 +126,6 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
         hasFilters,
         meteringPointHealthById,
         meteringPointHolderLessById,
-        meteringPointStatusById,
         dialog,
         confirm,
         dialogLoading,
@@ -251,20 +250,17 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                     <MeteringPointsList
                         settings={settings}
                         meteringPoints={meteringPoints}
-                        allMeteringPoints={scopedMeteringPoints}
                         assignmentsByMeteringPoint={filteredAssignmentsByMeteringPoint}
                         participantNameById={participantNameById}
                         healthByMeteringPoint={meteringPointHealthById}
-                        statusByMeteringPoint={meteringPointStatusById}
                         holderLessByMeteringPoint={meteringPointHolderLessById}
                         isManagedScope={isManagedScope}
                         groups={groups}
-                        renderGroupHeader={(group, headerState) => (
+                        renderGroupHeader={(group) => (
                             <BuildingHeader
                                 building={group.building}
                                 landowners={landownersOf(group.building)}
                                 canManage={canWrite}
-                                statusCounts={headerState.statusCounts}
                                 deletePending={deleteBuildingMutation.isPending}
                                 onEdit={openEditBuildingModal}
                                 onDelete={confirmDeleteBuilding}

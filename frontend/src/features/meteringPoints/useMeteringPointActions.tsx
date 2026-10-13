@@ -889,7 +889,6 @@ export function useMeteringPointActions({
         // Data health (#623)
         meteringPointHealthById,
         meteringPointHolderLessById,
-        meteringPointStatusById,
         needsAttentionByMeteringPoint,
         // Dialog
         dialog,

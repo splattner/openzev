@@ -59,10 +59,8 @@ are, and both are recorded. Buildings are managed on this page.
   named in its header.
 - The metering points are **grouped by building**, ordered by name, each
   building in a card of its own, whether the community has one building or
-  several. The tinted header shows the address, EGID, landowners and number of
-  metering points, and sums up the building's health: how many of its meters
-  need action, have data gaps or have no data yet, or "All good". **Add
-  metering point** (that building preselected) is in the header, and
+  several. The header shows the address, EGID, landowners and number of
+  metering points. **Add metering point** (that building preselected) is in the header, and
   **More → Edit building** next to it. A building without metering points shows
   "No metering points in this building yet". Search and the other filters apply
   within the groups; the **Building** filter shows one group.
@@ -260,12 +258,9 @@ join date, and a leaver's share stops on their leave date.
 
 ## What a Metering Point Row Shows
 
-Each meter on the **Metering Points** page is one row that shows, at a glance:
+Each meter on the **Metering Points** page is one row that shows, at a glance
+(the data health of a meter is in its details, below):
 
-- A **status dot** — green when all is well, yellow for data gaps, red when the
-  meter needs action (no current holder, or data at risk), an empty ring when no
-  data has arrived yet, grey when the meter is inactive. Hover the dot for the
-  reason.
 - The **meter ID**, an icon for its **type** (hover for *Consumption*,
   *Production* or *Bidirectional*), its **location** within the building (or
   "No location set")

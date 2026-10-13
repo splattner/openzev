@@ -170,9 +170,9 @@ export function meteringPointHealthBadgeClass(health: MeteringPointHealth): stri
 }
 
 /**
- * One glance at a meter: the data health, with a missing holder counted as the
- * worst case and an inactive meter set apart (it is out of billing scope, so
- * its health is not a problem to act on).
+ * How much a meter needs a look, for the "problems first" sort: its data health,
+ * with a missing holder counted as the worst case and an inactive meter set apart
+ * (it is out of billing scope, so its health is not a problem to act on).
  */
 export type MeteringPointStatus = 'ok' | 'warning' | 'danger' | 'pending' | 'inactive'
 
@@ -186,27 +186,6 @@ export function getMeteringPointStatus(
   if (health === 'yellow') return 'warning'
   if (health === 'no_data') return 'pending'
   return 'ok'
-}
-
-/** The status's key under `pages.meteringPoints.health`, for its label. */
-export function meteringPointStatusLabelKey(
-  status: MeteringPointStatus,
-  health: MeteringPointHealth,
-  holderLess: boolean,
-): string {
-  if (status === 'inactive') return 'pages.meteringPoints.inactive'
-  if (holderLess) return 'pages.meteringPoints.holderLessBadge'
-  return `pages.meteringPoints.health.${health}`
-}
-
-/** How many of `points` are in each status. */
-export function countMeteringPointStatuses(
-  points: MeteringPoint[],
-  statusById: Map<string, MeteringPointStatus>,
-): Record<MeteringPointStatus, number> {
-  const counts: Record<MeteringPointStatus, number> = { ok: 0, warning: 0, danger: 0, pending: 0, inactive: 0 }
-  for (const point of points) counts[statusById.get(point.id) ?? 'pending'] += 1
-  return counts
 }
 
 // ── Sort ────────────────────────────────────────────────────────────────────
