@@ -357,7 +357,7 @@ A `rg --pcre2 '#[0-9a-fA-F]{3,8}\b' frontend/src` inventory is committed as a Ph
 ### 7.4 Tables
 
 - Plain tables (`.page-stack table`) + the shared `frontend/src/components/DataTable.tsx` (TanStack) styled by the `.data-table` CSS contract (sticky header, `td.numeric`, hover). The planned bridging module `frontend/src/lib/dataGridTheme.ts` was never needed — MUI was retired in one sweep rather than re-themed first.
-- Sticky `thead` on the documents' dark header band (`--brand-deep`, same-colour bottom border; outer corners `--radius-sm` for a table outside a sheet) with white uppercase kicker labels (`0.6875rem / 650 / 0.05em`; sort buttons inherit the colour); `44px` rows (`height: 2.75rem`) at `0.875rem`, `1px solid var(--border-default)` separators (none under the last row), `hover: var(--surface)`, `selected: var(--brand-pale)`; quantities/money `text-align:right` + `tabular-nums`; DataTable cells `0.75rem` horizontal padding; `td code` identifiers never wrap. The documents' `.line-items` and `.doc-table` use the same `--brand-deep` header. `.participant-table` uses the same band. Every band cell repaints the band behind its content with a pseudo-element reaching 1px past its bottom and, after the first cell, past its left edge (`:where(.page-stack, .data-table) thead th::before`, `z-index: -1`, positioned by the sticky cell; cells ignore `box-shadow` under collapsed borders): at a fractional position or zoom, neighbouring cells otherwise leave a light seam on their shared edge, and the background and bottom border snap a light row apart. The raw metering grid's light header opts out (`content: none`). Inside a sheet (`.card`, `.table-card`) a table fills it edge to edge: a table, `.table-scroll` or `.data-table` that is a direct child of the sheet, or of a classless `div` or `.page-stack` directly inside it, takes `margin-inline: calc(-1 * var(--sheet-pad-inline))` (a bare `table` also `width: calc(100% + 2 * var(--sheet-pad-inline))`), and its outer cells pad by `--sheet-pad-inline` so their text lines up with the sheet's title; the band's corners are square. When that table is the sheet's first child it also takes `margin-top: calc(-1 * var(--sheet-pad-block))` and the sheet's inner top corners (`calc(var(--radius-lg) - 1px)`). The rules sit behind `:where()` so a component layout can override them: the stacked invoice rows (`@container (max-width: 46rem)`, no visible band) keep the sheet's top inset and pad each row card by `--sheet-pad-inline`, with dividers still running edge to edge. Zebra `var(--zebra)` optional (documents keep it; UI uses it only where scans benefit).
+- Sticky `thead` on the documents' dark header band (`--brand-deep`, same-colour bottom border; outer corners `--radius-sm` for a table outside a sheet) with white uppercase kicker labels (`0.6875rem / 650 / 0.05em`; sort buttons inherit the colour); `44px` rows (`height: 2.75rem`) at `0.875rem`, `1px solid var(--border-default)` separators (none under the last row), `hover: var(--surface)`, `selected: var(--brand-pale)`; quantities/money `text-align:right` + `tabular-nums`; DataTable cells `0.75rem` horizontal padding; `td code` identifiers never wrap. The documents' `.line-items` and `.doc-table` use the same `--brand-deep` header. `.participant-table` uses the same band. Every band cell repaints the band behind its content with a pseudo-element reaching 1px past its bottom and, after the first cell, past its left edge (`:where(.page-stack, .data-table) thead th::before`, `z-index: -1`, positioned by the sticky cell; cells ignore `box-shadow` under collapsed borders): at a fractional position or zoom, neighbouring cells otherwise leave a light seam on their shared edge, and the background and bottom border snap a light row apart. The raw metering grid's light header opts out (`content: none`). Inside a sheet (`.card`, `.table-card`) a table fills it edge to edge: a table, `.table-scroll` or `.data-table` that is a direct child of the sheet, or of a classless `div` or `.page-stack` directly inside it, takes `margin-inline: calc(-1 * var(--sheet-pad-inline))` (a bare `table` also `width: calc(100% + 2 * var(--sheet-pad-inline))`), and its outer cells pad by `--sheet-pad-inline` so their text lines up with the sheet's title; the band's corners are square. When that table is the sheet's first child it also takes `margin-top: calc(-1 * var(--sheet-pad-block))` and the sheet's inner top corners (`calc(var(--radius-lg) - 1px)`). When it is the sheet's last child it takes `margin-bottom: calc(-1 * var(--sheet-pad-block))` and its last row's outer cells the sheet's inner bottom corners, so the last row meets the sheet's bottom. The rules sit behind `:where()` so a component layout can override them: the stacked invoice rows (`@container (max-width: 46rem)`, no visible band) keep the sheet's top inset and pad each row card by `--sheet-pad-inline`, with dividers still running edge to edge. Zebra `var(--zebra)` optional (documents keep it; UI uses it only where scans benefit).
 - Row actions (`td > .button`, `.actions-cell-content > .button`): a primary action renders as a forest outline, a destructive one quiet (paper, `--danger-700` text, red tint on hover); only the page's own primary action is solid (§15).
 
 ### 7.5 Cards and chrome
@@ -1072,8 +1072,10 @@ contracts are unchanged.
   (`--field-height`). `.list-filters` is one wrapping line: a search input
   (full width on phones), further tab groups and compact selects, labelled by
   `aria-label`.
-  Participants: All · Needs attention · No metering point, with the search
-  in the same `.list-filters` row (nothing else narrows them).
+  Participants: Current & upcoming (default) · Needs attention · No metering
+  point · Ended (`distinct`), with the search in the same `.list-filters` row
+  (nothing else narrows them). Ended participations show only under Ended;
+  the attention and metering counts cover current and upcoming ones.
   Metering points: All · Active · Inactive · Unassigned (managers only);
   below, search, type tabs (All types · Consumption ·
   Production · Bidirectional, shown when more than one type is present or a
@@ -1087,12 +1089,44 @@ contracts are unchanged.
   next version, so it differs from Valid even at the same count), and all
   series; the tariff overview PDF's scope (valid or all) is chosen at its
   download instead (SPEC-2026-09-tariff-overview-pdf §11).
-- Ledger lists: participants and metering points render as
-  hairline-separated rows inside one sheet. Participant rows lead with the
-  name (`.participant-card-heading`), then badges, then five labelled detail
-  columns; Edit is a secondary action (SPEC-2026-04 §7.3). Metering points are
-  one-line rows that open in place to their assignments (§15.4); Assign is
-  `button-outline`.
+- Participant list (`ParticipantCardsSection`): the billing period's row
+  table, reusing its classes (`.table-card.invoice-rows.participant-rows`);
+  the legend sits below the sheet, so the sheet's bottom padding is 0.5rem.
+  - Columns: Participant (organisation icon and name, name addition; a muted
+    line with role tags, an Upcoming/Ended pill, email and phone; the missing
+    details in the red issues line), Address (street, then postcode and
+    place), Validity (from, then "– to" or "– Open"), Status, Allocation
+    weight (today's share over `weight / total`; §8.2 of
+    SPEC-2026-08-shared-metering-points) and an unlabelled actions column:
+    Contract PDF and, for a writer, the icon-only ⋯ menu (Edit, onboarding
+    links, account linking, delete).
+  - A writer opens the edit dialog from the name (`.participant-name-button`).
+  - Status: four `ProgressIcon`s (`frontend/src/components/ProgressIcon.tsx`,
+    shared with the invoice progress column; it takes a rendered icon).
+    Email, address and metering point (the sidebar's `PlugIcon`,
+    `frontend/src/components/IconSvg.tsx`) are done or an issue, from the
+    entry's `issues` (`participantIssues`). Invitation is done once the
+    onboarding link has been used (`onboarding_status` `active`) and open
+    otherwise; its tooltip is `status.invitationState.<onboarding_status>`.
+    It shows the link, not portal access: every participant has an account
+    from creation, and setting a password revokes the link. The account's
+    generated username is not shown (participants sign in by email); the
+    unlink confirmation names it. A `ProgressLegend` below the sheet names the icons and
+    the done/missing marks.
+  - Fixing an issue (writers only, `.participant-fix`): the red text is the
+    control, a missing email or address opening the edit dialog and a
+    missing metering point linking to `/metering/points`. The red icon does
+    the same for the mouse but is out of the tab order and hidden from
+    assistive technology (`.participant-fix--icon`). A viewer reads both as
+    plain text.
+  - Empty states: no participants at all offers New participant; when the
+    default tab is empty only because every participation has ended,
+    "Show ended" selects the Ended tab; otherwise "Clear filters".
+  - Below 46rem a row is a card (who and share, address and validity,
+    status beside the actions); below 28rem the status icons and the
+    actions each take a full line.
+- Metering point list: one-line rows inside one sheet per building that open in
+  place to their assignments (§15.4); Assign is `button-outline`.
 - Tariff list (`TariffCategorySections`): a rate card like the tariff overview PDF.
   - List contents: one sheet with a `.tariff-table` per category; the header shows the category. One row per series with its name, energy type, note first line, applicability, CHF price, unit, and validity. One line per band. No version count.
   - Pricing and coverage: `buildRateLines` in `rateLines.ts` (tested in `tariff-rate-lines.test.ts`); per-kWh prices carry at least three decimals, fees two. Applies names the band, weekdays (`formatWeekdays`), window and season; a dynamic average reads "Dynamic, average" or "Dynamic, incomplete average"; a percentage names its share and base with the approximate price; fees name their basis. Applies lines carry their full text as tooltip; the price column carries the pricing explanation; a shown (non-upcoming) validity keeps the full range as tooltip.
@@ -1151,7 +1185,7 @@ contracts are unchanged.
     Surplus metering, a supplementary source in `error` / `reconnect_required`),
     the location (or "No location set"), the
     meter type only as a muted icon before the ID (`.metering-point-type`; its
-    name is the tooltip and the `aria-label`; one quiet legend line above the
+    name is the tooltip and the `aria-label`; one quiet legend line below the
     sheets, `MeteringPointTypeLegend`, pairs each icon with its name for the types
     on the page, `pages.meteringPoints.typeLegend` labelling the list), the holder (name, "+N" for further current
     holders, "since", Community badge, "N earlier"; an upcoming-only holder
@@ -1244,7 +1278,7 @@ contracts are unchanged.
   holder, the "N earlier" count, no prompt for an inactive meter nobody holds,
   a viewer's list without Assign, menu or assignment controls, no building
   named under the rows, no holder column for a role without assignments, and
-  the type legend: once above the sheets, only the types on the page, none for an
+  the type legend: once below the sheets, only the types on the page, none for an
   empty list.
 - `screenshots/field-geometry.spec.ts`: the field contract is now 16px values,
   14px/500 labels, 13px helpers, 8px radius, 40px height (the buttons').

@@ -14,6 +14,7 @@ import { LanguageSelector } from './LanguageSelector'
 import { useToast } from '../lib/toast'
 import { useRouteFocus } from '../lib/useRouteFocus'
 import pkg from '../../package.json'
+import { IconSvg, PlugIcon } from './IconSvg'
 
 // Keep in sync with the mobile shell breakpoint in index.css.
 const MOBILE_MEDIA_QUERY = '(max-width: 768px)'
@@ -479,10 +480,6 @@ function SystemIcon() {
     )
 }
 
-function PlugIcon() {
-    return <IconSvg path="M9 7V3m6 4V3m-7 8h8a2 2 0 0 0 2-2V7H6v2a2 2 0 0 0 2 2Zm4 0v6a4 4 0 0 1-4 4h-1" />
-}
-
 function ChartIcon() {
     return <IconSvg path="M4 19V5m0 14h16M8 17v-5m4 5V8m4 9V11" />
 }
@@ -555,14 +552,6 @@ function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {
     return (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             {direction === 'left' ? <path d="m15 18-6-6 6-6" /> : <path d="m9 18 6-6-6-6" />}
-        </svg>
-    )
-}
-
-function IconSvg({ path }: { path: string | ReactNode }) {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            {typeof path === 'string' ? <path d={path} /> : path}
         </svg>
     )
 }

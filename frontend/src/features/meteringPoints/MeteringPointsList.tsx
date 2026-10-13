@@ -105,7 +105,6 @@ export function MeteringPointsList({
   if (groups && renderGroupHeader) {
     return (
       <div className="building-groups">
-        <MeteringPointTypeLegend meteringPoints={meteringPoints} />
         {groups.map((group) => (
           <section key={group.building.id} className={`building-group ${sheetClass}`}>
             {renderGroupHeader(group)}
@@ -119,17 +118,18 @@ export function MeteringPointsList({
             )}
           </section>
         ))}
+        <MeteringPointTypeLegend meteringPoints={meteringPoints} />
       </div>
     )
   }
 
   return (
-    <>
-      <MeteringPointTypeLegend meteringPoints={meteringPoints} />
+    <div className="building-groups">
       <div className={sheetClass}>
         {columns}
         <div className="metering-point-list">{meteringPoints.map(renderRow)}</div>
       </div>
-    </>
+      <MeteringPointTypeLegend meteringPoints={meteringPoints} />
+    </div>
   )
 }

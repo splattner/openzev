@@ -258,7 +258,7 @@ describe('MeteringPointsList', () => {
         expect(view.querySelector('.metering-sheet-holders')).toBeNull()
     })
 
-    it('explains the type icons once above the sheets, naming only the types on the page', () => {
+    it('explains the type icons once below the sheets, naming only the types on the page', () => {
         const view = render({ points: [...points, point('m4', { building: 'b2', meter_type: 'production' })] })
         const legend = view.querySelectorAll('.metering-type-legend')
         expect(legend).toHaveLength(1)
@@ -266,7 +266,8 @@ describe('MeteringPointsList', () => {
             'pages.meteringPoints.meterTypes.consumption',
             'pages.meteringPoints.meterTypes.production',
         ])
-        expect(legend[0].nextElementSibling?.classList.contains('building-group')).toBe(true)
+        expect(legend[0].previousElementSibling?.classList.contains('building-group')).toBe(true)
+        expect(legend[0].nextElementSibling).toBeNull()
     })
 
     it('has no legend without meters, and keeps it on the plain list of a role without buildings', () => {

@@ -261,7 +261,7 @@ Each meter on the **Metering Points** page is one row that shows, at a glance
 (the data health of a meter is in its details, below):
 
 - The **meter ID**, an icon for its **type**, its **location** within the building
-  (or "No location set"). A legend above the list names the icons: a bolt is
+  (or "No location set"). A legend below the list names the icons: a bolt is
   *Consumption*, a solar panel *Production*, left-right arrows *Bidirectional*
   (only the types you have are listed)
 - Badges only for what is unusual: **Inactive**, **No current holder** (the meter

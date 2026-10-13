@@ -1121,10 +1121,13 @@ Linking is a fact about one community's participant, so it lives with the
 participants (`ParticipantCardsSection`, `useParticipantAccountLinking`,
 `LinkAccountModal` in `frontend/src/features/participants/`).
 
-- Each participant card has an **Account** section: the linked username, or "No
-  account yet".
+- Each participant row's Status column has an **Invitation** icon: done once
+  the onboarding link has been used, otherwise open; its tooltip names the
+  link's state (not invited, invited until a date, used, expired, or revoked,
+  which includes a participant setting a password). The generated username
+  is not listed; the unlink confirmation names it.
 - **Admin only** (the endpoints are admin-only; the accounts query only runs for
-  admins): *Link existing* in the card menu when the participant has no account
+  admins): *Link existing* in the row menu when the participant has no account
   and at least one linkable account exists (`accountList.linkableAccounts` —
   any non-admin account, also one already holding participant rows elsewhere,
   matching the server's rule since #761); *Unlink* when it has one, except on

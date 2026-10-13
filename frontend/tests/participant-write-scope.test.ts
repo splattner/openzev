@@ -55,8 +55,8 @@ const participants = ['A', 'B'].map(zev => ({ id: `p${zev}`, zev, first_name: 'N
 let root: ReturnType<typeof createRoot>
 let client: QueryClient
 let container: HTMLDivElement
-async function render() {
-    await act(async () => root.render(createElement(MemoryRouter, null,
+async function render(path = '/participants') {
+    await act(async () => root.render(createElement(MemoryRouter, { initialEntries: [path] },
         createElement(QueryClientProvider, { client }, createElement(ParticipantsPage)),
     )))
 }
@@ -149,6 +149,42 @@ it('counts and lists the same participants under No metering point', async () =>
     expect(state.toolbar!.noMeteringCount).toBe(1)
     act(() => state.toolbar!.onReadinessFilterChange('noMetering'))
     expect(state.cards!.filteredParticipants.map(({ participant }) => participant.id)).toEqual(['unmetered'])
+})
+
+it('hides ended participants until the Ended tab is chosen', async () => {
+    client.setQueryData(queryKeys.zev.participants('A'), [
+        { ...participants[0], id: 'current', has_metering_point_assignment: false },
+        { ...participants[0], id: 'ended', valid_to: '2026-03-31', has_metering_point_assignment: false },
+    ])
+    await render()
+    expect(state.cards!.filteredParticipants.map(({ participant }) => participant.id)).toEqual(['current'])
+    expect(state.toolbar!).toMatchObject({ activeCount: 1, endedCount: 1, noMeteringCount: 1 })
+    act(() => state.toolbar!.onReadinessFilterChange('ended'))
+    expect(state.cards!.filteredParticipants.map(({ participant }) => participant.id)).toEqual(['ended'])
+})
+
+it('offers the Ended tab when every participation has ended', async () => {
+    client.setQueryData(queryKeys.zev.participants('A'), [
+        { ...participants[0], id: 'ended', valid_to: '2026-03-31' },
+    ])
+    await render()
+    expect(state.cards!.filteredParticipants).toEqual([])
+    act(() => state.cards!.onShowEnded!())
+    expect(state.cards!.filteredParticipants.map(({ participant }) => participant.id)).toEqual(['ended'])
+    expect(state.cards!.onShowEnded).toBeUndefined()
+})
+
+it('opens a deep link to an ended participation on the Ended tab', async () => {
+    client.setQueryData(queryKeys.zev.participants('A'), [
+        { ...participants[0], id: 'current' },
+        { ...participants[0], id: 'ended', valid_to: '2026-03-31' },
+    ])
+    // A mounted router keeps its location, so start a fresh one on the link.
+    act(() => root.unmount())
+    root = createRoot(container)
+    await render('/participants?focus=ended')
+    await waitForCondition(() => state.cards?.focusParticipantId === 'ended', 'deep link consumed')
+    expect(state.cards!.filteredParticipants.map(({ participant }) => participant.id)).toEqual(['ended'])
 })
 
 const onboarding = [

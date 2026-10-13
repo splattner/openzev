@@ -459,10 +459,10 @@ direction when no explicit direction column is present.
 
 Readiness/attention links for participant-validity warnings open the
 participants page with `?focus=<participant id>&field=valid_to`. The page
-consumes the parameters once: it clears any search/readiness filter that
-would hide the card, opens the edit modal with the validity focused, scrolls
-the participant card into view and flashes it (`.participant-card-focus`, a
-CSS-only highlight), then drops the parameters from the URL so a later
+consumes the parameters once: it clears the search and selects the
+Ended tab for an ended participation, otherwise the default tab, opens the
+edit modal with the validity focused, scrolls the participant row into view
+and flashes it (`.participant-row-focus`, a CSS-only highlight), then drops the parameters from the URL so a later
 refresh or another deep link re-triggers cleanly. URL consumption and the
 scroll/flash lifecycle are separate effects, so removing the parameters
 never cancels the highlight timers. Edit-intent links wait for community loading
@@ -486,9 +486,9 @@ missing selection as all communities. Covered by
 
 ### 8.6 Participant allocation-weight display
 
-Participant cards (`ParticipantCardsSection.tsx`) show today's allocation-weight
-share among current members. Ended and upcoming memberships show only their
-configured weight. See
+The participant list (`ParticipantCardsSection.tsx`) shows today's allocation-weight
+share among current members. Ended and upcoming memberships show `–` over
+their configured weight. See
 [shared metering points §8.2](2026-08-shared-metering-points.md#82-participants)
 for eligibility, filtering, formatting and billing rules.
 
@@ -558,7 +558,7 @@ python -m pytest -q
 - Assignment date-range picker with overlap/containment feedback
 - List filtering: one view tab (all / active / inactive / unassigned, `MeteringPointView` in the `view` query param, read by `readMeteringPointView`; `getScopedAndFilteredMeteringPoints` takes it as `view`) plus search and meter-type tabs (SPEC-2026-08-ui-redesign-pdf-style §15.3 filter tabs)
 - Buildings on the metering points page (SPEC-2026-10-buildings-and-sites §7.3): "Add building" next to "New Metering Point"; the meters are grouped by building, one building or several (`groupMeteringPointsByBuilding`, ordered by name, each group a sheet headed by the same `BuildingHeader` with add-meter and a menu with edit / delete; a role without buildings gets one plain list); with a building filter and a building select in the form (`tests/buildings.test.ts`; the full test plan is in SPEC-2026-10-buildings-and-sites §11)
-- The list rows (SPEC-2026-08-ui-redesign-pdf-style §15.4): `MeteringPointsList` renders `MeteringPointRow`s: the meter ID with badges for the unusual only and the meter type as a tooltip icon (named once in a legend line above the sheets), holder, last reading and a quiet action cluster, opening in place to Participants / Measurement; "Assign participant" is the one inline action, on an active meter nobody holds today. A sort select (`sort` query param: meter ID (default), location, oldest reading first) orders the list (`sortMeteringPoints`; `tests/metering-points-list.test.ts`)
+- The list rows (SPEC-2026-08-ui-redesign-pdf-style §15.4): `MeteringPointsList` renders `MeteringPointRow`s: the meter ID with badges for the unusual only and the meter type as a tooltip icon (named once in a legend line below the sheets), holder, last reading and a quiet action cluster, opening in place to Participants / Measurement; "Assign participant" is the one inline action, on an active meter nobody holds today. A sort select (`sort` query param: meter ID (default), location, oldest reading first) orders the list (`sortMeteringPoints`; `tests/metering-points-list.test.ts`)
 - Build and type checks: `npm run build`
 
 ### Manual verification
