@@ -2,6 +2,16 @@ apiVersion: v1
 entries:
   openzev:
   - apiVersion: v2
+    appVersion: 1.24.0
+    created: "2026-10-13T19:53:34.661435692Z"
+    description: Helm chart for deploying OpenZEV frontend, backend, and worker.
+    digest: 1822e1e4f7c38751bc23be995514c92956d17b266553b623bb201c2dc96b13a1
+    name: openzev
+    type: application
+    urls:
+    - openzev-1.24.0.tgz
+    version: 1.24.0
+  - apiVersion: v2
     appVersion: 1.23.0
     created: "2026-10-12T12:01:00.628063419Z"
     description: Helm chart for deploying OpenZEV frontend, backend, and worker.
@@ -371,4 +381,4 @@ entries:
     urls:
     - openzev-1.0.2.tgz
     version: 1.0.2
-generated: "2026-10-12T12:01:00.628195286Z"
+generated: "2026-10-13T19:53:34.661756147Z"
