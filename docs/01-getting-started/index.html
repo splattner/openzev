@@ -2486,6 +2486,10 @@ docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> 
 </code></pre></div>
 </li>
 </ul>
+<p>When upgrading to the participant-link protection, existing independent accounts
+keep their passwords, sessions and API keys. If the update happens between the
+password and two-factor steps, restart sign-in; the old challenge is no longer
+accepted.</p>
 <h3 id="synology-nas-container-manager">Synology NAS (Container Manager)<a class="headerlink" href="#synology-nas-container-manager" title="Permanent link">&para;</a></h3>
 <p>On a Synology NAS the release file runs as a <em>Project</em> in <strong>Container Manager</strong>
 (called <em>Docker</em> before DSM 7.2). You need DSM 7.2 or later on a model that

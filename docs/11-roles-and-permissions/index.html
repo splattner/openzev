@@ -2810,6 +2810,23 @@ belongs to:</p>
    person who rents in two communities keeps one login</li>
 <li>To detach an account again, choose <strong>Unlink</strong> (the account itself stays as it is)</li>
 </ol>
+<p>Independent-access accounts are admins, accounts allowed to create a community,
+and current/former manager/viewer grant or issuer/representative role holders.
+They use their normal login; participant links are refused, including after
+accepted access is revoked or admin/self-setup privileges are removed.</p>
+<p>An existing linked account without a password, enabled sign-in provider or
+passkey needs an access invitation before you assign a managing role. A party
+without an account can hold a role; invite it to enable sign-in. Giving manager/viewer access
+sends that invitation and ends their earlier participant links, sessions and API keys.
+Managers can start this flow only for participant accounts confined to their
+community; ask an admin for other accounts. Failed delivery leaves the invitation
+pending: use <strong>Resend invitation</strong> on the access row.</p>
+<p>Cancelling an invitation that was never accepted restores participant login when
+no other grant, managing role or independent-login requirement remains, even
+if it was sent on an earlier day. Send a fresh onboarding link. Remaining
+protected relationships keep the account in the invitation flow. Cancelling a
+reinvitation restores a previously protected account's active state when no open
+access remains; participant links stay refused. Use <a href="#user-cannot-login">account recovery</a> if it has no independent credentials.</p>
 <h3 id="other-account-actions">Other Account Actions<a class="headerlink" href="#other-account-actions" title="Permanent link">&para;</a></h3>
 <p>Open <strong>More</strong> on an account row for:</p>
 <ul>
@@ -3012,11 +3029,12 @@ access under <strong>ZEV settings → People &amp; access</strong>.</p>
 <ol>
 <li>Check the account under <strong>Platform → Accounts → Users</strong>: is it active, and
    has it ever signed in?</li>
-<li><strong>Participant:</strong> a manager of the community sends or copies the onboarding link
+<li><strong>Participant-only account:</strong> a manager of the community sends or copies the onboarding link
    again from the <strong>⋯</strong> menu on the participant's row. It signs them in, and they
    choose a new password.</li>
 <li>
-<p><strong>Manager or admin who forgot their password:</strong> someone with server access
+<p><strong>Account with independent access:</strong> use its external sign-in provider, if
+   configured. For a forgotten password, someone with server access
    sets a new one on the command line (the user then signs in with it; the
    service is <code>backend</code> instead of <code>app</code> in a two-container source build):</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>app<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>changepassword<span class="w"> </span>&lt;username&gt;
