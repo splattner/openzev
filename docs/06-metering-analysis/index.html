@@ -1996,8 +1996,8 @@ reach a card and <strong>Enter</strong> or <strong>Space</strong> to toggle it.<
 to inspect them. Managers can add points there; viewers can ask a manager to
 add them. A point with no readings appears in the <strong>Missing</strong> group.</p>
 <h3 id="status-table">Status Table<a class="headerlink" href="#status-table" title="Permanent link">&para;</a></h3>
-<p>Below the summary cards, a table shows per-metering-point details. Any
-column can be sorted by clicking its header (the Status column sorts worst
+<p>Below the summary cards, a table shows per-metering-point details. Click a
+column header to sort, except for Missing Days (the Status column sorts worst
 severity first).</p>
 <table>
 <thead>
@@ -2025,10 +2025,16 @@ severity first).</p>
 </tr>
 <tr>
 <td><strong>Missing Days</strong></td>
-<td>The first missing date range; click "+N more" to expand the full list in place</td>
+<td>The number of missing days; click it to open a drawer with the missing date ranges and their duration</td>
 </tr>
 </tbody>
 </table>
+<p>The drawer identifies the meter and holder for the selected period. It shows
+the first three gap ranges; click <strong>And N more gaps</strong> to reveal the rest.
+<strong>Go to imports</strong> opens the <strong>Import history</strong> tab with the current period and
+filters preserved. Managers can import a metering file covering the missing
+dates; files may contain readings for several meters. Viewers can inspect import
+history and ask a manager to import the data.</p>
 <p>Two additional warnings can appear under a meter's status, independent of
 its coverage:</p>
 <ul>
