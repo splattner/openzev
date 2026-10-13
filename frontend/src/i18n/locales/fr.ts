@@ -1909,7 +1909,6 @@ export const fr = {
                 active: 'Actifs',
                 inactive: 'Inactifs',
                 unassigned: 'Non attribués',
-                needsAttention: 'Nécessite une attention',
             },
             filters: {
                 search: 'Recherche',
@@ -1936,7 +1935,6 @@ export const fr = {
             never: 'Jamais',
             sort: {
                 label: 'Trier',
-                attention: "Problèmes d'abord",
                 meterId: 'ID compteur',
                 location: 'Emplacement',
                 lastReading: "Relevé le plus ancien d'abord",

@@ -11,7 +11,6 @@ import {
   isAssignmentCurrent,
   isMeteringPointHolderLess,
   meteringPointHealthBadgeClass,
-  meteringPointNeedsAttention,
   readMeteringPointTypeFilter,
   readMeteringPointView,
 } from '../src/features/meteringPoints/useMeteringPointForms'
@@ -186,26 +185,6 @@ describe('metering point form helpers', () => {
     })
   })
 
-  describe('meteringPointNeedsAttention', () => {
-    it('flags an active meter whose health is not green', () => {
-      expect(meteringPointNeedsAttention({ is_active: true }, 'yellow', false)).toBe(true)
-      expect(meteringPointNeedsAttention({ is_active: true }, 'red', false)).toBe(true)
-      expect(meteringPointNeedsAttention({ is_active: true }, 'no_data', false)).toBe(true)
-    })
-
-    it('flags an active, healthy meter that is holder-less', () => {
-      expect(meteringPointNeedsAttention({ is_active: true }, 'green', true)).toBe(true)
-    })
-
-    it('does not flag a healthy, held, active meter', () => {
-      expect(meteringPointNeedsAttention({ is_active: true }, 'green', false)).toBe(false)
-    })
-
-    it('never flags an inactive meter, regardless of health or holder status', () => {
-      expect(meteringPointNeedsAttention({ is_active: false }, 'red', true)).toBe(false)
-    })
-  })
-
   it('maps health to badge classes', () => {
     expect(meteringPointHealthBadgeClass('green')).toBe('badge badge-success')
     expect(meteringPointHealthBadgeClass('yellow')).toBe('badge badge-warning')
@@ -215,13 +194,14 @@ describe('metering point form helpers', () => {
 
   describe('reading filters from the URL (#625)', () => {
     it('reads a valid list view and falls back to "all" for anything else', () => {
-      for (const view of ['active', 'inactive', 'unassigned', 'attention'] as const) {
+      for (const view of ['active', 'inactive', 'unassigned'] as const) {
         expect(readMeteringPointView(view)).toBe(view)
       }
       expect(readMeteringPointView(null)).toBe('all')
       expect(readMeteringPointView('')).toBe('all')
-      // "assigned" has no tab any more.
+      // "assigned" and "attention" have no tab any more.
       expect(readMeteringPointView('assigned')).toBe('all')
+      expect(readMeteringPointView('attention')).toBe('all')
     })
 
     it('reads a valid type filter and falls back to "all" for anything else', () => {

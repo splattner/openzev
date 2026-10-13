@@ -1074,11 +1074,12 @@ contracts are unchanged.
   `aria-label`.
   Participants: All · Needs attention · No metering point, with the search
   in the same `.list-filters` row (nothing else narrows them).
-  Metering points: All · Active · Inactive · Unassigned (managers only) ·
-  Needs attention; below, search, type tabs (All types · Consumption ·
+  Metering points: All · Active · Inactive · Unassigned (managers only);
+  below, search, type tabs (All types · Consumption ·
   Production · Bidirectional, shown when more than one type is present or a
-  type is selected), a sort select (§15.4: problems first by default) and, with
-  more than one building, the building select.
+  type is selected), a sort select (§15.4: meter ID by default) and, with
+  more than one building, the building select. The list is about the meters,
+  so there is no data-health tab.
   The view is stored in the `view` query param (an unknown value reads as
   All); the type keeps `type`. Tariffs: Valid (default) · Upcoming · All,
   counting tariff series with a version in force today, series with a
@@ -1167,10 +1168,9 @@ contracts are unchanged.
     the supplementary source chip unless it already sits on the row) and
     Location (building, description, type, behind-the-meter).
   - **Sort** (`MeteringPointSort` in the `sort` query param, `readMeteringPointSort`,
-    `sortMeteringPoints`; not cleared by "Clear filters"): problems first (default;
-    `getMeteringPointStatus` ranks meters without a holder or with data at risk, then
-    data gaps, then no data yet, then healthy, then inactive ones; ties by meter ID), meter ID, location
-    (unset last) and oldest reading first (a meter that never reported leads).
+    `sortMeteringPoints`; not cleared by "Clear filters"): meter ID (default,
+    numbers by value), location (unset last) and oldest reading first (a meter that
+    never reported leads); an unknown value in the URL reads as meter ID.
     Applied after filtering; the groups keep the order within each building.
   - Narrow screens (≤ 760px): the row is two columns (title, actions) with
     the holder and last reading beneath; the details stack.
@@ -1231,9 +1231,9 @@ contracts are unchanged.
   narrow-tile fixture (`screenshots/fixtures/page-layout.tsx`) includes a
   date-and-time tile, so a tile that spills fails the `.stat-grid` overflow
   check.
-- `tests/metering-points-list.test.ts` (23): the status mapping used by the sort,
-  the sorts (worst first with numeric tie-breaks, unset locations last,
-  stalest reading first, the unknown URL value), and the list itself: "Assign participant" only on
+- `tests/metering-points-list.test.ts` (19): the sorts (meter ID with numbers by
+  value, unset locations last, stalest reading first, the unknown or removed URL
+  value), and the list itself: "Assign participant" only on
   a meter nobody holds, a holder with "+1", rows opening from their button and
   from their blank area but not from a control or the end of a text selection,
   every building, one or several, getting the same header, which is not a toggle,

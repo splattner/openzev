@@ -1920,7 +1920,6 @@ export const en = {
                 active: 'Active',
                 inactive: 'Inactive',
                 unassigned: 'Unassigned',
-                needsAttention: 'Needs attention',
             },
             filters: {
                 search: 'Search',
@@ -1947,7 +1946,6 @@ export const en = {
             never: 'Never',
             sort: {
                 label: 'Sort',
-                attention: 'Problems first',
                 meterId: 'Meter ID',
                 location: 'Location',
                 lastReading: 'Oldest reading first',

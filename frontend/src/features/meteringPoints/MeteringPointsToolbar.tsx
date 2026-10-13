@@ -19,7 +19,6 @@ type MeteringPointsToolbarProps = {
   activeCount: number
   inactiveCount: number
   assignedCount: number
-  needsAttentionCount: number
   searchTerm: string
   view: MeteringPointView
   sort: MeteringPointSort
@@ -40,7 +39,6 @@ type MeteringPointsToolbarProps = {
 }
 
 const SORT_OPTIONS: Array<{ value: MeteringPointSort; labelKey: string }> = [
-  { value: 'attention', labelKey: 'pages.meteringPoints.sort.attention' },
   { value: 'meter_id', labelKey: 'pages.meteringPoints.sort.meterId' },
   { value: 'location', labelKey: 'pages.meteringPoints.sort.location' },
   { value: 'last_reading', labelKey: 'pages.meteringPoints.sort.lastReading' },
@@ -53,7 +51,6 @@ export function MeteringPointsToolbar({
   activeCount,
   inactiveCount,
   assignedCount,
-  needsAttentionCount,
   searchTerm,
   view,
   sort,
@@ -78,7 +75,6 @@ export function MeteringPointsToolbar({
     ...(isManagedScope
       ? [{ value: 'unassigned' as const, label: t('pages.meteringPoints.summary.unassigned'), count: totalCount - assignedCount }]
       : []),
-    { value: 'attention', label: t('pages.meteringPoints.summary.needsAttention'), count: needsAttentionCount, attention: true },
   ]
   const typeTabs: Array<FilterTab<MeteringPointTypeFilter>> = [
     { value: 'all', label: t('pages.meteringPoints.filters.allTypes'), count: totalCount },

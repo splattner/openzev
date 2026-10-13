@@ -1909,7 +1909,6 @@ export const de = {
                 active: 'Aktiv',
                 inactive: 'Inaktiv',
                 unassigned: 'Ohne Zuweisung',
-                needsAttention: 'Benötigt Aufmerksamkeit',
             },
             filters: {
                 search: 'Suche',
@@ -1936,7 +1935,6 @@ export const de = {
             never: 'Nie',
             sort: {
                 label: 'Sortieren',
-                attention: 'Probleme zuerst',
                 meterId: 'Messpunkt-ID',
                 location: 'Standort',
                 lastReading: 'Ältester Messwert zuerst',

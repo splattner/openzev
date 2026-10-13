@@ -20,14 +20,13 @@ the metering points by building and, with several buildings, the toolbar offers 
 ![Metering points page](screenshots/04-metering-points.png)
 
 The tabs above the list count the metering points and show one view at a time:
-**All**, **Active**, **Inactive**, **Unassigned** (no participant today) and
-**Needs attention**; click the active tab again to show all. A tab with nothing
+**All**, **Active**, **Inactive** and **Unassigned** (no participant today);
+click the active tab again to show all. A tab with nothing
 in it, or with everything in it, is left out. Below them, the search finds a meter ID, location, building
 or participant, and, when the community has more than one metering point
 type, a second row of tabs narrows to one type. A **Sort** menu orders the
-list: **Problems first** (the default: meters without a holder or with data at
-risk, then data gaps, then meters without data yet), **Meter ID**, **Location**
-or **Oldest reading first**. The filters and the sort are kept in the page
+list by **Meter ID** (the default), **Location** or **Oldest reading first**
+(meters that never reported come first). The filters and the sort are kept in the page
 address, so a bookmark or shared link opens the same view.
 
 If a refresh fails, the last loaded list and any open form stay available.
@@ -315,7 +314,7 @@ To stop billing a meter:
 
 Then, if the meter is physically gone, open its **⋯ More** menu, click
 **Edit**, set **Active** to off and click **Save Changes**. Deactivating
-removes it from data-health and "needs attention" monitoring and stops
+removes it from data-health monitoring and stops
 per-metering-point fees; on its own it does not stop energy billing.
 Historical data remains available either way.
 

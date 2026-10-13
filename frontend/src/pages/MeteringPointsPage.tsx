@@ -122,7 +122,6 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
         activeCount,
         inactiveCount,
         assignedCount,
-        needsAttentionCount,
         hasFilters,
         meteringPointHealthById,
         meteringPointHolderLessById,
@@ -171,7 +170,6 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                     activeCount={activeCount}
                     inactiveCount={inactiveCount}
                     assignedCount={assignedCount}
-                    needsAttentionCount={needsAttentionCount}
                     searchTerm={searchTerm}
                     view={view}
                     sort={sort}

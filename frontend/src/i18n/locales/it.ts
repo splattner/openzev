@@ -1909,7 +1909,6 @@ export const it = {
                 active: 'Attivi',
                 inactive: 'Inattivi',
                 unassigned: 'Non assegnati',
-                needsAttention: 'Richiede attenzione',
             },
             filters: {
                 search: 'Ricerca',
@@ -1936,7 +1935,6 @@ export const it = {
             never: 'Mai',
             sort: {
                 label: 'Ordina',
-                attention: 'Prima i problemi',
                 meterId: 'ID contatore',
                 location: 'Posizione',
                 lastReading: 'Prima la lettura più vecchia',

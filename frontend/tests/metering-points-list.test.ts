@@ -16,11 +16,9 @@ vi.mock('../src/features/meteringPoints/SupplementarySourceStatus', () => ({ Sup
 import { BuildingHeader } from '../src/features/meteringPoints/BuildingHeader'
 import { MeteringPointsList } from '../src/features/meteringPoints/MeteringPointsList'
 import {
-    getMeteringPointStatus,
     groupMeteringPointsByBuilding,
     readMeteringPointSort,
     sortMeteringPoints,
-    type MeteringPointStatus,
 } from '../src/features/meteringPoints/useMeteringPointForms'
 import type { Building, MeteringPoint, MeteringPointAssignment } from '../src/types/api'
 
@@ -40,24 +38,6 @@ const assignment = (id: string, meteringPoint: string, participant: string, over
     created_at: '', updated_at: '', ...over,
 })
 
-describe('getMeteringPointStatus', () => {
-    it('sets an inactive meter apart whatever its health', () => {
-        expect(getMeteringPointStatus({ is_active: false }, 'red', true)).toBe('inactive')
-    })
-
-    it('counts a meter without a holder, or with at-risk data, as the worst case', () => {
-        expect(getMeteringPointStatus({ is_active: true }, 'green', true)).toBe('danger')
-        expect(getMeteringPointStatus({ is_active: true }, 'red', false)).toBe('danger')
-    })
-
-    it('maps the rest of the health states', () => {
-        expect(getMeteringPointStatus({ is_active: true }, 'yellow', false)).toBe('warning')
-        expect(getMeteringPointStatus({ is_active: true }, 'no_data', false)).toBe('pending')
-        expect(getMeteringPointStatus({ is_active: true }, 'green', false)).toBe('ok')
-    })
-
-})
-
 describe('sortMeteringPoints', () => {
     const points = [
         point('m3', { location_description: 'Roof', last_reading_at: '2026-10-03T00:00:00Z' }),
@@ -65,18 +45,13 @@ describe('sortMeteringPoints', () => {
         point('m2', { location_description: 'Apt 2', last_reading_at: '2026-09-01T00:00:00Z' }),
         point('m10', { location_description: 'Apt 10', last_reading_at: '2026-10-05T00:00:00Z' }),
     ]
-    const statuses = new Map<string, MeteringPointStatus>([['m1', 'ok'], ['m2', 'danger'], ['m3', 'warning'], ['m10', 'danger']])
-    const ids = (sort: Parameters<typeof sortMeteringPoints>[1]) => sortMeteringPoints(points, sort, statuses).map((p) => p.id)
+    const ids = (sort: Parameters<typeof sortMeteringPoints>[1]) => sortMeteringPoints(points, sort).map((p) => p.id)
 
-    it('puts the worst status first and orders ties by meter ID, numbers by value', () => {
-        expect(ids('attention')).toEqual(['m2', 'm10', 'm3', 'm1'])
-    })
-
-    it('orders by meter ID with numbers by value', () => {
+    it('orders by meter ID, numbers by value', () => {
         expect(ids('meter_id')).toEqual(['m1', 'm2', 'm3', 'm10'])
     })
 
-    it('puts a meter without a location last', () => {
+    it('puts a meter without a location last, ordering the rest by location with numbers by value', () => {
         expect(ids('location')).toEqual(['m2', 'm10', 'm3', 'm1'])
     })
 
@@ -86,14 +61,15 @@ describe('sortMeteringPoints', () => {
 
     it('does not reorder the list it is given', () => {
         const before = points.map((p) => p.id)
-        sortMeteringPoints(points, 'meter_id', statuses)
+        sortMeteringPoints(points, 'location')
         expect(points.map((p) => p.id)).toEqual(before)
     })
 
-    it('reads an unknown sort from the URL as the default', () => {
+    it('reads an unknown or removed sort from the URL as the default, meter ID', () => {
         expect(readMeteringPointSort('location')).toBe('location')
-        expect(readMeteringPointSort('nonsense')).toBe('attention')
-        expect(readMeteringPointSort(null)).toBe('attention')
+        expect(readMeteringPointSort('attention')).toBe('meter_id')
+        expect(readMeteringPointSort('nonsense')).toBe('meter_id')
+        expect(readMeteringPointSort(null)).toBe('meter_id')
     })
 })
 

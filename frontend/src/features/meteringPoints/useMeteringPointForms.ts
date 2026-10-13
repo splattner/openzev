@@ -152,16 +152,6 @@ export function isMeteringPointHolderLess(
   return !assignments.some((assignment) => isAssignmentCurrent(assignment, todayIso))
 }
 
-/** Whether a meter should be surfaced by the "needs attention" filter before a billing run. Always `false` for an inactive meter — it is out of billing scope. */
-export function meteringPointNeedsAttention(
-  point: Pick<MeteringPoint, 'is_active'>,
-  health: MeteringPointHealth,
-  holderLess: boolean,
-): boolean {
-  return point.is_active && (health !== 'green' || holderLess)
-}
-
-
 export function meteringPointHealthBadgeClass(health: MeteringPointHealth): string {
   if (health === 'green') return 'badge badge-success'
   if (health === 'yellow') return 'badge badge-warning'
@@ -169,49 +159,19 @@ export function meteringPointHealthBadgeClass(health: MeteringPointHealth): stri
   return 'badge badge-neutral'
 }
 
-/**
- * How much a meter needs a look, for the "problems first" sort: its data health,
- * with a missing holder counted as the worst case and an inactive meter set apart
- * (it is out of billing scope, so its health is not a problem to act on).
- */
-export type MeteringPointStatus = 'ok' | 'warning' | 'danger' | 'pending' | 'inactive'
-
-export function getMeteringPointStatus(
-  point: Pick<MeteringPoint, 'is_active'>,
-  health: MeteringPointHealth,
-  holderLess: boolean,
-): MeteringPointStatus {
-  if (!point.is_active) return 'inactive'
-  if (holderLess || health === 'red') return 'danger'
-  if (health === 'yellow') return 'warning'
-  if (health === 'no_data') return 'pending'
-  return 'ok'
-}
-
 // ── Sort ────────────────────────────────────────────────────────────────────
 
-/** `attention`: the meters to act on first; the rest order by the field they name. */
-export type MeteringPointSort = 'attention' | 'meter_id' | 'location' | 'last_reading'
-
-const STATUS_RANK: Record<MeteringPointStatus, number> = { danger: 0, warning: 1, pending: 2, ok: 3, inactive: 4 }
+export type MeteringPointSort = 'meter_id' | 'location' | 'last_reading'
 
 export function readMeteringPointSort(value: string | null): MeteringPointSort {
-  return value === 'meter_id' || value === 'location' || value === 'last_reading' ? value : 'attention'
+  return value === 'location' || value === 'last_reading' ? value : 'meter_id'
 }
 
 /** A new array: `last_reading` puts the stalest first (a meter that never reported leads), because that is the one to look at. */
-export function sortMeteringPoints(
-  points: MeteringPoint[],
-  sort: MeteringPointSort,
-  statusById: Map<string, MeteringPointStatus>,
-): MeteringPoint[] {
+export function sortMeteringPoints(points: MeteringPoint[], sort: MeteringPointSort): MeteringPoint[] {
   const byMeterId = (left: MeteringPoint, right: MeteringPoint) =>
     left.meter_id.localeCompare(right.meter_id, undefined, { numeric: true })
   const compare = (left: MeteringPoint, right: MeteringPoint): number => {
-    if (sort === 'attention') {
-      const delta = STATUS_RANK[statusById.get(left.id) ?? 'pending'] - STATUS_RANK[statusById.get(right.id) ?? 'pending']
-      return delta || byMeterId(left, right)
-    }
     if (sort === 'location') {
       const leftLocation = left.location_description?.trim() ?? ''
       const rightLocation = right.location_description?.trim() ?? ''
@@ -255,12 +215,11 @@ export function readMeteringPointTypeFilter(value: string | null): MeteringPoint
 }
 
 /**
- * The list's one counted view (`FilterTabs`): a status, the meters without a
- * holder today (as `getMeteringPointCounts`' `assignedCount` counts them), or
- * those needing attention.
+ * The list's one counted view (`FilterTabs`): a status, or the meters without a
+ * holder today (as `getMeteringPointCounts`' `assignedCount` counts them).
  */
-export type MeteringPointView = 'all' | 'active' | 'inactive' | 'unassigned' | 'attention'
+export type MeteringPointView = 'all' | 'active' | 'inactive' | 'unassigned'
 
 export function readMeteringPointView(value: string | null): MeteringPointView {
-  return value === 'active' || value === 'inactive' || value === 'unassigned' || value === 'attention' ? value : 'all'
+  return value === 'active' || value === 'inactive' || value === 'unassigned' ? value : 'all'
 }
