@@ -4,7 +4,9 @@ This guide covers metering point types, configuration, and maintenance in OpenZE
 
 ## What is a Metering Point?
 
-A **metering point** is a physical or logical energy meter:
+A **metering point** identifies where an energy flow is measured, independently
+of the physical meter that supplies its readings:
+
 - Assigned to a participant over a validity window rather than owned outright — see [Assignment Validity Periods](#assignment-validity-periods) below
 - Measures energy consumption or production
 - Records readings at regular intervals (typically every 15 minutes)
@@ -20,9 +22,19 @@ the metering points by building and, with several buildings, the toolbar offers 
 ![Metering points page](screenshots/04-metering-points.png)
 
 The tabs above the list count the metering points and show one view at a time:
-**All**, **Active**, **Inactive** and **Unassigned** (no participant today);
-click the active tab again to show all. A tab with nothing
-in it, or with everything in it, is left out. Below them, the search finds a meter ID, location, building
+**All**, **Active**, **Inactive**, **Needs attention** and **Unassigned** (no participant today);
+click the active tab again to show all. **Needs attention** includes active points
+with no readings, confirmed data gaps, or readings without a current assignment.
+Unavailable quality or assignment information is not counted as a confirmed problem;
+loading and retry notices explain when results may be incomplete. This view covers
+active inventory, not billing readiness. Connected-source warnings remain visible
+on rows and are handled separately. Data issues appear as named badges in
+**Last reading**; click one to open its data-quality view. A missing current
+assignment is marked in **Assignment**. These mark the same points counted
+under **Needs attention**, while point IDs remain plain text.
+A tab with nothing
+in it, or with everything in it, is left out; a nonempty **Needs attention** tab
+always remains visible. Below them, the search finds a meter ID, location, building
 or participant, and, when the community has more than one metering point
 type, a second row of tabs narrows to one type. A **Sort** menu orders the
 list by **Meter ID** (the default), **Location** or **Oldest reading first**
@@ -60,7 +72,7 @@ are, and both are recorded. Buildings are managed on this page.
   building in a card of its own, whether the community has one building or
   several. The header shows the address, EGID, landowners and number of
   metering points. **Add metering point** (that building preselected) is in the header, and
-  **More → Edit building** next to it. A building without metering points shows
+  **Edit building** next to it. A building without metering points shows
   "No metering points in this building yet". Search and the other filters apply
   within the groups; the **Building** filter shows one group.
 - A building can be deleted only once it is empty: move or delete its meters
@@ -86,8 +98,9 @@ its meters.
 
 1. Click **New Metering Point**
 2. Enter details:
-   - **Meter ID** — Equipment/MSID number (required, must be unique)
-   - **Meter type** — `Consumption`, `Production`, or `Bidirectional`
+   - **Meter ID** — required, unique identifier used to match imported readings to this
+     metering point. Use the identifier supplied by your data source.
+   - **Type** — `Consumption`, `Production`, or `Bidirectional`
    - **Active** — inventory status (defaults to on)
    - **Building** — only asked when the community has more than one
      [building](#buildings); with a single building the
@@ -182,12 +195,15 @@ original community for the result.
 - Leave assignment **Valid To** blank (ongoing)
 - Result: Billing includes solar production from June onwards
 
-**Scenario 2: Meter replacement**
-- Old meter final reading: 2026-12-31
-- New meter first reading: 2027-01-01
+**Scenario 2: A new source identifier**
+- The source stops reporting the old identifier on 2026-12-31
+- Create a point for the new identifier, first reported on 2027-01-01
 - Old assignment: **Valid To** = 2026-12-31
 - New assignment: **Valid From** = 2027-01-01
 - Result: No billing gaps or overlaps
+
+Replacing a physical meter alone does not require a new metering point or assignment
+if the data source continues using the same point identifier.
 
 ## Shared (Common-Area) Metering Points
 
@@ -251,9 +267,9 @@ A participant only shares readings from days they were actually a member. A
 mid-period joiner pays nothing towards community energy measured before their
 join date, and a leaver's share stops on their leave date.
 
-> **Note:** An **inactive** community meter (**Active** = off) bills nobody
-> for per-metering-point fees, exactly like an inactive personal meter. Its
-> historical readings still count towards the community energy pool.
+> **Note:** **Active** is an inventory status. Deactivating a community or personal
+> metering point does not stop its energy billing or per-point fees. Assignment
+> dates control the billing window; historical readings remain available.
 
 ## What a Metering Point Row Shows
 
@@ -264,11 +280,11 @@ Each meter on the **Metering Points** page is one row that shows, at a glance
   (or "No location set"). A legend below the list names the icons: a bolt is
   *Consumption*, a solar panel *Production*, left-right arrows *Bidirectional*
   (only the types you have are listed)
-- Badges only for what is unusual: **Inactive**, **No current holder** (the meter
+- Badges only for what is unusual: **Inactive**, **No current assignment** (the meter
   has readings but nobody is assigned to it), **Surplus metering** when
   [Generation behind the meter](#generation-behind-the-meter) is ticked, and the
   status of a connected energy data source when it needs attention
-- The **holder** — the participant who holds the meter today, with the start date,
+- The **assignment** — the participant assigned today, with the start date,
   a **Community** badge for a shared meter, and "+1" when several participants
   hold it. A meter nobody holds shows **Assign participant**; click it to set the
   assignment's validity window.
@@ -276,16 +292,19 @@ Each meter on the **Metering Points** page is one row that shows, at a glance
 
 **Chart** (the chart icon) opens the metering point's full reading history, and
 **⋯ More** has **Assign participant**, **Edit**, **Delete data** (admins) and
-**Delete**.
+**Delete**. With exactly one current assignment, the menu also offers editing or removing
+that assignment. Point IDs and participant names are selectable text.
+Viewers see no editing controls.
 
 Click a row, or the arrow at its end, to open its details in place:
 
-- **Participants** — every assignment, current first, with its validity window
+- **Assignments** — every assignment, current first, with its validity window
   and its state (*Upcoming* or *Ended* for the others). Use **Add assignment**,
-  **Edit** and **⋯ → Remove** here, for example to end a tenant's assignment
-  when they move out.
+  **Edit** and **Remove** here. Removal confirms the participant, point and dates,
+  then deletes the record. When a tenant moves out, use **Edit** to set an end date
+  and retain the assignment history.
 - **Measurement** — last and first reading, how many readings there are, and the
-  **data-health** badge (`Healthy`, `Data gaps`, `Data at risk` or `No data yet`,
+  **data-health** badge (`Healthy`, `Data gaps`, `Data at risk`, `No data yet` or `Unavailable`,
   based on the last 30 complete days up to yesterday); click it to open the
   metering point's data-quality view. A connected energy data source shows its
   status here too.
@@ -296,12 +315,15 @@ Click a row, or the arrow at its end, to open its details in place:
 ### Updating a Metering Point
 
 1. Go to **Metering Points**
-2. Open the meter's **⋯ More** menu and click **Edit**
+2. Open **⋯ More → Edit**
 3. Update its ID, type, active status, location, or
    [Generation behind the meter](#generation-behind-the-meter) flag
 4. Click **Save Changes**
 
-> **Warning:** Changing a meter ID retroactively can break billing audit trails. Prefer creating a new meter and adjusting assignment windows.
+> **Warning:** Changing an ID changes which imported readings match the point.
+> If the source starts reporting a different point identifier, create its point
+> and adjust assignment windows. A hardware replacement with an unchanged source
+> identifier needs no new point.
 
 ### Decommissioning a Meter
 
@@ -314,8 +336,8 @@ To stop billing a meter:
 
 Then, if the meter is physically gone, open its **⋯ More** menu, click
 **Edit**, set **Active** to off and click **Save Changes**. Deactivating
-removes it from data-health monitoring and stops
-per-metering-point fees; on its own it does not stop energy billing.
+excludes it from this page’s **Needs attention** view. It does not stop energy
+billing or per-metering-point fees; end its assignment from the applicable date.
 Historical data remains available either way.
 
 ## Metering Point and Billing

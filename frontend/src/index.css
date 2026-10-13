@@ -2884,10 +2884,12 @@ input.recurrence-chip-input {
    name and status first, details in labelled columns beneath, actions at
    the right. */
 /* Buildings are sheets of their own, meters are rows in them: a plain header
-   names the building and sums up its health, hairline rows list the meters,
+   names the building, hairline rows list the meters,
    and a row opens in place to the rest. */
 .metering-sheet {
   --mp-columns: minmax(12rem, 1fr) 7.5rem 7.5rem;
+
+  container-type: inline-size;
 
   overflow: hidden;
   background: var(--surface-card);
@@ -2901,7 +2903,45 @@ input.recurrence-chip-input {
 }
 
 .metering-point-list {
-  display: grid;
+  display: block;
+  width: 100%;
+  border-spacing: 0;
+}
+
+.metering-point-list > thead,
+.metering-point-card {
+  display: block;
+}
+
+.metering-point-list th,
+.metering-point-list td {
+  padding: 0;
+  border: 0;
+  text-align: left;
+}
+
+.metering-point-list .metering-point-columns th {
+  position: static;
+  padding: 0;
+  border-radius: 0;
+}
+
+.metering-point-list th::before {
+  content: none;
+}
+
+.metering-point-list tbody tr {
+  height: auto;
+}
+
+.metering-point-detail-row,
+.metering-point-list .metering-point-detail {
+  display: block;
+}
+
+.metering-point-list .metering-point-detail {
+  padding: 0.25rem 1rem 1rem;
+  background: var(--surface);
 }
 
 .building-groups {
@@ -2965,6 +3005,7 @@ input.recurrence-chip-input {
   align-items: center;
   gap: 0.5rem;
   overflow-wrap: anywhere;
+  margin: 0;
   font-size: 1.0625rem;
   font-weight: 650;
   color: var(--text-heading);
@@ -2978,7 +3019,8 @@ input.recurrence-chip-input {
 }
 
 .building-header-actions {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .metering-filtered-count {
@@ -3008,7 +3050,7 @@ input.recurrence-chip-input {
   border-top: 1px solid var(--border-subtle);
 }
 
-.metering-point-list > .metering-point-card:first-child {
+.metering-point-list > thead + .metering-point-card {
   border-top: 0;
 }
 
@@ -3093,6 +3135,8 @@ input.recurrence-chip-input {
 }
 
 .metering-holder-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -3108,6 +3152,20 @@ input.recurrence-chip-input {
 .metering-holder-since,
 .metering-point-last {
   font-size: 0.8125rem;
+}
+
+.metering-point-last {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.metering-quality-issue,
+.metering-holder-issue {
+  max-width: 100%;
+  white-space: normal;
 }
 
 .metering-point-actions,
@@ -3146,12 +3204,6 @@ input.recurrence-chip-input {
 
 .metering-point-card.is-expanded .metering-point-expand svg {
   transform: rotate(180deg);
-}
-
-/* The rest of the meter, in the width of the sheet and under its ID. */
-.metering-point-detail {
-  padding: 0.25rem 1rem 1rem;
-  background: var(--surface);
 }
 
 .metering-detail-grid {
@@ -3228,10 +3280,6 @@ input.recurrence-chip-input {
   display: none;
 }
 
-.metering-detail-actions {
-  margin-top: 0.75rem;
-}
-
 .metering-assignment-list {
   display: grid;
   margin: 0;
@@ -3259,6 +3307,9 @@ input.recurrence-chip-input {
 
 .metering-assignment-main {
   display: grid;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   gap: 0.15rem;
   font-size: 0.875rem;
 }
@@ -3272,9 +3323,13 @@ input.recurrence-chip-input {
   font-size: 0.8125rem;
 }
 
-@media (max-width: 760px) {
-  .metering-point-columns {
-    display: none;
+@container (max-width: 43rem) {
+  .metering-point-list > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   .metering-point-row {
@@ -3293,7 +3348,7 @@ input.recurrence-chip-input {
     grid-column: 1 / -1;
   }
 
-  .metering-point-detail {
+  .metering-point-list .metering-point-detail {
     padding: 0.25rem 0.75rem 0.75rem;
   }
 

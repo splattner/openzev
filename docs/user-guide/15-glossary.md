@@ -127,10 +127,10 @@ Price per kWh charged for local energy consumed.
 Access level on one community: may change everything in it, including who else has access. The issuer and the representative are managers through their role; anyone else becomes one through access given under People & access. See [Roles and Permissions](11-roles-and-permissions.md).
 
 **Metering Point**
-Physical or logical energy meter, assigned to a participant for a validity period. Measures consumption, production, or both. Identified by unique ID (MSID). See [Metering Points](04-metering-points.md).
+Point where an energy flow is measured, assigned to a participant for a validity period. Measures consumption, production, or both. Its ID matches imported readings using the identifier supplied by the data source, which may be a device serial number. The point and its physical device are distinct. The German UI calls this a **Messpunkt**. See [Metering Points](04-metering-points.md).
 
 **MSID**
-Meter Serial ID or Metering Point ID — unique identifier for a physical meter.
+Metering-point identifier used to match imported readings to a metering point. See [Metering Point](#m).
 
 ## N
 

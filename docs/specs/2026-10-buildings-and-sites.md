@@ -271,9 +271,10 @@ ZEV settings.
 - **Every building is a group with the same header**, one building or several
   (`MeteringPointsList`, SPEC-2026-08-ui-redesign-pdf-style §15.4): its own sheet, ordered by
   building name, starting with a `BuildingHeader`: name, address, EGID, landowners whose
-  role names it and the metering-point count, with "Add metering point" and an
-  `ActionMenu` ("More") for managers: "Edit building" and, only while the building has no
-  metering points, "Delete building" (confirm). Buildings do not fold. A building with no
+  role names it and the metering-point count, with "Add metering point" and a visible
+  "Edit building" button for managers. An `ActionMenu` ("More") offers "Delete building"
+  (confirm) only while the building has no metering points. The name is an `h2`
+  (`metering-building-${building.id}`) labelling that building's metering-point table. Buildings do not fold. A building with no
   metering points still shows its header with "No metering points in this building yet".
   Filtering by building shows only that group; search and the other filters apply within groups,
   and a group with no matching meter is hidden unless it has no metering points at all and no

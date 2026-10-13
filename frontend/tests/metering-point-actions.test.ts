@@ -32,6 +32,7 @@ const meteringPoints = [
 describe('metering point action helpers', () => {
   it('scopes metering points to the selected ZEV when management is restricted', () => {
     const { scopedMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+      needsAttentionByMeteringPoint: new Map(),
       selectedZevId: 'zev-1',
       isManagedScope: true,
       searchTerm: '',
@@ -43,6 +44,7 @@ describe('metering point action helpers', () => {
 
   it('does not show an unscoped management inventory without a selection', () => {
     const { scopedMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+      needsAttentionByMeteringPoint: new Map(),
       selectedZevId: null, isManagedScope: true, searchTerm: '', typeFilter: 'all',
     })
     expect(scopedMeteringPoints).toEqual([])
@@ -50,6 +52,7 @@ describe('metering point action helpers', () => {
 
   it('filters by search term, view, and type', () => {
     const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+      needsAttentionByMeteringPoint: new Map(),
       selectedZevId: null,
       isManagedScope: false,
       searchTerm: 'solar',
@@ -68,6 +71,7 @@ describe('metering point action helpers', () => {
 
   it('leaves every meter in in the "all" view', () => {
     const { meteringPoints: allViewPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+      needsAttentionByMeteringPoint: new Map(),
       selectedZevId: null,
       isManagedScope: false,
       searchTerm: '',
@@ -78,6 +82,7 @@ describe('metering point action helpers', () => {
 
   it('matches search against an assigned participant\'s name, not just meter ID or location', () => {
     const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+      needsAttentionByMeteringPoint: new Map(),
       selectedZevId: null,
       isManagedScope: false,
       searchTerm: 'anna',
@@ -90,6 +95,7 @@ describe('metering point action helpers', () => {
 
   it('leaves every meter in in the "all" view, whatever the assignments', () => {
     const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+      needsAttentionByMeteringPoint: new Map(),
       selectedZevId: null,
       isManagedScope: false,
       searchTerm: '',
@@ -101,6 +107,7 @@ describe('metering point action helpers', () => {
 
   it('narrows to meters without a current holder in the "unassigned" view', () => {
     const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+      needsAttentionByMeteringPoint: new Map(),
       selectedZevId: null,
       isManagedScope: false,
       searchTerm: '',
@@ -112,9 +119,19 @@ describe('metering point action helpers', () => {
       ]),
     })
 
-    // mp-3 has no entry at all — absence counts as unassigned, so it's included.
-    expect(filteredMeteringPoints.map((point) => point.id).sort()).toEqual(['mp-2', 'mp-3'])
+    // mp-3 has unknown assignment status, so it is excluded.
+    expect(filteredMeteringPoints.map((point) => point.id).sort()).toEqual(['mp-2'])
   })
+})
+
+it('combines attention with community and type filters, ignoring missing attention entries', () => {
+  const needsAttentionByMeteringPoint = new Map([['mp-1', true], ['mp-3', true]])
+  const { meteringPoints: filtered } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+    selectedZevId: 'zev-1', isManagedScope: true, searchTerm: '', typeFilter: 'consumption',
+    view: 'attention', needsAttentionByMeteringPoint,
+  })
+  expect(filtered.map((point) => point.id)).toEqual(['mp-1'])
+  expect(getMeteringPointCounts(meteringPoints.slice(0, 2), new Map(), '2026-05-08', needsAttentionByMeteringPoint).needsAttentionCount).toBe(1)
 })
 
 describe('getMeteringPointCounts', () => {
@@ -125,20 +142,20 @@ describe('getMeteringPointCounts', () => {
   }
 
   it('counts active/inactive from the scoped list, independent of assignments', () => {
-    const { activeCount, inactiveCount } = getMeteringPointCounts(meteringPoints, new Map(), today)
+    const { activeCount, inactiveCount } = getMeteringPointCounts(meteringPoints, new Map(), today, new Map())
     expect(activeCount).toBe(2)
     expect(inactiveCount).toBe(1)
   })
 
   it('does not count a meter whose only assignment already ended', () => {
     const assignments = new Map([['mp-1', [assignment({ valid_from: '2025-01-01', valid_to: '2026-01-31' })]]])
-    const { assignedCount } = getMeteringPointCounts(meteringPoints, assignments, today)
+    const { assignedCount } = getMeteringPointCounts(meteringPoints, assignments, today, new Map())
     expect(assignedCount).toBe(0)
   })
 
   it('does not count a meter whose only assignment has not started yet', () => {
     const assignments = new Map([['mp-1', [assignment({ valid_from: '2026-06-01', valid_to: null })]]])
-    const { assignedCount } = getMeteringPointCounts(meteringPoints, assignments, today)
+    const { assignedCount } = getMeteringPointCounts(meteringPoints, assignments, today, new Map())
     expect(assignedCount).toBe(0)
   })
 
@@ -152,7 +169,21 @@ describe('getMeteringPointCounts', () => {
         ],
       ],
     ])
-    const { assignedCount } = getMeteringPointCounts(meteringPoints, assignments, today)
+    const { assignedCount } = getMeteringPointCounts(meteringPoints, assignments, today, new Map())
     expect(assignedCount).toBe(1)
   })
+})
+
+it('does not count unavailable assignments as unassigned', () => {
+  expect(getMeteringPointCounts(meteringPoints, undefined, '2026-05-08', new Map()).unassignedCount).toBe(0)
+  expect(getMeteringPointCounts(meteringPoints, new Map(), '2026-05-08', new Map()).unassignedCount).toBe(3)
+})
+
+it('combines attention with search and building filters', () => {
+  const points = meteringPoints.map(point => ({ ...point, building: point.id === 'mp-1' ? 'building-1' : 'building-2' }))
+  const filter = { selectedZevId: 'zev-1', isManagedScope: true, searchTerm: 'basement', typeFilter: 'all' as const,
+    view: 'attention' as const, buildingFilter: 'building-1', needsAttentionByMeteringPoint: new Map([['mp-1', true]]) }
+  expect(getScopedAndFilteredMeteringPoints(points, filter).meteringPoints.map(point => point.id)).toEqual(['mp-1'])
+  expect(getScopedAndFilteredMeteringPoints(points, { ...filter, searchTerm: 'roof' }).meteringPoints).toEqual([])
+  expect(getScopedAndFilteredMeteringPoints(points, { ...filter, buildingFilter: 'building-2' }).meteringPoints).toEqual([])
 })

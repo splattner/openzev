@@ -1076,14 +1076,20 @@ contracts are unchanged.
   point · Ended (`distinct`), with the search in the same `.list-filters` row
   (nothing else narrows them). Ended participations show only under Ended;
   the attention and metering counts cover current and upcoming ones.
-  Metering points: All · Active · Inactive · Unassigned (managers only);
+  Metering points: All · Active · Inactive · Needs attention · Unassigned (managers only);
   below, search, type tabs (All types · Consumption ·
   Production · Bidirectional, shown when more than one type is present or a
   type is selected), a sort select (§15.4: meter ID by default) and, with
-  more than one building, the building select. The list is about the meters,
-  so there is no data-health tab.
+  more than one building, the building select. Needs attention includes active points
+  with confirmed yellow/red/no-data health or readings without a current assignment,
+  combining with other filters; inactive points are excluded even if still billable.
+  Unknown quality is neutral. Assignment absence requires a loaded response.
+  Loading/incomplete notices and retryable errors explain partial status information;
+  cached results remain usable. Supplementary-source warnings are separate.
+  A nonempty attention tab is never hidden. Health details remain in the expanded measurement card.
   The view is stored in the `view` query param (an unknown value reads as
-  All); the type keeps `type`. Tariffs: Valid (default) · Upcoming · All,
+  All); the type keeps `type`. Filters derive from the URL on every render, including
+  same-page and back/forward navigation. Tariffs: Valid (default) · Upcoming · All,
   counting tariff series with a version in force today, series with a
   version that starts after today (`distinct`: its rows show each series'
   next version, so it differs from Valid even at the same count), and all
@@ -1167,21 +1173,21 @@ contracts are unchanged.
   secondary. The PDF frame's bars (`.pdf-preview-actions`,
   `.pdf-preview-link`) are paper strips around the document.
 - Metering points (`features/meteringPoints/*`): buildings are sheets, meters
-  are rows. The page is about the meters, not their data: the rows carry no data
-  indicator, and the data health sits in the details.
+  are rows. Named issue badges appear beside the affected facts; full data-health
+  details remain in the expanded row.
   - **Building sheet** (`.metering-sheet` + `.building-group`; one per building, for one
     building as for several): a plain header on the sheet with a hairline below it
     (`BuildingHeader`): name, address, EGID, landowners and the meter count, "Add metering point"
-    and an `ActionMenu` with "Edit building"
-    (and "Delete building" while the building is empty); the last two for managers only.
+    and a visible "Edit building" button
+    (an `ActionMenu` offers "Delete building" while the building is empty); the last two for managers only.
     The header is not a toggle: buildings do not fold. A role that has no buildings loaded
     (participants), or a community whose buildings have not arrived yet, gets one plain sheet
     of rows without a header.
-  - **Row** (`MeteringPointRow`, grid `.metering-point-row`; columns Meter,
-    Holder (managers), Last reading, actions, all fixed or fractional so the
+  - **Row** (`MeteringPointRow`, grid `.metering-point-row` inside a semantic table; columns Metering point,
+    Assignment (managers), Last reading, actions, all fixed or fractional so the
     column heads stay over their columns; the heads are the tables' band —
     `--brand-deep`, white 11px small caps — in the one rule `.data-table thead th`
-    shares with `.metering-point-columns`): the meter ID with badges only for the unusual (Inactive, No current holder,
+    shares with `.metering-point-columns`): the meter ID with badges only for the unusual (Inactive, No current assignment,
     Surplus metering, a supplementary source in `error` / `reconnect_required`),
     the location (or "No location set"), the
     meter type only as a muted icon before the ID (`.metering-point-type`; its
@@ -1194,12 +1200,26 @@ contracts are unchanged.
     Delete) and the expand button. A
     meter with no holder today that is active shows the one primary
     action inline in the holder column: **Assign participant**
-    (`button-primary button-outline`). Neither a row nor the header is tinted. The row opens on a click anywhere outside its controls, except one that ends a
+    (`button-primary button-outline`), once assignment history is available.
+    Point IDs and participant names are selectable text. Managers edit points
+    through the row menu and assignments through the menu or expanded details.
+    Labelled edit actions retain their pencil icons, including building editing.
+    The menu separates assignment actions
+    from point actions; generic assignment edit/remove actions require exactly one
+    current assignment. Multiple current assignments are inconsistent with normal
+    backend validation; details retain individually targeted actions for recovery. Read-only roles have no editing controls.
+    Tables are named by the building `h2`, with `scope="col"` headers and an accessible
+    actions header. Expanded details fill the sheet width; their cell spans all three/four columns. Chart and
+    menu labels include the point ID. Attention points show the data-quality reason
+    in Last reading as a named link (amber for gaps/no readings, red for data at risk).
+    Missing-current-assignment warnings appear in Assignment. Healthy, unknown-only
+    and inactive points are unmarked. Neither a row nor
+    the header is tinted. The row opens on a click anywhere outside its controls, except one that ends a
     text selection (copying the meter ID).
   - **Details** (`.metering-point-detail`, two `.metering-detail-card`s, the
     assignments twice as wide as the measurement; the Measurement card alone for a
-    role that has no assignment data): Participants (every assignment, current
-    first, with state badge, dates, Edit and a Remove menu, and "Add
+    role that has no assignment data): Assignments (every assignment, current
+    first, with state badge, dates, Edit and a direct Remove button with confirmation, and "Add
     assignment") and Measurement (last and first reading, reading count, data
     quality link with the health badge, and the supplementary source chip unless
     it already sits on the row). The building, the location, the type and
@@ -1209,8 +1229,9 @@ contracts are unchanged.
     numbers by value), location (unset last) and oldest reading first (a meter that
     never reported leads); an unknown value in the URL reads as meter ID.
     Applied after filtering; the groups keep the order within each building.
-  - Narrow screens (≤ 760px): the row is two columns (title, actions) with
-    the holder and last reading beneath; the details stack.
+  - Narrow sheets (container width ≤43rem, independent of viewport/sidebar width): the row is two columns (title, actions) with
+    the holder and last reading beneath; the details stack. Headers are visually
+    clipped rather than hidden from assistive technology.
 - Imports: the start sheet uses `.card-header` (title + actions) with the
   description below; "Delete imports" is the quiet destructive button.
 - Feasibility: the system sheet's mode select moved out of the `h3` into a
@@ -1268,18 +1289,30 @@ contracts are unchanged.
   narrow-tile fixture (`screenshots/fixtures/page-layout.tsx`) includes a
   date-and-time tile, so a tile that spills fails the `.stat-grid` overflow
   check.
-- `tests/metering-points-list.test.ts` (21): the sorts (meter ID with numbers by
+- `tests/metering-points-list.test.ts`: the sorts (meter ID with numbers by
   value, unset locations last, stalest reading first, the unknown or removed URL
   value), and the list itself: "Assign participant" only on
   a meter nobody holds, a holder with "+1", rows opening from their button and
   from their blank area but not from a control or the end of a text selection,
   every building, one or several, getting the same header, which is not a toggle,
-  no status dot or health summary on rows or header, an upcoming-only
+  attention-only named issues in their relevant columns and no building health summary, an upcoming-only
   holder, the "N earlier" count, no prompt for an inactive meter nobody holds,
   a viewer's list without Assign, menu or assignment controls, no building
   named under the rows, no holder column for a role without assignments, and
   the type legend: once below the sheets, only the types on the page, none for an
-  empty list.
+  empty list; named tables, scoped headers, three/four-column detail spans,
+  selectable IDs/names, labelled editing with pencil icons and removal confirmations identifying the
+  selected assignment's point and dates, including repeated historical participants.
+- `tests/metering-draft-scope.test.ts`: unavailable status data, cached refresh
+  failures, independent assignment issues, community switching, removal failure/retry
+  and URL navigation; existing
+  scope/session safeguards remain covered.
+- `screenshots/metering-points.spec.ts`: Chromium smoke tests of table
+  rows/cells, three/four-column views, keyboard editor targets and focus return,
+  attention results and sort preservation. Geometry checks cover desktop,
+  intermediate/sidebar widths and phones with distinct long IDs and unbroken names,
+  including expanded controls. Captured screenshots
+  are artifacts, not baseline comparisons or screen-reader certification.
 - `screenshots/field-geometry.spec.ts`: the field contract is now 16px values,
   14px/500 labels, 13px helpers, 8px radius, 40px height (the buttons').
 - Backend: the full suite passes against PostgreSQL with Inter installed

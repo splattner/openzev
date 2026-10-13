@@ -14,6 +14,7 @@ type MeteringPointsListProps = {
   /** Empty for a role that has no assignment data loaded (see the hook) — never render a false positive from a missing entry. */
   holderLessByMeteringPoint: Map<string, boolean>
   settings: AppSettings
+  assignmentsAvailable: boolean
   isManagedScope: boolean
   /** The meters grouped by building, each group headed by `renderGroupHeader`; without them (a role that has no buildings) one plain list. */
   groups?: BuildingGroup[] | null
@@ -40,6 +41,7 @@ export function MeteringPointsList({
   healthByMeteringPoint,
   holderLessByMeteringPoint,
   settings,
+  assignmentsAvailable,
   isManagedScope,
   groups = null,
   renderGroupHeader,
@@ -68,8 +70,9 @@ export function MeteringPointsList({
       participantNameById={participantNameById}
       settings={settings}
       todayIso={todayIso}
-      health={healthByMeteringPoint.get(point.id) ?? 'no_data'}
+      health={healthByMeteringPoint.get(point.id) ?? 'unknown'}
       holderLess={holderLessByMeteringPoint.get(point.id) ?? false}
+      assignmentsAvailable={assignmentsAvailable}
       isManagedScope={isManagedScope}
       readOnly={readOnly}
       canDeleteData={canDeleteData}
@@ -93,13 +96,21 @@ export function MeteringPointsList({
   )
 
   const sheetClass = `metering-sheet${isManagedScope ? ' metering-sheet-holders' : ''}`
-  const columns = (
-    <div className="metering-point-columns" aria-hidden="true">
-      <span>{t('pages.meteringPoints.columns.meter')}</span>
-      {isManagedScope && <span>{t('pages.meteringPoints.columns.holder')}</span>}
-      <span>{t('pages.meteringPoints.columns.lastReading')}</span>
-      <span />
-    </div>
+  const renderTable = (points: MeteringPoint[], buildingId?: string) => (
+    <table className="metering-point-list" role="table"
+      aria-labelledby={buildingId ? `metering-building-${buildingId}` : undefined}
+      aria-label={buildingId ? undefined : t('pages.meteringPoints.title')}
+    >
+      <thead role="rowgroup">
+        <tr className="metering-point-columns" role="row">
+          <th scope="col" role="columnheader">{t('pages.meteringPoints.columns.meter')}</th>
+          {isManagedScope && <th scope="col" role="columnheader">{t('pages.meteringPoints.columns.holder')}</th>}
+          <th scope="col" role="columnheader">{t('pages.meteringPoints.columns.lastReading')}</th>
+          <th scope="col" role="columnheader"><span className="visually-hidden">{t('pages.meteringPoints.columns.actions')}</span></th>
+        </tr>
+      </thead>
+      {points.map(renderRow)}
+    </table>
   )
 
   if (groups && renderGroupHeader) {
@@ -111,10 +122,7 @@ export function MeteringPointsList({
             {group.points.length === 0 ? (
               <p className="muted building-group-empty">{t('pages.meteringPoints.buildings.emptyGroup')}</p>
             ) : (
-              <>
-                {columns}
-                <div className="metering-point-list">{group.points.map(renderRow)}</div>
-              </>
+              renderTable(group.points, group.building.id)
             )}
           </section>
         ))}
@@ -126,8 +134,7 @@ export function MeteringPointsList({
   return (
     <div className="building-groups">
       <div className={sheetClass}>
-        {columns}
-        <div className="metering-point-list">{meteringPoints.map(renderRow)}</div>
+        {renderTable(meteringPoints)}
       </div>
       <MeteringPointTypeLegend meteringPoints={meteringPoints} />
     </div>

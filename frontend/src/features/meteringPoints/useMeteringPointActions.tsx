@@ -36,6 +36,7 @@ import {
     getNextAssignmentGuidance,
     isAssignmentCurrent,
     isMeteringPointHolderLess,
+    meteringPointNeedsAttention,
     METERING_POINT_FILTER_KEYS,
     METERING_POINT_SORT_KEY,
     readMeteringPointBuildingFilter,
@@ -66,6 +67,7 @@ export function getScopedAndFilteredMeteringPoints(
         isManagedScope,
         searchTerm,
         view = 'all',
+        needsAttentionByMeteringPoint,
         typeFilter,
         buildingFilter = 'all',
         isAssignedByMeteringPoint,
@@ -75,10 +77,11 @@ export function getScopedAndFilteredMeteringPoints(
         isManagedScope: boolean
         searchTerm: string
         view?: MeteringPointView
+        needsAttentionByMeteringPoint: Map<string, boolean>
         typeFilter: MeteringPointTypeFilter
         /** `'all'`, or a building id (#890). */
         buildingFilter?: MeteringPointBuildingFilter
-        /** Only consulted for the `'unassigned'` view; a missing entry counts as unassigned. */
+        /** Only consulted for the `'unassigned'` view; a missing entry means assignment status is unavailable. */
         isAssignedByMeteringPoint?: Map<string, boolean>
         /** Space-joined names of every participant ever assigned to the meter, so search can match "which meter is Anna's?". */
         participantNamesByMeteringPoint?: Map<string, string>
@@ -93,7 +96,8 @@ export function getScopedAndFilteredMeteringPoints(
         const matchesView = view === 'all'
             || (view === 'active' && point.is_active)
             || (view === 'inactive' && !point.is_active)
-            || (view === 'unassigned' && !isAssignedByMeteringPoint?.get(point.id))
+            || (view === 'unassigned' && isAssignedByMeteringPoint?.get(point.id) === false)
+            || (view === 'attention' && !!needsAttentionByMeteringPoint.get(point.id))
         const matchesType = typeFilter === 'all' || point.meter_type === typeFilter
         const matchesSearch = !normalizedSearch
             || point.meter_id.toLowerCase().includes(normalizedSearch)
@@ -113,20 +117,26 @@ export type MeteringPointCounts = {
     inactiveCount: number
     /** Meters with a holder *today* — an assignment that already ended (or has yet to start) does not count. */
     assignedCount: number
+    unassignedCount: number
+    needsAttentionCount: number
 }
 
 export function getMeteringPointCounts(
     scopedMeteringPoints: MeteringPoint[],
-    assignmentsByMeteringPoint: Map<string, MeteringPointAssignment[]>,
+    assignmentsByMeteringPoint: Map<string, MeteringPointAssignment[]> | undefined,
     todayIso: string,
+    needsAttentionByMeteringPoint: Map<string, boolean>,
 ): MeteringPointCounts {
     const activeCount = scopedMeteringPoints.filter((point) => point.is_active).length
     const inactiveCount = scopedMeteringPoints.length - activeCount
     const assignedCount = scopedMeteringPoints.filter((point) =>
-        (assignmentsByMeteringPoint.get(point.id) ?? []).some((assignment) => isAssignmentCurrent(assignment, todayIso)),
+        (assignmentsByMeteringPoint?.get(point.id) ?? []).some((assignment) => isAssignmentCurrent(assignment, todayIso)),
     ).length
 
-    return { activeCount, inactiveCount, assignedCount }
+    const needsAttentionCount = scopedMeteringPoints.filter((point) => needsAttentionByMeteringPoint.get(point.id)).length
+
+    const unassignedCount = assignmentsByMeteringPoint === undefined ? 0 : scopedMeteringPoints.length - assignedCount
+    return { activeCount, inactiveCount, assignedCount, unassignedCount, needsAttentionCount }
 }
 
 export function useMeteringPointActions({
@@ -180,20 +190,14 @@ export function useMeteringPointActions({
     const [deleteDataFrom, setDeleteDataFrom] = useState('')
     const [deleteDataTo, setDeleteDataTo] = useState('')
 
-    // Initialize filters from the URL; setters update state and replace query parameters.
+    // The URL is the source of truth, including same-page and back/forward navigation.
     const [searchParams, setSearchParams] = useSearchParams()
     const FILTER = METERING_POINT_FILTER_KEYS
-
-    const [searchTerm, setSearchTermState] = useState(() => searchParams.get(FILTER.search) ?? '')
-    const [view, setViewState] = useState<MeteringPointView>(() => readMeteringPointView(searchParams.get(FILTER.view)))
-    const [typeFilter, setTypeFilterState] = useState<MeteringPointTypeFilter>(
-        () => readMeteringPointTypeFilter(searchParams.get(FILTER.type)),
-    )
-
-    const [buildingFilter, setBuildingFilterState] = useState<MeteringPointBuildingFilter>(
-        () => readMeteringPointBuildingFilter(searchParams.get(FILTER.building)),
-    )
-    const [sort, setSortState] = useState<MeteringPointSort>(() => readMeteringPointSort(searchParams.get(METERING_POINT_SORT_KEY)))
+    const searchTerm = searchParams.get(FILTER.search) ?? ''
+    const view = readMeteringPointView(searchParams.get(FILTER.view))
+    const typeFilter = readMeteringPointTypeFilter(searchParams.get(FILTER.type))
+    const buildingFilter = readMeteringPointBuildingFilter(searchParams.get(FILTER.building))
+    const sort = readMeteringPointSort(searchParams.get(METERING_POINT_SORT_KEY))
 
     /** Sets or removes one query param, without touching the others already there. */
     function writeFilterParam(key: string, value: string, isDefault: boolean) {
@@ -206,32 +210,23 @@ export function useMeteringPointActions({
     }
 
     function setSearchTerm(value: string) {
-        setSearchTermState(value)
         writeFilterParam(FILTER.search, value, value === '')
     }
     function setView(value: MeteringPointView) {
-        setViewState(value)
         writeFilterParam(FILTER.view, value, value === 'all')
     }
     function setTypeFilter(value: MeteringPointTypeFilter) {
-        setTypeFilterState(value)
         writeFilterParam(FILTER.type, value, value === 'all')
     }
 
     function setBuildingFilter(value: MeteringPointBuildingFilter) {
-        setBuildingFilterState(value)
         writeFilterParam(FILTER.building, value, value === 'all')
     }
     function setSort(value: MeteringPointSort) {
-        setSortState(value)
         writeFilterParam(METERING_POINT_SORT_KEY, value, value === 'meter_id')
     }
 
     function clearFilters() {
-        setSearchTermState('')
-        setViewState('all')
-        setTypeFilterState('all')
-        setBuildingFilterState('all')
         setSearchParams((previous) => {
             const next = new URLSearchParams(previous)
             Object.values(FILTER).forEach((key) => next.delete(key))
@@ -343,6 +338,7 @@ export function useMeteringPointActions({
         queryFn: () => fetchMeteringPointAssignments(),
         enabled: isManagedScope && !!selectedZevId,
     })
+    const assignmentsAvailable = assignmentsQuery.data !== undefined
     // Not role-gated: the endpoint scopes readings to what the caller may
     // see (a participant's own assigned meters), so the health indicator
     // stays accurate for every role instead of being hidden for some (#623).
@@ -702,31 +698,24 @@ export function useMeteringPointActions({
         return map
     }, [meteringPointsQuery.data, qualityByMeteringPoint])
 
-    // Empty (rather than computed with an empty assignment map, which would
-    // read every meter as holder-less) when assignments aren't loaded for
-    // this role — see isMeteringPointHolderLess's contract.
-    const meteringPointHolderLessById = useMemo(() => {
-        const map = new Map<string, boolean>()
-        if (!isManagedScope) return map
+    // An unavailable response cannot establish an absent assignment.
+    const meteringPointHolderLessById = new Map<string, boolean>()
+    const isAssignedByMeteringPoint = new Map<string, boolean>()
+    if (isManagedScope && assignmentsAvailable) {
         for (const point of meteringPointsQuery.data ?? []) {
-            map.set(point.id, isMeteringPointHolderLess(point, assignmentsByMeteringPoint.get(point.id) ?? [], todayIso))
+            const assignments = assignmentsByMeteringPoint.get(point.id) ?? []
+            meteringPointHolderLessById.set(point.id, isMeteringPointHolderLess(point, assignments, todayIso))
+            isAssignedByMeteringPoint.set(point.id, assignments.some((assignment) => isAssignmentCurrent(assignment, todayIso)))
         }
-        return map
-    }, [isManagedScope, meteringPointsQuery.data, assignmentsByMeteringPoint, todayIso])
+    }
 
-    // Empty for a role with no assignment data loaded, same as
-    // meteringPointHolderLessById — the "Assigned"/"Unassigned" chips are
-    // hidden for that role in the toolbar, so this never needs to fall back.
-    const isAssignedByMeteringPoint = useMemo(() => {
-        const map = new Map<string, boolean>()
-        for (const point of meteringPointsQuery.data ?? []) {
-            map.set(
-                point.id,
-                (assignmentsByMeteringPoint.get(point.id) ?? []).some((assignment) => isAssignmentCurrent(assignment, todayIso)),
-            )
-        }
-        return map
-    }, [meteringPointsQuery.data, assignmentsByMeteringPoint, todayIso])
+    const needsAttentionByMeteringPoint = new Map(
+        (meteringPointsQuery.data ?? []).map((point) => [point.id, meteringPointNeedsAttention(
+            point,
+            meteringPointHealthById.get(point.id) ?? 'unknown',
+            meteringPointHolderLessById.get(point.id) ?? false,
+        )]),
+    )
 
     // Every participant ever assigned, not just the current holder — a
     // search for a former tenant's name should still find their old meter.
@@ -747,6 +736,7 @@ export function useMeteringPointActions({
         isManagedScope,
         searchTerm,
         view,
+        needsAttentionByMeteringPoint,
         typeFilter,
         buildingFilter,
         isAssignedByMeteringPoint,
@@ -762,10 +752,11 @@ export function useMeteringPointActions({
         ),
     )
 
-    const { activeCount, inactiveCount, assignedCount } = getMeteringPointCounts(
+    const { activeCount, inactiveCount, unassignedCount, needsAttentionCount } = getMeteringPointCounts(
         scopedMeteringPoints,
-        filteredAssignmentsByMeteringPoint,
+        assignmentsQuery.data === undefined ? undefined : filteredAssignmentsByMeteringPoint,
         todayIso,
+        needsAttentionByMeteringPoint,
     )
     const hasFilters = !!searchTerm.trim()
         || view !== 'all'
@@ -848,7 +839,8 @@ export function useMeteringPointActions({
         meteringPoints,
         activeCount,
         inactiveCount,
-        assignedCount,
+        unassignedCount,
+        needsAttentionCount,
         hasFilters,
         // Data health (#623)
         meteringPointHealthById,

@@ -116,30 +116,29 @@ export function getMeteringPointHealthWindow(todayIso: string, days = HEALTH_WIN
   return { from: addDaysIso(todayIso, -days), to: addDaysIso(todayIso, -1) }
 }
 
-export type MeteringPointHealth = 'green' | 'yellow' | 'red' | 'no_data'
+export type MeteringPointHealth = 'green' | 'yellow' | 'red' | 'no_data' | 'unknown'
 
 /**
  * A meter's data-health state: `no_data` when it has never received a
  * reading (distinct from a completeness of 0% within the window, which is
  * `red` — a meter whose imports stopped is a different problem than one
  * that never started), otherwise the data-quality-status severity for the
- * inspection window.
+ * inspection window; `unknown` while that quality result is unavailable.
  */
 export function getMeteringPointHealth(
   point: Pick<MeteringPoint, 'reading_count'>,
   quality: MeteringPointDataQuality | undefined,
 ): MeteringPointHealth {
-  if (!point.reading_count) return 'no_data'
-  return quality?.severity ?? 'no_data'
+  if (point.reading_count === 0) return 'no_data'
+  return quality?.severity ?? 'unknown'
 }
 
 /**
  * A meter with recorded readings but no assignment valid *today* — its
- * energy is being metered but cannot be attributed (and therefore not
- * billed) to anyone. Mirrors the Participants page's "no metering point"
+ * energy measured today cannot be attributed to a participant. Mirrors the Participants page's "no metering point"
  * warning from the other direction.
  *
- * `false` for an inactive meter (out of billing scope) or one with no
+ * `false` for an inactive point (excluded from this inventory warning) or one with no
  * readings yet (nothing to attribute) — those are surfaced via
  * `getMeteringPointHealth` instead, not this warning.
  */
@@ -157,6 +156,15 @@ export function meteringPointHealthBadgeClass(health: MeteringPointHealth): stri
   if (health === 'yellow') return 'badge badge-warning'
   if (health === 'red') return 'badge badge-danger'
   return 'badge badge-neutral'
+}
+
+/** Active points with incomplete data or readings without a current holder need review. */
+export function meteringPointNeedsAttention(
+  point: Pick<MeteringPoint, 'is_active'>,
+  health: MeteringPointHealth,
+  holderLess: boolean,
+): boolean {
+  return point.is_active && (health === 'yellow' || health === 'red' || health === 'no_data' || holderLess)
 }
 
 // ── Sort ────────────────────────────────────────────────────────────────────
@@ -194,7 +202,7 @@ export function sortMeteringPoints(points: MeteringPoint[], sort: MeteringPointS
 // Each `read*` function turns a raw `?param=` value (or a hand-edited/stale
 // one that no longer matches the type) into a valid filter value, falling
 // back to the unfiltered default rather than throwing — a URL is never
-// trusted input. Pairs with the query-param names in `META_POINT_FILTER_KEYS`.
+// trusted input. Pairs with the query-param names in `METERING_POINT_FILTER_KEYS`.
 
 export const METERING_POINT_FILTER_KEYS = {
   search: 'search',
@@ -216,10 +224,11 @@ export function readMeteringPointTypeFilter(value: string | null): MeteringPoint
 
 /**
  * The list's one counted view (`FilterTabs`): a status, or the meters without a
- * holder today (as `getMeteringPointCounts`' `assignedCount` counts them).
+ * holder today (as `getMeteringPointCounts`' `assignedCount` counts them), or
+ * active points needing attention.
  */
-export type MeteringPointView = 'all' | 'active' | 'inactive' | 'unassigned'
+export type MeteringPointView = 'all' | 'active' | 'inactive' | 'unassigned' | 'attention'
 
 export function readMeteringPointView(value: string | null): MeteringPointView {
-  return value === 'active' || value === 'inactive' || value === 'unassigned' ? value : 'all'
+  return value === 'active' || value === 'inactive' || value === 'unassigned' || value === 'attention' ? value : 'all'
 }

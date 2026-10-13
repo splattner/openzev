@@ -366,6 +366,13 @@ operational history must be preserved:
   invoiced. Deactivating a meter whose assignment still runs leaves it billable.
 - Hard deletion (`DELETE`) is allowed but cascades to readings and assignments.
 
+Managers may delete a populated point, including its readings and assignments;
+the separate `delete-readings` operation is admin-only. Point and assignment
+deletion currently have no issued-invoice or locked-period guard. Stored invoices
+remain, but deleting source history can affect future recalculation. Assignment
+removal confirms the participant, point identifier and validity dates, and advises
+setting an end date to retain the relationship instead.
+
 **Guidance:** prefer soft deactivation when a meter has historical readings or
 invoices.  Use hard deletion only for meters created in error with no data.
 
@@ -556,9 +563,26 @@ python -m pytest -q
 
 - Form validation and error rendering for metering-point create/edit
 - Assignment date-range picker with overlap/containment feedback
-- List filtering: one view tab (all / active / inactive / unassigned, `MeteringPointView` in the `view` query param, read by `readMeteringPointView`; `getScopedAndFilteredMeteringPoints` takes it as `view`) plus search and meter-type tabs (SPEC-2026-08-ui-redesign-pdf-style §15.3 filter tabs)
-- Buildings on the metering points page (SPEC-2026-10-buildings-and-sites §7.3): "Add building" next to "New Metering Point"; the meters are grouped by building, one building or several (`groupMeteringPointsByBuilding`, ordered by name, each group a sheet headed by the same `BuildingHeader` with add-meter and a menu with edit / delete; a role without buildings gets one plain list); with a building filter and a building select in the form (`tests/buildings.test.ts`; the full test plan is in SPEC-2026-10-buildings-and-sites §11)
-- The list rows (SPEC-2026-08-ui-redesign-pdf-style §15.4): `MeteringPointsList` renders `MeteringPointRow`s: the meter ID with badges for the unusual only and the meter type as a tooltip icon (named once in a legend line below the sheets), holder, last reading and a quiet action cluster, opening in place to Participants / Measurement; "Assign participant" is the one inline action, on an active meter nobody holds today. A sort select (`sort` query param: meter ID (default), location, oldest reading first) orders the list (`sortMeteringPoints`; `tests/metering-points-list.test.ts`)
+- Lists support status, attention, search, type and building filters, with sort and filters stored
+  in the URL, including same-page navigation.
+- Attention covers active inventory with confirmed missing/incomplete data or readings without a
+  current assignment. Unavailable quality/assignment responses are not confirmed problems; cached
+  results remain usable and failed requests offer retry. Inactive points can remain billable through
+  dated assignments.
+- Named row issues use the same attention predicate as filtering/counts: data
+  issues link to data quality in Last reading, and missing current assignments
+  are marked in Assignment. Healthy, unknown-only and inactive points are unmarked.
+- Managers edit points through the row menu, assignments through their details or menu,
+  and buildings through the labelled button. Read-only roles have no editing controls.
+  Generic assignment actions require exactly one current assignment; inconsistent
+  overlapping assignments remain individually manageable in the details.
+- Buildings group the list; see [building operations](2026-10-buildings-and-sites.md).
+- See [UI interaction and accessibility](2026-08-ui-redesign-pdf-style.md#154-pages) for list
+  presentation and verification.
+- German terminology uses Messpunkt / Messpunkt-ID for the logical object and import identifier,
+  Zuweisung for its dated participant relationship, and Zähler for physical hardware, including
+  behind-the-meter generation. The input identifier follows the data source; a device serial number
+  is not rejected by validation.
 - Build and type checks: `npm run build`
 
 ### Manual verification

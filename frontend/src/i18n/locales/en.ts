@@ -4,7 +4,7 @@
 //   Unit symbols: kWh, kW, kVA, CHF
 //
 // Translatable Swiss terms specific to this locale:
-//   metering point → Zählpunkt / Messpunkt (DE), point de mesure (FR), punto di misura (IT)
+//   metering point → Messpunkt (DE), point de mesure (FR), punto di misura (IT)
 //   participant → Teilnehmende (DE), participant·e (FR), partecipante (IT)
 //   tariff → Tarif (DE), tarif (FR), tariffa (IT)
 //   billing → Abrechnung (DE), décompte (FR), fatturazione (IT)
@@ -1922,15 +1922,24 @@ export const en = {
             adminDescription: 'Manage meters independently from participants. Assign participants to meters with optional validity windows.',
             participantDescription: 'View your metering points and open the chart for detailed energy history.',
             loadFailed: 'Failed to load metering points.',
+            qualityLoading: 'Loading data quality. Needs attention shows confirmed issues so far.',
+            qualityLoadFailed: 'Data quality could not be loaded. Needs attention may be incomplete.',
+            qualityIncomplete: 'Data quality is unavailable for some points. Needs attention may be incomplete.',
+            assignmentsLoading: 'Loading assignments. Needs attention shows confirmed issues so far.',
+            assignmentsLoadFailed: 'Assignments could not be loaded. Needs attention may be incomplete.',
+            assignmentsUnavailable: 'Assignments unavailable',
             newMeteringPoint: 'New Metering Point',
             editTitle: 'Edit Metering Point',
             createTitle: 'Create Metering Point',
             saveChanges: 'Save Changes',
             createButton: 'Create Metering Point',
             assign: 'Assign participant',
-            chart: 'Chart',
             summaryLabel: 'Metering point summary',
+            chartFor: 'Chart for {{meterId}}',
+            removeAssignmentFor: 'Remove assignment for {{name}}',
+            moreActionsFor: 'More actions for {{meterId}}',
             summary: {
+                attention: 'Needs attention',
                 total: 'All',
                 active: 'Active',
                 inactive: 'Inactive',
@@ -1966,8 +1975,9 @@ export const en = {
                 lastReading: 'Oldest reading first',
             },
             columns: {
-                meter: 'Meter',
-                holder: 'Holder',
+                actions: 'Actions',
+                meter: 'Metering point',
+                holder: 'Assignment',
                 lastReading: 'Last reading',
             },
             since: 'since {{date}}',
@@ -1977,14 +1987,13 @@ export const en = {
             detail: {
                 show: 'Show details of {{meterId}}',
                 hide: 'Hide details of {{meterId}}',
-                participants: 'Participants',
+                participants: 'Assignments',
                 addAssignment: 'Add assignment',
                 measurement: 'Measurement',
                 lastReading: 'Last reading',
                 firstReading: 'First reading',
                 readings: 'Readings',
                 dataQuality: 'Data quality',
-                editMeteringPoint: 'Edit metering point',
             },
             buildings: {
                 add: 'Add building',
@@ -2021,6 +2030,9 @@ export const en = {
                 ended: 'Ended',
             },
             health: {
+                noReadings: 'No readings',
+                issueFor: 'Metering point {{meterId}}: {{status}} – view data quality',
+                unknown: 'Unavailable',
                 green: 'Healthy',
                 yellow: 'Data gaps',
                 red: 'Data at risk',
@@ -2028,13 +2040,13 @@ export const en = {
                 linkHint: 'Open the data quality view for this metering point',
             },
             neverReceivedData: 'No readings received yet',
-            holderLessBadge: 'No current holder',
-            holderLessHint: 'This meter has recorded readings but no participant is currently assigned to it — its energy cannot be billed.',
+            holderLessBadge: 'No current assignment',
+            holderLessHint: 'No participant is currently assigned. Check the assignment for new readings; earlier periods remain billable according to their dated assignments.',
             form: {
                 meterId: 'Meter ID *',
                 meterType: 'Meter type',
                 active: 'Active',
-                activeHint: 'Inventory status only — it does not affect billing. To stop billing a meter, set an end date on its assignment.',
+                activeHint: 'Inventory status does not affect billing. The assignment end date determines the billing window; earlier periods remain billable.',
                 location: 'Unit within the building',
                 building: 'Building',
                 buildingPlaceholder: 'Choose a building',
@@ -2055,7 +2067,7 @@ export const en = {
                 participant: 'Participant *',
                 validFrom: 'Valid from *',
                 validTo: 'Valid to',
-                validToHint: 'Leave Valid to empty for an open-ended (current) assignment.',
+                validToHint: 'Without an end date, the assignment is open-ended.',
                 openEndedWarning: 'This meter already has an open-ended assignment. Give it an end date before this new assignment can start — otherwise saving will be rejected as an overlap.',
                 selectParticipant: 'Select participant',
                 allocationMode: 'Allocation',
@@ -2068,7 +2080,7 @@ export const en = {
             deleteMessage: 'Are you sure you want to delete metering point "{{meterId}}"? This will also permanently delete its {{readingCount}} reading(s) and {{assignmentCount}} assignment(s). This action cannot be undone.',
             deleteConfirm: 'Delete Metering Point',
             removeAssignTitle: 'Remove Assignment',
-            removeAssignMessage: 'Are you sure you want to remove the assignment for "{{name}}"?',
+            removeAssignMessage: 'Permanently remove the assignment of {{name}} to {{meterId}} for {{from}} – {{to}}? To end the assignment, set an end date instead.',
             removeAssignConfirm: 'Remove Assignment',
             deleteData: {
                 button: 'Delete data',

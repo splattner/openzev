@@ -1,3 +1,4 @@
+import { waitForCondition } from './helpers/waitForCondition'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MemoryRouter } from 'react-router-dom'
@@ -5,7 +6,7 @@ import { MantineProvider } from '@mantine/core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-i18next', () => ({
-    useTranslation: () => ({ t: (key: string, options?: { count?: number }) => (options?.count === undefined ? key : `${key}:${options.count}`), i18n: { language: 'en' } }),
+    useTranslation: () => ({ t: (key: string, options?: Record<string, unknown>) => (key.endsWith('removeAssignMessage') || key.endsWith('issueFor') ? `${key}:${JSON.stringify(options)}` : options?.count === undefined ? key : `${key}:${options.count}`), i18n: { language: 'en' } }),
 }))
 vi.mock('../src/lib/appSettings', () => ({
     formatShortDate: (value: string) => value,
@@ -106,6 +107,7 @@ describe('MeteringPointsList', () => {
             healthByMeteringPoint: new Map(),
             holderLessByMeteringPoint: new Map(),
             settings: {} as never,
+            assignmentsAvailable: true,
             isManagedScope: true,
             groups,
             renderGroupHeader: (group) => createElement(BuildingHeader, {
@@ -145,10 +147,36 @@ describe('MeteringPointsList', () => {
         const rows = Array.from(view.querySelectorAll('.metering-point-card'))
         const holder = (index: number) => rows[index].querySelector('.metering-point-holder')!
         expect(holder(0).textContent).toContain('Anna Consumer')
-        expect(holder(0).querySelector('button')).toBeNull()
+        expect(holder(0).querySelector('.button-primary')).toBeNull()
         expect(holder(1).querySelector('.button-primary')).not.toBeNull()
         expect(holder(2).textContent).toContain('Anna Consumer')
         expect(holder(2).textContent).toContain('+1')
+    })
+
+    it('names building tables and exposes all column headers and detail spans', () => {
+        const view = render({ points })
+        const table = view.querySelector('table')!
+        const heading = view.querySelector('h2')!
+        expect(table.getAttribute('aria-labelledby')).toBe(heading.id)
+        expect(Array.from(table.querySelectorAll('th')).map((cell) => cell.getAttribute('scope'))).toEqual(['col', 'col', 'col', 'col'])
+        expect(table.querySelector('thead')!.getAttribute('aria-hidden')).toBeNull()
+        expect(table.querySelector('.metering-point-row')!.children).toHaveLength(4)
+        act(() => table.querySelector<HTMLButtonElement>('.metering-point-expand')!.click())
+        expect(table.querySelector('.metering-point-detail')!.getAttribute('colspan')).toBe('4')
+    })
+
+    it('keeps IDs and holders as text and offers a labelled building-edit button with a pencil', () => {
+        const editBuilding = vi.fn()
+        const view = render({ points,
+            renderGroupHeader: (group) => createElement(BuildingHeader, { building: group.building, landowners: [], canManage: true, onEdit: editBuilding }),
+        })
+        expect(view.querySelector('.metering-point-id-main button')).toBeNull()
+        expect(view.querySelector('.metering-holder-name button')).toBeNull()
+        const edit = view.querySelector<HTMLButtonElement>('.building-header-actions button')!
+        expect(edit.querySelector('svg[data-icon="pen"]')).not.toBeNull()
+        act(() => edit.click())
+        expect(editBuilding).toHaveBeenCalledWith(expect.objectContaining({ id: 'b1' }))
+        expect(view.querySelector('.metering-point-detail')).toBeNull()
     })
 
     it('keeps the row quiet: no Active badge, and the details are closed', () => {
@@ -214,6 +242,40 @@ describe('MeteringPointsList', () => {
         expect(holder.textContent).toBe('—')
     })
 
+    it('removes the selected assignment through a direct button and confirmation', () => {
+        const confirm = vi.fn()
+        const remove = vi.fn()
+        const view = render({ points: [point('m3')], groups: null, confirm, onDeleteAssignment: remove })
+        act(() => view.querySelector<HTMLButtonElement>('.metering-point-expand')!.click())
+        const detail = view.querySelector('.metering-point-detail')!
+        expect(detail.querySelector('[aria-haspopup="menu"]')).toBeNull()
+        const removeButtons = detail.querySelectorAll<HTMLButtonElement>('.metering-assignment-actions .button-danger')
+        expect(removeButtons).toHaveLength(2)
+        act(() => removeButtons[1].click())
+        expect(remove).not.toHaveBeenCalled()
+        expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ isDangerous: true }))
+        confirm.mock.calls[0][0].onConfirm()
+        expect(remove).toHaveBeenCalledExactlyOnceWith('a3')
+    })
+
+    it('identifies the point and selected historical period when a participant has repeated assignments', () => {
+        const confirm = vi.fn()
+        const remove = vi.fn()
+        const view = render({ points: [point('m1')], groups: null, confirm, onDeleteAssignment: remove,
+            assignmentsByMeteringPoint: new Map([['m1', [
+                assignment('recent', 'm1', 'p1', { valid_from: '2022-01-01', valid_to: '2022-12-31' }),
+                assignment('older', 'm1', 'p1', { valid_from: '2021-01-01', valid_to: '2021-12-31' }),
+            ]]]),
+        })
+        act(() => view.querySelector<HTMLButtonElement>('.metering-point-expand')!.click())
+        act(() => view.querySelectorAll<HTMLButtonElement>('.metering-assignment-actions .button-danger')[1].click())
+        const options = confirm.mock.calls[0][0]
+        expect(options.message).toContain(JSON.stringify({ name: 'Anna Consumer', meterId: 'm1', from: '2021-01-01', to: '2021-12-31' }))
+        expect(remove).not.toHaveBeenCalled()
+        options.onConfirm()
+        expect(remove).toHaveBeenCalledExactlyOnceWith('older')
+    })
+
     it('offers a viewer neither an Assign button, a menu nor assignment controls', () => {
         const view = render({ points, readOnly: true })
         expect(view.querySelector('.metering-point-holder .button-primary')).toBeNull()
@@ -234,10 +296,46 @@ describe('MeteringPointsList', () => {
         }
     })
 
-    it('shows no status dot and no health summary on the rows or in the building header', () => {
+    it('labels participant tables with three columns', () => {
+        const participant = render({ points, isManagedScope: false, groups: null })
+        expect(participant.querySelector('table')!.getAttribute('aria-label')).toBe('pages.meteringPoints.title')
+        expect(participant.querySelectorAll('th')).toHaveLength(3)
+        act(() => participant.querySelector<HTMLButtonElement>('.metering-point-expand')!.click())
+        expect(participant.querySelector('.metering-point-detail')!.getAttribute('colspan')).toBe('3')
+    })
+
+    it('shows no status dot or building health summary', () => {
         const view = render({ points })
         expect(view.querySelector('.dot')).toBeNull()
         expect(view.querySelector('.building-rollup')).toBeNull()
+    })
+
+    it.each([
+        { health: 'green', holderLess: false, active: true, expected: false },
+        { health: 'unknown', holderLess: false, active: true, expected: false },
+        { health: 'yellow', holderLess: false, active: true, expected: true },
+        { health: 'red', holderLess: false, active: true, expected: true },
+        { health: 'no_data', holderLess: false, active: true, expected: true },
+        { health: 'green', holderLess: true, active: true, expected: true },
+        { health: 'unknown', holderLess: true, active: true, expected: true },
+        { health: 'red', holderLess: true, active: false, expected: false },
+        { health: 'yellow', holderLess: true, active: true, expected: true },
+    ] as const)('marks only attention points: $health, missing assignment=$holderLess, active=$active', ({ health, holderLess, active, expected }) => {
+        const view = render({ points: [point('m1', { is_active: active, reading_count: health === 'no_data' ? 0 : 10 })], groups: null,
+            healthByMeteringPoint: new Map([['m1', health]]), holderLessByMeteringPoint: new Map([['m1', holderLess]]),
+        })
+        expect(!!view.querySelector('.metering-quality-issue, .metering-holder-issue')).toBe(expected)
+        expect(view.querySelector('.metering-point-id-main .dot')).toBeNull()
+        if (expected) {
+            if (health !== 'green' && health !== 'unknown') {
+                const issue = view.querySelector<HTMLAnchorElement>('.metering-point-last .metering-quality-issue')!
+                expect(issue.textContent).toContain(`pages.meteringPoints.health.${health === 'no_data' ? 'noReadings' : health}`)
+                expect(issue.getAttribute('href')).toBe('/metering-data?metering_point=m1&tab=quality')
+                expect(issue.getAttribute('aria-label')).toContain('m1')
+                expect(issue.classList.contains(health === 'red' ? 'badge-danger' : 'badge-warning')).toBe(true)
+            }
+            if (holderLess) expect(view.querySelector('.metering-point-holder .metering-holder-issue')!.textContent).toContain('pages.meteringPoints.holderLessBadge')
+        }
     })
 
     it('gives every building the same header, one or several', () => {
@@ -283,4 +381,47 @@ describe('MeteringPointsList', () => {
         container?.remove()
         expect(render({ points, isManagedScope: false, groups: null }).querySelector('.metering-type-legend')).not.toBeNull()
     })
+    it('does not offer generic edit/remove actions for multiple current assignments', async () => {
+        const view = render({ points: [point('m3')], groups: null })
+        act(() => view.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!.click())
+        await waitForCondition(() => !!document.querySelector('[role="menuitem"]'), 'point menu')
+        const menu = document.querySelector('[role="menu"]')!
+        expect(menu.textContent).not.toContain('pages.meteringPoints.editAssignTitle')
+        expect(menu.textContent).not.toContain('pages.meteringPoints.removeAssignTitle')
+        expect(menu.textContent).toContain('common.edit')
+    })
+
+    it('keeps assignment creation hidden until assignment history is available', () => {
+        const view = render({ points, assignmentsAvailable: false })
+        expect(view.querySelector('.metering-point-holder .button-primary')).toBeNull()
+        expect(view.querySelector('.metering-holder-name button')).toBeNull()
+        expect(view.textContent).toContain('pages.meteringPoints.assignmentsUnavailable')
+        act(() => view.querySelector<HTMLButtonElement>('.metering-point-expand')!.click())
+        expect(view.querySelector('.metering-point-detail')!.textContent).not.toContain('pages.meteringPoints.detail.addAssignment')
+    })
+
+    it('targets the single current assignment from the point menu', async () => {
+        const edit = vi.fn()
+        const confirm = vi.fn()
+        const remove = vi.fn()
+        const view = render({ points: [point('m1')], groups: null, onOpenEditAssignment: edit, confirm, onDeleteAssignment: remove })
+        const openMenu = async () => {
+            act(() => view.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!.click())
+            await waitForCondition(() => !!document.querySelector('[role="menuitem"]'), 'point menu')
+        }
+        await openMenu()
+        const editItem = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+            .find(button => button.textContent?.includes('pages.meteringPoints.editAssignTitle'))!
+        expect(editItem.querySelector('svg[data-icon="pen"]')).not.toBeNull()
+        act(() => editItem.click())
+        expect(edit).toHaveBeenCalledWith(expect.objectContaining({ id: 'a1' }))
+        await waitForCondition(() => !document.querySelector('[role="menuitem"]'), 'closed menu')
+        await openMenu()
+        act(() => Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+            .find(button => button.textContent?.includes('pages.meteringPoints.removeAssignTitle'))!.click())
+        expect(remove).not.toHaveBeenCalled()
+        confirm.mock.calls[0][0].onConfirm()
+        expect(remove).toHaveBeenCalledExactlyOnceWith('a1')
+    })
+
 })

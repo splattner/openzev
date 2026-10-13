@@ -11,6 +11,7 @@ import {
   isAssignmentCurrent,
   isMeteringPointHolderLess,
   meteringPointHealthBadgeClass,
+  meteringPointNeedsAttention,
   readMeteringPointTypeFilter,
   readMeteringPointView,
 } from '../src/features/meteringPoints/useMeteringPointForms'
@@ -145,8 +146,8 @@ describe('metering point form helpers', () => {
       expect(getMeteringPointHealth({ reading_count: 0 }, quality({ severity: 'green' }))).toBe('no_data')
     })
 
-    it('is "no_data" for a meter with readings but no matching quality-status entry (defensive fallback)', () => {
-      expect(getMeteringPointHealth({ reading_count: 10 }, undefined)).toBe('no_data')
+    it('is "unknown" for a point with readings but unavailable quality', () => {
+      expect(getMeteringPointHealth({ reading_count: 10 }, undefined)).toBe('unknown')
     })
 
     it('takes the severity from the quality-status entry once the meter has data', () => {
@@ -171,18 +172,27 @@ describe('metering point form helpers', () => {
       expect(isMeteringPointHolderLess(point({}), assignments, today)).toBe(false)
     })
 
-    it('does not flag a meter whose only assignment already ended (that is #621\'s assignedCount, not this)', () => {
+    it('flags a point whose only assignment has ended', () => {
       const assignments = [{ valid_from: '2025-01-01', valid_to: '2025-12-31' } as MeteringPointAssignment]
       expect(isMeteringPointHolderLess(point({}), assignments, today)).toBe(true)
     })
 
-    it('does not flag an inactive meter — it is out of billing scope', () => {
+    it('does not flag an inactive point in the inventory view', () => {
       expect(isMeteringPointHolderLess(point({ is_active: false }), [], today)).toBe(false)
     })
 
     it('does not flag a meter with no readings yet — nothing to attribute', () => {
       expect(isMeteringPointHolderLess(point({ reading_count: 0 }), [], today)).toBe(false)
     })
+  })
+
+  it('flags active points with missing or incomplete data, or readings without a holder', () => {
+    for (const health of ['no_data', 'yellow', 'red'] as const) {
+      expect(meteringPointNeedsAttention({ is_active: true }, health, false)).toBe(true)
+      expect(meteringPointNeedsAttention({ is_active: false }, health, true)).toBe(false)
+    }
+    expect(meteringPointNeedsAttention({ is_active: true }, 'green', true)).toBe(true)
+    expect(meteringPointNeedsAttention({ is_active: true }, 'green', false)).toBe(false)
   })
 
   it('maps health to badge classes', () => {
@@ -194,14 +204,13 @@ describe('metering point form helpers', () => {
 
   describe('reading filters from the URL (#625)', () => {
     it('reads a valid list view and falls back to "all" for anything else', () => {
-      for (const view of ['active', 'inactive', 'unassigned'] as const) {
+      for (const view of ['active', 'inactive', 'unassigned', 'attention'] as const) {
         expect(readMeteringPointView(view)).toBe(view)
       }
       expect(readMeteringPointView(null)).toBe('all')
       expect(readMeteringPointView('')).toBe('all')
-      // "assigned" and "attention" have no tab any more.
+      // "assigned" has no tab.
       expect(readMeteringPointView('assigned')).toBe('all')
-      expect(readMeteringPointView('attention')).toBe('all')
     })
 
     it('reads a valid type filter and falls back to "all" for anything else', () => {
@@ -212,4 +221,10 @@ describe('metering point form helpers', () => {
       expect(readMeteringPointTypeFilter('solar')).toBe('all')
     })
   })
+})
+
+it('keeps unavailable quality separate from confirmed assignment problems', () => {
+  expect(meteringPointNeedsAttention({ is_active: true }, 'unknown', false)).toBe(false)
+  expect(meteringPointNeedsAttention({ is_active: true }, 'unknown', true)).toBe(true)
+  expect(getMeteringPointHealth({ reading_count: 0 }, undefined)).toBe('no_data')
 })

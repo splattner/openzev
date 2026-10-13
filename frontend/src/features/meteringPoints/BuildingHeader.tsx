@@ -40,12 +40,7 @@ export function BuildingHeader({
   const { t } = useTranslation()
   const address = buildingAddress(building)
 
-  const menuItems: ActionMenuItem[] = [{
-    key: 'edit',
-    label: t('pages.meteringPoints.buildings.edit'),
-    icon: <FontAwesomeIcon icon={faPen} fixedWidth />,
-    onClick: () => onEdit(building),
-  }]
+  const menuItems: ActionMenuItem[] = []
   // Rare and destructive: overflow + confirm, and only once nothing is left in it.
   if (onDelete && building.metering_point_count === 0) {
     menuItems.push({
@@ -65,7 +60,7 @@ export function BuildingHeader({
           <FontAwesomeIcon icon={faBuilding} fixedWidth />
         </span>
         <div className="building-header-main">
-          <strong className="building-header-name">{building.name}</strong>
+          <h2 id={`metering-building-${building.id}`} className="building-header-name">{building.name}</h2>
           <span className="building-header-meta muted">
             {address && <span>{address}</span>}
             {building.egid !== null && <span>{t('pages.meteringPoints.buildings.egidBadge', { egid: building.egid })}</span>}
@@ -76,19 +71,23 @@ export function BuildingHeader({
       </div>
       <div className="building-header-side">
         {canManage && (
-          <div className="building-header-actions actions-row">
+          <div className="building-header-actions actions-row actions-row-wrap">
             {onAddMeteringPoint && (
               <button type="button" className="button button-secondary button-compact" onClick={() => onAddMeteringPoint(building)}>
                 <FontAwesomeIcon icon={faPlus} fixedWidth />
                 {t('pages.meteringPoints.buildings.addMeteringPoint')}
               </button>
             )}
-            <ActionMenu
+            <button type="button" className="button button-secondary button-compact" onClick={() => onEdit(building)}>
+              <FontAwesomeIcon icon={faPen} fixedWidth />
+              {t('pages.meteringPoints.buildings.edit')}
+            </button>
+            {menuItems.length > 0 && <ActionMenu
               label={t('pages.meteringPoints.moreActions')}
               icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
               iconOnly
               items={menuItems}
-            />
+            />}
           </div>
         )}
       </div>

@@ -30,6 +30,7 @@ import {
   assignmentStateSortOrder,
   getAssignmentState,
   meteringPointHealthBadgeClass,
+  meteringPointNeedsAttention,
   type MeteringPointHealth,
 } from './useMeteringPointForms'
 
@@ -55,6 +56,7 @@ type MeteringPointRowProps = {
   todayIso: string
   health: MeteringPointHealth
   holderLess: boolean
+  assignmentsAvailable: boolean
   isManagedScope: boolean
   readOnly: boolean
   canDeleteData: boolean
@@ -75,7 +77,7 @@ type MeteringPointRowProps = {
 /**
  * One metering point as a line of facts — ID, type, holder, last reading — that
  * opens in place to its participants, measurement and location. Badges are for
- * what is unusual about the meter itself; its data health is in the details.
+ * what is unusual about the meter itself; named issues appear in their relevant columns.
  */
 export function MeteringPointRow({
   point,
@@ -85,6 +87,7 @@ export function MeteringPointRow({
   todayIso,
   health,
   holderLess,
+  assignmentsAvailable,
   isManagedScope,
   readOnly,
   canDeleteData,
@@ -102,6 +105,7 @@ export function MeteringPointRow({
   onDeleteAssignment,
 }: MeteringPointRowProps) {
   const { t } = useTranslation()
+  const actionsId = `metering-point-actions-${point.id}`
   const canWrite = isManagedScope && !readOnly
   const nameOf = (assignment: MeteringPointAssignment) => participantNameById.get(assignment.participant) ?? assignment.participant
 
@@ -123,34 +127,75 @@ export function MeteringPointRow({
   // A source in trouble is worth a badge on the row; a healthy or pending one sits in the details.
   const sourceTone = statusTone(point.supplementary_source_status)
   const sourceNeedsAttention = sourceTone === 'warning' || sourceTone === 'danger'
+  const needsAttention = meteringPointNeedsAttention(point, health, holderLess)
+  const showDataIssue = needsAttention && health !== 'green' && health !== 'unknown'
+  const dataIssueLabel = t(health === 'no_data' ? 'pages.meteringPoints.health.noReadings' : `pages.meteringPoints.health.${health}`)
 
   function confirmRemoveAssignment(assignment: MeteringPointAssignment) {
     confirm({
       title: t('pages.meteringPoints.removeAssignTitle'),
-      message: t('pages.meteringPoints.removeAssignMessage', { name: nameOf(assignment) }),
+      message: t('pages.meteringPoints.removeAssignMessage', {
+        name: nameOf(assignment),
+        meterId: point.meter_id,
+        from: formatShortDate(assignment.valid_from, settings),
+        to: assignment.valid_to ? formatShortDate(assignment.valid_to, settings) : t('pages.meteringPoints.openEnded'),
+      }),
       confirmText: t('pages.meteringPoints.removeAssignConfirm'),
       isDangerous: true,
       onConfirm: () => onDeleteAssignment(assignment.id),
     })
   }
 
+  function handleEditPoint() {
+    // Restore to the menu trigger, since its item disappears when the editor opens.
+    document.getElementById(actionsId)?.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')?.focus()
+    onOpenEditMeteringPoint(point)
+  }
+
+  function handleEditCurrentAssignment() {
+    document.getElementById(actionsId)?.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')?.focus()
+    onOpenEditAssignment(current[0])
+  }
+
+  const assignmentSection = current.length ? t('pages.meteringPoints.columns.holder') : undefined
+  const pointSection = current.length ? t('pages.meteringPoints.columns.meter') : undefined
   const pointMenuItems: ActionMenuItem[] = []
   if (canWrite) {
-    pointMenuItems.push({
+    if (assignmentsAvailable) pointMenuItems.push({
       key: 'assign',
+      section: assignmentSection,
       label: t('pages.meteringPoints.assign'),
       icon: <FontAwesomeIcon icon={faUserPlus} fixedWidth />,
       onClick: () => onOpenCreateAssignModal(point.id),
     })
+    if (assignmentsAvailable && current.length === 1) {
+      pointMenuItems.push({
+        key: 'edit-assignment',
+        label: t('pages.meteringPoints.editAssignTitle'),
+        section: assignmentSection,
+        icon: <FontAwesomeIcon icon={faPen} fixedWidth />,
+        onClick: handleEditCurrentAssignment,
+      }, {
+        key: 'remove-assignment',
+        label: t('pages.meteringPoints.removeAssignTitle'),
+        section: assignmentSection,
+        icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
+        danger: true,
+        disabled: deleteAssignmentPending || dialogLoading,
+        onClick: () => confirmRemoveAssignment(current[0]),
+      })
+    }
     pointMenuItems.push({
       key: 'edit',
+      section: pointSection,
       label: t('common.edit'),
       icon: <FontAwesomeIcon icon={faPen} fixedWidth />,
-      onClick: () => onOpenEditMeteringPoint(point),
+      onClick: handleEditPoint,
     })
     if (canDeleteData) {
       pointMenuItems.push({
         key: 'delete-data',
+        section: pointSection,
         label: t('pages.meteringPoints.deleteData.button'),
         icon: <FontAwesomeIcon icon={faDatabase} fixedWidth />,
         onClick: () => onOpenDeleteDataModal(point),
@@ -158,6 +203,7 @@ export function MeteringPointRow({
     }
     pointMenuItems.push({
       key: 'delete',
+      section: pointSection,
       label: t('common.delete'),
       icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
       disabled: deleteMeteringPointPending || dialogLoading,
@@ -180,7 +226,7 @@ export function MeteringPointRow({
   // The whole line opens the details, but a click on a control inside it (or in its menu, which
   // React still bubbles through the portal) belongs to that control, and so does the end of a drag
   // that selected the meter ID to copy it.
-  function handleRowClick(event: MouseEvent<HTMLDivElement>) {
+  function handleRowClick(event: MouseEvent<HTMLTableRowElement>) {
     const target = event.target as HTMLElement
     if (!event.currentTarget.contains(target) || target.closest('a, button, input, select, [role="menu"]')) return
     if (window.getSelection()?.toString()) return
@@ -188,10 +234,13 @@ export function MeteringPointRow({
   }
 
   function renderHolder() {
+    if (!assignmentsAvailable) return <span className="muted">{t('pages.meteringPoints.assignmentsUnavailable')}</span>
     if (current.length > 0) {
       return (
         <>
-          <strong className="metering-holder-name">{nameOf(current[0])}</strong>
+          <strong className="metering-holder-name">
+            {nameOf(current[0])}
+          </strong>
           {current.length > 1 && <span className="metering-holder-more">+{current.length - 1}</span>}
           <span className="muted metering-holder-since">
             {t('pages.meteringPoints.since', { date: formatShortDate(current[0].valid_from, settings) })}
@@ -235,9 +284,9 @@ export function MeteringPointRow({
   const detailId = `metering-point-detail-${point.id}`
 
   return (
-    <article className={`metering-point-card${expanded ? ' is-expanded' : ''}`}>
-      <div className="metering-point-row" onClick={handleRowClick}>
-        <div className="metering-point-title">
+    <tbody role="rowgroup" className={`metering-point-card${expanded ? ' is-expanded' : ''}`}>
+      <tr role="row" className="metering-point-row" onClick={handleRowClick}>
+        <td role="cell" className="metering-point-title">
           <div className="metering-point-id">
             <span className="metering-point-id-main">
               <span className="metering-point-type" role="img" aria-label={typeLabel} title={typeLabel}>
@@ -246,35 +295,49 @@ export function MeteringPointRow({
               <strong>{point.meter_id}</strong>
             </span>
             {!point.is_active && <span className="badge badge-neutral">{t('pages.meteringPoints.inactive')}</span>}
-            {holderLess && (
-              <span className="badge badge-danger" title={t('pages.meteringPoints.holderLessHint')}>
-                <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />
-                {t('pages.meteringPoints.holderLessBadge')}
-              </span>
-            )}
             {point.has_behind_meter_generation && <BehindMeterBadge />}
             {isManagedScope && sourceNeedsAttention && (
               <SupplementarySourceStatus point={point} canManage={!readOnly} confirm={confirm} />
             )}
           </div>
           {location && <span className="muted metering-point-subtitle">{location}</span>}
-        </div>
-        {isManagedScope && <div className="metering-point-holder">{renderHolder()}</div>}
-        <span className="metering-point-last muted">
-          {lastReadingDate ?? t('pages.meteringPoints.never')}
-        </span>
-        <div className="metering-point-actions">
+        </td>
+        {isManagedScope && (
+          <td role="cell" className="metering-point-holder">
+            {needsAttention && holderLess && (
+              <span className="badge badge-danger metering-holder-issue" title={t('pages.meteringPoints.holderLessHint')}>
+                <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />
+                {t('pages.meteringPoints.holderLessBadge')}
+              </span>
+            )}
+            {renderHolder()}
+          </td>
+        )}
+        <td role="cell" className="metering-point-last muted">
+          {!(showDataIssue && health === 'no_data') && <span>{lastReadingDate ?? t('pages.meteringPoints.never')}</span>}
+          {showDataIssue && (
+            <Link
+              className={`badge ${health === 'red' ? 'badge-danger' : 'badge-warning'} metering-quality-issue`}
+              to={`/metering-data?metering_point=${point.id}&tab=quality`}
+              aria-label={t('pages.meteringPoints.health.issueFor', { meterId: point.meter_id, status: dataIssueLabel })}
+              title={t('pages.meteringPoints.health.linkHint')}
+            >
+              {dataIssueLabel}
+            </Link>
+          )}
+        </td>
+        <td id={actionsId} role="cell" className="metering-point-actions">
           <Link
             className="button button-ghost button-compact"
             to={`/metering/chart?metering_point=${point.id}`}
-            aria-label={t('pages.meteringPoints.chart')}
-            title={t('pages.meteringPoints.chart')}
+            aria-label={t('pages.meteringPoints.chartFor', { meterId: point.meter_id })}
+            title={t('pages.meteringPoints.chartFor', { meterId: point.meter_id })}
           >
             <FontAwesomeIcon icon={faChartLine} fixedWidth />
           </Link>
           {canWrite && (
             <ActionMenu
-              label={t('pages.meteringPoints.moreActions')}
+              label={t('pages.meteringPoints.moreActionsFor', { meterId: point.meter_id })}
               icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
               iconOnly
               items={pointMenuItems}
@@ -290,17 +353,18 @@ export function MeteringPointRow({
           >
             <FontAwesomeIcon icon={faChevronDown} fixedWidth />
           </button>
-        </div>
-      </div>
+        </td>
+      </tr>
 
       {expanded && (
-        <div className="metering-point-detail" id={detailId}>
+        <tr className="metering-point-detail-row" role="row">
+          <td role="cell" colSpan={isManagedScope ? 4 : 3} className="metering-point-detail" id={detailId}>
           <div className={`metering-detail-grid${isManagedScope ? ' metering-detail-grid-participants' : ''}`}>
             {isManagedScope && (
               <section className="metering-detail-card metering-detail-participants">
                 <header>
                   <h4>{t('pages.meteringPoints.detail.participants')}</h4>
-                  {canWrite && (
+                  {canWrite && assignmentsAvailable && (
                     <button type="button" className="button button-ghost button-compact" onClick={() => onOpenCreateAssignModal(point.id)}>
                       <FontAwesomeIcon icon={faPlus} fixedWidth />
                       {t('pages.meteringPoints.detail.addAssignment')}
@@ -308,7 +372,7 @@ export function MeteringPointRow({
                   )}
                 </header>
                 {sortedAssignments.length === 0 ? (
-                  <p className="muted metering-no-assignments">{t('pages.meteringPoints.noAssignments')}</p>
+                  <p className="muted metering-no-assignments">{t(assignmentsAvailable ? 'pages.meteringPoints.noAssignments' : 'pages.meteringPoints.assignmentsUnavailable')}</p>
                 ) : (
                   <ul className="metering-assignment-list">
                     {sortedAssignments.map((assignment) => {
@@ -332,7 +396,7 @@ export function MeteringPointRow({
                               {assignment.valid_to ? formatShortDate(assignment.valid_to, settings) : t('pages.meteringPoints.openEnded')}
                             </span>
                           </div>
-                          {canWrite && (
+                          {canWrite && assignmentsAvailable && (
                             <div className="metering-assignment-actions">
                               <button
                                 className="button button-secondary button-compact"
@@ -342,19 +406,16 @@ export function MeteringPointRow({
                                 <FontAwesomeIcon icon={faPen} fixedWidth />
                                 {t('common.edit')}
                               </button>
-                              <ActionMenu
-                                label={t('pages.meteringPoints.moreActions')}
-                                icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
-                                iconOnly
-                                items={[{
-                                  key: 'remove',
-                                  label: t('pages.meteringPoints.removeAssignment'),
-                                  icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
-                                  disabled: deleteAssignmentPending || dialogLoading,
-                                  danger: true,
-                                  onClick: () => confirmRemoveAssignment(assignment),
-                                }]}
-                              />
+                              <button
+                                className="button button-danger button-compact"
+                                type="button"
+                                aria-label={t('pages.meteringPoints.removeAssignmentFor', { name: nameOf(assignment) })}
+                                disabled={deleteAssignmentPending || dialogLoading}
+                                onClick={() => confirmRemoveAssignment(assignment)}
+                              >
+                                <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                {t('pages.meteringPoints.removeAssignment')}
+                              </button>
                             </div>
                           )}
                         </li>
@@ -403,16 +464,9 @@ export function MeteringPointRow({
               )}
             </section>
           </div>
-          {canWrite && (
-            <div className="metering-detail-actions actions-row actions-row-wrap">
-              <button type="button" className="button button-secondary button-compact" onClick={() => onOpenEditMeteringPoint(point)}>
-                <FontAwesomeIcon icon={faPen} fixedWidth />
-                {t('pages.meteringPoints.detail.editMeteringPoint')}
-              </button>
-            </div>
-          )}
-        </div>
+          </td>
+        </tr>
       )}
-    </article>
+    </tbody>
   )
 }

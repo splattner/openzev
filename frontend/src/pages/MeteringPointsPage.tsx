@@ -57,6 +57,8 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
 
     const {
         meteringPointsQuery,
+        dataQualityQuery,
+        assignmentsQuery,
         scope,
         saveMpMutation,
         deleteMpMutation,
@@ -121,7 +123,8 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
         scopedMeteringPoints,
         activeCount,
         inactiveCount,
-        assignedCount,
+        unassignedCount,
+        needsAttentionCount,
         hasFilters,
         meteringPointHealthById,
         meteringPointHolderLessById,
@@ -163,13 +166,28 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                 onRetry={() => void meteringPointsQuery.refetch()}
                 isRetrying={meteringPointsQuery.isFetching}
             >
+                {dataQualityQuery.isError ? (
+                    <Notice tone="warning" onRetry={() => void dataQualityQuery.refetch()} isRetrying={dataQualityQuery.isFetching}>
+                        {t('pages.meteringPoints.qualityLoadFailed')}
+                    </Notice>
+                ) : scopedMeteringPoints.some(point => meteringPointHealthById.get(point.id) === 'unknown') && (
+                    <p className="muted" role="status">{t(dataQualityQuery.isFetching ? 'pages.meteringPoints.qualityLoading' : 'pages.meteringPoints.qualityIncomplete')}</p>
+                )}
+                {isManagedScope && (assignmentsQuery.isError ? (
+                    <Notice tone="warning" onRetry={() => void assignmentsQuery.refetch()} isRetrying={assignmentsQuery.isFetching}>
+                        {t('pages.meteringPoints.assignmentsLoadFailed')}
+                    </Notice>
+                ) : assignmentsQuery.data === undefined && (
+                    <p className="muted" role="status">{t('pages.meteringPoints.assignmentsLoading')}</p>
+                ))}
                 <MeteringPointsToolbar
                     isManagedScope={isManagedScope}
                     readOnly={readOnly}
                     totalCount={scopedMeteringPoints.length}
                     activeCount={activeCount}
                     inactiveCount={inactiveCount}
-                    assignedCount={assignedCount}
+                    unassignedCount={unassignedCount}
+                    needsAttentionCount={needsAttentionCount}
                     searchTerm={searchTerm}
                     view={view}
                     sort={sort}
@@ -248,6 +266,7 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                     <MeteringPointsList
                         settings={settings}
                         meteringPoints={meteringPoints}
+                        assignmentsAvailable={assignmentsQuery.data !== undefined}
                         assignmentsByMeteringPoint={filteredAssignmentsByMeteringPoint}
                         participantNameById={participantNameById}
                         healthByMeteringPoint={meteringPointHealthById}

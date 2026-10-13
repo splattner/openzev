@@ -18,7 +18,8 @@ type MeteringPointsToolbarProps = {
   totalCount: number
   activeCount: number
   inactiveCount: number
-  assignedCount: number
+  unassignedCount: number
+  needsAttentionCount: number
   searchTerm: string
   view: MeteringPointView
   sort: MeteringPointSort
@@ -50,7 +51,8 @@ export function MeteringPointsToolbar({
   totalCount,
   activeCount,
   inactiveCount,
-  assignedCount,
+  unassignedCount,
+  needsAttentionCount,
   searchTerm,
   view,
   sort,
@@ -72,8 +74,9 @@ export function MeteringPointsToolbar({
     { value: 'all', label: t('pages.meteringPoints.summary.total'), count: totalCount },
     { value: 'active', label: t('pages.meteringPoints.summary.active'), count: activeCount },
     { value: 'inactive', label: t('pages.meteringPoints.summary.inactive'), count: inactiveCount },
+    { value: 'attention', label: t('pages.meteringPoints.summary.attention'), count: needsAttentionCount, attention: true },
     ...(isManagedScope
-      ? [{ value: 'unassigned' as const, label: t('pages.meteringPoints.summary.unassigned'), count: totalCount - assignedCount }]
+      ? [{ value: 'unassigned' as const, label: t('pages.meteringPoints.summary.unassigned'), count: unassignedCount }]
       : []),
   ]
   const typeTabs: Array<FilterTab<MeteringPointTypeFilter>> = [
