@@ -321,6 +321,11 @@ owner-vs-admin password-preservation case in
 (regression test for the bug found and fixed in `ensure_participant_account`
 during this implementation — see §4).
 
+`OnboardingConstraintUpgradeTests.test_upgrade_revokes_older_duplicates_then_constrains`
+checks the real constraint upgrade and restores the full migration graph in
+cleanup. It then creates an invoice with the current models to catch leaked
+historical schemas (including the invoice VAT-base column) regardless of test order.
+
 Frontend: `tests/participant-onboarding.test.ts` for the three API client
 functions; existing suite (`dead-i18n-keys`, `email-template-parity`) guards
 the locale and template-key changes.

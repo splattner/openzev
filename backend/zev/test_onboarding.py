@@ -607,4 +607,8 @@ class OnboardingConstraintUpgradeTests(TransactionTestCase):
             # The upgrade carried the participant's name onto its party.
             self.assertEqual(Participant.objects.get(pk=participant.pk).full_name, "Mig Rate")
         finally:
-            call_command("migrate", "zev", verbosity=0, interactive=False)
+            call_command("migrate", verbosity=0, interactive=False)
+
+        # Following tests need the live invoice schema, too.
+        from testing.factories import InvoiceFactory
+        InvoiceFactory()
