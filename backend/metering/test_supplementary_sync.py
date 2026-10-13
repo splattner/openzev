@@ -1,8 +1,9 @@
 """Sync tasks and the test/sync/reconciliation actions of SPEC §6.3 and §5."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from unittest import mock
+from zoneinfo import ZoneInfo
 
 from celery.exceptions import Retry
 from django.core.cache import cache
@@ -25,6 +26,11 @@ from metering.supplementary.testing import (
 from testing import factories
 
 
+ZURICH = ZoneInfo("Europe/Zurich")
+# An ordinary summer midday: neither a Swiss midnight nor a DST change is anywhere near the sync windows.
+ORDINARY_NOW = datetime(2026, 6, 17, 12, 0, tzinfo=ZURICH)
+
+
 class SyncTestCase(SupplementaryApiTestCase):
     def setUp(self):
         super().setUp()
@@ -42,10 +48,26 @@ class SyncTestCase(SupplementaryApiTestCase):
         pause = mock.patch.object(solar_manager, "PAUSE_BETWEEN_REQUESTS_S", 0)
         pause.start()
         self.addCleanup(pause.stop)
+        self.clock = None
         # The holder took over the meter three days ago, so a first sync is a few requests, not hundreds.
         self.assignment.valid_from = timezone.localdate() - timedelta(days=3)
         self.assignment.save()
         self.source = self.make_source()
+
+    def set_clock(self, now):
+        """Pin the clock and move the tenancy to start three Swiss days before it.
+
+        For tests that assert how many intervals were stored: fixture and sync read the same clock, so
+        the count depends only on the Swiss civil days the window spans (92 or 100 intervals across a
+        DST change), never on when the tests run.
+        """
+        if self.clock is None:
+            patcher = mock.patch("django.utils.timezone.now")
+            self.clock = patcher.start()
+            self.addCleanup(patcher.stop)
+        self.clock.return_value = now
+        self.assignment.valid_from = now.astimezone(ZURICH).date() - timedelta(days=3)
+        self.assignment.save()
 
     def make_source(self, point=None, participant=None, token="key-1"):
         source = SupplementarySource(
@@ -65,14 +87,34 @@ class SyncTestCase(SupplementaryApiTestCase):
 
 class SyncStorageTests(SyncTestCase):
     def test_a_first_sync_stores_the_tenancy_and_marks_the_source_ok(self):
+        self.set_clock(ORDINARY_NOW)
         result = self.run_sync()
-        self.assertGreater(result["accepted"], 96 * 3)
+        # Three full days plus the twelve hours of today that have passed.
+        self.assertEqual(result["accepted"], 96 * 3 + 48)
         self.source.refresh_from_db()
         self.assertEqual(self.source.status, SupplementaryStatus.OK)
         self.assertIsNotNone(self.source.last_success_at)
         self.assertEqual(self.source.last_error, "")
+        self.assertEqual(self.source.covers_from, datetime(2026, 6, 14, tzinfo=ZURICH))
+        self.assertEqual(self.source.synced_through, ORDINARY_NOW)
         self.assertEqual(self.source.covers_from, self.stored().order_by("timestamp").first().timestamp)
         self.assertEqual(self.source.synced_through, self.stored().order_by("-timestamp").first().timestamp + timedelta(minutes=15))
+
+    def assert_first_sync(self, now, covers_from, expected_intervals):
+        self.set_clock(now)
+        self.assertEqual(self.run_sync()["accepted"], expected_intervals)
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.covers_from, covers_from)
+        self.assertEqual(self.source.synced_through, now.replace(minute=now.minute - now.minute % 15))
+
+    def test_a_first_sync_just_after_swiss_midnight_stores_the_three_complete_days(self):
+        self.assert_first_sync(datetime(2026, 10, 13, 0, 8, tzinfo=ZURICH), datetime(2026, 10, 10, tzinfo=ZURICH), 288)
+
+    def test_a_first_sync_across_the_spring_dst_change_stores_the_23_hour_day(self):
+        self.assert_first_sync(datetime(2026, 3, 30, 0, 8, tzinfo=ZURICH), datetime(2026, 3, 27, tzinfo=ZURICH), 284)
+
+    def test_a_first_sync_across_the_autumn_dst_change_stores_the_25_hour_day(self):
+        self.assert_first_sync(datetime(2026, 10, 26, 0, 8, tzinfo=ZURICH), datetime(2026, 10, 23, tzinfo=ZURICH), 292)
 
     def test_values_are_stored_in_kwh_from_the_four_measured_flows(self):
         self.run_sync()
@@ -130,17 +172,26 @@ class SyncStorageTests(SyncTestCase):
         self.run_sync(backfill=True)
         self.assertGreaterEqual(len(self.vendor.range_requests), 3)
 
-    def test_each_day_is_stored_before_the_next_is_requested(self):
-        def fail_on_third(number):
-            return (500, {}, b"") if number == 3 else None
-
-        self.vendor.range_response = fail_on_third
+    def assert_days_stored_before_a_failed_request(self, now, expected):
+        self.set_clock(now)
+        self.vendor.range_response = lambda number: (500, {}, b"") if number == 3 else None
         with self.assertRaises(sync.ProviderError):
             self.run_sync()
-        self.assertEqual(self.stored().count(), 96 * 2)
+        self.assertEqual(self.stored().count(), expected)
         self.source.refresh_from_db()
         self.assertEqual(self.source.status, SupplementaryStatus.ERROR)
         self.assertIsNotNone(self.source.synced_through)  # the next run resumes from here
+
+    def test_each_day_is_stored_before_the_next_is_requested(self):
+        self.assert_days_stored_before_a_failed_request(ORDINARY_NOW, 96 * 2)
+
+    def test_the_days_stored_before_a_failure_include_the_23_hour_day(self):
+        # The first two days are 29 and 30 March; the clocks went forward on the 29th.
+        self.assert_days_stored_before_a_failed_request(datetime(2026, 4, 1, 12, 0, tzinfo=ZURICH), 92 + 96)
+
+    def test_the_days_stored_before_a_failure_include_the_25_hour_day(self):
+        # The first two days are 25 and 26 October; the clocks went back on the 25th.
+        self.assert_days_stored_before_a_failed_request(datetime(2026, 10, 28, 12, 0, tzinfo=ZURICH), 100 + 96)
 
     def test_a_vendor_value_that_fails_validation_is_rejected_without_failing_the_sync(self):
         original = vendor_row
@@ -256,13 +307,23 @@ class SyncFailureTests(SyncTestCase):
         self.assertEqual(self.source.status, SupplementaryStatus.DISABLED)
         self.assertFalse(self.source.enabled)
 
-    def test_a_disconnect_between_two_days_stops_the_run_and_keeps_the_stored_days(self):
+    def assert_first_day_kept_after_a_disconnect(self, now, expected):
+        self.set_clock(now)
         with self.disconnect_during_request(2):
             result = self.run_sync()
         self.assertEqual(result["skipped"], "disabled")
-        self.assertEqual(self.stored().count(), 96)
+        self.assertEqual(self.stored().count(), expected)
         self.source.refresh_from_db()
         self.assertEqual(self.source.status, SupplementaryStatus.DISABLED)
+
+    def test_a_disconnect_between_two_days_stops_the_run_and_keeps_the_stored_days(self):
+        self.assert_first_day_kept_after_a_disconnect(ORDINARY_NOW, 96)
+
+    def test_a_disconnect_after_the_23_hour_day_keeps_its_92_intervals(self):
+        self.assert_first_day_kept_after_a_disconnect(datetime(2026, 4, 1, 12, 0, tzinfo=ZURICH), 92)
+
+    def test_a_disconnect_after_the_25_hour_day_keeps_its_100_intervals(self):
+        self.assert_first_day_kept_after_a_disconnect(datetime(2026, 10, 28, 12, 0, tzinfo=ZURICH), 100)
 
 
 class SyncSkipTests(SyncTestCase):

@@ -866,14 +866,17 @@ token is never used; a non-rotating vendor leaves the ciphertext alone; one requ
 day, lazily; the access token is renewed; an undecryptable or wiped credential asks for a
 reconnect; `check`; registry).
 
-**`metering/test_supplementary_sync.py`** (59): `SyncStorageTests` (13: first sync stores the
-tenancy and marks the source ok; values in kWh; nothing before the tenancy or the backfill limit;
+**`metering/test_supplementary_sync.py`** (67): `SyncStorageTests` (18: first sync stores the
+tenancy and marks the source ok, with the counts pinned to a controlled Swiss clock, also just after
+midnight and across the 23- and 25-hour DST days; values in kWh; nothing before the tenancy or the backfill limit;
 only complete intervals; a second sync re-fetches only the overlap; revised values are upserted;
-`backfill`; each day stored before the next so a failure keeps the earlier days; vendor values
+`backfill`; each day stored before the next so a failure keeps the earlier days (92 or 100
+intervals on a DST day); vendor values
 that fail validation are rejected without failing the sync; an empty run still succeeds; the
-rotated key stored; `MeterReading` untouched), `SyncFailureTests` (8: a rejected or undecryptable
+rotated key stored; `MeterReading` untouched), `SyncFailureTests` (10: a rejected or undecryptable
 key is `reconnect_required` and not retried; transient failure sets `error` and retries; `429`
-waits at least its `Retry-After`; a concurrent disconnect is never overwritten and stops the run),
+waits at least its `Retry-After`; a concurrent disconnect is never overwritten and stops the run, keeping the days already stored,
+23- and 25-hour days included),
 `SyncSkipTests` (8: flag off, disabled, `reconnect_required`, push, deleted, busy lease, no
 tenancy, community mode), `FanOutTests` (4), `OrphanTests` (5: tenancy ended, current, future end,
 community mode, flag off), `SyncAuditTests` (5: no token in the audit; failure outcome; a broken
