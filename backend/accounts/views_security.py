@@ -5,7 +5,7 @@ out. Spec: docs/specs/2026-03-community-and-access.md §5.6a and §5.6b; ADR 002
 import logging
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -147,7 +147,12 @@ class EmailChangeConfirmView(APIView):
                 return invalid
             old_email = locked.email
             locked.email = new_email
-            locked.save(update_fields=["email"])
+            try:
+                with transaction.atomic():
+                    locked.save(update_fields=["email"])
+            except IntegrityError:
+                # Someone else took the address between the check and the write.
+                return invalid
             revoke_sessions(locked)
 
         emails.send_email_change_notice(old_email, new_email)

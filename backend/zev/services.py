@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -78,9 +78,11 @@ def own_participant_for_user(user, zev_id=None):
 def sync_participant_user_fields(participant, user) -> None:
     # The role is left alone: what an account may do comes from its grants and
     # participant rows, not from the role (#761).
-    user.email = participant.email
-    user.first_name = participant.first_name
-    user.last_name = participant.last_name
+    if not _same_address(user.email, participant.email):
+        user.email = participant.email
+    if not _shares_account(participant, user):
+        user.first_name = participant.first_name
+        user.last_name = participant.last_name
 
 
 def requires_independent_login(user) -> bool:
@@ -97,9 +99,23 @@ def requires_independent_login(user) -> bool:
     )
 
 
+def account_for_email(email, *, lock=False):
+    """The account whose address is ``email`` (case-insensitive); ``None`` for a blank or unused one."""
+    email = (email or "").strip()
+    if not email:
+        return None
+    accounts = User.objects.locked() if lock else User.objects.all()
+    return accounts.filter(email__iexact=email).order_by("pk").first()
+
+
 @transaction.atomic
 def ensure_participant_account(participant):
     """The user account linked to ``participant``, creating one if needed.
+
+    The participant's email identifies the account (``User.email`` is unique):
+    an account that already holds the address is linked as it is, with its
+    password, email and name untouched, instead of a second one being created.
+    Several participant rows with one address therefore share one account.
 
     Participant-only accounts get unusable passwords and no password-change
     requirement: nothing was transmitted, so ``must_change_password`` would
@@ -108,11 +124,27 @@ def ensure_participant_account(participant):
     password after signing in through a link.
     Accounts with their own login keep their password, email and name.
     """
-    if participant.user_id:
-        user = User.objects.locked().get(pk=participant.user_id)
+    user = User.objects.locked().get(pk=participant.user_id) if participant.user_id else None
+    if user is not None:
         participant.user = user
         if requires_independent_login(user):
             return user
+
+    holder = account_for_email(participant.email, lock=True)
+    if holder is not None and (user is None or holder.pk != user.pk):
+        return _link_participant(participant, holder)
+
+    if (
+        user is not None
+        and (participant.email or "").strip()
+        and not _same_address(participant.email, user.email)
+        and _shares_account(participant, user)
+    ):
+        # The address moved on, but other rows still use this account: they keep
+        # it, and this row gets an account of its own for the new address.
+        user = None
+
+    if user is not None:
         sync_participant_user_fields(participant, user)
         update_fields = ['email', 'first_name', 'last_name']
         if user.has_usable_password():
@@ -129,16 +161,36 @@ def ensure_participant_account(participant):
         last_name=participant.last_name,
         email=participant.email,
     )
-    user = User.objects.create_user(
-        username=username,
-        role=UserRole.USER,
-        email=participant.email,
-        first_name=participant.first_name,
-        last_name=participant.last_name,
-    )
+    try:
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=username,
+                role=UserRole.USER,
+                email=participant.email,
+                first_name=participant.first_name,
+                last_name=participant.last_name,
+            )
+    except IntegrityError:
+        # A concurrent request created the account for this address first.
+        holder = account_for_email(participant.email, lock=True)
+        if holder is None:
+            raise
+        return _link_participant(participant, holder)
+    return _link_participant(participant, user)
+
+
+def _link_participant(participant, user):
     participant.user = user
     participant.save(update_fields=['user', 'updated_at'])
     return user
+
+
+def _same_address(first, second) -> bool:
+    return (first or "").strip().lower() == (second or "").strip().lower()
+
+
+def _shares_account(participant, user) -> bool:
+    return user.participations.exclude(pk=participant.pk).exists()
 
 
 class LinkRefused(Exception):

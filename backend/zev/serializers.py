@@ -9,9 +9,10 @@ from django.utils import timezone
 
 from .models import Building, Zev, Participant, Party, PartyKind, PartyTitle, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode, PartyRole, ZevPartyRole
 from .services import (
-    create_zev_with_owner_setup, ensure_participant_account, lock_participant_account, requires_independent_login,
+    account_for_email, create_zev_with_owner_setup, ensure_participant_account, lock_participant_account, requires_independent_login,
 )
 from .tasks import trigger_building_geocode_if_address_present
+from accounts import email_change
 from .iban import (
     IBAN_ADDRESS_REQUIRED_MESSAGE,
     INVALID_IBAN_MESSAGE,
@@ -306,6 +307,10 @@ class ParticipantSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"email": "Participant email is required."})
 
         self._require_admin_for_protected_account(getattr(self.instance, "user", None))
+        # The address identifies an account, and the row would join the one that holds it.
+        holder = account_for_email(email)
+        if holder is not None and holder.pk != getattr(self.instance, "user_id", None):
+            self._require_admin_for_protected_account(holder)
         return attrs
 
     def _require_admin_for_protected_account(self, user):
@@ -696,6 +701,11 @@ class ZevOwnerAccountSerializer(serializers.Serializer):
     address_line2 = serializers.CharField(required=False, allow_blank=True, max_length=200)
     postal_code = serializers.CharField(required=False, allow_blank=True, max_length=10)
     city = serializers.CharField(required=False, allow_blank=True, max_length=100)
+
+    def validate_email(self, value: str) -> str:
+        if email_change.address_in_use(value):
+            raise serializers.ValidationError(email_change.ADDRESS_IN_USE_MESSAGE)
+        return value
 
     def validate_username(self, value: str) -> str:
         username = value.strip()

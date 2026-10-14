@@ -59,7 +59,7 @@ Extends `AbstractUser` (Django `accounts.models`).
 |---|---|---|
 | `id` | `IntegerField` (PK, auto) | Django default PK |
 | `username` | `CharField(150)` | Unique login name |
-| `email` | `EmailField` | |
+| `email` | `EmailField` | The account's identifier: unique case-insensitively among non-blank addresses (`UniqueConstraint(Lower("email"), condition=~Q(email=""), name="accounts_user_email_unique_ci")`, `accounts.0027`). Blank is allowed and not unique. `accounts.0026` first folded existing duplicates: participant-only accounts move their participant rows and parties to the strongest account for the address and are deleted; an account with a login of its own that cannot be folded keeps its username but loses the address (printed by the migration). #1005 |
 | `first_name` | `CharField(150)` | |
 | `last_name` | `CharField(150)` | |
 | `role` | `CharField(20)` choices `UserRole` | `admin` or `user` (default `user`); migration `accounts.0021` mapped the old `zev_owner` / `participant` / `guest` to `user` |
@@ -1025,7 +1025,8 @@ nothing extra since it is a plain column on the already-selected row.
 
 **Payload:** `{ username, email, first_name, last_name, role, password?, password2? }`
 
-Admin only. `password`/`password2` are **optional**. The admin console's "New
+Admin only. An `email` that another account already holds (any case) is a
+`400` on `email`; the same check applies to `PATCH /auth/users/{id}/` (§6.3). `password`/`password2` are **optional**. The admin console's "New
 account" action sends neither: `UserCreateSerializer.validate()` then generates
 a random 16-character password (`generate_temporary_password`) and stashes it
 on `self.generated_password` for the view to read — never persisted anywhere
@@ -1335,6 +1336,8 @@ shows its own error.
 
 **Endpoint:** `POST /api/v1/zev/zevs/create-with-owner/` (admin only)
 
+`owner.email` must not belong to an existing account (`400` on `owner.email`).
+
 **Payload:** `ZevCreateWithOwnerSerializer`:
 ```json
 {
@@ -1435,16 +1438,24 @@ On create:
 2a. Without `party`, a new party is created from the name, contact and address
    fields; with `party` (an existing party of the same ZEV, else 400
    `"The party belongs to another ZEV."`), the new participation shares it.
-3. Call `ensure_participant_account()`:
-   - Generates unique username from participant name/email.
-   - Creates `User` with `role=user`, an unusable password and `must_change_password=False`.
+3. Call `ensure_participant_account()`; the participant's email identifies the account:
+   - An account that already holds the address (any case) is linked as it is: its password, email and
+     name are untouched. Participant rows with one address, in one ZEV or several, share one account.
+     A non-admin cannot attach a row to such an account when it has its own login
+     (`requires_independent_login`): 400 on `user`.
+   - Otherwise generates a unique username from participant name/email and creates `User` with
+     `role=user`, an unusable password and `must_change_password=False`. A concurrent request that
+     creates the same address first is resolved by linking to its account.
    - Links user to participant, unless its managing party requires an access invitation first.
 4. Return participant data including `account_username` and `onboarding_status`; no password is returned.
 
 On update:
 1. Sync the linked user's `email`, `first_name`, and `last_name` via
    `sync_participant_user_fields()` — only for an account without its own
-   login. Accounts with independent access keep their authentication identity
+   login. Names are copied only while the row is the account's only participation. When the
+   address changed to one another account holds, the row is relinked to that account; when it
+   changed to a free address, a sole row moves its account there and a row sharing its
+   account with other rows gets an account of its own. Accounts with independent access keep their authentication identity
    (onboarding spec §4). The role is never written (#761).
 2. Edit guard: only admins may edit a participant record linked to an account
    requiring independent authentication (`zev.services.requires_independent_login`,

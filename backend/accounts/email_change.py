@@ -40,8 +40,15 @@ def _state_fingerprint(user: User) -> str:
     return salted_hmac(SALT, f"{user.pk}\x00{user.email}\x00{user.password}").hexdigest()[:16]
 
 
-def address_in_use(email: str, *, excluding: User) -> bool:
-    return User.objects.filter(email__iexact=email).exclude(pk=excluding.pk).exists()
+ADDRESS_IN_USE_MESSAGE = "An account with this email address already exists."
+
+
+def address_in_use(email: str, *, excluding: User | None = None) -> bool:
+    """Whether another account holds ``email``; the address identifies one account."""
+    accounts = User.objects.filter(email__iexact=email.strip())
+    if excluding is not None:
+        accounts = accounts.exclude(pk=excluding.pk)
+    return accounts.exists()
 
 
 def issue_token(user: User, new_email: str) -> str:

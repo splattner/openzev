@@ -72,6 +72,18 @@ class User(AbstractUser):
     session_version = models.PositiveIntegerField(default=0, editable=False)
     objects = OpenZevUserManager()
 
+    class Meta(AbstractUser.Meta):
+        constraints = [
+            # The address identifies the account: sign-in, OAuth matching, invitations
+            # and participant links all look it up, so no two accounts may share one.
+            models.UniqueConstraint(
+                models.functions.Lower("email"),
+                condition=~models.Q(email=""),
+                name="accounts_user_email_unique_ci",
+                violation_error_message="An account with this email address already exists.",
+            ),
+        ]
+
     @property
     def is_admin(self):
         return self.role == UserRole.ADMIN or self.is_superuser

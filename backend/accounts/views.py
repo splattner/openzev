@@ -790,7 +790,11 @@ def _is_pending_self_registration(user) -> bool:
 
 
 def _create_pending_user(email: str):
-    """Create the inactive account; retries a username taken by a concurrent registration."""
+    """Create the inactive account; retries a username taken by a concurrent registration.
+
+    Returns ``(user, created)``; ``created`` is false when a concurrent
+    registration for the same address got there first.
+    """
     local = slugify(email.split("@", 1)[0]).replace("-", ".") if "@" in email else ""
     base = local or "owner"
     for _ in range(3):
@@ -807,8 +811,11 @@ def _create_pending_user(email: str):
                     may_create_zev=True,
                     is_active=False,
                     must_change_password=True,
-                )
+                ), True
         except IntegrityError:
+            concurrent = User.objects.select_for_update().filter(email__iexact=email).first()
+            if concurrent is not None:
+                return concurrent, False
             if not User.objects.filter(username=username).exists():
                 raise
     raise IntegrityError(f"Could not find a free username for a new registration ({base!r})")
@@ -818,9 +825,10 @@ def _prepare_signup_link(email: str):
     """Create a signup credential atomically, serialized with verification and cancellation."""
     with transaction.atomic():
         user = User.objects.select_for_update().filter(email__iexact=email).first()
-        if user is None:
-            user = _create_pending_user(email)
-        elif not _is_pending_self_registration(user):
+        created = user is None
+        if created:
+            user, created = _create_pending_user(email)
+        if not created and not _is_pending_self_registration(user):
             return None
         previous_ids = list(user.email_verification_tokens.filter(
             purpose=EmailVerificationToken.Purpose.SIGNUP, consumed_at__isnull=True,

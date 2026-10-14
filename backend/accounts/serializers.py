@@ -9,7 +9,7 @@ from django.utils.text import slugify
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from urllib.parse import urlparse
-from . import mfa
+from . import email_change, mfa
 from .jwt_utils import add_custom_claims
 from .models import ApiKey, AppSettings, FeatureFlag, OAuthProvider, SocialAccount, TotpDevice, User, UserRole, VatRate, WebAuthnCredential
 from zev.models import Zev
@@ -81,6 +81,11 @@ class UserSerializer(serializers.ModelSerializer):
         raise serializers.ValidationError(
             "You can only set a community you belong to as the default."
         )
+
+    def validate_email(self, value):
+        if value and email_change.address_in_use(value, excluding=self.instance):
+            raise serializers.ValidationError(email_change.ADDRESS_IN_USE_MESSAGE)
+        return value
 
     class Meta:
         model = User
@@ -217,6 +222,11 @@ class UserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "username", "email", "first_name", "last_name", "password", "password2", "role"]
+
+    def validate_email(self, value):
+        if value and email_change.address_in_use(value):
+            raise serializers.ValidationError(email_change.ADDRESS_IN_USE_MESSAGE)
+        return value
 
     def validate(self, attrs):
         password = attrs.pop("password", None)
