@@ -2293,7 +2293,7 @@
 <li>Backend running? <code>docker compose ps</code></li>
 <li>Check logs: <code>docker compose logs app</code> (<code>backend</code> on the two-container source build)</li>
 <li>Database connected? <code>docker compose logs db</code></li>
-<li>More troubleshooting: Check Redis for celery</li>
+<li>More troubleshooting: Check Valkey for celery</li>
 </ol>
 <h2 id="authentication--access">Authentication &amp; Access<a class="headerlink" href="#authentication--access" title="Permanent link">&para;</a></h2>
 <h3 id="cant-login">Can't Login<a class="headerlink" href="#cant-login" title="Permanent link">&para;</a></h3>
@@ -2500,7 +2500,7 @@ A common cause is the Celery worker not running — check <code>docker compose l
 <p><strong>Fix:</strong></p>
 <ol>
 <li>Restart worker service: <code>docker compose restart worker</code></li>
-<li>Check Redis: <code>docker compose logs redis</code></li>
+<li>Check Valkey: <code>docker compose logs valkey</code></li>
 <li>Check worker and scheduler status under <strong>Platform → Overview → System health</strong></li>
 </ol>
 <h2 id="getting-help">Getting Help<a class="headerlink" href="#getting-help" title="Permanent link">&para;</a></h2>

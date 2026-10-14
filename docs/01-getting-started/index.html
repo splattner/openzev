@@ -2232,7 +2232,7 @@ installing, <a href="#creating-the-first-admin-account">create the first admin a
   <code>podman compose</code>). Building from source also needs a copy of this repository
   (<code>git clone https://github.com/splattner/openzev.git</code>)</li>
 <li>For Kubernetes: a cluster, <code>helm</code>, <code>kubectl</code>, and a PostgreSQL database and
-  Redis instance the cluster can reach</li>
+  Valkey (or Redis) instance the cluster can reach</li>
 <li>For a public instance: a domain name, TLS termination (a reverse proxy or
   ingress with a certificate), and an SMTP account for outgoing mail</li>
 <li>Basic familiarity with the terminal</li>
@@ -2255,7 +2255,7 @@ docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> 
 <li><strong>Frontend (UI):</strong> http://localhost:8080 (dev stack: http://localhost:5173)</li>
 <li><strong>Backend API:</strong> http://localhost:8080/api/v1/ (dev stack: http://localhost:8001)</li>
 <li><strong>Database:</strong> localhost:5432 (PostgreSQL, dev stack only)</li>
-<li><strong>Message Broker:</strong> localhost:6379 (Redis, dev stack only)</li>
+<li><strong>Message Broker:</strong> localhost:6379 (Valkey, dev stack only)</li>
 </ul>
 <p>To stop the dev stack:</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.dev.yml<span class="w"> </span>down
@@ -2267,10 +2267,10 @@ demo seed ships well-known passwords.</p>
 OpenZEV images — nothing is built on your server. It starts the application
 (<code>app</code>: nginx serving the frontend and proxying <code>/api/</code> to Django/gunicorn in
 the same container), a Celery worker, one Celery Beat scheduler, PostgreSQL and
-Redis on one host. Only port <code>8080</code> is published; PostgreSQL and Redis are
+Valkey on one host. Only port <code>8080</code> is published; PostgreSQL and Valkey are
 reachable only on the compose network. The images are signed with cosign and
 come with an SBOM.
-Keep the shared Redis cache supplied by Compose: registration reservations and
+Keep the shared Valkey cache supplied by Compose: registration reservations and
 throttles must be shared across backend workers; an in-memory cache is local to
 each process.</p>
 <h3 id="1-download-the-release-files">1. Download the release files<a class="headerlink" href="#1-download-the-release-files" title="Permanent link">&para;</a></h3>
@@ -2486,6 +2486,16 @@ docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> 
 </code></pre></div>
 </li>
 </ul>
+<p>When upgrading from a release that shipped Redis, the message broker and cache
+service is now Valkey, a Redis-compatible server, and the compose service is
+called <code>valkey</code> instead of <code>redis</code>. Nothing needs to be migrated: the broker
+and cache hold no data you need to keep (queued tasks are short-lived and the
+cache refills itself), and the connection URLs keep the <code>redis://</code> scheme.
+Run <code>docker compose up -d --remove-orphans</code> once to remove the old <code>redis</code>
+container. If you run your own Redis instead of the bundled one, you do not
+have to replace it. On Kubernetes, <code>valkey.url</code> / <code>valkey.cacheUrl</code> replace
+<code>redis.url</code> / <code>redis.cacheUrl</code> in the Helm values; the old keys keep working
+when set (see the <a href="https://github.com/splattner/openzev/blob/main/charts/openzev/README.md#upgrading-from-redis">chart README</a>).</p>
 <p>When upgrading to the participant-link protection, existing independent accounts
 keep their passwords, sessions and API keys. If the update happens between the
 password and two-factor steps, restart sign-in; the old challenge is no longer
@@ -2551,14 +2561,14 @@ command again.</p>
 <h2 id="production-on-kubernetes-helm">Production on Kubernetes (Helm)<a class="headerlink" href="#production-on-kubernetes-helm" title="Permanent link">&para;</a></h2>
 <p>The Helm chart deploys the frontend, backend, a Celery worker, one Celery Beat
 scheduler, an Ingress and a volume for invoice files. It does <strong>not</strong> deploy
-PostgreSQL or Redis — provide both yourself (a managed service or a separate
+PostgreSQL or Valkey (Redis works too) — provide both yourself (a managed service or a separate
 chart).</p>
 <ol>
 <li>Create secrets for the database URL, Django <code>SECRET_KEY</code>, the SMTP password
    and the encryption keys (generate the keys as shown in
    <a href="#2-configure-env">step 2</a> above).</li>
 <li>Write a <code>values-prod.yaml</code> with your domain, trusted origins, passkey
-   domain, database and Redis endpoints, SMTP settings and ingress. The
+   domain, database and Valkey endpoints, SMTP settings and ingress. The
    <a href="https://github.com/splattner/openzev/blob/main/charts/openzev/README.md#example-values">chart README</a> has a
    complete example — start from it.</li>
 <li>

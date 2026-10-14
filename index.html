@@ -262,7 +262,7 @@
       <article class="path">
         <span class="eyebrow">Selbst hosten</span>
         <h3>Docker Compose</h3>
-        <p>Der komplette Stack — Frontend, API, Celery-Worker und -Beat, PostgreSQL und Redis — ohne Demo-Daten.</p>
+        <p>Der komplette Stack — Frontend, API, Celery-Worker und -Beat, PostgreSQL und Valkey — ohne Demo-Daten.</p>
 <pre><span class="p">docker compose up -d --build</span>
 
 <span class="c"># frontend  :8080</span>
@@ -274,7 +274,7 @@
       <article class="path">
         <span class="eyebrow">Kubernetes</span>
         <h3>Kubernetes mit Helm</h3>
-        <p>Das Chart deployt Frontend, Backend, Worker und Beat in Ihren Cluster, mit Ingress und Media-PVC. PostgreSQL und Redis bringen Sie selbst mit.</p>
+        <p>Das Chart deployt Frontend, Backend, Worker und Beat in Ihren Cluster, mit Ingress und Media-PVC. PostgreSQL und Valkey bringen Sie selbst mit.</p>
 <pre><span class="p">helm repo add openzev \
   https://splattner.github.io/openzev</span>
 <span class="p">helm repo update</span>
@@ -301,7 +301,7 @@
     <dl class="stack-row">
       <div class="stack-item"><dt>Backend</dt><dd>Django, Django REST Framework, SimpleJWT</dd></div>
       <div class="stack-item"><dt>Frontend</dt><dd>React, TypeScript, Vite, React Query, i18next</dd></div>
-      <div class="stack-item"><dt>Async</dt><dd>Celery-Worker und -Beat auf Redis</dd></div>
+      <div class="stack-item"><dt>Async</dt><dd>Celery-Worker und -Beat auf Valkey</dd></div>
       <div class="stack-item"><dt>Daten</dt><dd>PostgreSQL, MariaDB oder SQLite</dd></div>
       <div class="stack-item"><dt>API</dt><dd>OpenAPI-Schema mit Swagger und ReDoc</dd></div>
       <div class="stack-item"><dt>Betrieb</dt><dd>Docker Compose oder Helm auf Kubernetes</dd></div>

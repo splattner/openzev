@@ -2702,9 +2702,9 @@ snapshot of platform infrastructure:</p>
 <ul>
 <li><strong>Database</strong> — engine (PostgreSQL/SQLite) and size; <code>degraded</code> if the probe
   fails</li>
-<li><strong>Celery</strong> — number of workers responding to a ping and the Redis queue
-  depth; <code>unknown</code> means no broker is reachable (local development without
-  Redis reports unknown, which is a valid state, not an outage)</li>
+<li><strong>Celery</strong> — number of workers responding to a ping and the broker queue
+  depth; <code>unknown</code> means no broker is reachable (local development without a
+  broker reports unknown, which is a valid state, not an outage)</li>
 <li><strong>Email</strong> — the configured backend mode (SMTP, console, in-memory, custom)</li>
 <li><strong>Energy data</strong> — whether participants' <a href="../20-energy-data/">own energy data</a> is
   switched on, how many sources are configured (disconnected ones included),
