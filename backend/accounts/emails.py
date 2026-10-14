@@ -49,3 +49,23 @@ def send_email_change_notice(old_email: str, new_email: str) -> None:
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[old_email],
     ).send(fail_silently=True)
+
+
+def send_password_reset_link(email: str, reset_url: str) -> None:
+    from .password_reset import LIFETIME_SECONDS
+
+    EmailMessage(
+        subject="Reset your OpenZEV password",
+        body=(
+            "Hello,\n\n"
+            "Someone asked to reset the password of the OpenZEV account for this address.\n"
+            "To choose a new password, open the link below:\n\n"
+            f"{reset_url}\n\n"
+            f"This link is valid for {LIFETIME_SECONDS // 3600} hour and works once. "
+            "You will be signed out everywhere and can then sign in with the new password.\n\n"
+            "If you did not ask for this, ignore this email — your password stays as it is.\n\n"
+            "Best regards,\nOpenZEV"
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[email],
+    ).send(fail_silently=False)

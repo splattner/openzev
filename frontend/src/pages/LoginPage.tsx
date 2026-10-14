@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AppFooter } from '../components/AppFooter'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
 import { useAuth } from '../lib/auth'
@@ -297,6 +297,10 @@ export function LoginPage() {
                         <button className="button" type="submit" disabled={loading}>
                             {loading ? t('common.loading') : t('auth.submit')}
                         </button>
+
+                        <Link to="/forgot-password" className="button button-ghost" style={{ textAlign: 'center' }}>
+                            {t('auth.forgot.link')}
+                        </Link>
 
                         {(passkeySupported || oauthProviders.length > 0) && (
                             <>

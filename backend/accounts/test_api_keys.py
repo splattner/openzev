@@ -353,6 +353,20 @@ class ApiKeyScopeTests(TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_a_key_cannot_request_or_complete_a_password_reset(self):
+        from . import password_reset
+
+        requested = self.client.post("/api/v1/auth/password-reset/", {"email": self.victim.email}, format="json")
+        completed = self.client.post(
+            "/api/v1/auth/password-reset/confirm/",
+            {"token": password_reset.issue_token(self.victim), "new_password": "hijacked-pw-9182"},
+            format="json",
+        )
+
+        self.assertEqual((requested.status_code, completed.status_code), (403, 403))
+        self.victim.refresh_from_db()
+        self.assertTrue(self.victim.check_password("pass1234"))
+
     def test_a_key_cannot_impersonate(self):
         response = self.client.post(f"/api/v1/auth/users/{self.victim.pk}/impersonate/")
         self.assertEqual(response.status_code, 403)

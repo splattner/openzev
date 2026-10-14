@@ -240,6 +240,18 @@ export async function confirmEmailChange(token: string): Promise<{ detail: strin
   return data
 }
 
+/** Ask for a password-reset mail. The answer is the same whether or not the address has an account. */
+export async function requestPasswordReset(email: string): Promise<{ detail: string }> {
+  const { data } = await api.post<{ detail: string }>('/auth/password-reset/', { email })
+  return data
+}
+
+/** Set a new password with an emailed link. Unauthenticated: the token is the authority; no session is started. */
+export async function confirmPasswordReset(token: string, newPassword: string): Promise<{ detail: string }> {
+  const { data } = await api.post<{ detail: string }>('/auth/password-reset/confirm/', { token, new_password: newPassword })
+  return data
+}
+
 /** Sign out every session but the one in use. */
 export async function revokeOtherSessions(): Promise<{ detail: string }> {
   const { data } = await api.post<{ detail: string }>('/auth/me/sessions/revoke/')

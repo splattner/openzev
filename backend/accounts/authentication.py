@@ -108,6 +108,8 @@ MFA_ENROLMENT_EXEMPT_URL_NAMES: dict[str, frozenset[str] | None] = {
     "set-initial-password": None,
     "email-change-request": None,
     "email-change-confirm": None,
+    "password-reset-request": None,
+    "password-reset-confirm": None,
     "sessions-revoke-own": None,
     # The enrolment ceremony itself.
     "mfa-totp-device": None,

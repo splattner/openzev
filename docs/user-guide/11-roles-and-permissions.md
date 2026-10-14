@@ -520,7 +520,7 @@ access under **ZEV settings → People & access**.
 **Possible causes:**
 - The onboarding link was never used, has expired, or was revoked
 - User account deactivated
-- Password forgotten — there is no self-service password reset
+- Password forgotten — the user can request a reset link with **Forgot your password?** on the sign-in page
 
 **Fix:**
 1. Check the account under **Platform → Accounts → Users**: is it active, and
@@ -528,9 +528,11 @@ access under **ZEV settings → People & access**.
 2. **Participant-only account:** a manager of the community sends or copies the onboarding link
    again from the **⋯** menu on the participant's row. It signs them in, and they
    choose a new password.
-3. **Account with independent access:** use its external sign-in provider, if
-   configured. For a forgotten password, someone with server access
-   sets a new one on the command line (the user then signs in with it; the
+3. **Account with a password:** the user chooses **Forgot your password?** on the
+   sign-in page and follows the emailed link (needs working
+   [email delivery](10-email-configuration.md)). Without email, or for an account that
+   only uses an external sign-in provider, someone with server access
+   sets a new password on the command line (the user then signs in with it; the
    service is `backend` instead of `app` in a two-container source build):
 
    ```bash

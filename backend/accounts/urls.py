@@ -35,6 +35,8 @@ from .views_security import (
     AdminRevokeSessionsView,
     EmailChangeConfirmView,
     EmailChangeRequestView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
     RevokeOwnSessionsView,
 )
 from .views_system import SystemHealthView
@@ -45,6 +47,10 @@ urlpatterns = [
     path("token/mfa/", TokenMfaView.as_view(), name="token-mfa"),
     path("logout/", logout_view, name="logout"),
     path("register/", register, name="register"),
+    # Absent from ACCOUNTS_API_KEY_ALLOWLIST (default-deny): a key must not be able to
+    # request or complete a reset, i.e. take over its owner's password.
+    path("password-reset/", PasswordResetRequestView.as_view(), name="password-reset-request"),
+    path("password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
     path("verify-email/", verify_email, name="verify-email"),
     path("users/", UserListCreateView.as_view(), name="user-list-create"),
     path("users/<int:pk>/", UserDetailView.as_view(), name="user-detail"),

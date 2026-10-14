@@ -63,6 +63,12 @@ EVENTS: dict[str, tuple[str, str, str]] = {
         "The password of your account was changed. Your other devices were signed out.",
         SELF,
     ),
+    "password_reset": (
+        "Your OpenZEV password was reset",
+        "The password of your account was reset with an emailed link. Every device was signed out. "
+        "Two-factor authentication was not changed.",
+        SELF,
+    ),
     "mfa_reset_by_admin": (
         "Two-factor authentication was reset on your OpenZEV account",
         "An administrator reset two-factor authentication on your account. Every passkey, "

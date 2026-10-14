@@ -55,19 +55,26 @@ Development stack (`docker-compose.dev.yml`) uses port 8001 instead.
 | "Permission denied" | Your account has no access to that community, or only view access | Ask a manager of the ZEV (or an admin) for access under **ZEV settings → People & access** |
 | Signed out on every device without logging out | Your password or email was changed, your two-factor was reset, or someone chose **Sign out everywhere** for your account | Sign in again; if you did not expect it, change your password and check with your administrator |
 | Email-change link says it "does not work" | The link was already used, is older than 24 hours, or your password or address changed after you asked | Request the change again under **My Account → Profile** |
+| Password-reset link says it "does not work" | The link was already used, is older than one hour, or your password or address changed after you asked | Request a new one with **Forgot your password?** on the sign-in page |
 | "429 Too many requests" | Login/registration attempts exceeded the per-IP rate limit | Wait a while (check the `Retry-After` header) before trying again |
 
 ### Forgot Password
 
-There is no "forgot password" link on the login page.
+Choose **Forgot your password?** under the sign-in form and enter the email address of your
+account. If that account has a password, you receive a link that is valid for one hour and works
+once. Opening it lets you choose a new password; you are signed out on every device and then sign
+in again with it. If you use a second factor (authenticator app or passkey), you are still asked
+for it when you sign in: the reset never replaces it.
 
-- **Participant-only accounts:** ask a manager of the community to send the onboarding link again
-  (**Participants → ⋯ → Send onboarding link**). It signs you in, and you
-  choose a new password. If your invoice has a participant QR code, you can
-  also request a sign-in link from the page it opens.
-- **Accounts with independent access:** use their external sign-in provider or
-  ask someone with server access to set a new password — see
-  [Roles and Permissions → "User cannot login"](11-roles-and-permissions.md#user-cannot-login).
+The page answers the same whether or not the address has an account, so a mail that does not
+arrive means one of: the address has no account, the account has no password (see below), the
+mail is in spam, or a link was already sent in the last 15 minutes (use that one, or wait).
+
+- **Participant-only accounts without a password:** ask a manager of the community to send the
+  onboarding link again (**Participants → ⋯ → Send onboarding link**). It signs you in, and you
+  choose a password. If your invoice has a participant QR code, you can also request a sign-in
+  link from the page it opens.
+- **Accounts that sign in with an external provider only:** use that provider.
 
 ### "Unauthorized" / "403 Forbidden" Errors
 

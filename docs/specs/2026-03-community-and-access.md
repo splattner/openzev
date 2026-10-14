@@ -751,6 +751,48 @@ under React StrictMode). The mails are fixed system messages
 (`accounts/emails.py`), deliberately not `EMAIL_TEMPLATE_DEFAULTS` entries: a
 security notice an admin can reword can be made to stop saying what happened.
 
+### 5.6d Password reset
+
+Recovery for an account whose password is lost (#1006), by an emailed one-time link.
+
+**Request:** `POST /api/v1/auth/password-reset/` `{ email }` (AllowAny, `PasswordResetRequestView`,
+`AuthPasswordResetThrottle`, scope `auth_password_reset`, per IP, `10/hour`,
+`AUTH_PASSWORD_RESET_THROTTLE_RATE`). A malformed address is `400`. Anything else is the same
+`202 {detail: "If that address belongs to an account with a password, a reset link has been sent."}`,
+whatever happened. A per-address mail cooldown (15 minutes, the cache slot `register` uses, key
+`password-reset-mail:<sha256(lowercased address)>`) is taken **before** the account is looked up, so it
+behaves the same for every address; an unreachable cache gives the neutral answer and no mail. The address
+is matched case-insensitively against the unique `User.email`. A link is sent only when
+`password_reset.can_reset(user)` holds: active, has an address and a **usable password**. Participant-only
+accounts without a password, OAuth-only accounts and inactive (pending signup or invitation) accounts get
+the neutral answer and nothing else. A participant who has chosen a password can be reset like anyone
+else. A mail failure is logged, releases the cooldown and returns the same answer. A sent link is audited
+`password.reset_requested` (no actor: the requester is unauthenticated).
+
+**Token:** `accounts/password_reset.py`, modelled on `email_change.py`: a `django.core.signing` token (salt
+`accounts.password-reset`, 1 h) carrying `{u: user id, f: fingerprint}`, the fingerprint a keyed MAC of the
+account's *current* address and password hash. Using it changes the hash, so it is single-use without a
+table; a password or address change, deactivation, or losing the password also kills it. The link is
+`{FRONTEND_URL}/reset-password?token=…`.
+
+**Confirm:** `POST /api/v1/auth/password-reset/confirm/` `{ token, new_password }` (AllowAny,
+`AuthVerifyThrottle`). An unusable token is `400 "This link is invalid or has expired."`; a missing
+or weak password (`validate_password` with the account) is `400 {detail}` and leaves the token valid.
+Otherwise, under a row lock that re-checks address and password hash: set the password, clear
+`must_change_password`, **revoke all sessions** (§5.6b), revoke the account's participant onboarding
+links, audit `password.reset` (actor = the account, `metadata.onboarding_links_revoked`), and send the
+`password_reset` security notice (§5.6c). **No session is minted and no second factor is touched**: the
+person signs in normally and meets the TOTP / passkey challenge.
+
+Both routes are absent from `ACCOUNTS_API_KEY_ALLOWLIST` (default-deny) and exempt from
+`enforce_mfa_enrolment` (`MFA_ENROLMENT_EXEMPT_URL_NAMES`), so an overdue account can still recover.
+
+Frontend: "Forgot your password?" on `LoginPage` → public `/forgot-password` (`ForgotPasswordPage`, same
+success text for every address) and `/reset-password?token=` (`ResetPasswordPage`; new password twice,
+success points at sign-in). i18n keys `auth.forgot.*` and `auth.reset.*` in all four locales.
+
+Tests: `accounts/test_password_reset.py`; `test_api_keys.py::…::test_a_key_cannot_request_or_complete_a_password_reset`.
+
 ### 5.6b Session revocation ("sign out everywhere")
 
 Tokens are stateless JWTs, so nothing server-side lists "sessions". Instead
@@ -788,6 +830,7 @@ explicit one:
 | Trigger | Effect |
 |---|---|
 | Password change / initial password set | other sessions end; caller keeps theirs |
+| Password reset confirmed (§5.6d) | all sessions end |
 | Email change confirmed | all sessions end |
 | Admin two-factor reset (`DELETE /users/{id}/mfa/`) | target's sessions end |
 | Admin deactivates an account (`PATCH /users/{id}/` `is_active: false`) | sessions end — so reactivating later does not bring back unexpired tokens |
@@ -823,6 +866,7 @@ an admin can reword can be made to stop saying what happened).
 | `DELETE /me/mfa/totp/` (only if the device was confirmed) | `totp_removed` | — |
 | `POST /me/mfa/recovery-codes/` | `recovery_codes_regenerated` | — |
 | `POST /me/change-password/` | `password_changed` | — |
+| `POST /password-reset/confirm/` | `password_reset` | — |
 | `DELETE /users/{id}/mfa/` (only if something was removed) | `mfa_reset_by_admin` | — |
 | `POST /users/{id}/revoke-sessions/` | `sessions_revoked_by_admin` | — |
 

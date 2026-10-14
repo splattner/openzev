@@ -2,10 +2,14 @@
 out. Spec: docs/specs/2026-03-community-and-access.md §5.6a and §5.6b; ADR 0022.
 """
 
+import hashlib
 import logging
 
 from django.conf import settings
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
+from redis.exceptions import RedisError
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -14,12 +18,15 @@ from rest_framework.views import APIView
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, record_audit_event
 
-from . import email_change, emails, notifications
+from zev import onboarding as zev_onboarding
+
+from . import email_change, emails, notifications, password_reset
 from .jwt_utils import impersonator_of
 from .models import User
 from .permissions import IsAdmin
 from .session_revocation import keep_current_session, lock_current_session, revoke_sessions
-from .throttling import AuthEmailChangeThrottle, AuthVerifyThrottle
+from .throttling import AuthEmailChangeThrottle, AuthPasswordResetThrottle, AuthVerifyThrottle
+from .views import _release_mail_slot, _reserve_mail_slot
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +169,114 @@ class EmailChangeConfirmView(APIView):
             actor=locked, changes=build_diff({"email": old_email}, {"email": new_email}, ["email"]),
         )
         return Response({"detail": "Email address updated. Sign in again with the new address."})
+
+
+PASSWORD_RESET_REQUEST_DETAIL = "If that address belongs to an account with a password, a reset link has been sent."
+
+
+class PasswordResetRequestView(APIView):
+    """POST /password-reset/ — ``{email}``.
+
+    Always the same 202 and body, whether or not the address has an account that
+    can be reset (see ``password_reset.can_reset``), a mail was sent, or sending
+    failed: the answer must not tell a stranger which addresses are registered.
+    The per-address cooldown is taken before the account is looked up, so it
+    behaves the same for every address too. Mints no session.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [AuthPasswordResetThrottle]
+
+    def post(self, request, *args, **kwargs):
+        if not isinstance(request.data, dict):
+            return Response({"detail": "Expected an object."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            email = serializers.EmailField(max_length=User._meta.get_field("email").max_length).run_validation(
+                str(request.data.get("email") or "").strip()
+            )
+        except serializers.ValidationError as exc:
+            return Response({"email": exc.detail}, status=status.HTTP_400_BAD_REQUEST)
+
+        accepted = Response({"detail": PASSWORD_RESET_REQUEST_DETAIL}, status=status.HTTP_202_ACCEPTED)
+        key = "password-reset-mail:" + hashlib.sha256(email.lower().encode()).hexdigest()
+        try:
+            nonce = _reserve_mail_slot(key)
+        except (RedisError, OSError):
+            logger.exception("Could not reserve a password-reset mail slot")
+            return accepted
+        if nonce is None:
+            return accepted
+
+        user = User.objects.filter(email__iexact=email).first()
+        if not password_reset.can_reset(user):
+            return accepted
+
+        reset_url = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={password_reset.issue_token(user)}"
+        try:
+            emails.send_password_reset_link(user.email, reset_url)
+        except Exception:
+            logger.exception("Could not send the password-reset link for user %s", user.pk)
+            _release_mail_slot(key, nonce)
+            return accepted
+
+        # Nobody is signed in here, so no actor: the event is about the account.
+        _audit(
+            request, "password.reset_requested", user,
+            f"Password reset link sent to {user.email}.",
+        )
+        return accepted
+
+
+class PasswordResetConfirmView(APIView):
+    """POST /password-reset/confirm/ — ``{token, new_password}``.
+
+    Unauthenticated by design, like the email-change link: it is opened from a
+    mailbox, possibly on another device, and the token is the authority. Sets the
+    password and signs the account out everywhere, but mints **no** session: the
+    person signs in again and meets their second factor like anyone else. Nothing
+    here touches TOTP, passkeys or recovery codes.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [AuthVerifyThrottle]
+
+    def post(self, request, *args, **kwargs):
+        invalid = Response({"detail": "This link is invalid or has expired."}, status=status.HTTP_400_BAD_REQUEST)
+        if not isinstance(request.data, dict):
+            return Response({"detail": "Expected an object."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user = password_reset.resolve_token(str(request.data.get("token") or "").strip())
+        except password_reset.PasswordResetError:
+            return invalid
+
+        new_password = request.data.get("new_password")
+        if not isinstance(new_password, str) or not new_password:
+            return Response({"detail": "A new password is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as exc:
+            # The token is untouched: the password hash it is bound to is unchanged.
+            return Response({"detail": " ".join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            # Re-check under a row lock: two opens of the same link must not both
+            # apply, and the account may have changed since resolve_token read it.
+            locked = User.objects.select_for_update().get(pk=user.pk)
+            if locked.password != user.password or locked.email != user.email or not password_reset.can_reset(locked):
+                return invalid
+            locked.set_password(new_password)
+            locked.must_change_password = False
+            locked.save(update_fields=["password", "must_change_password"])
+            revoke_sessions(locked)
+            links_revoked = zev_onboarding.revoke_active_for_user(locked)
+
+        _audit(
+            request, "password.reset", locked,
+            f"Reset the password of {locked.email or locked.username} with an emailed link.",
+            actor=locked, metadata={"onboarding_links_revoked": links_revoked},
+        )
+        notifications.notify(locked, "password_reset", request=request)
+        return Response({"detail": "Password updated. Sign in with the new password."})
 
 
 class RevokeOwnSessionsView(APIView):

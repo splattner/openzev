@@ -82,6 +82,13 @@ class AuthVerifyThrottle(AuthRateThrottle):
     scope = "auth_verify"
 
 
+class AuthPasswordResetThrottle(AuthRateThrottle):
+    """Per-IP budget on asking for a password-reset mail. The per-address mail
+    cooldown bounds one mailbox; this bounds one caller sweeping many."""
+
+    scope = "auth_password_reset"
+
+
 class AuthOAuthInitiateThrottle(AuthRateThrottle):
     scope = "auth_oauth_initiate"
 

@@ -36,6 +36,8 @@ const PublicInvoicePage = lazy(async () => ({ default: (await import('../pages/P
 const ParticipantsPage = lazy(async () => ({ default: (await import('../pages/ParticipantsPage')).ParticipantsPage }))
 const TariffsPage = lazy(async () => ({ default: (await import('../pages/TariffsPage')).TariffsPage }))
 const ConfirmEmailChangePage = lazy(async () => ({ default: (await import('../pages/ConfirmEmailChangePage')).ConfirmEmailChangePage }))
+const ForgotPasswordPage = lazy(async () => ({ default: (await import('../pages/ForgotPasswordPage')).ForgotPasswordPage }))
+const ResetPasswordPage = lazy(async () => ({ default: (await import('../pages/ResetPasswordPage')).ResetPasswordPage }))
 const VerifyEmailPage = lazy(async () => ({ default: (await import('../pages/VerifyEmailPage')).VerifyEmailPage }))
 const ZevSettingsTabRoute = lazy(async () => ({ default: (await import('../pages/ZevSettingsPage')).ZevSettingsTabRoute }))
 const OAuthCallbackPage = lazy(async () => ({ default: (await import('../pages/OAuthCallbackPage')).OAuthCallbackPage }))
@@ -53,6 +55,9 @@ export function AppRoutes() {
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         {/* Link emailed to a new address: public, the token is the authority. */}
         <Route path="/confirm-email-change" element={<ConfirmEmailChangePage />} />
+        {/* Password recovery: public, the emailed token is the authority. */}
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
         {/* Public (QR on invoice): no session, no app chrome. */}
         <Route path="/i/:prefix" element={<PublicInvoicePage />} />

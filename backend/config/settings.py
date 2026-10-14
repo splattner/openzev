@@ -182,6 +182,7 @@ REST_FRAMEWORK = {
         "auth_refresh": env("AUTH_REFRESH_THROTTLE_RATE", default="60/hour"),
         "auth_register": env("AUTH_REGISTER_THROTTLE_RATE", default="10/hour"),
         "auth_verify": env("AUTH_VERIFY_THROTTLE_RATE", default="30/hour"),
+        "auth_password_reset": env("AUTH_PASSWORD_RESET_THROTTLE_RATE", default="10/hour"),
         "auth_oauth_initiate": env("AUTH_OAUTH_INITIATE_THROTTLE_RATE", default="60/hour"),
         "auth_oauth_exchange": env("AUTH_OAUTH_EXCHANGE_THROTTLE_RATE", default="40/hour"),
         # Per-ACCOUNT (not per-IP) budget on the MFA challenge exchange —

@@ -75,6 +75,7 @@ Other ways access is *attached* to an existing account:
 | OAuth / OIDC | `POST /auth/oauth/login/<slug>/` → provider → `GET /auth/oauth/callback/<slug>/` → `POST /auth/oauth/token-exchange/` | Providers are configured by an admin (`/auth/oauth/providers/config/`). State lives 10 minutes, the exchange code 60 seconds. Linking an identity to a signed-in account: `POST /auth/oauth/link/<slug>/`; unlinking: `DELETE /auth/me/social-accounts/<id>/`. |
 | Magic link | `POST /public/magic-link/request/` and `…/consume/` (`accounts/magic_links.py`) | Reached from an invoice link. The requester never types an address; the mail goes to the address on file. Single use, 15 minutes, a new request supersedes the old one. |
 | Onboarding link | `POST /public/onboarding/consume/` (`zev/onboarding.py`) | Sent or copied by a manager. **Reusable, not consumed**, 30 days, revocable. Frontend route `/join/:prefix?s=…`. |
+| Password reset link | `POST /auth/password-reset/` and `…/confirm/` | Sets a password only; starts no session (section 5.9). |
 | Email verification | `POST /auth/verify-email/` | Signup (24 h) and invitation (7 days) tokens; consuming one activates the account and signs it in. |
 | API key | `Authorization: Api-Key ozv_…` | Created at `POST /auth/me/api-keys/`. Default expiry `API_KEY_DEFAULT_EXPIRY_DAYS` (365). Optional `read_only`. |
 | MCP | `Authorization: Api-Key ozv_…` or `Bearer ozv_…` on `/api/v1/mcp/` | Same keys, `McpApiKeyAuthentication`. Gated by the `mcp_server_enabled` feature flag. |
@@ -199,12 +200,15 @@ admin, admin MFA reset, and promotion. Reactivating an account does not revive o
 
 ### 5.9 Recovery
 
-- There is **no forgot-password flow** ([#1006](https://github.com/splattner/openzev/issues/1006);
-  also raised as a follow-up in the review of [#1003](https://github.com/splattner/openzev/pull/1003),
-  which adds link-based recovery for participant-only accounts only).
-  A user who has lost their password and has no passkey or OAuth identity depends on an
-  operator: `createsuperuser`, the Django admin at `/admin/` (mounted only when
-  `ADMIN_ENABLED`), or recreating the account.
+- **Forgot password** ([#1006](https://github.com/splattner/openzev/issues/1006)):
+  `POST /auth/password-reset/` emails a signed one-hour link to an active account with a usable
+  password, and `POST /auth/password-reset/confirm/` sets the new password, clears
+  `must_change_password`, revokes all sessions and the account's onboarding links, and mints no
+  session, so a second factor is still asked for at the next sign-in. Same neutral answer for every
+  address; per-address cooldown and per-IP throttle. Field-level detail:
+  [community and access §5.6d](2026-03-community-and-access.md#56d-password-reset).
+  Participant-only accounts without a password, OAuth-only and inactive accounts get no mail
+  and stay on their own recovery (links, provider).
 - Admins can reset a user's second factor (`DELETE /auth/users/<id>/mfa/`), which bumps the
   user's sessions. Recovery codes (ten, single use) are issued with the first factor.
 
@@ -224,7 +228,7 @@ audited as `user.delete` with status `denied`.
 
 Sign-in and account events are recorded in the `auth` category, including `auth.login`
 (with `method`), `auth.login_failed`, `auth.mfa.challenge_failed`, `auth.mfa.enrolled`,
-`auth.mfa.enrolment_required`, `email.verify`, `password.set_initial`, `user.create`,
+`auth.mfa.enrolment_required`, `email.verify`, `password.set_initial`, `password.reset_requested`, `password.reset`, `user.create`,
 `user.update`, `user.delete`, `oauth.login`, `oauth.provision`, `oauth.provision_refused`,
 `oauth.link`, `oauth.link_refused`, `oauth.unlink`, `oauth.login_failed`,
 `invoice_link.magic_link_requested`, `invoice_link.magic_link_consumed`,
@@ -236,7 +240,6 @@ identifier in the event.
 
 | Gap | Where | Issue |
 |---|---|---|
-| No forgot-password flow for password accounts | `accounts/urls.py` | [#1006](https://github.com/splattner/openzev/issues/1006) (see also [#1003](https://github.com/splattner/openzev/pull/1003)) |
 | OAuth provisioning ignores the self-registration flag; no domain restriction | `views_oauth.py` | not filed |
 | Onboarding link is a reusable bearer credential for 30 days | `zev/onboarding.py` | by design, see [participant onboarding link](2026-09-participant-onboarding-link.md) |
 
