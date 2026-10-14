@@ -12,6 +12,7 @@ mitigating it — there is no address field to probe.
 import logging
 import secrets
 
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
@@ -31,7 +32,7 @@ def account_for_participant(participant):
 
     try:
         return link_account_for(participant)
-    except LinkRefused:
+    except (LinkRefused, ObjectDoesNotExist, ValidationError):
         return None
 
 

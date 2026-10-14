@@ -6,6 +6,7 @@ token is a reusable bearer link rather than a one-shot magic link.
 """
 import logging
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 
 from rest_framework import status
@@ -26,7 +27,8 @@ from audit.models import AuditActionCategory, AuditEventSource, AuditEventStatus
 from audit.services import record_audit_event
 
 from . import onboarding
-from .services import LinkRefused, link_account_for
+from .models import Participant, ParticipantOnboardingToken
+from .services import LinkRefused, link_account_for, lock_participant_account
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +54,13 @@ def onboarding_consume(request):
 
     participant = token.participant
     try:
+        lock_participant_account(participant)
+        # Revocation may have committed since resolve(); lock after the participant.
+        token.refresh_from_db(from_queryset=ParticipantOnboardingToken.objects.select_for_update())
+        if token.revoked_at is not None or token.is_expired:
+            raise LinkRefused(code="token_unavailable")
         user = link_account_for(participant)
-    except LinkRefused as exc:
+    except (LinkRefused, Participant.DoesNotExist, ParticipantOnboardingToken.DoesNotExist, DjangoValidationError) as exc:
         # Do not disclose why the link was rejected.
         record_audit_event(
             action_type="participant_onboarding.consumed",
@@ -67,7 +74,7 @@ def onboarding_consume(request):
             target_id=str(participant.pk),
             target_display=participant.full_name,
             summary=f"Refused an onboarding link for participant {participant.full_name}.",
-            metadata={"token_prefix": token.prefix, "reason": exc.code},
+            metadata={"token_prefix": token.prefix, "reason": getattr(exc, "code", None) or "participant_unavailable"},
         )
         return Response({"detail": "This link is not valid."}, status=status.HTTP_404_NOT_FOUND)
 

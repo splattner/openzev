@@ -111,6 +111,10 @@ the participant sets their own password, the link is revoked. Administrators can
 any existing account other than an admin's, including one that is already a
 participant elsewhere, so one person keeps one login — or **Unlink** the current one. Platform → Accounts lists every account and which communities
 it belongs to; see [Roles and Permissions](11-roles-and-permissions.md).
+Unlinking also revokes the old onboarding link.
+
+If sending or copying a link fails because the participant changed in the meantime,
+refresh the list and try again. If the participant was removed, it will no longer appear.
 
 If unlinking fails, an error notification appears even if you closed the
 confirmation while it was processing. Open **Unlink** again to retry.

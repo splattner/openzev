@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.exceptions import NotFound
 from django.core.exceptions import ObjectDoesNotExist, ValidationError as DjangoValidationError
 from django.core.validators import RegexValidator
 from django.db import transaction
@@ -330,10 +331,14 @@ class ParticipantSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         try:
             lock_participant_account(instance)
+            if "party" in validated_data and validated_data["party"].pk != instance.party_id:
+                raise serializers.ValidationError({"party": "A participation cannot move to another party."})
             # Promotion or relinking may have happened since validate().
             self._require_admin_for_protected_account(instance.user if instance.user_id else None)
             participant = super().update(instance, validated_data)
             ensure_participant_account(participant)
+        except Participant.DoesNotExist as exc:
+            raise NotFound from exc
         except DjangoValidationError as exc:
             raise django_validation_error(exc) from exc
         return participant

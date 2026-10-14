@@ -526,8 +526,14 @@ class Participant(models.Model):
             validate_account_login(self.user)
 
     def save(self, *args, **kwargs):
-        pending = self.__dict__.pop("_party_pending", {})
+        from .services import lock_participant_account, protect_account_login
+
         update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = frozenset(update_fields)
+            if not update_fields:
+                return
+        pending = self.__dict__.get("_party_pending", {}).copy()
         if update_fields is not None:
             # Facade names are party fields: written to the party below.
             facade = [name for name in update_fields if name in PARTY_FACADE_FIELDS]
@@ -535,6 +541,9 @@ class Participant(models.Model):
             for name in facade:
                 pending.setdefault(name, getattr(self._party_or_none(), name, ""))
         with transaction.atomic():
+            writes_links = update_fields is None or {"user", "user_id", "party", "party_id"}.intersection(update_fields)
+            if writes_links:
+                previous = lock_participant_account(self, for_save=True, update_fields=update_fields)
             if self.party_id is None:
                 party = Party(zev_id=self.zev_id, **pending)
                 party.save()
@@ -547,18 +556,16 @@ class Participant(models.Model):
                     setattr(party, name, value)
                 party.save(update_fields=[*pending, "updated_at"])
             if kwargs.get("update_fields") == []:
+                self.__dict__.pop("_party_pending", None)
                 return
-            if self.user_id and (
-                update_fields is None or {"user", "user_id", "party", "party_id"}.intersection(update_fields)
+            if (
+                self.user_id and writes_links
+                and previous != {"user_id": self.user_id, "party_id": self.party_id}
+                and self.party.roles.filter(role__in=MANAGING_ROLES).exists()
             ):
-                party = Party.objects.select_for_update().get(pk=self.party_id)
-                previous = Participant.objects.filter(pk=self.pk).values("user_id", "party_id").first()
-                if previous != {"user_id": self.user_id, "party_id": self.party_id}:
-                    from .services import protect_account_login
-
-                    if party.roles.filter(role__in=MANAGING_ROLES).exists():
-                        self.user = protect_account_login(self.user)
+                self.user = protect_account_login(self.user)
             super().save(*args, **kwargs)
+        self.__dict__.pop("_party_pending", None)
 
     def refresh_from_db(self, using=None, fields=None, from_queryset=None):
         if fields is None:

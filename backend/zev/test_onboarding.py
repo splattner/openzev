@@ -361,6 +361,182 @@ class OwnLoginLinkTests(TestCase):
 
 
 class LinkPromotionLockTests(TransactionTestCase):
+    def setUp(self):
+        self._bound_lock_waits()
+        if connections["default"].vendor == "postgresql":
+            self.addCleanup(self._reset_lock_waits)
+
+    def _bound_lock_waits(self):
+        if connections["default"].vendor == "postgresql":
+            with connections["default"].cursor() as cursor:
+                cursor.execute("SET lock_timeout = '5s'")
+                cursor.execute("SET statement_timeout = '15s'")
+
+    def _reset_lock_waits(self):
+        with connections["default"].cursor() as cursor:
+            cursor.execute("RESET lock_timeout")
+            cursor.execute("RESET statement_timeout")
+
+    @skipUnlessDBFeature("has_select_for_update_nowait")
+    def test_user_save_during_party_move_is_refused(self):
+        self._move_during_link(lambda row: row.save(update_fields=["user_id"]))
+
+    @skipUnlessDBFeature("has_select_for_update_nowait")
+    def test_lookup_during_party_move_is_refused(self):
+        from .services import link_account_for
+
+        self._move_during_link(link_account_for)
+
+    def _move_during_link(self, operation):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+
+        from django.core.exceptions import ValidationError
+
+        from . import access
+        from .models import PartyRole
+        from .parties import assign_role
+
+        zev = create_managed_zev(name="Concurrent party move")
+        managing = Party.objects.create(zev=zev, last_name="Representative")
+        assign_role(zev, managing, PartyRole.REPRESENTATIVE, timezone.localdate())
+        participant = Participant.objects.create(
+            zev=zev, last_name="Moving", email="moving@example.com", valid_from=timezone.localdate(),
+        )
+        account = User.objects.create_user(username="moving")
+        linking, release = Event(), Event()
+        original_lock = Party.objects.select_for_update
+
+        def paused_lock(*args, **kwargs):
+            # Commit the move after the snapshot, before the first party lock.
+            if not linking.is_set():
+                linking.set()
+                if not release.wait(5):
+                    raise TimeoutError("Paused link was not released")
+            return original_lock(*args, **kwargs)
+
+        def link():
+            try:
+                self._bound_lock_waits()
+                row = Participant.objects.get(pk=participant.pk)
+                row.user = account
+                return operation(row)
+            finally:
+                connections.close_all()
+
+        with patch("zev.models.Party.objects.select_for_update", side_effect=paused_lock), ThreadPoolExecutor(1) as pool:
+            linked = pool.submit(link)
+            try:
+                self.assertTrue(linking.wait(5))
+                participant.party = managing
+                participant.save(update_fields=["party_id"])
+            finally:
+                release.set()
+            with self.assertRaises(ValidationError):
+                linked.result(timeout=10)
+        participant.refresh_from_db()
+        self.assertEqual(participant.party_id, managing.pk)
+        self.assertIsNone(participant.user_id)
+        self.assertFalse(access.can_manage(account, zev))
+
+    @skipUnlessDBFeature("has_select_for_update_nowait")
+    def test_lookup_during_account_relink_is_refused(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+
+        from django.core.exceptions import ValidationError
+
+        zev = create_managed_zev(name="Concurrent account relink")
+        participant = Participant.objects.create(
+            zev=zev, last_name="Relinking", email="relinking@example.com", valid_from=timezone.localdate(),
+        )
+        replacement = make_user("replacement_relink")
+        password = replacement.password
+        linking, release = Event(), Event()
+        original_lock = Party.objects.select_for_update
+
+        def paused_lock(*args, **kwargs):
+            if not linking.is_set():
+                linking.set()
+                if not release.wait(5):
+                    raise TimeoutError("Paused lookup was not released")
+            return original_lock(*args, **kwargs)
+
+        def lookup():
+            try:
+                self._bound_lock_waits()
+                return get_participant_onboarding_link(Participant.objects.get(pk=participant.pk))
+            finally:
+                connections.close_all()
+
+        with patch("zev.models.Party.objects.select_for_update", side_effect=paused_lock), ThreadPoolExecutor(1) as pool:
+            linked = pool.submit(lookup)
+            try:
+                self.assertTrue(linking.wait(5))
+                participant.user = replacement
+                participant.save(update_fields=["user"])
+            finally:
+                release.set()
+            with self.assertRaises(ValidationError):
+                linked.result(timeout=10)
+        participant.refresh_from_db()
+        replacement.refresh_from_db()
+        self.assertEqual(participant.user_id, replacement.pk)
+        self.assertEqual(replacement.password, password)
+        self.assertFalse(participant.onboarding_tokens.exists())
+
+    @skipUnlessDBFeature("has_select_for_update_nowait")
+    def test_resolved_token_cannot_sign_in_after_unlink(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+
+        zev = create_managed_zev(name="Concurrent unlink")
+        participant = Participant.objects.create(
+            zev=zev, last_name="Unlinking", email="unlinking@example.com", valid_from=timezone.localdate(),
+        )
+        _url, token = get_participant_onboarding_link(participant)
+        account_count = User.objects.count()
+        admin = make_user("unlink_lock_admin", UserRole.ADMIN)
+        client = APIClient()
+        auth(client, admin)
+        resolved, release = Event(), Event()
+        original_resolve = onboarding.resolve
+
+        def paused_resolve(*args):
+            result = original_resolve(*args)
+            resolved.set()
+            if not release.wait(5):
+                raise TimeoutError("Resolved token was not released")
+            return result
+
+        def consume():
+            try:
+                self._bound_lock_waits()
+                return APIClient().post(
+                    "/api/v1/public/onboarding/consume/",
+                    {"prefix": token.prefix, "s": token.secret}, format="json",
+                )
+            finally:
+                connections.close_all()
+
+        with patch("zev.onboarding.resolve", side_effect=paused_resolve), ThreadPoolExecutor(1) as pool:
+            signed_in = pool.submit(consume)
+            try:
+                self.assertTrue(resolved.wait(5))
+                response = client.post(f"/api/v1/zev/participants/{participant.pk}/unlink-account/")
+                self.assertEqual(response.status_code, 200, response.content)
+            finally:
+                release.set()
+            response = signed_in.result(timeout=10)
+        self.assertEqual(response.status_code, 404, response.content)
+        self.assertEqual(response.data, {"detail": "This link is not valid."})
+        self.assertNotIn("openzev_access", response.cookies)
+        participant.refresh_from_db()
+        token.refresh_from_db()
+        self.assertIsNone(participant.user_id)
+        self.assertIsNotNone(token.revoked_at)
+        self.assertEqual(User.objects.count(), account_count + 1)
+
     @skipUnlessDBFeature("has_select_for_update_nowait")
     def test_edit_and_copy_of_the_same_participant_complete_without_deadlock(self):
         from concurrent.futures import ThreadPoolExecutor
@@ -386,12 +562,14 @@ class LinkPromotionLockTests(TransactionTestCase):
 
         def copy():
             try:
+                self._bound_lock_waits()
                 return get_participant_onboarding_link(Participant.objects.get(pk=participant.pk))
             finally:
                 connections.close_all()
 
         def edit():
             try:
+                self._bound_lock_waits()
                 row = Participant.objects.get(pk=participant.pk)
                 editing.set()
                 return ParticipantSerializer().update(row, {"allocation_weight": Decimal("2")})
@@ -408,6 +586,8 @@ class LinkPromotionLockTests(TransactionTestCase):
                 # Taking the party first prevents an edit from holding it while waiting for this user.
                 with self.assertRaises(DatabaseError), transaction.atomic():
                     Party.objects.select_for_update(nowait=True).get(pk=participant.party_id)
+                with self.assertRaises(DatabaseError), transaction.atomic():
+                    Participant.objects.order_by().values("user_id").select_for_update(nowait=True).get(pk=participant.pk)
                 edited = pool.submit(edit)
                 self.assertTrue(editing.wait(5))
             finally:
@@ -440,6 +620,7 @@ class LinkPromotionLockTests(TransactionTestCase):
 
         def consume():
             try:
+                self._bound_lock_waits()
                 return APIClient().post(
                     "/api/v1/public/onboarding/consume/",
                     {"prefix": token.prefix, "s": token.secret}, format="json",
@@ -453,6 +634,8 @@ class LinkPromotionLockTests(TransactionTestCase):
                 self.assertTrue(minting.wait(5))
                 with self.assertRaises(DatabaseError), transaction.atomic():
                     User.objects.select_for_update(nowait=True).get(pk=participant.user_id)
+                with self.assertRaises(DatabaseError), transaction.atomic():
+                    ParticipantOnboardingToken.objects.select_for_update(nowait=True).get(pk=token.pk)
             finally:
                 release.set()
             response = signed_in.result(timeout=5)
@@ -480,6 +663,32 @@ class RevokeAndUnlinkTests(TestCase):
         )
         self.client = APIClient()
         auth(self.client, self.admin)
+
+    def test_unlink_conflict_leaves_account_and_token_unchanged(self):
+        from django.core.exceptions import ValidationError
+
+        _url, token = get_participant_onboarding_link(self.participant)
+        account_id = self.participant.user_id
+        with patch("zev.services.lock_participant_account", side_effect=ValidationError("Changed")):
+            response = self.client.post(f"/api/v1/zev/participants/{self.participant.pk}/unlink-account/")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.participant.refresh_from_db()
+        token.refresh_from_db()
+        self.assertEqual(self.participant.user_id, account_id)
+        self.assertIsNone(token.revoked_at)
+        self.assertFalse(AuditEvent.objects.filter(action_type="participant.unlink_account").exists())
+
+    def test_revocation_failure_rolls_back_unlink(self):
+        _url, token = get_participant_onboarding_link(self.participant)
+        account_id = self.participant.user_id
+        with patch("zev.onboarding.revoke_active_for_participant", side_effect=RuntimeError("Revocation failed")):
+            with self.assertRaisesRegex(RuntimeError, "Revocation failed"):
+                self.client.post(f"/api/v1/zev/participants/{self.participant.pk}/unlink-account/")
+        self.participant.refresh_from_db()
+        token.refresh_from_db()
+        self.assertEqual(self.participant.user_id, account_id)
+        self.assertIsNone(token.revoked_at)
+        self.assertFalse(AuditEvent.objects.filter(action_type="participant.unlink_account").exists())
 
     def test_revoke_action_kills_the_link_but_keeps_the_account(self):
         get_participant_onboarding_link(self.participant)

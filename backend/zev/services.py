@@ -147,19 +147,48 @@ class LinkRefused(Exception):
         super().__init__(message)
 
 
-def lock_participant_account(participant):
-    """Lock the party, reread the participant's account and lock it; returns the party.
+def lock_participant_account(participant, *, for_save=False, update_fields=None):
+    """Lock old/new parties, old/new users, then the participant; return its previous links.
 
-    Account and role edits take the same order (party, user, participant), so link
-    requests and participant edits cannot deadlock. Call inside a transaction.
+    Lookups reload both related objects. Saves reload links outside update_fields
+    and preserve unchanged cached objects. Uses the shared party/user/participant order.
     """
     from .models import Participant, Party
 
-    party = Party.objects.select_for_update().get(pk=participant.party_id)
-    participant.user_id = Participant.objects.values_list("user_id", flat=True).get(pk=participant.pk)
-    if participant.user_id:
-        participant.user = User.objects.locked().get(pk=participant.user_id)
-    return party
+    if not transaction.get_connection().in_atomic_block:
+        raise RuntimeError("lock_participant_account requires an outer transaction")
+    rows = Participant.objects.order_by().filter(pk=participant.pk).values("user_id", "party_id")
+    previous = rows.first()
+    if previous is None and (not for_save or not participant._state.adding):
+        raise Participant.DoesNotExist("This participant no longer exists.")
+    party_id, user_id = participant.party_id, participant.user_id
+    if previous is not None and (not for_save or update_fields is not None):
+        fields = set(update_fields or ())
+        if not for_save or not {"party", "party_id"}.intersection(fields):
+            party_id = previous["party_id"]
+        if not for_save or not {"user", "user_id"}.intersection(fields):
+            user_id = previous["user_id"]
+    party_id, user_id = Party._meta.pk.to_python(party_id), User._meta.pk.to_python(user_id)
+    parties = {p.pk: p for p in Party.objects.select_for_update().filter(
+        pk__in={party_id, (previous or {}).get("party_id")} - {None},
+    ).order_by("pk")}
+    users = {u.pk: u for u in User.objects.locked().filter(
+        pk__in={user_id, (previous or {}).get("user_id")} - {None},
+    ).order_by("pk")}
+    locked = rows.select_for_update().first()
+    if locked is None and previous is not None:
+        raise Participant.DoesNotExist("This participant no longer exists.")
+    if locked != previous:
+        raise ValidationError("This participant changed during locking. Please try again.", code="participant_changed")
+    if party_id is not None and party_id not in parties:
+        raise ValidationError({"party": "This party no longer exists."})
+    if user_id is not None and user_id not in users:
+        raise ValidationError({"user": "This account no longer exists."})
+    if not for_save or participant.party_id != party_id:
+        participant.party = parties.get(party_id)
+    if not for_save or participant.user_id != user_id:
+        participant.user = users.get(user_id)
+    return previous
 
 
 @transaction.atomic
@@ -167,8 +196,8 @@ def link_account_for(participant):
     """Return the participant account only when a link may authenticate it."""
     from .models import MANAGING_ROLES
 
-    party = lock_participant_account(participant)
-    if not participant.user_id and party.roles.filter(role__in=MANAGING_ROLES).exists():
+    lock_participant_account(participant)
+    if not participant.user_id and participant.party.roles.filter(role__in=MANAGING_ROLES).exists():
         raise LinkRefused(
             "Give this party an access invitation before creating a participant login.",
             code="login_setup_required",

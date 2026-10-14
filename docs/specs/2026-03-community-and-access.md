@@ -1468,7 +1468,7 @@ is saved (SPEC-2026-10-buildings-and-sites §7.7). `ParticipantSerializer` no lo
 | Contract PDF (read) | `/{id}/contract-pdf/` | GET | authenticated (self or admin/owner) | Stream the latest issued contract snapshot; 404 before the first issuance. Never mints a version. |
 | Contract PDF (issue) | `/{id}/contract-pdf/` | POST | authenticated (self or admin/owner) | Issue or reuse the persisted versioned contract snapshot and stream it as PDF (see SPEC-2026-08-contract-pdf-redesign) |
 | Link account | `/{id}/link-account/` | POST | admin only | Link an existing non-admin account; it may already hold participant rows here or elsewhere (#761). An admin account → 400 |
-| Unlink account | `/{id}/unlink-account/` | POST | admin only | Detach the account and revoke its onboarding link; refused if it would remove the last manager |
+| Unlink account | `/{id}/unlink-account/` | POST | admin only | Detach the account and revoke its onboarding link in one transaction; refused if it would remove the last manager |
 
 ### 8.4 Participant onboarding links
 

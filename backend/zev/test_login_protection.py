@@ -212,7 +212,9 @@ class LoginProtectionTests(TestCase):
         target = Participant.objects.create(zev=self.zev, party=party, valid_from=self.today)
         for instance, field, value in (
             (target, "user_id", self.account.pk),
+            (target, "user_id", str(self.account.pk)),
             (self.participant, "party_id", party.pk),
+            (self.participant, "party_id", str(party.pk)),
             (party, "user_id", self.account.pk),
             (Party(pk=party.pk, zev=self.zev, last_name=party.last_name), "user", self.account),
         ):
@@ -222,6 +224,193 @@ class LoginProtectionTests(TestCase):
                     instance.save(update_fields=[field])
                 instance.refresh_from_db()
         self.assertFalse(access.can_manage(self.account, self.zev))
+
+    def test_user_only_save_checks_the_current_party(self):
+        stale = Participant.objects.get(pk=self.participant.pk)
+        self.participant.user = None
+        self.participant.party = self.managing_party()
+        self.participant.save(update_fields=["user", "party"])
+
+        stale.user = self.account
+        with self.assertRaises(ValidationError):
+            stale.save(update_fields=["user_id"])
+        self.participant.refresh_from_db()
+        self.assertIsNone(self.participant.user_id)
+
+    def test_party_only_save_checks_the_current_account(self):
+        original_party_id = self.participant.party_id
+        stale = Participant.objects.get(pk=self.participant.pk)
+        stale_account = make_user("stale_participant_account")
+        stale.user = stale_account
+        stale.party = self.managing_party()
+
+        with self.assertRaises(ValidationError):
+            stale.save(update_fields=["party_id"])
+        self.participant.refresh_from_db()
+        self.assertEqual(self.participant.party_id, original_party_id)
+        self.assertFalse(access.can_manage(self.account, self.zev))
+
+    def test_link_lookup_refreshes_a_stale_party(self):
+        stale = Participant.objects.get(pk=self.participant.pk)
+        self.participant.user = None
+        self.participant.party = self.managing_party()
+        self.participant.save(update_fields=["user", "party"])
+
+        from .services import LinkRefused, link_account_for
+
+        with self.assertRaises(LinkRefused) as caught:
+            link_account_for(stale)
+        self.assertEqual(caught.exception.code, "login_setup_required")
+
+    def test_link_lookup_refuses_a_removed_participant(self):
+        from .services import link_account_for
+
+        stale = Participant.objects.get(pk=self.participant.pk)
+        self.participant.delete()
+
+        with self.assertRaises(Participant.DoesNotExist):
+            link_account_for(stale)
+
+    def test_full_save_refuses_a_removed_participant(self):
+        stale = Participant.objects.get(pk=self.participant.pk)
+        self.participant.delete()
+
+        with self.assertRaises(Participant.DoesNotExist):
+            stale.save()
+        self.assertFalse(Participant.objects.filter(pk=stale.pk).exists())
+
+    def test_empty_saves_preserve_pending_fields_and_cached_objects(self):
+        party, user = self.participant.party, self.participant.user
+        self.participant.first_name = "Staged"
+        for fields in ([], ()):
+            with self.subTest(fields=fields), self.assertNumQueries(0):
+                self.participant.save(update_fields=fields)
+            self.assertIs(self.participant.party, party)
+            self.assertIs(self.participant.user, user)
+            self.assertEqual(self.participant.first_name, "Staged")
+        self.participant.save(update_fields=["first_name"])
+        party.refresh_from_db()
+        self.assertEqual(party.first_name, "Staged")
+
+    def test_unrelated_saves_do_not_query_or_reload_links(self):
+        party, user = self.participant.party, self.participant.user
+        party.city = "Unsaved"
+        for field in ("notes", "valid_to", "allocation_weight"):
+            with self.subTest(field=field), self.assertNumQueries(3):
+                self.participant.save(update_fields=[field])
+            self.assertIs(self.participant.party, party)
+            self.assertIs(self.participant.user, user)
+            self.assertEqual(party.city, "Unsaved")
+
+    def test_failed_link_save_preserves_pending_party_fields(self):
+        self.participant.first_name = "Staged"
+        with patch("zev.services.lock_participant_account", side_effect=ValidationError("Changed")):
+            with self.assertRaises(ValidationError):
+                self.participant.save()
+        self.assertEqual(self.participant.first_name, "Staged")
+        self.participant.save(update_fields=["first_name"])
+        self.participant.refresh_from_db()
+        self.assertEqual(self.participant.first_name, "Staged")
+
+    def test_user_only_save_does_not_write_a_staged_party(self):
+        party_id = self.participant.party_id
+        account = User.objects.create_user(username="staged_link_account")
+        self.participant.user = account
+        self.participant.party = self.managing_party()
+
+        self.participant.save(update_fields=["user"])
+
+        self.participant.refresh_from_db()
+        self.assertEqual(self.participant.user_id, account.pk)
+        self.assertEqual(self.participant.party_id, party_id)
+
+    def test_link_saves_preserve_unchanged_cached_objects(self):
+        party, user = self.participant.party, self.participant.user
+        party.city = "Unsaved"
+        self.participant.save(update_fields=["user_id"])
+        self.assertIs(self.participant.party, party)
+        self.assertIs(self.participant.user, user)
+        self.assertEqual(self.participant.party.city, "Unsaved")
+
+    def test_missing_link_targets_return_field_errors(self):
+        for field, value in (("user", 2**60), ("party", uuid.uuid4())):
+            with self.subTest(field=field):
+                setattr(self.participant, f"{field}_id", value)
+                with self.assertRaises(ValidationError) as caught:
+                    self.participant.save(update_fields=[field])
+                self.assertIn(field, caught.exception.message_dict)
+                self.participant.refresh_from_db()
+
+    def test_link_lock_requires_an_outer_transaction(self):
+        with patch.object(connection, "in_atomic_block", False), self.assertRaisesRegex(RuntimeError, "outer transaction"):
+            lock_participant_account(self.participant)
+
+    def test_link_actions_return_404_after_a_participant_is_removed(self):
+        def remove_before_lock(participant):
+            Participant.objects.filter(pk=participant.pk).delete()
+            return lock_participant_account(participant)
+
+        original_party_lock = Party.objects.select_for_update
+
+        def remove_after_snapshot(*args, **kwargs):
+            Participant.objects.filter(pk=self.participant.pk).delete()
+            return original_party_lock(*args, **kwargs)
+
+        for action in ("onboarding-link", "send-onboarding-link"):
+            for seam, callback in (
+                ("zev.services.lock_participant_account", remove_before_lock),
+                ("zev.models.Party.objects.select_for_update", remove_after_snapshot),
+            ):
+                with self.subTest(action=action, seam=seam), patch(seam, side_effect=callback):
+                    response = self.client.post(f"/api/v1/zev/participants/{self.participant.pk}/{action}/")
+                self.assertEqual(response.status_code, 404, response.content)
+
+    def test_link_actions_return_400_on_a_locking_conflict(self):
+        for action in ("onboarding-link", "send-onboarding-link"):
+            with self.subTest(action=action), patch("zev.services.lock_participant_account", side_effect=ValidationError("Changed")):
+                response = self.client.post(f"/api/v1/zev/participants/{self.participant.pk}/{action}/")
+            self.assertEqual(response.status_code, 400, response.content)
+
+    def test_public_links_conceal_removed_or_changed_participants(self):
+        from accounts.magic_links import account_for_participant
+
+        _url, token = get_participant_onboarding_link(self.participant)
+        for error in (Participant.DoesNotExist(), ValidationError("Changed")):
+            with self.subTest(error=type(error).__name__), patch("zev.services.lock_participant_account", side_effect=error):
+                response = APIClient().post(
+                    "/api/v1/public/onboarding/consume/", {"prefix": token.prefix, "s": token.secret}, format="json",
+                )
+                self.assertIsNone(account_for_participant(self.participant))
+            self.assertEqual(response.status_code, 404, response.content)
+            self.assertNotIn("openzev_access", response.cookies)
+
+    def test_participant_edit_returns_404_for_a_removed_participant(self):
+        with patch("zev.serializers.lock_participant_account", side_effect=Participant.DoesNotExist):
+            response = self.client.patch(f"/api/v1/zev/participants/{self.participant.pk}/", {"last_name": "Changed"})
+        self.assertEqual(response.status_code, 404, response.content)
+
+    def test_participant_edit_rechecks_unchanged_party_after_locking(self):
+        from rest_framework.exceptions import ValidationError as APIValidationError
+
+        from .serializers import ParticipantSerializer
+
+        request = RequestFactory().patch("/")
+        request.user = self.manager
+        serializer = ParticipantSerializer(
+            self.participant, data={"party": str(self.participant.party_id)}, partial=True,
+            context={"request": request},
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        moved = Participant.objects.get(pk=self.participant.pk)
+        moved.party = Party.objects.create(zev=self.zev, last_name="Moved")
+        moved.save(update_fields=["party"])
+
+        with self.assertRaises(APIValidationError) as caught:
+            serializer.save()
+
+        self.assertIn("party", caught.exception.detail)
+        self.participant.refresh_from_db()
+        self.assertEqual(self.participant.party_id, moved.party_id)
 
     def test_accepted_access_remains_protected_after_an_older_grant_is_revoked(self):
         grant_id = self.invite()

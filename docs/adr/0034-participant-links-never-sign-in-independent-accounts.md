@@ -65,8 +65,8 @@ Trade-offs:
   separately).
 - A ZEV restore that would give a managing role to an account without a login is refused; the
   account needs an invitation first.
-- Participant-row saves, grant and role saves now take row locks in a fixed order
-  (party → users by id → participant → token/grant), which every new write path must follow.
+- Participant-row saves, grant and role saves take row locks in a fixed order
+  (parties by id → users by id → participant → token/grant), which every new write path must follow.
 
 ## Alternatives considered
 

@@ -230,15 +230,20 @@ authenticated before promotion cannot renew its retired session.
 User locks go through `User.objects.locked()`, which uses `no_key` only when
 `has_select_for_no_key_update` is true;
 MariaDB/MySQL use ordinary `FOR UPDATE`.
-Lock order is party → users ordered by id → participant → token/grant. Participant
-link lookup and participant updates both call `zev.services.lock_participant_account`,
-which locks the party, rereads the participant's account and locks it, before
-saving or synchronizing the account, preventing copy/send requests and edits from deadlocking.
-Participant updates repeat the serializer's admin-only check for protected accounts
-after that lock. Grant creation locks an existing account before its duplicate-grant
+Lock order is parties ordered by id → users ordered by id → participant → token/grant.
+`lock_participant_account` requires an outer transaction that holds the locks through
+the writes. It locks old and new links, then rechecks them under the participant lock;
+a change raises `ValidationError`; callers can refresh and retry.
+Lookup reloads both related objects. With `for_save=True`, links outside `update_fields`
+are refreshed, while unchanged cached objects are preserved. Empty saves do nothing;
+unrelated partial saves skip link locking. `Participant.clean()` is advisory.
+Full saves refuse to recreate deleted participants. Link-writing saves enforce promotion
+checks under the locks. Participant updates repeat the immutable-party and protected-account
+admin checks after locking. Grant creation locks an existing account before its duplicate-grant
 check, so a concurrent grant for the same account is refused with 400.
-Onboarding consumption
-holds the user lock through JWT issuance; invoice JWTs use the version read under
+Onboarding consumption locks and rechecks the token after locking the participant,
+before creating an account, and holds the user and token locks through JWT issuance.
+Invoice JWTs use the version read under
 that lock, so concurrent promotion invalidates them. Onboarding email delivery
 runs after the service transaction; delivery failure leaves the token available
 for retry through the same send action.
@@ -266,14 +271,19 @@ account policy from its schema-compatible snapshot.
 
 Send/copy return 400 `{"code": "own_login_required", "error": "This account must use its existing login."}` for protected accounts, or 400 `{"code": "login_setup_required", "error": "Give this party an access invitation before creating a participant login."}` for an unlinked managing party. Both refusals are audited `DENIED` with the code in `metadata.reason`.
 
+If links change during locking, copy/send/link/unlink and participant edits return
+a 400 validation error; a participant removed after lookup returns 404. The caller
+can refresh and try again. Public onboarding
+consumption keeps its generic 404, and magic-link requests keep their non-enumerating
+response. Missing target parties/accounts produce field validation errors on saves.
+
 `onboarding-link` is available to managers for participant-only accounts;
 `link-account` remains admin-only. The Participants page's "copy onboarding
 link" action calls `onboarding-link`.
 
-`unlink-account` revoking the active token is new behaviour, not carried over
-from the old action: without it, detaching the account would not actually cut
-access — whoever holds the emailed link could click it again and land in a
-freshly recreated account.
+`unlink-account` detaches the account and revokes its active token in one transaction.
+A consume request that resolved the token before unlink must recheck it under lock;
+it cannot recreate an account or issue a session after revocation commits.
 
 `set-initial-password` (`POST /auth/me/set-initial-password/`) and
 `change-password` (`POST /auth/me/change-password/`) revoke the account's
@@ -396,24 +406,29 @@ phase 2 — see `2026-03-community-and-access.md` §7.1a).
 
 ## 10. Test plan
 
-Backend: `zev/test_onboarding.py` (token service get-or-create/resolve/revoke,
-the public consume endpoint including reusability and audit source, revoke
-and unlink interaction, `onboarding_status` transitions, plus `OnboardingExpiryTests`:
-30-day expiry on new tokens, non-nullable column, expired → 404 and `expired`
-status, expired active token rotated with a new prefix on copy/resend,
-response URL and expiry belonging to the same token, and both password doors
-revoking the link; `OwnLoginLinkTests`: copy and send refused for an account
-with its own login and audited `DENIED`, a link minted before the account
-gained its own login no longer signs in, a participant-only account still gets
-its link and signs in, and access gained during account setup refuses sign-in;
-`LinkPromotionLockTests` (2 tests): PostgreSQL verifies the user lock remains held during
-session minting and that promotion invalidates the resulting session, and checks
-that concurrent participant edits and link copies complete with party-first locks) plus updated
-coverage in `zev/tests.py` for the create/send/link actions, including the
-owner-vs-admin password-preservation case in
-`test_onboarding_link_leaves_roles_alone_and_keeps_privileged_logins`
-(regression test for the bug found and fixed in `ensure_participant_account`
-during this implementation — see §4).
+`zev/test_onboarding.py` covers token creation, reuse, expiry, revocation, public
+consumption, audit source, unlinking and onboarding-status transitions.
+`OwnLoginLinkTests` checks that independent accounts cannot receive or consume
+participant links, while participant-only accounts can still sign in.
+
+`LinkPromotionLockTests` (6 tests, requiring database row locks; PostgreSQL lock and
+statement timeouts bound blocked workers):
+
+| Method | Assertion |
+|---|---|
+| `test_user_save_during_party_move_is_refused` | Reject a user-only save when a party move commits between the snapshot and locking |
+| `test_lookup_during_party_move_is_refused` | Reject link lookup on the same interleaving |
+| `test_lookup_during_account_relink_is_refused` | Reject a committed account relink during locking; preserve its credentials and create no token |
+| `test_resolved_token_cannot_sign_in_after_unlink` | Resolve before unlink commits; refuse afterward without a replacement account or cookies |
+| `test_edit_and_copy_of_the_same_participant_complete_without_deadlock` | Hold party and participant locks through copying; a concurrent edit completes |
+| `test_sign_in_holds_the_user_lock_and_promotion_retires_its_session` | Hold user and token locks through JWT issuance; promotion invalidates that session |
+
+`RevokeAndUnlinkTests.test_unlink_conflict_leaves_account_and_token_unchanged`
+checks HTTP 400, preserved links and no success audit.
+`test_revocation_failure_rolls_back_unlink` verifies detachment rolls back if revocation fails.
+
+`zev/tests.py` covers create/send/link actions, including credential preservation
+for independent accounts in `test_onboarding_link_leaves_roles_alone_and_keeps_privileged_logins`.
 
 `OnboardingConstraintUpgradeTests.test_upgrade_revokes_older_duplicates_then_constrains`
 checks the real constraint upgrade and restores the full migration graph in
@@ -424,14 +439,31 @@ Frontend: `tests/participant-onboarding.test.ts` for the three API client
 functions; existing suite (`dead-i18n-keys`, `email-template-parity`) guards
 the locale and template-key changes.
 
-`zev/test_login_protection.py` — `LoginProtectionTests` (37 tests):
+`zev/test_login_protection.py` — `LoginProtectionTests` (54 tests):
 
 | Method | Assertion |
 |---|---|
 | `test_another_zevs_manager_cannot_deactivate_a_participant` | 403; account and session stay active |
 | `test_cancelling_yesterdays_invitation_restores_login_and_only_spends_invitation_tokens` | Restore login; spend invitation, preserve signup token |
 | `test_accepted_access_keeps_its_login_after_same_day_revocation` | Preserve password; refuse links after grant deletion |
-| `test_raw_id_saves_cannot_link_a_passwordless_account_to_a_managing_party` | Reject all three attnames and reconstructed Party saves |
+| `test_raw_id_saves_cannot_link_a_passwordless_account_to_a_managing_party` | Reject all three attnames, string foreign-key IDs, and reconstructed Party saves |
+| `test_user_only_save_checks_the_current_party` | Refuse linking a passwordless account after a party move hidden by the stale instance |
+| `test_party_only_save_checks_the_current_account` | Refuse moving the persisted passwordless account even when the instance caches a different account with credentials |
+| `test_link_lookup_refreshes_a_stale_party` | Report `login_setup_required` for the current managing party without an account |
+| `test_link_lookup_refuses_a_removed_participant` | Raise `Participant.DoesNotExist` when the participant was deleted after lookup |
+| `test_full_save_refuses_a_removed_participant` | Refuse to recreate a deleted participant |
+| `test_empty_saves_preserve_pending_fields_and_cached_objects` | Zero queries for empty lists/tuples; preserve staged facade writes and cached objects |
+| `test_unrelated_saves_do_not_query_or_reload_links` | Notes, validity and allocation saves use only their update and transaction statements |
+| `test_failed_link_save_preserves_pending_party_fields` | Preserve staged party fields across a locking failure and retry |
+| `test_user_only_save_does_not_write_a_staged_party` | Persist only the user; discard the staged managing-party link |
+| `test_link_saves_preserve_unchanged_cached_objects` | Preserve unchanged cached party/user objects and their unsaved attributes |
+| `test_missing_link_targets_return_field_errors` | Missing user/party IDs raise field validation errors |
+| `test_link_lock_requires_an_outer_transaction` | Refuse calls without an existing transaction |
+| `test_link_actions_return_404_after_a_participant_is_removed` | Copy/send return 404 for deletion during lookup |
+| `test_link_actions_return_400_on_a_locking_conflict` | Copy/send translate concurrency validation errors to 400 |
+| `test_public_links_conceal_removed_or_changed_participants` | Public consumption returns generic 404 without cookies; magic-link lookup returns no account |
+| `test_participant_edit_returns_404_for_a_removed_participant` | Serializer updates return 404 after concurrent deletion |
+| `test_participant_edit_rechecks_unchanged_party_after_locking` | Refuse a stale party payload accepted before a committed move |
 | `test_accepted_access_remains_protected_after_an_older_grant_is_revoked` | Retain history; refuse onboarding |
 | `test_raw_id_saves_linking_a_managing_party_retire_participant_credentials` | Retire session, onboarding and magic credentials |
 | `test_saving_a_removed_grant_or_role_is_refused` | `ValidationError` instead of a missing-row error |

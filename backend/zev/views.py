@@ -5,7 +5,7 @@ from django.conf import settings as django_settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Count, Max, Min, Prefetch, Q
-from django.http import FileResponse, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from config.http import content_disposition, sanitize_filename
 from django.utils import timezone as dj_timezone
 from rest_framework import serializers, status, viewsets
@@ -704,6 +704,8 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         participant.user = account
         try:
             participant.save(update_fields=["user", "updated_at"])
+        except Participant.DoesNotExist as exc:
+            raise Http404 from exc
         except DjangoValidationError as exc:
             error = django_validation_error(exc)
             if "user" in error.detail:
@@ -745,14 +747,15 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
             with access.keeping_a_manager(participant.zev_id):
                 participant.user = None
                 participant.save(update_fields=["user", "updated_at"])
+                # Keep detachment and revocation under the participant lock.
+                onboarding.revoke_active_for_participant(participant)
+        except Participant.DoesNotExist as exc:
+            raise Http404 from exc
+        except DjangoValidationError as exc:
+            raise django_validation_error(exc) from exc
         except access.NoManagerLeft:
             participant.user = unlinked_account
             return Response({"detail": access.NO_MANAGER_LEFT}, status=status.HTTP_400_BAD_REQUEST)
-        # Detaching the account must also kill any outstanding onboarding
-        # link — otherwise whoever holds it can simply click it again and be
-        # handed a freshly recreated account, and this action would not have
-        # cut anything.
-        onboarding.revoke_active_for_participant(participant)
         record_audit_event(
             request=request,
             action_category=AuditActionCategory.PARTICIPANT,
@@ -798,6 +801,10 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         participant = self.get_object()
         try:
             onboarding_url, live_token = get_participant_onboarding_link(participant)
+        except Participant.DoesNotExist as exc:
+            raise Http404 from exc
+        except DjangoValidationError as exc:
+            raise django_validation_error(exc) from exc
         except LinkRefused as exc:
             return self._refuse_link(request, participant, "participant.onboarding_link_created", exc)
         record_audit_event(
@@ -822,6 +829,10 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         participant = self.get_object()
         try:
             onboarding_url, live_token = send_participant_onboarding_link(participant, request.user)
+        except Participant.DoesNotExist as exc:
+            raise Http404 from exc
+        except DjangoValidationError as exc:
+            raise django_validation_error(exc) from exc
         except LinkRefused as exc:
             return self._refuse_link(request, participant, "participant.send_onboarding_link", exc)
         except ValueError as exc:
