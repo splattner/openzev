@@ -338,7 +338,7 @@ def _compute_monthly_data(
         share = _participant_share(row["metering_point_id"], ts)
         if share == 0:
             continue
-        month_num = ts.month
+        month_num = civil_date(ts).month
         consumed = (row["consumed_kwh"] or Decimal("0")) * share
 
         zev_consumed = zev_consumption_by_ts.get(ts, Decimal("0"))
@@ -355,7 +355,7 @@ def _compute_monthly_data(
         share = _participant_share(row["metering_point_id"], ts)
         if share == 0:
             continue
-        month_num = ts.month
+        month_num = civil_date(ts).month
         produced = (row["produced_kwh"] or Decimal("0")) * share
         month_acc[month_num]["produced"] += produced
 

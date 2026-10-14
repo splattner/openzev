@@ -313,6 +313,31 @@ class AnnualStatementMonthlyDataTests(TestCase):
         self.assertEqual(feb["consumed_kwh"], "4.00")
         self.assertEqual(feb["from_zev_kwh"], "4.00")
 
+    def test_months_are_swiss_civil_months_not_utc_months(self):
+        from invoices.annual_statement import _compute_monthly_data
+        from metering.models import MeterReading, ReadingDirection, ReadingResolution
+        from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType
+
+        mp = MeteringPoint.objects.create(
+            zev=self.zev, meter_id="CH00000000000000000000000000REP03",
+            meter_type=MeteringPointType.CONSUMPTION)
+        MeteringPointAssignment.objects.create(
+            metering_point=mp, participant=self.participant,
+            valid_from=date(2026, 1, 1), valid_to=None)
+        # 2026-07-01 00:00 Zurich (CEST) is 2026-06-30 22:00 UTC.
+        MeterReading.objects.create(
+            metering_point=mp,
+            timestamp=datetime(2026, 6, 30, 22, 0, tzinfo=dt_timezone.utc),
+            energy_kwh=Decimal("3"), direction=ReadingDirection.IN,
+            resolution=ReadingResolution.FIFTEEN_MIN,
+        )
+
+        monthly, _totals = _compute_monthly_data(
+            self.participant, self.zev, 2026, self.tr)
+
+        self.assertEqual(monthly[5]["consumed_kwh"], "0.00")
+        self.assertEqual(monthly[6]["consumed_kwh"], "3.00")
+
     def test_community_meter_contributes_only_the_participants_weighted_share(self):
         """A community meter this participant does not literally hold must
         still reach their statement, at their weighted share — not zero
