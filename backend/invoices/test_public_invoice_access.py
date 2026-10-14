@@ -520,18 +520,7 @@ class MagicLinkTests(PublicInvoiceTestCase):
         self.participant.refresh_from_db()
         self.assertIsNotNone(self.participant.user.last_login)
 
-    def test_consuming_kills_a_leftover_password_from_before_this_behaviour(self):
-        """A usable password from an account created before passwordless
-        participant accounts existed must not survive a sign-in link.
-
-        Nothing mints a real password for a participant any more
-        (``zev.services.ensure_participant_account``), but an instance
-        upgrading from an older release can still have one sitting on a row
-        from back when it did. Isolated below the HTTP layer and below
-        ``account_for_participant`` (which would neutralize it a step
-        earlier, on request) so this exercises ``consume()``'s own
-        defensive branch specifically.
-        """
+    def test_pending_password_retires_only_when_link_authentication_completes(self):
         from accounts import magic_links
         from accounts.models import User, UserRole
 
@@ -545,8 +534,13 @@ class MagicLinkTests(PublicInvoiceTestCase):
         self.participant.save(update_fields=["user"])
 
         link = magic_links.issue(user)
-        magic_links.consume(link.token)
+        self.assertEqual(magic_links.consume(link.token).pk, user.pk)
+        user.refresh_from_db()
+        self.assertTrue(user.check_password("still-here-from-before"))
+        self.assertTrue(user.must_change_password)
 
+        link = magic_links.issue(user)
+        self.assertEqual(self.client.post(self.CONSUME_URL, {"token": link.token}).status_code, 200)
         user.refresh_from_db()
         self.assertFalse(user.has_usable_password())
         self.assertFalse(user.must_change_password)

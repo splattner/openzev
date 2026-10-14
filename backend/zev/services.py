@@ -117,11 +117,8 @@ def ensure_participant_account(participant):
     password, email and name untouched, instead of a second one being created.
     Several participant rows with one address therefore share one account.
 
-    Participant-only accounts get unusable passwords and no password-change
-    requirement: nothing was transmitted, so ``must_change_password`` would
-    strand them on a form asking to change a password they were never given.
-    Existing passwords are cleared here; participants can set their own
-    password after signing in through a link.
+    New participant-only accounts are passwordless. Synchronizing an existing
+    account preserves its password and pending password-change requirement.
     Accounts with their own login keep their password, email and name.
     """
     user = User.objects.locked().get(pk=participant.user_id) if participant.user_id else None
@@ -146,14 +143,7 @@ def ensure_participant_account(participant):
 
     if user is not None:
         sync_participant_user_fields(participant, user)
-        update_fields = ['email', 'first_name', 'last_name']
-        if user.has_usable_password():
-            user.set_unusable_password()
-            update_fields.append('password')
-        if user.must_change_password:
-            user.must_change_password = False
-            update_fields.append('must_change_password')
-        user.save(update_fields=update_fields)
+        user.save(update_fields=['email', 'first_name', 'last_name'])
         return user
 
     username = build_unique_participant_username(
@@ -255,7 +245,7 @@ def link_account_for(participant):
             code="login_setup_required",
         )
     user = ensure_participant_account(participant)
-    if requires_independent_login(user):
+    if not user.is_active or requires_independent_login(user):
         raise LinkRefused()
     return user
 

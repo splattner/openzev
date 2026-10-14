@@ -292,16 +292,26 @@ All paths are under `/api/v1/auth/`.
 | `passkeys/authenticate/begin/` | POST | `AllowAny` | `{email?}` → WebAuthn `PublicKeyCredentialRequestOptions` with `userVerification: "required"`. Challenge cached 5 min |
 | `passkeys/authenticate/complete/` | POST | `AllowAny` | Verifies the assertion, **refusing one whose `uv` flag is false**, → sets auth cookies. **No password involved** (D1, ADR 0020) |
 
-**As shipped in PR 2.** `auth.login` carries `metadata.method` `password+totp` or `recovery_code`
-for the second-step logins; the `oauth` value listed in §5.6 is **not** emitted — OAuth sign-ins
+`auth.login` after MFA carries `metadata.first_factor` (`password` or `participant_link`)
+and `metadata.second_factor` (`totp` or `recovery_code`). `metadata.method` remains
+`password+totp` for password/TOTP and `recovery_code` for recovery-code completion;
+link/TOTP uses `participant_link+totp`. The summary is "Login succeeded".
+The `oauth` value listed in §5.6 is **not** emitted — OAuth sign-ins
 keep their existing `oauth.login` event, which already names the provider. `passkey` is emitted by
 `passkeys/authenticate/complete/`. `token/mfa/` returns `400` for every failure (bad, replayed or expired), each audited as
 `auth.mfa.challenge_failed` with the reason.
 
 **The challenge token** is `django.core.signing.TimestampSigner(salt="accounts.mfa.challenge")`
-over `{user: pk, sv: session_version}`, with `max_age = MFA_CHALLENGE_TTL`
+over `{user: pk, sv: session_version, participant_link: boolean}`, with `max_age = MFA_CHALLENGE_TTL`
 (5 minutes). Resolution requires an active user and the current session version;
-session revocation invalidates outstanding challenges. Deploying the object-signed
+session revocation invalidates outstanding challenges. The optional provenance
+defaults to false for existing callers/challenges: pre-deployment object challenges
+containing only `{user, sv}` remain accepted, with no link recovery permission. `resolve_challenge(token, lock=False)`
+returns `(user, participant_link)`; `TokenMfaView` uses `lock=True` inside its transaction.
+Resolution rechecks signed expiry after the lock wait, then activity/session version;
+link provenance also rechecks independent-account eligibility. Pending credentials
+are retired and recovery is granted only after successful MFA; see
+[setup and recovery](2026-09-participant-onboarding-link.md#password-setup-and-explicit-recovery). Deploying the object-signed
 format rejects challenges issued by the previous scalar-signed format as
 `invalid_challenge`; users in the second step must restart login (a window of at
 most `MFA_CHALLENGE_TTL`, 5 minutes). A signed token rather than a
@@ -548,7 +558,7 @@ the caller *is* authenticated, just not allowed to do this yet — and records
    `mfa-recovery-codes`, `passkey-register-{begin,complete}`, `passkey-detail`,
    `passkey-authenticate-{begin,complete}`, `oauth-link-initiate`, `social-account-delete`), and
    self-protective account actions with no capability to grant (`me`, `change-password`,
-   `set-initial-password`, `email-change-request`, `email-change-confirm`, `sessions-revoke-own`,
+   `set-initial-password`, `reset-password`, `email-change-request`, `email-change-confirm`, `sessions-revoke-own`,
    `token_refresh`, `token-mfa`, and `api-key-detail` for `DELETE` only — revoking a key removes
    capability, renaming or minting one does not).
 4. Otherwise: `not AppSettings.load().mfa_required`, or

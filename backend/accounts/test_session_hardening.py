@@ -5,11 +5,13 @@ Spec: docs/specs/2026-03-community-and-access.md §5.6–§5.6b; ADR 0022.
 """
 
 import re
+from contextlib import ExitStack
 from unittest import mock
 
 from django.core import mail
 from django.core.cache import cache
-from django.test import TestCase
+from django.db import connections, transaction
+from django.test import TestCase, TransactionTestCase, skipUnlessDBFeature
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -17,6 +19,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from audit.models import AuditEvent, AuditEventStatus
 from testing.helpers import authenticate, make_user, create_managed_zev
 
+from . import email_change
 from .jwt_utils import make_jwt_for_user
 from .models import User, UserRole
 from .session_revocation import revoke_sessions
@@ -641,3 +644,62 @@ class EmailChangeTests(TestCase):
             codes = [self._request(password="wrong").status_code for _ in range(3)]
         self.assertEqual(codes, [400, 400, 429])
         cache.clear()
+
+
+class EmailConfirmationLockTests(TransactionTestCase):
+    @skipUnlessDBFeature("has_select_for_update")
+    def test_confirmation_revalidates_account_expiry_and_destination_after_lock_wait(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+        from testing.factories import ParticipantFactory
+
+        for change in ("password", "inactive", "expiry", "destination", "managed", "deleted"):
+            with self.subTest(change=change):
+                user = make_user(f"email-lock-{change}")
+                new_email = f"new-{change}@example.com"
+                token = email_change.issue_token(user, new_email)
+                resolved = Event()
+                original_resolve = email_change.resolve_token
+
+                def resolve(value, **kwargs):
+                    result = original_resolve(value, **kwargs)
+                    if kwargs.get("user") is None:
+                        resolved.set()
+                    return result
+
+                def confirm():
+                    try:
+                        return APIClient().post(EMAIL_CONFIRM, {"token": token})
+                    finally:
+                        connections.close_all()
+
+                with ThreadPoolExecutor(1) as pool, ExitStack() as expiry_guard, \
+                        mock.patch("accounts.email_change.resolve_token", side_effect=resolve), \
+                        mock.patch("accounts.views_security.emails.send_email_change_notice") as notice:
+                    with transaction.atomic():
+                        User.objects.locked().get(pk=user.pk)
+                        future = pool.submit(confirm)
+                        self.assertTrue(resolved.wait(5))
+                        if change == "password":
+                            client = _bearer(_session(user)["access"])
+                            self.assertEqual(client.post(CHANGE_PASSWORD, {
+                                "old_password": "pass1234", "new_password": NEW_PASSWORD,
+                            }).status_code, 200)
+                        elif change == "inactive":
+                            User.objects.filter(pk=user.pk).update(is_active=False)
+                        elif change == "expiry":
+                            expiry_guard.enter_context(mock.patch("accounts.email_change.LIFETIME_SECONDS", -1))
+                        elif change == "destination":
+                            other = make_user("email-lock-destination-owner")
+                            User.objects.filter(pk=other.pk).update(email=new_email)
+                        elif change == "managed":
+                            ParticipantFactory(user=user, email=user.email)
+                        else:
+                            user.delete()
+                    response = future.result(timeout=10)
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.data, {"detail": "This link is invalid or has expired."})
+                notice.assert_not_called()
+                if change != "deleted":
+                    user.refresh_from_db()
+                    self.assertNotEqual(user.email, new_email)

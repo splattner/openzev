@@ -163,9 +163,10 @@ class NotificationHookTests(TestCase):
         self.assertIn('"Work laptop"', mail.outbox[0].body)
 
     def test_changing_the_password_sends_a_notice(self):
-        response = self.client.post(
-            CHANGE_PASSWORD, {"old_password": "pass1234", "new_password": "Uniquely-Long-9164!"}, format="json"
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                CHANGE_PASSWORD, {"old_password": "pass1234", "new_password": "Uniquely-Long-9164!"}, format="json"
+            )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(_subjects(), ["Your OpenZEV password was changed"])
 
@@ -219,13 +220,14 @@ class SendingCanNeverBreakTheAction(TestCase):
 
     def test_a_broker_outage_does_not_fail_the_password_change(self):
         with mock.patch.object(send_security_notification, "delay", side_effect=ConnectionError("broker down")):
-            with self.assertLogs("accounts.notifications", level="ERROR"):
+            with self.assertLogs("accounts.notifications", level="ERROR"), self.captureOnCommitCallbacks(execute=True):
                 response = self.client.post(CHANGE_PASSWORD, self.body, format="json")
         self.assertEqual(response.status_code, 200)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password("Uniquely-Long-9164!"))
 
     def test_a_mail_failure_does_not_fail_the_password_change(self):
-        with mock.patch("accounts.notifications.EmailMessage.send", side_effect=OSError("smtp down")):
+        with mock.patch("accounts.notifications.EmailMessage.send", side_effect=OSError("smtp down")), \
+                self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(CHANGE_PASSWORD, self.body, format="json")
         self.assertEqual(response.status_code, 200)

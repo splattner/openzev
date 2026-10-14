@@ -121,6 +121,9 @@ A manager is **scoped** to the ZEVs it has access to:
 
 ### Participant Capabilities
 
+Participants can set a password or recover a forgotten one in **Account → Security**;
+see [password setup and recovery](03-participant-management.md#a-participant-forgot-their-password).
+
 The participant sidebar shows **Dashboard**, **My invoices**, and **Annual statement**; own consumption charts and trends stay reachable through the direct `/metering/chart` route.
 
 - **Dashboard:** View own energy consumption/production overview
@@ -452,10 +455,9 @@ it takes a few extra steps. Under **My Account → Profile → Email address**:
 The old address is emailed afterwards, so a change you did not make does not go unnoticed. The
 link works once, and stops working if your password or address changes before you use it.
 
-Accounts that have no password — participants, who sign in with emailed links, and accounts that
-only use an external identity provider — cannot do this themselves. For participants the address is
-maintained by the community's managers on the participant record; an administrator can change any
-account's address under **Platform → Accounts → Edit**.
+Participant-only email addresses remain manager-maintained, even after choosing a
+password. Passwordless accounts also cannot change their email themselves. An
+administrator can change an account's address under **Platform → Accounts → Edit**.
 
 ### Signing out other devices
 
@@ -520,7 +522,9 @@ access under **ZEV settings → People & access**.
 **Possible causes:**
 - The onboarding link was never used, has expired, or was revoked
 - User account deactivated
-- Password forgotten — the user can request a reset link with **Forgot your password?** on the sign-in page
+- Password forgotten — accounts with a password can request a reset link with
+  **Forgot your password?** on the sign-in page. Participant-only accounts can
+  also recover through a sign-in link in Account → Security within 15 minutes.
 
 **Fix:**
 1. Check the account under **Platform → Accounts → Users**: is it active, and

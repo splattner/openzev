@@ -57,10 +57,8 @@ class EmailChangeRequestView(APIView):
     re-point the account at an attacker's mailbox and keep it (the session alone
     proves nothing about the person holding it).
 
-    Accounts with no usable password — participants, who sign in by emailed
-    link, and OAuth-only accounts — cannot do this themselves: there is nothing
-    to re-authenticate with, and for participants the address is the community
-    owner's to maintain on the participant record. An admin can still edit it.
+    Participant-only addresses remain manager-maintained even after password setup.
+    Passwordless accounts cannot re-authenticate. Both use the administrator flow.
     """
 
     permission_classes = [IsAuthenticated]
@@ -70,6 +68,11 @@ class EmailChangeRequestView(APIView):
         user = request.user
         if impersonator_of(request.auth):
             return Response(NOT_WHILE_IMPERSONATING, status=status.HTTP_403_FORBIDDEN)
+        if email_change.is_managed(user):
+            return Response(
+                {"detail": "Your email address is managed by your administrator.", "code": "managed_email"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if not user.has_usable_password():
             return Response(
                 {"detail": "Your email address is managed by your administrator.", "code": "no_password"},
@@ -142,15 +145,18 @@ class EmailChangeConfirmView(APIView):
     def post(self, request, *args, **kwargs):
         invalid = Response({"detail": "This link is invalid or has expired."}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            user, new_email = email_change.resolve_token(str(request.data.get("token") or "").strip())
+            token = str(request.data.get("token") or "").strip()
+            user, new_email = email_change.resolve_token(token)
         except email_change.EmailChangeError:
             return invalid
 
         with transaction.atomic():
-            # Re-check under a row lock: two opens of the same link must not both
-            # apply, and the address may have changed since resolve_token read it.
-            locked = User.objects.select_for_update().get(pk=user.pk)
-            if locked.email != user.email or email_change.address_in_use(new_email, excluding=locked):
+            locked = User.objects.locked().filter(pk=user.pk).first()
+            if locked is None:
+                return invalid
+            try:
+                _, new_email = email_change.resolve_token(token, user=locked)
+            except email_change.EmailChangeError:
                 return invalid
             old_email = locked.email
             locked.email = new_email

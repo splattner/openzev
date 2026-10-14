@@ -11,12 +11,13 @@ import { useToast } from '../../lib/toast'
  *
  * Not part of the profile form: the email is the credential's anchor, so it
  * takes the current password and a confirmation link sent to the *new* address
- * before anything changes. Accounts with no password (participants, OAuth-only)
- * cannot re-authenticate, so they are told who maintains their address instead.
+ * before anything changes. Participant-only addresses remain manager-maintained;
+ * passwordless accounts cannot re-authenticate.
  */
 export function EmailChangeForm() {
     const { t } = useTranslation()
     const { user } = useAuth()
+    const managed = user?.can_change_email === false || user?.has_usable_password === false
     const { pushToast } = useToast()
 
     const [open, setOpen] = useState(false)
@@ -49,9 +50,9 @@ export function EmailChangeForm() {
                 <input type="email" value={user?.email ?? ''} disabled style={{ cursor: 'not-allowed' }} />
             </label>
 
-            {user?.has_usable_password === false && <small className="muted">{t('account.emailChange.managed')}</small>}
+            {managed && <small className="muted">{t('account.emailChange.managed')}</small>}
 
-            {user?.has_usable_password !== false && !open && (
+            {!managed && !open && (
                 <div>
                     <button type="button" className="button button-secondary button-compact" onClick={() => setOpen(true)}>
                         {t('account.emailChange.button')}
@@ -59,7 +60,7 @@ export function EmailChangeForm() {
                 </div>
             )}
 
-            {user?.has_usable_password !== false && open && (
+            {!managed && open && (
                 <form onSubmit={submit} style={{ display: 'grid', gap: '0.75rem' }}>
                     <small className="muted">{t('account.emailChange.hint')}</small>
                     <label>

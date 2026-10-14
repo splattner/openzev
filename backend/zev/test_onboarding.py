@@ -612,11 +612,11 @@ class LinkPromotionLockTests(TransactionTestCase):
         _url, token = get_participant_onboarding_link(participant)
         minting, release = Event(), Event()
 
-        def paused_mint(user):
+        def paused_mint(user, **kwargs):
             minting.set()
             if not release.wait(5):
                 raise TimeoutError("Session mint was not released")
-            return make_jwt_for_user(user)
+            return make_jwt_for_user(user, **kwargs)
 
         def consume():
             try:

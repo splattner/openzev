@@ -16,8 +16,10 @@ export interface User {
     must_change_password: boolean
     /** Account-level default community (ZEV id), always present; null = first managed by name. */
     preferred_zev: string | null
-    /** From /auth/me: whether the account can re-authenticate with a password (participants and OAuth-only accounts cannot). */
+    /** From /auth/me: whether this account has a usable password. */
     has_usable_password?: boolean
+    can_change_email?: boolean
+    password_recovery_expires_at?: string | null
     /** Present when this session is an impersonation session. */
     impersonated_by?: User
     /** From /auth/me: every community the account relates to (#761). */

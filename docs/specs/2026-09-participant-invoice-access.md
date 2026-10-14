@@ -296,7 +296,11 @@ catches `LinkRefused` from `link_account_for` and returns `None`; nothing is
 issued or sent. Eligibility, promotion and cancellation follow the canonical
 [onboarding account policy](2026-09-participant-onboarding-link.md#no-link-signs-in-an-account-with-its-own-login).
 Eligible accounts are created passwordless by `ensure_participant_account`,
-with `must_change_password=False`.
+with `must_change_password=False`. Requests preserve existing passwords and flags.
+Eligibility resolution and issuance share a transaction; `magic_links.issue` locks
+the user before token writes, serializing issuance with recovery and promotion.
+Email delivery occurs after that transaction. Issuance ordered after a password
+write may create a new link; a promoted account cannot consume participant links.
 
 **Throttle:** `MagicLinkRequestThrottle` at 5/hour keyed on the **invoice
 prefix**, with `InvoiceLinkThrottle`'s per-IP ceiling applying to the same view.
@@ -308,16 +312,20 @@ to bombard one mailbox, which an IP-keyed limit would not.
 `POST /api/v1/public/magic-link/consume/` with `{"token": "..."}`.
 
 Marks `consumed_at`, issues the normal auth cookies via the same helper
-`verify_email` uses, and returns the user payload. Subsequent requests are an
-ordinary participant session with ordinary participant scoping.
+`verify_email` uses, and returns `{"detail": "Signed in."}` (or the MFA challenge
+shape when required). Subsequent requests use ordinary participant scoping.
+After full authentication, including required MFA, pending credentials are retired
+and the session may reset its password; unflagged passwords are preserved. See
+[setup and recovery](2026-09-participant-onboarding-link.md#password-setup-and-explicit-recovery).
 
 A link whose account gained its own login after it was issued is spent without
 signing in (`magic_links.consume` returns `None`): such an account signs in with
 its own login (§5.3).
 
 Consumption locks the user before the token, matching access promotion's lock
-order. First independent access retires outstanding participant credentials
-and sessions (onboarding spec §4).
+order. The view holds that lock through challenge/session issuance; credentials
+remain unchanged while MFA is pending. First independent access retires participant
+credentials and sessions (onboarding spec §4).
 
 | Status | When |
 |---|---|

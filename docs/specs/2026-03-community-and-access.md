@@ -516,7 +516,7 @@ Two consequences for anything added later:
 
 **Two-factor challenge:** if the account has a second factor (a confirmed `TotpDevice` or a registered passkey), the password step returns `200 {"mfa_required": true, "mfa_token": "<signed>", "methods": ["totp", "recovery_code"]}` and sets **no** cookies. `POST /api/v1/auth/token/mfa/` `{mfa_token, code}` then completes the login (TOTP code or one-time recovery code). Magic-link consume and onboarding-link consume return the same challenge shape; the OAuth door honours an IdP `amr` claim instead (`OAuthProvider.require_mfa_claim`, default `False`). `methods` is `["recovery_code"]` for an account whose only factor is a passkey. A passkey (WebAuthn) itself signs in on its own via `POST /auth/passkeys/authenticate/{begin,complete}/` with no password and is never challenged. Accounts without a factor see the pre-2FA behaviour unchanged. Full contract: `2026-09-two-factor-authentication.md` §5.
 
-Helper `accounts.jwt_utils.make_jwt_for_user(user, *, impersonated_by=None) -> dict` and `add_custom_claims(token, user)` set the custom claims (used by `CustomTokenObtainPairSerializer`, every session-minting door — verify-email, set-initial-password, magic/onboarding links, OAuth, passkey — and impersonation, so all issue the same claims):
+Helper `accounts.jwt_utils.make_jwt_for_user(user, *, impersonated_by=None, participant_link=False) -> dict` and `add_custom_claims(token, user)` set the custom claims used by `CustomTokenObtainPairSerializer`, email verification, password writes, magic/onboarding links, OAuth, passkeys and impersonation:
 
 | Claim | Value |
 |---|---|
@@ -526,6 +526,7 @@ Helper `accounts.jwt_utils.make_jwt_for_user(user, *, impersonated_by=None) -> d
 | `must_change_password` | `user.must_change_password` |
 | `sv` | `user.session_version` — the account's session version when the token was issued (§5.6b) |
 | `impersonated_by` | admin id; only on impersonation sessions |
+| `password_recovery_until` | absolute Unix deadline, 15 minutes after completed participant-link login; preserved without extension by refresh, absent after recovery |
 
 **Session version check:** `CookieJWTAuthentication.get_user` refuses an access token whose `sv` (a missing claim reads as `0`) differs from `user.session_version` (`401`, code `session_revoked`) — see §5.6b. That check, and token validation generally, applies to an `Authorization: Bearer` header as before; an invalid, expired or signed-out **`openzev_access` cookie** is instead treated as no credentials (the browser sends it unprompted), so public `AllowAny` endpoints — the login page's `registration-enabled/` and `oauth/providers/` — keep answering `200`, while protected views answer `401` and drive the client's refresh.
 **MFA policy enforcement:** `CookieJWTAuthentication.authenticate` also refuses (`403`) an unsafe request from an account whose role requires two-factor authentication and is past its grace period with no factor enrolled, with a short exemption list for self-service security actions and every admin action on another account excluded — see `2026-09-two-factor-authentication.md` §7.3a. Not reached by `ApiKeyAuthentication` at all.
@@ -667,8 +668,8 @@ password. Otherwise returns 400 ("Use the change-password endpoint instead.").
 
 **Flow:**
 1. Validate password via Django password validators.
-2. Set password, clear `must_change_password` flag, revoke the account's other sessions (`revoke_sessions`, §5.6b), and revoke the account's onboarding links (`zev.onboarding.revoke_active_for_participant` — the link's stated purpose, "until they choose to set a password", is fulfilled, so a leaked mail must not stay a live bearer credential).
-3. Issue fresh JWT via `accounts.jwt_utils.make_jwt_for_user(user)` set as httpOnly cookies `openzev_access` / `openzev_refresh` (+ `csrftoken` via `get_token`) so updated claims take effect.
+2. Set password, clear `must_change_password`, then `_finish_password_change` revokes other sessions and all onboarding/magic links across the account's communities. API keys are retained.
+3. `keep_current_session` sets fresh auth cookies without recovery permission (preserving impersonation); schedule `password_changed` after commit. Audit `password.set_initial` carries both link-retirement counts and the actual prior `must_change_password` value (no invented diff when already false).
 
 ### 5.5 Password change
 
@@ -676,7 +677,8 @@ password. Otherwise returns 400 ("Use the change-password endpoint instead.").
 
 **Payload:** `{ old_password, new_password }`
 
-Validates old password, sets new password, clears `must_change_password`, then **signs the account out of every other session** (`revoke_sessions`, §5.6b) and revokes the account's onboarding links: whoever knew the old password, or held a stolen session, must not stay signed in. The response carries a fresh token pair under the new session version, so the caller stays signed in (an impersonation session stays an impersonation session). API keys are not revoked — they are separate credentials.
+Validates old password, sets new password, clears `must_change_password`, then **signs the account out of every other session** (`revoke_sessions`, §5.6b) and revokes the account's onboarding and outstanding magic links: whoever knew the old password, or held a stolen session, must not stay signed in. The response carries a fresh token pair under the new session version, so the caller stays signed in (an impersonation session stays an impersonation session). API keys are not revoked — they are separate credentials. `_finish_password_change` shares retirement, cookies and the post-commit notification with initial setup and recovery; `password.change` audits both link-retirement counts inside the password transaction;
+a failing audit insert rolls back credentials, sessions and links and schedules no notification.
 
 ### 5.6 Profile (me)
 
@@ -690,8 +692,17 @@ Validates old password, sets new password, clears `must_change_password`, then *
   to, in the shape of §6.4's `memberships` — and `may_create_zev: boolean`
   (#761).
 - GET additionally carries `has_usable_password: boolean` — whether the account
-  can re-authenticate with a password (participants and OAuth-only accounts
-  cannot); the email-change form (§5.6a) is offered only when it is true.
+  can re-authenticate with a password; participants may choose one in Account →
+  Security.
+- GET/PATCH carries `can_change_email: boolean`: usable password and no
+  manager-maintained participant identity (`email_change.is_managed`, reusing
+  participation presence from `memberships`). The email-change form (§5.6a) is offered only when true.
+- GET/PATCH carries `password_recovery_expires_at: ISO datetime | null`, derived
+  from the current link sign-in. Account → Security offers explicit
+  password replacement without the old password during that 15-minute window.
+  See [setup and recovery](2026-09-participant-onboarding-link.md#password-setup-and-explicit-recovery)
+  for eligibility, single use, retirement and failure behavior. Passwordless
+  accounts use the existing initial-password endpoint without an old-password field.
 - PATCH → partial update of **first name, last name and `preferred_zev` only**
   (`SelfUserSerializer`). A payload that tries to *change* `email`, `username`,
   `role`, `must_change_password` or `is_active` is rejected `400` naming the
@@ -722,7 +733,8 @@ a session holder).
 | Outcome | Response |
 |---|---|
 | Impersonation session | `403` |
-| Account has no usable password (participants — whose address the community owner maintains on the participant record — and OAuth-only accounts) | `403` `{code: "no_password"}` |
+| Participant-only account, including one with a chosen password (`email_change.is_managed`: has participations and does not require independent login) | `403` `{code: "managed_email"}`; the manager maintains its participant email |
+| Other account has no usable password | `403` `{code: "no_password"}` |
 | Malformed address / same as current / missing or wrong password | `400` (wrong password audited `auth.email_change.failed`, reason `bad_password`) |
 | Address held by another account (case-insensitive) | `202`, **same body as success**, no mail sent — cannot be used to find which addresses have accounts; audited `auth.email_change.failed` (`DENIED`, reason `address_in_use`) |
 | Otherwise | `202`; a confirmation link is emailed to the **new** address; audited `auth.email_change.requested`. A mail failure returns the same `202` body, is logged and audited as `auth.email_change.failed` (`FAILED`, reason `mail_failed`), and is not recorded as requested. |
@@ -733,19 +745,23 @@ where the fingerprint is a hash of the account's *current* address and password
 hash. It is stateless yet single-use and mortal: applying it changes the
 address, and any later change of address or password makes the fingerprint
 differ. It also dies if the account is deactivated or someone else took the
-target address meanwhile.
+target address meanwhile. A participant-only account cannot redeem it, including
+a token issued before the account became linked to a participant.
 
 **Confirm:** `POST /api/v1/auth/confirm-email-change/` `{ token }` (AllowAny,
 `AuthVerifyThrottle`, `auth_verify`) — unauthenticated because the link is opened
 from a mailbox, possibly on another device. Every refusal is the same `400 "This
-link is invalid or has expired."`. On success, under a row lock: set the
+link is invalid or has expired."`. `email_change.resolve_token(token, user=locked)`
+revalidates signature/expiry, account id, activity, current email/password fingerprint,
+managed-email policy and destination availability after the user lock is acquired.
+A deleted account also returns the generic refusal. On success: set the
 address, **revoke all sessions** (§5.6b), email the *previous* address (which
 shows only a masked new address), audit `auth.email_change.confirmed` (actor =
 the account, diff of `email`). No session is minted; the person signs in again
 with the new address.
 
 Frontend: `EmailChangeForm` (Profile tab; "managed by your administrator" hint
-when `has_usable_password` is false) and the public `/confirm-email-change`
+when `can_change_email` is false) and the public `/confirm-email-change`
 page (`ConfirmEmailChangePage`, spends the single-use link exactly once even
 under React StrictMode). The mails are fixed system messages
 (`accounts/emails.py`), deliberately not `EMAIL_TEMPLATE_DEFAULTS` entries: a
@@ -1870,6 +1886,7 @@ hook still rejects a missing provider. Details: SPEC-2026-10-zev-access-grants �
 | GET / PATCH | `/me/` | IsAuthenticated | View/update own profile |
 | POST | `/me/change-password/` | IsAuthenticated | Change password (requires old password) |
 | POST | `/me/set-initial-password/` | IsAuthenticated | Set password for first time (verification flow) |
+| POST | `/me/reset-password/` | IsAuthenticated, current eligible link JWT | Replace password without old value during the 15-minute recovery window; retire sessions/onboarding/magic links and keep caller signed in |
 | POST | `/me/email-change/` | IsAuthenticated | Ask for an email change; needs the current password; link goes to the new address (§5.6a) |
 | POST | `/confirm-email-change/` | AllowAny (token) | Apply an emailed email-change link (§5.6a) |
 | POST | `/me/sessions/revoke/` | IsAuthenticated | Sign out every other session (§5.6b) |
@@ -2173,10 +2190,11 @@ lists the test classes per module (test counts are the `test_*` methods).
 
 | Module | Classes | Tests | Coverage |
 |---|---|---|---|
-| `test_session_hardening.py` | 6 | 56 | Self-service profile lockdown (protected fields rejected, repeats accepted, names/preferred community still editable); session revocation (revoked/new/legacy tokens, dead access cookie leaves public endpoints working, refresh refusal, deactivation, stale-instance save cannot revive, API keys and impersonation); password change and revoke endpoints; verified email change (request/confirm, single-use, dies on password/address/deactivation/expiry, no enumeration, throttle, mail failure, API keys) |
+| `test_session_hardening.py` | 7 | 57 | Self-service profile lockdown (protected fields rejected, repeats accepted, names/preferred community still editable); session revocation (revoked/new/legacy tokens, dead access cookie leaves public endpoints working, refresh refusal, deactivation, stale-instance save cannot revive, API keys and impersonation); password change and revoke endpoints; verified email change (request/confirm, single-use, dies on password/address/deactivation/expiry, no enumeration, throttle, mail failure, API keys); PostgreSQL confirmation lock-wait revalidation for password/activity/expiry/destination/policy/deletion |
 | `test_security_notifications.py` | 5 | 26 | Every event composes (subject, body, `{detail}` filled, admin vs. self advice, no-turn-off line); guards (no address, inactive, gone/deactivated by send time); hooked into passkey add/remove, TOTP enable/disable (not for an abandoned enrolment), recovery-code regeneration, password change (not on failure), admin MFA reset (not when nothing was removed) and admin session revocation (not for the self-service one); a broker or mail failure never fails the triggering request |
 | `test_admin_users_list.py` | 2 | 13 | Admin user list: memberships per relationship (participant, owner-who-is-also-participant merged into one, owner of several communities sorted by name), confirmed-only `mfa_methods`, `last_login` exposed and `null` before the first sign-in, fixed query count, `/auth/me/` unaffected; `mfa_compliance` (`null` outside the policy, `"grace"` before the deadline, `"overdue"` after it, `"compliant"` once enrolled regardless of the deadline, no added query per account) |
 | `test_last_login.py` | 4 | 7 | `last_login` stamped by a plain password login (not by a failed one, not by the password step of a two-step login until `/token/mfa/` completes it) and by the auto-login after email verification; not restamped by a password change or by setting your initial password moments after verifying; untouched on either side of an impersonation session |
+| `test_password_recovery.py` | 2 | 28 | Password preservation, real TOTP/provenance, legacy challenges, recovery, retirement, managed email, audit accuracy/rollback and PostgreSQL consumption/reset/issuance races |
 | `test_admin_account_actions.py` | 2 | 12 | Account creation (generated password when omitted, returned once and never re-listed, two accounts get different passwords, a supplied password is still accepted, mismatched/weak supplied passwords rejected, generated password passes the validators anyway, response carries the new id, non-admin blocked); self-deactivation guard (blocked with a field error, deactivating someone else works and is audited, reactivating your own account is unaffected, deactivating someone else still revokes their sessions) |
 | `test_api_keys.py` | 10 | 81 | Generation, hashing, auth, read-only keys, scope deny-list, audit, throttling, CRUD, admin management |
 | `test_oauth.py` | 12 | 72 | Public endpoint validation, bounded JSON object responses, access-token/profile field types and model limits, numeric fallback IDs and linked login without email, redirect/credential containment, verified-email provisioning and linking, admin-only audited exception for trusted providers with an absent claim (new accounts only); provider listing, initiate, callback guards/redirects, link flow, social accounts, audit, `require_mfa_claim` (`OAuthMfaClaimTests`) |

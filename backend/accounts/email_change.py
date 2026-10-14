@@ -51,16 +51,26 @@ def address_in_use(email: str, *, excluding: User | None = None) -> bool:
     return accounts.exists()
 
 
+def is_managed(user: User, *, has_participations: bool | None = None) -> bool:
+    """Participant-only accounts use the address maintained on their participant record."""
+    from zev.services import requires_independent_login
+
+    if has_participations is None:
+        has_participations = user.participations.exists()
+    return has_participations and not requires_independent_login(user)
+
+
 def issue_token(user: User, new_email: str) -> str:
     return signing.dumps({"u": user.pk, "n": new_email, "f": _state_fingerprint(user)}, salt=SALT, compress=True)
 
 
-def resolve_token(token: str) -> tuple[User, str]:
+def resolve_token(token: str, *, user: User | None = None) -> tuple[User, str]:
     """The account and the address a valid token would move it to.
 
     Raises ``EmailChangeError`` for anything else: a bad or expired signature,
     a deactivated account, an account whose address or password has changed
     since the token was issued, or a target address someone else now holds.
+    Pass the locked user to revalidate the complete contract after a lock wait.
     """
     try:
         data = signing.loads(token, salt=SALT, max_age=LIFETIME_SECONDS)
@@ -68,8 +78,10 @@ def resolve_token(token: str) -> tuple[User, str]:
     except (signing.BadSignature, KeyError, TypeError):
         raise EmailChangeError from None
 
-    user = User.objects.filter(pk=user_id, is_active=True).first()
-    if user is None or _state_fingerprint(user) != fingerprint:
+    if user is None:
+        user = User.objects.filter(pk=user_id).first()
+    if (user is None or user.pk != user_id or not user.is_active
+            or is_managed(user) or _state_fingerprint(user) != fingerprint):
         raise EmailChangeError
     if address_in_use(new, excluding=user):
         raise EmailChangeError

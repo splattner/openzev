@@ -44,6 +44,8 @@ def issue(user) -> MagicLinkToken:
     twice should not leave a spare key lying in an inbox, and the most recent
     request is the one they are waiting for.
     """
+    # Serialize issuance with password writes and access promotion.
+    user = User.objects.locked().get(pk=user.pk)
     MagicLinkToken.objects.filter(user=user, consumed_at__isnull=True).update(
         consumed_at=timezone.now()
     )
@@ -77,10 +79,20 @@ def consume(token_value: str):
         token.consumed_at = timezone.now()
         token.save(update_fields=["consumed_at"])
 
-        if requires_independent_login(user):
+        if not user.is_active or requires_independent_login(user):
             return None
-        if user.must_change_password:
-            user.set_unusable_password()
-            user.must_change_password = False
-            user.save(update_fields=["password", "must_change_password"])
         return user
+
+
+def retire_pending_password(user) -> None:
+    """Retire pending credentials after full link authentication, under the user lock."""
+    if user.must_change_password:
+        user.set_unusable_password()
+        user.must_change_password = False
+        user.save(update_fields=["password", "must_change_password"])
+
+
+def revoke_for_user(user) -> int:
+    return MagicLinkToken.objects.filter(user=user, consumed_at__isnull=True).update(
+        consumed_at=timezone.now(),
+    )

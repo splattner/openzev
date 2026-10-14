@@ -45,7 +45,7 @@ class MfaChallengeError(Exception):
         super().__init__(reason)
 
 
-def issue_challenge(user: User) -> str:
+def issue_challenge(user: User, *, participant_link: bool = False) -> str:
     """Sign a token naming ``user``, valid for MFA_CHALLENGE_TTL.
 
     Deliberately a signed value, not a JWT: no authentication class in this
@@ -54,33 +54,34 @@ def issue_challenge(user: User) -> str:
     one — see ``test_challenge_token_cannot_authenticate_a_request``.
     """
     signer = signing.TimestampSigner(salt=MFA_CHALLENGE_SALT)
-    return signer.sign_object({"user": user.pk, "sv": user.session_version})
+    return signer.sign_object({
+        "user": user.pk, "sv": user.session_version, "participant_link": participant_link,
+    })
 
 
-def resolve_challenge(token: str) -> User:
-    """Resolve a challenge token to its user.
-
-    Raises ``MfaChallengeError`` (reason "expired_challenge" or
-    "invalid_challenge") rather than leaking which case applies to the
-    caller — only the audit log's reason field distinguishes them.
-    """
+def _challenge_payload(token: str) -> dict:
     signer = signing.TimestampSigner(salt=MFA_CHALLENGE_SALT)
     try:
-        payload = signer.unsign_object(token or "", max_age=MFA_CHALLENGE_TTL)
+        return signer.unsign_object(token or "", max_age=MFA_CHALLENGE_TTL)
     except signing.SignatureExpired:
         raise MfaChallengeError("expired_challenge") from None
     except (signing.BadSignature, ValueError, TypeError):
         raise MfaChallengeError("invalid_challenge") from None
 
+
+def resolve_challenge(token: str, *, lock: bool = False) -> tuple[User, bool]:
+    """Return the user and link provenance; locking requires an outer transaction."""
+    payload = _challenge_payload(token)
     try:
-        user = User.objects.get(pk=payload["user"], is_active=True)
+        users = User.objects.locked() if lock else User.objects.all()
+        user = users.get(pk=payload["user"], is_active=True)
+        if lock:
+            # Recheck expiry after waiting for the user lock.
+            payload = _challenge_payload(token)
         if payload["sv"] != user.session_version:
             raise MfaChallengeError("invalid_challenge")
-        return user
+        return user, payload.get("participant_link", False)
     except (User.DoesNotExist, ValueError, TypeError, KeyError):
-        # A malformed payload (missing keys, wrong types) can only come from a
-        # token this process did not issue — the signing key differs — but
-        # defence in depth is free.
         raise MfaChallengeError("invalid_challenge") from None
 
 

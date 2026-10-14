@@ -393,8 +393,13 @@ Mixin-driven events (`AuditedUpdateMixin`, `AuditedCreateDestroyMixin` in
 one `transaction.atomic()` block, so a failing audit insert rolls back the
 mutation it describes. The update mixin reads its before-snapshot outside
 that block, so the recorded diff is best-effort under concurrent writes.
-Hand-written `record_audit_event` call sites outside
-these mixins (invoice workflow transitions, user CRUD, account link/unlink)
+Password setup/change/recovery also write their audit event inside the credential
+transaction; audit failures roll back password/session/link changes and the post-commit
+notification. Initial setup records the actual prior pending-change flag. MFA login
+events distinguish `first_factor` (`password`/`participant_link`) and `second_factor`
+(`totp`/`recovery_code`); the existing `method` key is retained, with
+`participant_link+totp` for link/TOTP logins.
+Other hand-written `record_audit_event` call sites outside these mixins (invoice workflow transitions, user CRUD, account link/unlink)
 are follow-up work and are not yet transactional.
 
 ### 6.3 Initial workflow coverage matrix

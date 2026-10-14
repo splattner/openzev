@@ -704,10 +704,7 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 				# The role is no longer rewritten (#761): what an account may
 				# do comes from its grants and participant rows.
 				self.assertEqual(account.role, role)
-				# A login of its own (admin, self-registered, manager) must
-				# survive being invited as a participant — only an account
-				# with no login of its own is neutralized.
-				self.assertEqual(account.has_usable_password(), has_own_login)
+				self.assertTrue(account.check_password("pass1234"))
 				if has_own_login:
 					# It signs in with that login; a link would hand it to
 					# whoever holds the link — even when an admin asks.

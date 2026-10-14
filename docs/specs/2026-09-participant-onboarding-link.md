@@ -74,10 +74,11 @@ without leaving an immortal credential behind.
   override was judged not worth threading through a function used by every
   participant save. An operator who needs a specific username can still
   rename the account afterwards via the existing edit-user action.
-- **Migrating existing participant accounts.** An account issued before this
-  change keeps whatever password it has until it is next touched by
-  `ensure_participant_account` (any participant save, or an onboarding/magic
-  link), at which point it is neutralized. There is no bulk sweep.
+- **Migrating existing participant accounts.** No bulk sweep or password-origin
+  field is needed. Existing passwords and `must_change_password` survive account
+  synchronization and link generation. A valid participant-link consumption
+  retires a password after full authentication only when `must_change_password=True`; the flag describes
+  a pending change, including one requested by an admin, rather than its origin.
 
 ## 3. What this replaces, and why it is a removal rather than a new door
 
@@ -157,16 +158,14 @@ just this — already sets the clear-text precedent.
 
 The single function every account-creating path now goes through
 (`ParticipantSerializer`, the onboarding actions, `accounts.magic_links`).
-Behavioural change: for a **participant-only** account, it always ends with
-`set_unusable_password()` and `must_change_password=False` — on creation, and
-on every touch of an already-linked account that still carries a usable
-password (the upgrade safety net).
+New **participant-only** accounts are passwordless with `must_change_password=False`.
+Existing accounts keep their password and pending-change flag through participant
+edits, onboarding copy/send and invoice sign-in-link requests.
 
 **Leaves an account with its own login untouched** when it also happens to be
 linked as a participant (eligibility below). Its password, email and name are unchanged: participant edits
 must not alter its authentication identity. Only an account without its own
-login follows its participant record (`sync_participant_user_fields`) and has
-its password neutralized.
+login follows its participant record (`sync_participant_user_fields`).
 
 ### No link signs in an account with its own login
 
@@ -285,12 +284,10 @@ link" action calls `onboarding-link`.
 A consume request that resolved the token before unlink must recheck it under lock;
 it cannot recreate an account or issue a session after revocation commits.
 
-`set-initial-password` (`POST /auth/me/set-initial-password/`) and
-`change-password` (`POST /auth/me/change-password/`) revoke the account's
-onboarding links as well (audited as `onboarding_links_revoked` metadata on
-`password.set_initial` / `password.change`): the link's purpose is fulfilled
-once a password exists, so a leaked mail must not stay a live bearer
-credential afterwards.
+All password writes (`set-initial-password`, `change-password`, `reset-password`)
+retire the account's onboarding and outstanding magic links. Audit metadata records
+`onboarding_links_revoked` and `magic_links_revoked`; the caller keeps fresh cookies
+without recovery permission, and `password_changed` is scheduled after commit.
 
 `zev.onboarding.resolve(prefix, secret)` compares the secret first and returns
 `None` for an expired token exactly as for a revoked one (same 404 on consume —
@@ -298,9 +295,60 @@ see the enumeration comment in `invoices/views_public.py`).
 `get_or_create_for_participant`
 revokes an expired active token and mints a fresh one (new secret, never an
 extension), so "copy onboarding link" / "resend" always hands out a live link.
-Concurrent copy/send requests are serialized by the partial unique constraint
-(one unrevoked link per participant): the loser returns the winner's link
-rather than minting a second live one.
+Concurrent copy/send requests serialize on the participant row; the loser returns
+the winner's link. The partial unique constraint is the backstop.
+
+### Password setup and explicit recovery
+
+Valid onboarding consumption locks party → user → participant, then re-resolves
+the token's secret, expiry, revocation and disabled-ZEV status before synchronizing
+the current account. A request waiting behind password recovery cannot use a
+token read before its revocation. Both onboarding and magic-link consumption
+use `accounts.magic_links.retire_pending_password` to clear the password and flag
+only when `must_change_password=True`, after full authentication, including MFA.
+Issuing a challenge, failing it, or abandoning it leaves both unchanged.
+An unflagged chosen password survives sign-in. Inactive accounts are refused by
+both link doors without changing pending credentials.
+
+After completed eligible link authentication (including any MFA), JWTs carry
+`password_recovery_until`, an absolute Unix deadline from `PASSWORD_RECOVERY_WINDOW`
+(15 minutes). Refresh preserves it; `/auth/me/` exposes it as
+`password_recovery_expires_at: ISO datetime | null`. Sessions without a future
+integer claim skip account-eligibility queries.
+Ordinary password/OAuth/passkey sessions, API keys and impersonation have no recovery permission.
+
+`POST /auth/me/reset-password/` takes `{new_password}`. Under the user lock it
+checks the JWT's account id, current session version, live deadline and independent
+login boundary. Missing/expired/ineligible authority returns 403 with
+`code=password_recovery_required`; stale sessions return 401. Password validation
+failures return 400 without changing credentials or spending permission.
+Success validates and stores the password, clears `must_change_password`, bumps
+the session version, revokes all unrevoked onboarding links and outstanding magic
+tokens across the account's communities, and reissues caller cookies without
+recovery authority. API keys keep their separate semantics. Cookie requests require
+CSRF; API keys are denied; MFA-enrolment policy exempts this self-protective endpoint.
+No browser throttle is added: this authenticated action does not guess a credential,
+and success invalidates its permission through the session-version bump.
+Audit `password.reset` records success/denial, with success counts
+`onboarding_links_revoked` and `magic_links_revoked`; successful recovery schedules
+the existing `password_changed` notification after commit. All three password
+endpoints share `_finish_password_change` for retirement, cookies and notification.
+All password audits share their credential-write transaction; a failed insert rolls
+back the password, session version and retired links. No password or bearer secret
+is recorded. Magic-link issuance uses the same user lock, so tokens cannot be inserted
+inside an uncommitted retirement; later authorized issuance remains possible.
+
+Account → Security offers first-time setup without an old password via
+`set-initial-password` when `has_usable_password=False`. Existing passwords use
+the ordinary change form, with an explicit recovery action while link authority
+is live. Expiry disables recovery and asks for fresh link sign-in. Selection is tied
+to the displayed deadline; a changed/removed permission returns to ordinary change
+without clearing entered fields. Successful writes show success even if the subsequent
+profile refresh fails; refresh errors separately ask the user to reload. Signup,
+invitation and passwordless independent-account setup retain their existing gate.
+Participant-only email addresses remain manager-maintained even after password setup
+(`can_change_email=False`); both email-change request and confirmation enforce this.
+Passwords already wiped cannot be restored; the participant chooses a new one.
 
 `ParticipantSerializer` gains a computed `onboarding_status` field —
 `not_sent` / `sent` / `active` / `revoked` / `expired` — read from the participant's most
@@ -381,6 +429,12 @@ acceptable because:
 - an operator who suspects a link has leaked has an explicit, one-click way
   to kill it, discoverable from the same row that shows its status.
 
+A stolen participant link can also establish a durable password during recovery,
+subject to any required MFA. The 15-minute deadline limits the interval after login,
+not a stolen link's own lifetime. Password writes retire old sign-in links and
+sessions, and notify the account address. These limits do not eliminate mailbox or
+link compromise; accounts with independent access remain unreachable through this door.
+
 A disabled ZEV is one more kill switch, not one this spec originally
 anticipated: `onboarding.resolve()` returns `None` for a disabled ZEV's
 token, same as an unknown prefix or a wrong secret, so `onboarding_consume`
@@ -389,12 +443,9 @@ phase 2 — see `2026-03-community-and-access.md` §7.1a).
 
 ## 9. Deferred / open
 
-- **Returning without the link.** Phase 1 does not yet add "set a password"
-  as an offered action after sign-in, nor a "view online" link in the
-  ordinary invoice email — both listed in #712 as the real fix for
-  "onboarding and returning are different problems." The reusable link
-  covers the immediate gap; those are the more complete answer and are left
-  for a follow-up.
+- **Invoice email entry.** A "view online" link in the ordinary invoice email
+  remains deferred. Password setup and explicit link-authorized recovery are
+  offered in Account → Security.
 - **Empty landing state.** A participant onboarded at founding, before any
   invoice exists, lands on `/me/invoices` with nothing in it. Not addressed
   here.

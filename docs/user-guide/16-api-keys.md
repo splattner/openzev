@@ -104,7 +104,7 @@ Some endpoints refuse key authentication regardless of your role, returning
 | Endpoint | Why |
 | --- | --- |
 | `auth/token/refresh/` | A key must not be upgradeable into a browser session |
-| `auth/me/change-password/`, `auth/me/set-initial-password/` | Otherwise a leaked key locks the real owner out |
+| `auth/me/change-password/`, `auth/me/set-initial-password/`, `auth/me/reset-password/` | Otherwise a leaked key locks the real owner out |
 | `auth/me/` (PATCH), `auth/me/email-change/` | Moving the account email moves password recovery with it |
 | `auth/me/sessions/revoke/`, `auth/users/<id>/revoke-sessions/` | A key must not be able to sign its owner out |
 | `auth/users/` writes, `auth/users/<id>/impersonate/` | An admin's key must not be able to become somebody else |

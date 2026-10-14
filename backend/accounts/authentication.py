@@ -106,6 +106,7 @@ MFA_ENROLMENT_EXEMPT_URL_NAMES: dict[str, frozenset[str] | None] = {
     "me": None,
     "change-password": None,
     "set-initial-password": None,
+    "reset-password": None,
     "email-change-request": None,
     "email-change-confirm": None,
     "password-reset-request": None,

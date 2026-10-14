@@ -9,7 +9,7 @@ from .views import (
     UserDetailView, me, change_password, app_settings,
     VatRateListCreateView, VatRateDetailView,
     feature_flags_list, feature_flag_update, registration_enabled,
-    register, verify_email, set_initial_password,
+    register, verify_email, set_initial_password, reset_password,
 )
 from .views_oauth import (
     OAuthProviderDetailView,
@@ -59,6 +59,7 @@ urlpatterns = [
     path("me/", me, name="me"),
     path("me/change-password/", change_password, name="change-password"),
     path("me/set-initial-password/", set_initial_password, name="set-initial-password"),
+    path("me/reset-password/", reset_password, name="reset-password"),
     # Like the MFA routes, absent from ACCOUNTS_API_KEY_ALLOWLIST (default-deny):
     # a key must not be able to re-point or sign out its own owner's account.
     path("me/email-change/", EmailChangeRequestView.as_view(), name="email-change-request"),
