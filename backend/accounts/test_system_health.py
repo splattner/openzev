@@ -1,7 +1,7 @@
 """Tests for the admin-only system-health endpoint (nav-regroup phase 3).
 
 The endpoint must degrade gracefully: every probe is best-effort, so the
-suite asserts on response shape and permissions, never on a live Redis or
+suite asserts on response shape and permissions, never on a live broker or
 SMTP being reachable.
 """
 

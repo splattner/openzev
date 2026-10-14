@@ -18,7 +18,7 @@ configuration.
 ## Not included
 
 - PostgreSQL deployment
-- Redis deployment
+- Valkey (or Redis) deployment
 
 ## Install
 
@@ -323,26 +323,37 @@ email:
     key: EMAIL_HOST_PASSWORD
 ```
 
-## Redis
+## Valkey
 
-Redis is external to this chart (see [Not included](#not-included)). Point the
-Celery broker at `redis.url`, and the cache database (e.g. geocoding results —
-kept on a separate logical Redis DB so cache keys never collide with Celery's
-broker) at `redis.cacheUrl`:
+Valkey is external to this chart (see [Not included](#not-included)). Any
+Redis-compatible server works: Valkey speaks the Redis protocol, so the URLs
+keep the `redis://` scheme. Point the Celery broker at `valkey.url`, and the
+cache database (e.g. geocoding results — kept on a separate logical DB so
+cache keys never collide with Celery's broker) at `valkey.cacheUrl`:
 
 ```yaml
-redis:
-  url: redis://redis.example.svc.cluster.local:6379/0
-  cacheUrl: redis://redis.example.svc.cluster.local:6379/1
+valkey:
+  url: redis://valkey.example.svc.cluster.local:6379/0
+  cacheUrl: redis://valkey.example.svc.cluster.local:6379/1
 ```
 
 All backend replicas must share this cache for registration reservations and
 throttles; a process-local cache does not coordinate workers.
 
+### Upgrading from `redis.*`
+
+Earlier chart versions configured this under `redis.url` and `redis.cacheUrl`.
+Those values are deprecated but still honoured: when set they take precedence
+over `valkey.*`, so an existing install that overrides them keeps pointing at
+its current server (Redis or Valkey) with no change. Move the values to
+`valkey.*` when convenient. The chart default now points at a host named
+`valkey`; installs that relied on the old default host `redis` must set
+`valkey.url` / `valkey.cacheUrl` (or keep `redis.*`).
+
 ## Example values
 
 A complete production-oriented example covering the required Django host,
-trusted-origin and passkey settings, external database and Redis, secrets,
+trusted-origin and passkey settings, external database and Valkey, secrets,
 email, and ingress. This block is kept in sync with the `DEBUG=False`
 production system checks by `backend/config/test_helm_example.py`:
 
@@ -362,9 +373,9 @@ database:
     name: openzev-db-secret
     key: DATABASE_URL
 
-redis:
-  url: redis://redis.example.svc.cluster.local:6379/0
-  cacheUrl: redis://redis.example.svc.cluster.local:6379/1
+valkey:
+  url: redis://valkey.example.svc.cluster.local:6379/0
+  cacheUrl: redis://valkey.example.svc.cluster.local:6379/1
 
 secretKey:
   existingSecret:

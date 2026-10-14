@@ -35,7 +35,7 @@ def _isolated_media(tmp_path_factory):
 def _no_broker_calls(monkeypatch):
     """Keep ``.delay()`` from reaching a real broker.
 
-    There is no Redis in CI, so a view that queues work would otherwise spend
+    There is no broker in CI, so a view that queues work would otherwise spend
     the connection retry budget before failing — minutes of test time, and a
     failure that says nothing about the code under test. Tests that care
     whether something was queued patch the task themselves, and that patch

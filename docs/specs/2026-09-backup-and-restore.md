@@ -274,7 +274,7 @@ encryption key decision.
   migration state or a newer one, never an older one.
 - **Moving `MEDIA_ROOT` to object storage.** Orthogonal; this spec copies media
   into the archive and does not change how the app stores files.
-- **Backing up the Celery broker, Redis cache, or in-flight tasks.**
+- **Backing up the Celery broker, Valkey cache, or in-flight tasks.**
 - **Per-participant or per-invoice restore granularity.** The unit is the ZEV.
 
 ### Phasing

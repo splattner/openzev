@@ -102,14 +102,14 @@ jobs:
                       database-url: postgres://openzev:openzev@localhost:5432/openzev
         env:
             DATABASE_URL: ${{ matrix.database-url }}
-            TEST_REDIS_URL: redis://localhost:6379/15
+            TEST_VALKEY_URL: redis://localhost:6379/15
         services:
-            redis:
-                image: redis:8-alpine
+            valkey:
+                image: valkey/valkey:9-alpine
                 ports:
                     - 6379:6379
                 options: >-
-                    --health-cmd "redis-cli ping"
+                    --health-cmd "valkey-cli ping"
                     --health-interval 10s
                     --health-timeout 5s
                     --health-retries 5

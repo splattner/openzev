@@ -460,7 +460,7 @@ to the backend deployment only (workers never touch a TOTP secret), following th
 pattern — a plain `value` is accepted for parity, but an `existingSecret` reference is the
 documented production route. The three WebAuthn settings ship as `webauthn.{rpId, rpName, origin}` (each optional; the backend defaults to development values), and `manage.py check` gains `accounts.W002` when `DEBUG` is off and the RP ID/origin are not configured for a public HTTPS origin.
 
-**Challenge storage.** WebAuthn ceremony challenges live in the Django cache (Redis in
+**Challenge storage.** WebAuthn ceremony challenges live in the Django cache (Valkey in
 production) under `mfa:webauthn:{user_pk|session_key}` with a 5-minute TTL — they are
 single-use by construction and must not outlive the ceremony.
 

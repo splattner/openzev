@@ -13,9 +13,9 @@ from config.cache import delete_if_value
 def reservation_cache(request):
     prefix = "mail-slot-test-" + uuid.uuid4().hex
     if request.param == "redis":
-        url = os.environ.get("TEST_REDIS_URL")
+        url = os.environ.get("TEST_VALKEY_URL")
         if not url:
-            pytest.skip("Set TEST_REDIS_URL to exercise the production Redis operation")
+            pytest.skip("Set TEST_VALKEY_URL to exercise the production Valkey/Redis operation")
         backend = {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": url}
     else:
         backend = {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": prefix}

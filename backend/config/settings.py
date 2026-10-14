@@ -318,7 +318,8 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="openzev@example.com")
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
-# Separate logical Redis DB from the Celery broker (db 0) so cache keys never
+# Valkey (Redis-compatible, hence the redis:// scheme and Django's Redis backend).
+# Separate logical DB from the Celery broker (db 0) so cache keys never
 # collide with Celery's own bookkeeping keys.
 CACHES = {
     "default": {

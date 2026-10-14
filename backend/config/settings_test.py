@@ -12,7 +12,7 @@ from .settings import *  # noqa: F401,F403
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 # Every participant read touches the geocoding cache (ParticipantSerializer's
-# building_footprint field). Tests shouldn't need a real Redis instance for that —
+# building_footprint field). Tests shouldn't need a real Valkey/Redis instance for that —
 # an in-memory cache behaves the same for anything under test.
 CACHES = {
     "default": {

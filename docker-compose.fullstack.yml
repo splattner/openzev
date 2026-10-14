@@ -1,5 +1,5 @@
 # Single-container self-hosting stack. Requires backend/.env — see README "Self-hosting".
-# Only 8080 is published; db/redis talk over the compose network.
+# Only 8080 is published; db/valkey talk over the compose network.
 services:
   app:
     build:
@@ -11,13 +11,13 @@ services:
       - backend/.env
     environment:
       DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CACHE_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://valkey:6379/0
+      CACHE_URL: redis://valkey:6379/1
       # One trusted proxy hop: the fullstack nginx overwrites X-Forwarded-For.
       NUM_PROXIES: 1
     depends_on:
       - db
-      - redis
+      - valkey
     ports:
       - "8080:80"
     volumes:
@@ -32,13 +32,13 @@ services:
       - backend/.env
     environment:
       DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CACHE_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://valkey:6379/0
+      CACHE_URL: redis://valkey:6379/1
     volumes:
       - backend_media:/app/media
     depends_on:
       - app
-      - redis
+      - valkey
 
   beat:
     build:
@@ -49,11 +49,11 @@ services:
       - backend/.env
     environment:
       DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CACHE_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://valkey:6379/0
+      CACHE_URL: redis://valkey:6379/1
     depends_on:
       - app
-      - redis
+      - valkey
     # On a fresh stack, migrations run inside the app container's own
     # startup command and this container can win the race and start before
     # they land — django_celery_beat's scheduler tables won't exist yet and
@@ -75,8 +75,8 @@ services:
       # differing path silently gives this stack its own cluster (#492).
       - postgres_data:/var/lib/postgresql/data
 
-  redis:
-    image: redis:8-alpine
+  valkey:
+    image: valkey/valkey:9-alpine
 
 volumes:
   postgres_data:

@@ -172,12 +172,18 @@ database:
     name: ""
     key: DATABASE_URL
 
-# Redis is external to this chart.
-redis:
-  url: "redis://redis:6379/0"
-  # Cache DB (e.g. geocoding results) — kept on a separate logical Redis DB
+# Valkey (or any Redis-compatible server) is external to this chart.
+valkey:
+  url: "redis://valkey:6379/0"
+  # Cache DB (e.g. geocoding results) — kept on a separate logical DB
   # from the Celery broker above so cache keys never collide with Celery's.
-  cacheUrl: "redis://redis:6379/1"
+  cacheUrl: "redis://valkey:6379/1"
+
+# Deprecated: use `valkey` above. When set, these still take precedence so
+# existing installs that override `redis.url` / `redis.cacheUrl` keep working.
+redis:
+  url: ""
+  cacheUrl: ""
 
 email:
   backend: "django.core.mail.backends.console.EmailBackend"

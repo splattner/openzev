@@ -280,9 +280,9 @@ snapshot of platform infrastructure:
 
 - **Database** — engine (PostgreSQL/SQLite) and size; `degraded` if the probe
   fails
-- **Celery** — number of workers responding to a ping and the Redis queue
-  depth; `unknown` means no broker is reachable (local development without
-  Redis reports unknown, which is a valid state, not an outage)
+- **Celery** — number of workers responding to a ping and the broker queue
+  depth; `unknown` means no broker is reachable (local development without a
+  broker reports unknown, which is a valid state, not an outage)
 - **Email** — the configured backend mode (SMTP, console, in-memory, custom)
 - **Energy data** — whether participants' [own energy data](20-energy-data.md) is
   switched on, how many sources are configured (disconnected ones included),

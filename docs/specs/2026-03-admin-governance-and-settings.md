@@ -466,7 +466,7 @@ link the invoice breakdown to `/admin/invoices` and email statistics to
 - Five probe cards in `.grid.grid-3`, each with a status dot (`.dot` —
   `.dot-success`/`.dot-warning`/`.dot-info` mapped from `ok`/`degraded`/`unknown`):
   Database (engine + `formatBytes` size; SQLite uses page count × page size,
-  including in-memory databases), Celery (workers responding, Redis
+  including in-memory databases), Celery (workers responding, Valkey/Redis
   default-queue depth, exception-class-only `detail` on broker errors), MFA
   (whether its encryption key is configured), Backups (latest successful backup,
   staleness, and whether creation is blocked by a missing required key or a

@@ -17,21 +17,21 @@ x-openzev: &openzev
     - .env
   environment:
     DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
-    CELERY_BROKER_URL: redis://redis:6379/0
-    CACHE_URL: redis://redis:6379/1
+    CELERY_BROKER_URL: redis://valkey:6379/0
+    CACHE_URL: redis://valkey:6379/1
 
 services:
   app:
     <<: *openzev
     environment:
       DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CACHE_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://valkey:6379/0
+      CACHE_URL: redis://valkey:6379/1
       # One trusted proxy hop: the bundled nginx overwrites X-Forwarded-For.
       NUM_PROXIES: 1
     depends_on:
       - db
-      - redis
+      - valkey
     ports:
       - "8080:80"
     volumes:
@@ -42,7 +42,7 @@ services:
     command: celery -A config worker -l info
     depends_on:
       - app
-      - redis
+      - valkey
     volumes:
       - backend_media:/app/media
 
@@ -51,7 +51,7 @@ services:
     command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     depends_on:
       - app
-      - redis
+      - valkey
     # On a fresh stack, migrations run inside the app container's own
     # startup command and this container can win the race and start before
     # they land — django_celery_beat's scheduler tables won't exist yet and
@@ -73,8 +73,8 @@ services:
       # docker-compose.yml (#492).
       - postgres_data:/var/lib/postgresql/data
 
-  redis:
-    image: redis:8-alpine
+  valkey:
+    image: valkey/valkey:9-alpine
 
 volumes:
   postgres_data:

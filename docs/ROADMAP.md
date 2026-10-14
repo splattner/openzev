@@ -296,10 +296,10 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Feature | Status | Priority | Notes / Spec |
 |---|---|---|---|
 | Multi-tenant architecture (all data ZEV-scoped, object-level enforcement) | `shipped` | — | [ADR 0003](adr/0003-role-and-zev-scope-enforcement.md) |
-| Async job processing with Celery + Redis (email delivery, retries, correlation) | `shipped` | — | [ADR 0004](adr/0004-async-invoice-email-delivery.md) |
+| Async job processing with Celery + Valkey (email delivery, retries, correlation) | `shipped` | — | [ADR 0004](adr/0004-async-invoice-email-delivery.md) |
 | UTC storage and explicit timezone handling | `shipped` | — | [ADR 0007](adr/0007-timezone-policy.md), superseded by ADR 0026 |
 | Swiss civil time for billing, analytics and import (UTC instants, Europe/Zurich days and hours, import timezone setting, legacy re-anchoring) | `in-progress` | `high` | [ADR 0026](adr/0026-swiss-civil-time-for-billing.md), [spec](specs/2026-09-swiss-civil-time.md) |
-| Docker Compose local development setup (backend, frontend, DB, Redis, Celery) | `shipped` | — | — |
+| Docker Compose local development setup (backend, frontend, DB, Valkey, Celery) | `shipped` | — | — |
 | Helm chart for Kubernetes deployment | `shipped` | — | — |
 | Single-container fullstack Dockerfile with nginx | `shipped` | — | — |
 | Automated release pipeline with SBOM attachment | `shipped` | — | — |

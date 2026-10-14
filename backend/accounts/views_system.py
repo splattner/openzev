@@ -2,7 +2,7 @@
 
 Backs the "System health" tab of the admin Overview hub: a read-only snapshot
 of database, Celery worker/broker, and email-backend status. Every probe is
-best-effort — a probe that cannot run (no Redis in a test/dev environment,
+best-effort — a probe that cannot run (no broker in a test/dev environment,
 unreachable broker) reports ``status: "unknown"`` with the reason instead
 of failing the whole endpoint, so the tab degrades gracefully the same way
 the readiness cockpit does.
@@ -92,7 +92,7 @@ def _probe_celery() -> dict:
     """Worker ping + broker queue depth, both best-effort.
 
     Returns ``status: "unknown"`` when no broker is reachable (local dev
-    without Redis, CI, test suite) — that is a valid, reportable state, not
+    without a broker, CI, test suite) — that is a valid, reportable state, not
     an error.
     """
     workers_responding: int | None = None
@@ -103,7 +103,7 @@ def _probe_celery() -> dict:
         from config.celery import app as celery_app
 
         # The ping timeout only bounds waiting for replies. Bound connection
-        # establishment and Redis socket operations too, and disable Kombu's
+        # establishment and broker socket operations too, and disable Kombu's
         # default connection retries for this interactive diagnostic.
         with celery_app.connection_for_write(
             connect_timeout=QUEUE_TIMEOUT_SECONDS,
@@ -123,7 +123,7 @@ def _probe_celery() -> dict:
             try:
                 if conn.transport.driver_type == "redis":
                     queue = celery_app.conf.task_default_queue
-                    # queue_declare(passive=True) uses Redis transport's size
+                    # queue_declare(passive=True) uses the Redis transport's size
                     # calculation, including every configured priority bucket.
                     queue_depth = int(conn.default_channel.queue_declare(queue=queue, passive=True).message_count)
             except Exception:  # noqa: BLE001 — queue depth is optional diagnostics

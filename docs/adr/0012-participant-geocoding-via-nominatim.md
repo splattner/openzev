@@ -17,7 +17,7 @@ Geocode participant addresses server-side, on a cache-only basis — no new data
 
 - `zev/geocoding.py` calls Nominatim's structured search (`street`, `postalcode`, `city`, `country=Switzerland`, `polygon_geojson=1`) and only accepts a result as a building if: (a) it's tagged `building`/`house`, or its bounding box is small enough (≤150m diagonal) to plausibly be one building rather than a street/postal-code/city-level fallback match, **and** (b) Nominatim actually returned a `Polygon`/`MultiPolygon` geometry — i.e. the address resolved to a real mapped OSM way/relation, not just a bare address point with no drawn footprint. Anything coarser, unmatched, or geometry-less is treated as "not found."
 - The cached (and API-exposed) value is the real GeoJSON geometry — the polygon's actual nodes, in GeoJSON's native `[longitude, latitude]` order — not a derived bounding box. The bounding box is only used internally, transiently, for the size guard above.
-- Results are cached in Redis via Django's cache framework (`CACHES["default"]`, a Redis DB distinct from the Celery broker's), keyed by a hash of the normalized address. Positive matches get a long TTL (~180 days, since buildings don't move); negative results get a short TTL (~7 days) so a later-corrected typo isn't stuck.
+- Results are cached in Valkey via Django's cache framework (`CACHES["default"]`, a logical Valkey DB distinct from the Celery broker's), keyed by a hash of the normalized address. Positive matches get a long TTL (~180 days, since buildings don't move); negative results get a short TTL (~7 days) so a later-corrected typo isn't stuck.
 - A Celery task (`zev/tasks.py::warm_participant_geocode_cache_task`) warms the cache when a participant is created/updated with an address (via `ParticipantSerializer.create/update` and the ZEV-with-owner bootstrap path in `zev/services.py`). It's safe to enqueue unconditionally — the task is a no-op once the address is cached — so no "did the address actually change" diffing is needed.
 - `ParticipantSerializer.building_footprint` is a `SerializerMethodField` that reads the cache at serialization time. It never calls Nominatim itself, so API reads stay fast and never touch the network.
 - The frontend renders the geometry with react-leaflet's `<GeoJSON>` layer (not a hand-computed `<Rectangle>`), so Leaflet draws the polygon's real, possibly angled, edges — including holes for a `MultiPolygon`, handled natively.
@@ -35,7 +35,7 @@ Positive:
 - Reads (participant list/detail) never block on or fail because of the external service.
 
 Trade-offs:
-- Cache eviction (Redis restart, `FLUSHALL`, memory pressure) silently loses geocoding data; it self-heals on the next create/update of an affected participant, or a re-run of the backfill command, but there's a window with no map data for those participants.
+- Cache eviction (Valkey restart, `FLUSHALL`, memory pressure) silently loses geocoding data; it self-heals on the next create/update of an affected participant, or a re-run of the backfill command, but there's a window with no map data for those participants.
 - No manual correction path yet if Nominatim's automatic building match is wrong or missing — deferred to keep this iteration's scope tight.
 - The Swiss-only assumption is implicit in the geocoding query, not a stored/validated participant field — an address for a different country would silently geocode incorrectly rather than failing loudly.
 

@@ -8,7 +8,7 @@ This file gives coding agents the minimum project-specific context needed to wor
 
 - `backend/` — Django + Django REST Framework backend
 - `frontend/` — React + TypeScript + Vite frontend
-- `docker-compose.dev.yml` — the development stack (backend with live reload, Vite dev server with HMR, Celery worker + beat, Postgres, Redis); this is the one used day to day
+- `docker-compose.dev.yml` — the development stack (backend with live reload, Vite dev server with HMR, Celery worker + beat, Postgres, Valkey); this is the one used day to day
 - `docker-compose.yml` — production-like local stack (built frontend behind nginx)
 - `deploy/docker-compose.yml` — the production stack from the published fullstack image; attached to every release (release-please bumps its default image tag, so don't edit that tag by hand)
 - `docs/specs/`, `docs/adr/` — feature specs and architecture decisions
@@ -20,7 +20,7 @@ This file gives coding agents the minimum project-specific context needed to wor
 
 - Backend: Django, DRF, pytest
 - Frontend: React, TypeScript, TanStack Query, Vite
-- Async jobs: Celery + Redis
+- Async jobs: Celery + Valkey
 - DB: PostgreSQL
 - Use the Node version pinned in `.node-version` for frontend commands and tests; verify with `node --version` before running them
 

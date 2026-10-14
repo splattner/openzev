@@ -7,7 +7,7 @@
 
 Invoice emails require PDF generation, template rendering, external SMTP delivery, retries, and user-visible status tracking. Doing this synchronously in request/response would increase latency and fail unpredictably on transient email issues.
 
-The current system already uses Celery + Redis and keeps per-invoice email logs.
+The current system already uses Celery + Valkey (Redis-compatible; Redis until the 2026-10 switch) and keeps per-invoice email logs.
 
 ## Decision
 

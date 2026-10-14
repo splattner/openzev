@@ -70,9 +70,9 @@ spec:
               value: {{ .Values.database.url | quote }}
               {{- end }}
             - name: CELERY_BROKER_URL
-              value: {{ .Values.redis.url | quote }}
+              value: {{ .Values.redis.url | default .Values.valkey.url | quote }}
             - name: CACHE_URL
-              value: {{ .Values.redis.cacheUrl | quote }}
+              value: {{ .Values.redis.cacheUrl | default .Values.valkey.cacheUrl | quote }}
             - name: EMAIL_BACKEND
               value: {{ .Values.email.backend | quote }}
             - name: EMAIL_HOST

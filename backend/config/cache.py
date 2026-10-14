@@ -1,4 +1,4 @@
-"""Atomic reservation release for Django RedisCache and LocMemCache.
+"""Atomic reservation release for Django RedisCache (Valkey or Redis) and LocMemCache.
 
 Uses backend internals; integration tests cover the pinned Django version.
 Unsupported backends keep the reservation until it expires.

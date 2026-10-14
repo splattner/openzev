@@ -9,8 +9,8 @@ services:
       - backend/.env
     environment:
       DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CACHE_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://valkey:6379/0
+      CACHE_URL: redis://valkey:6379/1
       # One trusted hop: nginx is the only entry path and overwrites
       # X-Forwarded-For. Never publish this service's port.
       NUM_PROXIES: 1
@@ -18,7 +18,7 @@ services:
       - backend_media:/app/media
     depends_on:
       - db
-      - redis
+      - valkey
 
   worker:
     build:
@@ -29,13 +29,13 @@ services:
       - backend/.env
     environment:
       DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CACHE_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://valkey:6379/0
+      CACHE_URL: redis://valkey:6379/1
     volumes:
       - backend_media:/app/media
     depends_on:
       - backend
-      - redis
+      - valkey
 
   beat:
     build:
@@ -46,11 +46,11 @@ services:
       - backend/.env
     environment:
       DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CACHE_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://valkey:6379/0
+      CACHE_URL: redis://valkey:6379/1
     depends_on:
       - backend
-      - redis
+      - valkey
     # On a fresh stack, migrations run inside the backend container's own
     # startup command and this container can win the race and start before
     # they land — django_celery_beat's scheduler tables won't exist yet and
@@ -89,8 +89,8 @@ services:
       # each stack a cluster the others cannot see (#492).
       - postgres_data:/var/lib/postgresql/data
 
-  redis:
-    image: redis:8-alpine
+  valkey:
+    image: valkey/valkey:9-alpine
 
 volumes:
   postgres_data:

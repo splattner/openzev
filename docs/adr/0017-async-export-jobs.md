@@ -26,7 +26,7 @@ That design has structural costs:
   process but cannot coordinate across replicas or dedicated workers.
 
 Meanwhile the platform already has the machinery that fits this workload:
-Celery workers with a Redis broker, a shared database, and — because invoice
+Celery workers with a Valkey broker, a shared database, and — because invoice
 PDFs and emails already need it — artifact storage that is mounted into both
 the web service and the worker in every deployment shape (docker-compose
 `backend_media` volume, the fullstack single container, and the Helm media PVC

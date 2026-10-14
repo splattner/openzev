@@ -42,7 +42,7 @@ Development stack (`docker-compose.dev.yml`) uses port 8001 instead.
 1. Backend running? `docker compose ps`
 2. Check logs: `docker compose logs app` (`backend` on the two-container source build)
 3. Database connected? `docker compose logs db`
-4. More troubleshooting: Check Redis for celery
+4. More troubleshooting: Check Valkey for celery
 
 ## Authentication & Access
 
@@ -253,7 +253,7 @@ A common cause is the Celery worker not running — check `docker compose logs w
 
 **Fix:**
 1. Restart worker service: `docker compose restart worker`
-2. Check Redis: `docker compose logs redis`
+2. Check Valkey: `docker compose logs valkey`
 3. Check worker and scheduler status under **Platform → Overview → System health**
 
 ## Getting Help

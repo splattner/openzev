@@ -122,7 +122,7 @@ Step-by-step import flow with mapping, preview, and validation feedback.
 
 - Backend: Django, Django REST Framework, SimpleJWT
 - Frontend: React, TypeScript, Vite, React Query, i18next
-- Async jobs and schedules: Celery worker + Beat with Redis broker
+- Async jobs and schedules: Celery worker + Beat with Valkey broker (Redis-compatible)
 - Database: SQLite (default), PostgreSQL, MariaDB via `DATABASE_URL`
 - Deploy: Docker Compose, or the Helm chart on Kubernetes
 
@@ -164,7 +164,7 @@ Stop it with:
 docker compose -f docker-compose.dev.yml down
 ```
 
-Services: Frontend <http://localhost:8080> · Backend API <http://localhost:8080/api/v1/> · PostgreSQL and Redis internal to the compose network.
+Services: Frontend <http://localhost:8080> · Backend API <http://localhost:8080/api/v1/> · PostgreSQL and Valkey internal to the compose network.
 
 > **Breaking local API endpoint change:** the default API is now `http://localhost:8080/api/v1/` via nginx (the backend port is no longer published). `docker-compose.dev.yml` still serves it directly on port 8001.
 
@@ -196,7 +196,7 @@ docker compose exec app python manage.py createsuperuser
 
 The stack requires `.env` before starting. Only the application (`8080`) is
 reachable from the host; gunicorn is not published and is reachable only through
-the bundled nginx's `/api/` proxy, while PostgreSQL and Redis talk over the
+the bundled nginx's `/api/` proxy, while PostgreSQL and Valkey talk over the
 compose network only. To update, download the new release's `docker-compose.yml`
 and run `docker compose pull && docker compose up -d`. To build from source
 instead, see [Building from source](#building-from-source-with-compose).
@@ -258,7 +258,7 @@ cp backend/.env.production.example backend/.env
 docker compose -f docker-compose.fullstack.yml up -d --build
 ```
 
-`app` serves the frontend and proxies API requests to Django inside the same container; `worker`, `db`, and `redis` stay separate. Frontend URL: <http://localhost:8080>. Stop with `docker compose -f docker-compose.fullstack.yml down`.
+`app` serves the frontend and proxies API requests to Django inside the same container; `worker`, `db`, and `valkey` stay separate. Frontend URL: <http://localhost:8080>. Stop with `docker compose -f docker-compose.fullstack.yml down`.
 
 See the [Getting Started guide](docs/user-guide/01-getting-started.md#building-from-source) for details.
 
@@ -268,7 +268,7 @@ OpenZEV ships as a Helm chart in [`charts/openzev`](charts/openzev/README.md).
 
 The chart deploys the frontend, backend, a Celery worker, and one Celery Beat
 scheduler, plus an Ingress and a PVC for `/app/media`. It does **not** deploy
-PostgreSQL or Redis — you must provide reachable external database and Redis
+PostgreSQL or Valkey — you must provide reachable external database and Valkey (or Redis)
 endpoints.
 
 ```bash
@@ -277,7 +277,7 @@ helm repo update
 helm install openzev openzev/openzev -n openzev --create-namespace
 ```
 
-For install options and example values (external DB/Redis secrets, email, ingress), see the [Helm chart README](charts/openzev/README.md).
+For install options and example values (external DB/Valkey secrets, email, ingress), see the [Helm chart README](charts/openzev/README.md).
 
 ## Prebuilt Container Images
 
@@ -463,7 +463,7 @@ Development stack (`docker-compose.dev.yml`) serves these directly on port 8001.
 ## Development Notes
 
 - Without Docker, the backend defaults to SQLite (see `backend/.env.example`). Docker Compose uses PostgreSQL. MariaDB is also supported.
-- Async tasks (invoice emails, PDF generation, geocoding) require Redis and a
+- Async tasks (invoice emails, PDF generation, geocoding) require Valkey (or Redis) and a
   Celery worker. Periodic work such as dynamic-tariff refreshes also requires
   exactly one Celery Beat scheduler. Docker Compose includes all three; for
   other setups, ensure they are running.
