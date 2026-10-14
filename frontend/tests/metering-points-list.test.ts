@@ -128,10 +128,17 @@ describe('MeteringPointsList', () => {
     }
 
     const points = [
-        point('m1', { building: 'b1' }),
+        point('m1', { building: 'b1', location_description: 'Roof' }),
         point('m2', { building: 'b1' }),
         point('m3', { building: 'b2' }),
     ]
+
+    it('shows the location under the meter ID only when there is one', () => {
+        const view = render({ points })
+        const subtitles = Array.from(view.querySelectorAll('.metering-point-subtitle')).map((node) => node.textContent)
+        expect(subtitles).toEqual(['Roof'])
+        expect(view.textContent).not.toContain('pages.meteringPoints.noLocation')
+    })
 
     it('asks to assign only on a meter nobody holds, and names the holder elsewhere', () => {
         const view = render({ points })

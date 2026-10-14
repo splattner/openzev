@@ -119,7 +119,6 @@ export function MeteringPointRow({
 
   const typeLabel = t(`pages.meteringPoints.meterTypes.${point.meter_type}`)
   const location = point.location_description?.trim() ?? ''
-  const subtitle = location || t('pages.meteringPoints.noLocation')
   const lastReadingDate = point.last_reading_at ? formatShortDate(formatBusinessIsoDate(new Date(point.last_reading_at)), settings) : null
   // A source in trouble is worth a badge on the row; a healthy or pending one sits in the details.
   const sourceTone = statusTone(point.supplementary_source_status)
@@ -258,7 +257,7 @@ export function MeteringPointRow({
               <SupplementarySourceStatus point={point} canManage={!readOnly} confirm={confirm} />
             )}
           </div>
-          <span className="muted metering-point-subtitle">{subtitle}</span>
+          {location && <span className="muted metering-point-subtitle">{location}</span>}
         </div>
         {isManagedScope && <div className="metering-point-holder">{renderHolder()}</div>}
         <span className="metering-point-last muted">
