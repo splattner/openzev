@@ -2607,12 +2607,15 @@ input.recurrence-chip-input {
   resize: vertical;
 }
 
-/* Highlighted {{variable}} chips + hover tooltip in the template editor. */
+/* Highlighted {{variable}} chips + hover tooltip in the template editor.
+   The chips live in an overlay painted above the textarea, so they multiply
+   into it instead of covering the text underneath. */
 .template-var-chip {
   pointer-events: auto;
   cursor: help;
   border-radius: 3px;
   background: var(--brand-pale);
+  mix-blend-mode: multiply;
 }
 
 .template-var-tooltip {
