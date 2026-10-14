@@ -735,8 +735,11 @@ positive coverage and maintenance-link permissions.
   series-coherence field (§3.1.2 of the billing-engine spec), one series can
   hold both a static and a dynamic version across a static→dynamic
   switchover, and the two versions must render differently. A dynamic
-  version's list row reads "Dynamic, average" (or "Dynamic, incomplete
-  average") in its Applies column beside the average price (`rateLines`);
+  version's list row reads "Dynamic, average 15.09.2026 – 14.10.2026" (or
+  "Dynamic, incomplete average …") in its Applies column beside the average
+  price (`rateLines`); the dates are the summary's `reference_from` /
+  `reference_to`, the window the average covers, which ends today and is not
+  the version's validity shown in the Valid column;
   the drawer shows the source label with it (`priceSummary`). When the source's `last_fetch_status` is `failed`, a
   danger "Price fetch failed" badge (`pages.tariffs.dynamicFetchFailed`)
   appears beside the name in both, with the fetch error as its tooltip.

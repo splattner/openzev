@@ -205,8 +205,10 @@ moment, negative prices included.
   Enter the correct product name in the preview before importing. Leaving the
   visible product field blank explicitly confirms the endpoint default. V2
   product names returned by discovery are retained with the source.
-- On the Tariffs page, a dynamic tariff reads **Dynamic, average** under
-  **Applies**, beside its average price. If the source's last scheduled fetch
+- On the Tariffs page, a dynamic tariff reads **Dynamic, average** and
+  the dates the average covers (the most recent 30 days) under **Applies**,
+  beside its average price. These dates are not the tariff's validity, which
+  the **Valid** column shows. If the source's last scheduled fetch
   failed, a red **Price fetch failed** badge appears next to the name, with
   the failure shown as a tooltip.
 - You can also link a plain energy tariff to an existing dynamic source by

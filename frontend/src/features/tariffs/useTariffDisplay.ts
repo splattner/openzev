@@ -115,7 +115,7 @@ export function useTariffDisplay(settings: AppSettings, today: string) {
 
     /** Display rows for tariff bands, dynamic averages, or fixed fees. */
     function rateLines(series: TariffSeries, version: TariffVersion): RateLine[] {
-        return buildRateLines(series, version, (key, opts) => t(key, opts), dayNames, monthNames)
+        return buildRateLines(series, version, (key, opts) => t(key, opts), dayNames, monthNames, (day) => formatShortDate(day, settings))
     }
 
     function pricingTooltipFor(series: TariffSeries, version: TariffVersion, source?: DynamicTariffSource) {

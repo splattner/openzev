@@ -22,8 +22,8 @@ function mockT(key: string, opts?: Record<string, unknown>): string {
     if (key === 'pages.tariffs.rateCard.shared') return 'shared by the participants'
     if (key === 'pages.tariffs.rateCard.allHours') return 'All hours'
     if (key === 'pages.tariffs.rateCard.noTimeWindow') return 'time window not configured'
-    if (key === 'pages.tariffs.rateCard.dynamicAverage') return 'Dynamic, average'
-    if (key === 'pages.tariffs.rateCard.dynamicPartial') return 'Dynamic, incomplete average'
+    if (key === 'pages.tariffs.rateCard.dynamicAverage') return `Dynamic, average ${String(opts?.from)} – ${String(opts?.to)}`
+    if (key === 'pages.tariffs.rateCard.dynamicPartial') return `Dynamic, incomplete average ${String(opts?.from)} – ${String(opts?.to)}`
     if (key === 'pages.tariffs.rateCard.incompleteBaseAverage') return 'incomplete base average'
     if (key === 'pages.tariffs.approxPriceTooltip') return `${String(opts?.percentage)}% of CHF ${String(opts?.basePrice)}/kWh = CHF ${String(opts?.effectivePrice)}/kWh`
     if (key === 'pages.tariffs.dynamicAveragePartialTooltip') return 'The average uses only the intervals available in the reference period.'
@@ -76,13 +76,15 @@ function period(id: string, overrides: Record<string, unknown> = {}) {
     }
 }
 
+const formatDate = (isoDate: string) => isoDate.split('-').reverse().join('.')
+
 describe('buildRateLines', () => {
     it.each(['energy', 'percentage_of_energy'] as const)('identifies untimed non-flat bands without claiming complementary coverage (%s)', (billing_mode) => {
         const series = energySeries({ billing_mode })
         const high = period('ht', { period_type: 'high', price_chf_per_kwh: '0.295', percentage: '80', time_from: '07:00', time_to: '21:00', weekdays: '0,1,2,3,4' })
         const low = period('nt', { period_type: 'low', price_chf_per_kwh: '0.225', percentage: '60' })
         for (const periods of [[high, low], [low]]) {
-            const lines = buildRateLines(series, energyVersion(periods), t, DAY_NAMES, MONTH_NAMES)
+            const lines = buildRateLines(series, energyVersion(periods), t, DAY_NAMES, MONTH_NAMES, formatDate)
             expect(lines.at(-1)?.applies.split(' · ')[0]).toBe('Low (NT) time window not configured')
         }
     })
@@ -93,19 +95,19 @@ describe('buildRateLines', () => {
         { time_from: null, time_to: '21:00' },
     ])('keeps weekday and season restrictions while identifying an incomplete window: %j', (window) => {
         const version = energyVersion([period('p1', { period_type: 'band', label: 'Winter', weekdays: '0,1,2,3,4', months: '10,11,12,1,2,3', ...window })])
-        expect(buildRateLines(energySeries(), version, t, DAY_NAMES, MONTH_NAMES)[0].applies)
+        expect(buildRateLines(energySeries(), version, t, DAY_NAMES, MONTH_NAMES, formatDate)[0].applies)
             .toBe('Winter Mon–Fri, Oct–Mar, time window not configured')
     })
 
     it('shows an unnamed imported band window once, with its weekdays and season', () => {
         const version = energyVersion([period('p1', { period_type: 'band', time_from: '07:00:00', time_to: '12:00:00', weekdays: '0,1,2,3,4', months: '10,11,12,1,2,3' })])
-        expect(buildRateLines(energySeries(), version, t, DAY_NAMES, MONTH_NAMES)[0].applies)
+        expect(buildRateLines(energySeries(), version, t, DAY_NAMES, MONTH_NAMES, formatDate)[0].applies)
             .toBe('07:00–12:00 Mon–Fri, Oct–Mar')
     })
 
     it('keeps a named band and its window', () => {
         const version = energyVersion([period('p1', { period_type: 'band', label: 'Morning', time_from: '07:00', time_to: '12:00', weekdays: '0,1,2,3,4' })])
-        expect(buildRateLines(energySeries(), version, t, DAY_NAMES, MONTH_NAMES)[0].applies)
+        expect(buildRateLines(energySeries(), version, t, DAY_NAMES, MONTH_NAMES, formatDate)[0].applies)
             .toBe('Morning Mon–Fri, 07:00–12:00')
     })
 
@@ -115,7 +117,7 @@ describe('buildRateLines', () => {
             [period('p1', { period_type: 'high', percentage: '60', weekdays: '0,1,2,3,4', time_from: '07:00', time_to: '21:00' })],
             { percentage_base_summary: { price_chf_per_kwh: '0.295', dynamic_status: null, reference_date: '2026-06-15' } },
         )
-        const [line] = buildRateLines(series, version, t, DAY_NAMES, MONTH_NAMES)
+        const [line] = buildRateLines(series, version, t, DAY_NAMES, MONTH_NAMES, formatDate)
         expect(line.applies).toContain('High (HT)')
         expect(line.applies).toContain('Mon–Fri')
         expect(line.applies).toContain('07:00–21:00')
@@ -130,7 +132,7 @@ describe('buildRateLines', () => {
             [period('p1', { period_type: 'flat', percentage: '60' })],
             { percentage_base_summary: { price_chf_per_kwh: '0.295', dynamic_status: null, reference_date: '2026-06-15' } },
         )
-        const [line] = buildRateLines(series, version, t, DAY_NAMES, MONTH_NAMES)
+        const [line] = buildRateLines(series, version, t, DAY_NAMES, MONTH_NAMES, formatDate)
         expect(line.applies).toBe('All hours · 60% of the grid tariff (0.295)')
     })
 
@@ -140,7 +142,7 @@ describe('buildRateLines', () => {
             [period('p1', { period_type: 'band', label: 'Winter', percentage: '90', months: '10,11,12,1,2,3' })],
             { percentage_base_summary: { price_chf_per_kwh: '0.300', dynamic_status: null, reference_date: '2026-06-15' } },
         )
-        const [line] = buildRateLines(series, version, t, DAY_NAMES, MONTH_NAMES)
+        const [line] = buildRateLines(series, version, t, DAY_NAMES, MONTH_NAMES, formatDate)
         expect(line.applies).toContain('Winter')
         expect(line.applies).toContain('Oct–Mar')
         expect(line.applies).toContain('90% of the grid tariff')
@@ -152,7 +154,7 @@ describe('buildRateLines', () => {
             period('ht', { period_type: 'high', price_chf_per_kwh: '0.28000', time_from: '07:00', time_to: '21:00', weekdays: '0,1,2,3,4' }),
             period('nt', { period_type: 'low', price_chf_per_kwh: '0.18000', time_from: '21:00', time_to: '07:00' }),
         ])
-        const lines = buildRateLines(series, version, t, DAY_NAMES, MONTH_NAMES)
+        const lines = buildRateLines(series, version, t, DAY_NAMES, MONTH_NAMES, formatDate)
         expect(lines).toHaveLength(2)
         expect(lines[0].applies).toContain('High (HT)')
         expect(lines[0].price).toBe('0.280')
@@ -165,7 +167,7 @@ describe('buildRateLines', () => {
     it('reads a decimal zero price as a price, not as missing', () => {
         const series = energySeries({})
         const version = energyVersion([period('p1', { period_type: 'flat', price_chf_per_kwh: '0.00000' })])
-        const [line] = buildRateLines(series, version, t, DAY_NAMES, MONTH_NAMES)
+        const [line] = buildRateLines(series, version, t, DAY_NAMES, MONTH_NAMES, formatDate)
         expect(line.price).toBe('0.000')
     })
 
@@ -173,23 +175,23 @@ describe('buildRateLines', () => {
         const series = energySeries({})
         const complete = energyVersion([], {
             dynamic_source: 's1',
-            dynamic_price_summary: { status: 'complete', average_chf_per_kwh: '0.123', reference_from: null, reference_to: null },
+            dynamic_price_summary: { status: 'complete', average_chf_per_kwh: '0.123', reference_from: '2026-09-15', reference_to: '2026-10-14' },
         })
         const partial = energyVersion([], {
             dynamic_source: 's1',
-            dynamic_price_summary: { status: 'partial', average_chf_per_kwh: '0.123', reference_from: null, reference_to: null },
+            dynamic_price_summary: { status: 'partial', average_chf_per_kwh: '0.123', reference_from: '2026-09-15', reference_to: '2026-10-14' },
         })
         const unavailable = energyVersion([], {
             dynamic_source: 's1',
             dynamic_price_summary: { status: 'unavailable', average_chf_per_kwh: null, reference_from: null, reference_to: null },
         })
-        expect(buildRateLines(series, complete, t, DAY_NAMES, MONTH_NAMES)[0]).toMatchObject({
-            applies: 'Dynamic, average', price: '0.123', unit: 'per kWh',
+        expect(buildRateLines(series, complete, t, DAY_NAMES, MONTH_NAMES, formatDate)[0]).toMatchObject({
+            applies: 'Dynamic, average 15.09.2026 – 14.10.2026', price: '0.123', unit: 'per kWh',
         })
-        expect(buildRateLines(series, partial, t, DAY_NAMES, MONTH_NAMES)[0]).toMatchObject({
-            applies: 'Dynamic, incomplete average', price: '0.123',
+        expect(buildRateLines(series, partial, t, DAY_NAMES, MONTH_NAMES, formatDate)[0]).toMatchObject({
+            applies: 'Dynamic, incomplete average 15.09.2026 – 14.10.2026', price: '0.123',
         })
-        expect(buildRateLines(series, unavailable, t, DAY_NAMES, MONTH_NAMES)[0]).toMatchObject({
+        expect(buildRateLines(series, unavailable, t, DAY_NAMES, MONTH_NAMES, formatDate)[0]).toMatchObject({
             applies: 'Dynamic price', price: '—',
         })
     })
@@ -200,7 +202,7 @@ describe('buildRateLines', () => {
             [period('p1', { period_type: 'flat', percentage: '60' })],
             { percentage_base_summary: { price_chf_per_kwh: null, dynamic_status: 'unavailable', reference_date: '2026-06-15' } },
         )
-        const [line] = buildRateLines(series, version, t, DAY_NAMES, MONTH_NAMES)
+        const [line] = buildRateLines(series, version, t, DAY_NAMES, MONTH_NAMES, formatDate)
         expect(line.price).toBe('—')
         expect(line.applies).toContain('60% of the grid tariff')
         expect(line.applies).not.toContain('≈')
@@ -212,13 +214,13 @@ describe('buildRateLines', () => {
         const perPoint = energySeries({ billing_mode: 'per_metering_point_monthly_fee' })
         const monthlyVersion = energyVersion([], { fixed_price_chf: '50.00' })
         const sharedVersion = energyVersion([], { fixed_price_chf: '90.00' })
-        expect(buildRateLines(monthly, monthlyVersion, t, DAY_NAMES, MONTH_NAMES)[0]).toMatchObject({
+        expect(buildRateLines(monthly, monthlyVersion, t, DAY_NAMES, MONTH_NAMES, formatDate)[0]).toMatchObject({
             applies: 'per participant', price: '50.00', unit: 'per month',
         })
-        expect(buildRateLines(sharedYearly, sharedVersion, t, DAY_NAMES, MONTH_NAMES)[0]).toMatchObject({
+        expect(buildRateLines(sharedYearly, sharedVersion, t, DAY_NAMES, MONTH_NAMES, formatDate)[0]).toMatchObject({
             applies: 'shared by the participants', price: '90.00', unit: 'per year',
         })
-        expect(buildRateLines(perPoint, monthlyVersion, t, DAY_NAMES, MONTH_NAMES)[0]).toMatchObject({
+        expect(buildRateLines(perPoint, monthlyVersion, t, DAY_NAMES, MONTH_NAMES, formatDate)[0]).toMatchObject({
             applies: 'per metering point', unit: 'per month',
         })
     })
@@ -226,7 +228,7 @@ describe('buildRateLines', () => {
     it('reports a version without bands instead of an empty row', () => {
         const series = energySeries({})
         const version = energyVersion([])
-        const [line] = buildRateLines(series, version, t, DAY_NAMES, MONTH_NAMES)
+        const [line] = buildRateLines(series, version, t, DAY_NAMES, MONTH_NAMES, formatDate)
         expect(line.applies).toBe('No tariff periods yet.')
         expect(line.price).toBe('')
     })

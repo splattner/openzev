@@ -39,13 +39,18 @@ export function buildRateLines(
     t: RateLineTranslate,
     dayNames: string[],
     monthNames: string[],
+    formatDate: (isoDate: string) => string,
 ): RateLine[] {
     const perKwh = t('pages.tariffs.rateCard.perKwh')
     if (version.dynamic_source) {
         const summary = version.dynamic_price_summary
         if (!summary?.average_chf_per_kwh) return [{ applies: t('pages.tariffs.dynamicPriced'), price: '—', unit: perKwh }]
+        // The average covers a window ending today, not the version's validity.
         return [{
-            applies: t(summary.status === 'partial' ? 'pages.tariffs.rateCard.dynamicPartial' : 'pages.tariffs.rateCard.dynamicAverage'),
+            applies: t(summary.status === 'partial' ? 'pages.tariffs.rateCard.dynamicPartial' : 'pages.tariffs.rateCard.dynamicAverage', {
+                from: summary.reference_from ? formatDate(summary.reference_from) : '',
+                to: summary.reference_to ? formatDate(summary.reference_to) : '',
+            }),
             price: Number(summary.average_chf_per_kwh).toFixed(3),
             unit: perKwh,
         }]
