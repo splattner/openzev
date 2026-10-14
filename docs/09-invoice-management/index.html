@@ -2530,7 +2530,8 @@ default is the last completed year.</p>
 <li><strong>Key figures</strong> — the year's <strong>self-consumption rate</strong> (share of the ZEV's
   production used inside the ZEV), <strong>self-sufficiency rate</strong> (share of the
   ZEV's consumption covered by its own production), total production and
-  consumption, and the participants' total savings. When the previous year has
+  consumption, the participants' total savings, and the producers' total uplift
+  over the feed-in tariff. When the previous year has
   metering data, its rates are shown below this year's for comparison.</li>
 <li><strong>Over the year</strong> — both rates month by month. The previous year is drawn
   as dashed lines; months without data are left empty.</li>
@@ -2541,6 +2542,16 @@ default is the last completed year.</p>
   savings figures as on each participant's annual statement. Cancelled
   invoices do not count, and a participant without invoices for the year shows
   no savings.</li>
+<li><strong>Local sales vs. feed-in tariff</strong> — for producers: what selling electricity
+  inside the ZEV earned, what the same kWh would have earned as grid feed-in,
+  and the difference (the <strong>uplift</strong>). The feed-in figure uses the feed-in
+  tariff in force at the time, interval by interval, including a contractual
+  minimum price and fetched prices such as the BFE reference price. A negative
+  uplift means the ZEV price was below the feed-in tariff. A <strong>—</strong> means the
+  comparison is not available for that producer: an invoice for the year was
+  issued before this figure was stored (regenerate draft invoices to add it),
+  or a period has no feed-in tariff or gaps in its fetched prices. Invoices
+  and PDFs are not changed by this.</li>
 </ul>
 <p>The rates use the same definitions as <strong>Energy balance</strong>, so the figures
 match. A year without metering data shows a short notice instead.</p>
