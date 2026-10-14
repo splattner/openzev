@@ -1849,7 +1849,8 @@
 <h1 id="metering-points">Metering Points<a class="headerlink" href="#metering-points" title="Permanent link">&para;</a></h1>
 <p>This guide covers metering point types, configuration, and maintenance in OpenZEV.</p>
 <h2 id="what-is-a-metering-point">What is a Metering Point?<a class="headerlink" href="#what-is-a-metering-point" title="Permanent link">&para;</a></h2>
-<p>A <strong>metering point</strong> is a physical or logical energy meter:</p>
+<p>A <strong>metering point</strong> identifies where an energy flow is measured, independently
+of the physical meter that supplies its readings:</p>
 <ul>
 <li>Assigned to a participant over a validity window rather than owned outright — see <a href="#assignment-validity-periods">Assignment Validity Periods</a> below</li>
 <li>Measures energy consumption or production</li>
@@ -1863,9 +1864,19 @@ location text says which unit within the building it measures. The page groups
 the metering points by building and, with several buildings, the toolbar offers a <strong>Building</strong> filter.</p>
 <p><img alt="Metering points page" src="../screenshots/04-metering-points.png" /></p>
 <p>The tabs above the list count the metering points and show one view at a time:
-<strong>All</strong>, <strong>Active</strong>, <strong>Inactive</strong> and <strong>Unassigned</strong> (no participant today);
-click the active tab again to show all. A tab with nothing
-in it, or with everything in it, is left out. Below them, the search finds a meter ID, location, building
+<strong>All</strong>, <strong>Active</strong>, <strong>Inactive</strong>, <strong>Needs attention</strong> and <strong>Unassigned</strong> (no participant today);
+click the active tab again to show all. <strong>Needs attention</strong> includes active points
+with no readings, confirmed data gaps, or readings without a current assignment.
+Unavailable quality or assignment information is not counted as a confirmed problem;
+loading and retry notices explain when results may be incomplete. This view covers
+active inventory, not billing readiness. Connected-source warnings remain visible
+on rows and are handled separately. Data issues appear as named badges in
+<strong>Last reading</strong>; click one to open its data-quality view. A missing current
+assignment is marked in <strong>Assignment</strong>. These mark the same points counted
+under <strong>Needs attention</strong>, while point IDs remain plain text.
+A tab with nothing
+in it, or with everything in it, is left out; a nonempty <strong>Needs attention</strong> tab
+always remains visible. Below them, the search finds a meter ID, location, building
 or participant, and, when the community has more than one metering point
 type, a second row of tabs narrows to one type. A <strong>Sort</strong> menu orders the
 list by <strong>Meter ID</strong> (the default), <strong>Location</strong> or <strong>Oldest reading first</strong>
@@ -1918,7 +1929,7 @@ are, and both are recorded. Buildings are managed on this page.</p>
   building in a card of its own, whether the community has one building or
   several. The header shows the address, EGID, landowners and number of
   metering points. <strong>Add metering point</strong> (that building preselected) is in the header, and
-  <strong>More → Edit building</strong> next to it. A building without metering points shows
+  <strong>Edit building</strong> next to it. A building without metering points shows
   "No metering points in this building yet". Search and the other filters apply
   within the groups; the <strong>Building</strong> filter shows one group.</li>
 <li>A building can be deleted only once it is empty: move or delete its meters
@@ -1946,8 +1957,9 @@ its meters.</p>
 <li>
 <p>Enter details:</p>
 <ul>
-<li><strong>Meter ID</strong> — Equipment/MSID number (required, must be unique)</li>
-<li><strong>Meter type</strong> — <code>Consumption</code>, <code>Production</code>, or <code>Bidirectional</code></li>
+<li><strong>Meter ID</strong> — required, unique identifier used to match imported readings to this
+   metering point. Use the identifier supplied by your data source.</li>
+<li><strong>Type</strong> — <code>Consumption</code>, <code>Production</code>, or <code>Bidirectional</code></li>
 <li><strong>Active</strong> — inventory status (defaults to on)</li>
 <li><strong>Building</strong> — only asked when the community has more than one
    <a href="#buildings">building</a>; with a single building the
@@ -2040,14 +2052,16 @@ original community for the result.</p>
 <li>Leave assignment <strong>Valid To</strong> blank (ongoing)</li>
 <li>Result: Billing includes solar production from June onwards</li>
 </ul>
-<p><strong>Scenario 2: Meter replacement</strong></p>
+<p><strong>Scenario 2: A new source identifier</strong></p>
 <ul>
-<li>Old meter final reading: 2026-12-31</li>
-<li>New meter first reading: 2027-01-01</li>
+<li>The source stops reporting the old identifier on 2026-12-31</li>
+<li>Create a point for the new identifier, first reported on 2027-01-01</li>
 <li>Old assignment: <strong>Valid To</strong> = 2026-12-31</li>
 <li>New assignment: <strong>Valid From</strong> = 2027-01-01</li>
 <li>Result: No billing gaps or overlaps</li>
 </ul>
+<p>Replacing a physical meter alone does not require a new metering point or assignment
+if the data source continues using the same point identifier.</p>
 <h2 id="shared-common-area-metering-points">Shared (Common-Area) Metering Points<a class="headerlink" href="#shared-common-area-metering-points" title="Permanent link">&para;</a></h2>
 <p>A common-area meter — <em>Allgemeinstrom</em>: stairwell lighting, lift, laundry,
 heat pump, the shared grid connection — measures energy the whole community
@@ -2115,9 +2129,9 @@ easy to tell apart from a participant's own consumption.</p>
 mid-period joiner pays nothing towards community energy measured before their
 join date, and a leaver's share stops on their leave date.</p>
 <blockquote>
-<p><strong>Note:</strong> An <strong>inactive</strong> community meter (<strong>Active</strong> = off) bills nobody
-for per-metering-point fees, exactly like an inactive personal meter. Its
-historical readings still count towards the community energy pool.</p>
+<p><strong>Note:</strong> <strong>Active</strong> is an inventory status. Deactivating a community or personal
+metering point does not stop its energy billing or per-point fees. Assignment
+dates control the billing window; historical readings remain available.</p>
 </blockquote>
 <h2 id="what-a-metering-point-row-shows">What a Metering Point Row Shows<a class="headerlink" href="#what-a-metering-point-row-shows" title="Permanent link">&para;</a></h2>
 <p>Each meter on the <strong>Metering Points</strong> page is one row that shows, at a glance
@@ -2127,11 +2141,11 @@ historical readings still count towards the community energy pool.</p>
   (or "No location set"). A legend below the list names the icons: a bolt is
   <em>Consumption</em>, a solar panel <em>Production</em>, left-right arrows <em>Bidirectional</em>
   (only the types you have are listed)</li>
-<li>Badges only for what is unusual: <strong>Inactive</strong>, <strong>No current holder</strong> (the meter
+<li>Badges only for what is unusual: <strong>Inactive</strong>, <strong>No current assignment</strong> (the meter
   has readings but nobody is assigned to it), <strong>Surplus metering</strong> when
   <a href="#generation-behind-the-meter">Generation behind the meter</a> is ticked, and the
   status of a connected energy data source when it needs attention</li>
-<li>The <strong>holder</strong> — the participant who holds the meter today, with the start date,
+<li>The <strong>assignment</strong> — the participant assigned today, with the start date,
   a <strong>Community</strong> badge for a shared meter, and "+1" when several participants
   hold it. A meter nobody holds shows <strong>Assign participant</strong>; click it to set the
   assignment's validity window.</li>
@@ -2139,15 +2153,18 @@ historical readings still count towards the community energy pool.</p>
 </ul>
 <p><strong>Chart</strong> (the chart icon) opens the metering point's full reading history, and
 <strong>⋯ More</strong> has <strong>Assign participant</strong>, <strong>Edit</strong>, <strong>Delete data</strong> (admins) and
-<strong>Delete</strong>.</p>
+<strong>Delete</strong>. With exactly one current assignment, the menu also offers editing or removing
+that assignment. Point IDs and participant names are selectable text.
+Viewers see no editing controls.</p>
 <p>Click a row, or the arrow at its end, to open its details in place:</p>
 <ul>
-<li><strong>Participants</strong> — every assignment, current first, with its validity window
+<li><strong>Assignments</strong> — every assignment, current first, with its validity window
   and its state (<em>Upcoming</em> or <em>Ended</em> for the others). Use <strong>Add assignment</strong>,
-  <strong>Edit</strong> and <strong>⋯ → Remove</strong> here, for example to end a tenant's assignment
-  when they move out.</li>
+  <strong>Edit</strong> and <strong>Remove</strong> here. Removal confirms the participant, point and dates,
+  then deletes the record. When a tenant moves out, use <strong>Edit</strong> to set an end date
+  and retain the assignment history.</li>
 <li><strong>Measurement</strong> — last and first reading, how many readings there are, and the
-  <strong>data-health</strong> badge (<code>Healthy</code>, <code>Data gaps</code>, <code>Data at risk</code> or <code>No data yet</code>,
+  <strong>data-health</strong> badge (<code>Healthy</code>, <code>Data gaps</code>, <code>Data at risk</code>, <code>No data yet</code> or <code>Unavailable</code>,
   based on the last 30 complete days up to yesterday); click it to open the
   metering point's data-quality view. A connected energy data source shows its
   status here too.</li>
@@ -2156,13 +2173,16 @@ historical readings still count towards the community energy pool.</p>
 <h3 id="updating-a-metering-point">Updating a Metering Point<a class="headerlink" href="#updating-a-metering-point" title="Permanent link">&para;</a></h3>
 <ol>
 <li>Go to <strong>Metering Points</strong></li>
-<li>Open the meter's <strong>⋯ More</strong> menu and click <strong>Edit</strong></li>
+<li>Open <strong>⋯ More → Edit</strong></li>
 <li>Update its ID, type, active status, location, or
    <a href="#generation-behind-the-meter">Generation behind the meter</a> flag</li>
 <li>Click <strong>Save Changes</strong></li>
 </ol>
 <blockquote>
-<p><strong>Warning:</strong> Changing a meter ID retroactively can break billing audit trails. Prefer creating a new meter and adjusting assignment windows.</p>
+<p><strong>Warning:</strong> Changing an ID changes which imported readings match the point.
+If the source starts reporting a different point identifier, create its point
+and adjust assignment windows. A hardware replacement with an unchanged source
+identifier needs no new point.</p>
 </blockquote>
 <h3 id="decommissioning-a-meter">Decommissioning a Meter<a class="headerlink" href="#decommissioning-a-meter" title="Permanent link">&para;</a></h3>
 <p>To stop billing a meter:</p>
@@ -2174,8 +2194,8 @@ historical readings still count towards the community energy pool.</p>
 </ol>
 <p>Then, if the meter is physically gone, open its <strong>⋯ More</strong> menu, click
 <strong>Edit</strong>, set <strong>Active</strong> to off and click <strong>Save Changes</strong>. Deactivating
-removes it from data-health monitoring and stops
-per-metering-point fees; on its own it does not stop energy billing.
+excludes it from this page’s <strong>Needs attention</strong> view. It does not stop energy
+billing or per-metering-point fees; end its assignment from the applicable date.
 Historical data remains available either way.</p>
 <h2 id="metering-point-and-billing">Metering Point and Billing<a class="headerlink" href="#metering-point-and-billing" title="Permanent link">&para;</a></h2>
 <p>During invoice generation:</p>
