@@ -420,3 +420,113 @@ unchanged.
 ([2026-10-supplementary-energy-data.md](2026-10-supplementary-energy-data.md) §5.1). `self_sufficiency_rate` stays `null` for net-metered participants; the table cell
 shows the gross rate with an info marker when `gross_energy` carries one (`NetMeteredRate`). Totals,
 `previous_totals` and `months` are unchanged. TypeScript: `AnnualReportParticipant.gross_energy`.
+
+## Producer uplift (2026-10)
+
+The report also answers the producer's question that the savings column answers
+for consumers: how much more did selling inside the ZEV earn than feeding the
+same energy to the grid?
+
+### What it measures
+
+For a producer's locally sold kWh (`split_production`'s `local_sold_kwh`, the
+part of production consumed in the ZEV at the same timestamp):
+
+- **ZEV revenue** — what the invoices credited for them (`local_sale_chf`).
+- **Feed-in benchmark** — what the same kWh would have earned at the feed-in
+  tariff, **interval by interval**, through `TariffResolver.price_at`, so a
+  fetched series (BFE reference price) and its contractual minimum apply
+  exactly as they do to real exports (`SPEC-2026-bfe-reference-market-price`).
+  `local_sale_feed_in_chf`.
+- **Uplift** — revenue minus benchmark. Signed: a ZEV price below the feed-in
+  tariff gives a negative uplift, which the report shows rather than hides
+  (unlike `compute_savings`, which returns `null` when local is not cheaper).
+
+### Data model
+
+Three columns on `Invoice` (migration `invoices/0021_invoice_local_sale_feed_in`),
+written by `generate_invoice` in both producer loops (personal and
+community-allocated, so a participant's weighted share of community production
+counts):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `total_local_sold_kwh` | `Decimal(12,4)`, default 0 | Energy sold locally, quantized like the sibling kWh totals |
+| `local_sale_chf` | `Decimal(10,2)`, default 0 | The producer-credit groups (`producer_credit`, `shared_producer_credit`) as a positive amount; the same sum that is kept out of the VAT base (tariffs spec §4.8) |
+| `local_sale_feed_in_chf` | `Decimal(10,2)`, nullable | The benchmark, `ROUND_HALF_UP` to 0.01. `0.00` when nothing was sold locally; `null` when it cannot be priced |
+
+`local_sale_feed_in_chf` is `null` when **any** locally sold interval has no
+feed-in tariff in force on its day, or falls in a gap of a fetched feed-in
+series (`DynamicPriceGapError`, caught in `_feed_in_value`). A partial sum would
+understate the benchmark and inflate the uplift. Billing is unaffected: the
+sale is credited at the local price and the invoice is generated; only the
+comparison is unknown. Invoices issued before the columns existed are `null`
+too (no backfill: it would reprice old readings with today's tariffs, which is
+not the figure that was billed). Regenerating a draft fills it in.
+
+The columns are read-only in `InvoiceSerializer`, listed in the transfer
+archive's `INVOICE_FIELDS` (additive and optional on import, no format bump:
+`_pick` drops absent values and the defaults apply), and not shown on the
+invoice PDF or any invoice screen.
+
+### API
+
+`participants[]` gains `uplift` and the report gains `uplift_total_chf`:
+
+```json
+"uplift": {
+  "local_sold_kwh": "200.00", "local_chf": "40.00", "local_rp": "20.00",
+  "feed_in_chf": "16.00", "feed_in_rp": "8.00", "uplift_chf": "24.00"
+} | null,
+```
+
+`compute_producer_uplift(invoices)` in `invoices/annual_report.py` sums the
+participant's non-cancelled invoices of the year (the selection `compute_savings`
+uses, now shared as `_invoices_by_participant`). It returns `null` when there are
+no invoices, when **any** invoice's `local_sale_feed_in_chf` is `null` (summing
+only the known ones would compare different periods), or when the summed sold
+kWh is `<= 0`. `*_rp` are centimes per kWh. `uplift_total_chf` is the sum of
+`uplift_chf` over rows with an uplift, two decimals, or `null`.
+
+### Frontend
+
+- `AnnualReportKpis`: a sixth `StatCard` (`stats.uplift`, hint `hints.uplift`)
+  only when `uplift_total_chf` is not `null`.
+- `ProducerUpliftCard` (`AnnualReportSection.tsx`): a
+  `participant-table--static` table for participants with `uplift` or
+  `produced_kwh > 0`, columns participant, sold in ZEV, ZEV revenue, at
+  feed-in tariff, uplift. A producer whose comparison is unknown renders `—`
+  in every figure (never zero); a `tfoot` total appears when
+  `uplift_total_chf` is set; `uplift.note` explains the definition and the
+  dash. The card is omitted when there is no such participant.
+- Types: `AnnualReportUplift`, `AnnualReportParticipant.uplift`,
+  `AnnualReport.uplift_total_chf`; `Invoice.total_local_sold_kwh`,
+  `local_sale_chf`, `local_sale_feed_in_chf` (optional).
+- i18n (four locales, `pages.reports.annualReport`): `stats.uplift`,
+  `hints.uplift`, `uplift.{title, description, total, note}`,
+  `col.{sold, zevRevenue, feedInRevenue, uplift}`.
+
+### Tests
+
+- `invoices/test_engine_local_sale_feed_in.py` (10): static pricing; only the
+  locally sold part of production counts; the tariff in force on the day
+  applies; zero (not null) without local sales; null without a feed-in tariff,
+  and when it is missing on one sale day, with billing unaffected; per-interval
+  dynamic prices; the contractual minimum; a series gap leaves null without
+  failing billing; a community-allocated share.
+- `invoices/test_annual_report.py` (6 added): uplift equals revenue minus
+  benchmark and matches `compute_producer_uplift`; sums across invoices; a
+  negative uplift is kept; one unknown invoice makes the year `null`;
+  non-producers have none; cancelled invoices and other years are ignored.
+- `tests/reports-page.test.ts` (4 added): table and KPI with values, a negative
+  value, dashes for an unknown producer, no card without producers.
+- `zev/test_transfer.py`: `SchemaParityTests` keeps the archive field list in step
+  with the model, and `test_the_local_sale_figures_behind_the_producer_uplift_round_trip`
+  covers the round trip.
+
+### Known limits
+
+- Invoices issued before this change show `—` until regenerated. Only drafts can be
+  regenerated; sent and paid invoices keep `null`, so a year that mixes both has no uplift.
+- The benchmark follows the feed-in tariff configured in the ZEV, not the
+  producer's actual grid contract; it is as accurate as that tariff.

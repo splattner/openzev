@@ -1609,8 +1609,8 @@ export const it = {
                 shared: 'ripartito tra i partecipanti',
                 allHours: 'Tutte le ore',
                 noTimeWindow: 'fascia oraria non configurata',
-                dynamicAverage: 'Dinamico, media',
-                dynamicPartial: 'Dinamico, media incompleta',
+                dynamicAverage: 'Dinamico, media {{from}} – {{to}}',
+                dynamicPartial: 'Dinamico, media incompleta {{from}} – {{to}}',
                 percentOf: '{{percentage}}% della tariffa di rete',
                 percentOfBase: '{{percentage}}% della tariffa di rete ({{base}})',
                 incompleteBaseAverage: 'media di base incompleta',
@@ -2876,10 +2876,12 @@ export const it = {
                     produced: 'Produzione',
                     consumed: 'Consumo',
                     savings: 'Risparmi dei partecipanti',
+                    uplift: 'Maggior ricavo produttori',
                 },
                 hints: {
                     previousYear: '{{year}}: {{rate}}',
                     savings: 'Secondo le fatture dell\'anno',
+                    uplift: 'Vendita locale vs. remunerazione immissione',
                 },
                 trend: {
                     title: 'Andamento nell\'anno',
@@ -2894,6 +2896,12 @@ export const it = {
                     total: 'Totale',
                     note: 'Il risparmio confronta il costo fatturato dell\'elettricità della RCP con quanto sarebbero costati gli stessi kWh alla tariffa di rete media delle fatture, come nel rendiconto annuale. Le fatture annullate non contano; senza fatture la riga resta vuota.',
                 },
+                uplift: {
+                    title: 'Vendita locale vs. remunerazione immissione',
+                    description: 'Quanto i produttori hanno guadagnato vendendo elettricità nella RCP, rispetto a quanto gli stessi kWh avrebbero reso come immissione in rete.',
+                    total: 'Totale',
+                    note: 'Il prezzo RCP è quanto le fatture hanno accreditato per i kWh venduti localmente. Il valore alla remunerazione per l\'immissione valuta gli stessi kWh intervallo per intervallo alla remunerazione in vigore allora, incluso un prezzo minimo contrattuale. Un maggior ricavo negativo significa che il prezzo RCP era inferiore alla remunerazione per l\'immissione. Un trattino significa che il confronto non è disponibile: fatture emesse prima della memorizzazione di questo valore, oppure un periodo senza remunerazione per l\'immissione o con lacune nei prezzi recuperati. Le fatture annullate non contano.',
+                },
                 col: {
                     participant: 'Partecipante',
                     consumption: 'Consumo',
@@ -2902,6 +2910,10 @@ export const it = {
                     localCost: 'Costo elettricità RCP',
                     gridCost: 'Costo alla tariffa di rete',
                     savings: 'Risparmio',
+                    sold: 'Venduto nella RCP',
+                    zevRevenue: 'Ricavo RCP',
+                    feedInRevenue: 'Alla remunerazione immissione',
+                    uplift: 'Maggior ricavo',
                 },
             },
             financialSummary: {

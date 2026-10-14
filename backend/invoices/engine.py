@@ -1588,6 +1588,25 @@ def _price_energy(acc, tariffs, energy_type, quantity, ts, day, *, sign, bucket=
         )
 
 
+def _feed_in_value(tariffs, quantity, ts, day) -> Decimal | None:
+    """What ``quantity`` kWh would have earned as feed-in at ``ts``.
+
+    Priced through the same funnel as the real feed-in credit, so a fetched
+    series and its minimum apply. None when it cannot be priced: no feed-in
+    tariff covers ``day``, or a fetched series has no price for ``ts``. The
+    caller treats that as "unknown" rather than failing the invoice, since
+    this figure is informational and the sale itself is billed at the local
+    price.
+    """
+    active = tariffs.energy(EnergyType.FEED_IN, day)
+    if not active:
+        return None
+    try:
+        return sum((quantity * tariffs.price_at(tariff, ts)[0] for tariff in active), Decimal("0"))
+    except DynamicPriceGapError:
+        return None
+
+
 @transaction.atomic
 def generate_invoice(
     participant: Participant,
@@ -1688,6 +1707,10 @@ def generate_invoice(
             _price_energy(items_accumulator, tariffs, energy_type, quantity, ts, day, sign=1)
 
     exported_kwh_acc = Decimal("0")
+    # Locally sold kWh and what they would have earned as feed-in; the latter
+    # stays None once any interval cannot be priced (see _feed_in_value).
+    local_sold_kwh_acc = Decimal("0")
+    local_sale_feed_in_acc: Decimal | None = Decimal("0")
 
     skipped_production_readings = 0
     skipped_production_kwh = Decimal("0")
@@ -1719,6 +1742,10 @@ def generate_invoice(
                 items_accumulator, tariffs, EnergyType.LOCAL, local_sold_kwh, ts, day,
                 sign=-1, bucket="producer_credit",
             )
+            local_sold_kwh_acc += local_sold_kwh
+            if local_sale_feed_in_acc is not None:
+                value = _feed_in_value(tariffs, local_sold_kwh, ts, day)
+                local_sale_feed_in_acc = None if value is None else local_sale_feed_in_acc + value
 
         if exported_kwh > 0:
             for tariff in tariffs.energy(EnergyType.FEED_IN, day):
@@ -1814,6 +1841,10 @@ def generate_invoice(
                 items_accumulator, tariffs, EnergyType.LOCAL, shared_local_sold, ts, day,
                 sign=-1, bucket="shared_producer_credit",
             )
+            local_sold_kwh_acc += shared_local_sold
+            if local_sale_feed_in_acc is not None:
+                value = _feed_in_value(tariffs, shared_local_sold, ts, day)
+                local_sale_feed_in_acc = None if value is None else local_sale_feed_in_acc + value
 
         if shared_exported > 0:
             for tariff in tariffs.energy(EnergyType.FEED_IN, day):
@@ -1885,6 +1916,13 @@ def generate_invoice(
         total_local_kwh=local_kwh,
         total_grid_kwh=grid_kwh,
         total_feed_in_kwh=exported_kwh_acc.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP),
+        total_local_sold_kwh=local_sold_kwh_acc.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP),
+        local_sale_chf=Decimal("0") - producer_credit_chf,
+        local_sale_feed_in_chf=(
+            None
+            if local_sale_feed_in_acc is None
+            else local_sale_feed_in_acc.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        ),
         subtotal_chf=subtotal,
         vat_rate=vat_rate,
         vat_base_chf=vat_base_chf if zev.vat_mode == VatMode.REGISTERED else None,

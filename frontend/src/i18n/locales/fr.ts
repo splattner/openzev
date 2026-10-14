@@ -1609,8 +1609,8 @@ export const fr = {
                 shared: 'réparti entre les participants',
                 allHours: 'Toutes les heures',
                 noTimeWindow: 'plage horaire non configurée',
-                dynamicAverage: 'Dynamique, moyenne',
-                dynamicPartial: 'Dynamique, moyenne incomplète',
+                dynamicAverage: 'Dynamique, moyenne {{from}} – {{to}}',
+                dynamicPartial: 'Dynamique, moyenne incomplète {{from}} – {{to}}',
                 percentOf: '{{percentage}} % du tarif réseau',
                 percentOfBase: '{{percentage}} % du tarif réseau ({{base}})',
                 incompleteBaseAverage: 'moyenne de base incomplète',
@@ -2876,10 +2876,12 @@ export const fr = {
                     produced: 'Production',
                     consumed: 'Consommation',
                     savings: 'Économies des participants',
+                    uplift: 'Plus-value producteurs',
                 },
                 hints: {
                     previousYear: '{{year}} : {{rate}}',
                     savings: 'Selon les factures de l\'année',
+                    uplift: 'Vente locale vs. rémunération d\'injection',
                 },
                 trend: {
                     title: 'Évolution sur l\'année',
@@ -2894,6 +2896,12 @@ export const fr = {
                     total: 'Total',
                     note: 'Les économies comparent le coût facturé de l\'électricité du RCP à ce que les mêmes kWh auraient coûté au tarif réseau moyen des factures, comme dans le relevé annuel. Les factures annulées ne comptent pas ; sans factures, la ligne reste vide.',
                 },
+                uplift: {
+                    title: 'Vente locale vs. rémunération d\'injection',
+                    description: 'Ce que les producteurs ont gagné en vendant de l\'électricité dans le RCP, comparé à ce que les mêmes kWh auraient rapporté en injection dans le réseau.',
+                    total: 'Total',
+                    note: 'Le prix RCP est ce que les factures ont crédité pour les kWh vendus localement. La valeur à la rémunération d\'injection évalue les mêmes kWh intervalle par intervalle à la rémunération en vigueur à l\'époque, y compris un prix minimum contractuel. Une plus-value négative signifie que le prix RCP était inférieur à la rémunération d\'injection. Un tiret signifie que la comparaison n\'est pas disponible : factures émises avant l\'enregistrement de cette valeur, ou période sans rémunération d\'injection ou avec des lacunes dans les prix récupérés. Les factures annulées ne comptent pas.',
+                },
                 col: {
                     participant: 'Participant',
                     consumption: 'Consommation',
@@ -2902,6 +2910,10 @@ export const fr = {
                     localCost: 'Coût électricité RCP',
                     gridCost: 'Coût au tarif réseau',
                     savings: 'Économies',
+                    sold: 'Vendu dans le RCP',
+                    zevRevenue: 'Revenu RCP',
+                    feedInRevenue: 'À la rémunération d\'injection',
+                    uplift: 'Plus-value',
                 },
             },
             financialSummary: {

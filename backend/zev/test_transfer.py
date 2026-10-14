@@ -112,6 +112,8 @@ def build_populated_zev(owner, *, name="Transfer ZEV", meter_prefix="TR"):
         period_start=date(2026, 1, 1), period_end=date(2026, 1, 31),
         status=InvoiceStatus.SENT, subtotal_chf=Decimal("42.00"), total_chf=Decimal("45.36"),
         vat_rate=Decimal("0.0800"), vat_chf=Decimal("3.36"),
+        total_local_sold_kwh=Decimal("200.0000"), local_sale_chf=Decimal("40.00"),
+        local_sale_feed_in_chf=Decimal("16.00"),
     )
     InvoiceItem.objects.create(
         invoice=invoice, item_type=InvoiceItem.ItemType.LOCAL_ENERGY,
@@ -432,6 +434,13 @@ class RoundTripTests(TestCase):
         self.assertEqual(invoice.total_chf, Decimal("45.36"))
         self.assertEqual(invoice.items.count(), 1)
         self.assertFalse(invoice.pdf_file)
+
+    def test_the_local_sale_figures_behind_the_producer_uplift_round_trip(self):
+        result = self._import()
+        invoice = Invoice.objects.get(zev_id=result["zev_id"])
+        self.assertEqual(invoice.total_local_sold_kwh, Decimal("200.0000"))
+        self.assertEqual(invoice.local_sale_chf, Decimal("40.00"))
+        self.assertEqual(invoice.local_sale_feed_in_chf, Decimal("16.00"))
 
     def test_the_counter_is_pushed_past_the_imported_numbering(self):
         """Otherwise the first billing run mints a number the ZEV already has."""

@@ -223,6 +223,10 @@ record (see below). `INVOICE_FIELDS` carries the invoice's `issuer` /
 `recipient` copy (#761, SPEC invoice-lifecycle §3.1a) as JSON objects; they are
 optional on import, so an archive written before they existed still imports
 (the copy is built at the next render) and needs no format-version bump.
+`INVOICE_FIELDS` also carries `total_local_sold_kwh`, `local_sale_chf` and the nullable
+`local_sale_feed_in_chf` (the annual report's producer uplift, `2026-09-annual-zev-report.md`):
+additive, with model defaults, so an older archive imports with zero sales and an unknown
+benchmark, and no format-version bump is needed.
 `READING_CSV_COLUMNS = ("meter_id", "timestamp",
 "energy_kwh", "direction", "resolution", "import_source")` — the same layout the
 normal CSV metering import reads, plus `resolution`/`import_source` so nothing is

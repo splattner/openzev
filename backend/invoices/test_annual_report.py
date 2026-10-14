@@ -20,6 +20,7 @@ from testing.helpers import authenticate as auth, make_user
 from tariffs.models import TariffCategory
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType
 
+from .annual_report import compute_producer_uplift
 from .annual_statement import compute_savings
 from .models import InvoiceItem, InvoiceStatus
 from .test_helpers import make_invoice, make_participant, make_zev
@@ -246,6 +247,84 @@ class AnnualReportContentTests(AnnualReportTestCase):
 
         self.assertEqual(rows[str(late.pk)]["consumed_kwh"], 0.0)
         self.assertEqual(rows[str(late.pk)]["savings"]["saved_chf"], "0.20")
+
+    def _producer_invoice(self, period, sold, local_chf, feed_in_chf, inv_status=InvoiceStatus.SENT):
+        """A producer invoice with the engine's stored local-sale figures."""
+        invoice = make_invoice(self.zev, self.producer, inv_status=inv_status, period=period)
+        invoice.total_local_sold_kwh = Decimal(sold)
+        invoice.local_sale_chf = Decimal(local_chf)
+        invoice.local_sale_feed_in_chf = None if feed_in_chf is None else Decimal(feed_in_chf)
+        invoice.save(update_fields=["total_local_sold_kwh", "local_sale_chf", "local_sale_feed_in_chf"])
+        return invoice
+
+    def _producer_row(self, report):
+        return next(r for r in report["participants"] if r["participant_id"] == str(self.producer.pk))
+
+    def test_producer_uplift_is_local_revenue_minus_the_feed_in_benchmark(self):
+        invoice = self._producer_invoice((date(2026, 6, 1), date(2026, 6, 30)), "200", "40.00", "16.00")
+
+        report = self._report()
+
+        uplift = self._producer_row(report)["uplift"]
+        self.assertEqual(uplift, compute_producer_uplift([invoice]))
+        self.assertEqual(uplift["local_sold_kwh"], "200.00")
+        self.assertEqual(uplift["local_chf"], "40.00")
+        self.assertEqual(uplift["local_rp"], "20.00")
+        self.assertEqual(uplift["feed_in_chf"], "16.00")
+        self.assertEqual(uplift["feed_in_rp"], "8.00")
+        self.assertEqual(uplift["uplift_chf"], "24.00")
+        self.assertEqual(report["uplift_total_chf"], "24.00")
+
+    def test_producer_uplift_sums_the_years_invoices(self):
+        self._producer_invoice((date(2026, 5, 1), date(2026, 5, 31)), "100", "20.00", "5.00")
+        self._producer_invoice((date(2026, 6, 1), date(2026, 6, 30)), "100", "20.00", "11.00")
+
+        uplift = self._producer_row(self._report())["uplift"]
+
+        self.assertEqual(uplift["local_sold_kwh"], "200.00")
+        self.assertEqual(uplift["feed_in_rp"], "8.00")
+        self.assertEqual(uplift["uplift_chf"], "24.00")
+
+    def test_a_negative_uplift_is_kept(self):
+        # Selling below the feed-in tariff costs the producer money; the report says so.
+        self._producer_invoice((date(2026, 6, 1), date(2026, 6, 30)), "100", "5.00", "9.00")
+
+        report = self._report()
+
+        self.assertEqual(self._producer_row(report)["uplift"]["uplift_chf"], "-4.00")
+        self.assertEqual(report["uplift_total_chf"], "-4.00")
+
+    def test_an_unknown_benchmark_on_any_invoice_leaves_the_year_without_uplift(self):
+        # An invoice issued before the figures were stored, or one the engine
+        # could not price: summing the others would compare different periods.
+        self._producer_invoice((date(2026, 5, 1), date(2026, 5, 31)), "100", "20.00", None)
+        self._producer_invoice((date(2026, 6, 1), date(2026, 6, 30)), "100", "20.00", "8.00")
+
+        report = self._report()
+
+        self.assertIsNone(self._producer_row(report)["uplift"])
+        self.assertIsNone(report["uplift_total_chf"])
+
+    def test_participants_without_local_sales_have_no_uplift(self):
+        self._invoice(self.consumer, (date(2026, 6, 1), date(2026, 6, 30)), ("4", "0.80"), ("6", "1.80"))
+        invoice = make_invoice(self.zev, self.consumer, period=(date(2026, 7, 1), date(2026, 7, 31)))
+        invoice.local_sale_feed_in_chf = Decimal("0.00")
+        invoice.save(update_fields=["local_sale_feed_in_chf"])
+
+        report = self._report()
+
+        consumer = next(r for r in report["participants"] if r["participant_id"] == str(self.consumer.pk))
+        self.assertIsNone(consumer["uplift"])
+
+    def test_uplift_ignores_cancelled_invoices_and_other_years(self):
+        self._producer_invoice((date(2026, 6, 1), date(2026, 6, 30)), "100", "20.00", "8.00",
+                               inv_status=InvoiceStatus.CANCELLED)
+        self._producer_invoice((date(2025, 6, 1), date(2025, 6, 30)), "100", "20.00", "8.00")
+
+        report = self._report()
+
+        self.assertTrue(all(row["uplift"] is None for row in report["participants"]))
+        self.assertIsNone(report["uplift_total_chf"])
 
     def test_year_without_readings_reports_no_data(self):
         report = self._report(year=2024)

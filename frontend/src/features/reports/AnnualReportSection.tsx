@@ -60,6 +60,7 @@ export function AnnualReportSection({ zevId, year }: AnnualReportSectionProps) {
             <AnnualReportKpis report={report} />
             <AnnualTrendCard report={report} />
             <ParticipantSavingsCard report={report} />
+            <ProducerUpliftCard report={report} />
         </>
     )
 }
@@ -101,6 +102,14 @@ function AnnualReportKpis({ report }: { report: AnnualReport }) {
                     currency="CHF"
                     hint={t('pages.reports.annualReport.hints.savings')}
                 />
+                {report.uplift_total_chf !== null && (
+                    <StatCard
+                        label={t('pages.reports.annualReport.stats.uplift')}
+                        value={formatChfAmount(Number(report.uplift_total_chf))}
+                        currency="CHF"
+                        hint={t('pages.reports.annualReport.hints.uplift')}
+                    />
+                )}
             </section>
             {report.has_behind_meter_generation && <p className="muted">{t('behindMeter.zevNote')}</p>}
         </>
@@ -233,6 +242,59 @@ function ParticipantSavingsCard({ report }: { report: AnnualReport }) {
             )}
             <p className="muted" style={{ marginBottom: 0, fontSize: '0.875rem' }}>
                 {t('pages.reports.annualReport.participants.note')}
+            </p>
+        </section>
+    )
+}
+
+/**
+ * Producers only: what selling inside the ZEV earned over the feed-in tariff
+ * (spec 2026-09-annual-zev-report). A producer whose comparison is unknown
+ * keeps a row of dashes, so a missing figure is never mistaken for zero.
+ */
+function ProducerUpliftCard({ report }: { report: AnnualReport }) {
+    const { t } = useTranslation()
+    const producers = report.participants.filter((row) => row.uplift !== null || row.produced_kwh > 0)
+    if (producers.length === 0) return null
+    return (
+        <section className="card">
+            <h3 style={{ marginTop: 0 }}>{t('pages.reports.annualReport.uplift.title')}</h3>
+            <p className="muted">{t('pages.reports.annualReport.uplift.description')}</p>
+            <div className="table-scroll">
+                <table className="participant-table participant-table--static">
+                    <thead>
+                        <tr>
+                            <th>{t('pages.reports.annualReport.col.participant')}</th>
+                            <th className="numeric">{t('pages.reports.annualReport.col.sold')}</th>
+                            <th className="numeric">{t('pages.reports.annualReport.col.zevRevenue')}</th>
+                            <th className="numeric">{t('pages.reports.annualReport.col.feedInRevenue')}</th>
+                            <th className="numeric">{t('pages.reports.annualReport.col.uplift')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {producers.map((row) => (
+                            <tr key={row.participant_id}>
+                                <td>{row.participant_name || '-'}</td>
+                                <td className="numeric">{row.uplift ? yearKwh(Number(row.uplift.local_sold_kwh)) : '—'}</td>
+                                <td className="numeric">{chfOrDash(row.uplift?.local_chf)}</td>
+                                <td className="numeric">{chfOrDash(row.uplift?.feed_in_chf)}</td>
+                                <td className="numeric">{chfOrDash(row.uplift?.uplift_chf)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                    {report.uplift_total_chf !== null && (
+                        <tfoot>
+                            <tr>
+                                <td>{t('pages.reports.annualReport.uplift.total')}</td>
+                                <td colSpan={3} />
+                                <td className="numeric">{chfOrDash(report.uplift_total_chf)}</td>
+                            </tr>
+                        </tfoot>
+                    )}
+                </table>
+            </div>
+            <p className="muted" style={{ marginBottom: 0, fontSize: '0.875rem' }}>
+                {t('pages.reports.annualReport.uplift.note')}
             </p>
         </section>
     )

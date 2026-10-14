@@ -61,6 +61,18 @@ class Invoice(models.Model):
     total_local_kwh = models.DecimalField(max_digits=12, decimal_places=4, default=0)
     total_grid_kwh = models.DecimalField(max_digits=12, decimal_places=4, default=0)
     total_feed_in_kwh = models.DecimalField(max_digits=12, decimal_places=4, default=0)
+    # The producer's local sales, for the annual report's uplift (what selling
+    # inside the ZEV earned over feeding the grid). ``total_local_sold_kwh`` is
+    # the energy sold locally and ``local_sale_chf`` what the ZEV credited for
+    # it (positive). ``local_sale_feed_in_chf`` is what those same kWh would
+    # have earned at the feed-in tariff, interval by interval; null when that
+    # cannot be priced (no feed-in tariff, or a gap in a fetched series) and on
+    # invoices issued before the feature existed.
+    total_local_sold_kwh = models.DecimalField(max_digits=12, decimal_places=4, default=0)
+    local_sale_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    local_sale_feed_in_chf = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
     subtotal_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     vat_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0)
     # What ``vat_chf`` was charged on (#957): the subtotal without producer

@@ -1119,6 +1119,10 @@ export interface Invoice {
     total_local_kwh?: string
     total_grid_kwh?: string
     total_feed_in_kwh?: string
+    total_local_sold_kwh?: string
+    local_sale_chf?: string
+    /** What the locally sold kWh would have earned as feed-in; null when it could not be priced or on older invoices. */
+    local_sale_feed_in_chf?: string | null
     status: string
     sent_at?: string | null
     pdf_url?: string | null
@@ -1766,6 +1770,20 @@ export interface AnnualReportSavings {
     saved_chf: string
 }
 
+/**
+ * What a producer's local sales earned over feeding the grid, summed from the
+ * engine's per-invoice figures. Signed: a ZEV price below the feed-in tariff
+ * gives a negative `uplift_chf`.
+ */
+export interface AnnualReportUplift {
+    local_sold_kwh: string
+    local_chf: string
+    local_rp: string
+    feed_in_chf: string
+    feed_in_rp: string
+    uplift_chf: string
+}
+
 export interface AnnualReportParticipant {
     participant_id: string
     participant_name: string
@@ -1779,6 +1797,8 @@ export interface AnnualReportParticipant {
     /** The participant's own-system figures for the year (no timeline); null without a source or while the feature is off. */
     gross_energy: GrossEnergy | null
     savings: AnnualReportSavings | null
+    /** Null for a non-producer, or when the feed-in comparison is unknown for any invoice of the year. */
+    uplift: AnnualReportUplift | null
 }
 
 export interface AnnualReport {
@@ -1793,6 +1813,7 @@ export interface AnnualReport {
     months: AnnualReportMonth[]
     participants: AnnualReportParticipant[]
     savings_total_chf: string | null
+    uplift_total_chf: string | null
 }
 
 export interface HourlyProfileEntry {

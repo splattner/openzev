@@ -1,12 +1,14 @@
-"""Annual ZEV report: a year's energy balance, its monthly trend, and what
-participation saved each participant.
+"""Annual ZEV report: a year's energy balance, its monthly trend, what
+participation saved each consumer, and what selling locally earned each
+producer over feeding the grid.
 
 Owner/admin view of one ZEV and one calendar year (docs/specs/
 2026-09-annual-zev-report.md). Nothing here is computed afresh: the energy
 figures are the Energy balance dashboard's (``metering.analytics``) over the
-civil year in monthly buckets, and the savings are the annual statement's
-(``compute_savings``) summed per participant, so the report reconciles with
-both.
+civil year in monthly buckets, the savings are the annual statement's
+(``compute_savings``) summed per participant, and the producer uplift sums the
+per-invoice figures the engine stored, so the report reconciles with the
+invoices.
 """
 
 from datetime import date
@@ -73,11 +75,11 @@ def _empty_month() -> dict:
     return {"produced_kwh": 0.0, "consumed_kwh": 0.0, "imported_kwh": 0.0, "exported_kwh": 0.0}
 
 
-def _savings_by_participant(zev, year: int) -> dict[str, dict]:
-    """``compute_savings`` per participant over the year's non-cancelled invoices.
+def _invoices_by_participant(zev, year: int) -> dict[str, list]:
+    """The year's non-cancelled invoices of ``zev`` grouped by participant id.
 
-    Same invoice selection as the annual statement, so a participant's row
-    here matches the savings box on their statement.
+    Same invoice selection as the annual statement, so a participant's rows
+    here match their statement.
     """
     invoices = (
         Invoice.objects.filter(
@@ -92,7 +94,40 @@ def _savings_by_participant(zev, year: int) -> dict[str, dict]:
     grouped: dict[str, list] = {}
     for invoice in invoices:
         grouped.setdefault(str(invoice.participant_id), []).append(invoice)
-    return {pid: compute_savings(rows) for pid, rows in grouped.items()}
+    return grouped
+
+
+def compute_producer_uplift(invoices) -> dict | None:
+    """What selling locally earned over feeding the grid, summed over ``invoices``.
+
+    The engine stores, per invoice, the energy sold locally, what the ZEV
+    credited for it, and what the same kWh would have earned at the feed-in
+    tariff interval by interval. None when there is nothing to compare: no
+    local sales, or any invoice whose benchmark is unknown (no feed-in tariff,
+    a gap in a fetched series, or issued before the figures were stored) —
+    summing only the known invoices would mix periods.
+
+    Unlike ``compute_savings`` a negative result is kept: a ZEV price below
+    the feed-in tariff costs the producer money, and hiding that would make
+    the column look better than it is.
+    """
+    if not invoices or any(invoice.local_sale_feed_in_chf is None for invoice in invoices):
+        return None
+
+    sold_kwh = sum((invoice.total_local_sold_kwh for invoice in invoices), Decimal("0"))
+    if sold_kwh <= 0:
+        return None
+    local_chf = sum((invoice.local_sale_chf for invoice in invoices), Decimal("0"))
+    feed_in_chf = sum((invoice.local_sale_feed_in_chf for invoice in invoices), Decimal("0"))
+
+    return {
+        "local_sold_kwh": f"{sold_kwh:.2f}",
+        "local_chf": f"{local_chf:.2f}",
+        "local_rp": f"{local_chf / sold_kwh * 100:.2f}",
+        "feed_in_chf": f"{feed_in_chf:.2f}",
+        "feed_in_rp": f"{feed_in_chf / sold_kwh * 100:.2f}",
+        "uplift_chf": f"{local_chf - feed_in_chf:.2f}",
+    }
 
 
 def build_annual_report(zev, year: int) -> dict:
@@ -119,7 +154,9 @@ def build_annual_report(zev, year: int) -> dict:
         row["previous_self_sufficiency_rate"] = prior["self_sufficiency_rate"] if prior else None
         months.append(row)
 
-    savings = _savings_by_participant(zev, year)
+    invoices = _invoices_by_participant(zev, year)
+    savings = {pid: compute_savings(rows) for pid, rows in invoices.items()}
+    uplift = {pid: compute_producer_uplift(rows) for pid, rows in invoices.items()}
     names = {str(p.id): f"{p.first_name} {p.last_name}".strip() for p in zev.participants.all()}
 
     participants = {}
@@ -140,6 +177,7 @@ def build_annual_report(zev, year: int) -> dict:
             ),
             "has_behind_meter_generation": has_behind_meter_generation,
             "savings": savings.get(pid),
+            "uplift": uplift.get(pid),
         }
     # Invoiced but without readings in the year (e.g. a data gap): the savings
     # are still real money, so the row stays.
@@ -155,6 +193,7 @@ def build_annual_report(zev, year: int) -> dict:
                 "self_sufficiency_rate": None,
                 "has_behind_meter_generation": False,
                 "savings": row_savings,
+                "uplift": uplift.get(pid),
             }
 
     gross = participants_gross(list(participants), *civil_window(date(year, 1, 1), date(year, 12, 31)))
@@ -162,6 +201,7 @@ def build_annual_report(zev, year: int) -> dict:
         row["gross_energy"] = gross.get(pid)
 
     saved = [Decimal(row["savings"]["saved_chf"]) for row in participants.values() if row["savings"]]
+    uplifts = [Decimal(row["uplift"]["uplift_chf"]) for row in participants.values() if row["uplift"]]
 
     return {
         "zev_id": str(zev.id),
@@ -173,4 +213,5 @@ def build_annual_report(zev, year: int) -> dict:
         "months": months,
         "participants": sorted(participants.values(), key=lambda row: row["participant_name"].lower()),
         "savings_total_chf": f"{sum(saved, Decimal('0')):.2f}" if saved else None,
+        "uplift_total_chf": f"{sum(uplifts, Decimal('0')):.2f}" if uplifts else None,
     }

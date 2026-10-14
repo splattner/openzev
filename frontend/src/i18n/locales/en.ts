@@ -1620,8 +1620,8 @@ export const en = {
                 shared: 'shared by the participants',
                 allHours: 'All hours',
                 noTimeWindow: 'time window not configured',
-                dynamicAverage: 'Dynamic, average',
-                dynamicPartial: 'Dynamic, incomplete average',
+                dynamicAverage: 'Dynamic, average {{from}} – {{to}}',
+                dynamicPartial: 'Dynamic, incomplete average {{from}} – {{to}}',
                 percentOf: '{{percentage}}% of the grid tariff',
                 percentOfBase: '{{percentage}}% of the grid tariff ({{base}})',
                 incompleteBaseAverage: 'incomplete base average',
@@ -2887,10 +2887,12 @@ export const en = {
                     produced: 'Production',
                     consumed: 'Consumption',
                     savings: 'Participant savings',
+                    uplift: 'Producer uplift',
                 },
                 hints: {
                     previousYear: '{{year}}: {{rate}}',
                     savings: 'Based on the year\'s invoices',
+                    uplift: 'Local sales vs. feed-in tariff',
                 },
                 trend: {
                     title: 'Over the year',
@@ -2905,6 +2907,12 @@ export const en = {
                     total: 'Total',
                     note: 'Savings compare what ZEV electricity was billed at with what the same kWh would have cost at the invoices\' average grid rate, as on the annual statement. Cancelled invoices do not count; without invoices the row stays empty.',
                 },
+                uplift: {
+                    title: 'Local sales vs. feed-in tariff',
+                    description: 'What producers earned by selling electricity inside the ZEV, compared with what the same kWh would have earned as grid feed-in.',
+                    total: 'Total',
+                    note: 'The ZEV price is what the invoices credited for locally sold kWh. The feed-in tariff figure prices the same kWh at the feed-in tariff in force at the time, interval by interval, including a contractual minimum price. A negative uplift means the ZEV price was below the feed-in tariff. A dash means the comparison is not available: invoices issued before this figure was stored, or a period without a feed-in tariff or with gaps in its fetched prices. Cancelled invoices do not count.',
+                },
                 col: {
                     participant: 'Participant',
                     consumption: 'Consumption',
@@ -2913,6 +2921,10 @@ export const en = {
                     localCost: 'ZEV electricity cost',
                     gridCost: 'Cost at grid rate',
                     savings: 'Savings',
+                    sold: 'Sold in ZEV',
+                    zevRevenue: 'ZEV revenue',
+                    feedInRevenue: 'At feed-in tariff',
+                    uplift: 'Uplift',
                 },
             },
             financialSummary: {

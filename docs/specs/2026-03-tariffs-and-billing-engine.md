@@ -457,6 +457,9 @@ produced by the engine:
 | `total_local_kwh` | Sum of local energy allocated to this participant |
 | `total_grid_kwh` | Sum of grid energy allocated to this participant |
 | `total_feed_in_kwh` | Sum of exported energy allocated to this producer |
+| `total_local_sold_kwh` | Sum of locally sold energy allocated to this producer (personal plus community share) |
+| `local_sale_chf` | The producer-credit groups as a positive amount: what the producer was credited for locally sold energy |
+| `local_sale_feed_in_chf` | What the same locally sold kWh would have earned at the feed-in tariff, priced per reading through `TariffResolver.price_at` (fetched series and minimum included) by `_feed_in_value`; null if any such reading has no feed-in tariff or a gap in a fetched series, which never fails billing. Informational: it does not enter any line item, subtotal or VAT. See `2026-09-annual-zev-report.md` |
 | `subtotal_chf` | Sum of all line-item totals |
 | `vat_rate` | Resolved VAT rate (decimal fraction, e.g. `0.0810`); 0 unless `vat_mode = registered` |
 | `vat_base_chf` | Under `vat_mode = registered`: `subtotal_chf` minus the producer-credit groups, i.e. what the ZEV itself supplies (§4.8); null otherwise |

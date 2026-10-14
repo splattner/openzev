@@ -139,6 +139,7 @@ function makeReport(overrides: Partial<AnnualReport> = {}): AnnualReport {
                     hypothetical_chf: '1.20',
                     saved_chf: '0.40',
                 },
+                uplift: null,
             },
             {
                 participant_id: 'p-2',
@@ -150,9 +151,11 @@ function makeReport(overrides: Partial<AnnualReport> = {}): AnnualReport {
                 self_sufficiency_rate: null,
                 has_behind_meter_generation: false,
                 savings: null,
+                uplift: null,
             },
         ],
         savings_total_chf: '0.40',
+        uplift_total_chf: null,
         ...overrides,
     }
 }
@@ -294,15 +297,98 @@ describe('ReportsPage annual report', () => {
         expect(kpis.textContent).toContain('CHF\u00a00.40')
         expect(container.textContent).toContain('pages.reports.annualReport.trend.title')
 
-        const rows = Array.from(container.querySelectorAll('.participant-table tbody tr'))
+        const savingsTable = container.querySelector('.participant-table')!
+        const rows = Array.from(savingsTable.querySelectorAll('tbody tr'))
         expect(rows.map((row) => row.querySelector('td')?.textContent)).toEqual(['Pia Muster', 'Paul Produzent'])
         expect(rows[0].textContent).toContain('CHF 0.80')
         expect(rows[0].textContent).toContain('CHF 1.20')
         // No invoices, no savings: the money columns stay empty rather than showing zero.
         expect(rows[1].textContent).toContain('—')
         expect(rows[1].textContent).not.toContain('CHF')
-        expect(container.querySelector('.participant-table tfoot')?.textContent).toContain('CHF 0.40')
+        expect(savingsTable.querySelector('tfoot')?.textContent).toContain('CHF 0.40')
         unmount()
+    })
+
+    describe('producer uplift', () => {
+        const UPLIFT = {
+            local_sold_kwh: '200.00',
+            local_chf: '40.00',
+            local_rp: '20.00',
+            feed_in_chf: '16.00',
+            feed_in_rp: '8.00',
+            uplift_chf: '24.00',
+        }
+
+        function withUplift(uplift: typeof UPLIFT | null, total: string | null) {
+            const base = makeReport()
+            return makeReport({
+                participants: base.participants.map((row) => (row.participant_id === 'p-2' ? { ...row, uplift } : row)),
+                uplift_total_chf: total,
+            })
+        }
+
+        const upliftTable = (container: HTMLElement) => container.querySelectorAll('.participant-table')[1]
+
+        it('shows what local sales earned over the feed-in tariff, per producer and in total', async () => {
+            vi.mocked(invoicesApi.fetchAnnualReport).mockResolvedValue(withUplift(UPLIFT, '24.00'))
+
+            const { container, unmount } = renderReportsPage()
+            await flush()
+            await flush()
+
+            expect(container.querySelector('.kpi-row')?.textContent).toContain('pages.reports.annualReport.stats.uplift')
+            expect(container.querySelector('.kpi-row')?.textContent).toContain('24.00')
+            const rows = Array.from(upliftTable(container).querySelectorAll('tbody tr'))
+            expect(rows.map((row) => row.querySelector('td')?.textContent)).toEqual(['Paul Produzent'])
+            expect(rows[0].textContent).toContain('CHF 40.00')
+            expect(rows[0].textContent).toContain('CHF 16.00')
+            expect(rows[0].textContent).toContain('CHF 24.00')
+            expect(upliftTable(container).querySelector('tfoot')?.textContent).toContain('CHF 24.00')
+            unmount()
+        })
+
+        it('keeps a negative uplift visible', async () => {
+            vi.mocked(invoicesApi.fetchAnnualReport).mockResolvedValue(
+                withUplift({ ...UPLIFT, local_chf: '5.00', feed_in_chf: '9.00', uplift_chf: '-4.00' }, '-4.00'),
+            )
+
+            const { container, unmount } = renderReportsPage()
+            await flush()
+            await flush()
+
+            expect(upliftTable(container).querySelector('tbody')?.textContent).toMatch(/-\s?4\.00|−\s?4\.00/)
+            unmount()
+        })
+
+        it('shows dashes, not zero, for a producer whose comparison is unknown', async () => {
+            vi.mocked(invoicesApi.fetchAnnualReport).mockResolvedValue(withUplift(null, null))
+
+            const { container, unmount } = renderReportsPage()
+            await flush()
+            await flush()
+
+            const row = upliftTable(container).querySelector('tbody tr')!
+            expect(row.querySelector('td')?.textContent).toBe('Paul Produzent')
+            expect(row.textContent).toContain('—')
+            expect(row.textContent).not.toContain('CHF')
+            expect(upliftTable(container).querySelector('tfoot')).toBeNull()
+            expect(container.querySelector('.kpi-row')?.textContent).not.toContain('pages.reports.annualReport.stats.uplift')
+            unmount()
+        })
+
+        it('omits the card when nobody produced', async () => {
+            const base = makeReport()
+            vi.mocked(invoicesApi.fetchAnnualReport).mockResolvedValue(
+                makeReport({ participants: base.participants.filter((row) => row.participant_id === 'p-1') }),
+            )
+
+            const { container, unmount } = renderReportsPage()
+            await flush()
+            await flush()
+
+            expect(container.textContent).not.toContain('pages.reports.annualReport.uplift.title')
+            unmount()
+        })
     })
 
     it('renders — and a badge for a net-metered participant, plus the ZEV-wide note', async () => {
@@ -320,6 +406,7 @@ describe('ReportsPage annual report', () => {
                         self_sufficiency_rate: null,
                         has_behind_meter_generation: true,
                         savings: null,
+                        uplift: null,
                     },
                 ],
             }),

@@ -63,6 +63,9 @@ lifecycle from scratch.
 | `total_local_kwh` | `Decimal(12,4)` | Computed by engine |
 | `total_grid_kwh` | `Decimal(12,4)` | Computed by engine |
 | `total_feed_in_kwh` | `Decimal(12,4)` | Computed by engine |
+| `total_local_sold_kwh` | `Decimal(12,4)` | Energy the producer sold locally, computed by engine; feeds the annual report's producer uplift (`2026-09-annual-zev-report.md`) |
+| `local_sale_chf` | `Decimal(10,2)` | What the invoice credited for those kWh (positive), computed by engine |
+| `local_sale_feed_in_chf` | `Decimal(10,2)` (nullable) | What the same kWh would have earned at the feed-in tariff, interval by interval; null when it cannot be priced and on invoices issued before the field existed. Not shown on any invoice screen or PDF |
 | `subtotal_chf` | `Decimal(10,2)` | Sum of line-item totals |
 | `vat_rate` | `Decimal(5,4)` | VAT fraction (e.g. `0.0810`) |
 | `vat_base_chf` | `Decimal(10,2)` (nullable) | What `vat_chf` was charged on, under `vat_mode = registered`: `subtotal_chf` without the producer-credit lines (see tariffs spec §4.8). Null under the other VAT modes and on invoices issued before the field existed, whose VAT base is `subtotal_chf` |
@@ -999,7 +1002,7 @@ Two shapes, split by cost. `InvoiceListSerializer` returns all invoice fields pl
 
 The split exists because the list is the one unbounded read: `AdminInvoicesContent` passes no ZEV filter and walks every invoice in the instance one page at a time, so each nested line item and email-log row is paid for once per invoice across the whole dataset. Measured on 50 invoices × 8 items, one page went from 151.4 KiB to 33.2 KiB (4.6×, 78% smaller) and from 4 queries to 2; at the client walker's 200-page cap that is 29.6 MiB → 6.5 MiB. No list consumer reads the nested arrays — `AdminInvoicesContent` renders `invoice_number`/`zev_name`/`participant_name`/period/`total_chf`/`status`, and `BillingEmailsPage` reads the annotated latest-email fields before loading history on demand. In `frontend/src/types/api.ts` both fields are optional (`items?`, `email_logs?`). See #488.
 
-Read-only fields: `id`, `invoice_number`, `created_at`, `updated_at`, `pdf_file`, plus all billing-engine/workflow fields that never come from client input: `status`, `total_local_kwh`, `total_grid_kwh`, `total_feed_in_kwh`, `subtotal_chf`, `vat_rate`, `vat_base_chf`, `vat_chf`, `total_chf`, `period_start`, `period_end`, `zev`, `participant`, `sent_at`, `due_date`. Generic create/update/partial_update endpoints are not exposed; creation happens only via `generate`/`generate-all`, mutations only via the workflow actions.
+Read-only fields: `id`, `invoice_number`, `created_at`, `updated_at`, `pdf_file`, plus all billing-engine/workflow fields that never come from client input: `status`, `total_local_kwh`, `total_grid_kwh`, `total_feed_in_kwh`, `total_local_sold_kwh`, `local_sale_chf`, `local_sale_feed_in_chf`, `subtotal_chf`, `vat_rate`, `vat_base_chf`, `vat_chf`, `total_chf`, `period_start`, `period_end`, `zev`, `participant`, `sent_at`, `due_date`. Generic create/update/partial_update endpoints are not exposed; creation happens only via `generate`/`generate-all`, mutations only via the workflow actions.
 
 ### 9.2 InvoiceItemSerializer
 

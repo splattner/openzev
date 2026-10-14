@@ -1609,8 +1609,8 @@ export const de = {
                 shared: 'auf die Teilnehmer aufgeteilt',
                 allHours: 'Rund um die Uhr',
                 noTimeWindow: 'Zeitfenster nicht konfiguriert',
-                dynamicAverage: 'Dynamisch, Durchschnitt',
-                dynamicPartial: 'Dynamisch, unvollständiger Durchschnitt',
+                dynamicAverage: 'Dynamisch, Durchschnitt {{from}} – {{to}}',
+                dynamicPartial: 'Dynamisch, unvollständiger Durchschnitt {{from}} – {{to}}',
                 percentOf: '{{percentage}} % des Netztarifs',
                 percentOfBase: '{{percentage}} % des Netztarifs ({{base}})',
                 incompleteBaseAverage: 'unvollständiger Basisdurchschnitt',
@@ -2876,10 +2876,12 @@ export const de = {
                     produced: 'Produktion',
                     consumed: 'Verbrauch',
                     savings: 'Ersparnis Teilnehmende',
+                    uplift: 'Mehrerlös Produzenten',
                 },
                 hints: {
                     previousYear: '{{year}}: {{rate}}',
                     savings: 'Gemäss Rechnungen des Jahres',
+                    uplift: 'Lokaler Verkauf vs. Einspeisevergütung',
                 },
                 trend: {
                     title: 'Verlauf über das Jahr',
@@ -2894,6 +2896,12 @@ export const de = {
                     total: 'Total',
                     note: 'Die Ersparnis vergleicht die verrechneten Kosten für ZEV-Strom mit dem, was dieselben kWh zum durchschnittlichen Netztarif der Rechnungen gekostet hätten, wie in der Jahresabrechnung. Stornierte Rechnungen zählen nicht; ohne Rechnungen bleibt die Zeile leer.',
                 },
+                uplift: {
+                    title: 'Lokaler Verkauf vs. Einspeisevergütung',
+                    description: 'Was Produzenten durch den Verkauf von Strom im ZEV verdient haben, verglichen mit dem, was dieselben kWh als Netzeinspeisung eingebracht hätten.',
+                    total: 'Total',
+                    note: 'Der ZEV-Preis ist, was die Rechnungen für lokal verkaufte kWh gutgeschrieben haben. Der Wert zur Einspeisevergütung bewertet dieselben kWh intervallweise zur damals gültigen Einspeisevergütung, inklusive vertraglichem Mindestpreis. Ein negativer Mehrerlös bedeutet, dass der ZEV-Preis unter der Einspeisevergütung lag. Ein Strich bedeutet, dass der Vergleich nicht verfügbar ist: Rechnungen, die vor Speicherung dieses Werts erstellt wurden, oder ein Zeitraum ohne Einspeisevergütung oder mit Lücken in den abgerufenen Preisen. Stornierte Rechnungen zählen nicht.',
+                },
                 col: {
                     participant: 'Teilnehmende',
                     consumption: 'Verbrauch',
@@ -2902,6 +2910,10 @@ export const de = {
                     localCost: 'Kosten ZEV-Strom',
                     gridCost: 'Kosten ab Netz',
                     savings: 'Ersparnis',
+                    sold: 'Verkauft im ZEV',
+                    zevRevenue: 'Erlös ZEV',
+                    feedInRevenue: 'Zur Einspeisevergütung',
+                    uplift: 'Mehrerlös',
                 },
             },
             financialSummary: {
