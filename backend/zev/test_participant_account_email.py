@@ -8,7 +8,7 @@ from rest_framework.test import APIClient
 from accounts.models import User, UserRole
 from testing.helpers import authenticate, create_managed_zev, make_user
 
-from .models import Participant, ZevAccessGrant, ZevAccessRole
+from .models import Participant, Zev, ZevAccessGrant, ZevAccessRole
 from .services import ensure_participant_account
 
 
@@ -144,3 +144,135 @@ class ZevOwnerSetupEmailTests(TestCase):
 
         self.assertEqual(response.status_code, 400, response.content)
         self.assertIn("email", response.json()["owner"])
+
+
+class ZevOwnerSetupExistingAccountTests(TestCase):
+    """#1009: the wizard can make an existing account the owner."""
+
+    def setUp(self):
+        self.admin = make_user("eo_admin", UserRole.ADMIN)
+        self.client = APIClient()
+        authenticate(self.client, self.admin)
+
+    def post(self, owner, **extra):
+        payload = {
+            "name": "Existing Owner ZEV", "start_date": "2026-03-01", "zev_type": "vzev",
+            "billing_interval": "monthly", "owner": owner,
+            "metering_points": [{"meter_id": "METER-EXO", "meter_type": "consumption"}],
+            **extra,
+        }
+        return self.client.post("/api/v1/zev/zevs/create-with-owner/", payload, format="json")
+
+    def test_an_existing_account_becomes_the_owner_untouched(self):
+        account = make_user("eo_account", UserRole.USER)
+        before = (account.password, account.email, account.first_name, account.last_name, account.must_change_password)
+
+        response = self.post({"account": account.pk, "phone": "044 000 00 00"})
+
+        self.assertEqual(response.status_code, 201, response.content)
+        owner = response.json()["owner"]
+        self.assertEqual(owner["id"], account.pk)
+        self.assertIsNone(owner["temporary_password"])
+        self.assertTrue(owner["existing_account"])
+        self.assertEqual(User.objects.filter(email__iexact=account.email).count(), 1)
+        account.refresh_from_db()
+        self.assertEqual(
+            (account.password, account.email, account.first_name, account.last_name, account.must_change_password), before,
+        )
+        participant = Participant.objects.get(pk=response.json()["owner_participant_id"])
+        self.assertEqual(participant.user_id, account.pk)
+        self.assertEqual(participant.email, account.email)
+        self.assertEqual(participant.phone, "044 000 00 00")
+        self.assertTrue(account.independent_login_required)
+
+    def test_the_owner_manages_the_zev_through_the_issuer_role_without_a_grant(self):
+        account = make_user("eo_role", UserRole.USER)
+        response = self.post({"account": account.pk}, start_date="2020-01-01")
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertFalse(ZevAccessGrant.objects.filter(user=account).exists())
+        zev_ids = [row["id"] for row in self.client_for(account).get("/api/v1/zev/zevs/").json()["results"]]
+        self.assertIn(response.json()["zev"]["id"], zev_ids)
+
+    def client_for(self, user):
+        client = APIClient()
+        authenticate(client, user)
+        return client
+
+    def test_a_zev_starting_later_gets_a_bridging_grant(self):
+        account = make_user("eo_later", UserRole.USER)
+        response = self.post({"account": account.pk}, start_date="2999-01-01")
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(ZevAccessGrant.objects.filter(user=account, role=ZevAccessRole.MANAGER).count(), 1)
+
+    def test_the_new_person_fields_are_ignored_for_an_existing_account(self):
+        account = make_user("eo_ignored", UserRole.USER)
+        taken = make_user("eo_taken", UserRole.USER)
+
+        response = self.post({
+            "account": account.pk, "first_name": "Other", "last_name": "Name",
+            "email": taken.email, "username": taken.username,
+        })
+
+        self.assertEqual(response.status_code, 201, response.content)
+        account.refresh_from_db()
+        self.assertNotEqual(account.first_name, "Other")
+        self.assertEqual(Participant.objects.get(pk=response.json()["owner_participant_id"]).email, account.email)
+
+    def test_an_admin_account_is_refused(self):
+        response = self.post({"account": make_user("eo_other_admin", UserRole.ADMIN).pk})
+
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("account", response.json()["owner"])
+
+    def test_a_deactivated_account_is_refused(self):
+        account = make_user("eo_off", UserRole.USER)
+        account.is_active = False
+        account.save(update_fields=["is_active"])
+
+        response = self.post({"account": account.pk})
+
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("account", response.json()["owner"])
+
+    def test_an_account_without_a_login_is_refused(self):
+        account = make_user("eo_nologin", UserRole.USER)
+        account.set_unusable_password()
+        account.save(update_fields=["password"])
+
+        response = self.post({"account": account.pk})
+
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("account", response.json()["owner"])
+        self.assertFalse(Zev.objects.filter(name="Existing Owner ZEV").exists())
+
+    def test_an_unknown_account_is_refused(self):
+        response = self.post({"account": 999999})
+
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("account", response.json()["owner"])
+
+    def test_a_new_person_still_needs_name_and_email(self):
+        response = self.post({"first_name": "Only"})
+
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertEqual(set(response.json()["owner"]), {"last_name", "email"})
+
+    def test_a_new_account_reports_its_temporary_password(self):
+        response = self.post({"first_name": "Neu", "last_name": "Person", "email": "neu.person@example.com"})
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertTrue(response.json()["owner"]["temporary_password"])
+        self.assertFalse(response.json()["owner"]["existing_account"])
+
+    def test_making_an_existing_account_owner_is_audited(self):
+        from audit.models import AuditEvent
+
+        account = make_user("eo_audit", UserRole.USER)
+        response = self.post({"account": account.pk})
+
+        self.assertEqual(response.status_code, 201, response.content)
+        event = AuditEvent.objects.get(action_type="zev.owner_existing_account")
+        self.assertEqual(event.target_id, response.json()["zev"]["id"])
+        self.assertEqual(event.metadata_json["owner_user_id"], account.pk)

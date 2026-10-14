@@ -57,8 +57,9 @@ vi.mock('../src/lib/api/zev', async (importOriginal) => ({
     updateZev: vi.fn(),
 }))
 
+const fetchUsersMock = vi.fn(() => Promise.resolve([] as unknown[]))
 vi.mock('../src/lib/api/auth', () => ({
-    fetchUsers: () => Promise.resolve([]),
+    fetchUsers: () => fetchUsersMock(),
 }))
 
 vi.mock('../src/lib/appSettings', () => ({
@@ -433,6 +434,89 @@ describe('ZevListPage creation wizard — bank fields', () => {
             const inputs = meterIdInputs(container)
             expect(inputs[0].getAttribute('aria-invalid')).toBe(null)
             expect(inputs[1].getAttribute('aria-invalid')).toBe('true')
+        } finally {
+            act(() => root.unmount())
+            container.remove()
+        }
+    })
+})
+
+describe('ZevListPage creation wizard — existing account as owner', () => {
+    beforeEach(() => {
+        createZevWithOwnerMock.mockClear()
+        fetchUsersMock.mockReset()
+        fetchUsersMock.mockResolvedValue([
+            { id: 7, username: 'erika', email: 'erika@example.com', first_name: 'Erika', last_name: 'Muster', role: 'user' },
+            { id: 1, username: 'boss', email: 'boss@example.com', first_name: 'Ad', last_name: 'Min', role: 'admin' },
+        ])
+    })
+
+    it('sends the chosen account without new-person identity and shows no temporary password', async () => {
+        createZevWithOwnerMock.mockResolvedValue({
+            zev: { id: 'z-new', name: 'Existing ZEV' },
+            owner: { id: 7, username: 'erika', temporary_password: null, existing_account: true },
+            owner_participant_id: 'p3',
+            metering_points: [{ id: 'm3', meter_id: 'METER-1' }],
+        })
+        const { container, root } = await renderZevListPage()
+        try {
+            await act(async () => { clickButton(container, 'pages.zevs.newZev').click() })
+            await fillRequiredStepOneInputs(container)
+            await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
+
+            await act(async () => {
+                container.querySelectorAll<HTMLInputElement>('input[name="owner_mode"]')[1].click()
+            })
+            await flush()
+            expect(container.querySelector('input[name="first_name"]')).toBe(null)
+            const select = container.querySelector<HTMLSelectElement>('select[name="owner_account"]')!
+            const labels = Array.from(select.options).map((option) => option.textContent)
+            expect(labels).toContain('Erika Muster (erika@example.com)')
+            expect(labels.join()).not.toContain('boss@example.com')
+
+            // An account must be chosen before moving on.
+            await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
+            expect(container.textContent).toContain('pages.zevs.validation.ownerAccountRequired')
+
+            await act(async () => {
+                Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(select, '7')
+                select.dispatchEvent(new Event('change', { bubbles: true }))
+            })
+            await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
+            await fillMeterId(container)
+            await act(async () => { clickButton(container, 'pages.zevs.wizard.next').click() })
+            expect(container.textContent).toContain('Erika Muster (erika@example.com)')
+
+            await act(async () => { clickButton(container, 'pages.zevs.wizard.createZev').click() })
+            await flush()
+
+            expect(createZevWithOwnerMock).toHaveBeenCalledTimes(1)
+            expect(createZevWithOwnerMock.mock.calls[0][0].owner.account).toBe(7)
+            expect(container.textContent).toContain('pages.zevs.wizard.createdExistingAccount')
+            expect(container.textContent).not.toContain('pages.zevs.wizard.passwordLabel')
+        } finally {
+            act(() => root.unmount())
+            container.remove()
+        }
+    })
+
+    it('sends no account id for a new person', async () => {
+        createZevWithOwnerMock.mockResolvedValue({
+            zev: { id: 'z-new', name: 'New ZEV' },
+            owner: { id: 8, username: 'oscar', temporary_password: 'pw', existing_account: false },
+            owner_participant_id: 'p4',
+            metering_points: [{ id: 'm4', meter_id: 'METER-1' }],
+        })
+        const { container, root } = await renderZevListPage()
+        try {
+            await act(async () => { clickButton(container, 'pages.zevs.newZev').click() })
+            await fillRequiredStepOneInputs(container)
+            await walkToReview(container)
+            await act(async () => { clickButton(container, 'pages.zevs.wizard.createZev').click() })
+            await flush()
+
+            expect(createZevWithOwnerMock.mock.calls[0][0].owner.account).toBeUndefined()
+            expect(container.textContent).toContain('pw')
         } finally {
             act(() => root.unmount())
             container.remove()

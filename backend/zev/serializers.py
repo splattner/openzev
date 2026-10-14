@@ -9,7 +9,8 @@ from django.utils import timezone
 
 from .models import Building, Zev, Participant, Party, PartyKind, PartyTitle, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode, PartyRole, ZevPartyRole
 from .services import (
-    account_for_email, create_zev_with_owner_setup, ensure_participant_account, lock_participant_account, requires_independent_login,
+    account_for_email, create_zev_with_owner_setup, ensure_participant_account, existing_owner_problem,
+    lock_participant_account, requires_independent_login,
 )
 from .tasks import trigger_building_geocode_if_address_present
 from accounts import email_change
@@ -691,16 +692,30 @@ class ZevDetailSerializer(ZevSerializer):
 
 
 class ZevOwnerAccountSerializer(serializers.Serializer):
+    """The responsible person: a new account, or ``account`` — the id of an existing one.
+
+    With ``account`` the name and email come from that account, which is left
+    as it is; ``username``, ``first_name``, ``last_name`` and ``email`` are then ignored.
+    """
+
+    account = serializers.IntegerField(required=False, min_value=1)
     username = serializers.CharField(required=False, allow_blank=True, max_length=150)
     title = serializers.ChoiceField(choices=Participant.Title.choices, required=False, allow_blank=True)
-    first_name = serializers.CharField(max_length=100)
-    last_name = serializers.CharField(max_length=100)
-    email = serializers.EmailField()
+    first_name = serializers.CharField(required=False, max_length=100)
+    last_name = serializers.CharField(required=False, max_length=100)
+    email = serializers.EmailField(required=False)
     phone = serializers.CharField(required=False, allow_blank=True, max_length=30)
     address_line1 = serializers.CharField(required=False, allow_blank=True, max_length=200)
     address_line2 = serializers.CharField(required=False, allow_blank=True, max_length=200)
     postal_code = serializers.CharField(required=False, allow_blank=True, max_length=10)
     city = serializers.CharField(required=False, allow_blank=True, max_length=100)
+
+    def to_internal_value(self, data):
+        # An existing account is used as it is, so the new-person checks below
+        # (taken email or username) must not reject what is merely ignored.
+        if isinstance(data, dict) and data.get('account') not in (None, ''):
+            data = {key: value for key, value in data.items() if key not in {'username', 'first_name', 'last_name', 'email'}}
+        return super().to_internal_value(data)
 
     def validate_email(self, value: str) -> str:
         if email_change.address_in_use(value):
@@ -715,6 +730,25 @@ class ZevOwnerAccountSerializer(serializers.Serializer):
         if user_model.objects.filter(username=username).exists():
             raise serializers.ValidationError('This username is already taken.')
         return username
+
+    def validate_account(self, value: int):
+        user = self.context['request'].user.__class__.objects.filter(pk=value).first()
+        if user is None:
+            raise serializers.ValidationError('This account no longer exists.')
+        problem = existing_owner_problem(user)
+        if problem:
+            raise serializers.ValidationError(problem)
+        return user
+
+    def validate(self, attrs):
+        if 'account' not in attrs:
+            missing = {
+                field: 'This field is required.'
+                for field in ('first_name', 'last_name', 'email') if not attrs.get(field)
+            }
+            if missing:
+                raise serializers.ValidationError(missing)
+        return attrs
 
 
 class SelfSetupOwnerAddressSerializer(serializers.Serializer):
@@ -780,8 +814,11 @@ class ZevCreateWithOwnerSerializer(BankIbanValidationMixin, serializers.Serializ
         metering_points_data = validated_data.pop('metering_points')
         if not validated_data.get('invoice_prefix'):
             validated_data.pop('invoice_prefix', None)
-        return create_zev_with_owner_setup(
-            zev_data=validated_data,
-            owner_data=owner_data,
-            metering_points_data=metering_points_data,
-        )
+        try:
+            return create_zev_with_owner_setup(
+                zev_data=validated_data,
+                owner_data=owner_data,
+                metering_points_data=metering_points_data,
+            )
+        except DjangoValidationError as exc:
+            raise django_validation_error(exc)

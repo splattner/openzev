@@ -39,7 +39,11 @@ Admins can create a ZEV together with a new responsible-person account in one wi
 
 1. Click **New ZEV**
 2. **Step 1** — fill in ZEV details (name, start date, type, billing interval, etc.).
-3. **Step 2** — fill in the responsible person details (name, address, email).
+3. **Step 2** — fill in the responsible person details (name, address, email),
+   or choose **Existing account** to make someone who already has an account
+   the responsible person. That account keeps its password, email and name; it
+   needs a sign-in method or a pending invitation, and admin accounts cannot be
+   chosen.
    The payment section belongs with this person because the participant record
    supplies the creditor name and address on QR-Rechnungen. Enter the optional
    **Bank Name** and **Bank IBAN** for the account receiving participant payments.
@@ -52,7 +56,9 @@ Admins can create a ZEV together with a new responsible-person account in one wi
 The system creates the ZEV, the responsible-person account — the ZEV's manager —
 with a temporary password, its participant record (the issuer of the ZEV's
 invoices and contracts), and the listed metering points. The temporary password is shown once at the end — pass it on
-to the responsible person, who sets their own password at first sign-in.
+to the responsible person, who sets their own password at first sign-in. For an
+existing account nothing is created, so no password is shown: the person signs
+in as before.
 
 Admins can also create a bare ZEV (without the wizard) through the API. Nobody
 manages it until an admin grants access in **ZEV Settings → People & access**.

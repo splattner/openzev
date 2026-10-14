@@ -25,6 +25,7 @@ import { ZevImportModal } from '../features/zev/ZevImportModal'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { FormModal } from '../components/FormModal'
+import { fetchUsers } from '../lib/api/auth'
 import { createZevWithOwner, disableZev, enableZev, fetchZevs, purgeZev, updateZev } from '../lib/api/zev'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
@@ -129,6 +130,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
     const [editForm, setEditForm] = useState<ZevInput>(getDefaultZevForm())
     const [createForm, setCreateForm] = useState<ZevWizardInput>(defaultCreateForm)
     const [wizardStep, setWizardStep] = useState<WizardStep>(1)
+    const [ownerMode, setOwnerMode] = useState<'new' | 'existing'>('new')
     const [showEditModal, setShowEditModal] = useState(false)
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [showImportModal, setShowImportModal] = useState(false)
@@ -146,6 +148,21 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
     const [purgeConfirmation, setPurgeConfirmation] = useState('')
     // State controls the button; the ref supplies current input at dispatch.
     const purgeConfirmationRef = useRef('')
+
+    const accountsQuery = useQuery({
+        queryKey: queryKeys.auth.users(),
+        queryFn: fetchUsers,
+        enabled: showCreateModal && ownerMode === 'existing',
+    })
+    // An admin already sees every ZEV and cannot be an owner; the server refuses the rest with a reason.
+    const ownerAccounts = (accountsQuery.data ?? []).filter((account) => account.role !== 'admin')
+    const selectedOwnerAccount = ownerAccounts.find((account) => account.id === createForm.owner.account)
+    const accountName = (account: { first_name: string; last_name: string; username: string }) =>
+        [account.first_name, account.last_name].filter(Boolean).join(' ') || account.username
+    const ownerName = ownerMode === 'existing' && selectedOwnerAccount
+        ? accountName(selectedOwnerAccount)
+        : `${createForm.owner.first_name} ${createForm.owner.last_name}`
+    const ownerEmail = ownerMode === 'existing' && selectedOwnerAccount ? selectedOwnerAccount.email : createForm.owner.email
 
     const createMutation = useMutation({
         mutationFn: createZevWithOwner,
@@ -250,6 +267,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
         setShowMeteringPointErrors(false)
         setCreatedCredentials(null)
         setCreatedZevName('')
+        setOwnerMode('new')
         if (copyFeedbackTimeoutRef.current) window.clearTimeout(copyFeedbackTimeoutRef.current)
         setCopyFeedback(null)
         createSubmittedRef.current = false
@@ -282,9 +300,13 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
         }
 
         if (step === 2) {
-            if (!form.owner.first_name.trim()) return t('pages.zevs.validation.ownerFirstNameRequired')
-            if (!form.owner.last_name.trim()) return t('pages.zevs.validation.ownerLastNameRequired')
-            if (!form.owner.email.trim()) return t('pages.zevs.validation.ownerEmailRequired')
+            if (ownerMode === 'existing') {
+                if (!form.owner.account) return t('pages.zevs.validation.ownerAccountRequired')
+            } else {
+                if (!form.owner.first_name.trim()) return t('pages.zevs.validation.ownerFirstNameRequired')
+                if (!form.owner.last_name.trim()) return t('pages.zevs.validation.ownerLastNameRequired')
+                if (!form.owner.email.trim()) return t('pages.zevs.validation.ownerEmailRequired')
+            }
             if (form.bank_iban?.trim() && !isValidIban(form.bank_iban)) return t('pages.zevs.validation.invalidIban')
             if (form.bank_iban?.trim() && !form.owner.address_line1?.trim()) {
                 return t('pages.zevs.validation.ownerAddressRequiredForIban')
@@ -333,6 +355,8 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
         createMutation.mutate({
             ...createForm,
             bank_iban: normalizeIban(createForm.bank_iban ?? ''),
+            // The server uses an existing account as it is and ignores the new-person identity fields.
+            owner: { ...createForm.owner, account: ownerMode === 'existing' ? createForm.owner.account : undefined },
         })
     }
 
@@ -521,6 +545,35 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                 <strong>{t('pages.zevs.wizard.step2Header')}</strong>
                                 <p className="muted" style={{ margin: '0.35rem 0 0' }}>{t('pages.zevs.wizard.step2Description')}</p>
                             </div>
+                            <div className="grid-span-full" role="radiogroup" aria-label={t('pages.zevs.wizard.ownerModeLabel')} style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+                                <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                    <input type="radio" name="owner_mode" checked={ownerMode === 'new'} onChange={() => setOwnerMode('new')} />
+                                    <span>{t('pages.zevs.wizard.ownerModeNew')}</span>
+                                </label>
+                                <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                    <input type="radio" name="owner_mode" checked={ownerMode === 'existing'} onChange={() => setOwnerMode('existing')} />
+                                    <span>{t('pages.zevs.wizard.ownerModeExisting')}</span>
+                                </label>
+                            </div>
+                            {ownerMode === 'existing' && (
+                                <label className="grid-span-full">
+                                    <span>{t('pages.zevs.wizard.ownerAccount')}</span>
+                                    <select
+                                        name="owner_account"
+                                        value={createForm.owner.account ?? ''}
+                                        disabled={accountsQuery.isLoading}
+                                        onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, account: event.target.value ? Number(event.target.value) : undefined } }))}
+                                    >
+                                        <option value="">{t('pages.zevs.wizard.ownerAccountPlaceholder')}</option>
+                                        {ownerAccounts.map((account) => (
+                                            <option key={account.id} value={account.id}>
+                                                {accountName(account)} ({account.email})
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <small className="muted">{t('pages.zevs.wizard.ownerAccountHint')}</small>
+                                </label>
+                            )}
                             <label>
                                 <span>{t('pages.zevs.form.title')}</span>
                                 <select value={createForm.owner.title ?? ''} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, title: event.target.value as ZevWizardInput['owner']['title'] } }))}>
@@ -530,22 +583,26 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                     ))}
                                 </select>
                             </label>
-                            <label>
-                                <span>{t('pages.zevs.form.usernameOptional')}</span>
-                                <input value={createForm.owner.username ?? ''} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, username: event.target.value } }))} />
-                            </label>
-                            <label>
-                                <span>{t('pages.zevs.form.firstName')}</span>
-                                <input name="first_name" value={createForm.owner.first_name} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, first_name: event.target.value } }))} required />
-                            </label>
-                            <label>
-                                <span>{t('pages.zevs.form.lastName')}</span>
-                                <input name="last_name" value={createForm.owner.last_name} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, last_name: event.target.value } }))} required />
-                            </label>
-                            <label>
-                                <span>{t('pages.zevs.form.email')}</span>
-                                <input name="email" type="email" value={createForm.owner.email} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, email: event.target.value } }))} required />
-                            </label>
+                            {ownerMode === 'new' && (
+                                <>
+                                    <label>
+                                        <span>{t('pages.zevs.form.usernameOptional')}</span>
+                                        <input value={createForm.owner.username ?? ''} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, username: event.target.value } }))} />
+                                    </label>
+                                    <label>
+                                        <span>{t('pages.zevs.form.firstName')}</span>
+                                        <input name="first_name" value={createForm.owner.first_name} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, first_name: event.target.value } }))} required />
+                                    </label>
+                                    <label>
+                                        <span>{t('pages.zevs.form.lastName')}</span>
+                                        <input name="last_name" value={createForm.owner.last_name} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, last_name: event.target.value } }))} required />
+                                    </label>
+                                    <label>
+                                        <span>{t('pages.zevs.form.email')}</span>
+                                        <input name="email" type="email" value={createForm.owner.email} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, email: event.target.value } }))} required />
+                                    </label>
+                                </>
+                            )}
                             <label>
                                 <span>{t('pages.zevs.form.phone')}</span>
                                 <input value={createForm.owner.phone ?? ''} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, phone: event.target.value } }))} />
@@ -683,8 +740,8 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                         <div className="card grid-span-full">
                             <h3 style={{ marginTop: 0 }}>{t('pages.zevs.wizard.review')}</h3>
                             <p><strong>{t('pages.zevs.wizard.reviewZev')}</strong> {createForm.name} ({t(`pages.zevs.zevTypes.${createForm.zev_type}` as Parameters<typeof t>[0])}) · {t('pages.zevs.wizard.reviewStarting', { date: formatShortDate(createForm.start_date, settings) })}</p>
-                            <p><strong>{t('pages.zevs.wizard.reviewOwner')}</strong> {createForm.owner.first_name} {createForm.owner.last_name} ({createForm.owner.email})</p>
-                            <p><strong>{t('pages.zevs.wizard.reviewPaymentRecipient')}</strong> {createForm.owner.first_name} {createForm.owner.last_name}{reviewRecipientAddress ? ` · ${reviewRecipientAddress}` : ''}</p>
+                            <p><strong>{t('pages.zevs.wizard.reviewOwner')}</strong> {ownerName} ({ownerEmail})</p>
+                            <p><strong>{t('pages.zevs.wizard.reviewPaymentRecipient')}</strong> {ownerName}{reviewRecipientAddress ? ` · ${reviewRecipientAddress}` : ''}</p>
                             <p><strong>{t('pages.zevs.wizard.reviewBillingInterval')}</strong> {t(reviewBillingInterval?.labelKey ?? 'pages.zevs.billingIntervals.monthly')}</p>
                             <p><strong>{t('pages.zevs.wizard.reviewMeteringPoints')}</strong> {createForm.metering_points.length}</p>
                             <ul>
@@ -702,36 +759,42 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                     {wizardStep === 5 && createdCredentials && (
                         <div className="grid-span-full page-stack">
                             <p style={{ margin: 0 }}>
-                                {t('pages.zevs.wizard.createdIntro', { name: createdZevName })}
+                                {t(createdCredentials.temporary_password === null ? 'pages.zevs.wizard.createdIntroExisting' : 'pages.zevs.wizard.createdIntro', { name: createdZevName })}
                             </p>
 
-                            <div className="card" style={{ padding: '1rem' }}>
-                                <p style={{ margin: '0 0 0.5rem' }}><strong>{t('pages.zevs.wizard.usernameLabel')}</strong></p>
-                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                                    <code>{createdCredentials.username}</code>
-                                    <button
-                                        className="button button-secondary"
-                                        type="button"
-                                        onClick={() => copyToClipboardWithFeedback(createdCredentials.username, t('pages.zevs.wizard.usernameLabel'))}
-                                    >
-                                        <FontAwesomeIcon icon={faCopy} fixedWidth />
-                                        {t('pages.zevs.wizard.copyUsername')}
-                                    </button>
+                            {createdCredentials.temporary_password === null ? (
+                                <div className="card" style={{ padding: '1rem' }}>
+                                    {t('pages.zevs.wizard.createdExistingAccount', { username: createdCredentials.username })}
                                 </div>
+                            ) : (
+                                <div className="card" style={{ padding: '1rem' }}>
+                                    <p style={{ margin: '0 0 0.5rem' }}><strong>{t('pages.zevs.wizard.usernameLabel')}</strong></p>
+                                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <code>{createdCredentials.username}</code>
+                                        <button
+                                            className="button button-secondary"
+                                            type="button"
+                                            onClick={() => copyToClipboardWithFeedback(createdCredentials.username, t('pages.zevs.wizard.usernameLabel'))}
+                                        >
+                                            <FontAwesomeIcon icon={faCopy} fixedWidth />
+                                            {t('pages.zevs.wizard.copyUsername')}
+                                        </button>
+                                    </div>
 
-                                <p style={{ margin: '1rem 0 0.5rem' }}><strong>{t('pages.zevs.wizard.passwordLabel')}</strong></p>
-                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                                    <code>{createdCredentials.temporary_password}</code>
-                                    <button
-                                        className="button button-secondary"
-                                        type="button"
-                                        onClick={() => copyToClipboardWithFeedback(createdCredentials.temporary_password, t('pages.zevs.wizard.passwordLabel'))}
-                                    >
-                                        <FontAwesomeIcon icon={faCopy} fixedWidth />
-                                        {t('pages.zevs.wizard.copyPassword')}
-                                    </button>
+                                    <p style={{ margin: '1rem 0 0.5rem' }}><strong>{t('pages.zevs.wizard.passwordLabel')}</strong></p>
+                                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <code>{createdCredentials.temporary_password}</code>
+                                        <button
+                                            className="button button-secondary"
+                                            type="button"
+                                            onClick={() => copyToClipboardWithFeedback(createdCredentials.temporary_password ?? '', t('pages.zevs.wizard.passwordLabel'))}
+                                        >
+                                            <FontAwesomeIcon icon={faCopy} fixedWidth />
+                                            {t('pages.zevs.wizard.copyPassword')}
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             {copyFeedback && <div className="muted">{copyFeedback}</div>}
                         </div>

@@ -1332,11 +1332,34 @@ exactly what gets sent. It starts with one empty row; "Add metering point"
 appends a row and focuses its meter ID; a row can be deleted while more than
 one remains. "Next" requires a non-blank, unique (after trimming) meter ID on
 every row; on failure the banner names the problem and each offending row
-shows its own error.
+shows its own error. Step 2 offers "New person" or "Existing account" (#1009):
+the latter is a select of the non-admin accounts from `GET /auth/users/`, and
+hides the username, name and email fields. Step 5 shows the username and
+temporary password only for a new account; for an existing one it states that
+no password was created or changed.
 
 **Endpoint:** `POST /api/v1/zev/zevs/create-with-owner/` (admin only)
 
-`owner.email` must not belong to an existing account (`400` on `owner.email`).
+`owner.email` of a new person must not belong to an existing account (`400` on
+`owner.email`). To use an existing account as the owner, send its id as
+`owner.account` instead (#1009):
+
+- `owner.account` is an integer account id; `owner.username`, `first_name`,
+  `last_name` and `email` are then ignored (`ZevOwnerAccountSerializer.to_internal_value`
+  drops them, so a taken email or username does not matter). Without
+  `owner.account`, `first_name`, `last_name` and `email` are required.
+- `title`, `phone` and the address fields still apply: they describe the owner
+  participant, not the account.
+- The account is refused with `400` on `owner.account` when it does not exist, is an
+  admin (already sees every ZEV and cannot be linked to a participant), is
+  deactivated, or has no login (`has_login_credentials`) and no pending invitation.
+  An account with a pending invitation is accepted. The check is
+  `existing_owner_problem()` (`zev/services.py`), run in the serializer and again under the
+  account's row lock in the service.
+- The account's password, email, name and `must_change_password` are never
+  changed. Becoming a manager through the issuer role marks it
+  `independent_login_required` (`protect_account_login`) like any promoted account.
+- The view records an audit event `zev.owner_existing_account` (governance) on the new ZEV.
 
 **Payload:** `ZevCreateWithOwnerSerializer`:
 ```json
@@ -1349,6 +1372,7 @@ shows its own error.
   "bank_name": "...",
   "bank_iban": "...",
   "owner": {
+    "account": null,
     "username": "",
     "title": "mr",
     "first_name": "...",
@@ -1378,12 +1402,14 @@ the informational bank name in parentheses only when non-empty). A blank or
 invalid IBAN keeps the billing-settings warning until it is corrected.
 
 **Service:** `create_zev_with_owner_setup()` (atomic transaction):
-1. Generate unique username (email-local → full-name → first-name fallback, suffix if taken).
+1. With `owner.account`: lock that account and re-check `existing_owner_problem()`; use it as it is (steps 1–2 are skipped, the participant's name and email come from the account). Otherwise generate a unique username (email-local → full-name → first-name fallback, suffix if taken).
 2. Create `User` with `role=user`, `must_change_password=True`, temporary password; its issuer role supplies management access (a grant bridges a future start date).
 3. Create `Zev` with that user as owner.
 4. Create owner `Participant` with `valid_from = zev.start_date`.
 5. Create each `MeteringPoint` → create `MeteringPointAssignment` to owner participant.
-6. Return `{ zev: {id, name}, owner: {id, username, temporary_password}, owner_participant_id, metering_points: [{id, meter_id}] }`.
+6. Return `{ zev: {id, name}, owner: {id, username, temporary_password, existing_account}, owner_participant_id, metering_points: [{id, meter_id}] }`. For an existing account `temporary_password` is `null` and `existing_account` is `true`.
+
+Model-guard `ValidationError`s raised while promoting the account are returned as `400`.
 
 ### 7.3 Self-setup
 

@@ -156,6 +156,22 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         result = serializer.save()
+        if result["owner"]["existing_account"]:
+            self._record_audit_best_effort(
+                request,
+                action_category=AuditActionCategory.GOVERNANCE,
+                action_type="zev.owner_existing_account",
+                target_type="zev.Zev",
+                zev=Zev.objects.filter(pk=result["zev"]["id"]).first(),
+                target_id=result["zev"]["id"],
+                target_display=result["zev"]["name"],
+                summary=(
+                    f"Created ZEV {result['zev']['name']} with the existing account "
+                    f"{result['owner']['username']} as its owner."
+                ),
+                metadata={"owner_user_id": result["owner"]["id"]},
+                status=AuditEventStatus.SUCCESS,
+            )
         return Response(result, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["post"], url_path="self-setup")

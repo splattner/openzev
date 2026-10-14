@@ -295,6 +295,8 @@ export interface ZevInput {
 }
 
 export interface ZevOwnerInput {
+    /** Id of an existing account to make the owner; its name and email are then used as they are and `username`, `first_name`, `last_name` and `email` are ignored. */
+    account?: number
     username?: string
     title?: 'mr' | 'mrs' | 'ms' | 'dr' | 'prof' | ''
     first_name: string
@@ -488,7 +490,9 @@ export interface ZevWizardResult {
     owner: {
         id: number
         username: string
-        temporary_password: string
+        /** `null` when an existing account was made the owner: nothing was created, so there is nothing to hand over. */
+        temporary_password: string | null
+        existing_account: boolean
     }
     owner_participant_id: string
     metering_points: Array<{

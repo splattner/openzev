@@ -307,6 +307,22 @@ def protect_account_login(user, *, credential_field="user"):
     return locked
 
 
+def existing_owner_problem(user) -> str | None:
+    """Why ``user`` cannot be made a ZEV's owner, or ``None`` when it can.
+
+    An admin already sees every ZEV and cannot be linked to a participant. A
+    deactivated account cannot sign in, and one without a login (or a pending
+    invitation) would be promoted to a manager nobody can sign in as.
+    """
+    if user.is_admin:
+        return "An admin account cannot be a ZEV owner. Choose another account."
+    if not user.is_active and not is_pending_invitation(user):
+        return "This account is deactivated."
+    if not has_login_credentials(user) and not is_pending_invitation(user):
+        return "Send this account an access invitation before making it a ZEV owner."
+    return None
+
+
 def send_participant_onboarding_link(participant, invited_by) -> tuple[str, ParticipantOnboardingToken]:
     """Email an onboarding link; raises ValueError without email or LinkRefused for protected accounts."""
     from . import onboarding
@@ -341,28 +357,45 @@ def get_participant_onboarding_link(participant) -> tuple[str, ParticipantOnboar
 
 @transaction.atomic
 def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_points_data: list[dict]) -> dict:
+    """Create a ZEV, its owner and metering points.
+
+    ``owner_data['account']`` names an existing account to make the owner: it is
+    linked as it is, so its password, email and name stay untouched and no
+    temporary password is returned. Otherwise a new account is created.
+    """
     from .models import MeteringPoint, MeteringPointAssignment, Participant, Zev
     from .access import grant_manager_until_role
     from .buildings import ensure_initial_building
     from .parties import ensure_initial_roles
 
-    first_name = owner_data['first_name']
-    last_name = owner_data['last_name']
-    email = owner_data['email']
-    username = (owner_data.get('username') or '').strip()
-    if not username:
-        username = build_unique_username(first_name=first_name, last_name=last_name, email=email, fallback='owner')
+    existing_account = owner_data.get('account')
+    temporary_password = None
+    if existing_account is not None:
+        owner_user = User.objects.locked().get(pk=existing_account.pk)
+        problem = existing_owner_problem(owner_user)
+        if problem:
+            raise ValidationError({'owner': problem})
+        first_name = owner_data.get('first_name') or owner_user.first_name
+        last_name = owner_data.get('last_name') or owner_user.last_name
+        email = owner_user.email
+    else:
+        first_name = owner_data['first_name']
+        last_name = owner_data['last_name']
+        email = owner_data['email']
+        username = (owner_data.get('username') or '').strip()
+        if not username:
+            username = build_unique_username(first_name=first_name, last_name=last_name, email=email, fallback='owner')
 
-    temporary_password = generate_temporary_password()
-    owner_user = User.objects.create_user(
-        username=username,
-        password=temporary_password,
-        role=UserRole.USER,
-        email=email,
-        first_name=first_name,
-        last_name=last_name,
-        must_change_password=True,
-    )
+        temporary_password = generate_temporary_password()
+        owner_user = User.objects.create_user(
+            username=username,
+            password=temporary_password,
+            role=UserRole.USER,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            must_change_password=True,
+        )
 
     zev = Zev.objects.create(**zev_data)
     owner_participant = Participant.objects.create(
@@ -414,7 +447,9 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
         'owner': {
             'id': owner_user.id,
             'username': owner_user.username,
+            # None for an existing account: nothing was created or changed.
             'temporary_password': temporary_password,
+            'existing_account': existing_account is not None,
         },
         'owner_participant_id': str(owner_participant.id),
         'metering_points': created_metering_points,
