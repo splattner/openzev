@@ -9,7 +9,8 @@ from collections import defaultdict
 from datetime import date as date_type, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
-from django.db.models import Max, Min, Sum
+from django.db.models import Count, Max, Min, Sum
+from django.db.models.functions import TruncDate
 
 from allocation.errors import OverlappingAssignmentWindowsError
 from allocation.read_model import (
@@ -17,7 +18,7 @@ from allocation.read_model import (
     community_totals_by_timestamp,
     eligible_participant_shares,
 )
-from allocation.validity import active_during, civil_date, period_window, wall_clock
+from allocation.validity import active_during, business_tz, civil_date, period_window, wall_clock
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
 from zev import access
@@ -817,6 +818,24 @@ def compute_data_quality_status(metering_points, date_from, date_to):
         )
     }
 
+    # One grouped query for every meter: (meter, Swiss civil day) -> count.
+    # The database buckets the days (never ``timestamp__date``, ADR 0026), so
+    # only one row per meter and day reaches Python, not one per reading.
+    window_start, window_end = period_window(date_from, date_to)
+    readings_per_day_by_mp: dict = defaultdict(dict)
+    for mp_id, day, count in (
+        MeterReading.objects.filter(
+            metering_point__in=metering_points,
+            timestamp__gte=window_start,
+            timestamp__lt=window_end,
+        )
+        .annotate(day=TruncDate("timestamp", tzinfo=business_tz()))
+        .values_list("metering_point_id", "day")
+        .annotate(count=Count("id"))
+        .order_by()
+    ):
+        readings_per_day_by_mp[mp_id][day] = count
+
     result = []
     for mp in metering_points:
         try:
@@ -824,19 +843,8 @@ def compute_data_quality_status(metering_points, date_from, date_to):
         except OverlappingAssignmentWindowsError:
             windows = None
 
-        window_start, window_end = period_window(date_from, date_to)
-        readings_ts = MeterReading.objects.filter(
-            metering_point=mp,
-            timestamp__gte=window_start,
-            timestamp__lt=window_end,
-        ).values_list("timestamp", flat=True)
-
-        days_with_data = set()
-        readings_per_day = defaultdict(int)
-        for ts in readings_ts:
-            day = civil_date(ts)
-            days_with_data.add(day)
-            readings_per_day[day] += 1
+        readings_per_day = readings_per_day_by_mp.get(mp.id, {})
+        days_with_data = set(readings_per_day)
 
         missing_days = sorted(all_days - days_with_data)
         gaps = []

@@ -742,6 +742,13 @@ overlapping assignment windows are surfaced by the amber row warnings below,
 not by the severity cell: a fully-complete meter with no holder is still
 `green` on completeness while its warning says its readings are unbilled.
 
+**Reading aggregation:** the readings of all requested metering points are
+read in one grouped query — `(metering_point_id, Swiss civil day) -> count`,
+days bucketed in the database with `TruncDate(tzinfo=business_tz())` (ADR
+0026) — so the query count does not grow with the number of meters or the
+length of the period. Tests: `test_readings_are_read_in_one_query_regardless_of_meter_count`,
+`test_readings_are_bucketed_by_swiss_civil_day`.
+
 **Participant resolution:** the displayed holder is the assignment with the
 latest `valid_from` among those overlapping the reviewed period — the most
 recent holder within the period, not today's (one batched query); meters with

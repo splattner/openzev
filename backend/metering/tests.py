@@ -3,7 +3,9 @@ from decimal import Decimal
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
@@ -1079,6 +1081,69 @@ class DataQualityStatusTests(TestCase):
 		self.assertEqual(resp.status_code, 200)
 		mp_status = resp.data["metering_points"][0]
 		self.assertEqual(mp_status["participant_name"], "Unassigned")
+
+	def _reading(self, metering_point, ts):
+		MeterReading.objects.create(
+			metering_point=metering_point,
+			timestamp=ts,
+			energy_kwh=Decimal("1.0"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.FIFTEEN_MIN,
+		)
+
+	def test_readings_are_bucketed_by_swiss_civil_day(self):
+		"""23:30 UTC on Jan 1 is 00:30 on Jan 2 in Zurich, so it counts for Jan 2."""
+		auth(self.client, self.owner)
+		self._reading(self.metering_point, datetime(2026, 1, 1, 23, 30, tzinfo=timezone.utc))
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-03"},
+		)
+
+		mp_status = resp.data["metering_points"][0]
+		self.assertEqual(mp_status["days_with_data"], 1)
+		self.assertEqual(
+			[(g["start_date"], g["end_date"]) for g in mp_status["gaps"]],
+			[("2026-01-01", "2026-01-01"), ("2026-01-03", "2026-01-03")],
+		)
+
+	def test_unassigned_readings_count_every_reading_of_a_day(self):
+		auth(self.client, self.owner)
+		MeteringPointAssignment.objects.filter(metering_point=self.metering_point).delete()
+		for hour in (10, 11, 12):
+			self._reading(self.metering_point, datetime(2026, 1, 2, hour, 0, tzinfo=timezone.utc))
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-07"},
+		)
+
+		mp_status = resp.data["metering_points"][0]
+		self.assertEqual(mp_status["unassigned_days"], 1)
+		self.assertEqual(mp_status["unassigned_readings"], 3)
+
+	def test_readings_are_read_in_one_query_regardless_of_meter_count(self):
+		auth(self.client, self.owner)
+
+		def reading_queries(extra_meters):
+			for i in range(extra_meters):
+				mp = MeteringPoint.objects.create(
+					zev=self.zev,
+					meter_id=f"CH-DQ-EXTRA-{extra_meters}-{i}",
+					meter_type=MeteringPointType.CONSUMPTION,
+				)
+				self._reading(mp, datetime(2026, 1, 2, 12, 0, tzinfo=timezone.utc))
+			with CaptureQueriesContext(connection) as ctx:
+				resp = self.client.get(
+					"/api/v1/metering/readings/data-quality-status/",
+					{"date_from": "2026-01-01", "date_to": "2026-01-07"},
+				)
+			self.assertEqual(resp.status_code, 200)
+			return sum('"metering_meterreading"' in q["sql"] for q in ctx.captured_queries)
+
+		self.assertEqual(reading_queries(0), 1)
+		self.assertEqual(reading_queries(4), 1)
 
 
 class ChartDataEndpointTests(TestCase):
