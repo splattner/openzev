@@ -57,7 +57,7 @@ def onboarding_consume(request):
         lock_participant_account(participant)
         # Revocation may have committed since resolve(); lock after the participant.
         token.refresh_from_db(from_queryset=ParticipantOnboardingToken.objects.select_for_update())
-        if token.revoked_at is not None or token.is_expired:
+        if onboarding.resolve(prefix, secret) is None:
             raise LinkRefused(code="token_unavailable")
         user = link_account_for(participant)
     except (LinkRefused, Participant.DoesNotExist, ParticipantOnboardingToken.DoesNotExist, DjangoValidationError) as exc:

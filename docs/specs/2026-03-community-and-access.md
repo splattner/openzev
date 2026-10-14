@@ -794,10 +794,13 @@ table; a password or address change, deactivation, or losing the password also k
 **Confirm:** `POST /api/v1/auth/password-reset/confirm/` `{ token, new_password }` (AllowAny,
 `AuthVerifyThrottle`). An unusable token is `400 "This link is invalid or has expired."`; a missing
 or weak password (`validate_password` with the account) is `400 {detail}` and leaves the token valid.
-Otherwise, under a row lock that re-checks address and password hash: set the password, clear
+Otherwise, under the user lock, `password_reset.resolve_token(token, user=locked)`
+rechecks signed expiry, account activity, address and password hash. Set the password, clear
 `must_change_password`, **revoke all sessions** (§5.6b), revoke the account's participant onboarding
-links, audit `password.reset` (actor = the account, `metadata.onboarding_links_revoked`), and send the
-`password_reset` security notice (§5.6c). **No session is minted and no second factor is touched**: the
+and outstanding magic links, and audit `password.reset` (actor = the account;
+`metadata.onboarding_links_revoked` and `metadata.magic_links_revoked`) inside the same transaction.
+An audit failure rolls back the password, sessions and links. Schedule the
+`password_reset` security notice after commit (§5.6c). **No session is minted and no second factor is touched**: the
 person signs in normally and meets the TOTP / passkey challenge.
 
 Both routes are absent from `ACCOUNTS_API_KEY_ALLOWLIST` (default-deny) and exempt from
@@ -820,14 +823,21 @@ are not affected.
 `accounts/session_revocation.py`: `validate_refresh_token(refresh_token)`
 returns a validated `RefreshToken` for an active account with a current `sv`,
 or raises `TokenError`. Both ordinary refresh and stop-impersonation use it.
-`revoke_sessions(user)` — an atomic
-`UPDATE … SET session_version = session_version + 1`, then a reload so tokens
+`revoke_sessions(user)` — in one transaction, an atomic
+`UPDATE … SET session_version = session_version + 1`, deletion of pending
+`OAuthExchangeCode` rows, then a reload so tokens
 minted straight afterwards carry the new value; `keep_current_session(request,
 response, user)` — hand the caller a fresh pair so revoking *other* sessions
-does not sign them out. Plain `User.save()` excludes `session_version` and
-`independent_login_required` so stale instances cannot revive revoked sessions
-or clear independent-authentication protection. Explicit updates and admin/self-setup promotion persist the
-lifecycle flag; session revocation uses the atomic update.
+does not sign them out. Plain `User.save()` excludes `session_version`,
+`independent_login_required` and the loaded password, so stale profile writes cannot
+revive sessions, clear independent-authentication protection or restore an old
+password. Intentional `set_password()` and `set_unusable_password()` writes still
+persist; the unusable-password marker is cleared after saving. User serializers save
+only supplied fields, preserving a pending-change flag changed by a concurrent
+credential write. Synchronous and asynchronous password checks upgrade hashes with
+a compare-and-swap on the verified hash; a concurrent replacement refuses the upgrade
+and makes verification fail. Explicit updates and admin/self-setup promotion persist
+the lifecycle flag; session revocation uses the atomic update.
 
 `lock_current_session(request)` reloads and locks the account within the caller's
 transaction and rejects deleted/inactive accounts or a mismatched session version
@@ -856,7 +866,12 @@ explicit one:
 
 API keys remain separate credentials; independent-access promotion also retires
 them (onboarding spec §4). MFA challenges carry the session version and become
-invalid when sessions are revoked. There is no per-device list: a counter can say
+invalid when sessions are revoked. OAuth exchange locks the user before the code,
+rechecks account activity and code validity, and consumes/mints in one transaction.
+Concurrent redemption succeeds at most once; an exchange racing revocation either
+fails or yields a session invalidated by the revocation. Callback code issuance
+locks the current user and rejects activity/session-version changes since identity
+resolution. There is no per-device list: a counter can say
 "everything before now is dead", not "this one device" (ADR 0022).
 
 All four new endpoints are absent from `ACCOUNTS_API_KEY_ALLOWLIST`
@@ -2194,10 +2209,11 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `test_security_notifications.py` | 5 | 26 | Every event composes (subject, body, `{detail}` filled, admin vs. self advice, no-turn-off line); guards (no address, inactive, gone/deactivated by send time); hooked into passkey add/remove, TOTP enable/disable (not for an abandoned enrolment), recovery-code regeneration, password change (not on failure), admin MFA reset (not when nothing was removed) and admin session revocation (not for the self-service one); a broker or mail failure never fails the triggering request |
 | `test_admin_users_list.py` | 2 | 13 | Admin user list: memberships per relationship (participant, owner-who-is-also-participant merged into one, owner of several communities sorted by name), confirmed-only `mfa_methods`, `last_login` exposed and `null` before the first sign-in, fixed query count, `/auth/me/` unaffected; `mfa_compliance` (`null` outside the policy, `"grace"` before the deadline, `"overdue"` after it, `"compliant"` once enrolled regardless of the deadline, no added query per account) |
 | `test_last_login.py` | 4 | 7 | `last_login` stamped by a plain password login (not by a failed one, not by the password step of a two-step login until `/token/mfa/` completes it) and by the auto-login after email verification; not restamped by a password change or by setting your initial password moments after verifying; untouched on either side of an impersonation session |
-| `test_password_recovery.py` | 2 | 28 | Password preservation, real TOTP/provenance, legacy challenges, recovery, retirement, managed email, audit accuracy/rollback and PostgreSQL consumption/reset/issuance races |
+| `test_password_writes.py` | 1 | 4 | Stale profile saves, intentional usable/unusable writes, synchronous/asynchronous hash upgrades and concurrent password replacement |
+| `test_password_recovery.py` | 2 | 29 | Password preservation, real TOTP/provenance, legacy challenges, recovery, retirement, managed email, audit accuracy/rollback, stale profile writes, OAuth retirement and PostgreSQL consumption/reset/issuance races |
 | `test_admin_account_actions.py` | 2 | 12 | Account creation (generated password when omitted, returned once and never re-listed, two accounts get different passwords, a supplied password is still accepted, mismatched/weak supplied passwords rejected, generated password passes the validators anyway, response carries the new id, non-admin blocked); self-deactivation guard (blocked with a field error, deactivating someone else works and is audited, reactivating your own account is unaffected, deactivating someone else still revokes their sessions) |
 | `test_api_keys.py` | 10 | 81 | Generation, hashing, auth, read-only keys, scope deny-list, audit, throttling, CRUD, admin management |
-| `test_oauth.py` | 12 | 72 | Public endpoint validation, bounded JSON object responses, access-token/profile field types and model limits, numeric fallback IDs and linked login without email, redirect/credential containment, verified-email provisioning and linking, admin-only audited exception for trusted providers with an absent claim (new accounts only); provider listing, initiate, callback guards/redirects, link flow, social accounts, audit, `require_mfa_claim` (`OAuthMfaClaimTests`) |
+| `test_oauth.py` | 15 | 78 | Public endpoint validation, bounded JSON object responses, access-token/profile field types and model limits, numeric fallback IDs and linked login without email, redirect/credential containment, verified-email provisioning and linking, admin-only audited exception for trusted providers with an absent claim (new accounts only); provider listing, initiate, callback guards/redirects, link flow, social accounts, audit, `require_mfa_claim` (`OAuthMfaClaimTests`); callback issuance revalidation, OAuth exchange revocation and PostgreSQL single-use/revocation races |
 | `test_passkeys.py` | 8 | 64 | Passkey registration and passwordless sign-in against a software authenticator, MFA policy and grace arithmetic, removal guard, admin reset, RP-ID/origin system checks |
 | `test_mfa.py` | 4 | 28 | TOTP enrolment/removal/recovery codes, two-step login, MFA at the magic-link/onboarding/OAuth/impersonation/email-verification doors, per-account throttle (`SPEC-2026-09-two-factor-authentication`) |
 | `test_registration_concurrency.py` | — (3 functions) | 7 cases | PostgreSQL cancellation/verification/resend row-lock ordering; SMTP outside transactions; transitions during delivery; late cleanup preserves newer links |

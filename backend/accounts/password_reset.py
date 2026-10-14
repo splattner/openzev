@@ -47,12 +47,13 @@ def issue_token(user: User) -> str:
     return signing.dumps({"u": user.pk, "f": _state_fingerprint(user)}, salt=SALT, compress=True)
 
 
-def resolve_token(token: str) -> User:
+def resolve_token(token: str, *, user: User | None = None) -> User:
     """The account a valid token belongs to.
 
     Raises ``PasswordResetError`` for a bad or expired signature, an account that
     was deactivated or lost its password, and one whose address or password has
     changed since the token was issued.
+    Pass the locked user to revalidate the complete contract after a lock wait.
     """
     try:
         data = signing.loads(token, salt=SALT, max_age=LIFETIME_SECONDS)
@@ -60,7 +61,8 @@ def resolve_token(token: str) -> User:
     except (signing.BadSignature, KeyError, TypeError):
         raise PasswordResetError from None
 
-    user = User.objects.filter(pk=user_id).first()
-    if not can_reset(user) or _state_fingerprint(user) != fingerprint:
+    if user is None:
+        user = User.objects.filter(pk=user_id).first()
+    if not can_reset(user) or user.pk != user_id or _state_fingerprint(user) != fingerprint:
         raise PasswordResetError
     return user

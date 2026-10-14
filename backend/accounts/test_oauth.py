@@ -16,11 +16,15 @@ import socket
 import urllib.error
 import urllib.request
 import urllib.response
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from threading import Barrier
 from datetime import timedelta
+from unittest import skipUnless
 from unittest.mock import patch
 
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.db import close_old_connections, connection, connections
+from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -936,3 +940,112 @@ class ProviderUrlSerializerTests(TestCase):
         changed = OAuthProviderSerializer(provider, data={"token_url": "http://idp.example/other"}, partial=True)
         self.assertFalse(changed.is_valid())
         self.assertIn("token_url", changed.errors)
+
+
+class OAuthCallbackRevocationTests(OAuthTestCase):
+    def test_callback_does_not_issue_a_code_after_revocation_or_deactivation(self):
+        for change in ("version", "inactive"):
+            with self.subTest(change=change):
+                user = make_user(f"callback_{change}")
+                SocialAccount.objects.create(provider=self.provider, user=user, uid=change)
+                self.start_state(change)
+                lock = User.objects.locked
+
+                def change_before_lock():
+                    updates = {"session_version": user.session_version + 1} if change == "version" else {"is_active": False}
+                    User.objects.filter(pk=user.pk).update(**updates)
+                    return lock()
+
+                with fake_provider_http({"access_token": "at"}, {"sub": change, "email": user.email}), patch(
+                    "accounts.views_oauth.User.objects.locked", side_effect=change_before_lock,
+                ):
+                    response = self.callback(code="c", state=change)
+                self.assertEqual(response.url, f"{FRONTEND}/login?oauth_error=account_inactive")
+                self.assertFalse(OAuthExchangeCode.objects.filter(user=user).exists())
+
+
+class OAuthExchangeRevocationTests(TestCase):
+    def setUp(self):
+        self.user = make_user("oauth_exchange_owner")
+        self.code = "one-time-exchange-code"
+        OAuthExchangeCode.objects.create(user=self.user, code=self.code)
+
+    def exchange(self):
+        return APIClient().post("/api/v1/auth/oauth/token-exchange/", {"code": self.code}, format="json")
+
+    def test_session_revocation_discards_pending_exchange_codes(self):
+        from .session_revocation import revoke_sessions
+
+        revoke_sessions(self.user)
+        response = self.exchange()
+        self.assertEqual(response.status_code, 400)
+        self.assertNotIn("openzev_access", response.cookies)
+        self.assertFalse(OAuthExchangeCode.objects.exists())
+
+    def test_inactive_account_cannot_exchange_an_existing_code(self):
+        User.objects.filter(pk=self.user.pk).update(is_active=False)
+        response = self.exchange()
+        self.assertEqual(response.status_code, 400)
+        self.assertNotIn("openzev_access", response.cookies)
+
+    def test_revocation_between_code_lookup_and_user_lock_refuses_exchange(self):
+        from .session_revocation import revoke_sessions
+
+        lock = User.objects.locked
+
+        # A deterministic interleaving at the view's lock boundary.
+        with patch("accounts.views_oauth.User.objects.locked") as acquire:
+            def revoke_once():
+                acquire.side_effect = lock
+                revoke_sessions(self.user)
+                return lock()
+            acquire.side_effect = revoke_once
+            response = self.exchange()
+        self.assertEqual(response.status_code, 400)
+        self.assertNotIn("openzev_access", response.cookies)
+
+
+@skipUnless(connection.vendor == "postgresql", "Requires PostgreSQL row locking")
+class OAuthExchangeConcurrencyTests(TransactionTestCase):
+    def setUp(self):
+        self.user = make_user("concurrent_exchange_owner")
+        self.code = "concurrent-exchange-code"
+        OAuthExchangeCode.objects.create(user=self.user, code=self.code)
+
+    def exchange(self):
+        response = APIClient().post("/api/v1/auth/oauth/token-exchange/", {"code": self.code}, format="json")
+        return response.status_code, response.cookies.get("openzev_access")
+
+    def simultaneously(self, *operations):
+        barrier = Barrier(len(operations))
+
+        def run(operation):
+            close_old_connections()
+            try:
+                barrier.wait(timeout=10)
+                return operation()
+            finally:
+                connections.close_all()
+
+        with ThreadPoolExecutor(max_workers=len(operations)) as executor:
+            return list(executor.map(run, operations))
+
+    def test_concurrent_redemption_mints_at_most_one_session(self):
+        responses = self.simultaneously(self.exchange, self.exchange)
+        self.assertEqual(sorted(status for status, _cookie in responses), [200, 400])
+        self.assertFalse(OAuthExchangeCode.objects.exists())
+
+    def test_exchange_racing_revocation_cannot_leave_a_valid_session(self):
+        from rest_framework_simplejwt.tokens import AccessToken
+        from .session_revocation import revoke_sessions
+        from .session_revocation import is_session_current
+
+        response, _ = self.simultaneously(
+            self.exchange, lambda: revoke_sessions(self.user),
+        )
+        status, cookie = response
+        self.user.refresh_from_db()
+        self.assertIn(status, (200, 400))
+        if cookie is not None:
+            self.assertFalse(is_session_current(AccessToken(cookie.value), self.user))
+        self.assertFalse(OAuthExchangeCode.objects.exists())

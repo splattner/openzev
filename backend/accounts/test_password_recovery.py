@@ -14,7 +14,7 @@ from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from accounts import email_change, magic_links, mfa
 from accounts.api_keys import generate_key
 from accounts.jwt_utils import PASSWORD_RECOVERY_CLAIM, make_jwt_for_user, password_recovery_deadline
-from accounts.models import ApiKey, AppSettings, MagicLinkToken, TotpDevice, User
+from accounts.models import ApiKey, AppSettings, MagicLinkToken, OAuthExchangeCode, TotpDevice, User
 from accounts.session_revocation import revoke_sessions
 from audit.models import AuditEvent
 from testing.factories import ParticipantFactory
@@ -221,6 +221,7 @@ class ParticipantPasswordRecoveryTests(TestCase):
         second = ParticipantFactory(user=self.user, email=self.user.email)
         onboarding.get_or_create_for_participant(second)
         magic_links.issue(self.user)
+        OAuthExchangeCode.objects.create(user=self.user, code="pending-before-link-recovery")
         _, prefix, hashed_secret = generate_key()
         key = ApiKey.objects.create(user=self.user, name="existing", prefix=prefix, hashed_key=hashed_secret)
         with patch("accounts.views.notifications.notify") as notify, self.captureOnCommitCallbacks(execute=True):
@@ -238,6 +239,9 @@ class ParticipantPasswordRecoveryTests(TestCase):
         self.assertFalse(self.participant.onboarding_tokens.filter(revoked_at__isnull=True).exists())
         key.refresh_from_db()
         self.assertIsNone(key.revoked_at)
+        self.assertEqual(APIClient().post("/api/v1/auth/oauth/token-exchange/", {
+            "code": "pending-before-link-recovery",
+        }).status_code, 400)
         replay = APIClient()
         replay.credentials(HTTP_AUTHORIZATION=f"Bearer {proof}")
         self.assertEqual(replay.post(RESET, {"new_password": "Replay-password42!"}).status_code, 401)
@@ -245,6 +249,23 @@ class ParticipantPasswordRecoveryTests(TestCase):
         self.assertEqual(event.metadata_json["onboarding_links_revoked"], 2)
         self.assertEqual(event.metadata_json["magic_links_revoked"], 1)
         self.assertNotIn(PASSWORD, str(event.metadata_json))
+
+    def test_profile_edit_loaded_before_recovery_cannot_restore_credentials_or_pending_flag(self):
+        from accounts.serializers import SelfUserSerializer
+
+        self.choose_password()
+        self.link_login()
+        User.objects.filter(pk=self.user.pk).update(must_change_password=True)
+        stale = User.objects.get(pk=self.user.pk)
+        response = self.client.post(RESET, {"new_password": "Replacement-password42!"})
+        self.assertEqual(response.status_code, 200, response.data)
+        serializer = SelfUserSerializer(stale, data={"first_name": "Updated"}, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, "Updated")
+        self.assertTrue(self.user.check_password("Replacement-password42!"))
+        self.assertFalse(self.user.must_change_password)
 
     def test_ordinary_and_impersonated_sessions_cannot_recover(self):
         self.choose_password()

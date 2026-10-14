@@ -187,8 +187,10 @@ admin, admin MFA reset, and promotion. Reactivating an account does not revive o
 - **Provisioning does not check `zev_self_registration_enabled`.** With any provider enabled,
   anyone whom the IdP verifies can get an account (role `user`, no ZEV access). There is no
   domain or allow-list setting on `OAuthProvider`.
-- The callback only redirects to the configured frontend URL; the exchange code is single
-  use.
+- The callback only redirects to the configured frontend URL. Code issuance locks
+  the user and rechecks account activity/session version. Exchange locks the user
+  before the code and consumes/mints in one transaction. Revocation discards pending
+  codes, and concurrent exchange cannot mint a session that survives it.
 
 ### 5.8 Self-registration
 
@@ -203,7 +205,7 @@ admin, admin MFA reset, and promotion. Reactivating an account does not revive o
 - **Forgot password** ([#1006](https://github.com/splattner/openzev/issues/1006)):
   `POST /auth/password-reset/` emails a signed one-hour link to an active account with a usable
   password, and `POST /auth/password-reset/confirm/` sets the new password, clears
-  `must_change_password`, revokes all sessions and the account's onboarding links, and mints no
+  `must_change_password`, revokes all sessions and the account's onboarding and outstanding magic links, and mints no
   session, so a second factor is still asked for at the next sign-in. Same neutral answer for every
   address; per-address cooldown and per-IP throttle. Field-level detail:
   [community and access §5.6d](2026-03-community-and-access.md#56d-password-reset).

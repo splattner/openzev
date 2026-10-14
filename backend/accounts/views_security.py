@@ -20,7 +20,7 @@ from audit.services import build_diff, record_audit_event
 
 from zev import onboarding as zev_onboarding
 
-from . import email_change, emails, notifications, password_reset
+from . import email_change, emails, magic_links, notifications, password_reset
 from .jwt_utils import impersonator_of
 from .models import User
 from .permissions import IsAdmin
@@ -251,7 +251,8 @@ class PasswordResetConfirmView(APIView):
         if not isinstance(request.data, dict):
             return Response({"detail": "Expected an object."}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            user = password_reset.resolve_token(str(request.data.get("token") or "").strip())
+            token = str(request.data.get("token") or "").strip()
+            user = password_reset.resolve_token(token)
         except password_reset.PasswordResetError:
             return invalid
 
@@ -267,21 +268,25 @@ class PasswordResetConfirmView(APIView):
         with transaction.atomic():
             # Re-check under a row lock: two opens of the same link must not both
             # apply, and the account may have changed since resolve_token read it.
-            locked = User.objects.select_for_update().get(pk=user.pk)
-            if locked.password != user.password or locked.email != user.email or not password_reset.can_reset(locked):
+            try:
+                locked = User.objects.locked().get(pk=user.pk)
+                password_reset.resolve_token(token, user=locked)
+            except (User.DoesNotExist, password_reset.PasswordResetError):
                 return invalid
             locked.set_password(new_password)
             locked.must_change_password = False
             locked.save(update_fields=["password", "must_change_password"])
             revoke_sessions(locked)
             links_revoked = zev_onboarding.revoke_active_for_user(locked)
-
-        _audit(
-            request, "password.reset", locked,
-            f"Reset the password of {locked.email or locked.username} with an emailed link.",
-            actor=locked, metadata={"onboarding_links_revoked": links_revoked},
-        )
-        notifications.notify(locked, "password_reset", request=request)
+            magic_revoked = magic_links.revoke_for_user(locked)
+            _audit(
+                request, "password.reset", locked,
+                f"Reset the password of {locked.email or locked.username} with an emailed link.",
+                actor=locked, metadata={
+                    "onboarding_links_revoked": links_revoked, "magic_links_revoked": magic_revoked,
+                },
+            )
+            transaction.on_commit(lambda: notifications.notify(locked, "password_reset", request=request))
         return Response({"detail": "Password updated. Sign in with the new password."})
 
 

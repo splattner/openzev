@@ -244,6 +244,28 @@ class OnboardingConsumeViewTests(TestCase):
 
         self.assertEqual(resp.status_code, 404)
 
+    def test_disabling_zev_after_resolution_preserves_pending_credentials(self):
+        from .services import ensure_participant_account, lock_participant_account
+
+        user = ensure_participant_account(self.participant)
+        user.set_password("Pending-participant-password42!")
+        user.must_change_password = True
+        user.save(update_fields=["password", "must_change_password"])
+
+        def disabled_while_waiting(participant):
+            type(self.zev).objects.filter(pk=self.zev.pk).update(disabled_at=timezone.now())
+            return lock_participant_account(participant)
+
+        with patch("zev.views_public.lock_participant_account", side_effect=disabled_while_waiting):
+            response = self.client.post(
+                self.CONSUME_URL, {"prefix": self.token.prefix, "s": self.token.secret}, format="json",
+            )
+        self.assertEqual(response.status_code, 404)
+        self.assertNotIn("openzev_access", response.cookies)
+        user.refresh_from_db()
+        self.assertTrue(user.check_password("Pending-participant-password42!"))
+        self.assertTrue(user.must_change_password)
+
     def test_records_an_audit_event_with_the_onboarding_link_source(self):
         self.client.post(
             self.CONSUME_URL, {"prefix": self.token.prefix, "s": self.token.secret}, format="json",

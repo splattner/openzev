@@ -2,11 +2,14 @@ import uuid
 from collections.abc import Callable
 from datetime import date, timedelta
 
+from asgiref.sync import sync_to_async
+
 import pyotp
 from pyotp.utils import strings_equal
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, UserManager
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import connection, models, transaction
@@ -88,6 +91,27 @@ class User(AbstractUser):
     def is_admin(self):
         return self.role == UserRole.ADMIN or self.is_superuser
 
+    def set_unusable_password(self):
+        super().set_unusable_password()
+        self._unusable_password_set = True
+
+    async def acheck_password(self, raw_password):
+        return await sync_to_async(self.check_password, thread_sensitive=True)(raw_password)
+
+    def check_password(self, raw_password):
+        # A hash upgrade must not restore a password retired during verification.
+        current = True
+        verified_hash = self.password
+
+        def upgrade(password):
+            nonlocal current
+            encoded = make_password(password)
+            current = bool(type(self).objects.filter(pk=self.pk, password=verified_hash).update(password=encoded))
+            if current:
+                self.password = encoded
+
+        return check_password(raw_password, verified_hash, upgrade) and current
+
     def _privilege_field(self):
         """The form field that granted independent access, for error messages."""
         return "role" if self.role == UserRole.ADMIN else "is_superuser" if self.is_superuser else "may_create_zev"
@@ -100,18 +124,18 @@ class User(AbstractUser):
             validate_account_login(self, field=self._privilege_field())
 
     def save(self, *args, **kwargs):
-        # A plain ``save()`` writes every column, including ``session_version``
-        # as this instance last saw it. A request that loaded the user before a
-        # revocation would then write the old value back and quietly revive the
-        # sessions that were just signed out. Revocation goes through
-        # ``session_revocation.revoke_sessions`` (an atomic UPDATE), never through
-        # a model save — so a save must never touch the column.
+        # Profile saves must not restore retired credentials or session state.
+        # Django sets _password only for an intentional set_password(), not a load.
         if kwargs.get("update_fields") is None and not self._state.adding and not kwargs.get("force_insert"):
             kwargs["update_fields"] = [
                 field.name
                 for field in self._meta.concrete_fields
-                if not field.primary_key and field.name not in ("session_version", "independent_login_required")
+                if not field.primary_key and field.name not in (
+                    "session_version", "independent_login_required", "password",
+                )
             ]
+            if self._password is not None or getattr(self, "_unusable_password_set", False):
+                kwargs["update_fields"].extend(["password"])
         privilege_fields = {"role", "is_superuser", "may_create_zev"}
         update_fields = kwargs.get("update_fields")
         if not self.independent_login_required and (self.is_admin or self.may_create_zev) and (
@@ -128,8 +152,10 @@ class User(AbstractUser):
                     if update_fields is not None:
                         kwargs["update_fields"] = set(update_fields) | {"independent_login_required"}
                     super().save(*args, **kwargs)
+                    self._unusable_password_set = False
                 return
         super().save(*args, **kwargs)
+        self._unusable_password_set = False
 
     def __str__(self):
         return f"{self.get_full_name() or self.username} <{self.email}>"

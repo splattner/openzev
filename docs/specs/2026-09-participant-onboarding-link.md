@@ -284,10 +284,13 @@ link" action calls `onboarding-link`.
 A consume request that resolved the token before unlink must recheck it under lock;
 it cannot recreate an account or issue a session after revocation commits.
 
-All password writes (`set-initial-password`, `change-password`, `reset-password`)
+Authenticated password writes (`set-initial-password`, `change-password`, `reset-password`)
 retire the account's onboarding and outstanding magic links. Audit metadata records
 `onboarding_links_revoked` and `magic_links_revoked`; the caller keeps fresh cookies
 without recovery permission, and `password_changed` is scheduled after commit.
+The emailed `password-reset/confirm` door also retires both kinds of link, with the
+same audit counts, but signs out every session and schedules `password_reset` after
+commit without issuing cookies. Its signed token is fully revalidated under the user lock.
 
 `zev.onboarding.resolve(prefix, secret)` compares the secret first and returns
 `None` for an expired token exactly as for a revoked one (same 404 on consume —
@@ -299,6 +302,8 @@ Concurrent copy/send requests serialize on the participant row; the loser return
 the winner's link. The partial unique constraint is the backstop.
 
 ### Password setup and explicit recovery
+
+Decision and alternatives: [ADR 0036](../adr/0036-explicit-participant-link-password-recovery.md).
 
 Valid onboarding consumption locks party → user → participant, then re-resolves
 the token's secret, expiry, revocation and disabled-ZEV status before synchronizing
@@ -333,6 +338,10 @@ Audit `password.reset` records success/denial, with success counts
 `onboarding_links_revoked` and `magic_links_revoked`; successful recovery schedules
 the existing `password_changed` notification after commit. All three password
 endpoints share `_finish_password_change` for retirement, cookies and notification.
+Session revocation also discards pending OAuth exchange codes; callback issuance and
+exchange serialize with it under the user lock. Profile updates save only supplied
+fields, and ordinary model saves/hash upgrades cannot restore a replaced password
+(community-and-access spec §5.6b).
 All password audits share their credential-write transaction; a failed insert rolls
 back the password, session version and retired links. No password or bearer secret
 is recorded. Magic-link issuance uses the same user lock, so tokens cannot be inserted

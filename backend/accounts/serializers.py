@@ -26,7 +26,10 @@ class UserSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         try:
-            return super().update(instance, validated_data)
+            for field, value in validated_data.items():
+                setattr(instance, field, value)
+            instance.save(update_fields=validated_data)
+            return instance
         except DjangoValidationError as exc:
             raise serializers.ValidationError(
                 exc.message_dict if hasattr(exc, "error_dict") else {"detail": exc.messages}

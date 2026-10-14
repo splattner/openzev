@@ -8,10 +8,11 @@ fail (``CookieJWTAuthentication.get_user`` for access tokens,
 rather than a table of issued tokens — see ADR 0022 for why that is enough,
 and what it deliberately does not give you (a per-device session list).
 
-API keys are separate credentials with their own revocation and are not
-affected.
+Revocation also discards pending OAuth exchange codes. API keys are separate
+credentials with their own revocation and are not affected.
 """
 
+from django.db import transaction
 from django.db.models import F
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.exceptions import TokenError
@@ -20,7 +21,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .cookies import set_auth_cookies
 from .jwt_utils import SESSION_CLAIM, impersonator_of, make_jwt_for_user
-from .models import User
+from .models import OAuthExchangeCode, User
 
 
 def is_session_current(token, user) -> bool:
@@ -50,6 +51,7 @@ def lock_current_session(request):
     return user
 
 
+@transaction.atomic
 def revoke_sessions(user) -> None:
     """Invalidate every token issued for ``user`` so far.
 
@@ -58,6 +60,7 @@ def revoke_sessions(user) -> None:
     leave the column alone — see the comment there.
     """
     type(user).objects.filter(pk=user.pk).update(session_version=F("session_version") + 1)
+    OAuthExchangeCode.objects.filter(user=user).delete()
     user.refresh_from_db(fields=["session_version"])
 
 

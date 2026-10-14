@@ -128,7 +128,8 @@ An entry also shows the roles the participant holds in the community today:
 
 ### A Participant Forgot Their Password
 
-There is no "forgot password" link on the login page. Send or copy the
+An account with a chosen password can use **Forgot your password?** on the login
+page to request an emailed reset link. For a participant-only account, you can also send or copy the
 onboarding link for a participant-only account from **⋯** on their entry: it signs
 them in. After completing any two-factor check, they open **Account → Security**
 and choose **Reset password**, then enter and confirm
@@ -142,10 +143,13 @@ they can also request a sign-in link themselves from the page it opens.
 Successful recovery signs out other devices and revokes all onboarding and
 invoice sign-in links for the account across its communities. The device used
 for recovery stays signed in. If an earlier version already removed a password,
-it cannot be restored; the participant chooses a new one.
+it cannot be restored; the participant chooses a new one. The emailed reset also
+revokes sign-in links, then asks the participant to sign in normally with the new
+password and any required second factor.
 
-For accounts with independent access, use their external sign-in provider or
-ask someone with server access to reset the password; see
+For accounts with independent access, use **Forgot your password?** if they have
+a password, or their external sign-in provider. If neither is available, ask
+someone with server access to recover the account; see
 [Roles and Permissions](11-roles-and-permissions.md#user-cannot-login).
 
 ## Participation Contract

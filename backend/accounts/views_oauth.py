@@ -19,6 +19,7 @@ from urllib.parse import urlencode
 
 from django.conf import settings
 from django.core.validators import validate_email
+from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.utils.text import slugify
@@ -546,7 +547,11 @@ def oauth_callback(request, provider_slug: str):
 
     # Issue a short-lived exchange code for the frontend to convert to JWT
     exchange_code = secrets.token_urlsafe(32)
-    OAuthExchangeCode.objects.create(code=exchange_code, user=user)
+    with transaction.atomic():
+        current = User.objects.locked().filter(pk=user.pk, is_active=True).first()
+        if current is None or current.session_version != user.session_version:
+            return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=account_inactive")
+        OAuthExchangeCode.objects.create(code=exchange_code, user=current)
     _record_auth_event(
         request,
         action_type="oauth.login",
@@ -577,23 +582,28 @@ def oauth_token_exchange(request):
     if not re.fullmatch(r'[A-Za-z0-9_\-]{10,64}', code):
         return Response({"detail": "Invalid or expired code."}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        exchange = OAuthExchangeCode.objects.select_related("user").get(code=code)
-    except OAuthExchangeCode.DoesNotExist:
-        return Response({"detail": "Invalid or expired code."}, status=status.HTTP_400_BAD_REQUEST)
+    invalid = Response({"detail": "Invalid or expired code."}, status=status.HTTP_400_BAD_REQUEST)
+    owner = OAuthExchangeCode.objects.filter(code=code).values("user_id").first()
+    if owner is None:
+        return invalid
 
-    if not exchange.is_valid():
+    # Match revocation's user-first lock order; consume and mint in one transaction.
+    with transaction.atomic():
+        user = User.objects.locked().filter(pk=owner["user_id"], is_active=True).first()
+        if user is None:
+            return invalid
+        exchange = OAuthExchangeCode.objects.select_for_update().filter(code=code, user=user).first()
+        if exchange is None:
+            return invalid
+        expired = not exchange.is_valid()
         exchange.delete()
-        return Response({"detail": "Code has expired."}, status=status.HTTP_400_BAD_REQUEST)
-
-    user = exchange.user
-    exchange.delete()
-
-    tokens = make_jwt_for_user(user)
-    response = Response({"detail": "Login successful."})
-    set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
-    record_login(user)
-    return response
+        if expired:
+            return Response({"detail": "Code has expired."}, status=status.HTTP_400_BAD_REQUEST)
+        tokens = make_jwt_for_user(user)
+        response = Response({"detail": "Login successful."})
+        set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
+        record_login(user)
+        return response
 
 
 # ── social accounts (current user) ───────────────────────────────────────────
