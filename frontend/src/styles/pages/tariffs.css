@@ -110,9 +110,13 @@
   color: var(--ink);
 }
 
+td.tariff-table-unit,
+td.tariff-table-valid {
+  color: var(--text-muted);
+}
+
 .tariff-table-unit,
 .tariff-table-valid {
-  color: var(--text-muted);
   white-space: nowrap;
 }
 
@@ -183,6 +187,10 @@
     box-shadow: none;
   }
 
+  .tariff-list .tariff-table tbody tr:hover > td {
+    background: var(--surface);
+  }
+
   .tariff-list .tariff-table tbody tr.is-selected,
   .tariff-list .tariff-table tbody tr:has(:focus-visible) {
     background: var(--surface);
@@ -238,6 +246,9 @@
 
   .tariff-table-valid {
     grid-area: valid;
+  }
+
+  .tariff-table td.tariff-table-valid {
     font-size: 0.8125rem;
   }
 

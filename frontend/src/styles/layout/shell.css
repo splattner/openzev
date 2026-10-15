@@ -467,12 +467,6 @@
   font-weight: 500;
 }
 
-.impersonation-banner .button {
-  min-height: 2rem;
-  padding: 0.3rem 0.7rem;
-  font-size: 0.8125rem;
-}
-
 .user-menu {
   position: relative;
 }

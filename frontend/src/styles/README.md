@@ -4,40 +4,49 @@
 layers once and `@import`s every file into one of them:
 
 ```
-@layer native, vendor, app;
+@layer native, vendor, tokens, base, layout, components, pages, responsive, utilities;
 ```
 
 | Layer | Holds |
 | --- | --- |
 | `native` | `native-controls.css`: native element defaults a Mantine class must beat |
 | `vendor` | Mantine, Mantine dates and Leaflet CSS |
-| `app` | Everything below, in the import order of `index.css` |
+| `tokens` | `tokens.css` |
+| `base` | `base.css` |
+| `layout` | `layout/*` except `responsive.css` |
+| `components` | `components/*` and `misc.css` |
+| `pages` | `pages/*` |
+| `responsive` | `layout/responsive.css`: the media-query overrides of components and pages |
+| `utilities` | `utilities.css` |
 
 A rule in a later layer beats one in an earlier layer whatever its selector specificity,
-so our rules beat Mantine's without selector tricks. Inside `app` nothing changed: later
-files win ties and the order is part of the behaviour, so add a new file by importing it
-where it belongs, not at the end by default.
+so a page rule overrides a component rule, and ours override Mantine's, without selector
+tricks (`:where()`, doubled classes, `:not()`). Put the override in the later layer instead.
+Inside a layer nothing changed: specificity first, then later imports win ties, so the
+import order within a layer is still part of the behaviour. Add a new file by importing it
+into its layer, where it belongs in that layer.
+
+Because layers rank before specificity, **write a page rule for the element it means**:
+`td.tariff-table-unit`, not `.tariff-table-unit`, when the same class sits on a `th` that
+a component styles as the table band. A bare class used to lose to the band on
+specificity; now it wins. When a page rule is meant to beat a component rule, that is the
+whole point; when it is not, scope it.
 
 **Never leave CSS outside a layer.** Unlayered rules beat every layer. Third-party
 stylesheets are imported in `index.css` with `layer(vendor)`, not from a component.
 Styles libraries inject at runtime (Mantine's `<style>` for CSS variables and style
 props) are unlayered and win; they only set what the component was asked to set.
 
-Splitting `app` into finer layers (layout, components, pages, …) would let the specificity
-workarounds go, but it flips every place where a component rule currently wins by
-specificity over a page rule (hover states, container queries, table bands). Do it
-file by file, checking each, not in one move.
-
 | Folder / file | Holds |
 | --- | --- |
 | `tokens.css` | Generated design tokens (`design/tokens.json`) — never edit by hand |
 | `base.css` | `:root` scale (radius, shadow), reset, typography, field-token sizing of native inputs (skips Mantine's own) |
 | `native-controls.css` | Native element defaults a Mantine class must beat (labels, checkbox width); layer `native` |
-| `layout/` | App shell, sidebar, account menu, page header, responsive shell, footer |
+| `layout/` | App shell, sidebar, account menu, page header, footer; `responsive.css` is its own `responsive` layer |
 | `components/` | Shared, reusable pieces: tables, sheets, stat tiles, buttons, badges, dialogs, … |
 | `pages/` | Rules used by one page or feature (metering points, tariffs, billing period, …) |
 | `utilities.css` | Single-property spacing helpers (`mt-1`, `mb-15`, …) |
-| `misc.css` | Leftovers from the split that have no better home yet (some may be dead) |
+| `misc.css` | Leftovers from the split that have no better home yet (some may be dead); layer `components` |
 
 Rules of thumb: a class used by two or more pages belongs in `components/`; a class
 used by one page belongs in `pages/`. Colours come from `var(--…)` tokens; the

@@ -79,6 +79,7 @@
 
 .invoice-row-meta a:hover,
 .invoice-progress-covered a:hover {
+  color: var(--interactive-hover);
   text-decoration: underline;
 }
 

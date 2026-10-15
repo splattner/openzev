@@ -93,3 +93,10 @@
 .danger {
   background: var(--danger-600);
 }
+
+/* The impersonation banner is a slim strip: its buttons are smaller than the scale. */
+.impersonation-banner .button {
+  min-height: 2rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8125rem;
+}

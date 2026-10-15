@@ -10,52 +10,58 @@
  * so keep it. Anything left outside a layer beats every layer, so third-party CSS is
  * imported here into `vendor`, never bare from a component.
  */
-@layer native, vendor, app;
+@layer native, vendor, tokens, base, layout, components, pages, responsive, utilities;
 
 @import './native-controls.css' layer(native);
 @import '@mantine/core/styles.css' layer(vendor);
 @import '@mantine/dates/styles.css' layer(vendor);
 @import 'leaflet/dist/leaflet.css' layer(vendor);
 
-@import './tokens.css' layer(app);
-@import './base.css' layer(app);
-@import './components/table.css' layer(app);
-@import './layout/shell.css' layer(app);
-@import './components/filter-bar.css' layer(app);
-@import './pages/raw-metering.css' layer(app);
-@import './layout/account-menu.css' layer(app);
-@import './layout/page-header.css' layer(app);
-@import './components/sheet.css' layer(app);
-@import './components/stat-tiles.css' layer(app);
-@import './pages/overview-hubs.css' layer(app);
-@import './components/pdf-frame.css' layer(app);
-@import './components/empty-state.css' layer(app);
-@import './components/badge.css' layer(app);
-@import './components/charts.css' layer(app);
-@import './components/button.css' layer(app);
-@import './components/form-helpers.css' layer(app);
-@import './utilities.css' layer(app);
-@import './components/template-editor-and-row-actions.css' layer(app);
-@import './pages/billing-period.css' layer(app);
-@import './components/list-filters.css' layer(app);
-@import './pages/metering-points.css' layer(app);
-@import './pages/tariffs.css' layer(app);
-@import './components/row-helpers.css' layer(app);
-@import './pages/billing-period-rows.css' layer(app);
-@import './pages/participant-rows.css' layer(app);
-@import './components/checkbox-and-toast.css' layer(app);
-@import './pages/login.css' layer(app);
-@import './components/notice.css' layer(app);
-@import './components/dialog.css' layer(app);
-@import './pages/templates-and-layouts.css' layer(app);
-@import './layout/responsive.css' layer(app);
-@import './layout/app-footer.css' layer(app);
-@import './pages/login-split.css' layer(app);
-@import './misc.css' layer(app);
-@import './pages/drawers.css' layer(app);
-@import './pages/tariff-versions.css' layer(app);
-@import './components/app-tabs.css' layer(app);
-@import './pages/public-invoice.css' layer(app);
-@import './pages/overview-period.css' layer(app);
-@import './pages/annual-documents.css' layer(app);
-@import './pages/zev-settings.css' layer(app);
+@import './tokens.css' layer(tokens);
+
+@import './base.css' layer(base);
+
+@import './layout/shell.css' layer(layout);
+@import './layout/account-menu.css' layer(layout);
+@import './layout/page-header.css' layer(layout);
+@import './layout/app-footer.css' layer(layout);
+
+@import './components/table.css' layer(components);
+@import './components/filter-bar.css' layer(components);
+@import './components/sheet.css' layer(components);
+@import './components/stat-tiles.css' layer(components);
+@import './components/pdf-frame.css' layer(components);
+@import './components/empty-state.css' layer(components);
+@import './components/badge.css' layer(components);
+@import './components/charts.css' layer(components);
+@import './components/button.css' layer(components);
+@import './components/form-helpers.css' layer(components);
+@import './components/template-editor-and-row-actions.css' layer(components);
+@import './components/list-filters.css' layer(components);
+@import './components/row-helpers.css' layer(components);
+@import './components/checkbox-and-toast.css' layer(components);
+@import './components/notice.css' layer(components);
+@import './components/dialog.css' layer(components);
+@import './misc.css' layer(components);
+@import './components/app-tabs.css' layer(components);
+
+@import './pages/raw-metering.css' layer(pages);
+@import './pages/overview-hubs.css' layer(pages);
+@import './pages/billing-period.css' layer(pages);
+@import './pages/metering-points.css' layer(pages);
+@import './pages/tariffs.css' layer(pages);
+@import './pages/billing-period-rows.css' layer(pages);
+@import './pages/participant-rows.css' layer(pages);
+@import './pages/login.css' layer(pages);
+@import './pages/templates-and-layouts.css' layer(pages);
+@import './pages/login-split.css' layer(pages);
+@import './pages/drawers.css' layer(pages);
+@import './pages/tariff-versions.css' layer(pages);
+@import './pages/public-invoice.css' layer(pages);
+@import './pages/overview-period.css' layer(pages);
+@import './pages/annual-documents.css' layer(pages);
+@import './pages/zev-settings.css' layer(pages);
+
+@import './layout/responsive.css' layer(responsive);
+
+@import './utilities.css' layer(utilities);

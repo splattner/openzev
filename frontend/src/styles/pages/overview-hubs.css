@@ -30,6 +30,7 @@
 }
 
 .setup-guidance-list a:hover {
+  color: var(--interactive-hover);
   text-decoration: underline;
 }
 

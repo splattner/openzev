@@ -18,6 +18,17 @@
   padding: var(--sheet-pad-block) var(--sheet-pad-inline);
 }
 
+/* A form set straight into a sheet stacks its fields with breathing room. */
+.card > form {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.card > form > .button:not([style]) {
+  justify-self: start;
+}
+
 /* A table fills its sheet edge to edge, as the line items fill the
    documents' measure: the dark band meets the sheet's sides, and its top
    too when the table opens the sheet. The outer columns keep the sheet's

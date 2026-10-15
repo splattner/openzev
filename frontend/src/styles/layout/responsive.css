@@ -183,6 +183,11 @@
 
     padding: var(--sheet-pad-block) var(--sheet-pad-inline);
   }
+
+  /* Toolbars are bare cards (list-filters.css): nothing to pad. */
+  :is(.metering-toolbar, .participant-toolbar, .tariff-toolbar).card {
+    padding: 0;
+  }
 }
 
 @media (max-width: 640px) {

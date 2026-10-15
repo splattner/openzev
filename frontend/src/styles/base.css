@@ -53,17 +53,6 @@ hr {
   border-top: 1px solid var(--border-default);
 }
 
-/* A form set straight into a sheet stacks its fields with breathing room. */
-.card > form {
-  display: grid;
-  gap: 1rem;
-  align-content: start;
-}
-
-.card > form > .button:not([style]) {
-  justify-self: start;
-}
-
 /* Focus visibility everywhere — covers hand-rolled CSS and Mantine widgets. */
 :focus-visible {
   outline: 2px solid var(--focus-ring);

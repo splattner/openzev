@@ -225,9 +225,9 @@ render `PageHeader` plus the same body. These bodies have no header-hiding
 
 ### 4.2 CSS contracts
 
-**File:** `frontend/src/styles/` (entry `index.css` declares the cascade layers once — `native, vendor, app` — and imports `tokens.css`, `base.css`, `layout/`, `components/`, `pages/` into `app` in cascade order; see README there)
+**File:** `frontend/src/styles/` (entry `index.css` declares the cascade layers once — `native, vendor, tokens, base, layout, components, pages, responsive, utilities` — and imports every file into its layer; see README there)
 
-**Where CSS goes.** Our own rules live in the `app` layer, where import order and selector specificity decide as before. Third-party CSS (Mantine, Leaflet) is imported into `vendor` from `index.css`, below `app`, so our rules beat it without selector tricks; never import a stylesheet bare from a component, because unlayered CSS beats every layer. Native element defaults that a Mantine class must win over go in `native-controls.css` (layer `native`, below `vendor`).
+**Where CSS goes.** Pick the layer by what the rule is: a later layer beats an earlier one whatever the selector specificity, and within a layer specificity and then import order decide as usual. So a page override needs no `:where()`, doubled class or `:not()` trick — put it in `pages/`; a media-query override of a component or page goes in `layout/responsive.css`. A page rule that names a bare class shared with a styled element (a `th` that the table band owns) must be scoped to the element it means (`td.x`), since it now beats the band. Third-party CSS (Mantine, Leaflet) is imported into `vendor` from `index.css`; never import a stylesheet bare from a component, because unlayered CSS beats every layer. Native element defaults that a Mantine class must win over go in `native-controls.css` (layer `native`, below `vendor`).
 
 The following utility and shared classes define the current management-page
 language and should be reused instead of ad hoc page-local CSS when possible:

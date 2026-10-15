@@ -1,7 +1,7 @@
 /* ── Raw metering data (drill-down day → hour × 15-minute grid) ──────────────── */
-/* Shrink to content (out-specifying `.page-stack table { width: 100% }`) so the
-   few numeric columns stay grouped instead of being stretched across the page. */
-.raw-metering .raw-metering-days {
+/* Shrink to content (the `pages` layer beats `.page-stack table { width: 100% }`)
+   so the few numeric columns stay grouped instead of being stretched across the page. */
+.raw-metering-days {
   width: auto;
   min-width: min(100%, 34rem);
   border-collapse: collapse;
@@ -18,7 +18,7 @@
 }
 
 /* Day summary rows — compact and clickable */
-.raw-metering-days th {
+.raw-metering-days tbody th {
   font-size: 0.8rem;
   color: var(--text-body);
   background: var(--surface);
@@ -47,6 +47,10 @@
 .raw-metering-day[aria-expanded='true'] > td {
   background: var(--brand-pale);
   font-weight: 600;
+}
+
+.raw-metering-day[aria-expanded='true']:hover > td {
+  background: var(--surface);
 }
 
 .raw-metering-day-label {
