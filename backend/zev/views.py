@@ -656,6 +656,7 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
 
         from invoices.contract_pdf import issue_contract_pdf
 
+        self.assert_target_not_disabled(participant)
         issue, created = issue_contract_pdf(participant, issued_by=request.user)
         if created:
             record_audit_event(

@@ -1576,6 +1576,31 @@ class ImportEndpointTests(TestCase):
         self.assertEqual(self.zev.tariff_source_url, self.URL)
         self.assertEqual(Tariff.objects.filter(zev=self.zev).count(), 1)
 
+    def test_disabled_zev_refuses_apply_before_fetching_or_writing(self):
+        from tariffs.views_import import _load
+
+        self.zev.disabled_at = datetime.now(timezone.utc)
+        self.zev.save()
+        with mock.patch("tariffs.views_import._load", wraps=_load) as load:
+            response = self._apply(["Netznutzung Basis (Arbeitspreis)@2027-01-01"])
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("disabled", response.json()["detail"])
+        load.assert_not_called()
+        self.assertFalse(Tariff.objects.filter(zev=self.zev).exists())
+        self.zev.refresh_from_db()
+        self.assertEqual(self.zev.tariff_source_url, "")
+
+    def test_disabled_zev_keeps_preview_and_admin_apply(self):
+        self.zev.disabled_at = datetime.now(timezone.utc)
+        self.zev.save()
+        preview = self._preview()
+        self.assertEqual(preview.status_code, 200, preview.content)
+        key = preview.json()["candidates"][0]["key"]
+        authenticate(self.client, make_user("vse_disabled_admin", UserRole.ADMIN))
+        response = self._apply([key])
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertTrue(Tariff.objects.filter(zev=self.zev).exists())
+
     def test_apply_is_audited_with_its_source(self):
         key = self._preview().json()["candidates"][0]["key"]
 

@@ -7,6 +7,8 @@ from unittest.mock import patch
 
 from django.template.loader import render_to_string
 from django.test import TestCase
+from django.utils import timezone
+from rest_framework.test import APIClient
 
 import pytest
 
@@ -26,7 +28,7 @@ from invoices.template_context import build_sample_contract_context
 from tariffs.models import BillingMode, EnergyType, PeriodType, TariffPeriod
 from testing.factories import TariffFactory, assignment_for, flat_tariff
 from testing.helpers import clear_vat_rates
-from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode, Zev
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode, Zev, ZevAccessGrant, ZevAccessRole
 from zev.parties import ensure_initial_roles
 
 
@@ -519,6 +521,59 @@ class ContractIssuanceTests(TestCase):
         with patch("invoices.contract_pdf.timezone.localdate") as mocked_localdate:
             mocked_localdate.return_value = today
             return issue_contract_pdf(self.participant)
+
+    def test_disabled_zev_refuses_issue_without_changing_the_counter(self):
+        self.zev.disabled_at = timezone.now()
+        self.zev.save()
+        before = self.zev.contract_counter
+        client = APIClient()
+        client.force_authenticate(self.owner)
+        with patch("invoices.contract_pdf.render_pdf", return_value=b"%PDF") as render:
+            response = client.post(f"/api/v1/zev/participants/{self.participant.pk}/contract-pdf/")
+        self.assertEqual(response.status_code, 400, response.content)
+        render.assert_not_called()
+        self.assertFalse(ContractIssue.objects.exists())
+        self.zev.refresh_from_db()
+        self.assertEqual(self.zev.contract_counter, before)
+
+    def test_disabled_zev_contract_read_access(self):
+        client = APIClient()
+        client.force_authenticate(self.owner)
+        url = f"/api/v1/zev/participants/{self.participant.pk}/contract-pdf/"
+        with patch("invoices.contract_pdf.render_pdf", return_value=b"%PDF"):
+            self.assertEqual(client.post(url).status_code, 200)
+        self.zev.refresh_from_db()
+        self.zev.disabled_at = timezone.now()
+        self.zev.save()
+        self.assertEqual(client.get(url).status_code, 200)
+        viewer = make_user("disabled_contract_viewer", UserRole.USER)
+        ZevAccessGrant.objects.create(zev=self.zev, user=viewer, role=ZevAccessRole.VIEWER)
+        client.force_authenticate(viewer)
+        self.assertEqual(client.get(url).status_code, 200)
+        # This action skips the coarse gate; its write-scoped queryset hides the row.
+        self.assertEqual(client.post(url).status_code, 404)
+
+        self.participant.user = make_user("disabled_contract_participant", UserRole.USER)
+        self.participant.save()
+        client.force_authenticate(self.participant.user)
+        self.assertEqual(client.get(url).status_code, 404)
+        self.assertEqual(ContractIssue.objects.count(), 1)
+
+    def test_admin_can_issue_a_new_contract_version_while_disabled(self):
+        with patch("invoices.contract_pdf.render_pdf", return_value=b"%PDF"):
+            first, _ = issue_contract_pdf(self.participant)
+        self.zev.disabled_at = timezone.now()
+        self.zev.save(update_fields=["disabled_at"])
+        # Changed contract content must mint a version instead of reusing the snapshot.
+        self.participant.first_name = "Changed"
+        self.participant.save()
+        client = APIClient()
+        client.force_authenticate(make_user("disabled_contract_admin", UserRole.ADMIN))
+        with patch("invoices.contract_pdf.render_pdf", return_value=b"%PDF"):
+            response = client.post(f"/api/v1/zev/participants/{self.participant.pk}/contract-pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ContractIssue.objects.count(), 2)
+        self.assertEqual(ContractIssue.objects.latest("version").version, first.version + 1)
 
     @pytest.mark.slow
     def test_first_download_issues_version_one_with_sequence_number(self):

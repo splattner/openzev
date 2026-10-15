@@ -335,7 +335,8 @@ So any unsafe request by a viewer or participant to a detail route resolves to
 forgot an explicit check.
 
 `assert_within_scope`: `target_zev.owner_id != user.pk` → `not can_manage(user, target_zev)`.
-`assert_target_not_disabled`: unchanged.
+Disabled-state guards and custom-action exceptions follow
+[community and access §4.5](2026-03-community-and-access.md#45-write-scoping-zevscopedquerysetmixin).
 
 `MeterReadingViewSet` overrides `_scope_by_relation` only to alias
 `reading_day` (`TruncDate("timestamp", tzinfo=business_tz())`) and
@@ -395,7 +396,7 @@ from the management endpoints, and its shell shows nothing to manage.
 | `audit/views.py` `CanViewAuditEvents`, `_base_queryset` | `role == ZEV_OWNER`, `zev__owner=user` | admin, or viewable ZEVs non-empty; `zev_id__in=viewable_zev_ids` |
 | `zev/views.py` `ParticipantViewSet._contract_pdf_access_denied` | `is_zev_owner` | GET: `can_view` or own participant; POST (issue): `can_manage` |
 | `zev/views.py` `self_setup` | `is_zev_owner`; `Zev.objects.filter(owner=user, disabled_at__isnull=True)` | admin or `may_create_zev`; "already have a ZEV" = an active manager grant on a non-disabled ZEV (§7.6) |
-| `zev/services.py` `own_participant_for_user(user, zev_id=None)` | first participant row | first **current** row, in `zev_id` when given |
+| `zev/services.py` `own_participant_for_user(user, zev_id=None)` | first participant row | first **current** row in an enabled ZEV, in `zev_id` when given |
 | `zev/serializers.py` `ParticipantSerializer.validate` | `user.role != PARTICIPANT` | unchanged in step 4; removed in step 5 with the link/unlink rework |
 | `accounts/serializers.py` `SelfUserSerializer.validate_preferred_zev` | `is_zev_owner`, `value.owner_id != user.pk` | `can_view(user, value)` or any participant row (current or past) in it; message "You can only set a community you belong to as the default." |
 | `accounts/models.py` `User.is_zev_owner` | property | removed |
@@ -502,7 +503,7 @@ or passkey; `is_pending_invitation` checks an inactive account with an unused
 invitation. `validate_account_login` accepts either for managing-role assignment
 and later links; the parties spec §5.5 describes its field errors.
 `own_participant_for_user(user, zev_id=None)` returns the first current row in
-that ZEV when given.
+an enabled ZEV, restricted to the named ZEV when given.
 
 `ParticipantSerializer.validate` keeps the non-admin edit guard: a linked
 independent account returns 400 on `user`. Party contact edits are ZEV-local
@@ -593,16 +594,18 @@ The admin accounts list filters by role on the client; the choices are
 2. The caller manages or views anything (admin, or a grant) → self-service only when it names a `zev_id`
    in which it holds a current participant row (that row); otherwise the
    manager branch, where naming a ZEV it cannot view is a 403.
-3. Any other account is self-service: its current row in the named `zev_id`,
-   else — as before per-ZEV grants, when a participant's ids were simply
-   ignored — its first current row (`own_participant_for_user`). With no
-   current row, an account that has any (ended) participant row gets 404; an
-   account that never took part is served by the manager branch (400 without
-   ids).
+3. A participant-only account gets its current row in the named `zev_id`, or
+   its first current row only when no ZEV is named. Rows in disabled ZEVs are
+   ineligible. An unavailable explicit selection returns 404 without rendering
+   another community's document. An account that never took part is served by
+   the manager branch (400 without IDs).
 
 The participant Reports page names the selected community (`zev_id`) when the
 account has more than one (§9.4), so a participant of two ZEVs gets the
 statement of the one it is looking at.
+
+Disabling suspends participant-only reads; manager/viewer/admin report reads
+remain available. Re-enabling restores eligible participant access.
 
 Self-service statements keep `sent_only=True` (#861).
 

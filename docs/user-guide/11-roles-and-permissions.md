@@ -336,6 +336,12 @@ OpenZEV enforces data boundaries:
 
 ### ZEV Isolation
 
+Disabled communities remain readable through manager or viewer access;
+participant-only access is suspended. Only admins may modify community data
+or re-enable it, except that managers may revoke invoice access links.
+Bulk import-history deletion is rejected if the selection includes a disabled
+community.
+
 - A manager of ZEV A **cannot** see ZEV B's data unless it has access there too
 - Tariffs, metering points, and invoices are entirely isolated by ZEV
 - Admins can view all ZEVs but typically delegate operations to managers

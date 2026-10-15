@@ -594,10 +594,13 @@ real PDFs (WeasyPrint) and asserting markup with the `<style>` blocks stripped
 | `test_very_long_notes_do_not_balloon_the_document` | A ~3,800-char note keeps the PDF ≤ 12 pages and Appendix B still renders last |
 | `test_unassigned_meter_placeholder_is_neutral` | Without assignments the markup shows the `meter_none` statement once per meter group and never a bare `CH` chip |
 
-**`ContractIssuanceTests`** (14 tests):
+**`ContractIssuanceTests`** (17 tests):
 
 | Test | Asserts |
 |---|---|
+| `test_disabled_zev_refuses_issue_without_changing_the_counter` | Manager POST on a disabled ZEV returns 400 before rendering, creates no issue, and leaves the contract counter unchanged |
+| `test_disabled_zev_contract_read_access` | Manager/viewer GET works while disabled; viewer POST and participant GET are 404 |
+| `test_admin_can_issue_a_new_contract_version_while_disabled` | Changed contract content produces another version for an admin in a disabled ZEV |
 | `test_first_download_issues_version_one_with_sequence_number` | First issue → version 1, `CTR-2026-0001`, PDF stored, sha256 `context_hash`, `zev.contract_counter` incremented |
 | `test_unchanged_redownload_reuses_the_frozen_snapshot` | Identical rendered HTML → the stored issue is returned, no new row, byte-identical PDF |
 | `test_redownload_on_a_later_calendar_day_reuses_the_frozen_snapshot` | The "today" date in the rendered document does not force a new version on a later day |
@@ -796,6 +799,7 @@ The contract is no longer a throwaway render of mutable state:
 - **Download flow.** `POST /api/v1/zev/participants/{pk}/contract-pdf/`
   issues on first download and streams the snapshot afterwards; `GET` is a
   pure read of an already-issued snapshot (404 before the first issuance).
+  Access follows the [disabled-ZEV rules](2026-03-community-and-access.md#45-write-scoping-zevscopedquerysetmixin).
   The filename carries the version (`contract_{last}_{first}_v{n}.pdf`). A new
   issuance writes a `contract.issue` PARTICIPANT audit event; an unchanged
   re-download writes a `contract.download` event (with

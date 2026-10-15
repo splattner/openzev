@@ -391,6 +391,9 @@ coverage runs against PostgreSQL only (§13, `test_workflow.py`).
 
 #### Annual statement / financial summary downloads (frontend location)
 
+Reports follow [access-grants §7.8](2026-10-zev-access-grants.md#78-reports-self-service-invoicesviews_reportspy),
+including strict ZEV selection for participant self-service.
+
 The single-document endpoints below are consumed from the **/reports** route
 (`frontend/src/pages/ReportsPage.tsx`) — the owner/admin Reports view;
 participants reach the same page (participant branch) via **/me/statement**
@@ -418,10 +421,7 @@ an invoice PDF fetch to preserve popup permission. Browser aborts do not stop
 server rendering.
 
 The old synchronous `GET /invoices/invoices/annual-statements-zip/` endpoint is
-gone. Participant self-service resolves to the shared membership
-(`zev.services.own_participant_for_user`) — the same record named by
-`zev_name` on `GET /auth/me/` — so the label and the generated document
-always agree, including for multi-membership users.
+gone.
 
 **Whole-ZEV annual-statement ZIP — export jobs** (`/api/v1/exports/`):
 
@@ -1217,6 +1217,11 @@ the cockpit readiness and attention caches.
 ## 13. Test plan
 
 ### Backend (invoice tests other than PDF)
+
+`test_disabled_zev_reports.py` covers `test_report_visibility` (20 cases),
+`test_self_service_without_ids_returns_after_reenable` (2), and
+`test_explicit_zev_never_falls_back_to_another_membership` (12): role/state
+visibility, restored access, and strict selection with a second membership.
 
 | File | Test class | Validates |
 |---|---|---|

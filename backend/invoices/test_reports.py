@@ -74,11 +74,7 @@ class AnnualStatementTests(ReportTestCase):
         self.assertEqual(resp.status_code, 403)
 
     def test_participant_gets_their_own_without_naming_ids(self):
-        """A participant never passes zev_id/participant_id; the ids they *do*
-        pass are ignored, so they cannot request someone else's statement."""
-        resp = self._get(ANNUAL_STATEMENT, self.puser, year=2026,
-                         zev_id=str(self.other_zev.pk),
-                         participant_id=str(self.other_participant.pk))
+        resp = self._get(ANNUAL_STATEMENT, self.puser, year=2026)
 
         self.assertEqual(resp.status_code, 200)
         self.assertIn("annual-statement-2026-Muster.pdf", resp["Content-Disposition"])
@@ -192,12 +188,11 @@ class FinancialSummaryTests(ReportTestCase):
 
         self.assertEqual(resp.status_code, 404)
 
-    def test_participant_ignores_supplied_ids_and_gets_their_own(self):
+    def test_participant_cannot_select_another_zev(self):
         resp = self._get(FINANCIAL_SUMMARY, self.puser, year=2026, zev_id=str(self.other_zev.pk),
                          participant_id=str(self.other_participant.pk))
 
-        self.assertEqual(resp.status_code, 200)
-        self.assertIn("financial-summary-2026-Muster.pdf", resp["Content-Disposition"])
+        self.assertEqual(resp.status_code, 404)
 
 
 class MalformedInputTests(ReportTestCase):

@@ -54,18 +54,20 @@ def build_unique_username(*, first_name: str, last_name: str, email: str | None 
 
 
 def own_participant_for_user(user, zev_id=None):
-    """Self-service membership shared by ``/auth/me`` and report downloads.
+    """Self-service membership for report downloads.
 
     The account's current participant row — in ``zev_id`` when given, else the
-    first by ordering. An ended row is not a membership any more (#761); an
-    unusable ``zev_id`` finds nothing rather than raising.
+    first by ordering. Ended rows and disabled ZEVs give no self-service
+    access; an unusable ``zev_id`` finds nothing rather than raising.
     """
     from django.core.exceptions import ValidationError
 
     from .access import live_participant_q
     from .models import Participant
 
-    rows = Participant.objects.filter(live_participant_q(), user=user).select_related("zev")
+    rows = Participant.objects.filter(
+        live_participant_q(), user=user, zev__disabled_at__isnull=True,
+    ).select_related("zev")
     if zev_id:
         try:
             rows = rows.filter(zev_id=zev_id)

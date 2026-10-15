@@ -268,6 +268,7 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
         version almost always exists because the price changed.
         """
         source = self.get_object()
+        self.assert_target_not_disabled(source)
         valid_from = _parse_required_date(request.data.get('valid_from'), 'valid_from')
 
         siblings = list(
@@ -339,6 +340,7 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
         copy is a different tariff that happens to start from the same numbers.
         """
         source = self.get_object()
+        self.assert_target_not_disabled(source)
         name = str(request.data.get('name') or '').strip()
         if not name:
             return Response({'name': ['A name is required.']}, status=status.HTTP_400_BAD_REQUEST)
@@ -396,6 +398,7 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
         Renaming is therefore only offered for the series as a whole.
         """
         source = self.get_object()
+        self.assert_target_not_disabled(source)
         name = str(request.data.get('name') or '').strip()
         if not name:
             return Response({'name': ['A name is required.']}, status=status.HTTP_400_BAD_REQUEST)

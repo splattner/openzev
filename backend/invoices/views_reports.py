@@ -117,10 +117,10 @@ def _self_service(request) -> tuple[bool, Participant | None]:
     that manages or views anything is self-service only for a ZEV it names and
     holds a current participant row in; otherwise it is served as a manager
     (naming another ZEV is refused there). An account that only participates is
-    always self-service: it gets its row in the named ZEV, or — as before
-    per-ZEV grants, when a participant's ids were simply ignored — its first
-    current one. With no current row, a former participant gets a 404, while an
-    account that never took part is served as a manager (#761).
+    always self-service: an explicit ZEV selects only its current row there;
+    without a ZEV it gets its first current row in an enabled community.
+    An unavailable selection gets a 404. An account that never took part is
+    served as a manager (#761).
     """
     from zev.services import own_participant_for_user
 
@@ -131,7 +131,7 @@ def _self_service(request) -> tuple[bool, Participant | None]:
     if user.is_admin or access.viewable_zev_ids(user):
         participant = own_participant_for_user(user, zev_id=zev_id) if zev_id else None
         return participant is not None, participant
-    participant = (zev_id and own_participant_for_user(user, zev_id=zev_id)) or own_participant_for_user(user)
+    participant = own_participant_for_user(user, zev_id=zev_id)
     if participant is not None:
         return True, participant
     # A former participant has nothing left to ask about (404); an account

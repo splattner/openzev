@@ -63,15 +63,15 @@ the same series.
 | Actor | Capability |
 |---|---|
 | `admin` | Preview and import into any ZEV |
-| `zev_owner` | Preview and import into ZEVs they own |
-| `participant` | None — 403 |
-| `guest` | None — 401 |
+| Manager | Preview managed ZEVs; apply only while enabled |
+| Viewer / participant / account without access | None — 403 |
+| Anonymous | None — 401 |
 
 Both endpoints use `permission_classes = [IsAuthenticated, HasZevAccess]`.
-`HasZevAccess` checks the *role* only, so ownership is checked explicitly
-in `tariffs.views_import._resolve_zev`: a non-admin whose `id` is not the ZEV's
-`owner_id` gets `PermissionDenied`. Without that check any ZEV owner could
-write tariffs into any other ZEV.
+`HasZevAccess` is a coarse gate; `tariffs.views_import._resolve_zev` checks
+`access.can_manage(user, zev)` explicitly and raises `PermissionDenied` for
+another ZEV. Preview and apply follow the
+[disabled-ZEV rules](2026-03-community-and-access.md#45-write-scoping-zevscopedquerysetmixin).
 
 ## 4. Data model
 
@@ -733,13 +733,16 @@ allowed to say: the refusal does not report what the name resolved to (while
 `log_detail` does), a TLS error's paths do not reach the response, and the
 operator's own reason phrase is not echoed back.
 
-**`ImportEndpointTests`** (15): auth; participants forbidden; an owner refused
+**`ImportEndpointTests`** (17): auth; participants forbidden; an owner refused
 another owner's ZEV; preview writes nothing; the stored URL as fallback; a ZEV
 with no URL told what is missing; a fetch failure as a 400 not a 500; apply
 creates only what was ticked and remembers the URL; the audit event and its
 metadata; a changed document refused with 409 and no write; `remember_url:
 false` honoured; input validation; the preview publishes the billing modes it
 may offer, and a mode picked there reaches the created tariff.
+
+- `test_disabled_zev_refuses_apply_before_fetching_or_writing`: no fetch, tariff, or URL change on refusal.
+- `test_disabled_zev_keeps_preview_and_admin_apply`: manager preview and admin apply remain available.
 
 Each of these was checked to fail with the production code reverted (duplicate
 detection, wrap-around splitting, the address checks, the billing-mode

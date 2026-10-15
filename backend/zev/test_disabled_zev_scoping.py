@@ -224,6 +224,16 @@ class WriteExistingTariffAndReadingRowTests(_OwnerAndParticipant):
         super().setUp()
         self._disable()
 
+    def test_admin_guard_does_not_fetch_the_parent_zev(self):
+        from types import SimpleNamespace
+        from tariffs.views import TariffViewSet
+
+        tariff = Tariff.objects.get(pk=self.tariff.pk)
+        view = TariffViewSet()
+        view.request = SimpleNamespace(user=self.admin)
+        with self.assertNumQueries(0):
+            view.assert_target_not_disabled(tariff)
+
     def test_owner_cannot_patch_tariff(self):
         response = self.owner_client.patch(
             f"{TARIFFS}{self.tariff.id}/", {"name": "Renamed Tariff"}, format="json",

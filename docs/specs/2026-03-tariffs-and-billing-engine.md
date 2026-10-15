@@ -130,6 +130,9 @@ end-dated last version, are simply periods the series does not cover.
   rejected by the overlap guard for reasons the caller cannot see.
 - Two versions of one series may not share a `valid_from`.
 
+Custom version, duplicate, and rename writes obey the
+[disabled-ZEV rules](2026-03-community-and-access.md#45-write-scoping-zevscopedquerysetmixin).
+
 OpenZEV rejects overlapping validity windows for two tariffs of the same
 `(zev, name)` — regardless of billing mode.
 
@@ -1542,6 +1545,12 @@ community energy to a single participant.
 | Duplicate starts a separate series without touching the source; refuses a blank or identical name | §6.1a |
 | Rename renames every version; refuses a name already in use; identical name is a no-op | §6.1a |
 | A version cannot change the series' category/billing mode/energy type | §3.1.1 |
+
+### Backend (`tariffs/test_disabled_zev.py`)
+
+`tariffs/test_disabled_zev.py::test_custom_write_access` (18 cases) covers
+manager/viewer/admin access in both ZEV states and unchanged tariff and band
+values after refusal.
 
 ### Backend (`tariffs/tests.py`) — validity windows
 
