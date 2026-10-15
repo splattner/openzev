@@ -12,6 +12,7 @@
 }
 
 /* Sign-in: a quiet sheet on the paper — the logo, one heading, the form. */
+
 .login-card {
   display: grid;
   gap: 1rem;
@@ -30,30 +31,3 @@
   margin: -0.5rem 0 0.25rem;
 }
 
-.login-brand {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  padding-bottom: 1.25rem;
-  border-bottom: 1px solid var(--border-default);
-  position: relative;
-}
-
-/* The documents' rule under the brand, centred. */
-.login-brand::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: calc(50% - 1.75rem);
-  width: 3.5rem;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--accent-rule);
-}
-
-.login-logo {
-  width: min(100%, 200px);
-  height: auto;
-  display: block;
-  margin: 0 auto;
-}

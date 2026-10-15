@@ -1,0 +1,129 @@
+/* ZEV settings → Access (#761): who may manage or view the community. */
+
+.zev-access-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.zev-access-row {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border-default);
+  border-radius: 0.6rem;
+  background: var(--white);
+}
+
+.zev-access-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+  min-width: 0;
+}
+
+.zev-access-who .muted {
+  overflow-wrap: anywhere;
+}
+
+.zev-access-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.zev-access-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 1rem;
+  font-size: 0.9rem;
+}
+
+.zev-access-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.zev-access-form-hint {
+  margin: 0;
+}
+
+/* ZEV settings → Parties (#761): issuer, representative, landowners, contacts. */
+
+.zev-parties-block {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-default);
+}
+
+.zev-parties-block-first {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.zev-parties-block-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.zev-parties-block-header h4 {
+  margin: 0;
+}
+
+.zev-parties-block-header p {
+  margin: 0.15rem 0 0;
+  font-size: 0.9rem;
+}
+
+.zev-parties-holder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+  margin: 0;
+}
+
+.zev-parties-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.zev-parties-history li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.75rem;
+}
+
+.zev-parties-inline-date {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+@media (min-width: 48rem) {
+  .zev-access-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .zev-access-meta {
+    grid-column: 1;
+  }
+
+  .zev-access-actions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+

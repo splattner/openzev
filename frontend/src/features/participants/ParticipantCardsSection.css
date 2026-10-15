@@ -17,6 +17,7 @@
 
 /* A missing detail is the way to fix it: red text, or its icon, that opens
    the edit dialog or the metering points. */
+
 .participant-fix {
   display: inline-flex;
   align-items: center;
@@ -79,6 +80,7 @@
 }
 
 /* Cards: who and share, then where and since when, then status and the menu. */
+
 @container (max-width: 46rem) {
   .invoice-rows.participant-rows tbody tr {
     grid-template:
@@ -109,6 +111,7 @@
 
 /* Phones: the status icons and the buttons each take a full line, so the
    buttons never widen the share column or crowd the icons. */
+
 @container (max-width: 28rem) {
   .invoice-rows.participant-rows tbody tr {
     grid-template:
@@ -123,31 +126,3 @@
   }
 }
 
-.metering-missing-list {
-  margin: 0.35rem 0 0;
-  padding-left: 1rem;
-  font-size: 0.8rem;
-}
-
-.metering-missing-list li + li {
-  margin-top: 0.12rem;
-}
-
-.table-inline-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--interactive);
-  font-size: 0.82rem;
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.table-inline-link:hover {
-  color: var(--interactive-hover);
-  text-decoration: underline;
-}

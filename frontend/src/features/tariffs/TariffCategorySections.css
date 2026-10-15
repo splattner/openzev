@@ -1,9 +1,11 @@
 /* One row per series; details and write actions live in the drawer. */
+
 .tariff-list {
   container-type: inline-size;
 }
 
 /* Fixed columns, so every category's table lines up under the one above. */
+
 .tariff-table {
   table-layout: fixed;
 }
@@ -43,6 +45,7 @@
 
 /* The series whose drawer is open — so it stays identifiable once you've
    scrolled or the list re-sorts under you. */
+
 .tariff-table tbody tr.is-selected > td:first-child {
   box-shadow: inset 3px 0 0 var(--brand-mid);
 }
@@ -51,6 +54,7 @@
    the neutral of the "ended" pill (the sunken surface reads green). The
    text stays above 4.5:1 on that ground, where the muted grey would not; a
    problem pill keeps its own tone. */
+
 .tariff-table tbody tr.is-ended > td,
 .tariff-list .tariff-table tbody tr.is-ended {
   background: color-mix(in srgb, var(--status-neutral) 60%, var(--surface-card));
@@ -86,6 +90,7 @@
 }
 
 /* One line, as on the PDF; the full note is its tooltip and in the drawer. */
+
 .tariff-table-notes {
   overflow: hidden;
   white-space: nowrap;
@@ -94,6 +99,7 @@
 }
 
 /* Desktop: each band's hours, price and unit share one baseline. */
+
 .tariff-table-lines > div {
   overflow: hidden;
   line-height: 1.5rem;
@@ -259,113 +265,3 @@ td.tariff-table-valid {
   }
 }
 
-.tariff-period-section-title-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.tariff-period-line,
-.tariff-period-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  flex-wrap: wrap;
-}
-
-.tariff-period-actions {
-  justify-content: flex-end;
-}
-
-.tariff-card-summary-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem 0.75rem;
-  flex-wrap: wrap;
-}
-
-.tariff-card-summary-row .tariff-detail-card {
-  flex: 1 1 220px;
-}
-
-.tariff-card-details {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.5rem;
-}
-
-/* A labelled value: kicker over the figure, on a sunken ground. */
-.tariff-detail-card {
-  display: grid;
-  gap: 0.2rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-
-.tariff-detail-card-wide {
-  grid-column: span 2;
-}
-
-.tariff-detail-label {
-  font-size: 0.6875rem;
-  font-weight: 650;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.tariff-detail-value {
-  color: var(--ink);
-  font-size: 0.875rem;
-  line-height: 1.45;
-  font-variant-numeric: tabular-nums;
-  word-break: break-word;
-}
-
-.tariff-period-section {
-  display: grid;
-  gap: 0.75rem;
-  padding-top: 0.25rem;
-  border-top: 1px solid var(--border-default);
-}
-
-.tariff-period-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.tariff-period-section-header h4 {
-  margin: 0;
-}
-
-.tariff-period-list {
-  display: grid;
-  gap: 0.375rem;
-}
-
-.tariff-period-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  flex-wrap: wrap;
-}
-
-.tariff-period-main {
-  display: grid;
-  gap: 0.3rem;
-}
-
-.tariff-period-meta,
-.tariff-period-empty {
-  margin: 0;
-  font-size: 0.8125rem;
-}

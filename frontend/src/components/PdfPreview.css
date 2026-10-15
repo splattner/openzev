@@ -1,0 +1,27 @@
+/* The viewer's bars are paper strips around the document. */
+
+.pdf-preview-actions {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-card);
+}
+
+.pdf-preview-frame {
+  width: 100%;
+  border: 0;
+  display: block;
+}
+
+.pdf-preview-link {
+  padding: 0.5rem 0.875rem;
+  margin: 0;
+  border-top: 1px solid var(--border-default);
+  background: var(--surface-card);
+  font-size: 0.875rem;
+}
+
+.pdf-preview-empty {
+  padding: 2rem;
+  text-align: center;
+}
+

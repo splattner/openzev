@@ -1,0 +1,103 @@
+.invoice-progress-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  font-size: 1.05rem;
+}
+
+/* An outline icon (`IconSvg`) draws inside a margin, so it runs larger than
+   the solid Font Awesome glyphs to look the same size. */
+
+.invoice-progress-icon > svg:not(.svg-inline--fa) {
+  width: 1.3em;
+  height: 1.3em;
+  flex-shrink: 0;
+}
+
+.invoice-progress-icon--done,
+.invoice-progress-icon--active {
+  color: var(--brand-mid);
+}
+
+.invoice-progress-icon--issue {
+  color: var(--danger-600);
+}
+
+.invoice-progress-icon--open {
+  color: var(--muted);
+  opacity: 0.5;
+}
+
+/* The state mark sits on the icon's corner inside a ring of card colour. */
+
+.invoice-progress-mark {
+  position: absolute;
+  right: -0.25rem;
+  bottom: -0.2rem;
+  display: inline-flex;
+  border-radius: 50%;
+  background: var(--surface-card);
+  box-shadow: 0 0 0 1.5px var(--surface-card);
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.invoice-progress-icon--done .invoice-progress-mark {
+  color: var(--success-600);
+}
+
+.invoice-progress-icon--active .invoice-progress-mark {
+  color: var(--interactive);
+}
+
+.invoice-progress-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  padding-top: 0.85rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.invoice-progress-legend ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.invoice-progress-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.invoice-progress-legend .invoice-progress-icon {
+  width: 1.2rem;
+  height: 1.2rem;
+  font-size: 0.85rem;
+}
+
+.invoice-progress-legend-mark {
+  display: inline-flex;
+  font-size: 0.8rem;
+}
+
+.invoice-progress-legend-mark--done {
+  color: var(--success-600);
+}
+
+.invoice-progress-legend-mark--active {
+  color: var(--interactive);
+}
+
+.invoice-progress-legend-mark--issue {
+  color: var(--danger-600);
+}
+

@@ -34,23 +34,3 @@
   text-decoration: underline;
 }
 
-/* ── Billing hub: the current period card ───────────────────────────── */
-
-.billing-current-period {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.billing-current-period .eyebrow,
-.billing-current-period .muted {
-  margin: 0;
-}
-
-.billing-current-period-range {
-  display: block;
-  margin: 0.25rem 0;
-  font-variant-numeric: tabular-nums;
-}

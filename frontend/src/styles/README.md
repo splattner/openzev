@@ -15,7 +15,7 @@ layers once and `@import`s every file into one of them:
 | `base` | `base.css` |
 | `layout` | `layout/*` except `responsive.css` |
 | `components` | `components/*` and `misc.css` |
-| `pages` | `pages/*` |
+| `pages` | `pages/*`, then the stylesheets that sit next to their page or component |
 | `responsive` | `layout/responsive.css`: the media-query overrides of components and pages |
 | `utilities` | `utilities.css` |
 
@@ -44,10 +44,33 @@ props) are unlayered and win; they only set what the component was asked to set.
 | `native-controls.css` | Native element defaults a Mantine class must beat (labels, checkbox width); layer `native` |
 | `layout/` | App shell, sidebar, account menu, page header, footer; `responsive.css` is its own `responsive` layer |
 | `components/` | Shared, reusable pieces: tables, sheets, stat tiles, buttons, badges, dialogs, … |
-| `pages/` | Rules used by one page or feature (metering points, tariffs, billing period, …) |
+| `pages/` | Page-level rules shared by several pages: sign-in shell, form grids, invoice rows, public card |
 | `utilities.css` | Single-property spacing helpers (`mt-1`, `mb-15`, …) |
 | `misc.css` | Leftovers from the split that have no better home yet (some may be dead); layer `components` |
 
-Rules of thumb: a class used by two or more pages belongs in `components/`; a class
-used by one page belongs in `pages/`. Colours come from `var(--…)` tokens; the
-alpha-only exceptions are listed per file in `scripts/hex-migration-allowlist.json`.
+## Where a rule lives
+
+CSS used by exactly one page or component sits **next to it**, named after it:
+`features/tariffs/TariffDetailDrawer.css`, `pages/LoginPage.css`,
+`components/PeriodSelector.css`. A rule shared by a component and the one page that
+renders it goes in the page's file. Only what several pages share stays here:
+shared primitives (sheet, table, buttons, badges, dialogs, stat tiles) in `components/`,
+shared page-level rules in `pages/`. When you delete a component, delete its stylesheet
+and its import with it.
+
+Co-located files keep the global class names; don't convert them to CSS Modules. The
+design system is a shared global vocabulary. Use `*.module.css` only for a new, genuinely
+local component.
+
+A co-located file is imported **from `index.css`**, into the `pages` layer (append it to
+the end of that block), not from the component. Routes are lazy-loaded, so a stylesheet
+imported by a component would ship with its route chunk and land in the cascade whenever
+that route first loads, which makes the order inside the layer depend on navigation.
+When a component goes, its stylesheet goes with it, and the build fails on the
+leftover `@import` until that goes too. A media query that only overrides the file's own rules goes in an
+`@media`/`@container` block after them, in the same file; one that has to beat a rule
+from another file still goes in `layout/responsive.css`.
+
+Colours come from `var(--…)` tokens; the alpha-only exceptions are listed per file in
+`scripts/hex-migration-allowlist.json` (paths relative to `src`, so they move with the
+file).

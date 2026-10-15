@@ -2,15 +2,11 @@
    Reached from the QR on an invoice, with no session and no app chrome. It
    reads as a document rather than a screen: one sheet, centred, no navigation
    to offer someone who has nothing to navigate to. */
+
 .public-invoice-page {
   min-height: 100vh;
   padding: 2rem 1rem 4rem;
   background: var(--app-bg);
-}
-
-.public-invoice-card {
-  max-width: 30rem;
-  text-align: center;
 }
 
 .public-invoice-sheet {
@@ -200,8 +196,10 @@
 
 /* The SVGs carry print dimensions and a viewBox; this is what makes them
    scale to a phone instead of overflowing it. */
+
 .public-invoice-chart svg {
   width: 100%;
   height: auto;
   display: block;
 }
+

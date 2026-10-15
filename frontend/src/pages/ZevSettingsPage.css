@@ -1,0 +1,32 @@
+/* ZEV settings save bar: compact sticky footer, visible only while dirty,
+   saving, or showing a save error. Opaque so scrolled content never shows
+   through; safe-area padding for mobile browsers. */
+
+.zev-settings-save-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border-default);
+  border-radius: 0.75rem;
+  background: var(--surface-card);
+}
+
+.zev-settings-save-bar-text {
+  flex: 1 1 auto;
+  min-width: 10rem;
+  font-weight: 600;
+}
+
+.zev-settings-save-bar .actions-row {
+  margin-left: auto;
+}
+
+.zev-settings-save-bar-error {
+  flex: 1 1 100%;
+}
+

@@ -1,6 +1,8 @@
 /* ── Raw metering data (drill-down day → hour × 15-minute grid) ──────────────── */
+
 /* Shrink to content (the `pages` layer beats `.page-stack table { width: 100% }`)
    so the few numeric columns stay grouped instead of being stretched across the page. */
+
 .raw-metering-days {
   width: auto;
   min-width: min(100%, 34rem);
@@ -10,6 +12,7 @@
 
 /* Numeric columns: right-align (out-specifying `.page-stack td { text-align: left }`)
    with room to breathe now that the table hugs its content. */
+
 .raw-metering-days .raw-metering-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -18,6 +21,7 @@
 }
 
 /* Day summary rows — compact and clickable */
+
 .raw-metering-days tbody th {
   font-size: 0.8rem;
   color: var(--text-body);
@@ -72,6 +76,7 @@
 
 /* Anomaly flags (#652) — a small inline badge next to the day it's about,
    and a fuller-width banner inside the expanded day detail. */
+
 .raw-metering-day-flag {
   display: inline-block;
   padding: 0.05rem 0.5rem;
@@ -99,6 +104,7 @@
 }
 
 /* Expanded interval detail */
+
 .raw-metering-detail-cell {
   padding: 0 !important;
   background: var(--surface);
@@ -110,6 +116,7 @@
 }
 
 /* Intraday sparkline above the value table */
+
 .raw-metering-sparkline {
   padding: 0.5rem 1rem 0.7rem;
 }
@@ -125,6 +132,7 @@
 }
 
 /* Hour × 15-minute grid — one column per hour, one row per slot */
+
 .raw-metering-grid-wrap {
   padding: 0 1rem 0.4rem;
 }
@@ -156,6 +164,7 @@
 }
 
 /* Hour headers (top) and slot labels (left) */
+
 .raw-metering-grid thead th {
   color: var(--muted);
   background: var(--surface);
@@ -183,3 +192,4 @@
 .raw-metering-grid tbody tr:nth-child(even) td {
   background: rgba(148, 163, 184, 0.06);
 }
+

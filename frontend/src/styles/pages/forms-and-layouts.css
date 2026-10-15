@@ -1,0 +1,55 @@
+/* Responsive form grids — inline 2-col grids that collapse on mobile */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+fieldset.form-grid {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.payment-recipient-section {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.payment-recipient-section p {
+  margin: 0;
+}
+
+.payment-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+/* Main + aside layout (e.g. admin template editor + field reference): the
+   work gets the room, the reference stays a readable column. */
+
+.content-with-aside {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 30rem);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.content-with-aside > aside {
+  width: 100%;
+  max-width: 30rem;
+  min-width: 0;
+}
+
+.content-with-aside > section {
+  min-width: 0;
+}
+

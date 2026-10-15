@@ -1,0 +1,19 @@
+.table-inline-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--interactive);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.table-inline-link:hover {
+  color: var(--interactive-hover);
+  text-decoration: underline;
+}
+

@@ -4,11 +4,16 @@
  *
  *   native  native element defaults that a component library's class must beat
  *   vendor  third-party CSS (Mantine, Leaflet), so our own rules win without selector tricks
- *   app     everything we write
+ *   tokens … utilities  everything we write, one layer per kind of rule (see README.md)
  *
- * Inside `app` the order of these imports is the cascade order — later files win ties,
+ * Inside a layer the order of these imports is the cascade order — later files win ties,
  * so keep it. Anything left outside a layer beats every layer, so third-party CSS is
  * imported here into `vendor`, never bare from a component.
+ *
+ * The `pages` block also imports the stylesheets that sit next to the page or component
+ * they style (`../features/…`, `../pages/…`, `../components/…`); they are imported here,
+ * not from the component, so their place in the cascade does not depend on which lazy
+ * route loaded first. Add a new one at the end of the block.
  */
 @layer native, vendor, tokens, base, layout, components, pages, responsive, utilities;
 
@@ -45,22 +50,48 @@
 @import './misc.css' layer(components);
 @import './components/app-tabs.css' layer(components);
 
-@import './pages/raw-metering.css' layer(pages);
-@import './pages/overview-hubs.css' layer(pages);
-@import './pages/billing-period.css' layer(pages);
-@import './pages/metering-points.css' layer(pages);
-@import './pages/tariffs.css' layer(pages);
-@import './pages/billing-period-rows.css' layer(pages);
-@import './pages/participant-rows.css' layer(pages);
+@import '../components/RawMeteringTable.css' layer(pages);
+@import '../features/overview/SetupGuidance.css' layer(pages);
+@import '../pages/BillingPeriodsPage.css' layer(pages);
+@import '../pages/InvoicesPage.css' layer(pages);
+@import '../features/invoices/InvoiceBatchActions.css' layer(pages);
+@import '../components/PeriodSelector.css' layer(pages);
+@import '../features/meteringPoints/MeteringPointsList.css' layer(pages);
+@import '../pages/MeteringPointsPage.css' layer(pages);
+@import '../features/meteringPoints/MeteringPointTypeLegend.css' layer(pages);
+@import '../features/tariffs/TariffCategorySections.css' layer(pages);
+@import '../features/tariffs/TariffDetailDrawer.css' layer(pages);
+@import './pages/invoice-rows.css' layer(pages);
+@import '../features/invoices/InvoicePeriodRowsTable.css' layer(pages);
+@import '../components/ProgressIcon.css' layer(pages);
+@import '../features/invoices/InvoiceRowProgress.css' layer(pages);
+@import '../features/participants/ParticipantCardsSection.css' layer(pages);
+@import './pages/table-inline-link.css' layer(pages);
 @import './pages/login.css' layer(pages);
-@import './pages/templates-and-layouts.css' layer(pages);
+@import '../pages/LoginPage.css' layer(pages);
+@import './pages/forms-and-layouts.css' layer(pages);
+@import '../pages/AdminTemplatesHubPage.css' layer(pages);
+@import '../pages/FeasibilityCalculatorPage.css' layer(pages);
 @import './pages/login-split.css' layer(pages);
-@import './pages/drawers.css' layer(pages);
-@import './pages/tariff-versions.css' layer(pages);
-@import './pages/public-invoice.css' layer(pages);
-@import './pages/overview-period.css' layer(pages);
-@import './pages/annual-documents.css' layer(pages);
-@import './pages/zev-settings.css' layer(pages);
+@import '../features/meteringPoints/MeteringGapsDrawer.css' layer(pages);
+@import '../features/audit/AuditEventDrawer.css' layer(pages);
+@import '../features/audit/ChangesDiff.css' layer(pages);
+@import '../features/tariffs/TariffVersionModal.css' layer(pages);
+@import '../features/tariffs/TariffFormModal.css' layer(pages);
+@import '../features/tariffs/TariffPriceHistoryChart.css' layer(pages);
+@import '../pages/PublicInvoicePage.css' layer(pages);
+@import './pages/public-card.css' layer(pages);
+@import '../components/BillingPeriodCard.css' layer(pages);
+@import '../features/reports/ParticipantYearDocuments.css' layer(pages);
+@import '../components/PdfPreview.css' layer(pages);
+@import '../pages/InvoiceDetailPage.css' layer(pages);
+@import '../pages/ZevSettingsPage.css' layer(pages);
+@import '../components/ZevEmailTemplateFields.css' layer(pages);
+@import '../components/TemplateSourceStatus.css' layer(pages);
+@import '../features/zev/ZevPartiesSection.css' layer(pages);
+@import '../features/zev/PartyAccess.css' layer(pages);
+@import '../pages/ZevListPage.css' layer(pages);
+@import '../components/dashboard/OwnSystemKwh.css' layer(pages);
 
 @import './layout/responsive.css' layer(responsive);
 
