@@ -7,7 +7,7 @@ import { ActionMenu, type ActionMenuItem } from './ActionMenu'
 import { openInvoicePdf } from '../lib/api/invoices'
 import { formatChf, formatChfAmount } from '../lib/numbers'
 import type { Invoice } from '../types/api'
-import { invoiceStatusBadgeClass } from '../features/invoices/invoiceStatus'
+import { invoiceStatusBadgeClass, isPartlyPaid } from '../features/invoices/invoiceStatus'
 
 export function InvoiceLink({ invoice, from, period, children, className }: {
     invoice: Pick<Invoice, 'id' | 'invoice_number'>
@@ -27,9 +27,12 @@ export function InvoiceLink({ invoice, from, period, children, className }: {
     )
 }
 
-export function InvoiceStatusBadge({ status }: { status: Invoice['status'] }) {
+/** Pass `paidChf` where it is known, so a partly paid invoice says so. */
+export function InvoiceStatusBadge({ status, paidChf }: { status: Invoice['status']; paidChf?: Invoice['paid_chf'] }) {
     const { t } = useTranslation()
-    return <span className={invoiceStatusBadgeClass(status)}>{status ? t(`invoice.status.${status}`) : ''}</span>
+    const label = isPartlyPaid({ status, paid_chf: paidChf }) ? t('invoice.status.partlyPaid')
+        : status ? t(`invoice.status.${status}`) : ''
+    return <span className={invoiceStatusBadgeClass(status)}>{label}</span>
 }
 
 /** `currency={false}` drops "CHF" where the column header already names it. */

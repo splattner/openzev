@@ -19,7 +19,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
-from invoices.models import Invoice, InvoiceItem, InvoiceStatus
+from invoices.models import Invoice, InvoiceItem, InvoiceStatus, Payment
 from metering.models import ImportLog, MeterReading, ReadingResolution, SupplementarySource
 from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
@@ -120,6 +120,8 @@ def build_populated_zev(owner, *, name="Transfer ZEV", meter_prefix="TR"):
         description="Solar energy", quantity_kwh=Decimal("100.0000"),
         unit_price_chf=Decimal("0.42000"), total_chf=Decimal("42.00"),
     )
+    Invoice.objects.filter(pk=invoice.pk).update(approved_at=datetime(2026, 2, 2, 8, 0, tzinfo=timezone.utc))
+    Payment.objects.create(invoice=invoice, amount_chf=Decimal("20.00"), paid_on=date(2026, 2, 20), note="Teilzahlung")
     return zev
 
 
@@ -441,6 +443,31 @@ class RoundTripTests(TestCase):
         self.assertEqual(invoice.total_local_sold_kwh, Decimal("200.0000"))
         self.assertEqual(invoice.local_sale_chf, Decimal("40.00"))
         self.assertEqual(invoice.local_sale_feed_in_chf, Decimal("16.00"))
+
+    def test_payments_and_approval_round_trip(self):
+        result = self._import()
+        invoice = Invoice.objects.get(zev_id=result["zev_id"])
+        self.assertEqual(invoice.approved_at, datetime(2026, 2, 2, 8, 0, tzinfo=timezone.utc))
+        payment = invoice.payments.get()
+        self.assertEqual(
+            (payment.amount_chf, payment.paid_on, payment.note, payment.source),
+            (Decimal("20.00"), date(2026, 2, 20), "Teilzahlung", Payment.Source.MANUAL),
+        )
+
+    def test_an_archive_from_before_payments_settles_its_paid_invoices(self):
+        raw = export_and_clear(self.source)
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            invoices = json.loads(archive.read("invoices.json"))
+        for entry in invoices:
+            entry.pop("payments")
+            entry.pop("approved_at")
+            entry["status"] = InvoiceStatus.PAID
+        result = self._import(rewrite_archive(raw, replace={"invoices.json": invoices}))
+        invoice = Invoice.objects.get(zev_id=result["zev_id"])
+        self.assertIsNotNone(invoice.approved_at)
+        payment = invoice.payments.get()
+        self.assertEqual(payment.amount_chf, invoice.total_chf)
+        self.assertEqual(payment.source, Payment.Source.BACKFILL)
 
     def test_the_counter_is_pushed_past_the_imported_numbering(self):
         """Otherwise the first billing run mints a number the ZEV already has."""
@@ -1155,6 +1182,7 @@ class SchemaParityTests(TestCase):
         "TARIFF_PERIOD_FIELDS": TariffPeriod,
         "INVOICE_FIELDS": Invoice,
         "INVOICE_ITEM_FIELDS": InvoiceItem,
+        "PAYMENT_FIELDS": Payment,
         "SUPPLEMENTARY_SOURCE_FIELDS": SupplementarySource,
     }
 
@@ -1217,6 +1245,8 @@ class SchemaParityTests(TestCase):
             "updated_at",
         },
         "INVOICE_ITEM_FIELDS": {"id", "invoice"},
+        # Nested under its invoice; ``created_by`` is an account.
+        "PAYMENT_FIELDS": {"id", "invoice", "created_by", "created_at"},
         # A source travels by ``meter_id`` and the archive ``participant_id``. Nothing that holds
         # a secret or describes a live connection travels: the credential and push token, the
         # on/off switch and status, the sync bookkeeping and the last comparison with the meter all

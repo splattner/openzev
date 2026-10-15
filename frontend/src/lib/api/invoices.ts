@@ -195,8 +195,22 @@ export async function markInvoiceSent(invoiceId: string): Promise<Invoice> {
   return data
 }
 
-export async function markInvoicePaid(invoiceId: string): Promise<Invoice> {
-  const { data } = await api.post<Invoice>(`/invoices/invoices/${invoiceId}/mark-paid/`)
+/** Books the outstanding amount as one payment; `paidOn` defaults to today. */
+export async function markInvoicePaid(invoiceId: string, paidOn?: string): Promise<Invoice> {
+  const { data } = await api.post<Invoice>(`/invoices/invoices/${invoiceId}/mark-paid/`, paidOn ? { paid_on: paidOn } : {})
+  return data
+}
+
+export async function recordPayment(
+  invoiceId: string,
+  body: { amount_chf: string; paid_on?: string; note?: string },
+): Promise<Invoice> {
+  const { data } = await api.post<Invoice>(`/invoices/invoices/${invoiceId}/payments/`, body)
+  return data
+}
+
+export async function deletePayment(invoiceId: string, paymentId: string): Promise<Invoice> {
+  const { data } = await api.delete<Invoice>(`/invoices/invoices/${invoiceId}/payments/${paymentId}/`)
   return data
 }
 

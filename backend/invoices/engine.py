@@ -265,7 +265,8 @@ def _discard_replaceable_invoices(participant, period_start, period_end) -> None
 
     A draft or cancelled invoice overlapping this period is replaced; anything
     further along its lifecycle has been sent to somebody and must not be
-    silently rewritten.
+    silently rewritten. A cancelled invoice that was ever approved stays, with
+    its number, next to the new one (ADR 0037).
     """
     overlapping = Invoice.objects.filter(
         participant=participant,
@@ -277,7 +278,9 @@ def _discard_replaceable_invoices(participant, period_start, period_end) -> None
         raise ValueError(
             f"Invoice {locked.invoice_number} already has status '{locked.status}' and cannot be regenerated."
         )
-    overlapping.filter(status__in=[InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED]).delete()
+    overlapping.filter(
+        status__in=[InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED], approved_at__isnull=True,
+    ).delete()
 
 
 # ─── Pricing state ────────────────────────────────────────────────────────────

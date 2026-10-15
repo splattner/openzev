@@ -481,8 +481,9 @@ invoice PDF or any invoice screen.
 ```
 
 `compute_producer_uplift(invoices)` in `invoices/annual_report.py` sums the
-participant's non-cancelled invoices of the year (the selection `compute_savings`
-uses, now shared as `_invoices_by_participant`). It returns `null` when there are
+participant's billed invoices of the year — issued and not cancelled,
+`invoices.models.billed_invoices` (#388) — the selection `compute_savings` uses,
+shared as `_invoices_by_participant`, and the same one as the annual statement. It returns `null` when there are
 no invoices, when **any** invoice's `local_sale_feed_in_chf` is `null` (summing
 only the known ones would compare different periods), or when the summed sold
 kWh is `<= 0`. `*_rp` are centimes per kWh. `uplift_total_chf` is the sum of

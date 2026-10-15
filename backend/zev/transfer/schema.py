@@ -349,12 +349,24 @@ INVOICE_FIELDS = (
     "embedded_vat_chf",
     "total_chf",
     "sent_at",
+    # Optional (#388): an archive written before it existed infers it on
+    # import from status and ``sent_at``.
+    "approved_at",
     "due_date",
     "notes",
     # The issuer/recipient copy (#761). Optional: an archive written before
     # it existed imports without it, and the copy is built at the next render.
     "issuer",
     "recipient",
+)
+
+# Nested under each invoice as ``payments`` (#388). Optional: an older
+# archive's paid invoice imports with one payment for its total.
+PAYMENT_FIELDS = (
+    "amount_chf",
+    "paid_on",
+    "note",
+    "source",
 )
 
 INVOICE_ITEM_FIELDS = (

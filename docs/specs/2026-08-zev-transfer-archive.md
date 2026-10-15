@@ -202,6 +202,7 @@ openzev-export-<community>-<date>.zip
                            "periods": [{"id", <TARIFF_PERIOD_FIELDS>}]}]
   invoices.json          [{"id", "participant_id", <INVOICE_FIELDS>,
                            "items": [{"id", <INVOICE_ITEM_FIELDS>}],
+                           "payments": [{<PAYMENT_FIELDS>}],
                            "dynamic_evidence": [{"dynamic_source": {<DYNAMIC_SOURCE_FIELDS>},
                              "tariff_id_snapshot", "evidence_from", "evidence_to"}]}]
   readings/<meter>.csv   one file per meter
@@ -210,7 +211,7 @@ openzev-export-<community>-<date>.zip
 
 Field lists (`ZEV_FIELDS`, `PARTY_FIELDS`, `PARTY_ROLE_FIELDS`, `PARTICIPANT_FIELDS`, `METERING_POINT_FIELDS`,
 `ASSIGNMENT_FIELDS`, `TARIFF_FIELDS`, `TARIFF_PERIOD_FIELDS`, `INVOICE_FIELDS`,
-`INVOICE_ITEM_FIELDS`, `DYNAMIC_SOURCE_FIELDS`) are hand-written in `schema.py` — a file format with a
+`INVOICE_ITEM_FIELDS`, `PAYMENT_FIELDS`, `DYNAMIC_SOURCE_FIELDS`) are hand-written in `schema.py` — a file format with a
 version, not a mirror of the serializers. `user` (Participant) is absent by
 design (as `Zev.owner` was, before #761 removed it); imported participants arrive unlinked. `disabled_at`/
 `disabled_by`/`disabled_reason` (Zev) are absent for the same reason plus one
@@ -227,6 +228,15 @@ optional on import, so an archive written before they existed still imports
 `local_sale_feed_in_chf` (the annual report's producer uplift, `2026-09-annual-zev-report.md`):
 additive, with model defaults, so an older archive imports with zero sales and an unknown
 benchmark, and no format-version bump is needed.
+`INVOICE_FIELDS` carries `approved_at`, and each invoice nests its `payments`
+(`PAYMENT_FIELDS = ("amount_chf", "paid_on", "note", "source")`; `created_by` is an
+account and does not travel) — #388, SPEC payments-and-credits. Both are optional,
+with no format-version bump: an archive without `approved_at` imports an
+approved/sent/paid invoice, or one with `sent_at`, with `approved_at = sent_at` or
+the import time (`_import_invoices`), and an archive without `payments` gives a
+paid invoice with a non-zero total one `backfill` payment of `total_chf`, dated by
+`sent_at` or else the period end (`_import_payments`) — the same rule as migration
+`invoices/0023`.
 `READING_CSV_COLUMNS = ("meter_id", "timestamp",
 "energy_kwh", "direction", "resolution", "import_source")` — the same layout the
 normal CSV metering import reads, plus `resolution`/`import_source` so nothing is
@@ -476,7 +486,10 @@ still_get_separate_members`); `metering_points.json` carries
 **`RoundTripTests`**: every section arrives; assignments follow the right
 participant; participants arrive unlinked; readings keep resolution and values;
 tariff periods round-trip; invoice items travel (PDFs only when `invoice_pdfs`
-is explicitly selected — see `test_transfer_invoice_pdfs.py`); the counter is
+is explicitly selected — see `test_transfer_invoice_pdfs.py`); payments and
+`approved_at` round-trip (`test_payments_and_approval_round_trip`) and an archive
+from before them settles its paid invoices
+(`test_an_archive_from_before_payments_settles_its_paid_invoices`); the counter is
 pushed past imported numbering; readings are recorded as an import log;
 importing twice collides on meter ids; a structure-only archive can be imported
 twice; a subset can be imported from a full archive;
@@ -524,8 +537,8 @@ version, *, replace=None)` rewrites a current export as an older format
 
 **`SchemaParityTests`**: `test_field_lists_match_their_models_exactly` —
 `assertEqual(set(<section fields>), {model._meta.fields names} -
-FIELDS_EXCLUDED_FROM_ARCHIVE[section])` for all ten section/model pairs
-(exclusions: `id`, `user`, `zev`/parent FKs, `party` (travels as `party_id`),
+FIELDS_EXCLUDED_FROM_ARCHIVE[section])` for every section/model pair, `PAYMENT_FIELDS`
+against `Payment` included (exclusions: `id`, `user`, `created_by`, `zev`/parent FKs, `party` (travels as `party_id`),
 `sort_name` (derived), `created_at`, `updated_at`, `pdf_file`); `test_reading_csv_columns_exist_on_the_reading_model`.
 
 **`TransferEndpointTests`**: owner can export own ZEV; owner cannot export

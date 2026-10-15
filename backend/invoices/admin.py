@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Invoice, InvoiceItem, EmailLog
+from .models import Invoice, InvoiceItem, EmailLog, Payment
 
 
 class InvoiceItemInline(admin.TabularInline):
@@ -14,13 +14,24 @@ class EmailLogInline(admin.TabularInline):
     readonly_fields = ("sent_at", "status", "error_message")
 
 
+class PaymentInline(admin.TabularInline):
+    model = Payment
+    extra = 0
+    readonly_fields = ("amount_chf", "paid_on", "note", "source", "created_by", "created_at")
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        # Payments go through the workflow, which keeps the status in step.
+        return False
+
+
 @admin.register(Invoice)
 class InvoiceAdmin(admin.ModelAdmin):
     list_display = ("invoice_number", "participant", "zev", "period_start", "period_end", "total_chf", "status")
     list_filter = ("status", "zev")
     search_fields = ("invoice_number", "participant__party__first_name", "participant__party__last_name", "participant__party__organisation_name")
-    inlines = [InvoiceItemInline, EmailLogInline]
-    readonly_fields = ("invoice_number", "created_at", "updated_at")
+    inlines = [InvoiceItemInline, PaymentInline, EmailLogInline]
+    readonly_fields = ("invoice_number", "approved_at", "created_at", "updated_at")
     date_hierarchy = "period_end"
 
 

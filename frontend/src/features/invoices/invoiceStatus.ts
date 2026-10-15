@@ -9,6 +9,14 @@ function isOpenInvoiceStatus(status: string): boolean {
 }
 
 /**
+ * A sent invoice with some, but not all, of its amount received (#388).
+ * Not a status of its own: derived from the recorded payments.
+ */
+export function isPartlyPaid(invoice: { status: string; paid_chf?: string } | null | undefined): boolean {
+  return !!invoice && invoice.status === 'sent' && Number(invoice.paid_chf ?? 0) !== 0
+}
+
+/**
  * Badge CSS class for an invoice status, shared by all invoice tables.
  * Approved wears the invoice document's own status pill (sage); sent is the
  * blue of something in transit; paid the settled green.

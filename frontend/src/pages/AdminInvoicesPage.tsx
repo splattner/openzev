@@ -110,7 +110,7 @@ export function AdminInvoicesContent() {
                 filterFn: 'equalsString',
                 cell: (ctx) => {
                     const status = String(ctx.getValue() ?? '')
-                    return <InvoiceStatusBadge status={status} />
+                    return <InvoiceStatusBadge status={status} paidChf={ctx.row.original.paid_chf} />
                 },
             },
             {

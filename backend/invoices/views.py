@@ -1,9 +1,11 @@
 import io
 import logging
+import uuid
 import zipfile
 from datetime import date as date_type
 
-from django.db.models import OuterRef, Subquery
+from django.db.models import OuterRef, Subquery, Sum
+from django.utils import timezone
 from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -17,10 +19,11 @@ from allocation.validity import active_during
 from zev.models import Zev, Participant
 from zev import access
 from zev.scoping import ZevScopedQuerySetMixin
-from .models import Invoice, InvoicePdfStatus, InvoiceStatus, EmailLog, sent_to_participant
+from .models import Invoice, InvoicePdfStatus, InvoiceStatus, EmailLog, Payment, sent_to_participant
 from .serializers import (
     InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
-    GenerateZevInvoicesSerializer
+    GenerateZevInvoicesSerializer, MarkPaidSerializer, PaymentSerializer,
+    RecordPaymentSerializer,
 )
 from . import access_tokens
 from .engine import DynamicTariffError, generate_invoice, preflight_dynamic_prices
@@ -37,8 +40,10 @@ from .workflow import (
     approve_invoice,
     cancel_invoice,
     can_delete_invoice,
+    delete_payment,
     mark_invoice_paid,
     mark_invoice_sent,
+    record_payment,
 )
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, record_audit_event
@@ -64,6 +69,26 @@ def _record_invoice_event(*, invoice: Invoice | None = None, target_id: str = ""
         target_display=target_display or (_invoice_target_display(invoice) if invoice else ""),
         **kwargs,
     )
+
+
+def _payment_metadata(before: dict) -> dict | None:
+    """Audit metadata for the payment a workflow call booked, if any."""
+    payment = before.get("payment")
+    if payment is None:
+        return None
+    return {
+        "payment_id": str(payment.pk),
+        "amount_chf": f"{payment.amount_chf:.2f}",
+        "paid_on": payment.paid_on.isoformat(),
+    }
+
+
+def _is_uuid(value) -> bool:
+    try:
+        uuid.UUID(str(value))
+    except ValueError:
+        return False
+    return True
 
 
 def _deny_if_zev_disabled(request, invoice: Invoice, *, action_type: str, denied_verb: str):
@@ -139,7 +164,7 @@ class InvoiceViewSet(
         # database cost the payload change just removed. getattr because schema
         # generation instantiates the view without an action.
         if getattr(self, "action", None) != "list":
-            queryset = queryset.prefetch_related("items", "email_logs")
+            queryset = queryset.prefetch_related("items", "email_logs", "payments")
         else:
             # last_email_status/log_id ride a subquery annotation inside the
             # invoice SELECT, no per-row N+1. Both use the same deterministic
@@ -149,9 +174,17 @@ class InvoiceViewSet(
                 .order_by("-created_at", "-id")
                 .values("status", "id")[:1]
             )
+            paid = (
+                Payment.objects.filter(invoice=OuterRef("pk"))
+                .order_by()
+                .values("invoice")
+                .annotate(total=Sum("amount_chf"))
+                .values("total")
+            )
             queryset = queryset.annotate(
                 last_email_status=Subquery(latest_log.values("status")[:1]),
                 last_email_log_id=Subquery(latest_log.values("id")[:1]),
+                paid_sum=Subquery(paid[:1]),
             )
         return self.scope_queryset(queryset)
 
@@ -252,6 +285,18 @@ class InvoiceViewSet(
         denial = _deny_if_zev_disabled(request, invoice, action_type="invoice.delete", denied_verb="invoice deletion")
         if denial is not None:
             return denial
+        if invoice.payments.exists():
+            _record_invoice_event(
+                request=request,
+                action_type="invoice.delete",
+                summary=f"Denied invoice deletion for {_invoice_target_display(invoice)}: payments recorded.",
+                status=AuditEventStatus.DENIED,
+                invoice=invoice,
+            )
+            return Response(
+                {"error": "Invoices with recorded payments cannot be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if not request.user.is_admin and not can_delete_invoice(invoice):
             _record_invoice_event(
                 request=request,
@@ -261,7 +306,10 @@ class InvoiceViewSet(
                 invoice=invoice,
                 changes={"status": {"before": invoice.status, "after": invoice.status}},
             )
-            return Response({"error": "Only draft or cancelled invoices can be deleted."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Only draft or cancelled invoices that were never approved can be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         invoice_number = _invoice_target_display(invoice)
         invoice_id = str(invoice.pk)
         participant_id = str(invoice.participant_id)
@@ -619,15 +667,19 @@ class InvoiceViewSet(
         )
         return Response(self.get_serializer(invoice).data)
 
-    def _perform_status_transition(self, request, *, action_type, workflow_fn, denied_verb, success_summary):
-        """Shared body for the four status-transition actions below.
+    def _perform_status_transition(
+        self, request, *, action_type, workflow_fn, denied_verb, success_summary,
+        metadata=None, invoice=None, response_status=status.HTTP_200_OK,
+    ):
+        """Shared body for the status-transition and payment actions below.
 
         Each just picks a workflow function (which raises InvoiceWorkflowError
         on an invalid transition) and phrasing for the audit log; this method
         owns the get-object/try-except/audit-event/response shape they all
-        share identically.
+        share identically. ``metadata`` builds the audit metadata from the
+        workflow's ``before`` dict.
         """
-        invoice = self.get_object()
+        invoice = invoice or self.get_object()
         denial = _deny_if_zev_disabled(request, invoice, action_type=action_type, denied_verb=denied_verb)
         if denial is not None:
             return denial
@@ -648,8 +700,11 @@ class InvoiceViewSet(
             summary=success_summary(invoice),
             invoice=invoice,
             changes=build_diff(before, {"status": invoice.status}, ["status"]),
+            metadata=metadata(before) if metadata else None,
         )
-        return Response(InvoiceSerializer(invoice, context={"request": request}).data)
+        # The workflow wrote payments behind the prefetch this instance carries.
+        getattr(invoice, "_prefetched_objects_cache", {}).pop("payments", None)
+        return Response(InvoiceSerializer(invoice, context={"request": request}).data, status=response_status)
 
     @action(detail=True, methods=["post"], url_path="approve",
             permission_classes=[IsAuthenticated, HasZevAccess])
@@ -678,13 +733,75 @@ class InvoiceViewSet(
     @action(detail=True, methods=["post"], url_path="mark-paid",
             permission_classes=[IsAuthenticated, HasZevAccess])
     def mark_paid(self, request, pk=None):
-        """Record that a sent invoice has been paid."""
+        """Record that a sent invoice has been paid in full: books the
+        outstanding amount as one payment."""
+        body = MarkPaidSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
         return self._perform_status_transition(
             request,
             action_type="invoice.mark_paid",
-            workflow_fn=mark_invoice_paid,
+            workflow_fn=lambda invoice: mark_invoice_paid(
+                invoice, paid_on=body.validated_data.get("paid_on"), user=request.user,
+            ),
             denied_verb="mark-paid",
             success_summary=lambda invoice: f"Marked invoice {_invoice_target_display(invoice)} as paid.",
+            metadata=_payment_metadata,
+        )
+
+    @action(detail=True, methods=["get", "post"], url_path="payments",
+            permission_classes=[IsAuthenticated, HasZevAccess])
+    def payments(self, request, pk=None):
+        """List an invoice's payments, or record one (managers)."""
+        if request.method == "GET":
+            invoice = self.get_object()
+            if not access.can_view(request.user, invoice.zev):
+                return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+            return Response(PaymentSerializer(invoice.payments.all(), many=True).data)
+
+        body = RecordPaymentSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        data = body.validated_data
+        return self._perform_status_transition(
+            request,
+            action_type="invoice.payment_record",
+            workflow_fn=lambda invoice: record_payment(
+                invoice,
+                amount_chf=data["amount_chf"],
+                paid_on=data.get("paid_on") or timezone.localdate(),
+                note=data.get("note", ""),
+                user=request.user,
+            ),
+            denied_verb="payment",
+            success_summary=lambda invoice: (
+                f"Recorded a payment of CHF {data['amount_chf']:.2f} for invoice {_invoice_target_display(invoice)}."
+            ),
+            metadata=_payment_metadata,
+            response_status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["delete"], url_path=r"payments/(?P<payment_id>[^/.]+)",
+            permission_classes=[IsAuthenticated, HasZevAccess])
+    def remove_payment(self, request, pk=None, payment_id=None):
+        """Remove a payment entered by mistake (managers)."""
+        invoice = self.get_object()
+        payment = invoice.payments.filter(pk=payment_id).first() if _is_uuid(payment_id) else None
+        if payment is None:
+            return Response({"error": "Payment not found."}, status=status.HTTP_404_NOT_FOUND)
+        payment.invoice = invoice
+        return self._perform_status_transition(
+            request,
+            invoice=invoice,
+            action_type="invoice.payment_delete",
+            workflow_fn=lambda _invoice: delete_payment(payment),
+            denied_verb="payment removal",
+            success_summary=lambda inv: (
+                f"Removed a payment of CHF {payment.amount_chf:.2f} from invoice {_invoice_target_display(inv)}."
+            ),
+            metadata=lambda _before: {
+                "payment_id": str(payment.pk),
+                "amount_chf": f"{payment.amount_chf:.2f}",
+                "paid_on": payment.paid_on.isoformat(),
+            },
         )
 
     @action(detail=True, methods=["post"], url_path="cancel",

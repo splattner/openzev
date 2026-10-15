@@ -29,8 +29,11 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.base import ContentFile
 from django.conf import settings
 from django.db import DataError, IntegrityError, transaction
+from django.utils import timezone
 
-from invoices.models import Invoice, InvoiceItem, InvoiceDynamicSourceEvidence, InvoicePdfStatus
+from invoices.models import (
+    Invoice, InvoiceDynamicSourceEvidence, InvoiceItem, InvoicePdfStatus, InvoiceStatus, Payment,
+)
 from tariffs.dynamic.evidence import lock_sources, record_invoice_evidence
 from metering.importers.csv_importer import _parse_datetime_utc, _parse_decimal
 from metering.importers.limits import (
@@ -72,6 +75,7 @@ from .schema import (
     DYNAMIC_SOURCE_FIELDS,
     INVOICE_FIELDS,
     INVOICE_ITEM_FIELDS,
+    PAYMENT_FIELDS,
     MANIFEST_NAME,
     METERING_POINT_FIELDS,
     LEGACY_PARTICIPANT_FIELDS,
@@ -713,8 +717,15 @@ def _import_invoices(archive, zev, participants_by_archive_id, collector):
         try:
             with transaction.atomic():
                 invoice = Invoice(zev=zev, participant=participant, **fields)
+                if invoice.approved_at is None and (
+                    invoice.sent_at is not None
+                    or invoice.status in (InvoiceStatus.APPROVED, InvoiceStatus.SENT, InvoiceStatus.PAID)
+                ):
+                    # An archive from before #388: issued, time unknown.
+                    invoice.approved_at = invoice.sent_at or timezone.now()
                 invoice.full_clean(exclude=["zev", "participant", "pdf_file"])
                 invoice.save()
+                _import_payments(invoice, raw, position)
                 items = []
                 for raw_item in raw.get("items") or []:
                     item_fields = _pick(raw_item, INVOICE_ITEM_FIELDS, position, SECTION_INVOICES)
@@ -746,6 +757,25 @@ def _import_invoices(archive, zev, participants_by_archive_id, collector):
         count += 1
         highest = max(highest, _trailing_number(invoice.invoice_number))
     return count, highest
+
+
+def _import_payments(invoice, raw, position):
+    """Create the invoice's payments. An archive from before #388 carries none:
+    its paid invoice gets one payment for the total, like the migration that
+    introduced payments, dated by delivery or else the period end."""
+    if "payments" in raw:
+        entries = [_pick(entry, PAYMENT_FIELDS, position, SECTION_INVOICES) for entry in raw["payments"] or []]
+    elif invoice.status == InvoiceStatus.PAID and invoice.total_chf:
+        paid_on = timezone.localdate(invoice.sent_at) if invoice.sent_at else invoice.period_end
+        entries = [{"amount_chf": invoice.total_chf, "paid_on": paid_on, "source": Payment.Source.BACKFILL}]
+    else:
+        entries = []
+    payments = []
+    for entry in entries:
+        payment = Payment(invoice=invoice, **entry)
+        payment.full_clean(exclude=["invoice"])
+        payments.append(payment)
+    Payment.objects.bulk_create(payments)
 
 
 def _trailing_number(invoice_number):

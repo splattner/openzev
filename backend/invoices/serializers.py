@@ -1,5 +1,8 @@
+from decimal import Decimal
+
 from rest_framework import serializers
-from .models import Invoice, InvoiceItem, EmailLog
+from zev import access
+from .models import Invoice, InvoiceItem, EmailLog, Payment
 from .description_utils import strip_period_suffix
 
 
@@ -28,6 +31,31 @@ class EmailLogSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
 
+class PaymentSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Payment
+        fields = ["id", "invoice", "amount_chf", "paid_on", "note", "source", "created_by_name", "created_at"]
+        read_only_fields = fields
+
+    def get_created_by_name(self, obj) -> str | None:
+        user = obj.created_by
+        if user is None:
+            return None
+        return user.get_full_name() or user.email
+
+
+class RecordPaymentSerializer(serializers.Serializer):
+    amount_chf = serializers.DecimalField(max_digits=10, decimal_places=2)
+    paid_on = serializers.DateField(required=False)
+    note = serializers.CharField(max_length=500, required=False, allow_blank=True, default="")
+
+
+class MarkPaidSerializer(serializers.Serializer):
+    paid_on = serializers.DateField(required=False)
+
+
 class InvoiceListSerializer(serializers.ModelSerializer):
     """Every invoice field except the nested ``items`` and ``email_logs``.
 
@@ -44,6 +72,8 @@ class InvoiceListSerializer(serializers.ModelSerializer):
     pdf_url = serializers.SerializerMethodField()
     last_email_status = serializers.SerializerMethodField()
     last_email_log_id = serializers.SerializerMethodField()
+    paid_chf = serializers.SerializerMethodField()
+    outstanding_chf = serializers.SerializerMethodField()
 
     class Meta:
         model = Invoice
@@ -76,8 +106,26 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             "zev",
             "participant",
             "sent_at",
+            "approved_at",
             "due_date",
         ]
+
+    def _paid(self, obj) -> Decimal:
+        # The list annotates the sum; detail reads prefetch the payments.
+        if "paid_sum" in obj.__dict__:
+            return obj.paid_sum or Decimal("0")
+        payments = getattr(obj, "_prefetched_objects_cache", {}).get("payments")
+        if payments is None:
+            payments = obj.payments.all()
+        return sum((p.amount_chf for p in payments), Decimal("0"))
+
+    def get_paid_chf(self, obj) -> str:
+        return f"{self._paid(obj):.2f}"
+
+    def get_outstanding_chf(self, obj) -> str:
+        if obj.status == "cancelled":
+            return "0.00"
+        return f"{obj.total_chf - self._paid(obj):.2f}"
 
     def get_pdf_url(self, obj) -> str | None:
         if obj.pdf_file:
@@ -136,6 +184,15 @@ class InvoiceSerializer(InvoiceListSerializer):
     items = InvoiceItemSerializer(many=True, read_only=True)
     email_logs = EmailLogSerializer(many=True, read_only=True)
     access_link = serializers.SerializerMethodField()
+    payments = serializers.SerializerMethodField()
+
+    def get_payments(self, obj) -> list[dict] | None:
+        """The payment history, for the ZEV's managers and viewers only; a
+        participant sees ``paid_chf``/``outstanding_chf`` but not the rows."""
+        request = self.context.get("request")
+        if request is None or not access.can_view(request.user, obj.zev_id):
+            return None
+        return PaymentSerializer(obj.payments.all(), many=True).data
 
     def get_access_link(self, obj) -> dict | None:
         """State of the access link printed on this invoice, or ``None``.

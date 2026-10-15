@@ -1,5 +1,6 @@
 import type { Invoice, InvoicePeriodParticipantRow } from '../../types/api'
 import { getLatestEmailLog } from './emailLogs'
+import { isPartlyPaid } from './invoiceStatus'
 
 /** Shared workflow state for progress, issues and filtering. */
 
@@ -51,7 +52,7 @@ export type InvoiceProgressStep = typeof INVOICE_PROGRESS_STEPS[number]
 /** `active` is work under way (an email queued); `issue` needs the operator. */
 export type InvoiceStepState = 'done' | 'open' | 'active' | 'issue'
 /** Why a step is `active` or `issue`: the problem, or the work under way. */
-export type InvoiceStepReason = InvoiceRowIssue | 'generating' | 'pdfPending' | 'sending' | 'noMeters'
+export type InvoiceStepReason = InvoiceRowIssue | 'generating' | 'pdfPending' | 'sending' | 'noMeters' | 'partlyPaid'
 export type InvoiceRowStep = { step: InvoiceProgressStep; state: InvoiceStepState; reason?: InvoiceStepReason }
 
 const STATUS_ORDER = ['draft', 'approved', 'sent', 'paid']
@@ -86,7 +87,8 @@ export function invoiceRowProgress(row: InvoicePeriodParticipantRow, work: Invoi
             : work.sending || (delivering && delivery === 'pending') ? { state: 'active', reason: 'sending' }
                 : issues.includes('noEmail') ? { state: 'issue', reason: 'noEmail' }
                     : { state: reached('sent') ? 'done' : 'open' },
-        paid: { state: reached('paid') ? 'done' : 'open' },
+        paid: isPartlyPaid(invoice) ? { state: 'active', reason: 'partlyPaid' }
+            : { state: reached('paid') ? 'done' : 'open' },
     }
     return INVOICE_PROGRESS_STEPS.map((step) => ({ step, ...steps[step] }))
 }

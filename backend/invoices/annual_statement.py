@@ -36,7 +36,7 @@ from .generated_chart_tokens import (
     _CHART_MUTED,
 )
 from .document_parties import issuer_context
-from .models import Invoice, InvoiceStatus, sent_to_participant
+from .models import billed_invoices, sent_to_participant
 from .pdf import _format_date_value, _render_template
 
 ANNUAL_STATEMENT_TEMPLATE = "invoices/annual_statement_pdf.html"
@@ -600,12 +600,7 @@ def generate_annual_statement_pdf(
     year_start = date(year, 1, 1)
     year_end = date(year, 12, 31)
 
-    year_invoices_qs = Invoice.objects.filter(
-        participant=participant,
-        zev=zev,
-        period_start__gte=year_start,
-        period_end__lte=year_end,
-    ).exclude(status=InvoiceStatus.CANCELLED)
+    year_invoices_qs = billed_invoices(zev, year_start, year_end, participant)
     if sent_only:
         year_invoices_qs = year_invoices_qs.filter(sent_to_participant())
     year_invoices = list(year_invoices_qs.prefetch_related("items").order_by("period_start"))

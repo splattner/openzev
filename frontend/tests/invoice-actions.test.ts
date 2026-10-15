@@ -45,4 +45,13 @@ describe('invoice action helpers', () => {
     expect(hasDeletePermission(cancelledInvoice, 'participant')).toBe(true)
     expect(hasDeletePermission(sentInvoice, 'admin')).toBe(true)
   })
+
+  it('keeps issued and paid invoices (#388)', () => {
+    const issuedCancelled = { status: 'cancelled', approved_at: '2026-02-01T08:00:00Z' } as Invoice
+    const paid = { status: 'paid', paid_chf: '42.00' } as Invoice
+
+    expect(hasDeletePermission(issuedCancelled, 'user')).toBe(false)
+    expect(hasDeletePermission(issuedCancelled, 'admin')).toBe(true)
+    expect(hasDeletePermission(paid, 'admin')).toBe(false)
+  })
 })

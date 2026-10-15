@@ -118,10 +118,16 @@ class ParticipantAnnualStatementSentOnlyTests(TestCase):
     def test_sent_only_leaves_out_unsent_invoices(self):
         self.assertEqual(self._rendered_invoice_numbers(sent_only=True), {self.sent.invoice_number})
 
-    def test_default_keeps_every_uncancelled_invoice(self):
+    def test_default_keeps_every_issued_invoice(self):
+        # The owner's statement counts what was billed (#388): approved and
+        # sent invoices, not the draft still being worked on.
+        approved = make_invoice(
+            self.zev, self.participant, inv_status=InvoiceStatus.APPROVED,
+            period=(date(2026, 3, 1), date(2026, 3, 31)),
+        )
         self.assertEqual(
             self._rendered_invoice_numbers(),
-            {self.draft.invoice_number, self.sent.invoice_number},
+            {approved.invoice_number, self.sent.invoice_number},
         )
 
     def test_participant_download_asks_for_sent_only(self):

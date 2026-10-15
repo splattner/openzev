@@ -1,7 +1,7 @@
 # Feature Spec: Payments, credit notes and corrections of paid invoices (#388)
 
 - Spec ID: SPEC-2026-10-payments-and-credits
-- Status: Draft
+- Status: In Progress (phase 1, payments and `approved_at`, implemented)
 - Scope: Major
 - Type: Feature
 - Owners: Sebastian Plattner
@@ -116,12 +116,17 @@ visible to the participant from creation, because a credit note is issued the mo
 
 Serializer additions: `approved_at`, `paid_chf` (sum of payments), `outstanding_chf` (amount due
 minus `paid_chf`. Before phase 3 the amount due is `total_chf`), and, on the detail serializer, a
-nested `payments` list. Phase 2 adds `credits` (credit notes whose source is this invoice). Phase 3
+nested `payments` list for callers with `zev.access.can_view` on the invoice's ZEV (`null` for a
+participant, who sees the two totals only). Phase 2 adds `credits` (credit notes whose source is this invoice). Phase 3
 adds `credit_applied_chf`, `amount_due_chf` and `credit_applications`. In the list serializer,
-`paid_chf` comes from a `Sum` annotation so the list query count doesn't grow.
+`paid_chf` comes from a `paid_sum` `Subquery` annotation so the list query count doesn't grow; detail
+reads and the period overview prefetch `payments`. `outstanding_chf` is `"0.00"` for a cancelled
+invoice.
 
-**Issued:** `approved_at IS NOT NULL`. A helper `issued()` returning a `models.Q`, next to
-`sent_to_participant()` in `invoices/models.py`.
+**Issued:** `invoices.models.issued()` returns
+`Q(approved_at__isnull=False) | Q(status__in=(approved, sent, paid))`, next to
+`sent_to_participant()`. The status clause covers rows written without the workflow (seed data,
+direct status writes), the same way `sent_to_participant()` covers a missing `sent_at`.
 
 ### 4.2 `Payment` (phase 1)
 
@@ -140,45 +145,58 @@ adds `credit_applied_chf`, `amount_due_chf` and `credit_applications`. In the li
 
 Ordering `["paid_on", "created_at", "id"]`. Check constraint `amount_chf <> 0`.
 
-**`record_payment(invoice, *, amount_chf, paid_on, note="", user) -> Payment`** in
-`invoices/workflow.py`. It runs under the same row lock as `_lock_and_transition`:
+The amount due is `total_chf` until phase 3 (`workflow.amount_due`); `workflow.paid_chf(pk)` sums
+the payments. Every function below locks the invoice row (`select_for_update`) and decides against
+its committed state, like `_lock_and_transition`. Each returns the `before` diff dict
+(`{"status": …}`), with the booked payment under `"payment"` where there is one.
 
-- The invoice must be `sent` or `paid`. The error messages are "Only sent invoices can receive
-  payments." and "Invoice is already fully paid." An approved invoice has to be marked sent first.
-  That keeps today's order (`sent → paid`) and avoids a new `approved → paid` transition.
-- `amount_chf` must not be zero and must have the sign of the amount due. When the amount due is
-  positive, `paid_chf + amount_chf` must not exceed it ("Payment exceeds the outstanding amount of
-  CHF {x}."). When the amount due is zero or negative (a producer payout), only one payment equal to
-  the amount due is accepted. That is the `mark-paid` path, and it keeps today's behaviour for
-  payouts.
-- When `paid_chf` then equals the amount due, the status moves `sent → paid`. Otherwise it stays
-  `sent`, and "partly paid" is shown from `paid_chf > 0`. There is no new status.
+**`record_payment(invoice, *, amount_chf, paid_on, note="", user=None)`**, in order:
 
-**`mark_invoice_paid(invoice, *, paid_on=None, user=None)`** keeps its endpoint and its result. It
-calls `record_payment` for the outstanding amount with `source="mark_paid"`. An invoice with an
-amount due of zero moves to `paid` without a payment row.
+- The invoice must be `sent`: "Invoice is already fully paid." for `paid`, "Only sent invoices can
+  receive payments." otherwise. An approved invoice has to be marked sent first. That keeps today's
+  order (`sent → paid`) and avoids a new `approved → paid` transition.
+- An amount due of zero or less (a producer payout) is refused: "This invoice has nothing to
+  collect. Mark it as paid instead." Payouts are settled in full through `mark_invoice_paid`.
+- `amount_chf > 0` ("The payment amount must be positive."), `paid_on` not after today ("The
+  payment date cannot be in the future."), and `amount_chf ≤ outstanding` ("The payment exceeds
+  the outstanding amount of CHF {x}.").
+- Creates a `manual` payment. When it covers the outstanding amount, the status moves
+  `sent → paid`. Otherwise it stays `sent`, and "partly paid" is shown from `paid_chf ≠ 0`. There is
+  no new status.
 
-**`delete_payment(payment, *, user)`** corrects a payment entered by mistake. It is refused when the
-invoice is `cancelled`, and from phase 2 also when a credit was derived from the invoice. When the
-invoice was `paid` and the sum now falls short of the amount due, the status moves back
-`paid → sent`. That is a new transition, reachable only here.
+**`mark_invoice_paid(invoice, *, paid_on=None, user=None)`** keeps its endpoint and response. The
+invoice must be `sent` ("Only sent invoices can be marked as paid."), `paid_on` defaults to today
+and must not be in the future. It books the outstanding amount (negative for a payout) as one
+`mark_paid` payment, or none when nothing is outstanding (a zero total), and moves to `paid`.
 
-**Backfill (data migration):** every invoice with `status = paid` gets one `Payment` with
-`amount_chf = total_chf` and `source = backfill`. `paid_on` is the date of the newest `AuditEvent`
-with `action_type = "invoice.mark_paid"` and `target_id = invoice.pk`, falling back to the civil
-date of `updated_at`. Invoices with a total of zero get no payment.
+**`delete_payment(payment)`** removes a payment entered by mistake. It is refused when the invoice is
+not `sent`/`paid` ("Payments of a cancelled invoice cannot be removed."), and from phase 2 also
+when a credit was derived from the invoice. When the invoice was `paid` and the rest no longer
+equals the amount due, the status moves back `paid → sent`. That is a new transition, reachable only
+here.
+
+**`cancel_invoice`** gets a `guard` (new optional argument of `_lock_and_transition`, evaluated
+under the row lock) that refuses an invoice with payments: "Invoices with recorded payments cannot
+be cancelled."
+
+**Backfill (migration `invoices/0023`):** every invoice with `status = paid` and a non-zero total
+gets one `Payment` with `amount_chf = total_chf` and `source = backfill`. `paid_on` is the Swiss
+civil date of the newest successful `AuditEvent` with `action_type = "invoice.mark_paid"` and
+`target_id = invoice.pk`, falling back to `updated_at`. The reverse migration is a no-op.
 
 ### 4.3 `approved_at` (phase 1)
 
-- Stamped with `timezone.now()` in `approve_invoice` (`extra_fields`) and in `approve_all`. Open PR
-  #1022 routes batch approval through the locked workflow. Whichever lands second makes sure both
-  paths stamp the field.
-- Backfill: for `status in (approved, sent, paid)`, use the newest `invoice.approve` audit event,
-  else `sent_at`, else `updated_at`. For `cancelled` with `sent_at` set, use `sent_at`, because the
-  invoice provably went out. Other cancelled invoices keep `NULL`. Whether they were approved before
-  cancellation can only be guessed from audit events, and they behave as they do today.
-- Transfer archive: added to `INVOICE_FIELDS` as an optional field (older archives import with
-  `NULL`). Backup: covered by the `Invoice` model dump.
+- Stamped with `timezone.now()` by `approve_invoice`, inside the locked `approval_fields` that also
+  freeze the party copy. `approve-all` approves each draft through `approve_invoice` (#1022), so
+  both paths stamp it.
+- Backfill (migration `invoices/0023`), for any status: the newest successful `invoice.approve`
+  audit event, else `sent_at`. Both prove the invoice was approved or went out, so a cancelled
+  invoice with either is issued too. An approved/sent/paid invoice with neither (approved through
+  `approve-all`, which audits per ZEV, not per invoice) takes `updated_at`. Any other invoice keeps
+  `NULL` and behaves as it does today.
+- Transfer archive: added to `INVOICE_FIELDS` as an optional field. An older archive's
+  approved/sent/paid invoice, or one with `sent_at`, imports with `approved_at = sent_at` or the
+  import time. Backup: covered by the `Invoice` model dump.
 
 ### 4.4 `Credit` (phase 2)
 
@@ -207,7 +225,7 @@ date of `updated_at`. Invoices with a total of zero get no payment.
 
 **Number sequence:** new `Zev.credit_note_prefix` (`CharField(10)`, default `"CN"`) and
 `Zev.credit_note_counter` (`PositiveIntegerField`, default `1`). `Zev.next_credit_note_number()`
-uses the same locked allocator as invoice numbers (open PR #1021). Both fields go into the ZEV
+uses the same locked allocator as invoice numbers (#1021). Both fields go into the ZEV
 settings serializer and the transfer archive (the counter is pushed past the imported credits, the
 same way `invoice_counter` is in `zev/transfer/importer.py`).
 
@@ -249,7 +267,7 @@ original is kept (§4.5).
 | Regeneration finds `approved`/`sent`/`paid` | blocked (409) | blocked (unchanged, `locked_overlapping_invoices`) |
 | Non-admin `DELETE` | draft or cancelled | draft or cancelled **and** `approved_at IS NULL` |
 | Admin `DELETE` | any | any invoice **without payments**, and from phase 2 without credits. An admin can still remove an issued invoice that never received money. |
-| `cancel` with payments | — | refused: "Invoices with recorded payments are corrected, not cancelled." |
+| `cancel` with payments | — | refused: "Invoices with recorded payments cannot be cancelled." (phase 2 points to `correct`) |
 
 `_discard_replaceable_invoices` filters on
 `status__in=[DRAFT, CANCELLED], approved_at__isnull=True`. `can_delete_invoice` gains the same
@@ -273,12 +291,13 @@ invoices:
 
 ### 4.6 One aggregation rule (phase 1)
 
-A new helper `billed_invoices(zev, participant, start, end)` in `invoices/models.py` returns the
-invoices that are issued, not `cancelled`, and inside the window. It is used by:
+A new helper `billed_invoices(zev, start, end, participant=None)` in `invoices/models.py` returns
+the invoices that are `issued()`, not `cancelled`, and inside the window, for one participant or
+the whole ZEV. It is used by:
 
 | Report | Today | New |
 |---|---|---|
-| `financial_summary.generate_financial_summary_pdf` | `status = paid` | `billed_invoices`. The paid amount is shown from `Payment` per invoice. |
+| `financial_summary.generate_financial_summary_pdf` | `status = paid` | `billed_invoices`. Issued but unpaid invoices now count too: the summary reports what was billed. |
 | `annual_statement` invoice table and totals | everything except `cancelled` (drafts included) | `billed_invoices` (the `sent_only` filter for participants stays) |
 | `annual_report` | everything except `cancelled` | `billed_invoices` |
 | `views_dashboard` `total_revenue` | `sent` + `paid` | unchanged in phase 1. Phase 3: `billed_invoices` minus adjustment credits. |
@@ -403,16 +422,30 @@ SPEC-2026-04. All text goes through i18n (de, fr, it, en).
 
 ### 7.1 Phase 1
 
-- **`frontend/src/features/invoices/RecordPaymentModal.tsx`** (new): amount (defaults to
-  `outstanding_chf`), date (defaults to today), note. Opened by the existing "Mark paid" action in
-  `useInvoiceActions.tsx`, which keeps one-click mark-paid as the dialog's primary button with the
-  full amount.
-- **`InvoiceDetailPage.tsx`**: a "Payments" card listing payments (date, amount, note, who), a
-  delete action per row for managers, and `paid_chf` / `outstanding_chf`.
-- **Status badge** (`invoiceStatus.ts`): `sent` with `paid_chf > 0` shows "Partly paid".
-- API client (`lib/api/invoices.ts`): `listPayments(invoiceId)`, `recordPayment(invoiceId, body)`,
-  `deletePayment(invoiceId, paymentId)`. `markInvoicePaid(invoiceId, paidOn?)`.
-- Query invalidation: invoice detail, invoice list, period overview, readiness.
+- **Billing period table** (`useInvoiceActions.tsx`): unchanged. "Mark paid" stays the one-click
+  primary action of a sent row and books the full outstanding amount.
+- **`frontend/src/features/invoices/InvoicePaymentsCard.tsx`** (new), on `InvoiceDetailPage.tsx`
+  for non-participants whenever the invoice carries `payments`. A `card` with a `card-header`:
+  "Payments" plus, for managers on a `sent` invoice, "Record payment" (only when
+  `total_chf > 0`) and "Mark paid" (labelled "Mark rest as paid" once payments exist). Below: the
+  summary "Received {paid} · outstanding {outstanding}" (or "· the invoice is cancelled"), and a
+  `data-table` of payments (paid on, amount, note or the source label, recorded by) with a
+  `ConfirmDialog`-guarded remove action per row for managers while the invoice isn't cancelled.
+  Hidden when there are no payments and nothing can be recorded. After any change the page writes
+  the returned invoice into `queryKeys.invoices.detail(id)` and invalidates the invoice lists,
+  `mine`, period overviews, readiness, readiness list and attention.
+- **`frontend/src/features/invoices/RecordPaymentModal.tsx`** (new): `FormModal` (480px) with amount
+  (defaults to `outstanding_chf`, validated `> 0` and `≤ outstanding` inline), paid on
+  (`CivilDateInput`, defaults to today, `maxDate` today) and an optional note, submitted through
+  `FormModalFooter`.
+- **Partly paid** (`invoiceStatus.ts` `isPartlyPaid`): a `sent` invoice with `paid_chf ≠ 0`.
+  `InvoiceStatusBadge` takes an optional `paidChf` and then reads "Partly paid" (detail page, admin
+  invoice list, My invoices, participant dashboard card). In the period table's progress
+  (`invoiceRowState.ts`), the paid step is `active` with reason `partlyPaid`.
+- API client (`lib/api/invoices.ts`): `recordPayment(invoiceId, body)`,
+  `deletePayment(invoiceId, paymentId)`, `markInvoicePaid(invoiceId, paidOn?)`.
+- i18n: `invoice.status.partlyPaid`, `pages.invoices.progress.reasons.partlyPaid`,
+  `pages.invoiceDetail.payments.*` in de, fr, it, en.
 
 ```typescript
 export interface Payment {
@@ -429,7 +462,7 @@ export interface Payment {
 //   approved_at?: string | null
 //   paid_chf?: string
 //   outstanding_chf?: string
-//   payments?: Payment[]            // detail only
+//   payments?: Payment[] | null     // detail only; null for a participant
 ```
 
 ### 7.2 Phase 2
@@ -462,37 +495,58 @@ export interface Payment {
 | VAT on a credit for a VAT-registered ZEV that has already filed the quarter | Medium | The credit note carries the original `vat_rate` and VAT amount. The user guide explains booking it in the current period. No automation. |
 | Correcting payouts (`total_chf <= 0`) is still impossible | Medium | Refused with a clear error. Out of scope, named in ADR 0037. |
 | Deleting a participant still cascades their issued invoices | Medium | Pre-existing. Separate issue (§2). |
-| Overlap with open PRs #1021 (numbering) and #1022 (approval) | Low | Phase 1 rebases on whichever has merged. The credit sequence reuses #1021's allocator. |
+| Overlap with #1021 (numbering) and #1022 (approval) | Low | Both merged before phase 1; it builds on them. The credit sequence reuses #1021's allocator. |
 
 ## 9. Test plan
 
-Test names are the intended set. Counts are filled in when each phase lands.
+Phases 2 and 3 list the intended tests; their names and counts are filled in when they land.
 
-### Phase 1 — `invoices/test_payments.py` (new), `invoices/test_workflow.py`
+### Phase 1 — `invoices/test_payments.py` (31 tests)
 
-| Test | Asserts |
-|---|---|
-| `test_record_partial_payment_keeps_invoice_sent` | `paid_chf` = amount, status `sent` |
-| `test_payments_covering_total_mark_invoice_paid` | Second payment moves it to `paid` |
-| `test_payment_above_outstanding_is_refused` | `400`, no row |
-| `test_payment_on_approved_or_draft_is_refused` | Guard |
-| `test_mark_paid_records_full_payment` | One `mark_paid` payment equal to the outstanding amount |
-| `test_mark_paid_on_payout_invoice_records_negative_payment` | `total_chf < 0` keeps working |
-| `test_mark_paid_zero_total_has_no_payment` | Status `paid`, no row |
-| `test_delete_payment_reverts_paid_to_sent` | New transition |
-| `test_cancel_refuses_invoice_with_payments` | `400` |
-| `test_viewer_cannot_record_payment` / `test_participant_cannot_list_payments` | Scope |
-| `test_disabled_zev_refuses_payment_for_non_admin` | `_deny_if_zev_disabled` |
-| `test_payment_audit_events` | `invoice.payment_record` / `payment_delete` |
-| `test_approve_stamps_approved_at` / `test_approve_all_stamps_approved_at` | Both paths |
-| `test_regeneration_keeps_issued_cancelled_invoice` | Retained, new draft next to it |
-| `test_regeneration_deletes_never_issued_cancelled_invoice` | Unchanged behaviour |
-| `test_owner_cannot_delete_issued_cancelled_invoice` / `test_admin_cannot_delete_invoice_with_payments` | Deletion rules |
-| `test_period_overview_prefers_replacement_over_cancelled_original` | §4.5 |
-| `test_readiness_ignores_retained_cancelled_invoice` | §4.5 |
-| `test_backfill_creates_payment_per_paid_invoice` / `test_backfill_sets_approved_at` | Migration (migrator test) |
-| `test_reports_use_billed_invoices` (annual statement, annual report, financial summary) | Drafts excluded, cancelled excluded, issued included |
-| `test_transfer_roundtrip_keeps_payments_and_approved_at` | Archive |
+**`PaymentWorkflowTests`** (10): `test_record_partial_payment_keeps_invoice_sent`,
+`test_payments_covering_total_mark_invoice_paid`, `test_payment_above_outstanding_is_refused`,
+`test_payment_on_approved_or_draft_is_refused` (draft, approved, cancelled),
+`test_payment_in_the_future_or_not_positive_is_refused`,
+`test_mark_paid_records_the_outstanding_amount` (rest after a partial payment, dated, `mark_paid`),
+`test_mark_paid_on_payout_invoice_records_negative_payment` (and `record_payment` refuses it),
+`test_mark_paid_zero_total_has_no_payment`, `test_delete_payment_reverts_paid_to_sent`,
+`test_approve_stamps_approved_at`.
+
+**`PaymentApiTests`** (12): `test_record_payment_returns_updated_invoice` (`201`, `paid_chf`,
+`outstanding_chf`, nested payments), `test_record_payment_above_outstanding_returns_400`,
+`test_mark_paid_accepts_a_date` (and audit metadata), `test_list_shows_paid_and_outstanding`
+(annotation), `test_remove_payment` (status back to `sent`, audit), `test_remove_unknown_payment_returns_404`,
+`test_payment_audit_event`, `test_cancel_refuses_invoice_with_payments`,
+`test_viewer_cannot_record_payment` (reads, cannot write),
+`test_participant_sees_totals_but_not_payment_rows` (`payments` null, list `403`),
+`test_disabled_zev_refuses_payment_for_non_admin`, `test_approve_all_stamps_approved_at`.
+
+**`RetentionTests`** (7): `test_regeneration_keeps_issued_cancelled_invoice`,
+`test_regeneration_deletes_never_issued_cancelled_invoice`,
+`test_owner_cannot_delete_issued_cancelled_invoice`,
+`test_owner_can_delete_never_issued_cancelled_invoice`,
+`test_admin_cannot_delete_invoice_with_payments`,
+`test_period_overview_prefers_replacement_over_cancelled_original`,
+`test_readiness_ignores_retained_cancelled_invoice`.
+
+**`BillingRuleTests`** (1): `test_billed_invoices_excludes_drafts_and_cancelled`.
+
+**`BackfillMigrationTests`** (1): `test_backfill_payments_and_approved_at` (payment amount, audit-dated
+`paid_on` across midnight UTC, none for a zero total, `approved_at` from `sent_at` for paid and
+sent-then-cancelled, `NULL` for draft and never-sent cancelled).
+
+Also changed: `test_participant_invoice_visibility.py::ParticipantAnnualStatementSentOnlyTests::test_default_keeps_every_issued_invoice`
+(was `test_default_keeps_every_uncancelled_invoice`: the draft no longer counts).
+`zev/test_transfer.py`: `RoundTripTests::test_payments_and_approval_round_trip`,
+`RoundTripTests::test_an_archive_from_before_payments_settles_its_paid_invoices`, and
+`SchemaParityTests` covers `PAYMENT_FIELDS`.
+
+### Phase 1 — frontend, `frontend/tests/invoice-payments.test.ts` (6 tests)
+
+`isPartlyPaid`; the paid progress step (`open` → `active`/`partlyPaid` → `done`); the payments card
+lists payments with the summary and "Mark rest as paid"; recording a payment through the dialog
+(defaults to the outstanding amount, calls `recordPayment`, reports the new invoice); a payout
+offers only mark-paid; a viewer with no payments sees no card.
 
 ### Phase 2 — `invoices/test_credits.py` (new)
 

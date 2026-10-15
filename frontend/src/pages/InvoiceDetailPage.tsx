@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { PageSkeleton } from '../components/PageSkeleton'
@@ -15,6 +15,8 @@ import { useAuth } from '../lib/auth'
 import { scopeNoteKey, shellRoleForZev } from '../lib/communityAccess'
 import { PdfPreview } from '../components/PdfPreview'
 import { InvoiceAccessLinkCard } from '../features/invoices/InvoiceAccessLinkCard'
+import { InvoicePaymentsCard } from '../features/invoices/InvoicePaymentsCard'
+import type { Invoice } from '../types/api'
 
 import { usePdfObjectUrl } from '../lib/usePdfObjectUrl'
 import { PageHeader } from '../components/PageHeader'
@@ -29,6 +31,7 @@ export function InvoiceDetailPage() {
     const location = useLocation()
     const { invoiceId } = useParams<{ invoiceId: string }>()
     const { settings } = useAppSettings()
+    const queryClient = useQueryClient()
     // Participants reach this page for their own invoices; revoking is a
     // management control and must not be offered to the person holding the QR.
     // Decided by the invoice's own community, which need not be the selected
@@ -96,6 +99,17 @@ export function InvoiceDetailPage() {
         ? t('common.back')
         : t('pages.invoiceDetail.backToInvoices')
 
+    // A payment changes the status and totals every invoice list shows.
+    const handleInvoiceChanged = (updated: Invoice) => {
+        queryClient.setQueryData(queryKeys.invoices.detail(updated.id), updated)
+        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.lists() })
+        void queryClient.invalidateQueries({ queryKey: ['invoices', 'period-overview'] })
+        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.mine() })
+        for (const key of ['readiness', 'readiness-list', 'attention']) {
+            void queryClient.invalidateQueries({ queryKey: ['invoices', key] })
+        }
+    }
+
     const handleGeneratePdf = async () => {
         if (!invoiceId) return
         setGenerating(true)
@@ -121,7 +135,7 @@ export function InvoiceDetailPage() {
                     // The document's own header: status pill, recipient, period.
                     <span className="invoice-detail-meta">
                         <span className="visually-hidden">{t('pages.invoiceDetail.status')}: </span>
-                        <InvoiceStatusBadge status={inv.status} />
+                        <InvoiceStatusBadge status={inv.status} paidChf={inv.paid_chf} />
                         <span>{`${inv.participant_name} · ${formatShortDate(inv.period_start, settings)} → ${formatShortDate(inv.period_end, settings)}`}</span>
                     </span>
                 }
@@ -145,6 +159,11 @@ export function InvoiceDetailPage() {
                     <StatCard label={t('pages.invoiceDetail.feedIn')} value={formatKwh(Number(inv.total_feed_in_kwh ?? 0))} unit="kWh" />
                 </section>
             </div>
+
+            {/* `payments` is null for a participant, who sees the totals only. */}
+            {!isParticipant && inv.payments != null && (
+                <InvoicePaymentsCard invoice={inv} canManage={canManageAccessLink} onChanged={handleInvoiceChanged} />
+            )}
 
             {canManageAccessLink && inv.access_link != null && (
                 <InvoiceAccessLinkCard

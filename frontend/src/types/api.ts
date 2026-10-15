@@ -1131,6 +1131,14 @@ export interface Invoice {
     local_sale_feed_in_chf?: string | null
     status: string
     sent_at?: string | null
+    /** Stamped on approval and never cleared: an issued invoice is never deleted (ADR 0037). */
+    approved_at?: string | null
+    /** Sum of the recorded payments. */
+    paid_chf?: string
+    /** What is still owed; `0.00` for a cancelled invoice. */
+    outstanding_chf?: string
+    /** Detail reads for the ZEV's managers and viewers; null for a participant. */
+    payments?: Payment[] | null
     pdf_url?: string | null
     /**
      * Where the document is, as distinct from the invoice's own `status`.
@@ -1149,6 +1157,18 @@ export interface Invoice {
      * The retry endpoint is log-scoped, so the email-delivery tab needs the
      * log id to offer an inline retry off the list payload. */
     last_email_log_id?: string | null
+}
+
+/** Money received for an invoice (#388). */
+export interface Payment {
+    id: string
+    invoice: string
+    amount_chf: string
+    paid_on: string
+    note: string
+    source: 'manual' | 'mark_paid' | 'backfill'
+    created_by_name: string | null
+    created_at: string
 }
 
 /**

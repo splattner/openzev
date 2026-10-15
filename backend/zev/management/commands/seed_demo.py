@@ -19,6 +19,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Q, Sum
+from django.utils import timezone as djtimezone
 
 from accounts.models import FeatureFlag, VatRate
 from allocation.validity import active_during, business_tz, civil_date, period_start_dt, period_window, wall_clock
@@ -32,6 +33,7 @@ from invoices.models import (
     EmailLog,
     Invoice,
     InvoiceStatus,
+    Payment,
 )
 from invoices.pdf import save_invoice_pdf
 from metering.models import ImportLog, ImportSource, MeterReading, ReadingDirection, ReadingResolution
@@ -2181,26 +2183,53 @@ class Command(BaseCommand):
             )
         invoices.sort(key=lambda invoice: invoice.invoice_number)
 
+        issued_at = period_start_dt(period_end)
         if closed:
-            for invoice in invoices:
-                invoice.status = InvoiceStatus.PAID
-                invoice.sent_at = period_start_dt(period_end)
-                invoice.save(update_fields=["status", "sent_at"])
+            for invoice in invoices[:-1] if len(invoices) > 1 else invoices:
+                self._settle_invoice(invoice, issued_at)
             if len(invoices) > 1:
                 invoices[-1].status = InvoiceStatus.CANCELLED
-                invoices[-1].save(update_fields=["status"])
+                invoices[-1].approved_at = issued_at
+                invoices[-1].sent_at = issued_at
+                invoices[-1].save(update_fields=["status", "approved_at", "sent_at"])
             return invoices
 
-        # First stays DRAFT; the rest advance so the list shows a realistic mix.
+        # First stays DRAFT; the rest advance so the list shows a realistic mix,
+        # the fourth sent and partly paid.
         if len(invoices) > 1:
             invoices[1].status = InvoiceStatus.APPROVED
-            invoices[1].save(update_fields=["status"])
-        if len(invoices) > 2:
-            invoices[2].status = InvoiceStatus.SENT
-            invoices[2].sent_at = period_start_dt(period_end)
-            invoices[2].save(update_fields=["status", "sent_at"])
+            invoices[1].approved_at = issued_at
+            invoices[1].save(update_fields=["status", "approved_at"])
+        for invoice in invoices[2:4]:
+            invoice.status = InvoiceStatus.SENT
+            invoice.approved_at = issued_at
+            invoice.sent_at = issued_at
+            invoice.save(update_fields=["status", "approved_at", "sent_at"])
+        if len(invoices) > 3 and invoices[3].total_chf > 1:
+            Payment.objects.create(
+                invoice=invoices[3],
+                amount_chf=(invoices[3].total_chf / 2).quantize(Decimal("0.01")),
+                paid_on=min(invoices[3].period_end + timedelta(days=10), djtimezone.localdate()),
+                note="Teilzahlung",
+            )
 
         return invoices
+
+    @staticmethod
+    def _settle_invoice(invoice: Invoice, issued_at) -> None:
+        """Mark ``invoice`` approved, sent and paid in full on ``issued_at``,
+        with the payment that a paid invoice carries (#388)."""
+        invoice.status = InvoiceStatus.PAID
+        invoice.approved_at = issued_at
+        invoice.sent_at = issued_at
+        invoice.save(update_fields=["status", "approved_at", "sent_at"])
+        if invoice.total_chf:
+            Payment.objects.create(
+                invoice=invoice,
+                amount_chf=invoice.total_chf,
+                paid_on=min(invoice.period_end + timedelta(days=20), djtimezone.localdate()),
+                source=Payment.Source.MARK_PAID,
+            )
 
     def _seed_paid_year_invoices(
         self,
@@ -2213,8 +2242,8 @@ class Command(BaseCommand):
 
         One run per quarter of ``year`` (the flagship bills quarterly), every
         invoice paid as if long collected — the reports page defaults to the
-        previous calendar year, and its financial summary reads paid invoices
-        only, so draft/sent rows would leave it empty. A quarter overlapping
+        previous calendar year, and its financial summary reads issued invoices
+        only, so draft rows would leave it empty. A quarter overlapping
         ``skip_period`` (the flagship's open period, seeded separately in
         draft/approved/sent) is left alone, and quarters without readings are
         skipped rather than billed against nothing.
@@ -2242,9 +2271,7 @@ class Command(BaseCommand):
                     f"participant(s): {failures}"
                 )
             for invoice in invoices:
-                invoice.status = InvoiceStatus.PAID
-                invoice.sent_at = period_start_dt(period_end)
-                invoice.save(update_fields=["status", "sent_at"])
+                self._settle_invoice(invoice, period_start_dt(period_end))
             seeded.extend(invoices)
         return seeded
 

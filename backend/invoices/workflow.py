@@ -9,11 +9,17 @@ inline.
 State machine::
 
     draft ──approve──▶ approved ──mark_sent──▶ sent ──mark_paid──▶ paid
-      │                   │                      │
-      └───────cancel──────┴──────────cancel──────┘        (paid is final)
+      │                   │                      │  ◀─delete_payment─┘
+      └───────cancel──────┴──────────cancel──────┘
 
-    cancelled is terminal (but draft/cancelled invoices may be regenerated
-    by the engine).
+    cancelled is terminal. A draft or cancelled invoice that was never
+    approved may be replaced by the engine; one that was approved is kept for
+    good (``approved_at``, ADR 0037).
+
+Payments (#388): ``record_payment`` books money received against a sent
+invoice and moves it to ``paid`` once the amount due is covered;
+``mark_invoice_paid`` books the outstanding amount in one go. An invoice with
+payments is never cancelled or deleted directly.
 
 Concurrency (#572): every transition below checks and writes the row's
 *current* database state inside one locked transaction (``SELECT ... FOR
@@ -31,10 +37,13 @@ lock is acquired *after* the slow part (SMTP delivery) has already
 completed in the caller, not held across it.
 """
 
+from decimal import Decimal
+
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 
-from .models import Invoice, InvoicePdfStatus, InvoiceStatus
+from .models import Invoice, InvoicePdfStatus, InvoiceStatus, Payment
 
 
 class InvoiceWorkflowError(Exception):
@@ -51,7 +60,7 @@ class InvoiceWorkflowError(Exception):
         self.user_message: str = message
 
 
-def _lock_and_transition(invoice, *, allowed_from, to_status, invalid_message, extra_fields=None):
+def _lock_and_transition(invoice, *, allowed_from, to_status, invalid_message, extra_fields=None, guard=None):
     """Validate and apply a status transition against the row's committed
     state, then mirror the result onto the caller's ``invoice`` instance.
 
@@ -59,7 +68,8 @@ def _lock_and_transition(invoice, *, allowed_from, to_status, invalid_message, e
     refused unless the row's *current* status (re-read under a row lock, not
     whatever ``invoice.status`` held when it was loaded) is one of them.
     ``invalid_message`` is called with that current status to build the
-    ``InvoiceWorkflowError`` message when the guard fails.
+    ``InvoiceWorkflowError`` message when the guard fails. ``guard``, if given,
+    is called with the locked row and returns a refusal message or ``None``.
     A callable ``extra_fields`` builds its values from the locked row.
 
     On success, the written fields are copied back onto ``invoice`` so the
@@ -78,6 +88,9 @@ def _lock_and_transition(invoice, *, allowed_from, to_status, invalid_message, e
         if locked.status not in allowed:
             invoice.status = locked.status
             raise InvoiceWorkflowError(invalid_message(locked.status))
+        refusal = guard(locked) if guard else None
+        if refusal:
+            raise InvoiceWorkflowError(refusal)
 
         if callable(extra_fields):
             extra_fields = extra_fields(locked)
@@ -113,7 +126,11 @@ def approve_invoice(invoice: Invoice) -> dict:
             storage = locked.pdf_file.storage
             stored_name = locked.pdf_file.name
             transaction.on_commit(lambda: delete_stored_pdf(storage, stored_name))
-        return {**fields, "pdf_file": "", "pdf_status": InvoicePdfStatus.NONE}
+        return {
+            **fields, "pdf_file": "", "pdf_status": InvoicePdfStatus.NONE,
+            # Never cleared: from here on the invoice is issued (ADR 0037).
+            "approved_at": timezone.now(),
+        }
 
     return _lock_and_transition(
         invoice,
@@ -135,18 +152,121 @@ def mark_invoice_sent(invoice: Invoice) -> dict:
     )
 
 
-def mark_invoice_paid(invoice: Invoice) -> dict:
-    """Transition sent → paid. Returns the ``before`` diff dict."""
-    return _lock_and_transition(
-        invoice,
-        allowed_from=InvoiceStatus.SENT,
-        to_status=InvoiceStatus.PAID,
-        invalid_message=lambda _current: "Only sent invoices can be marked as paid.",
-    )
+def paid_chf(invoice_pk) -> Decimal:
+    """Sum of the payments recorded for an invoice."""
+    return Payment.objects.filter(invoice_id=invoice_pk).aggregate(
+        total=Sum("amount_chf")
+    )["total"] or Decimal("0")
+
+
+def amount_due(invoice: Invoice) -> Decimal:
+    """What the invoice asks the participant to pay. Negative for a producer
+    payout."""
+    return invoice.total_chf
+
+
+def _mirror_status(invoice: Invoice, locked: Invoice) -> None:
+    invoice.status = locked.status
+    invoice.updated_at = locked.updated_at
+
+
+def record_payment(invoice: Invoice, *, amount_chf: Decimal, paid_on, note: str = "", user=None) -> dict:
+    """Book a payment against a sent invoice. Returns the ``before`` diff dict
+    with the new ``payment`` under its own key.
+
+    A positive amount due takes partial payments up to the outstanding amount;
+    a payout (amount due ≤ 0) is only settled in full, through
+    :func:`mark_invoice_paid`. The invoice turns ``paid`` once the payments
+    cover the amount due.
+    """
+    with transaction.atomic():
+        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if locked.status != InvoiceStatus.SENT:
+            _mirror_status(invoice, locked)
+            raise InvoiceWorkflowError(
+                "Invoice is already fully paid." if locked.status == InvoiceStatus.PAID
+                else "Only sent invoices can receive payments."
+            )
+        due = amount_due(locked)
+        if due <= 0:
+            raise InvoiceWorkflowError("This invoice has nothing to collect. Mark it as paid instead.")
+        if amount_chf <= 0:
+            raise InvoiceWorkflowError("The payment amount must be positive.")
+        if paid_on > timezone.localdate():
+            raise InvoiceWorkflowError("The payment date cannot be in the future.")
+        outstanding = due - paid_chf(locked.pk)
+        if amount_chf > outstanding:
+            raise InvoiceWorkflowError(f"The payment exceeds the outstanding amount of CHF {outstanding:.2f}.")
+
+        payment = Payment.objects.create(
+            invoice=locked, amount_chf=amount_chf, paid_on=paid_on, note=note,
+            source=Payment.Source.MANUAL, created_by=user,
+        )
+        before_status = locked.status
+        if amount_chf == outstanding:
+            locked.status = InvoiceStatus.PAID
+        locked.updated_at = timezone.now()
+        locked.save(update_fields=["status", "updated_at"])
+
+    _mirror_status(invoice, locked)
+    return {"status": before_status, "payment": payment}
+
+
+def mark_invoice_paid(invoice: Invoice, *, paid_on=None, user=None) -> dict:
+    """Transition sent → paid, booking the outstanding amount as one payment.
+
+    Returns the ``before`` diff dict with the payment (``None`` when nothing
+    was outstanding, e.g. a zero total) under ``payment``.
+    """
+    paid_on = paid_on or timezone.localdate()
+    with transaction.atomic():
+        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if locked.status != InvoiceStatus.SENT:
+            _mirror_status(invoice, locked)
+            raise InvoiceWorkflowError("Only sent invoices can be marked as paid.")
+        if paid_on > timezone.localdate():
+            raise InvoiceWorkflowError("The payment date cannot be in the future.")
+        outstanding = amount_due(locked) - paid_chf(locked.pk)
+        payment = None
+        if outstanding != 0:
+            payment = Payment.objects.create(
+                invoice=locked, amount_chf=outstanding, paid_on=paid_on,
+                source=Payment.Source.MARK_PAID, created_by=user,
+            )
+        before_status = locked.status
+        locked.status = InvoiceStatus.PAID
+        locked.updated_at = timezone.now()
+        locked.save(update_fields=["status", "updated_at"])
+
+    _mirror_status(invoice, locked)
+    return {"status": before_status, "payment": payment}
+
+
+def delete_payment(payment: Payment) -> dict:
+    """Remove a payment entered by mistake. Returns the ``before`` diff dict.
+
+    A paid invoice whose payments no longer cover the amount due goes back to
+    ``sent`` — the only way out of ``paid`` besides a correction.
+    """
+    with transaction.atomic():
+        locked = Invoice.objects.select_for_update().get(pk=payment.invoice_id)
+        if locked.status not in (InvoiceStatus.SENT, InvoiceStatus.PAID):
+            raise InvoiceWorkflowError("Payments of a cancelled invoice cannot be removed.")
+        before_status = locked.status
+        Payment.objects.filter(pk=payment.pk).delete()
+        if locked.status == InvoiceStatus.PAID and paid_chf(locked.pk) != amount_due(locked):
+            locked.status = InvoiceStatus.SENT
+        locked.updated_at = timezone.now()
+        locked.save(update_fields=["status", "updated_at"])
+
+    payment.invoice.status = locked.status
+    payment.invoice.updated_at = locked.updated_at
+    return {"status": before_status}
 
 
 def cancel_invoice(invoice: Invoice) -> dict:
-    """Cancel a not-yet-paid invoice. Returns the ``before`` diff dict."""
+    """Cancel a not-yet-paid invoice without payments. Returns the ``before``
+    diff dict."""
     return _lock_and_transition(
         invoice,
         allowed_from={InvoiceStatus.DRAFT, InvoiceStatus.APPROVED, InvoiceStatus.SENT},
@@ -154,6 +274,10 @@ def cancel_invoice(invoice: Invoice) -> dict:
         invalid_message=lambda current: (
             "Invoice is already cancelled." if current == InvoiceStatus.CANCELLED
             else "Paid invoices cannot be cancelled."
+        ),
+        guard=lambda locked: (
+            "Invoices with recorded payments cannot be cancelled."
+            if Payment.objects.filter(invoice_id=locked.pk).exists() else None
         ),
     )
 
@@ -190,5 +314,9 @@ def record_email_delivery(invoice: Invoice, sent_at) -> str:
 
 
 def can_delete_invoice(invoice: Invoice) -> bool:
-    """Non-admins may only delete draft or cancelled invoices."""
-    return invoice.status in (InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED)
+    """Non-admins may only delete draft or cancelled invoices that were never
+    approved: an issued invoice keeps its number for good (ADR 0037)."""
+    return (
+        invoice.status in (InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED)
+        and invoice.approved_at is None
+    )

@@ -78,7 +78,7 @@ export function MyInvoicesPage() {
                                         </td>
                                         <td className="numeric"><InvoiceAmount value={invoice.total_chf} /></td>
                                         <td>
-                                            <InvoiceStatusBadge status={invoice.status} />
+                                            <InvoiceStatusBadge status={invoice.status} paidChf={invoice.paid_chf} />
                                         </td>
                                         <td>
                                             <InvoiceRowActions>

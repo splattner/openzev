@@ -489,7 +489,7 @@ The engine runs **inside a single database transaction**.
 ### 4.0 Guard rails
 
 1. If a non-draft, non-cancelled invoice exists for the same participant + period → **raise `ValueError`** (do not overwrite).
-2. Delete any existing `draft` or `cancelled` invoice for the same participant + period.
+2. Delete any existing `draft` or `cancelled` invoice for the same participant + period that was never approved (`approved_at` null). A cancelled invoice that was approved stays, with its number, next to the new one (ADR 0037, `_discard_replaceable_invoices`).
 
 ### 4.1 Collect metering points
 

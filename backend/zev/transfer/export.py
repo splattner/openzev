@@ -32,6 +32,7 @@ from .schema import (
     FORMAT_VERSION,
     INVOICE_FIELDS,
     INVOICE_ITEM_FIELDS,
+    PAYMENT_FIELDS,
     INVOICE_PDFS_DIR,
     MANIFEST_NAME,
     BUILDING_FIELDS,
@@ -219,6 +220,7 @@ def _export_invoices(zev):
                 {"id": str(item.id), **_fields(item, INVOICE_ITEM_FIELDS)}
                 for item in invoice.items.all()
             ],
+            "payments": [_fields(payment, PAYMENT_FIELDS) for payment in invoice.payments.all()],
             "dynamic_evidence": [
                 {
                     "dynamic_source": _fields(evidence.source, DYNAMIC_SOURCE_FIELDS),
@@ -233,7 +235,7 @@ def _export_invoices(zev):
         # the data and would dominate the archive size. See the issue's note —
         # a regenerated PDF uses today's template, so this is not the right
         # answer if original documents have to be retained.
-        for invoice in Invoice.objects.filter(zev=zev).prefetch_related("items", "dynamic_evidence__source").order_by("period_start", "invoice_number")
+        for invoice in Invoice.objects.filter(zev=zev).prefetch_related("items", "payments", "dynamic_evidence__source").order_by("period_start", "invoice_number")
     ]
 
 

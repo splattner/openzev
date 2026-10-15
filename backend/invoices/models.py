@@ -30,6 +30,33 @@ def sent_to_participant() -> models.Q:
     )
 
 
+def issued() -> models.Q:
+    """Invoices that were ever approved (ADR 0037).
+
+    ``approved_at`` is stamped on approval and never cleared, so it survives a
+    later cancellation: an issued invoice may have left OpenZEV (its PDF can be
+    downloaded from approval on) and is never deleted by regeneration. The
+    status clause covers an approved/sent/paid row whose ``approved_at`` was
+    never stamped, as ``sent_to_participant`` does for ``sent_at``.
+    """
+    return models.Q(approved_at__isnull=False) | models.Q(
+        status__in=(InvoiceStatus.APPROVED, InvoiceStatus.SENT, InvoiceStatus.PAID)
+    )
+
+
+def billed_invoices(zev, start, end, participant=None):
+    """The invoices a report counts as billed in a window: issued and not
+    cancelled, for one participant or (``None``) the whole ZEV. The one rule
+    shared by the financial summary, the annual statement and the annual
+    report, so they agree on a participant's year."""
+    invoices = Invoice.objects.filter(
+        issued(), zev=zev, period_start__gte=start, period_end__lte=end,
+    ).exclude(status=InvoiceStatus.CANCELLED)
+    if participant is not None:
+        invoices = invoices.filter(participant=participant)
+    return invoices
+
+
 class InvoicePdfStatus(models.TextChoices):
     """Where the invoice's document is, as distinct from the invoice's own status.
 
@@ -101,6 +128,9 @@ class Invoice(models.Model):
         default=InvoicePdfStatus.NONE,
     )
     sent_at = models.DateTimeField(null=True, blank=True)
+    # Stamped on approval and never cleared, not even on cancellation: from
+    # here on the invoice counts as issued and is never deleted (ADR 0037).
+    approved_at = models.DateTimeField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
     # Who the invoice is from and to, copied like the amounts are: refreshed
@@ -123,6 +153,45 @@ class Invoice(models.Model):
 
     def __str__(self):
         return f"Invoice {self.invoice_number} - {self.participant.full_name} ({self.period_start} – {self.period_end})"
+
+
+class Payment(models.Model):
+    """Money received for an invoice (#388).
+
+    The invoice is ``paid`` once its payments cover the amount due; a payment
+    short of that leaves it ``sent`` and partly paid. ``amount_chf`` carries
+    the sign of the invoice: a producer payout (negative total) is paid with
+    one negative payment.
+    """
+
+    class Source(models.TextChoices):
+        MANUAL = "manual", "Recorded payment"
+        MARK_PAID = "mark_paid", "Marked as paid"
+        BACKFILL = "backfill", "Backfilled"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # CASCADE so the ZEV purge still works; the API refuses to delete or
+    # cancel an invoice that has payments.
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="payments")
+    amount_chf = models.DecimalField(max_digits=10, decimal_places=2)
+    paid_on = models.DateField()
+    note = models.CharField(max_length=500, blank=True)
+    source = models.CharField(max_length=20, choices=Source.choices, default=Source.MANUAL)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["paid_on", "created_at", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(amount_chf=0), name="payment_amount_not_zero"
+            ),
+        ]
+
+    def __str__(self):
+        return f"Payment {self.amount_chf} CHF on {self.paid_on} for {self.invoice_id}"
 
 
 class InvoiceDynamicSourceEvidence(models.Model):
