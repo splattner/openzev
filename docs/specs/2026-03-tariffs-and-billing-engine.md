@@ -1384,6 +1384,8 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 
 - Invoice generation may be triggered asynchronously for heavy periods (via Celery).
 - The engine runs inside `@transaction.atomic`; partial failures roll back cleanly.
+- `Zev.next_invoice_number()` allocates transactionally; a failed invoice returns
+  its number (see the [numbering contract](2026-03-admin-governance-and-settings.md#43-zev-governance-fields)).
 - Re-runs / regeneration must honor locking rules (§4.0).
 
 ---
@@ -1420,6 +1422,7 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 | `fixed_price_chf` entered per-participant on a shared fee | Medium | Field label and form hint state "total for the community"; §3.4 and §4.6.3 call out the changed meaning |
 | Shared fee over- or under-recovering after a membership change | Medium | Denominator and charged months both evaluated per month (§4.6.3); reconciliation asserted across a full ZEV run |
 | A dynamic tariff's fetched series has a gap inside a billed period | High — would otherwise bill zero for a real reading | Engine refuses to generate rather than degrade (§4.4.3); readiness flags the gap before generation is attempted (`2026-09-dynamic-tariffs.md` §9.3) |
+| Concurrent generation for one participant and period | High — duplicate invoices with distinct numbers | Known gap: overlap checks precede number allocation and are not serialized. Follow-up: coordinate generation per participant/period; numbering locks alone do not make generation idempotent. |
 
 ---
 

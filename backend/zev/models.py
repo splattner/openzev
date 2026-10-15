@@ -224,17 +224,23 @@ class Zev(models.Model):
                  "Clear it, or set the VAT mode to registered."}
             )
 
-    def next_invoice_number(self):
-        num = f"{self.invoice_prefix}-{self.invoice_counter:05d}"
-        Zev.objects.filter(pk=self.pk).update(invoice_counter=models.F("invoice_counter") + 1)
-        self.refresh_from_db()
+    def next_invoice_number(self) -> str:
+        """Allocate from the persisted prefix/counter under a row lock.
+
+        Rolls back with any surrounding transaction.
+        """
+        with transaction.atomic():
+            locked = Zev.objects.select_for_update(no_key=True).get(pk=self.pk)
+            num = f"{locked.invoice_prefix}-{locked.invoice_counter:05d}"
+            Zev.objects.filter(pk=locked.pk).update(invoice_counter=models.F("invoice_counter") + 1)
+            self.refresh_from_db()
         return num
 
     def next_contract_number(self, year: int | None = None) -> str:
         """Next participation-contract document number (per-ZEV sequence).
 
         Format ``CTR-YYYY-NNNN``. The counter is read and incremented under a
-        ``select_for_update`` row lock, so two concurrent issuances cannot
+        ``select_for_update(no_key=True)`` row lock, so concurrent issuances cannot
         derive the same number from a stale counter value. Pass ``year`` to
         pin the year (used by the contract service so its patched clock and
         the rendered document agree). Safe to call inside an outer
@@ -244,7 +250,7 @@ class Zev(models.Model):
         """
         year = year or timezone.localdate().year
         with transaction.atomic():
-            locked = Zev.objects.select_for_update().get(pk=self.pk)
+            locked = Zev.objects.select_for_update(no_key=True).get(pk=self.pk)
             num = f"CTR-{year}-{locked.contract_counter:04d}"
             Zev.objects.filter(pk=locked.pk).update(
                 contract_counter=models.F("contract_counter") + 1

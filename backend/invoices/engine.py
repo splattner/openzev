@@ -2024,20 +2024,6 @@ def generate_invoices_for_zev(zev: Zev, period_start: date, period_end: date) ->
             raise
         except Exception as exc:
             logger.exception("Invoice generation failed for participant %s", participant.full_name)
-            # next_invoice_number() bumps zev.invoice_counter in memory; the
-            # savepoint rollback restores the row but not the instance, and every
-            # participant shares the same zev object (p.zev is zev). Re-sync so the
-            # next participant reuses the number the failed one gave back instead of
-            # skipping it and then colliding on a stale +1.
-            try:
-                zev.refresh_from_db(fields=["invoice_counter"])
-            except Exception:
-                # Don't mask the original failure; if we cannot re-sync, subsequent
-                # participants will fail early on the (likely unreachable) DB anyway.
-                logger.exception(
-                    "Could not re-sync invoice counter after failure for participant %s",
-                    participant.full_name,
-                )
             failure = {
                 "participant_id": str(participant.id),
                 "participant_name": participant.full_name,

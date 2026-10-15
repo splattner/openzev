@@ -780,8 +780,9 @@ The contract is no longer a throwaway render of mutable state:
   version) or mints a new version. `generate_contract_pdf` stays as the pure
   render for tests/previews.
 - **Concurrency.** Number minting and issue creation share one transaction;
-  the per-ZEV counter lock (`select_for_update`) serializes concurrent
-  issuances. `latest` is re-read and re-compared under that lock — before
+  the per-ZEV counter lock (`select_for_update(no_key=True)`) serializes concurrent
+  issuances while allowing foreign-key inserts referencing the ZEV (e.g. audit
+  events). `latest` is re-read and re-compared under that lock — before
   minting and again after the counter bump — so a competing issuance that
   committed while this request waited is either reused (identical content
   mints **no redundant version**; the unused counter bump is an accepted

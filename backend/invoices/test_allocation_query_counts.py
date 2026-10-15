@@ -121,20 +121,10 @@ class AllocationQueryCountTests(_ReconciliationBase):
             AssignmentWindows.for_participant(self.alice, PERIOD_START, PERIOD_END)
 
     def test_engine_generate_invoice_query_count(self):
-        # Windows fetch + readings fetch + tariff lookup + invoice writes.
-        # 13 -> 17 -> 16: shared metering points (#387) added a community
-        # consumption and a community production reading fetch, plus a
-        # Participant fetch each for the date- and month-granular
-        # allocation-weight sums. #465 dropped the month-granular one from
-        # PeriodReadings: it was never read, because the fixed-fee
-        # denominators are tariff-clamped and are built inside
-        # _price_fixed_fees instead. 16 -> 17: the invoice's copy of its
-        # issuer (#761) reads the owner's participant row; a batch reads it
-        # once for all its invoices. 17 -> 18: the issuer is the dated role
-        # holder (one query); this ZEV has none, so the owner fallback reads
-        # the owner's party too, until Zev.owner goes.
+        # Covers metering/tariffs, issuer snapshots, and invoice writes.
+        # Number allocation adds SAVEPOINT, a locked read, and RELEASE (+3).
         self._call_at_most(
-            18, generate_invoice, self.alice, PERIOD_START, PERIOD_END
+            21, generate_invoice, self.alice, PERIOD_START, PERIOD_END
         )
 
     def test_weight_keyed_shared_fees_do_not_scale_queries_with_tariff_count(self):

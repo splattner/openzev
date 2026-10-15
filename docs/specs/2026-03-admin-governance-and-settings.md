@@ -134,7 +134,7 @@ The two-factor policy fields `mfa_required`, `mfa_grace_period_days` and `mfa_po
 |---|---|---|---|
 | `billing_interval` | CharField(20) | `monthly` | Choices: `monthly`, `quarterly`, `semi_annual`, `annual` (from `BillingInterval` TextChoices) |
 | `invoice_prefix` | CharField(10) | `INV` | Prefix of `next_invoice_number()`. API writes must match `\A[A-Z0-9-]{1,10}\Z`; updates preserve unchanged raw legacy values (including blanks/whitespace), and a blank wizard value means the default. Newly assigned whitespace is refused on updates. Migration `0043` only reports invalid legacy values. |
-| `invoice_counter` | PositiveIntegerField | `1` | Auto-incremented atomically via `F()` expression |
+| `invoice_counter` | PositiveIntegerField | `1` | Read and incremented under a ZEV row lock |
 | `invoice_language` | CharField(2) | `de` | Choices: `de`, `fr`, `it`, `en` (from `InvoiceLanguage` TextChoices). Used for PDF + contract translation lookups. |
 | `payment_term_days` | PositiveIntegerField | `30` | Days after invoice generation (issue date) until payment is due. Validators: min 1, max 365. The engine uses it to set `Invoice.due_date` at generation. |
 | `bank_iban` | CharField(34) | blank | For QR-Rechnung generation; model and API validation normalize whitespace/case and validate the ISO 13616 MOD-97 checksum |
@@ -162,12 +162,19 @@ DEFAULT_EMAIL_BODY_TEMPLATE = (
 
 **Invoice numbering:**
 - `next_invoice_number()` generates `"{prefix}-{counter:05d}"` (e.g. `INV-00001`).
-- Numbering is **per ZEV**: each community has its own prefix and counter and starts
-  at 1, enforced by the `unique_invoice_number_per_zev` constraint on `Invoice`.
+- Numbering is **per ZEV**: each community has its own prefix and counter (default
+  `1`). `Invoice` enforces `unique_invoice_number_per_zev`.
   Two ZEVs may therefore both hold an `INV-00001`; a number identifies an invoice
   only together with its ZEV.
-- Atomically increments `invoice_counter` using `Zev.objects.filter(pk=self.pk).update(invoice_counter=F("invoice_counter") + 1)`.
-- Calls `self.refresh_from_db()` after increment.
+- Inside `transaction.atomic()`, reads the persisted prefix/counter under a
+  `select_for_update(no_key=True)` ZEV row lock and increments with `F()`.
+  On PostgreSQL this serializes allocators while allowing foreign-key inserts
+  referencing the ZEV (e.g. audit events).
+- Successful calls retain the lock until transaction completion; rolling back
+  to a savepoint releases locks acquired after that savepoint.
+- Rollback restores the counter, allowing reuse. Standalone calls commit their
+  allocation. The calling instance is refreshed after increment.
+- Counter resets and stale settings writes remain a separate risk (§12).
 
 **Serializer:** `ZevSerializer` — `fields = "__all__"`, read-only: `id`, `created_at`, `updated_at`, `disabled_at`, `disabled_by`, `disabled_reason` (the last three change only through `ZevViewSet.disable`/`enable` — see `2026-03-community-and-access.md` §7.1a). Read-only `issuer` (`{party, display_name}` of today's issuer, or `null`); there is no `owner` (removed in #761, see `2026-03-community-and-access.md` §7.1).
 
@@ -778,6 +785,7 @@ Changing date formats does NOT retroactively modify already-generated PDF files 
 | Template regressions in generated PDFs | Medium | Admin can edit and preview HTML template. Template is a Django template file readable in plain text. |
 | Email template rendering failure | Medium | On `KeyError`/`ValueError`, the invoice-email task falls back to the shipped defaults and logs a warning; other uncaught formatting errors are not guaranteed to degrade gracefully. |
 | VAT overlap allowing double taxation | High | `clean()` checks all existing ranges. `full_clean()` called in `save()`. API wraps validation errors for clear feedback. |
+| Settings writes rewind document counters | High — number reuse or invoice-generation failures | Known gap: `ZevSerializer` permits invoice/contract counter edits, and full-model settings saves can overwrite increments with stale values. Follow-up: restrict counter writes and save only supplied settings. |
 
 ---
 
