@@ -119,6 +119,8 @@ when the capability changes; do not treat them as baselines:
 ## Drafts
 
 - `2026-06-leg-billing-model.md` (Draft)
+- `2026-10-payments-and-credits.md` (Draft) — payments, credit notes, correcting paid invoices and
+  carrying credit forward; `approved_at` as the retention marker. See [#388](https://github.com/splattner/openzev/issues/388). ADR 0037.
 - `2026-09-backup-and-restore.md` (Implemented — backups, restore of an instance and of one community, schedule, retention, verification)
 - `2026-09-two-factor-authentication.md` (Draft) — TOTP and passkeys; extends the `auth.*` audit
   namespace shipped in 1.15.0. See [#740](https://github.com/splattner/openzev/issues/740).
