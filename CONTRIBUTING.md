@@ -33,9 +33,6 @@ docker compose -f docker-compose.dev.yml exec backend python manage.py seed_demo
 - Backend API: <http://localhost:8001/api/v1/>, with Swagger UI at `/api/docs/` and ReDoc at `/api/redoc/`
 - Demo admin: `admin@openzev.local` / `admin1234`. The other demo accounts and what the seed creates are listed in the [Getting Started guide](docs/user-guide/01-getting-started.md#demo-accounts).
 
-If the backend starts failing with Postgres `too many clients already`, restart
-the backend container.
-
 To run the production-like stack (built frontend behind nginx, with demo data)
 use `scripts/start-demo-environment.sh` instead.
 
