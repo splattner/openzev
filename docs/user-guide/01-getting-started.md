@@ -407,12 +407,52 @@ already-running stack (see below). It contains two communities with the
 same issuer — the flagship **ZEV STWEG Sonnenhof** and the smaller
 **ZEV Sonnenfirma AG** — so both sides of the community choice have real
 data to show. It also has a viewer of the flagship community and a property
-manager who manages both, to show per-community access. Credentials and the full list of what the seed creates are in
-the root [`README.md`](../../README.md#seed-data--demo-accounts).
+manager who manages both, to show per-community access.
 
-The flagship includes **Netznutzung dynamisch**, a dynamic tariff with
-synthetic demo prices, so its tariff details and the platform's dynamic-price
-console have data to show. It starts after the demo's invoiced periods.
+Seeded demo users:
+
+- Admin: `admin@openzev.local` / `admin1234`
+- Issuer and manager: `owner@openzev.local` / `owner1234`
+- Participant (ZEV 1): `anna@openzev.local` / `anna1234`
+- Participant (ZEV 1, flat 2 + parking space with charger): `ben@openzev.local` / `ben1234`
+- Participant (ZEV 2): `clara@openzev.local` / `clara1234`
+- Viewer (ZEV 1, read-only): `viewer@openzev.local` / `viewer1234`
+- Property manager (both ZEVs): `manager@openzev.local` / `manager1234`
+- Former participant (ZEV 1, moved out): `former@openzev.local` / `former1234`
+- Joint household (ZEV 1): `household@openzev.local` / `household1234`
+- Organisation participant (ZEV 1): `organisation@openzev.local` / `organisation1234`
+- Manager of ZEV 1 by grant + participant of ZEV 2: `mixed@openzev.local` / `mixed1234`
+- Viewer of ZEV 1 until 31 March next year (Treuhand): `treuhand@openzev.local` / `treuhand1234`
+- No ZEV yet, may set one up: `newcomer@openzev.local` / `newcomer1234`
+- Pending invitation (ZEV 2 viewer, no password yet): `invitee@openzev.local`
+
+"Last year" below means the year before `--end-date`.
+
+- **Dated issuer:** Otto Vorbesitzer (no login) issued the flagship's invoices until
+  30 June last year, Paula Producer from 1 July.
+- **Tenant change:** Maria left flat 3 after Q1 last year and the Musters took over the
+  same meter. Maria's login shows only her one invoice; she has moved away since, and
+  that invoice keeps her old address.
+- **Parties that are not participants:** the Verwaltung Muster AG represents the
+  flagship and manages it through that role; Hans Hauswart is a contact without access.
+- **Landowners:** each house of the second ZEV has its own (Paula, Clara, Lukas). The
+  role grants no access.
+
+The seed command creates two communities owned by the same demo owner, so the community switcher can be exercised:
+
+- **ZEV STWEG Sonnenhof** — the flagship, a single-building condominium (`zev`) with quarterly billing, German invoices and VAT folded into its prices. Carries participants, metering points, tariffs and hourly readings from 1 January of the previous year through the seed window, with 15-minute readings only for its latest 14 days. The previous year is billed quarter by quarter as paid invoices, except when its final quarter overlaps the open prior quarter; that prior quarter has draft, approved and sent invoices.
+- **ZEV Sonnenfirma AG** — a smaller property-company (`vzev`) with monthly billing, English invoices, VAT-registered with a UID, shared grid-connection and per-metering-point fees, and itemized tariff bands. Carries its own participants, metering points, tariffs and readings, plus two invoice periods: the prior complete month in draft/approved/sent and the month before it closed (paid/cancelled).
+
+The standard Swiss VAT ranges (7.7 % from 2018 and 8.1 % from 2024) are added only when no existing rate overlaps each range; existing VAT timelines are preserved. The operational/log pages are seeded too — metering import logs (CSV + SDAT-CH, with CSV provenance on a real meter month), invoice email logs, two issued contract snapshots (Anna and Clara), stored PDFs for Anna's sent and paid invoices, and audit events (including one denied) — and one meter on the flagship carries an intentional ~12-day reading gap in the current quarter so the data-quality page has a real issue to show.
+
+The flagship also carries **Netznutzung dynamisch**, linked to a synthetic price
+source with quarter-hourly prices from the start of the quarter containing
+`--end-date` through the following day. The tariff starts after all seeded
+invoice periods, so their totals are unchanged. Fetching is disabled and the
+source URL is a reserved `.invalid` host, so seeding never calls a tariff API.
+Re-seeding keeps the stored prices.
+
+Re-running `seed_demo` refreshes the demo readings, invoices and Anna's PDFs, import/email logs and audit events, while retaining contract snapshots. If the seed transaction rolls back, existing invoice rows and PDFs remain unchanged. PDF generation and cleanup run after commit and are best-effort. Screenshot captures explicitly select ZEV STWEG Sonnenhof so they consistently show the same community.
 
 ### Resetting Demo Data
 
@@ -425,6 +465,12 @@ docker compose exec backend python manage.py seed_demo
 This refreshes demo readings, invoices, import/email logs and audit events for
 both communities, and fills the synthetic dynamic-price series through tomorrow.
 Its stored price history and issued contract snapshots are retained.
+
+By default, `--end-date` is today and `--start-date` is the start of the
+complete quarter before that end date. Both dates accept `YYYY-MM-DD`; use
+`--end-date` to reproduce a historical window and `--start-date` to override
+its default start.
+
 
 ## First-Time Setup
 
@@ -545,14 +591,51 @@ The API is protected by JWT authentication. Demo credentials work for API access
 
 If you prefer not to build locally, prebuilt images are available on GitHub Container Registry:
 
-- `ghcr.io/splattner/openzev-backend:latest`
-- `ghcr.io/splattner/openzev-frontend:latest`
-- `ghcr.io/splattner/openzev-fullstack:latest`
+- `ghcr.io/splattner/openzev-backend` — the Django API
+- `ghcr.io/splattner/openzev-frontend` — the static frontend served by nginx
+- `ghcr.io/splattner/openzev-fullstack` — frontend and backend in one container, which the release `docker-compose.yml` uses
 
 Tag variants:
 - `latest` — newest published release
 - `vX.Y.Z` — specific release version
-- `main` — latest development build (may be unstable)
+- `main` — latest build from the `main` branch
+- `main-<short-sha>` — the build of one specific `main` commit
+
+Images tagged `main` are rebuilt on every commit to `main` and may contain
+unfinished changes or breaking behaviour. Use them for previews only; for a
+reproducible deployment pin a release tag such as `v1.2.3`.
+
+### SBOMs and signatures
+
+Release images and `main` images are published with signed container manifests
+and signed SBOM attestations. Release SBOM files are attached to the GitHub
+release; `main` SBOMs are uploaded as artifacts of the `Container Build Check`
+workflow run. An SBOM is verified through the signed attestation bound to the
+image, not through a detached signature on the raw `.spdx.json` file.
+
+With [`cosign`](https://docs.sigstore.dev/cosign/) installed, verify an image's
+GitHub OIDC keyless signature (for a release image, replace `:main` with the
+release tag, for example `:v1.2.3`):
+
+```bash
+cosign verify \
+  --certificate-identity-regexp "https://github.com/splattner/openzev/.github/workflows/.*" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  ghcr.io/splattner/openzev-backend:main
+```
+
+Verify the signed SBOM attestation the same way:
+
+```bash
+cosign verify-attestation \
+  --certificate-identity-regexp "https://github.com/splattner/openzev/.github/workflows/.*" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  --type spdxjson \
+  ghcr.io/splattner/openzev-backend:main
+```
+
+To inspect the attested predicate, append `| jq '.payload | @base64d | fromjson'`,
+or download the `.spdx.json` file from the release or workflow run.
 
 ### Reverse proxies and NUM_PROXIES
 
@@ -604,9 +687,20 @@ so switching between them keeps one database.
 Older revisions mounted that volume at different paths in different files, which
 gave each stack a cluster the others could not see: starting one, then the
 other, looked like the database had been wiped. If you are coming from such a
-setup, the first start after upgrading initialises an empty cluster; see the
-upgrade note in the [README](../../README.md#quick-start-docker) for how to
-carry data across.
+setup, the first start after upgrading initialises an empty cluster. Dump
+anything you want to keep from the old volume first, then restore it into the
+new one:
+
+```bash
+docker compose up -d db
+docker compose exec db pg_dump -U openzev openzev > backup.sql
+docker compose down -v          # discards the old volume
+docker compose up -d --build
+docker compose exec -T db psql -U openzev openzev < backup.sql
+```
+
+For demo data, `scripts/start-demo-environment.sh` reseeds from scratch and no
+dump is needed.
 
 See [Troubleshooting](12-troubleshooting.md) for more help.
 

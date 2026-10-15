@@ -1,4 +1,4 @@
-# Requires backend/.env (copied from backend/.env.production.example) — see README "Self-hosting".
+# Requires backend/.env (copied from backend/.env.production.example) — see docs/user-guide/01-getting-started.md ("Building from source").
 # For local development use docker-compose.dev.yml instead.
 services:
   backend:

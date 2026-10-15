@@ -2768,7 +2768,7 @@ class SeedDemoReseedTests(SeedDemoWindow, TestCase):
 		self.assertFalse(contact.participations.exists())
 
 	def _check_the_access_personas_survive_a_reseed(self):
-		"""Re-seeding keeps the #761 personas as the README describes them."""
+		"""Re-seeding keeps the #761 personas as the Getting Started guide describes them."""
 		from accounts.models import User
 		from zev import access
 		from zev.models import MeteringPointAssignment, Participant, PartyKind, ZevPartyRole

@@ -1,4 +1,4 @@
-# Single-container self-hosting stack. Requires backend/.env — see README "Self-hosting".
+# Single-container self-hosting stack. Requires backend/.env — see docs/user-guide/01-getting-started.md ("Building from source").
 # Only 8080 is published; db/valkey talk over the compose network.
 services:
   app:

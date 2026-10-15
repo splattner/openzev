@@ -1,7 +1,7 @@
 # OpenZEV frontend
 
 React + TypeScript + Vite single-page application for the OpenZEV energy
-community management platform. See the root `README.md` for full-stack setup;
+community management platform. See the root `CONTRIBUTING.md` for full-stack setup;
 this file covers frontend-only development.
 
 ## Stack
@@ -18,7 +18,7 @@ Use the Node version pinned in `.node-version` (currently 24.20.0).
 
 ```bash
 npm install
-cp .env.example .env   # set VITE_API_BASE_URL (see root README)
+cp .env.example .env   # set VITE_API_BASE_URL (see root CONTRIBUTING.md)
 npm run dev            # http://localhost:5173
 ```
 

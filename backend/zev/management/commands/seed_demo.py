@@ -3,7 +3,7 @@
 Two communities owned by one demo owner (flagship STWEG + company ZEV),
 accounts (including a viewer and a property manager with per-ZEV access), meters, readings, tariffs, invoices in every status, and
 operational history (import/email logs, contracts, audit events), plus personas
-for the per-ZEV access and party model (#761). See the README for the full list
+for the per-ZEV access and party model (#761). See the Getting Started guide (docs/user-guide/01-getting-started.md) for the full list
 and the demo login credentials.
 """
 
@@ -456,7 +456,7 @@ class Command(BaseCommand):
         ZevAccessGrant.objects.filter(zev=zev, user=property_manager).delete()
         self._upsert_grant(zev=second_zev, user=property_manager, role=ZevAccessRole.MANAGER, granted_by=owner)
 
-        # Access and party personas (#761); the README lists what each shows.
+        # Access and party personas (#761); the Getting Started guide lists what each shows.
         former_user = self._upsert_user(
             User,
             username="demo_former",
