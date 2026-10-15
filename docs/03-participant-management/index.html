@@ -1958,7 +1958,10 @@ use their normal login; sending or copying an onboarding link is refused.</p>
 <li>Create tariffs or invoices</li>
 </ul>
 <p>Every participant gets an account when they are added; the onboarding link
-is how they first sign in to it. The <strong>Invitation</strong> status icon shows that
+is how they first sign in to it. In <strong>Account → Security</strong>, they can choose a
+password without entering an old one. Their chosen password survives changes
+to participant details and subsequent link sign-ins. Their email address remains
+manager-maintained on the participant record. The <strong>Invitation</strong> status icon shows that
 link's state: <em>Not invited</em> (no link
 sent yet), <em>Invited</em> (sent, not used yet, with its expiry date), <em>Invitation
 link used</em>, <em>Expired</em> (with the expiry date) or <em>Revoked</em> (by you, or
@@ -1980,13 +1983,26 @@ confirmation while it was processing. Open <strong>Unlink</strong> again to retr
 <strong>Issuer</strong> (the invoices and contracts are from them), <strong>Representative</strong>
 (toward the grid operator) and <strong>Landowner</strong>. The issuer's entry comes first.</p>
 <h3 id="a-participant-forgot-their-password">A Participant Forgot Their Password<a class="headerlink" href="#a-participant-forgot-their-password" title="Permanent link">&para;</a></h3>
-<p>There is no "forgot password" link on the login page. Send or copy the
+<p>An account with a chosen password can use <strong>Forgot your password?</strong> on the login
+page to request an emailed reset link. For a participant-only account, you can also send or copy the
 onboarding link for a participant-only account from <strong>⋯</strong> on their entry: it signs
-them in, and they then choose a new password. If their invoices carry the
+them in. After completing any two-factor check, they open <strong>Account → Security</strong>
+and choose <strong>Reset password</strong>, then enter and confirm
+a new password. This action is available for <strong>15 minutes after link sign-in</strong>;
+if it expires, they sign in through a participant link again. Signing in through a link
+keeps an existing password unless an administrator has required a password change.
+If their invoices carry the
 <a href="../02-zev-setup/#participant-access-from-the-invoice">participant QR code</a>,
 they can also request a sign-in link themselves from the page it opens.</p>
-<p>For accounts with independent access, use their external sign-in provider or
-ask someone with server access to reset the password; see
+<p>Successful recovery signs out other devices and revokes all onboarding and
+invoice sign-in links for the account across its communities. The device used
+for recovery stays signed in. If an earlier version already removed a password,
+it cannot be restored; the participant chooses a new one. The emailed reset also
+revokes sign-in links, then asks the participant to sign in normally with the new
+password and any required second factor.</p>
+<p>For accounts with independent access, use <strong>Forgot your password?</strong> if they have
+a password, or their external sign-in provider. If neither is available, ask
+someone with server access to recover the account; see
 <a href="../11-roles-and-permissions/#user-cannot-login">Roles and Permissions</a>.</p>
 <h2 id="participation-contract">Participation Contract<a class="headerlink" href="#participation-contract" title="Permanent link">&para;</a></h2>
 <p><strong>Contract PDF</strong> on a participant's row downloads their participation

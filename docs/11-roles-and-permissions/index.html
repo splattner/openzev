@@ -2616,6 +2616,8 @@ manager access under <strong>ZEV settings → People &amp; access</strong>.</p>
 <h2 id="participant-role">Participant Role<a class="headerlink" href="#participant-role" title="Permanent link">&para;</a></h2>
 <p><strong>Participants</strong> are community members with read-only access to their own data.</p>
 <h3 id="participant-capabilities">Participant Capabilities<a class="headerlink" href="#participant-capabilities" title="Permanent link">&para;</a></h3>
+<p>Participants can set a password or recover a forgotten one in <strong>Account → Security</strong>;
+see <a href="../03-participant-management/#a-participant-forgot-their-password">password setup and recovery</a>.</p>
 <p>The participant sidebar shows <strong>Dashboard</strong>, <strong>My invoices</strong>, and <strong>Annual statement</strong>; own consumption charts and trends stay reachable through the direct <code>/metering/chart</code> route.</p>
 <ul>
 <li><strong>Dashboard:</strong> View own energy consumption/production overview</li>
@@ -2966,10 +2968,9 @@ it takes a few extra steps. Under <strong>My Account → Profile → Email addre
 </ol>
 <p>The old address is emailed afterwards, so a change you did not make does not go unnoticed. The
 link works once, and stops working if your password or address changes before you use it.</p>
-<p>Accounts that have no password — participants, who sign in with emailed links, and accounts that
-only use an external identity provider — cannot do this themselves. For participants the address is
-maintained by the community's managers on the participant record; an administrator can change any
-account's address under <strong>Platform → Accounts → Edit</strong>.</p>
+<p>Participant-only email addresses remain manager-maintained, even after choosing a
+password. Passwordless accounts also cannot change their email themselves. An
+administrator can change an account's address under <strong>Platform → Accounts → Edit</strong>.</p>
 <h3 id="signing-out-other-devices">Signing out other devices<a class="headerlink" href="#signing-out-other-devices" title="Permanent link">&para;</a></h3>
 <p>Under <strong>My Account → Security → Sessions</strong>, <strong>Sign out other devices</strong> ends every session except the
 one you are using. Do it if you lost a device or suspect someone else has access. There is no list
@@ -3023,7 +3024,9 @@ access under <strong>ZEV settings → People &amp; access</strong>.</p>
 <ul>
 <li>The onboarding link was never used, has expired, or was revoked</li>
 <li>User account deactivated</li>
-<li>Password forgotten — the user can request a reset link with <strong>Forgot your password?</strong> on the sign-in page</li>
+<li>Password forgotten — accounts with a password can request a reset link with
+  <strong>Forgot your password?</strong> on the sign-in page. Participant-only accounts can
+  also recover through a sign-in link in Account → Security within 15 minutes.</li>
 </ul>
 <p><strong>Fix:</strong></p>
 <ol>
