@@ -1,5 +1,6 @@
 /* Communities an account belongs to (admin accounts list). Chips are buttons:
    selecting one opens that community's Participants page. */
+
 .account-memberships {
   display: flex;
   flex-wrap: wrap;
@@ -39,39 +40,3 @@
   letter-spacing: 0.05em;
 }
 
-.participant-card-list {
-  display: grid;
-}
-
-
-/* Deep-link target (`?focus=` from attention links): briefly flash the row. */
-.participant-row-focus {
-  animation: participant-row-flash 2.4s ease-out 1;
-}
-
-@keyframes participant-row-flash {
-  0% {
-    background: var(--brand-pale);
-  }
-  100% {
-    background: transparent;
-  }
-}
-
-.invoice-cell-stack {
-  display: grid;
-  gap: 0.3rem;
-  align-content: start;
-}
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  border: 0;
-  white-space: nowrap;
-}

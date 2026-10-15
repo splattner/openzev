@@ -1,0 +1,29 @@
+.app-route-loading {
+  min-height: 60vh;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.skeleton-block {
+  /* Keep fixed-width placeholders within their container. */
+  max-width: 100%;
+  border-radius: var(--radius-md);
+}
+
+.skeleton-table-rows {
+  display: grid;
+  gap: 0.6rem;
+}
+
+/* The participant cards placeholder (PageSkeleton). */
+.participant-card-list {
+  display: grid;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

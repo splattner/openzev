@@ -1,6 +1,7 @@
 /* ── Charts (Recharts) — the documents' chart grammar ─────────────────────
    Legends in ink beside a colour swatch, as the PDF charts set them;
    tooltips are small raised sheets. Recharts writes these styles inline. */
+
 .recharts-default-legend {
   font-size: 0.8125rem;
 }
@@ -22,6 +23,7 @@
 }
 
 /* Fit the paired charts to their panel, including the desktop sidebar. */
+
 .balance-chart-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
@@ -58,33 +60,7 @@
   opacity: 0.3;
 }
 
-/* Admin dashboard invoice-status tiles: figure tiles, paid set in green. */
-.status-tile {
-  display: grid;
-  gap: 0.35rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--surface-card);
+.chart-card {
+  min-height: 360px;
 }
 
-.status-tile-label {
-  font-size: 0.6875rem;
-  font-weight: 650;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.status-tile-value {
-  font-size: 1.625rem;
-  font-weight: 650;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-}
-
-.status-tile-paid .status-tile-value {
-  color: var(--success-700);
-}

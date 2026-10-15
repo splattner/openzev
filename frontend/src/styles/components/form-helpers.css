@@ -3,6 +3,7 @@
 }
 
 /* Keep two-column inputs aligned when descriptions vary in height. */
+
 .inline-form.align-start {
   align-items: start;
 }
@@ -54,6 +55,7 @@
 
 /* Two columns wide, but only where the grid has them: in the single-column
    layout a span would create a second, implicit column. */
+
 @media (min-width: 641px) {
   .grid-span-2 {
     grid-column: span 2;
@@ -64,6 +66,7 @@
    plain field so the group's label lines up with the inputs beside it, but
    marked up as role="group" rather than a fieldset — a legend does not lay out
    predictably inside a grid. */
+
 .recurrence-field {
   display: grid;
   gap: 0.4rem;
@@ -78,6 +81,7 @@
 /* Each chip fills its grid cell, so selecting one cannot change any width and
    the rows stay put while the group is being used. Applied through Mantine's
    `classNames` API rather than by reaching for its internal class names. */
+
 .recurrence-chip {
   width: 100%;
   justify-content: center;
@@ -88,7 +92,26 @@
    overrides on specificity — leaving a 13px inline-block that doubled every
    chip's height. Taken out of flow entirely here; the label's `for` is what
    makes the chip clickable, so the input never needs to occupy space. */
+
 input.recurrence-chip-input {
   position: absolute;
   width: 0;
 }
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* Label with a hint underneath: keep the box on the first line. */
+
+.checkbox-row.align-start {
+  align-items: flex-start;
+}
+
+.checkbox-row-text {
+  display: grid;
+  gap: 0.15rem;
+}
+

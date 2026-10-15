@@ -1,6 +1,7 @@
 /* ── Tables — the documents' line items in screen form ──────────────────────
    Kicker-style column labels in white on the documents' dark forest header
    band, hairline rows, tabular figures right-aligned. */
+
 .page-stack table,
 .data-table table {
   width: 100%;
@@ -23,6 +24,7 @@
 }
 
 /* Wide record tables (DataTable) keep columns closer together. */
+
 .data-table th,
 .data-table td {
   padding-inline: 0.75rem;
@@ -40,6 +42,7 @@
    only engages within the nearest scroll container, so without a height bound
    the wrapper never scrolls vertically and the header would not stick.
    Short tables are unaffected (no vertical overflow). */
+
 .table-scroll {
   overflow-x: auto;
   max-height: calc(100dvh - 12rem);
@@ -53,6 +56,7 @@
 }
 
 /* Frozen name column; corner 4, header row 3, body column 1. */
+
 .participant-table th:first-child,
 .participant-table td:first-child {
   position: sticky;
@@ -78,6 +82,7 @@
 }
 
 /* Read-only variant (annual report): rows are not a selection. */
+
 .participant-table--static tbody tr {
   cursor: default;
 }
@@ -120,6 +125,7 @@
 }
 
 /* Fill the cell with the name button; shared focus styles show keyboard focus. */
+
 .participant-select,
 .audit-event-select {
   display: block;
@@ -147,6 +153,7 @@
 
 /* Keep billing workflow columns readable on narrow screens; the existing
    table-scroll wrapper owns horizontal overflow. */
+
 .billing-workflow-table {
   min-width: 48rem;
 }
@@ -158,6 +165,7 @@
 
 /* Operational table contract: sticky header, scannable rows (40–44px),
    hover feedback, right-aligned tabular quantities/money. */
+
 .page-stack thead th,
 .data-table thead th {
   position: sticky;
@@ -167,6 +175,7 @@
 
 /* The band itself: deep forest, white small caps. The metering points list's
    column heads wear it too, so the two stay one style. */
+
 .page-stack thead th,
 .data-table thead th,
 .metering-point-columns {
@@ -182,6 +191,7 @@
 
 /* Neighbouring header cells can leave a light seam at fractional zoom; each
    cell repaints the band 1px past its bottom and left edges. */
+
 :where(.page-stack, .data-table) thead th::before {
   content: '';
   position: absolute;
@@ -196,6 +206,7 @@
 }
 
 /* The band's outer corners follow the sheet's. */
+
 .page-stack thead th:first-child,
 .data-table thead th:first-child {
   border-top-left-radius: var(--radius-sm);
@@ -211,6 +222,7 @@
 }
 
 /* Identifiers (invoice and meter numbers) never break at their hyphens. */
+
 .data-table td code {
   white-space: nowrap;
 }
@@ -236,6 +248,7 @@
 }
 
 /* Quantities and money — tabular numerals align vertically down the column. */
+
 .page-stack td.numeric,
 .data-table td.numeric {
   text-align: right;
@@ -260,4 +273,23 @@
 
 .data-table-footer {
   font-size: 0.8125rem;
+}
+
+.invoice-cell-stack {
+  display: grid;
+  gap: 0.3rem;
+  align-content: start;
+}
+
+/* Feature flags: the switch column, wide enough for the longest state label. */
+
+.feature-toggle-col {
+  width: 8rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .participant-table tbody tr > td {
+    animation: none !important;
+    transition: none !important;
+  }
 }

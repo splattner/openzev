@@ -8,33 +8,3 @@
   overflow: hidden;
 }
 
-h2,
-h3 {
-  margin: 0;
-}
-
-.muted {
-  color: var(--muted);
-}
-
-.text-error {
-  color: var(--danger-700);
-}
-
-.app-route-loading {
-  min-height: 60vh;
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-}
-
-.skeleton-block {
-  /* Keep fixed-width placeholders within their container. */
-  max-width: 100%;
-  border-radius: var(--radius-md);
-}
-
-.skeleton-table-rows {
-  display: grid;
-  gap: 0.6rem;
-}

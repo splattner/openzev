@@ -1,0 +1,37 @@
+/* Status dot — small filled circle for one-glance health/readiness
+   indicators (billing periods table, admin system health). Uses the same
+   status tokens as the badges; size adapts to its context's font. */
+
+.dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: var(--muted);
+}
+
+.dot-success {
+  background: var(--success-600);
+}
+
+/* Filled dots use the strongest fill available in the token set (600 for
+   success; the warning/info palettes stop at 300/200). */
+
+.dot-warning {
+  background: var(--warning-300);
+}
+
+.dot-info {
+  background: var(--info-200);
+}
+
+/* Admin system-health probes: title row aligns the status dot with the
+   heading text. */
+
+.system-health-probe h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+

@@ -14,7 +14,7 @@ layers once and `@import`s every file into one of them:
 | `tokens` | `tokens.css` |
 | `base` | `base.css` |
 | `layout` | `layout/*` except `responsive.css` |
-| `components` | `components/*` and `misc.css` |
+| `components` | `components/*` |
 | `pages` | `pages/*`, then the stylesheets that sit next to their page or component |
 | `responsive` | `layout/responsive.css`: the media-query overrides of components and pages |
 | `utilities` | `utilities.css` |
@@ -43,10 +43,9 @@ props) are unlayered and win; they only set what the component was asked to set.
 | `base.css` | `:root` scale (radius, shadow), reset, typography, field-token sizing of native inputs (skips Mantine's own) |
 | `native-controls.css` | Native element defaults a Mantine class must beat (labels, checkbox width); layer `native` |
 | `layout/` | App shell, sidebar, account menu, page header, footer; `responsive.css` is its own `responsive` layer |
-| `components/` | Shared, reusable pieces: tables, sheets, stat tiles, buttons, badges, dialogs, … |
+| `components/` | Shared, reusable pieces, one file per piece, named after it: `table.css`, `sheet.css`, `button.css`, `badge.css`, `status-dot.css`, `toast.css`, `dialog.css`, … |
 | `pages/` | Page-level rules shared by several pages: sign-in shell, form grids, invoice rows, public card |
-| `utilities.css` | Single-property spacing helpers (`mt-1`, `mb-15`, …) |
-| `misc.css` | Leftovers from the split that have no better home yet (some may be dead); layer `components` |
+| `utilities.css` | Single-property spacing helpers (`mt-1`, `mb-15`, …) and `.visually-hidden`, which must win over any rule |
 
 ## Where a rule lives
 

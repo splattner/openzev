@@ -1,4 +1,5 @@
 /* A blank sheet: dashed edge, centred message, the way forward below it. */
+
 .empty-state {
   display: grid;
   gap: 0.5rem;
@@ -33,11 +34,3 @@
   margin-top: 0.75rem;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .skeleton-block::after,
-  .participant-row-focus,
-  .participant-table tbody tr > td {
-    animation: none !important;
-    transition: none !important;
-  }
-}

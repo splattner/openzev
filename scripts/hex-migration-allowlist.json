@@ -1,7 +1,7 @@
 [
   "styles/base.css@alpha",
   "styles/components/button.css@alpha",
-  "styles/components/template-editor-and-row-actions.css@alpha",
+  "styles/components/template-editor.css@alpha",
   "styles/layout/account-menu.css@alpha",
   "styles/layout/shell.css@alpha",
   "components/RawMeteringTable.css@alpha",

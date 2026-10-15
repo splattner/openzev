@@ -1,5 +1,6 @@
 /* ── KPI tiles — the documents' figure tiles ───────────────────────────────
    Kicker label, the figure with its unit set small, an optional hint line. */
+
 .stat-card {
   display: flex;
   flex-direction: column;
@@ -13,6 +14,7 @@
 
 /* The value line is the size container (the tile itself stays a subgrid):
    figures scale to the tile, so a narrow tile never breaks a number. */
+
 .stat-card .stat-value {
   max-width: 100%;
   margin: 0.125rem 0 0;
@@ -52,6 +54,7 @@
 
 /* Tiles in a row share their label, figure and hint tracks (subgrid), so
    every figure sits on one line even where a label wraps to two. */
+
 :is(.stat-grid, .kpi-row, .grid) > .stat-card {
   display: grid;
   grid-row: span 3;
@@ -62,6 +65,7 @@
 }
 
 /* Toggle selection uses the interactive color; severity colors the value. */
+
 .stat-card--interactive {
   appearance: none;
   width: 100%;
@@ -80,6 +84,7 @@
 }
 
 /* Tile grids: combine the wide modifier with the base class. */
+
 .stat-grid {
   display: grid;
   gap: 1rem;
@@ -90,60 +95,8 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
 }
 
-.notice--retry {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.toolbar {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.toolbar-main {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.75rem 1rem;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-/* Actions stay at the right, also when they wrap below the summary. */
-.toolbar-actions {
-  min-width: 0;
-  max-width: 100%;
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.toolbar-actions .button {
-  max-width: 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-/* Stack context above actions on narrow screens. */
-@media (max-width: 700px) {
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .toolbar-actions {
-    margin-left: 0;
-    justify-content: flex-start;
-  }
-}
-
 /* Long compound labels (Amortisationsdauer) hyphenate in narrow tiles. */
+
 .stat-label {
   margin: 0;
   font-size: 0.6875rem;
@@ -164,6 +117,7 @@
 }
 
 /* The dark figure tile — the invoice's savings tile. At most one per view. */
+
 .stat-card--accent {
   background: var(--brand-deep);
   border-color: var(--brand-deep);
@@ -198,9 +152,43 @@
 }
 
 /* Flat: inside .card, no chrome. */
+
 .stat-card.stat-card--flat {
   background: transparent;
   border: 0;
   box-shadow: none;
   padding: 0.5rem 0.25rem;
 }
+
+/* Admin dashboard invoice-status tiles: figure tiles, paid set in green. */
+
+.status-tile {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+}
+
+.status-tile-label {
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.status-tile-value {
+  font-size: 1.625rem;
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.status-tile-paid .status-tile-value {
+  color: var(--success-700);
+}
+

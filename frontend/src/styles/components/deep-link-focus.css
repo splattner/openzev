@@ -1,0 +1,21 @@
+/* Deep-link target (`?focus=` from attention links): briefly flash the row. */
+
+.participant-row-focus {
+  animation: participant-row-flash 2.4s ease-out 1;
+}
+
+@keyframes participant-row-flash {
+  0% {
+    background: var(--brand-pale);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .participant-row-focus {
+    animation: none !important;
+    transition: none !important;
+  }
+}

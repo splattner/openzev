@@ -1,6 +1,7 @@
 /* ── Buttons ────────────────────────────────────────────────────────────────
    Primary = flat deep forest; secondary = paper with a hairline; one
    height scale. */
+
 .button {
   display: inline-flex;
   align-items: center;
@@ -26,6 +27,7 @@
    (e.g. .button-secondary:hover) override this base hover — without it a
    hovered secondary button got the deep brand background while keeping its
    dark ink text (unreadable). */
+
 :where(.button):hover:not(:disabled) {
   background: var(--brand);
 }
@@ -60,6 +62,7 @@
 
 /* Destructive but rare: quiet until hovered; the confirm dialog's button is
    the solid red one. Row-level (compact) danger buttons follow the same rule. */
+
 .button-secondary.button-destructive,
 .button-danger.button-compact,
 .button.danger.button-compact {
@@ -83,20 +86,41 @@
   font-size: 0.8125rem;
 }
 
-.menu-item-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1rem;
-}
-
 .danger {
   background: var(--danger-600);
 }
 
 /* The impersonation banner is a slim strip: its buttons are smaller than the scale. */
+
 .impersonation-banner .button {
   min-height: 2rem;
   padding: 0.3rem 0.7rem;
   font-size: 0.8125rem;
 }
+
+/* Button variants */
+
+.button-outline {
+  background: transparent;
+  border: 1px solid var(--interactive);
+  box-shadow: none;
+  color: var(--interactive);
+}
+
+.button-outline:hover:not(:disabled) {
+  background: var(--brand-pale);
+  color: var(--brand-deep);
+}
+
+.button-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+  color: var(--text-body);
+}
+
+.button-ghost:hover:not(:disabled) {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+

@@ -221,7 +221,6 @@
   }
 
   .tariff-period-actions,
-  .participant-card-actions,
   .metering-assignment-actions {
     justify-content: flex-start;
   }

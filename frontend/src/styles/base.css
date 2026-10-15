@@ -54,6 +54,7 @@ hr {
 }
 
 /* Focus visibility everywhere — covers hand-rolled CSS and Mantine widgets. */
+
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
@@ -69,6 +70,7 @@ a {
    focused/error/disabled states keep working; the rule has to sit above the
    `vendor` layer to beat Mantine's `input { font: inherit }` reset on the
    rest. Excluded types keep their intrinsic rendering. */
+
 input:where(:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']):not([type='hidden']):not([type='submit']):not([type='button']):not([type='reset']):not([type='image']):not([type='color']):not([class*='mantine-'])),
 select:where(:not([multiple]):not([class*='mantine-'])) {
   width: 100%;
@@ -83,6 +85,7 @@ select:where(:not([multiple]):not([class*='mantine-'])) {
 }
 
 /* Shared ZEV editors use the field tokens in the settings page and edit modal. */
+
 .zev-general-settings-fields textarea,
 .zev-email-field textarea {
   width: 100%;

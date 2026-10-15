@@ -1,5 +1,6 @@
 /* Status pills — the document's status pill: a pale fill, a hairline of the
    next tone, sentence case for scanning in tables. */
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -15,6 +16,7 @@
 }
 
 /* A badge that opens something: a real button, so keyboard and screen readers get it. */
+
 button.badge-button {
   cursor: pointer;
   font-family: inherit;
@@ -61,6 +63,7 @@ button.badge-button:focus-visible {
 
 /* The status pill printed on the invoice (shared_pdf_base.html
    `.document-status`). */
+
 .badge-brand {
   background: var(--brand-pale);
   border-color: var(--brand-glow);
@@ -70,6 +73,7 @@ button.badge-button:focus-visible {
 /* Attributes, not states: what a record is (billing mode, energy type, meter
    type, role, kind), set quiet and outlined, so the coloured pills beside
    them can say what is going on (current, scheduled, needs attention). */
+
 .badge-tag {
   background: var(--surface-card);
   border-color: var(--border-strong);
@@ -77,51 +81,3 @@ button.badge-button:focus-visible {
   font-weight: 500;
 }
 
-/* Status dot — small filled circle for one-glance health/readiness
-   indicators (billing periods table, admin system health). Uses the same
-   status tokens as the badges; size adapts to its context's font. */
-.dot {
-  display: inline-block;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 999px;
-  flex-shrink: 0;
-  background: var(--muted);
-}
-
-.dot-success {
-  background: var(--success-600);
-}
-
-/* Filled dots use the strongest fill available in the token set (600 for
-   success; the warning/info palettes stop at 300/200). */
-.dot-warning {
-  background: var(--warning-300);
-}
-
-.dot-info {
-  background: var(--info-200);
-}
-
-/* Admin system-health probes: title row aligns the status dot with the
-   heading text. */
-.system-health-probe h3 {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-/* Shared ActionMenu (Mantine dropdown) danger entries. Mantine's color prop
-   cannot resolve CSS variables for its hover tint, so the class carries both
-   label and hover colors from the tokens directly. */
-.action-menu-item-danger {
-  color: var(--danger-700);
-}
-
-.action-menu-item-danger:hover {
-  background: var(--danger-100);
-}
-
-.chart-card {
-  min-height: 360px;
-}
