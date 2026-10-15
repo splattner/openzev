@@ -2187,6 +2187,11 @@ link leads back to <strong>My invoices</strong>.</p>
   through the API only — there is no cancel button in the UI.</li>
 </ul>
 <p>Only admins can delete an invoice that is approved, sent or paid.</p>
+<p>Approval freezes the issuer and recipient details and discards the draft PDF.
+Use <strong>Generate PDF</strong> to view the approved document. Emailing generates a
+missing PDF automatically. <strong>Mark sent</strong> records manual delivery without
+generating a PDF; you can generate it afterwards. Later address or bank-detail
+changes do not change the approved document.</p>
 <h2 id="billing-hub-invoices--emails">Billing Hub (Invoices · Emails)<a class="headerlink" href="#billing-hub-invoices--emails" title="Permanent link">&para;</a></h2>
 <p>The sidebar entry <strong>Billing</strong> (<code>/billing/invoices</code>) opens the invoice-first
 billing hub. Its tabs are routes — each is directly linkable:</p>
@@ -2468,6 +2473,10 @@ regenerate it.</p>
 <p><strong>More → Open PDF</strong> opens the document. Generation and regeneration are also
 under <strong>More</strong> for any invoice that exists. <strong>Download all
 PDFs</strong> in the command bar downloads the period's documents together.</p>
+<p>If document details keep changing during rendering, generation can stop with
+<strong>PDF missing</strong>. Use <strong>Generate PDF</strong> again once those changes are finished.
+Email delivery retries these conflicts automatically; if retries run out,
+the failure appears in the audit log.</p>
 <p>For custom templates that omit the second address line, ask an admin to
 <a href="../14-admin-console/#invoice-pdf-templates">update the PDF template</a>, then regenerate the affected PDFs.</p>
 <h2 id="participant-access-links">Participant Access Links<a class="headerlink" href="#participant-access-links" title="Permanent link">&para;</a></h2>
