@@ -1,9 +1,8 @@
 # Contributing to OpenZEV
 
-Thanks for taking an interest. OpenZEV is a one-person project that grew out of
-billing a real ZEV, so contributions are welcome but reviewed at a hobby pace.
-For anything larger than a small fix, open an issue first so we can agree on the
-direction before you spend time on it.
+Thanks for taking an interest. OpenZEV grew out of billing a real ZEV, and
+contributions are welcome. For anything larger than a small fix, open an issue
+first so we can agree on the direction before you spend time on it.
 
 - **Found a bug or have an idea?** [Open an issue](https://github.com/splattner/openzev/issues).
 - **Found a vulnerability?** Do not open an issue; follow [SECURITY.md](SECURITY.md).
