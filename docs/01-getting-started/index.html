@@ -686,6 +686,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#sboms-and-signatures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SBOMs and signatures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#reverse-proxies-and-num_proxies" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2055,6 +2066,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#sboms-and-signatures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SBOMs and signatures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#reverse-proxies-and-num_proxies" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2632,11 +2654,49 @@ already-running stack (see below). It contains two communities with the
 same issuer — the flagship <strong>ZEV STWEG Sonnenhof</strong> and the smaller
 <strong>ZEV Sonnenfirma AG</strong> — so both sides of the community choice have real
 data to show. It also has a viewer of the flagship community and a property
-manager who manages both, to show per-community access. Credentials and the full list of what the seed creates are in
-the root <a href="https://github.com/splattner/openzev/blob/main/README.md#seed-data--demo-accounts"><code>README.md</code></a>.</p>
-<p>The flagship includes <strong>Netznutzung dynamisch</strong>, a dynamic tariff with
-synthetic demo prices, so its tariff details and the platform's dynamic-price
-console have data to show. It starts after the demo's invoiced periods.</p>
+manager who manages both, to show per-community access.</p>
+<p>Seeded demo users:</p>
+<ul>
+<li>Admin: <code>admin@openzev.local</code> / <code>admin1234</code></li>
+<li>Issuer and manager: <code>owner@openzev.local</code> / <code>owner1234</code></li>
+<li>Participant (ZEV 1): <code>anna@openzev.local</code> / <code>anna1234</code></li>
+<li>Participant (ZEV 1, flat 2 + parking space with charger): <code>ben@openzev.local</code> / <code>ben1234</code></li>
+<li>Participant (ZEV 2): <code>clara@openzev.local</code> / <code>clara1234</code></li>
+<li>Viewer (ZEV 1, read-only): <code>viewer@openzev.local</code> / <code>viewer1234</code></li>
+<li>Property manager (both ZEVs): <code>manager@openzev.local</code> / <code>manager1234</code></li>
+<li>Former participant (ZEV 1, moved out): <code>former@openzev.local</code> / <code>former1234</code></li>
+<li>Joint household (ZEV 1): <code>household@openzev.local</code> / <code>household1234</code></li>
+<li>Organisation participant (ZEV 1): <code>organisation@openzev.local</code> / <code>organisation1234</code></li>
+<li>Manager of ZEV 1 by grant + participant of ZEV 2: <code>mixed@openzev.local</code> / <code>mixed1234</code></li>
+<li>Viewer of ZEV 1 until 31 March next year (Treuhand): <code>treuhand@openzev.local</code> / <code>treuhand1234</code></li>
+<li>No ZEV yet, may set one up: <code>newcomer@openzev.local</code> / <code>newcomer1234</code></li>
+<li>Pending invitation (ZEV 2 viewer, no password yet): <code>invitee@openzev.local</code></li>
+</ul>
+<p>"Last year" below means the year before <code>--end-date</code>.</p>
+<ul>
+<li><strong>Dated issuer:</strong> Otto Vorbesitzer (no login) issued the flagship's invoices until
+  30 June last year, Paula Producer from 1 July.</li>
+<li><strong>Tenant change:</strong> Maria left flat 3 after Q1 last year and the Musters took over the
+  same meter. Maria's login shows only her one invoice; she has moved away since, and
+  that invoice keeps her old address.</li>
+<li><strong>Parties that are not participants:</strong> the Verwaltung Muster AG represents the
+  flagship and manages it through that role; Hans Hauswart is a contact without access.</li>
+<li><strong>Landowners:</strong> each house of the second ZEV has its own (Paula, Clara, Lukas). The
+  role grants no access.</li>
+</ul>
+<p>The seed command creates two communities owned by the same demo owner, so the community switcher can be exercised:</p>
+<ul>
+<li><strong>ZEV STWEG Sonnenhof</strong> — the flagship, a single-building condominium (<code>zev</code>) with quarterly billing, German invoices and VAT folded into its prices. Carries participants, metering points, tariffs and hourly readings from 1 January of the previous year through the seed window, with 15-minute readings only for its latest 14 days. The previous year is billed quarter by quarter as paid invoices, except when its final quarter overlaps the open prior quarter; that prior quarter has draft, approved and sent invoices.</li>
+<li><strong>ZEV Sonnenfirma AG</strong> — a smaller property-company (<code>vzev</code>) with monthly billing, English invoices, VAT-registered with a UID, shared grid-connection and per-metering-point fees, and itemized tariff bands. Carries its own participants, metering points, tariffs and readings, plus two invoice periods: the prior complete month in draft/approved/sent and the month before it closed (paid/cancelled).</li>
+</ul>
+<p>The standard Swiss VAT ranges (7.7 % from 2018 and 8.1 % from 2024) are added only when no existing rate overlaps each range; existing VAT timelines are preserved. The operational/log pages are seeded too — metering import logs (CSV + SDAT-CH, with CSV provenance on a real meter month), invoice email logs, two issued contract snapshots (Anna and Clara), stored PDFs for Anna's sent and paid invoices, and audit events (including one denied) — and one meter on the flagship carries an intentional ~12-day reading gap in the current quarter so the data-quality page has a real issue to show.</p>
+<p>The flagship also carries <strong>Netznutzung dynamisch</strong>, linked to a synthetic price
+source with quarter-hourly prices from the start of the quarter containing
+<code>--end-date</code> through the following day. The tariff starts after all seeded
+invoice periods, so their totals are unchanged. Fetching is disabled and the
+source URL is a reserved <code>.invalid</code> host, so seeding never calls a tariff API.
+Re-seeding keeps the stored prices.</p>
+<p>Re-running <code>seed_demo</code> refreshes the demo readings, invoices and Anna's PDFs, import/email logs and audit events, while retaining contract snapshots. If the seed transaction rolls back, existing invoice rows and PDFs remain unchanged. PDF generation and cleanup run after commit and are best-effort. Screenshot captures explicitly select ZEV STWEG Sonnenhof so they consistently show the same community.</p>
 <h3 id="resetting-demo-data">Resetting Demo Data<a class="headerlink" href="#resetting-demo-data" title="Permanent link">&para;</a></h3>
 <p>To reload the demo dataset:</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>backend<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>seed_demo
@@ -2644,6 +2704,10 @@ console have data to show. It starts after the demo's invoiced periods.</p>
 <p>This refreshes demo readings, invoices, import/email logs and audit events for
 both communities, and fills the synthetic dynamic-price series through tomorrow.
 Its stored price history and issued contract snapshots are retained.</p>
+<p>By default, <code>--end-date</code> is today and <code>--start-date</code> is the start of the
+complete quarter before that end date. Both dates accept <code>YYYY-MM-DD</code>; use
+<code>--end-date</code> to reproduce a historical window and <code>--start-date</code> to override
+its default start.</p>
 <h2 id="first-time-setup">First-Time Setup<a class="headerlink" href="#first-time-setup" title="Permanent link">&para;</a></h2>
 <p>This tour uses the demo accounts. On a production instance, sign in with the
 admin account you <a href="#creating-the-first-admin-account">created above</a>; the
@@ -2741,16 +2805,43 @@ fails, reopen its confirmation to retry.</p>
 <h2 id="prebuilt-container-images">Prebuilt Container Images<a class="headerlink" href="#prebuilt-container-images" title="Permanent link">&para;</a></h2>
 <p>If you prefer not to build locally, prebuilt images are available on GitHub Container Registry:</p>
 <ul>
-<li><code>ghcr.io/splattner/openzev-backend:latest</code></li>
-<li><code>ghcr.io/splattner/openzev-frontend:latest</code></li>
-<li><code>ghcr.io/splattner/openzev-fullstack:latest</code></li>
+<li><code>ghcr.io/splattner/openzev-backend</code> — the Django API</li>
+<li><code>ghcr.io/splattner/openzev-frontend</code> — the static frontend served by nginx</li>
+<li><code>ghcr.io/splattner/openzev-fullstack</code> — frontend and backend in one container, which the release <code>docker-compose.yml</code> uses</li>
 </ul>
 <p>Tag variants:</p>
 <ul>
 <li><code>latest</code> — newest published release</li>
 <li><code>vX.Y.Z</code> — specific release version</li>
-<li><code>main</code> — latest development build (may be unstable)</li>
+<li><code>main</code> — latest build from the <code>main</code> branch</li>
+<li><code>main-&lt;short-sha&gt;</code> — the build of one specific <code>main</code> commit</li>
 </ul>
+<p>Images tagged <code>main</code> are rebuilt on every commit to <code>main</code> and may contain
+unfinished changes or breaking behaviour. Use them for previews only; for a
+reproducible deployment pin a release tag such as <code>v1.2.3</code>.</p>
+<h3 id="sboms-and-signatures">SBOMs and signatures<a class="headerlink" href="#sboms-and-signatures" title="Permanent link">&para;</a></h3>
+<p>Release images and <code>main</code> images are published with signed container manifests
+and signed SBOM attestations. Release SBOM files are attached to the GitHub
+release; <code>main</code> SBOMs are uploaded as artifacts of the <code>Container Build Check</code>
+workflow run. An SBOM is verified through the signed attestation bound to the
+image, not through a detached signature on the raw <code>.spdx.json</code> file.</p>
+<p>With <a href="https://docs.sigstore.dev/cosign/"><code>cosign</code></a> installed, verify an image's
+GitHub OIDC keyless signature (for a release image, replace <code>:main</code> with the
+release tag, for example <code>:v1.2.3</code>):</p>
+<div class="highlight"><pre><span></span><code>cosign<span class="w"> </span>verify<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--certificate-identity-regexp<span class="w"> </span><span class="s2">"https://github.com/splattner/openzev/.github/workflows/.*"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--certificate-oidc-issuer<span class="w"> </span><span class="s2">"https://token.actions.githubusercontent.com"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>ghcr.io/splattner/openzev-backend:main
+</code></pre></div>
+<p>Verify the signed SBOM attestation the same way:</p>
+<div class="highlight"><pre><span></span><code>cosign<span class="w"> </span>verify-attestation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--certificate-identity-regexp<span class="w"> </span><span class="s2">"https://github.com/splattner/openzev/.github/workflows/.*"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--certificate-oidc-issuer<span class="w"> </span><span class="s2">"https://token.actions.githubusercontent.com"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>spdxjson<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>ghcr.io/splattner/openzev-backend:main
+</code></pre></div>
+<p>To inspect the attested predicate, append <code>| jq '.payload | @base64d | fromjson'</code>,
+or download the <code>.spdx.json</code> file from the release or workflow run.</p>
 <h3 id="reverse-proxies-and-num_proxies">Reverse proxies and NUM_PROXIES<a class="headerlink" href="#reverse-proxies-and-num_proxies" title="Permanent link">&para;</a></h3>
 <p><code>NUM_PROXIES</code> defaults to <code>0</code>, so direct requests cannot choose their own
 rate-limit or audit identity through <code>X-Forwarded-For</code>. The default and fullstack
@@ -2788,9 +2879,17 @@ so switching between them keeps one database.</p>
 <p>Older revisions mounted that volume at different paths in different files, which
 gave each stack a cluster the others could not see: starting one, then the
 other, looked like the database had been wiped. If you are coming from such a
-setup, the first start after upgrading initialises an empty cluster; see the
-upgrade note in the <a href="https://github.com/splattner/openzev/blob/main/README.md#quick-start-docker">README</a> for how to
-carry data across.</p>
+setup, the first start after upgrading initialises an empty cluster. Dump
+anything you want to keep from the old volume first, then restore it into the
+new one:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>db
+docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>db<span class="w"> </span>pg_dump<span class="w"> </span>-U<span class="w"> </span>openzev<span class="w"> </span>openzev<span class="w"> </span>&gt;<span class="w"> </span>backup.sql
+docker<span class="w"> </span>compose<span class="w"> </span>down<span class="w"> </span>-v<span class="w">          </span><span class="c1"># discards the old volume</span>
+docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--build
+docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-T<span class="w"> </span>db<span class="w"> </span>psql<span class="w"> </span>-U<span class="w"> </span>openzev<span class="w"> </span>openzev<span class="w"> </span>&lt;<span class="w"> </span>backup.sql
+</code></pre></div>
+<p>For demo data, <code>scripts/start-demo-environment.sh</code> reseeds from scratch and no
+dump is needed.</p>
 <p>See <a href="../12-troubleshooting/">Troubleshooting</a> for more help.</p>
 <h2 id="disclaimer">Disclaimer<a class="headerlink" href="#disclaimer" title="Permanent link">&para;</a></h2>
 <p>OpenZEV is built for personal use and self-hosting by tinkerers who enjoy running their own stack. <strong>Please double-check your data and billing outputs</strong>—we do not take responsibility for incorrect imports, calculations, invoices, or invoicing workflows.</p>
