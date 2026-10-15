@@ -225,7 +225,9 @@ render `PageHeader` plus the same body. These bodies have no header-hiding
 
 ### 4.2 CSS contracts
 
-**File:** `frontend/src/styles/` (entry `index.css` imports `tokens.css`, `base.css`, `layout/`, `components/`, `pages/` in cascade order; see README there)
+**File:** `frontend/src/styles/` (entry `index.css` declares the cascade layers once — `native, vendor, app` — and imports `tokens.css`, `base.css`, `layout/`, `components/`, `pages/` into `app` in cascade order; see README there)
+
+**Where CSS goes.** Our own rules live in the `app` layer, where import order and selector specificity decide as before. Third-party CSS (Mantine, Leaflet) is imported into `vendor` from `index.css`, below `app`, so our rules beat it without selector tricks; never import a stylesheet bare from a component, because unlayered CSS beats every layer. Native element defaults that a Mantine class must win over go in `native-controls.css` (layer `native`, below `vendor`).
 
 The following utility and shared classes define the current management-page
 language and should be reused instead of ad hoc page-local CSS when possible:
@@ -279,9 +281,9 @@ field tokens (`design/tokens.json` → `fields`): 2.5rem (40px) height — the
 buttons' height, so fields and buttons on one line align — 1rem value
 type at 1.5 line height (native selects retain platform line-height behavior),
 0.5rem radius, 0.95rem base inline padding, 0.875rem/500 labels in
-`--text-body`, 0.8125rem helpers, and 0.4rem label/control/helper gaps. Native rules live in `styles/base.css`;
-their input-type exclusions use `:where()` to keep specificity below Mantine's
-state and section rules. Native helpers (`label > small.muted`) use the shared
+`--text-body`, 0.8125rem helpers, and 0.4rem label/control/helper gaps. Native rules live in `styles/base.css` and
+`styles/native-controls.css`; the text-field rule in `base.css` skips Mantine's own inputs
+(`[class*='mantine-']`, plus the input-type exclusions in `:where()`) so their state and section rules keep working. Native helpers (`label > small.muted`) use the shared
 helper size and line height.
 
 Mantine defaults live in `frontend/src/lib/mantineTheme.ts`: `Input` box vars

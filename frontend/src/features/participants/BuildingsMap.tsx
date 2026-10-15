@@ -1,5 +1,4 @@
 import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
 import { useEffect, useMemo } from 'react'
 import { GeoJSON, MapContainer, TileLayer, useMap } from 'react-leaflet'
 import { useTranslation } from 'react-i18next'

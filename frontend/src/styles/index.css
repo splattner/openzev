@@ -1,43 +1,61 @@
-/* Entry point: the order of these imports is the cascade order — keep it. */
-@import './tokens.css';
-@import './base.css';
-@import './components/table.css';
-@import './layout/shell.css';
-@import './components/filter-bar.css';
-@import './pages/raw-metering.css';
-@import './layout/account-menu.css';
-@import './layout/page-header.css';
-@import './components/sheet.css';
-@import './components/stat-tiles.css';
-@import './pages/overview-hubs.css';
-@import './components/pdf-frame.css';
-@import './components/empty-state.css';
-@import './components/badge.css';
-@import './components/charts.css';
-@import './components/button.css';
-@import './components/form-helpers.css';
-@import './utilities.css';
-@import './components/template-editor-and-row-actions.css';
-@import './pages/billing-period.css';
-@import './components/list-filters.css';
-@import './pages/metering-points.css';
-@import './pages/tariffs.css';
-@import './components/row-helpers.css';
-@import './pages/billing-period-rows.css';
-@import './pages/participant-rows.css';
-@import './components/checkbox-and-toast.css';
-@import './pages/login.css';
-@import './components/notice.css';
-@import './components/dialog.css';
-@import './pages/templates-and-layouts.css';
-@import './layout/responsive.css';
-@import './layout/app-footer.css';
-@import './pages/login-split.css';
-@import './misc.css';
-@import './pages/drawers.css';
-@import './pages/tariff-versions.css';
-@import './components/app-tabs.css';
-@import './pages/public-invoice.css';
-@import './pages/overview-period.css';
-@import './pages/annual-documents.css';
-@import './pages/zev-settings.css';
+/*
+ * Entry point. The cascade layers are declared once, below; a rule in a later layer
+ * beats one in an earlier layer whatever its selector specificity.
+ *
+ *   native  native element defaults that a component library's class must beat
+ *   vendor  third-party CSS (Mantine, Leaflet), so our own rules win without selector tricks
+ *   app     everything we write
+ *
+ * Inside `app` the order of these imports is the cascade order — later files win ties,
+ * so keep it. Anything left outside a layer beats every layer, so third-party CSS is
+ * imported here into `vendor`, never bare from a component.
+ */
+@layer native, vendor, app;
+
+@import './native-controls.css' layer(native);
+@import '@mantine/core/styles.css' layer(vendor);
+@import '@mantine/dates/styles.css' layer(vendor);
+@import 'leaflet/dist/leaflet.css' layer(vendor);
+
+@import './tokens.css' layer(app);
+@import './base.css' layer(app);
+@import './components/table.css' layer(app);
+@import './layout/shell.css' layer(app);
+@import './components/filter-bar.css' layer(app);
+@import './pages/raw-metering.css' layer(app);
+@import './layout/account-menu.css' layer(app);
+@import './layout/page-header.css' layer(app);
+@import './components/sheet.css' layer(app);
+@import './components/stat-tiles.css' layer(app);
+@import './pages/overview-hubs.css' layer(app);
+@import './components/pdf-frame.css' layer(app);
+@import './components/empty-state.css' layer(app);
+@import './components/badge.css' layer(app);
+@import './components/charts.css' layer(app);
+@import './components/button.css' layer(app);
+@import './components/form-helpers.css' layer(app);
+@import './utilities.css' layer(app);
+@import './components/template-editor-and-row-actions.css' layer(app);
+@import './pages/billing-period.css' layer(app);
+@import './components/list-filters.css' layer(app);
+@import './pages/metering-points.css' layer(app);
+@import './pages/tariffs.css' layer(app);
+@import './components/row-helpers.css' layer(app);
+@import './pages/billing-period-rows.css' layer(app);
+@import './pages/participant-rows.css' layer(app);
+@import './components/checkbox-and-toast.css' layer(app);
+@import './pages/login.css' layer(app);
+@import './components/notice.css' layer(app);
+@import './components/dialog.css' layer(app);
+@import './pages/templates-and-layouts.css' layer(app);
+@import './layout/responsive.css' layer(app);
+@import './layout/app-footer.css' layer(app);
+@import './pages/login-split.css' layer(app);
+@import './misc.css' layer(app);
+@import './pages/drawers.css' layer(app);
+@import './pages/tariff-versions.css' layer(app);
+@import './components/app-tabs.css' layer(app);
+@import './pages/public-invoice.css' layer(app);
+@import './pages/overview-period.css' layer(app);
+@import './pages/annual-documents.css' layer(app);
+@import './pages/zev-settings.css' layer(app);

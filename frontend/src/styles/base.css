@@ -75,18 +75,13 @@ a {
   text-decoration: none;
 }
 
-button,
-input,
-select {
-  font: inherit;
-}
-
 /* Text-like controls share the field-token dimensions with Mantine inputs
-   (same tokens via the theme). `:where()` keeps this rule below Mantine's
-   own input styles so focused/error/disabled states keep working.
-   Excluded types keep their intrinsic rendering. */
-input:where(:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']):not([type='hidden']):not([type='submit']):not([type='button']):not([type='reset']):not([type='image']):not([type='color'])),
-select:where(:not([multiple])) {
+   (same tokens via the theme). Mantine's own inputs are skipped so their
+   focused/error/disabled states keep working; the rule has to sit above the
+   `vendor` layer to beat Mantine's `input { font: inherit }` reset on the
+   rest. Excluded types keep their intrinsic rendering. */
+input:where(:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']):not([type='hidden']):not([type='submit']):not([type='button']):not([type='reset']):not([type='image']):not([type='color']):not([class*='mantine-'])),
+select:where(:not([multiple]):not([class*='mantine-'])) {
   width: 100%;
   height: var(--field-height);
   padding: 0 var(--field-padding-inline);
@@ -111,29 +106,6 @@ select:where(:not([multiple])) {
   line-height: var(--field-line-height);
 }
 
-/* Keep checkboxes and radios at intrinsic width even when another form rule
-   applies a width to inputs. They are excluded from the field rule above. */
-input[type="checkbox"],
-input[type="radio"] {
-  width: auto;
-}
-
-/* Field labels match Mantine's (theme `InputWrapper`): the label is quieter
-   than the value it names. */
-label {
-  display: grid;
-  gap: var(--field-gap);
-  font-size: var(--field-label-size);
-  font-weight: var(--field-label-weight);
-  color: var(--text-body);
-}
-
 label :is(input, select, textarea) {
   font-weight: 400;
-}
-
-label > small.muted {
-  font-size: var(--field-help-size);
-  font-weight: 400;
-  line-height: var(--field-line-height);
 }
