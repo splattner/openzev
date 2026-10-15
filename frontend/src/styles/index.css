@@ -33,7 +33,6 @@
 
 @import './components/table.css' layer(components);
 @import './components/filter-bar.css' layer(components);
-@import './components/period-selector.css' layer(components);
 @import './components/sheet.css' layer(components);
 @import './components/stat-tiles.css' layer(components);
 @import './components/toolbar.css' layer(components);

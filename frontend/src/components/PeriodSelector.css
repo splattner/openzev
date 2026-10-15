@@ -1,3 +1,168 @@
+/* Period selector: previous / range / next as one group, kept on one line; the
+   range gives way (ellipsis) before the arrows wrap. The compact variant (the
+   dashboards) follows below. */
+
+.period-selector {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.period-selector:not(.period-selector--compact) .period-selector-trigger {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.period-selector:not(.period-selector--compact) .period-selector-text {
+  min-width: 0;
+}
+
+/* Beside other fields the range and its interval share one line, so the
+   trigger keeps the shared control height; the interval's label is left to
+   screen readers. Phones stack the fields, and the trigger its two lines. */
+
+@media (min-width: 769px) {
+  .period-selector:not(.period-selector--compact) .period-selector-text {
+    grid-auto-flow: column;
+    align-items: baseline;
+    gap: 0.625rem;
+  }
+
+  .period-selector-interval-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+.period-selector:not(.period-selector--compact) :is(.period-selector-range, .period-selector-interval) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.period-selector-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: var(--field-height);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-card);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sheet);
+  padding: 0.3rem 0.875rem;
+  font: inherit;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.period-selector-trigger:hover:not(:disabled) {
+  background: var(--surface-sunken);
+}
+
+.period-selector-trigger:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.period-selector .button {
+  min-height: var(--field-height);
+}
+
+.period-selector:not(.period-selector--compact) .period-selector-step {
+  width: var(--field-height);
+  padding-inline: 0;
+  flex: none;
+}
+
+.period-selector-text {
+  display: grid;
+  gap: 0.05rem;
+  justify-items: start;
+  text-align: start;
+}
+
+.period-selector-title {
+  font-weight: 650;
+  font-size: 0.8125rem;
+  color: var(--ink);
+}
+
+.period-selector-range {
+  font-weight: 650;
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.period-selector-interval {
+  font-size: 0.75rem;
+}
+
+.period-selector-caret {
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.period-selector-caret[data-open] {
+  transform: rotate(180deg);
+}
+
+.period-selector-dropdown {
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem;
+}
+
+.period-selector-presets {
+  display: grid;
+  gap: 0.125rem;
+  align-content: start;
+  min-width: 12rem;
+}
+
+.period-selector-preset {
+  display: grid;
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.period-selector-preset:hover {
+  background: var(--surface-sunken);
+}
+
+.period-selector-preset.active {
+  background: var(--brand-pale);
+  color: var(--brand-deep);
+  font-weight: 650;
+}
+
+.period-selector-preset small {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 640px) {
+  .period-selector-dropdown {
+    flex-direction: column;
+  }
+}
+
 /* Compact stepper: chevrons around a one-line trigger naming the period. */
 
 .period-selector--compact {
@@ -7,7 +172,7 @@
   min-width: 0;
 }
 
-.period-selector-step {
+.period-selector--compact .period-selector-step {
   flex: none;
   width: 2.5rem;
   padding-inline: 0;
@@ -63,4 +228,3 @@
 .period-selector-name-sizer {
   visibility: hidden;
 }
-
