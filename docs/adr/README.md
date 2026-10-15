@@ -38,6 +38,7 @@ This directory captures key architectural decisions for OpenZEV.
 - [0032: One visual language for screen and documents](0032-one-visual-language-for-screen-and-documents.md) (amends 0014)
 - [0033: The energy data flag defaults to on once the integration key is configured](0033-energy-data-flag-follows-the-integration-key.md)
 - [0034: Participant links never sign in an account with independent access](0034-participant-links-never-sign-in-independent-accounts.md)
+- [0035: One rule for where content opens — dialog, drawer, page, disclosure](0035-overlay-and-disclosure-pattern-rules.md)
 
 ## Conventions
 
