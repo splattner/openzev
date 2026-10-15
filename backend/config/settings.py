@@ -120,7 +120,10 @@ import dj_database_url
 DATABASES = {
     "default": dj_database_url.config(
         default=env("DATABASE_URL", default=f"sqlite:///{BASE_DIR}/db.sqlite3"),
-        conn_max_age=600,
+        # Seconds a DB connection is kept open per thread. The dev stack sets 0:
+        # runserver spawns a thread per request and a finished thread never
+        # closes its connection, so persistent connections pile up there.
+        conn_max_age=env.int("DB_CONN_MAX_AGE", default=600),
     )
 }
 

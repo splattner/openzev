@@ -14,6 +14,8 @@ services:
       CACHE_URL: redis://valkey:6379/1
       # Backend remains directly reachable in dev; do not trust client-supplied XFF.
       NUM_PROXIES: 0
+      # runserver is threaded and leaks one persistent connection per request thread.
+      DB_CONN_MAX_AGE: 0
     volumes:
       - ./backend:/app
       - backend_media:/app/media
