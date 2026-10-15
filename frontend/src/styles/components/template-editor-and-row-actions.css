@@ -1,0 +1,62 @@
+/* Highlighted {{variable}} chips + hover tooltip in the template editor.
+   The chips live in an overlay painted above the textarea, so they multiply
+   into it instead of covering the text underneath. */
+.template-var-chip {
+  pointer-events: auto;
+  cursor: help;
+  border-radius: 3px;
+  background: var(--brand-pale);
+  mix-blend-mode: multiply;
+}
+
+.template-var-tooltip {
+  position: absolute;
+  background: var(--brand-deep);
+  color: var(--white);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.actions-cell {
+  text-align: right;
+}
+
+.actions-cell-content {
+  display: flex;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 100%;
+}
+
+/* In a row, the main action is a forest outline: one solid button per page
+   (the page's own primary action), not one per record. */
+:is(td, .actions-cell-content) > .button:not(.button-secondary, .button-ghost, .button-danger, .danger, .button-outline) {
+  background: transparent;
+  border-color: var(--interactive);
+  box-shadow: none;
+  color: var(--interactive);
+}
+
+:is(td, .actions-cell-content) > .button:not(.button-secondary, .button-ghost, .button-danger, .danger, .button-outline):hover:not(:disabled) {
+  background: var(--brand-pale);
+  color: var(--brand-deep);
+}
+
+/* A destructive row action is quiet, as in the compact rule below. */
+:is(td, .actions-cell-content) > :is(.button-danger, .button.danger) {
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  color: var(--danger-700);
+}
+
+:is(td, .actions-cell-content) > :is(.button-danger, .button.danger):hover:not(:disabled) {
+  background: var(--danger-100);
+  border-color: var(--danger-300);
+}

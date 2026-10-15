@@ -1,0 +1,94 @@
+/* The footer flows after the split instead of being absolutely positioned:
+   an absolute footer floats over the card whenever the split fills the
+   viewport, because grid centering lets the split eat the reserved space. */
+.login-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.login-shell>.login-split {
+  margin-block: auto;
+}
+
+.login-shell>.app-footer {
+  margin-top: 2rem;
+}
+
+/* Two-column login split layout */
+.login-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: center;
+  width: min(100%, 900px);
+}
+
+.login-split.login-split-single {
+  grid-template-columns: 1fr;
+  width: min(100%, 480px);
+  justify-items: center;
+}
+
+@media (max-width: 700px) {
+  .login-split {
+    grid-template-columns: 1fr;
+  }
+
+  .login-register-panel {
+    display: none;
+  }
+}
+
+.login-register-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+  .login-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+
+  .login-divider::before,
+  .login-divider::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid var(--border-default);
+  }
+
+  .oauth-provider-list {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .oauth-provider-button {
+    width: 100%;
+  }
+
+.login-register-inner {
+  display: grid;
+  gap: 1rem;
+  text-align: center;
+  padding: 2rem;
+  border-radius: var(--radius-lg);
+  background: var(--brand-pale);
+  border: 1px solid var(--brand-glow);
+}
+
+.login-register-inner h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--brand-deep);
+}
+
+.login-register-inner p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}

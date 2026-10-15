@@ -22,7 +22,7 @@ function control(type: string): HTMLInputElement {
 describe('global form-control widths', () => {
     beforeAll(() => {
         const style = document.createElement('style')
-        style.textContent = readFileSync(resolve(__dirname, '../src/index.css'), 'utf8')
+        style.textContent = readFileSync(resolve(__dirname, '../src/styles/base.css'), 'utf8')
         document.head.appendChild(style)
     })
 

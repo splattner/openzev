@@ -1,0 +1,274 @@
+/* ZEV settings save bar: compact sticky footer, visible only while dirty,
+   saving, or showing a save error. Opaque so scrolled content never shows
+   through; safe-area padding for mobile browsers. */
+.zev-settings-save-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border-default);
+  border-radius: 0.75rem;
+  background: var(--surface-card);
+}
+
+.zev-settings-save-bar-text {
+  flex: 1 1 auto;
+  min-width: 10rem;
+  font-weight: 600;
+}
+
+.zev-settings-save-bar .actions-row {
+  margin-left: auto;
+}
+
+.zev-settings-save-bar-error {
+  flex: 1 1 100%;
+}
+
+/* Email subject/body: label row carries the source badge and the action
+   above the field; default mode shows the platform text read-only. */
+.zev-email-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.template-source {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.template-source-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.template-source p {
+  margin: 0;
+}
+
+.zev-email-label-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.zev-email-label-row > button {
+  margin-left: auto;
+}
+
+.zev-email-default-preview {
+  margin: 0;
+  padding: 0.625rem var(--field-padding-inline);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--field-radius);
+  background: var(--surface);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.zev-email-fields-toggle {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+
+/* ZEV settings → Access (#761): who may manage or view the community. */
+.zev-access-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.zev-access-row {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border-default);
+  border-radius: 0.6rem;
+  background: var(--white);
+}
+
+.zev-access-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+  min-width: 0;
+}
+
+.zev-access-who .muted {
+  overflow-wrap: anywhere;
+}
+
+.zev-access-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.zev-access-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 1rem;
+  font-size: 0.9rem;
+}
+
+.zev-access-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.zev-access-form-hint {
+  margin: 0;
+}
+
+/* ZEV settings → Parties (#761): issuer, representative, landowners, contacts. */
+.zev-parties-block {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-default);
+}
+
+.zev-parties-block-first {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.zev-parties-block-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.zev-parties-block-header h4 {
+  margin: 0;
+}
+
+.zev-parties-block-header p {
+  margin: 0.15rem 0 0;
+  font-size: 0.9rem;
+}
+
+.zev-parties-holder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+  margin: 0;
+}
+
+.zev-parties-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.zev-parties-history li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.75rem;
+}
+
+/* Access on a person's own row of the People & access tab (#761). */
+.party-access {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.party-access-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  font-size: 0.9rem;
+}
+
+.party-access-line .muted {
+  overflow-wrap: anywhere;
+}
+
+.party-access-line select {
+  width: auto;
+}
+
+.zev-parties-inline-date {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+@media (min-width: 48rem) {
+  .zev-access-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .zev-access-meta {
+    grid-column: 1;
+  }
+
+  .zev-access-actions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+
+/* ZEV creation wizard, step 3: every metering point is edited in place. */
+.wizard-metering-points {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wizard-metering-point {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.wizard-metering-point-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.wizard-metering-point-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) minmax(0, 3fr);
+  gap: 0.75rem;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .wizard-metering-point-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Own-system figure under a net-metered participant's meter value. */
+.own-system-kwh {
+  display: block;
+}

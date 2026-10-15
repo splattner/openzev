@@ -254,7 +254,7 @@ aborts/disposes old document state and generates only the active document.
 - kWh is shown whole (`formatKwh(v, {maxDecimals: 0})` + ` kWh`), percentages
   with `formatPercent`, money with `formatChf`.
 
-CSS (`index.css`): `.participant-table--static tbody tr { cursor: default }`
+CSS (`styles/components/table.css`): `.participant-table--static tbody tr { cursor: default }`
 and `.participant-table tfoot td` (bold, top border).
 
 ### 7.3 Billing hub

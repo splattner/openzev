@@ -1,0 +1,43 @@
+/* A blank sheet: dashed edge, centred message, the way forward below it. */
+.empty-state {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: center;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+}
+
+.card.empty-state {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: transparent;
+  box-shadow: none;
+}
+
+.empty-state > :is(h2, h3):first-child {
+  justify-content: center;
+  margin: 0;
+}
+
+.empty-state > :is(h2, h3):first-child::before {
+  content: none;
+}
+
+.empty-state > p.muted {
+  max-width: 52ch;
+  margin: 0;
+}
+
+.empty-state > .actions-row {
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block::after,
+  .participant-row-focus,
+  .participant-table tbody tr > td {
+    animation: none !important;
+    transition: none !important;
+  }
+}

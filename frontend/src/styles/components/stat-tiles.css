@@ -1,0 +1,206 @@
+/* ── KPI tiles — the documents' figure tiles ───────────────────────────────
+   Kicker label, the figure with its unit set small, an optional hint line. */
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  overflow-wrap: break-word;
+  padding: 0.95rem 1.1rem 1rem;
+  border-radius: var(--radius-md);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* The value line is the size container (the tile itself stays a subgrid):
+   figures scale to the tile, so a narrow tile never breaks a number. */
+.stat-card .stat-value {
+  max-width: 100%;
+  margin: 0.125rem 0 0;
+  container-type: inline-size;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.stat-figure {
+  font-size: clamp(1.125rem, 16cqi, 1.625rem);
+  white-space: nowrap;
+}
+
+.stat-figure--text {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.stat-unit {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+.stat-card > p.muted,
+.stat-card > span.muted {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* Tiles in a row share their label, figure and hint tracks (subgrid), so
+   every figure sits on one line even where a label wraps to two. */
+:is(.stat-grid, .kpi-row, .grid) > .stat-card {
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  row-gap: 0.25rem;
+  align-content: start;
+  align-items: start;
+}
+
+/* Toggle selection uses the interactive color; severity colors the value. */
+.stat-card--interactive {
+  appearance: none;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stat-card--interactive:hover {
+  border-color: var(--border-strong);
+}
+
+.stat-card--interactive[aria-pressed='true'] {
+  border-color: var(--interactive);
+  box-shadow: 0 0 0 1px var(--interactive), var(--shadow-sheet);
+}
+
+/* Tile grids: combine the wide modifier with the base class. */
+.stat-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+}
+
+.stat-grid--wide {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+
+.notice--retry {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.toolbar-main {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* Actions stay at the right, also when they wrap below the summary. */
+.toolbar-actions {
+  min-width: 0;
+  max-width: 100%;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.toolbar-actions .button {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Stack context above actions on narrow screens. */
+@media (max-width: 700px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-actions {
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+}
+
+/* Long compound labels (Amortisationsdauer) hyphenate in narrow tiles. */
+.stat-label {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  hyphens: auto;
+  color: var(--text-muted);
+}
+
+/* ── KPI row (dashboard hero + stats; redesign spec §5.1/§7.5) ── */
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: 1.25fr repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+/* The dark figure tile — the invoice's savings tile. At most one per view. */
+.stat-card--accent {
+  background: var(--brand-deep);
+  border-color: var(--brand-deep);
+}
+
+.stat-card--accent .stat-label,
+.stat-card--accent .stat-unit {
+  color: var(--brand-accent);
+}
+
+.stat-card--accent .stat-value {
+  color: var(--white);
+}
+
+.stat-card--accent-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--brand-accent);
+}
+
+.stat-card--success .stat-value {
+  color: var(--success-600);
+}
+
+.stat-card--warning .stat-value {
+  color: var(--warning-800);
+}
+
+.stat-card--danger .stat-value {
+  color: var(--danger-600);
+}
+
+/* Flat: inside .card, no chrome. */
+.stat-card.stat-card--flat {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0.5rem 0.25rem;
+}

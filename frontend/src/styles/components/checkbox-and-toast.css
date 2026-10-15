@@ -1,0 +1,49 @@
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* Label with a hint underneath: keep the box on the first line. */
+.checkbox-row.align-start {
+  align-items: flex-start;
+}
+
+.checkbox-row-text {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.toast-stack {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: grid;
+  gap: 0.5rem;
+  /* Above the modal (1000) and the dropdowns that open over it (1100) —
+     see src/lib/zLayers.ts, which owns this scale. */
+  z-index: 1200;
+}
+
+.toast {
+  min-width: 240px;
+  max-width: 420px;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  color: var(--white);
+  font-size: 0.875rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-overlay);
+}
+
+.toast-info {
+  background: var(--interactive);
+}
+
+.toast-success {
+  background: var(--success-600);
+}
+
+.toast-error {
+  background: var(--danger-700);
+}

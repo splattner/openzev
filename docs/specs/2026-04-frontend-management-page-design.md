@@ -225,7 +225,7 @@ render `PageHeader` plus the same body. These bodies have no header-hiding
 
 ### 4.2 CSS contracts
 
-**File:** `frontend/src/index.css`
+**File:** `frontend/src/styles/` (entry `index.css` imports `tokens.css`, `base.css`, `layout/`, `components/`, `pages/` in cascade order; see README there)
 
 The following utility and shared classes define the current management-page
 language and should be reused instead of ad hoc page-local CSS when possible:
@@ -262,7 +262,7 @@ language and should be reused instead of ad hoc page-local CSS when possible:
 | `.email-log*` | Delivery history cards with wrapping text and status rows. |
 | `.balance-chart-grid` | Dashboard consumption/production pair, independent of form layout. Auto-fit columns require 24rem each plus a 2rem gap; panels with less space stack, and the minimum track width is capped at 100% of the panel. |
 
-**Inline styles.** Put static presentation in `index.css`, reusing existing
+**Inline styles.** Put static presentation in `frontend/src/styles/`, reusing existing
 classes where practical. Keep `style` props for runtime values,
 component-provided dimensions, and tokens owned by TypeScript constants
 (`lib/zLayers.ts`, `lib/chartTokens.ts`). Use modifier classes for fixed visual
@@ -279,7 +279,7 @@ field tokens (`design/tokens.json` → `fields`): 2.5rem (40px) height — the
 buttons' height, so fields and buttons on one line align — 1rem value
 type at 1.5 line height (native selects retain platform line-height behavior),
 0.5rem radius, 0.95rem base inline padding, 0.875rem/500 labels in
-`--text-body`, 0.8125rem helpers, and 0.4rem label/control/helper gaps. Native rules live in `index.css`;
+`--text-body`, 0.8125rem helpers, and 0.4rem label/control/helper gaps. Native rules live in `styles/base.css`;
 their input-type exclusions use `:where()` to keep specificity below Mantine's
 state and section rules. Native helpers (`label > small.muted`) use the shared
 helper size and line height.
@@ -373,7 +373,7 @@ Frontend interaction rules relevant to async work:
   eligible records, single-page result sets, future billing periods) are
   hidden instead of rendered as dead disabled buttons — a greyed button reads
   to users as a stuck loading state. Disabled buttons use the
-  `cursor: not-allowed` affordance (`index.css` `.button:disabled`), never
+  `cursor: not-allowed` affordance (`styles/components/button.css` `.button:disabled`), never
   `cursor: wait`.
 
 ## 7. Frontend
@@ -596,7 +596,7 @@ These pages define the current management-page reference set.
 | New pages revert to dense equal-weight row buttons | Medium | Reuse `ActionMenu`, compact buttons, and this spec’s action hierarchy |
 | Tabs are overused for simple category groupings | Medium | Default to sections unless categories are truly mutually exclusive working contexts |
 | Locale files encode icons or punctuation | Low | Keep strings semantic only; render visuals in components |
-| Shared styling drifts into page-local one-offs | Medium | Extend `index.css` page-family blocks before inventing new local structures |
+| Shared styling drifts into page-local one-offs | Medium | Extend the `styles/` page-family files before inventing new local structures |
 | Destructive actions ship without confirmation | High | Require `useConfirmDialog` + `ConfirmDialog` for delete/remove/clear workflows |
 
 ## 9. Test plan

@@ -1,0 +1,223 @@
+/* Hamburger button: part of the phone's app bar. */
+.mobile-menu-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-body);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.mobile-menu-button:hover {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.mobile-menu-button:focus-visible {
+  outline-offset: -2px;
+}
+
+.mobile-menu-button svg {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+
+.mobile-bar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.mobile-bar-brand img:first-child {
+  width: 1.875rem;
+  height: 1.875rem;
+}
+
+.mobile-bar-brand img:last-child {
+  width: auto;
+  height: 1rem;
+}
+
+/* Sidebar overlay backdrop for mobile */
+.sidebar-overlay {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpi-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .card.confirm-dialog {
+    padding: 1rem;
+  }
+
+  /* The header stays edge to edge on the narrower inset. */
+  .form-modal {
+    padding: 0 1rem 1rem;
+  }
+
+  .form-modal-header {
+    margin-inline: -1rem;
+    padding-inline: 1rem;
+  }
+
+  .form-modal-header::after {
+    left: 1rem;
+  }
+
+  /* Keep in sync with Layout.tsx's mobile media query. */
+  /* Switch shell to single-column — sidebar becomes an overlay */
+  .shell,
+  .shell.shell-collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  /* Sidebar is a fixed drawer */
+  .sidebar,
+  .sidebar.collapsed {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(17.5rem, 86vw);
+    height: 100dvh;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    padding: 1rem 0.75rem 0.75rem;
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: var(--shadow-overlay);
+  }
+
+  /* Forest scrim behind the drawer */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: color-mix(in srgb, var(--brand-ink) 45%, transparent);
+    z-index: 199;
+  }
+
+  .sidebar-overlay.visible {
+    display: block;
+  }
+
+  /* Collapse button hidden on mobile — hamburger replaces it */
+  .sidebar-collapse-button {
+    display: none;
+  }
+
+  .content {
+    padding: 0 1rem 1.5rem;
+  }
+
+  /* The app bar: a full-bleed white strip, pinned while the page scrolls. */
+  .top-nav {
+    position: sticky;
+    top: 0;
+    z-index: 150;
+    width: auto;
+    margin: 0 -1rem 1.25rem;
+  }
+
+  .top-nav:has(.impersonation-banner) {
+    margin-bottom: 1rem;
+  }
+
+  .top-nav .impersonation-banner {
+    margin: 0 1rem;
+  }
+
+  .mobile-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 3.5rem;
+    padding: 0.375rem 0.75rem 0.375rem 0.375rem;
+    border-bottom: 1px solid var(--border-default);
+    background: var(--surface-card);
+    color: var(--text-primary);
+  }
+
+  /* Table cards always scroll horizontally on mobile */
+  .table-card {
+    overflow-x: auto;
+  }
+
+  /* Two-column form grids collapse to single column */
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Content+aside stacks vertically */
+  .content-with-aside {
+    grid-template-columns: 1fr;
+  }
+
+  /* Cards: reduce padding */
+  .card,
+  .table-card {
+    --sheet-pad-block: 1rem;
+    --sheet-pad-inline: 1rem;
+
+    padding: var(--sheet-pad-block) var(--sheet-pad-inline);
+  }
+}
+
+@media (max-width: 640px) {
+
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Two tiles a row on a phone; the hero figure takes the whole first row. */
+  .kpi-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .kpi-row > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .payment-fields-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .tariff-detail-card-wide {
+    grid-column: auto;
+  }
+
+  .tariff-period-actions,
+  .participant-card-actions,
+  .metering-assignment-actions {
+    justify-content: flex-start;
+  }
+}

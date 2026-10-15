@@ -1,5 +1,12 @@
 [
-  "index.css@alpha",
+  "styles/base.css@alpha",
+  "styles/components/button.css@alpha",
+  "styles/components/template-editor-and-row-actions.css@alpha",
+  "styles/layout/account-menu.css@alpha",
+  "styles/layout/shell.css@alpha",
+  "styles/pages/drawers.css@alpha",
+  "styles/pages/raw-metering.css@alpha",
+  "styles/pages/tariff-versions.css@alpha",
   "features/invoices/InvoiceDeleteModal.tsx@alpha",
   "features/audit/AuditEventDrawer.tsx@alpha",
   "features/tariffs/TariffDetailDrawer.tsx@alpha",

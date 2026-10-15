@@ -1,0 +1,93 @@
+/* ── Billing period page: command bar and row filter ── */
+
+.invoice-period-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+
+/* Period stepper on the left, the period's batch actions on the right. */
+.invoice-command-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.invoice-batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+/* One control size across the bar, the overflow menu's compact button included. */
+.invoice-command-bar .button {
+  min-height: 2.5rem;
+  font-size: 0.9rem;
+}
+
+/* Compact stepper: chevrons around a one-line trigger naming the period. */
+.period-selector--compact {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.period-selector-step {
+  flex: none;
+  width: 2.5rem;
+  padding-inline: 0;
+}
+
+.period-selector--compact .period-selector-trigger {
+  min-width: 0;
+  min-height: 2.5rem;
+  padding-block: 0.35rem;
+}
+
+.period-selector--compact .period-selector-text {
+  min-width: 0;
+}
+
+.period-selector--compact .period-selector-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.period-selector--compact .period-selector-range svg {
+  color: var(--interactive);
+}
+
+/* A range that is no billing period: the warning keeps its icon apart. */
+.period-selector .badge-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* The shown name and its invisible siblings share one cell: the widest name
+   of the year sets the width, so stepping never moves the chevrons. */
+.period-selector-name {
+  display: grid;
+  min-width: 0;
+  text-align: start;
+  font-variant-numeric: tabular-nums;
+}
+
+.period-selector-name > span {
+  grid-area: 1 / 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.period-selector-name-sizer {
+  visibility: hidden;
+}

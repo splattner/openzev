@@ -1,0 +1,263 @@
+/* ── Tables — the documents' line items in screen form ──────────────────────
+   Kicker-style column labels in white on the documents' dark forest header
+   band, hairline rows, tabular figures right-aligned. */
+.page-stack table,
+.data-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.page-stack th,
+.page-stack td,
+.data-table th,
+.data-table td {
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--border-default);
+  text-align: left;
+}
+
+.page-stack th,
+.page-stack td {
+  vertical-align: top;
+}
+
+/* Wide record tables (DataTable) keep columns closer together. */
+.data-table th,
+.data-table td {
+  padding-inline: 0.75rem;
+}
+
+.data-table th,
+.data-table td {
+  vertical-align: middle;
+}
+
+/* Scroll container for wide tables. Prevents the table's
+   min-content width from stretching the page layout (grid/flex children
+   default to min-width: auto) and confines overflow to the table itself.
+   Also bounded vertically: position: sticky (see .data-table thead th below)
+   only engages within the nearest scroll container, so without a height bound
+   the wrapper never scrolls vertically and the header would not stick.
+   Short tables are unaffected (no vertical overflow). */
+.table-scroll {
+  overflow-x: auto;
+  max-height: calc(100dvh - 12rem);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.participant-table th,
+.participant-table td {
+  vertical-align: middle;
+}
+
+/* Frozen name column; corner 4, header row 3, body column 1. */
+.participant-table th:first-child,
+.participant-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 6rem;
+  max-width: 10rem;
+  overflow-wrap: break-word;
+}
+
+.participant-table th.numeric,
+.participant-table td.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.participant-table td.numeric {
+  white-space: nowrap;
+}
+
+.participant-table tbody tr {
+  cursor: pointer;
+}
+
+/* Read-only variant (annual report): rows are not a selection. */
+.participant-table--static tbody tr {
+  cursor: default;
+}
+
+.participant-table tfoot td {
+  font-weight: 600;
+  border-top: 1px solid var(--border-default);
+}
+
+.participant-table thead tr th {
+  position: sticky;
+  top: 0;
+  background: var(--brand-deep);
+  z-index: 3;
+}
+
+.participant-table thead tr th:first-child {
+  z-index: 4;
+}
+
+.participant-table td:first-child {
+  background: var(--surface-card);
+  box-shadow: 1px 0 0 var(--border-default);
+}
+
+.participant-table tbody tr > td {
+  transition: background-color 150ms ease;
+}
+
+.participant-table tbody tr:hover > td,
+.participant-table tbody tr.is-selected > td,
+.participant-table tbody tr:has(:focus-visible) > td {
+  background: var(--surface);
+}
+
+.participant-table tbody tr.is-selected > td:first-child {
+  box-shadow:
+    inset 3px 0 0 var(--brand-mid),
+    1px 0 0 var(--border-default);
+}
+
+/* Fill the cell with the name button; shared focus styles show keyboard focus. */
+.participant-select,
+.audit-event-select {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0.15rem 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.participant-select:focus-visible,
+.audit-event-select:focus-visible,
+.tariff-select:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+.participant-table tbody tr.is-selected .participant-select {
+  font-weight: 600;
+}
+
+/* Keep billing workflow columns readable on narrow screens; the existing
+   table-scroll wrapper owns horizontal overflow. */
+.billing-workflow-table {
+  min-width: 48rem;
+}
+
+.billing-period-cell,
+.invoice-number-cell {
+  white-space: nowrap;
+}
+
+/* Operational table contract: sticky header, scannable rows (40–44px),
+   hover feedback, right-aligned tabular quantities/money. */
+.page-stack thead th,
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* The band itself: deep forest, white small caps. The metering points list's
+   column heads wear it too, so the two stay one style. */
+.page-stack thead th,
+.data-table thead th,
+.metering-point-columns {
+  padding-block: 0.55rem;
+  border-bottom-color: var(--brand-deep);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--white);
+  background: var(--brand-deep);
+}
+
+/* Neighbouring header cells can leave a light seam at fractional zoom; each
+   cell repaints the band 1px past its bottom and left edges. */
+:where(.page-stack, .data-table) thead th::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--brand-deep);
+}
+
+:where(.page-stack, .data-table) thead th + th::before {
+  left: -1px;
+}
+
+/* The band's outer corners follow the sheet's. */
+.page-stack thead th:first-child,
+.data-table thead th:first-child {
+  border-top-left-radius: var(--radius-sm);
+}
+
+.page-stack thead th:last-child,
+.data-table thead th:last-child {
+  border-top-right-radius: var(--radius-sm);
+}
+
+.data-table thead th {
+  white-space: nowrap;
+}
+
+/* Identifiers (invoice and meter numbers) never break at their hyphens. */
+.data-table td code {
+  white-space: nowrap;
+}
+
+.mono-editor {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.9rem;
+}
+
+.page-stack tbody tr,
+.data-table tbody tr {
+  height: 2.75rem;
+}
+
+.page-stack tbody tr:last-child > td,
+.data-table tbody tr:last-child > td {
+  border-bottom-color: transparent;
+}
+
+.page-stack tbody tr:hover > td,
+.data-table tbody tr:hover > td {
+  background: var(--surface);
+}
+
+/* Quantities and money — tabular numerals align vertically down the column. */
+.page-stack td.numeric,
+.data-table td.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.data-table-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.data-table-footer {
+  font-size: 0.8125rem;
+}

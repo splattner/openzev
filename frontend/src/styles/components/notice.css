@@ -1,0 +1,46 @@
+/* Notices: a pale tone with a hairline of the next step — the pills' grammar
+   at paragraph size. */
+.error-banner {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--danger-300);
+  border-radius: var(--radius-md);
+  background: var(--danger-100);
+  color: var(--danger-700);
+  font-size: 0.875rem;
+  box-shadow: none;
+}
+
+.error-text {
+  color: var(--danger-700);
+}
+
+.warning-banner {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--warning-200);
+  border-radius: var(--radius-md);
+  background: var(--warning-100);
+  color: var(--warning-800);
+  font-size: 0.875rem;
+}
+
+.info-banner {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--info-100);
+  border: 1px solid var(--info-200);
+  color: var(--text-body);
+  font-size: 0.875rem;
+}
+
+.warning-banner a {
+  color: var(--warning-800);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.metering-dq-warning {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--warning-800);
+  max-width: 220px;
+}

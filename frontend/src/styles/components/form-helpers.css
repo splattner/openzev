@@ -1,0 +1,94 @@
+.inline-form {
+  align-items: end;
+}
+
+/* Keep two-column inputs aligned when descriptions vary in height. */
+.inline-form.align-start {
+  align-items: start;
+}
+
+.field-error {
+  color: var(--danger-600);
+  font-size: 0.85rem;
+}
+
+.imports-history-filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.imports-history-filters input[type="search"] {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.imports-history-filters select {
+  flex: 0 1 16rem;
+  width: auto;
+  min-width: 0;
+}
+
+.actions-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.actions-row-end {
+  justify-content: flex-end;
+}
+
+.actions-row-gap-lg {
+  gap: 1rem;
+}
+
+.actions-row-wrap {
+  flex-wrap: wrap;
+}
+
+.grid-span-full {
+  grid-column: 1 / -1;
+}
+
+/* Two columns wide, but only where the grid has them: in the single-column
+   layout a span would create a second, implicit column. */
+@media (min-width: 641px) {
+  .grid-span-2 {
+    grid-column: span 2;
+  }
+}
+
+/* Grouped toggles for a tariff band's weekdays and months. Laid out like a
+   plain field so the group's label lines up with the inputs beside it, but
+   marked up as role="group" rather than a fieldset — a legend does not lay out
+   predictably inside a grid. */
+.recurrence-field {
+  display: grid;
+  gap: 0.4rem;
+  min-inline-size: 0;
+}
+
+.recurrence-chips {
+  display: grid;
+  gap: 0.375rem;
+}
+
+/* Each chip fills its grid cell, so selecting one cannot change any width and
+   the rows stay put while the group is being used. Applied through Mantine's
+   `classNames` API rather than by reaching for its internal class names. */
+.recurrence-chip {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Mantine hides a chip's checkbox by zeroing its width, which the
+   `input[type="checkbox"] { width: auto }` reset near the top of this file
+   overrides on specificity — leaving a 13px inline-block that doubled every
+   chip's height. Taken out of flow entirely here; the label's `for` is what
+   makes the chip clickable, so the input never needs to occupy space. */
+input.recurrence-chip-input {
+  position: absolute;
+  width: 0;
+}

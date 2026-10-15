@@ -1,0 +1,127 @@
+/* Status pills — the document's status pill: a pale fill, a hairline of the
+   next tone, sentence case for scanning in tables. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.125rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+/* A badge that opens something: a real button, so keyboard and screen readers get it. */
+button.badge-button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+button.badge-button:hover {
+  filter: brightness(0.96);
+}
+
+button.badge-button:focus-visible {
+  outline: 2px solid var(--brand-mid);
+  outline-offset: 2px;
+}
+
+.badge-neutral {
+  background: var(--status-neutral);
+  border-color: var(--border-default);
+  color: var(--ink-soft);
+}
+
+.badge-info {
+  background: var(--status-info);
+  border-color: var(--info-200);
+  color: var(--ink-soft);
+}
+
+.badge-success {
+  background: var(--status-success);
+  border-color: var(--success-200);
+  color: var(--success-700);
+}
+
+.badge-danger {
+  background: var(--status-danger);
+  border-color: var(--danger-300);
+  color: var(--danger-700);
+}
+
+.badge-warning {
+  background: var(--status-warning);
+  border-color: var(--warning-200);
+  color: var(--warning-800);
+}
+
+/* The status pill printed on the invoice (shared_pdf_base.html
+   `.document-status`). */
+.badge-brand {
+  background: var(--brand-pale);
+  border-color: var(--brand-glow);
+  color: var(--brand-mid);
+}
+
+/* Attributes, not states: what a record is (billing mode, energy type, meter
+   type, role, kind), set quiet and outlined, so the coloured pills beside
+   them can say what is going on (current, scheduled, needs attention). */
+.badge-tag {
+  background: var(--surface-card);
+  border-color: var(--border-strong);
+  color: var(--text-body);
+  font-weight: 500;
+}
+
+/* Status dot — small filled circle for one-glance health/readiness
+   indicators (billing periods table, admin system health). Uses the same
+   status tokens as the badges; size adapts to its context's font. */
+.dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: var(--muted);
+}
+
+.dot-success {
+  background: var(--success-600);
+}
+
+/* Filled dots use the strongest fill available in the token set (600 for
+   success; the warning/info palettes stop at 300/200). */
+.dot-warning {
+  background: var(--warning-300);
+}
+
+.dot-info {
+  background: var(--info-200);
+}
+
+/* Admin system-health probes: title row aligns the status dot with the
+   heading text. */
+.system-health-probe h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Shared ActionMenu (Mantine dropdown) danger entries. Mantine's color prop
+   cannot resolve CSS variables for its hover tint, so the class carries both
+   label and hover colors from the tokens directly. */
+.action-menu-item-danger {
+  color: var(--danger-700);
+}
+
+.action-menu-item-danger:hover {
+  background: var(--danger-100);
+}
+
+.chart-card {
+  min-height: 360px;
+}

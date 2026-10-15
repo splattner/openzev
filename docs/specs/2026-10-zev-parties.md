@@ -556,7 +556,7 @@ their role badges; edit in `PartyFormModal` (`features/zev/PartyFormModal.tsx`: 
 organisation name, title, first/last name — "contact" labels for an organisation —, name
 addition, email, phone, address, notes); delete (with `ConfirmDialog`) only while it holds no
 role. Every change invalidates parties, roles, access, the ZEV list (issuer) and participants.
-Styles `.zev-parties-*` in `index.css` (`.zev-parties-block-first` drops the divider of the
+Styles `.zev-parties-*` in `styles/pages/zev-settings.css` (`.zev-parties-block-first` drops the divider of the
 contacts card's first block), reusing the `.zev-access-*` rows.
 
 ### 8.4 Participants

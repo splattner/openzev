@@ -1,0 +1,90 @@
+/* ── Charts (Recharts) — the documents' chart grammar ─────────────────────
+   Legends in ink beside a colour swatch, as the PDF charts set them;
+   tooltips are small raised sheets. Recharts writes these styles inline. */
+.recharts-default-legend {
+  font-size: 0.8125rem;
+}
+
+.recharts-legend-item-text {
+  color: var(--text-body) !important;
+}
+
+.recharts-default-tooltip {
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-raised);
+  font-size: 0.8125rem;
+}
+
+.chart-card-description {
+  margin-top: 0;
+  font-size: 0.875rem;
+}
+
+/* Fit the paired charts to their panel, including the desktop sidebar. */
+.balance-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  gap: 2rem;
+}
+
+.balance-chart-grid > div {
+  min-width: 0;
+}
+
+.balance-chart-label {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.energy-flow-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.energy-flow-link {
+  transition: fill-opacity 200ms, stroke-opacity 200ms;
+  cursor: pointer;
+}
+
+.energy-flow-node {
+  cursor: pointer;
+  transition: opacity 200ms;
+}
+
+.energy-flow-node--dimmed {
+  opacity: 0.3;
+}
+
+/* Admin dashboard invoice-status tiles: figure tiles, paid set in green. */
+.status-tile {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+}
+
+.status-tile-label {
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.status-tile-value {
+  font-size: 1.625rem;
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.status-tile-paid .status-tile-value {
+  color: var(--success-700);
+}

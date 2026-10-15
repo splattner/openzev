@@ -1,0 +1,29 @@
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 0.75rem 0;
+}
+
+.app-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: inherit;
+}
+
+.app-footer-link svg {
+  display: block;
+  opacity: 0.85;
+}
+
+.app-footer-text {
+  font-weight: 600;
+}
+
+.app-footer-version {
+  color: var(--muted);
+}
