@@ -389,7 +389,7 @@ Template: `TEMPLATE_NAME = "invoices/invoice_pdf.html"` — editable by admins v
 - Includes: invoice, `vat_rate_percent` (`invoice.vat_rate × 100`), items grouped by category (`grouped_items`), zev, participant, issuer, recipient, representative, owner_participant (deprecated alias), QR-Rechnung SVG, `inline_qr_payment` flag, invoice-number prefix/suffix split, localized `status_display`, energy comparison chart SVG, hourly profile chart SVG, energy-flow Sankey SVG, energy summary KPIs, savings data, and the translation dict (`tr`)
 
 `generate_pdf(invoice)` renders HTML via `_render_template()`, which prefers a DB `PdfTemplate` override (rendered with `Template(content).render(Context(context))`) and falls back to `render_to_string()` for the on-disk default, then converts to PDF/A-3b via `render_pdf()` (`invoices/pdf_render.py`, shared with contract/annual-statement/financial-summary rendering).
-`save_invoice_pdf(invoice)` generates and attaches as `invoice_{number}.pdf`, writing back only `pdf_file`/`updated_at` via a conditional row update (concurrent workflow changes survive; a concurrently deleted row raises instead of being recreated).
+`save_invoice_pdf(invoice)` attaches `invoice_{number}.pdf`, writing only `pdf_file`, `pdf_status` and `updated_at` when status and party copies still match. Publication conflicts retry once; rejected files are cleaned up without undoing workflow changes or recreating deleted rows ([invoice lifecycle §8.1](2026-03-invoice-lifecycle-and-communication.md#81-pipeline)).
 
 ---
 

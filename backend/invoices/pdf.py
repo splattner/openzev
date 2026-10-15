@@ -467,10 +467,14 @@ def generate_pdf(
     return pdf_bytes
 
 
-def _delete_stored_pdf(invoice, stored_name) -> None:
-    """Best-effort removal of a just-written PDF; failures are logged, never raised."""
+class InvoicePdfSupersededError(Exception):
+    """The invoice changed during both render attempts; no output was published."""
+
+
+def delete_stored_pdf(storage, stored_name) -> None:
+    """Remove an unused PDF, logging storage failures."""
     try:
-        invoice.pdf_file.storage.delete(stored_name)
+        storage.delete(stored_name)
     except Exception:
         logger.exception("Orphaned invoice PDF could not be removed: %s", stored_name)
 
@@ -480,41 +484,51 @@ def save_invoice_pdf(
     *,
     period_context: InvoicePdfPeriodContext | None = None,
 ) -> None:
-    """Generate PDF and attach it to the Invoice model.
+    """Render and attach a PDF without saving the stale invoice instance.
 
-    Only ``pdf_file``, ``pdf_status`` and ``updated_at`` are written back, via a
-    conditional ``UPDATE`` on the primary key. Rendering takes long enough
-    that the passed ``invoice`` may be stale: saving the whole instance
-    would overwrite a concurrent workflow change (e.g. revert an approval)
-    or resurrect a concurrently deleted row. A deleted row is treated as a
-    failed render: the just-written file is removed and
-    ``Invoice.DoesNotExist`` is raised instead of recreating the record.
+    Publish only while status and party copies still match; other rendered
+    data is outside this guard. Delete rejected output and retry once.
+    Repeated conflicts raise InvoicePdfSupersededError; deletion raises
+    Invoice.DoesNotExist after cleanup.
     """
     from django.utils import timezone
 
     from .models import Invoice, InvoicePdfStatus
 
-    pdf_bytes = generate_pdf(invoice, period_context=period_context)
-    filename = f"invoice_{invoice.invoice_number}.pdf"
-    # Write the file without saving the (possibly stale) model instance.
-    invoice.pdf_file.save(filename, ContentFile(pdf_bytes), save=False)
-    stored_name = invoice.pdf_file.name
-    try:
-        updated = Invoice.objects.filter(pk=invoice.pk).update(
-            pdf_file=stored_name,
-            # Same UPDATE as the file, so the status cannot outrun it.
-            pdf_status=InvoicePdfStatus.READY,
-            updated_at=timezone.now(),
-        )
-    except Exception:
-        logger.exception(
-            "Invoice PDF database update failed for invoice %s", invoice.invoice_number,
-        )
-        _delete_stored_pdf(invoice, stored_name)
-        raise
-    if not updated:
-        _delete_stored_pdf(invoice, stored_name)
-        raise Invoice.DoesNotExist(
-            f"Invoice {invoice.pk} was deleted while its PDF was rendering."
-        )
-    logger.info("Saved PDF for invoice %s", invoice.invoice_number)
+    storage = invoice.pdf_file.storage
+    for _ in range(2):
+        pdf_bytes = generate_pdf(invoice, period_context=period_context)
+        filename = f"invoice_{invoice.invoice_number}.pdf"
+        # Write the file without saving the (possibly stale) model instance.
+        invoice.pdf_file.save(filename, ContentFile(pdf_bytes), save=False)
+        stored_name = invoice.pdf_file.name
+        saved_at = timezone.now()
+        try:
+            updated = Invoice.objects.filter(
+                pk=invoice.pk, status=invoice.status,
+                issuer=invoice.issuer, recipient=invoice.recipient,
+            ).update(
+                pdf_file=stored_name,
+                # Same UPDATE as the file, so the status cannot outrun it.
+                pdf_status=InvoicePdfStatus.READY,
+                updated_at=saved_at,
+            )
+        except Exception:
+            logger.exception(
+                "Invoice PDF database update failed for invoice %s", invoice.invoice_number,
+            )
+            delete_stored_pdf(storage, stored_name)
+            raise
+        if updated:
+            invoice.pdf_status = InvoicePdfStatus.READY
+            invoice.updated_at = saved_at
+            logger.info("Saved PDF for invoice %s", invoice.invoice_number)
+            return
+        delete_stored_pdf(storage, stored_name)
+        try:
+            invoice.refresh_from_db()
+        except Invoice.DoesNotExist:
+            raise Invoice.DoesNotExist(
+                f"Invoice {invoice.pk} was deleted while its PDF was rendering."
+            ) from None
+    raise InvoicePdfSupersededError("Invoice changed during both PDF render attempts.")

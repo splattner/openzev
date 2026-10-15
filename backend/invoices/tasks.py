@@ -18,7 +18,7 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
     """Send an invoice PDF by email to the participant."""
     from accounts.models import AppSettings
     from .models import Invoice, EmailLog
-    from .pdf import save_invoice_pdf, _format_date_value
+    from .pdf import InvoicePdfSupersededError, save_invoice_pdf, _format_date_value
     from .workflow import record_email_delivery
 
     try:
@@ -39,7 +39,28 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
 
     # Ensure PDF exists
     if not invoice.pdf_file:
-        save_invoice_pdf(invoice)
+        try:
+            save_invoice_pdf(invoice)
+        except InvoicePdfSupersededError as exc:
+            if self.request.retries >= self.max_retries:
+                record_audit_event(
+                    action_category=AuditActionCategory.INVOICE,
+                    action_type="invoice.email_task",
+                    target_type="invoices.Invoice",
+                    target=invoice,
+                    target_id=str(invoice.pk),
+                    target_display=invoice.invoice_number,
+                    summary=(
+                        f"Invoice email task failed for {invoice.invoice_number}: "
+                        "PDF publication conflicts exhausted all retries."
+                    ),
+                    status=AuditEventStatus.FAILED,
+                    source=AuditEventSource.CELERY,
+                )
+            raise self.retry(exc=exc, countdown=60)
+        except Invoice.DoesNotExist:
+            logger.info("Invoice %s was deleted before email delivery", invoice_id)
+            return
 
     recipient = recipient_email or invoice.participant.email
     if not recipient:
@@ -212,19 +233,14 @@ def _render_pdfs(invoices) -> int:
     from django.db.models import prefetch_related_objects
 
     from .models import Invoice, InvoicePdfStatus
-    from .pdf import build_invoice_pdf_period_context, save_invoice_pdf
+    from .pdf import InvoicePdfSupersededError, build_invoice_pdf_period_context, save_invoice_pdf
 
-    def mark_failed(invoice) -> None:
-        """Record that this invoice has no document and none is coming.
-
-        Keyed on the primary key rather than saved from the instance, which is
-        stale by now, and swallowed on error: a status write must not turn one
-        participant's failure into the batch's.
-        """
+    def set_pdf_status(invoice, pdf_state, pdf_status) -> None:
+        """Update only if no workflow change or publication overtook this render."""
         try:
-            Invoice.objects.filter(pk=invoice.pk).update(pdf_status=InvoicePdfStatus.FAILED)
+            Invoice.objects.filter(pk=invoice.pk, **pdf_state).update(pdf_status=pdf_status)
         except Exception:
-            logger.exception("Could not record PDF failure for invoice %s", invoice.pk)
+            logger.exception("Could not record PDF status for invoice %s", invoice.pk)
 
     invoices = list(invoices)
     prefetch_related_objects(invoices, "items")
@@ -232,10 +248,14 @@ def _render_pdfs(invoices) -> int:
     period_contexts = {}
     failed_periods = set()
     for invoice in invoices:
+        pdf_state = {
+            "updated_at": invoice.updated_at, "pdf_file": invoice.pdf_file.name,
+            "status": invoice.status,
+        }
         key = (invoice.zev_id, invoice.period_start, invoice.period_end)
         if key in failed_periods:
             failed += 1
-            mark_failed(invoice)
+            set_pdf_status(invoice, pdf_state, InvoicePdfStatus.FAILED)
             continue
 
         if key not in period_contexts:
@@ -246,7 +266,7 @@ def _render_pdfs(invoices) -> int:
             except Exception:
                 failed += 1
                 failed_periods.add(key)
-                mark_failed(invoice)
+                set_pdf_status(invoice, pdf_state, InvoicePdfStatus.FAILED)
                 logger.exception(
                     "PDF period context generation failed for ZEV %s, %s to %s",
                     invoice.zev_id,
@@ -259,9 +279,14 @@ def _render_pdfs(invoices) -> int:
             save_invoice_pdf(invoice, period_context=period_contexts[key])
         except SoftTimeLimitExceeded:
             raise
+        except (InvoicePdfSupersededError, Invoice.DoesNotExist):
+            set_pdf_status(
+                invoice, {**pdf_state, "pdf_status": InvoicePdfStatus.PENDING}, InvoicePdfStatus.NONE,
+            )
+            logger.info("PDF generation superseded for invoice %s", invoice.invoice_number)
         except Exception as exc:
             failed += 1
-            mark_failed(invoice)
+            set_pdf_status(invoice, pdf_state, InvoicePdfStatus.FAILED)
             logger.error("PDF generation failed for invoice %s: %s", invoice.invoice_number, exc)
     return failed
 

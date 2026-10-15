@@ -413,7 +413,7 @@ The first implementation slices must instrument these existing modules:
 | `backend/tariffs/views.py` | tariff CRUD, tariff preset import/export |
 | `backend/invoices/views.py` | generate, generate-all, approve, mark-sent, mark-paid, cancel, delete, generate-pdf, send-email, retry-email |
 | `backend/metering/views.py` | import preview/import commit/delete-data and import log–adjacent actions |
-| `backend/invoices/tasks.py` | send-email queued/success/failure/retry outcome |
+| `backend/invoices/tasks.py` | send-email queued/success/failure/retry outcome, including a `FAILED` `invoice.email_task` event when pre-send PDF conflicts exhaust all retries |
 | `backend/mcp_server/views.py` | `mcp.tool.call` (category `system`, source `mcp`) once per MCP `tools/call` — success/failed/denied; see SPEC-2026-mcp-server §8 |
 
 ### 6.4 Async event rules

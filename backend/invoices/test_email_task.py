@@ -13,8 +13,9 @@ from unittest import mock
 import pytest
 from django.core.files.base import ContentFile
 
-from audit.models import AuditEvent, AuditEventStatus
-from invoices.models import EmailLog, InvoiceStatus
+from audit.models import AuditEvent, AuditEventSource, AuditEventStatus
+from invoices.models import EmailLog, Invoice, InvoiceStatus
+from invoices.pdf import InvoicePdfSupersededError
 from invoices.tasks import send_invoice_email_task
 from testing import factories
 
@@ -40,6 +41,55 @@ def test_missing_invoice_returns_without_error():
     send_invoice_email_task.run("00000000-0000-0000-0000-000000000000")
     # No EmailLog should be created and no exception raised.
     assert EmailLog.objects.count() == 0
+
+
+def test_superseded_pdf_retries_before_sending(mailoutbox):
+    invoice = factories.InvoiceFactory(status=InvoiceStatus.APPROVED)
+    with (
+        mock.patch("invoices.pdf.save_invoice_pdf", side_effect=InvoicePdfSupersededError("changed")),
+        mock.patch.object(send_invoice_email_task, "retry", side_effect=RuntimeError("retried")) as retry,
+    ):
+        with pytest.raises(RuntimeError, match="retried"):
+            send_invoice_email_task.run(str(invoice.pk))
+
+    retry.assert_called_once()
+    assert len(mailoutbox) == 0
+    assert not EmailLog.objects.filter(invoice=invoice).exists()
+    assert not AuditEvent.objects.filter(action_type="invoice.email_task").exists()
+
+
+def test_exhausted_pdf_conflicts_record_a_failed_audit_event(mailoutbox):
+    invoice = factories.InvoiceFactory(status=InvoiceStatus.APPROVED)
+    with mock.patch(
+        "invoices.pdf.save_invoice_pdf", side_effect=InvoicePdfSupersededError("changed"),
+    ):
+        send_invoice_email_task.push_request(retries=send_invoice_email_task.max_retries)
+        try:
+            with pytest.raises(InvoicePdfSupersededError, match="changed"):
+                send_invoice_email_task.run(str(invoice.pk))
+        finally:
+            send_invoice_email_task.pop_request()
+
+    event = AuditEvent.objects.get(action_type="invoice.email_task")
+    assert event.status == AuditEventStatus.FAILED
+    assert event.source == AuditEventSource.CELERY
+    assert event.target_id == str(invoice.pk)
+    assert event.zev_id == invoice.zev_id
+    assert "PDF" in event.summary
+    assert len(mailoutbox) == 0
+    assert not EmailLog.objects.filter(invoice=invoice).exists()
+    invoice.refresh_from_db()
+    assert invoice.status == InvoiceStatus.APPROVED
+    assert invoice.sent_at is None
+
+
+def test_deletion_during_pdf_generation_skips_email(mailoutbox):
+    invoice = factories.InvoiceFactory(status=InvoiceStatus.APPROVED)
+    with mock.patch("invoices.pdf.save_invoice_pdf", side_effect=Invoice.DoesNotExist):
+        send_invoice_email_task.run(str(invoice.pk))
+
+    assert len(mailoutbox) == 0
+    assert not EmailLog.objects.filter(invoice=invoice).exists()
 
 
 def test_no_recipient_skips_and_logs_failed(mailoutbox):

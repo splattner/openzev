@@ -98,6 +98,12 @@ Draft → Approved → Sent → Paid
 
 Only admins can delete an invoice that is approved, sent or paid.
 
+Approval freezes the issuer and recipient details and discards the draft PDF.
+Use **Generate PDF** to view the approved document. Emailing generates a
+missing PDF automatically. **Mark sent** records manual delivery without
+generating a PDF; you can generate it afterwards. Later address or bank-detail
+changes do not change the approved document.
+
 ## Billing Hub (Invoices · Emails)
 
 The sidebar entry **Billing** (`/billing/invoices`) opens the invoice-first
@@ -350,6 +356,11 @@ PDF generation is a separate step from invoice creation.
 **More → Open PDF** opens the document. Generation and regeneration are also
 under **More** for any invoice that exists. **Download all
 PDFs** in the command bar downloads the period's documents together.
+
+If document details keep changing during rendering, generation can stop with
+**PDF missing**. Use **Generate PDF** again once those changes are finished.
+Email delivery retries these conflicts automatically; if retries run out,
+the failure appears in the audit log.
 
 For custom templates that omit the second address line, ask an admin to
 [update the PDF template](14-admin-console.md#invoice-pdf-templates), then regenerate the affected PDFs.

@@ -17,7 +17,6 @@ from allocation.validity import active_during
 from zev.models import Zev, Participant
 from zev import access
 from zev.scoping import ZevScopedQuerySetMixin
-from .document_parties import build_issuer, build_recipient
 from .models import Invoice, InvoicePdfStatus, InvoiceStatus, EmailLog, sent_to_participant
 from .serializers import (
     InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
@@ -25,7 +24,7 @@ from .serializers import (
 )
 from . import access_tokens
 from .engine import DynamicTariffError, generate_invoice, preflight_dynamic_prices
-from .pdf import save_invoice_pdf
+from .pdf import InvoicePdfSupersededError, save_invoice_pdf
 from .tasks import (
     generate_invoice_pdf_task,
     generate_zev_invoices_task,
@@ -512,11 +511,25 @@ class InvoiceViewSet(
         denial = _deny_if_zev_disabled(request, invoice, action_type="invoice.generate_pdf", denied_verb="PDF generation")
         if denial is not None:
             return denial
+        pdf_state = {
+            "updated_at": invoice.updated_at, "pdf_file": invoice.pdf_file.name,
+            "status": invoice.status,
+        }
         try:
             save_invoice_pdf(invoice)
+        except InvoicePdfSupersededError:
+            return Response(
+                {"error": "Invoice changed while generating the PDF. Please try again."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except Invoice.DoesNotExist:
+            return Response(
+                {"error": "Invoice was deleted while generating the PDF."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         except Exception as exc:
             logger.exception("PDF generation failed for invoice %s", invoice.invoice_number)
-            Invoice.objects.filter(pk=invoice.pk).update(pdf_status=InvoicePdfStatus.FAILED)
+            Invoice.objects.filter(pk=invoice.pk, **pdf_state).update(pdf_status=InvoicePdfStatus.FAILED)
             _record_invoice_event(
                 request=request,
                 action_type="invoice.generate_pdf",
@@ -782,19 +795,15 @@ class InvoiceViewSet(
         if error:
             return error
 
-        # One conditional UPDATE per draft, each writing the issuer/recipient
-        # copy a last time (frozen from approval on, #761). A draft approved
-        # or deleted concurrently simply does not count.
-        issuers = {}
         count = 0
-        for draft in invoices.filter(status=InvoiceStatus.DRAFT):
-            if draft.period_end not in issuers:
-                issuers[draft.period_end] = build_issuer(_zev, draft.period_end)
-            count += Invoice.objects.filter(pk=draft.pk, status=InvoiceStatus.DRAFT).update(
-                status=InvoiceStatus.APPROVED,
-                issuer=issuers[draft.period_end],
-                recipient=build_recipient(draft.participant),
-            )
+        drafts = invoices.filter(status=InvoiceStatus.DRAFT).select_related(None).prefetch_related(None).only("pk")
+        for draft in drafts:
+            try:
+                approve_invoice(draft)
+            except (Invoice.DoesNotExist, InvoiceWorkflowError):
+                # A draft changed or deleted concurrently does not count.
+                continue
+            count += 1
         _record_invoice_event(
             request=request,
             action_type="invoice.approve_all",

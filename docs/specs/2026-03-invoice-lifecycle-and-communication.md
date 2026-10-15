@@ -104,9 +104,10 @@ participant's address changed (`invoices/document_parties.py`).
 The issuer party is whoever held the `issuer` role on the invoice's
 `period_end` (`issuer_party(zev, day)` → `zev.parties.issuer_on`,
 SPEC-2026-10-zev-parties §4.5, §7.1); without one, the issuer is the ZEV name
-alone (`from_participant: false`). A batch builds the issuer once for its
-period (`InvoiceGenerationContext.issuer`), and `approve-all` once per
-`period_end`.
+alone (`from_participant: false`). A generation batch builds the issuer once
+for its period (`InvoiceGenerationContext.issuer`). Single and batch approval
+both use `approve_invoice`, rebuilding the copy from the locked invoice row
+and freshly loaded related data rather than the caller's cached relations.
 Copies written before parties existed lack the party keys, which read as empty.
 The QR bill names are the `name_lines` on one line, at most 70 characters.
 
@@ -116,9 +117,15 @@ The QR bill names are the `name_lines` on one line, at most 70 characters.
 |---|---|
 | Generation (`engine.generate_invoice`) | Written. A batch builds the issuer once (`InvoiceGenerationContext.issuer`) |
 | Any render while `draft` (`copy_for_render`) | Rebuilt from today's data and stored with a conditional `UPDATE … WHERE status = 'draft'`; if an approval won the race, the approved copy is read back instead |
-| `approve_invoice`, `approve-all` | Written a last time in the same row update as the status |
+| `approve_invoice`, `approve-all` | Written a last time in the same locked row update as the status; `pdf_file` is cleared and `pdf_status` becomes `none` |
 | `approved`, `sent`, `paid`, `cancelled` | Frozen: renders read the stored copy |
 | Any non-draft without a copy (an invoice created without one) | Built from today's data once and stored |
+
+Approval always retires the draft PDF, even when the copy is unchanged: the
+stored copy alone does not prove which data an existing file rendered. The
+old file is deleted best-effort after the approval transaction commits; a
+rollback preserves it. Until a new PDF is generated there is no stored
+download, and email delivery renders one lazily from the approved copy.
 
 Migration `invoices.0019_invoice_issuer_recipient_copy` backfills every
 existing invoice from the data of the migration day (the best available). The
@@ -344,7 +351,7 @@ coverage runs against PostgreSQL only (§13, `test_workflow.py`).
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `POST` | `/invoices/{id}/generate-pdf/` | `HasZevAccess` | Generate/regenerate PDF; returns `{pdf_url}` |
+| `POST` | `/invoices/{id}/generate-pdf/` | `HasZevAccess` | Generate/regenerate PDF; returns `{pdf_url}`; `409` if both attempts are superseded, `404` if deleted mid-render, `500` on rendering/storage failure (§8.1) |
 | `POST` | `/invoices/{id}/send-email/` | `HasZevAccess` | Queue email to participant (optional `email` override); returns `{detail}` |
 | `POST` | `/invoices/{id}/retry-email/{email_log_id}/` | `HasZevAccess` | Re-queue a failed email; `400` if already sent or its recipient was swept |
 | `POST` | `/invoices/approve-all/` | `HasZevAccess` | Approve all draft invoices for a ZEV period (`zev_id`, `period_start`, `period_end`); returns `{approved}`; audit-logged (`invoice.approve_all`) |
@@ -692,12 +699,12 @@ Total rendered output is not capped; repeated fields can amplify it.
 **Execution flow:**
 
 1. Load invoice + participant + ZEV from database.
-2. If invoice has no `pdf_file` → generate and save PDF first.
+2. If invoice has no `pdf_file` → generate and save PDF first. A publication conflict retries the task after 60s before any email is sent. Once all three retries are exhausted, record a `FAILED` `invoice.email_task` audit event (source `celery`) before re-raising the conflict; no `EmailLog` is created. Deletion skips delivery.
 3. Resolve recipient: explicit `recipient_email` parameter, or `participant.email`. Skip if empty.
 4. Render subject and body from ZEV templates (with fallback).
 5. Create `EmailLog` entry with `status = "pending"`.
 6. Build `EmailMessage` with PDF attachment (`invoice_{number}.pdf`, `application/pdf`).
-7. Call `email.send()` — the only step below that may retry the task.
+7. Call `email.send()`.
 8. **On send failure** (steps 6–7 raise):
    - Update `EmailLog`: `status = "failed"`, `error_message = str(exc)`.
    - Record a `FAILED` `invoice.email_sent` audit event.
@@ -754,12 +761,17 @@ The `participant_magic_link`, `zev_access_invitation` and `zev_access_granted` s
 3. Convert HTML → PDF via WeasyPrint through `render_pdf()` in `invoices/pdf_render.py`, which emits **PDF/A-3b** (`PDF_VARIANT = "pdf/a-3b"`) — a long-term archival format suitable for Swiss GeBüV retention, with WeasyPrint adding the XMP identification, sRGB OutputIntent, and font subsets. The same helper renders contract, annual statement, and financial summary PDFs. Because template content is admin-editable, the WeasyPrint fetcher is restricted to `data:` URIs (`ALLOWED_URL_PROTOCOLS` in `pdf_render.py`) — templates embed images as data URIs and cannot make the renderer read local files or request remote URLs.
    Text renders in Inter, the app's face (ADR 0032): the default templates set `var(--font-print)` from `pdf/_tokens.css`, and the generated chart SVGs carry the same stack on their root (`_CHART_FONT_FAMILY`), since inline SVG does not inherit the document font. Inter comes from Debian's `fonts-inter` in the backend images; without it the stack falls back to Helvetica Neue/Helvetica/Arial. The Swiss QR-bill payment part keeps the `qrbill` SVG's own `Arial,Helvetica` stack (resolved to the metric-compatible Liberation Sans in the image), as its standard requires.
 4. Save PDF to `invoice.pdf_file` (`invoices/pdf/invoice_{number}.pdf`).
-   `save_invoice_pdf()` writes the file without saving the (possibly stale)
-   invoice instance, then updates only `pdf_file`/`updated_at` via a
-   conditional `UPDATE` on the primary key — a concurrent approval or other
-   workflow change survives the save. If the row was deleted mid-render the
-   just-written file is removed and `Invoice.DoesNotExist` is raised instead
-   of recreating the record (the render counts as failed).
+   `save_invoice_pdf()` publishes only while the row's status and
+   `issuer`/`recipient` copies still match the render, updating `pdf_file`,
+   `pdf_status = ready`, and `updated_at` together. Other rendered data is
+   outside this guard. Rejected output is deleted and retried once; another
+   conflict raises `InvoicePdfSupersededError` (`409` from `generate-pdf`).
+   Deletion cleans up and raises `Invoice.DoesNotExist` (`404`). PDF tasks skip
+   superseded/deleted work, clearing `pending` to `none` only if the pre-render
+   status, file reference and `updated_at` still match; the email task retries
+   a conflict before sending (§7.2).
+   Genuine failures mark `failed` only if the pre-render status, file reference
+   and `updated_at` still match, preserving a newer publication or transition.
 
 `_render_pdfs()` groups invoices by `(zev_id, period_start, period_end)` and
 builds one `InvoicePdfPeriodContext` per group. The context explicitly
@@ -1168,6 +1180,7 @@ the cockpit readiness and attention caches.
 | File | Test class | Validates |
 |---|---|---|
 | `test_document_parties.py` | `CopyContentTests`, `FreezeTests`, `BatchApprovalTests`, `BackfillMigrationTests` (10) | §3.1a: copy content (owner row or ZEV name), a draft follows today's data and stores it, approval freezes it (PDF context and QR bill unchanged after the owner, IBAN and participant move), a missing copy is filled once, a render racing an approval keeps the approved copy, live fields still reachable, `approve-all` writes it, the migration backfill |
+| `test_pdf_approval.py` | Function-based regressions | §3.1a/§8.1: approval invalidation, frozen PDF/QR values, email attachment selection, rollback, missing-PDF/manual-send lifecycle, concurrent publication/failure handling, clearing superseded pending renders, and batch query budget; real PostgreSQL row-lock coverage |
 | `test_invoice_list_filter.py` | `InvoiceStatusFilterTests`, `InvoiceStatusFilterScopingTests` | §5.1: comma-separated `?status=` (single/repeated values, whitespace tolerance, empty = absent, all unknown values → 400, list-only so detail routes are unaffected), status × `zev_id` + role scoping (participant cannot enumerate another ZEV's open invoices), composes with pagination |
 | `test_invoice_list_filter.py` | `InvoiceParticipantAndPeriodFilterTests` | §5.1: `?participant_id=` narrows to that participant and composes with `?status=`, cannot widen an owner's scope, malformed UUID → 400; `?period_from=`/`?period_to=` narrow by period overlap (either alone, both together), malformed date → 400 |
 | `test_participant_invoice_visibility.py` | `ParticipantInvoiceVisibilityTests`, `ParticipantAnnualStatementSentOnlyTests` | §6.1 (#861): participant list shows only sent/paid/cancelled-after-sending invoices, owner list unnarrowed, unsent invoices 404 on detail and `/pdf`, a `sent`/`paid` row without `sent_at` stays visible; `sent_only=True` leaves unsent invoices out of the annual statement, default keeps them, participant download passes `sent_only=True` and owner download `False` |
@@ -1184,7 +1197,7 @@ the cockpit readiness and attention caches.
 | `test_engine_edge_cases.py` | `InvoiceMathEdgeCaseTests` | Edge cases: monthly fee month-boundary counting, tariff validity windows, zero/negative fees, rounding |
 | `test_engine_edge_cases.py` | `InvoiceVatRateSelectionTests` | VAT rate active at period_end, zero VAT when no vat_number |
 | `test_email_formatting.py` | `InvoiceEmailFormattingTests` | §7.1–7.2: date format in email body, custom ZEV templates, auto-transition to sent |
-| `test_email_task.py` | 6 function-based tests | §7.2: missing invoice no-ops, no recipient skips with failed log, success records sent log and transitions status, send failure marks log failed and retries, draft stays draft after send, a post-delivery bookkeeping failure (`#576`) leaves the log `sent` (not `failed`) with exactly one email sent, does not retry, leaves the invoice status as a visible gap, and records a distinct `FAILED` audit event naming the delivery as having happened |
+| `test_email_task.py` | Function-based tests | §7.2: pre-delivery PDF conflict/deletion, audit on exhausted PDF retries, recipient guards, send logging/retry, status transitions, and no duplicate delivery after a bookkeeping failure |
 | `test_reports.py` | `AnnualStatementTests` (11), `FinancialSummaryTests` (6), `MalformedInputTests` (5), `AnnualStatementMonthlyDataTests` (3) | §5.4/§8.2: single-statement report permissions and self-service scoping, malformed/out-of-range input handling, financial-summary fallbacks, `/auth/me` label-vs-download agreement for multi-membership users, and per-timestamp monthly data attribution (ADR 0013). The whole-ZEV ZIP tests moved to `exports/tests.py` with the job flow |
 | `exports/tests.py` | `ExportJobCreateTests` (17), `ExportJobListTests` (4), `ExportJobRunnerTests` (11), `ExportJobDownloadTests` (6), `ExportJobSweepTests` (5), `AnnualStatementExportBuilderTests` (13), `AnnualStatementExportRealRenderTests` (1, slow) | §5.4/§8.1 (ADR 0017): `202` creation with year/participant validation and `queued` audit, unknown or malformed `zev_id` → `404`, in-flight dedupe on the full validated params dict across any matching active job (not just the newest), per-type audit display/summaries/metadata from `ExportDefinition`, enqueue-after-commit wiring, enqueue failure → `503` + `failed`, requester-scoped list/status/download (including loss of ZEV ownership), task-level soft/hard time limits, one-claim duplicate delivery, retention anchored at completion, late completion never resurrecting a swept-failed job, soft time limits aborting a mid-batch render without publishing a (partial) ZIP, partial → completed with `omitted.txt` manifest and counts, all-fail / unexpected / publish failures → `failed` without an artifact, expired → `410` + `expired` flag, sweep file deletion with metadata retention, stale running / lost queued recovery that never fails a job claimed meanwhile (backlog-safe queued window), ZIP entry byte-budget + sanitization rules with pk appended only on collisions (including a final guard against readable names mimicking a pk-suffixed entry), storage roundtrip, and one real-render end-to-end job |
 | `test_invoice_numbering.py` | `TestNumberingIsScopedToTheZev`, `TestDuplicatesWithinOneZevAreStillRejected` | §4.1: two ZEVs on the default `INV` prefix both bill and each counts from 1; a duplicate number within one ZEV is refused at the database level (`bulk_create` bypasses `save()`) |
@@ -1203,7 +1216,7 @@ the cockpit readiness and attention caches.
 |---|---|
 | `InvoicePdfQrTests` | §8.4: QR skip on missing debtor data, success path, text/binary writer compatibility, skip on `qrbill` rejection, QR built in all four languages. §8.2: context uses AppSettings date formats, invoice-number prefix/suffix split (hyphen, long prefix, no hyphen), translation dict is not mutated by context building, period-suffix stripping from item descriptions (§8.9), `status_display` translation, empty `due_date` formatting, `inline_qr_payment` enabled for small invoices and disabled for long invoices / invoices with notes / missing IBAN, sample invoice context exposes every key the default template uses. §8.5: energy comparison rendered with and without a prior period. §8.6: energy-flow SVG returns `None` without readings and renders with valid data; energy summary local-share computation and `None` case. §8.7: hourly profile buckets by local time (not UTC), returns `None` for daily-only resolution, and skips readings outside the participant's assignment window (ADR 0013). §8.8: savings `None` cases (no local energy, local rate ≥ grid rate) and bar-percentage computation. Default template structural layout checks (dedicated invoice/payment layouts) |
 | `PeriodParticipantStatsTests` | §8.6: per-timestamp participant stats — mid-period transfer splits readings between both holders, gap readings appear on no participant, stats reconcile with engine invoice totals |
-| `SaveInvoicePdfConcurrencyTests` | §8.1: concurrent approval survives the PDF save (only `pdf_file`/`updated_at` written back); concurrent delete raises instead of resurrecting the row, without orphaning items or files |
+| `SaveInvoicePdfConcurrencyTests` | §8.1: concurrent workflow changes survive the PDF save (only `pdf_file`/`pdf_status`/`updated_at` written back); concurrent delete raises instead of resurrecting the row; database-update failure cleans up the output, and cleanup errors preserve the original failure |
 | `AnnualStatementMonthlyDataTests` | Annual-statement monthly data: per-timestamp attribution across assignment changes, gap readings excluded |
 | `InvoicePdfRenderingTests` | Full WeasyPrint rendering: short invoice → 2 pages, long invoice → 3 pages, savings + many items → 3 pages, all four languages render without error; recipient address-line rendering, escaping and frozen-copy preservation; long-recipient wrapping and QR fallback; inline QR and separate payment slip geometry (106 mm height, bottom-aligned with page bottom) via PDF content-stream inspection; no QR clip rect on the insights page. Regression coverage for the render-time guard: wrapping multi-line descriptions that overflow the inline height estimate still produce exactly one slip (`_count_qr_slips`), and a long dedicated-payment invoice keeps a single bottom-aligned slip on its payment page; a realistic EVU-style invoice with ~5 Abgaben across all four cost categories (energy, grid fees, levies, metering) paginates to ≥3 pages with exactly one slip |
 | `TranslationParityTests` | §8.3: all four locales have identical, non-empty translation keys and identical `status_values` keys |

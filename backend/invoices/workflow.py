@@ -34,7 +34,7 @@ completed in the caller, not held across it.
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Invoice, InvoiceStatus
+from .models import Invoice, InvoicePdfStatus, InvoiceStatus
 
 
 class InvoiceWorkflowError(Exception):
@@ -60,6 +60,7 @@ def _lock_and_transition(invoice, *, allowed_from, to_status, invalid_message, e
     whatever ``invoice.status`` held when it was loaded) is one of them.
     ``invalid_message`` is called with that current status to build the
     ``InvoiceWorkflowError`` message when the guard fails.
+    A callable ``extra_fields`` builds its values from the locked row.
 
     On success, the written fields are copied back onto ``invoice`` so the
     caller keeps its own instance — with its prefetched relations — for
@@ -69,12 +70,17 @@ def _lock_and_transition(invoice, *, allowed_from, to_status, invalid_message, e
     happened using a stale value.
     """
     with transaction.atomic():
-        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        rows = Invoice.objects.select_for_update(of=("self",))
+        if to_status == InvoiceStatus.APPROVED:
+            rows = rows.select_related("zev", "participant__party")
+        locked = rows.get(pk=invoice.pk)
         allowed = {allowed_from} if isinstance(allowed_from, str) else set(allowed_from)
         if locked.status not in allowed:
             invoice.status = locked.status
             raise InvoiceWorkflowError(invalid_message(locked.status))
 
+        if callable(extra_fields):
+            extra_fields = extra_fields(locked)
         before_status = locked.status
         locked.status = to_status
         locked.updated_at = timezone.now()
@@ -96,17 +102,25 @@ def _lock_and_transition(invoice, *, allowed_from, to_status, invalid_message, e
 def approve_invoice(invoice: Invoice) -> dict:
     """Transition draft → approved. Returns the ``before`` diff dict.
 
-    Writes the issuer/recipient copy a last time: from here on it is frozen,
-    and every render of the invoice shows exactly this (#761).
+    Freeze a fresh party copy and clear the PDF reference in one transaction.
     """
     from .document_parties import build_copy
+    from .pdf import delete_stored_pdf
+
+    def approval_fields(locked):
+        fields = build_copy(locked)
+        if locked.pdf_file:
+            storage = locked.pdf_file.storage
+            stored_name = locked.pdf_file.name
+            transaction.on_commit(lambda: delete_stored_pdf(storage, stored_name))
+        return {**fields, "pdf_file": "", "pdf_status": InvoicePdfStatus.NONE}
 
     return _lock_and_transition(
         invoice,
         allowed_from=InvoiceStatus.DRAFT,
         to_status=InvoiceStatus.APPROVED,
         invalid_message=lambda _current: "Only draft invoices can be approved.",
-        extra_fields=build_copy(invoice),
+        extra_fields=approval_fields,
     )
 
 
