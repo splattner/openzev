@@ -1186,10 +1186,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#marking-invoices-as-paid" class="md-nav__link">
+  <a href="#recording-payments" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Marking Invoices as Paid
+        Recording payments
       
     </span>
   </a>
@@ -1973,10 +1973,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#marking-invoices-as-paid" class="md-nav__link">
+  <a href="#recording-payments" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Marking Invoices as Paid
+        Recording payments
       
     </span>
   </a>
@@ -2179,14 +2179,23 @@ link leads back to <strong>My invoices</strong>.</p>
 <li><strong>Draft</strong> — just generated; can be reviewed, approved, regenerated or deleted.</li>
 <li><strong>Approved</strong> — locked; can be emailed or marked as sent. Its amounts can no
   longer change.</li>
-<li><strong>Sent</strong> — emailed (or marked as sent); can be resent or marked paid.</li>
-<li><strong>Paid</strong> — fully settled; only its PDF can still be regenerated.</li>
-<li><strong>Cancelled</strong> — removed from the active workflow; can be deleted or generated
-  again. A cancelled invoice does not count as generated for its period: its
-  period card still asks you to generate a replacement. Cancelling is available
-  through the API only — there is no cancel button in the UI.</li>
+<li><strong>Sent</strong> — emailed (or marked as sent); can be resent, receive payments and
+  be marked paid. A sent invoice that has received part of its total shows
+  <strong>Partly paid</strong>.</li>
+<li><strong>Paid</strong> — the payments cover the total; only its PDF can still be
+  regenerated.</li>
+<li><strong>Cancelled</strong> — removed from the active workflow. A cancelled invoice does
+  not count as generated for its period: its period card still asks you to
+  generate a replacement. Cancelling is available through the API only — there
+  is no cancel button in the UI, and an invoice with payments cannot be
+  cancelled.</li>
 </ul>
-<p>Only admins can delete an invoice that is approved, sent or paid.</p>
+<p>Once an invoice has been approved it keeps its number for good: if it is
+cancelled later, generating the period again creates a new invoice next to it
+instead of replacing it, so no invoice number ever goes missing. Only a draft,
+or a cancelled invoice that was never approved, is replaced or can be deleted
+by a manager. Admins can delete other invoices too, except one that has
+received payments.</p>
 <p>Approval freezes the issuer and recipient details and discards the draft PDF.
 Use <strong>Generate PDF</strong> to view the approved document. Emailing generates a
 missing PDF automatically. <strong>Mark sent</strong> records manual delivery without
@@ -2367,7 +2376,9 @@ the rest under <strong>More</strong>:</p>
 </table>
 <p><strong>More</strong> groups invoice actions first, then PDF and email actions. <strong>Open PDF</strong>
 appears once the invoice has a stored document.</p>
-<p>Admins also see <strong>Delete invoice</strong> for approved, sent and paid invoices.</p>
+<p>Admins also see <strong>Delete invoice</strong> for approved, sent and paid invoices without
+payments. A cancelled invoice that had been approved offers no <strong>Delete
+invoice</strong> to managers: it stays on record with its number.</p>
 <p>The filter above the table counts the period's rows: <strong>All</strong>, <strong>Drafts</strong>,
 <strong>Approved</strong>, <strong>Sent</strong> and <strong>Issues</strong> (rows with missing metering data, a
 generation conflict, a failed PDF, a failed email or no email address). Select one to show just
@@ -2425,6 +2436,12 @@ PDF does:</p>
   does not equal the subtotal times the rate; the invoice PDF below lists the
   producer credit after the VAT.</li>
 </ul>
+<p><strong>Payments</strong> (managers and viewers) — what has been received for the invoice:
+the amount received and still outstanding, and one row per payment with its
+date, amount, note and who recorded it. On a sent invoice, managers see
+<strong>Record payment</strong> and <strong>Mark Paid</strong> here (see
+<a href="#recording-payments">Recording payments</a>). Participants see the invoice's
+status, not the payment rows.</p>
 <p><strong>Energy totals:</strong></p>
 <table>
 <thead>
@@ -2513,12 +2530,31 @@ history</strong>, where a failed latest attempt also has a <strong>Retry</strong
 <p>Use Tab or Shift+Tab to move between email-history controls, then Escape or
 <strong>Close</strong> to return to the history button.</p>
 <p>Email sending is asynchronous via Celery with automatic retries. For delivery mechanics, retry behavior, and troubleshooting failed emails, see <a href="../10-email-configuration/">Email Configuration</a>.</p>
-<h2 id="marking-invoices-as-paid">Marking Invoices as Paid<a class="headerlink" href="#marking-invoices-as-paid" title="Permanent link">&para;</a></h2>
-<p>When a participant has paid:</p>
+<h2 id="recording-payments">Recording payments<a class="headerlink" href="#recording-payments" title="Permanent link">&para;</a></h2>
+<p>When a participant has paid the whole invoice, click <strong>Mark Paid</strong> on the row
+(shown for <code>Sent</code> invoices). It records one payment for the outstanding amount,
+dated today, and the status changes to <code>Paid</code>. It is a single-click action.</p>
+<p>For a partial payment, or to record the date the money actually arrived, open
+the invoice and use the <strong>Payments</strong> card:</p>
 <ol>
-<li>Click <strong>Mark Paid</strong> on the row (shown for <code>Sent</code> invoices).</li>
+<li>Click <strong>Record payment</strong>.</li>
+<li>Enter the amount (it starts at the outstanding amount and can't exceed it),
+   the date it was paid (not in the future) and, optionally, a note such as the
+   bank reference.</li>
+<li>Click <strong>Record payment</strong>.</li>
 </ol>
-<p>The status changes to <code>Paid</code>. There is no additional confirmation dialog or payment-detail input — it is a single-click action.</p>
+<p>A payment short of the total leaves the invoice <strong>Partly paid</strong>: its status
+pill says so, and the payment step in the period table shows it as under way.
+Once the payments cover the total, the invoice becomes <code>Paid</code>. <strong>Mark rest as
+paid</strong> records whatever is still outstanding in one go.</p>
+<p>An invoice that pays a producer out (a negative total) has no <strong>Record
+payment</strong>: <strong>Mark Paid</strong> records the payout in full.</p>
+<p>To correct a payment entered by mistake, remove it with the bin icon on its
+row in the <strong>Payments</strong> card. A paid invoice whose remaining payments no longer
+cover the total goes back to <code>Sent</code>. Payments of a cancelled invoice can't be
+removed.</p>
+<p>Invoices that were marked paid before payments were recorded have one payment
+for their total, dated when they were marked paid.</p>
 <h2 id="deleting-invoices">Deleting Invoices<a class="headerlink" href="#deleting-invoices" title="Permanent link">&para;</a></h2>
 <p>Invoices can be deleted to clean up incorrect or test data.</p>
 <ol>
@@ -2527,8 +2563,9 @@ history</strong>, where a failed latest attempt also has a <strong>Retry</strong
 </ol>
 <p><strong>Delete visibility rules:</strong></p>
 <ul>
-<li><strong>Draft</strong> or <strong>Cancelled</strong> invoices — <strong>More → Delete invoice</strong> is available to managers.</li>
-<li><strong>Any status</strong> — admins can always delete.</li>
+<li><strong>Draft</strong> invoices, and <strong>Cancelled</strong> invoices that were never approved —
+  <strong>More → Delete invoice</strong> is available to managers.</li>
+<li><strong>Any status</strong> — admins can delete, as long as the invoice has no payments.</li>
 </ul>
 <p>Deletion is permanent; the invoice is removed from the database.</p>
 <h2 id="reports-annual-report-statements-and-tax-overviews">Reports: Annual Report, Statements and Tax Overviews<a class="headerlink" href="#reports-annual-report-statements-and-tax-overviews" title="Permanent link">&para;</a></h2>
@@ -2548,9 +2585,9 @@ default is the last completed year.</p>
   came from the ZEV, their self-sufficiency rate, and their savings: what their
   ZEV electricity was billed at, what the same kWh would have cost at the
   average grid rate on their invoices, and the difference. These are the same
-  savings figures as on each participant's annual statement. Cancelled
-  invoices do not count, and a participant without invoices for the year shows
-  no savings.</li>
+  savings figures as on each participant's annual statement. Only invoices
+  that have been approved count — not drafts, and not cancelled invoices — and
+  a participant without invoices for the year shows no savings.</li>
 <li><strong>Local sales vs. feed-in tariff</strong> — for producers: what selling electricity
   inside the ZEV earned, what the same kWh would have earned as grid feed-in,
   and the difference (the <strong>uplift</strong>). The feed-in figure uses the feed-in
@@ -2587,7 +2624,9 @@ same <strong>—</strong> and note appear on that participant's annual statement
 statement or select the <strong>Tax Overview</strong> tab. Use <strong>Download PDF</strong> to save the
 document. <strong>Open in new tab</strong> shows the same PDF. Select <strong>Retry</strong> if generation
 fails, or reload the page for fresh documents. The tax overview shows producers'
-net local-energy revenue and feed-in compensation.</p>
+net local-energy revenue and feed-in compensation. The annual statement and the
+tax overview count the same invoices as the annual report: those that have
+been approved and not cancelled, whether or not they are paid yet.</p>
 <p><img alt="Participant annual documents with embedded statement" src="../screenshots/23b-participant-annual-statement.png" /></p>
 <p>These documents use your consumption, invoices, and savings. They become
 available after billing. The selected community appears above the page title.</p>
