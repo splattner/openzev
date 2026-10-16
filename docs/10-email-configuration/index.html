@@ -2081,6 +2081,11 @@ You can clear the editor and type replacement text without reopening it.
 <td>Invoice total in CHF</td>
 <td><code>123.45</code></td>
 </tr>
+<tr>
+<td><code>{amount_due_chf}</code></td>
+<td>Amount still to pay in CHF: the total less any credit note applied</td>
+<td><code>98.45</code></td>
+</tr>
 </tbody>
 </table>
 <h3 id="default-template">Default Template<a class="headerlink" href="#default-template" title="Permanent link">&para;</a></h3>
@@ -2092,7 +2097,7 @@ You can clear the editor and type replacement text without reopening it.
 
 Please find your energy invoice for the period {period_start} to {period_end} attached.
 
-Total: CHF {total_chf}
+Amount due: CHF {amount_due_chf}
 
 Kind regards,
 {zev_name}
