@@ -26,16 +26,18 @@ from allocation.validity import active_during, business_tz, civil_date, period_s
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
 from audit.services import record_audit_event
 from invoices.contract_pdf import issue_contract_pdf
-from invoices.engine import generate_invoices_for_zev
+from invoices.engine import generate_invoice, generate_invoices_for_zev
 from invoices.models import (
     DEFAULT_INVOICE_EMAIL_SUBJECT,
     ContractIssue,
+    Credit,
     EmailLog,
     Invoice,
     InvoiceStatus,
     Payment,
 )
 from invoices.pdf import save_invoice_pdf
+from invoices.workflow import correct_invoice
 from metering.models import ImportLog, ImportSource, MeterReading, ReadingDirection, ReadingResolution
 from tariffs.dynamic.models import DynamicApiVersion, DynamicTariffSource, DynamicTariffType, FetchStatus
 from tariffs.dynamic.storage import store_points
@@ -1129,6 +1131,10 @@ class Command(BaseCommand):
     def _delete_invoices(self, invoices) -> None:
         """Delete invoice rows; remove unreferenced PDFs after commit."""
         stale = {name for name in invoices.values_list("pdf_file", flat=True) if name}
+        # Credit notes protect their source invoice, so they go first.
+        credits = Credit.objects.filter(source_invoice__in=invoices)
+        stale |= {name for name in credits.values_list("pdf_file", flat=True) if name}
+        credits.delete()
         invoices.delete()
         if stale:
             transaction.on_commit(lambda: self._delete_stale_pdfs(stale), robust=True)
@@ -1364,6 +1370,7 @@ class Command(BaseCommand):
         invoices = self._seed_invoices(
             zev, invoice_period_start, invoice_period_end,
         )
+        self._seed_credits(closed_invoices, closed_start, closed_end)
         return SecondCommunitySeed(
             open_invoices=invoices,
             open_start=invoice_period_start,
@@ -2214,6 +2221,25 @@ class Command(BaseCommand):
             )
 
         return invoices
+
+    def _seed_credits(self, closed_invoices: list[Invoice], period_start: date, period_end: date) -> None:
+        """Correct two of the settled invoices (#388): the first is reversed and
+        re-issued as a draft, the second gets a partial credit."""
+        payable = [
+            invoice for invoice in closed_invoices
+            if invoice.status == InvoiceStatus.PAID and invoice.total_chf > 1
+        ]
+        # Their PDFs are queued like any credit note's; the worker renders them.
+        if payable:
+            reversed_invoice = payable[0]
+            correct_invoice(
+                reversed_invoice, kind="reversal", reason="Falscher Zählerstand, Rechnung neu erstellt",
+            )
+            generate_invoice(reversed_invoice.participant, period_start, period_end)
+        if len(payable) > 1:
+            invoice = payable[1]
+            amount = (invoice.total_chf / 10).quantize(Decimal("0.01"))
+            correct_invoice(invoice, kind="adjustment", amount_chf=amount, reason="Tarif zu hoch verrechnet")
 
     @staticmethod
     def _settle_invoice(invoice: Invoice, issued_at) -> None:

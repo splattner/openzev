@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{{ tr.credit_label }} {{ credit.credit_number }}</title>
+    {% comment %}Same document anatomy as the invoice (pdf/shared_pdf_base.html):
+    document header, summary band, totals box and running footer. A credit note
+    carries no QR-Rechnung. Customised PdfTemplate overrides store full
+    standalone HTML and are unaffected by the include.{% endcomment %}
+    {% include "pdf/shared_pdf_base.html" %}
+
+    <style>
+        .credit-page {
+            padding: 12mm 16mm;
+        }
+
+        .credit-summary {
+            display: flex;
+            gap: 10mm;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin: 6mm 0 5mm;
+        }
+
+        .credit-reference {
+            font-size: 10pt;
+            font-weight: 700;
+            color: var(--brand-deep);
+            margin: 6mm 0 3mm;
+        }
+
+        .credit-reason {
+            background: var(--brand-pale);
+            border-radius: 2mm;
+            padding: 3mm 4mm;
+            margin-bottom: 6mm;
+            font-size: 9pt;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .credit-reason .eyebrow {
+            margin-bottom: 1mm;
+        }
+
+        .credit-totals {
+            margin-left: auto;
+            width: 80mm;
+        }
+
+        .credit-settlement {
+            color: var(--muted);
+            font-size: 8.5pt;
+            line-height: 1.5;
+            margin-top: 8mm;
+        }
+
+        .page-meta .meta-center::after { content: counter(page) " / " counter(pages); }
+
+        @page {
+            size: A4;
+            margin: 0 0 12mm 0;
+            @top-center { content: none; }
+            @bottom-center {
+                content: element(footer-meta);
+                width: 210mm;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div style="position: running(footer-meta)" class="page-meta page-meta--footer">
+        <div class="page-meta-inner">
+            <span class="meta-left">{{ zev.name }} · {{ tr.credit_label }} {{ credit.credit_number }}</span>
+            <span class="meta-center"></span>
+            <span class="meta-right">{{ formatted_dates.credit_date }}</span>
+        </div>
+    </div>
+
+    <main class="credit-page">
+        <header class="document-header">
+            <div>
+                <div class="brand-row">
+                    <div class="company-name">{{ zev.name }}</div>
+                </div>
+                <div class="company-address">
+                    {% if issuer.from_participant %}
+                    {{ issuer.name }}{% if issuer.name_addition %}<br>{{ issuer.name_addition }}{% endif %}<br>
+                    {{ issuer.address_line1 }}{% if issuer.address_line2 %}, {{ issuer.address_line2 }}{% endif %}<br>
+                    {{ issuer.postal_code }}{% if issuer.city %} {{ issuer.city }}{% endif %}<br>
+                    {% endif %}
+                    {% if zev.vat_number %}VAT: {{ zev.vat_number }}{% endif %}
+                </div>
+            </div>
+            <div>
+                <div class="document-label">{{ tr.credit_label }}</div>
+                <div class="document-number">{{ credit_number_prefix }}<strong>{{ credit_number_suffix }}</strong></div>
+            </div>
+        </header>
+
+        <section class="credit-summary">
+            <div class="recipient-block">
+                <div class="eyebrow">{{ tr.to }}</div>
+                <strong class="recipient-name">{{ participant.full_name }}</strong>{% if participant.name_addition %}<div class="recipient-name-addition">{{ participant.name_addition }}</div>{% endif %}
+                <div class="recipient-address">
+                    {{ participant.address_line1 }}<br>
+                    {% if participant.address_line2 %}{{ participant.address_line2 }}<br>{% endif %}
+                    {{ participant.postal_code }} {{ participant.city }}
+                </div>
+                {% if participant.email %}
+                <div class="recipient-email">{{ participant.email }}</div>
+                {% endif %}
+            </div>
+            <dl class="facts">
+                <div class="fact">
+                    <dt>{{ tr.credit_date }}</dt>
+                    <dd>{{ formatted_dates.credit_date }}</dd>
+                </div>
+                {% if source_invoice %}
+                <div class="fact">
+                    <dt>{{ tr.billing_period }}</dt>
+                    <dd>{{ formatted_dates.period_start }} – {{ formatted_dates.period_end }}</dd>
+                </div>
+                {% endif %}
+                <div class="fact">
+                    <dt>{{ tr.kind }}</dt>
+                    <dd>{{ kind_display }}</dd>
+                </div>
+            </dl>
+        </section>
+
+        {% if credit_for_invoice %}
+        <div class="credit-reference">{{ credit_for_invoice }}</div>
+        {% endif %}
+
+        <div class="credit-reason">
+            <div class="eyebrow">{{ tr.reason_label }}</div>
+            {{ credit.reason }}
+        </div>
+
+        <div class="credit-totals summary-box">
+            <table>
+                {% if show_vat %}
+                <tr>
+                    <td>{{ tr.net }}</td>
+                    <td class="numeric">CHF {{ net_chf|floatformat:2 }}</td>
+                </tr>
+                <tr>
+                    <td>{{ tr.vat }} ({{ vat_rate_percent|floatformat:1 }}%)</td>
+                    <td class="numeric">CHF {{ credit.vat_chf|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
+                <tr class="grand-total">
+                    <td>{{ tr.total }}</td>
+                    <td class="numeric">CHF {{ credit.amount_chf|floatformat:2 }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <p class="credit-settlement">{{ tr.settlement_note }}<br>{{ tr.notes_question }}</p>
+    </main>
+</body>
+
+</html>

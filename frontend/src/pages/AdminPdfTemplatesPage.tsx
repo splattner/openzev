@@ -7,6 +7,9 @@ import {
     fetchContractPdfTemplate,
     fetchInvoicePdfTemplate,
     fetchAnnualStatementPdfTemplate,
+    fetchCreditNotePdfTemplate,
+    resetCreditNotePdfTemplate,
+    updateCreditNotePdfTemplate,
     previewPdfTemplateBlob,
     resetContractPdfTemplate,
     resetInvoicePdfTemplate,
@@ -25,7 +28,7 @@ import { TemplateSourceStatus } from '../components/TemplateSourceStatus'
 import { useTemplateDraft } from '../lib/useTemplateDraft'
 import { PageHeader } from '../components/PageHeader'
 
-const PDF_TEMPLATE_TABS = ['invoice', 'contract', 'annual_statement'] as const
+const PDF_TEMPLATE_TABS = ['invoice', 'contract', 'annual_statement', 'credit_note'] as const
 
 export type PdfTemplateTab = (typeof PDF_TEMPLATE_TABS)[number]
 
@@ -47,6 +50,12 @@ const PDF_TEMPLATE_CONFIG = {
         fetch: fetchAnnualStatementPdfTemplate,
         save: updateAnnualStatementPdfTemplate,
         reset: resetAnnualStatementPdfTemplate,
+    },
+    credit_note: {
+        queryKey: queryKeys.admin.creditNotePdfTemplate,
+        fetch: fetchCreditNotePdfTemplate,
+        save: updateCreditNotePdfTemplate,
+        reset: resetCreditNotePdfTemplate,
     },
 } satisfies Record<PdfTemplateTab, {
     queryKey: () => readonly string[]
@@ -228,7 +237,7 @@ function TemplateEditor({
     onReset: () => Promise<PdfTemplateMutationResponse>
     isSaving: boolean
     isResetting: boolean
-    templateType: 'invoice' | 'contract' | 'annual_statement'
+    templateType: PdfTemplateTab
 }) {
     const { t } = useTranslation()
     const [mutationError, setMutationError] = useState<string | null>(null)
@@ -266,7 +275,8 @@ function TemplateEditor({
         confirm({
             title: t('admin.resetBuiltInConfirmTitle', {
                 template: t(templateType === 'invoice' ? 'admin.invoiceTemplate'
-                    : templateType === 'contract' ? 'admin.contractTemplate' : 'admin.annualStatementTemplate'),
+                    : templateType === 'contract' ? 'admin.contractTemplate'
+                        : templateType === 'credit_note' ? 'admin.creditNoteTemplate' : 'admin.annualStatementTemplate'),
             }),
             message: t('admin.resetBuiltInConfirmMessage'),
             confirmText: t('admin.resetBuiltIn'),
@@ -505,6 +515,7 @@ export function AdminPdfTemplatesPage({ embedded = false, template }: {
         invoice: t('admin.invoiceTemplate'),
         contract: t('admin.contractTemplate'),
         annual_statement: t('admin.annualStatementTemplate'),
+        credit_note: t('admin.creditNoteTemplate'),
     }
 
 

@@ -19,7 +19,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
-from invoices.models import Invoice, InvoiceItem, InvoiceStatus, Payment
+from invoices.models import Credit, Invoice, InvoiceItem, InvoiceStatus, Payment
 from metering.models import ImportLog, MeterReading, ReadingResolution, SupplementarySource
 from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
@@ -122,6 +122,12 @@ def build_populated_zev(owner, *, name="Transfer ZEV", meter_prefix="TR"):
     )
     Invoice.objects.filter(pk=invoice.pk).update(approved_at=datetime(2026, 2, 2, 8, 0, tzinfo=timezone.utc))
     Payment.objects.create(invoice=invoice, amount_chf=Decimal("20.00"), paid_on=date(2026, 2, 20), note="Teilzahlung")
+    Credit.objects.create(
+        zev=zev, participant=alice, source_invoice=invoice, credit_number="CN-00001", kind="adjustment",
+        reason="Overcharged", amount_chf=Decimal("5.40"), vat_mode="registered",
+        vat_rate=Decimal("0.0800"), vat_chf=Decimal("0.40"),
+    )
+    Zev.objects.filter(pk=zev.pk).update(credit_note_counter=2)
     return zev
 
 
@@ -147,6 +153,7 @@ def export_and_clear(zev, sections=None):
     else. ``Invoice.zev`` is PROTECT, so invoices go first.
     """
     raw = export_to_bytes(zev, sections)
+    Credit.objects.filter(zev=zev).delete()
     Invoice.objects.filter(zev=zev).delete()
     zev.delete()
     return raw
@@ -453,6 +460,17 @@ class RoundTripTests(TestCase):
             (payment.amount_chf, payment.paid_on, payment.note, payment.source),
             (Decimal("20.00"), date(2026, 2, 20), "Teilzahlung", Payment.Source.MANUAL),
         )
+
+    def test_credits_round_trip_and_push_the_counter(self):
+        result = self._import()
+        invoice = Invoice.objects.get(zev_id=result["zev_id"])
+        credit = invoice.credits.get()
+        self.assertEqual(
+            (credit.credit_number, credit.kind, credit.amount_chf, credit.vat_chf, credit.reason),
+            ("CN-00001", "adjustment", Decimal("5.40"), Decimal("0.40"), "Overcharged"),
+        )
+        self.assertEqual(credit.participant_id, invoice.participant_id)
+        self.assertEqual(credit.zev.credit_note_counter, 2)
 
     def test_an_archive_from_before_payments_settles_its_paid_invoices(self):
         raw = export_and_clear(self.source)
@@ -1183,6 +1201,7 @@ class SchemaParityTests(TestCase):
         "INVOICE_FIELDS": Invoice,
         "INVOICE_ITEM_FIELDS": InvoiceItem,
         "PAYMENT_FIELDS": Payment,
+        "CREDIT_FIELDS": Credit,
         "SUPPLEMENTARY_SOURCE_FIELDS": SupplementarySource,
     }
 
@@ -1247,6 +1266,10 @@ class SchemaParityTests(TestCase):
         "INVOICE_ITEM_FIELDS": {"id", "invoice"},
         # Nested under its invoice; ``created_by`` is an account.
         "PAYMENT_FIELDS": {"id", "invoice", "created_by", "created_at"},
+        # Nested under its invoice; the PDF travels in ``invoice_pdfs``.
+        "CREDIT_FIELDS": {
+            "id", "zev", "participant", "source_invoice", "pdf_file", "pdf_status", "created_by",
+        },
         # A source travels by ``meter_id`` and the archive ``participant_id``. Nothing that holds
         # a secret or describes a live connection travels: the credential and push token, the
         # on/off switch and status, the sync bookkeeping and the last comparison with the meter all

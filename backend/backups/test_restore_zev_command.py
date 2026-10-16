@@ -18,7 +18,7 @@ from backups.models import BackupDestination, BackupJob, RestoreJob
 from backups.test_archive import build
 from backups.test_restore_zev import zev_rows
 from exports.models import ExportJob
-from invoices.models import Invoice
+from invoices.models import Credit, Invoice
 from zev.models import Participant, Zev
 from testing.helpers import create_managed_zev
 
@@ -52,6 +52,7 @@ class ZevCommandTestCase(TestCase):
 
     def damage(self):
         Zev.objects.filter(pk=self.alpha_id).update(name="Damaged")
+        Credit.objects.filter(zev_id=self.alpha_id).delete()
         Participant.objects.filter(zev_id=self.alpha_id, party__first_name="Alice").delete()
 
 
@@ -113,6 +114,7 @@ class RestoreCommandTests(ZevCommandTestCase):
 
     @override_settings(BACKUP_ENCRYPTION_KEYS=[], BACKUP_REQUIRE_ENCRYPTION=True)
     def test_a_deleted_community_is_named_by_id_and_needs_no_safety_backup(self):
+        Credit.objects.filter(zev_id=self.alpha_id).delete()
         Invoice.objects.filter(zev_id=self.alpha_id).delete()
         Zev.objects.filter(pk=self.alpha_id).delete()
         out, _ = self.run_command("--zev", str(self.alpha_id))

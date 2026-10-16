@@ -602,6 +602,57 @@ _CONTRACT_FIELDS.append(_translation_group(_CONTRACT_TRANSLATION_KEYS))
 _ANNUAL_STATEMENT_FIELDS.append(_translation_group(_ANNUAL_STATEMENT_TRANSLATION_KEYS))
 
 
+# ── Credit note PDF catalog (#388) ───────────────────────────────────────
+
+_CREDIT_NOTE_TRANSLATION_KEYS = (
+    "billing_period",
+    "credit_date",
+    "credit_label",
+    "kind",
+    "net",
+    "notes_question",
+    "reason_label",
+    "settlement_note",
+    "to",
+    "total",
+    "vat",
+)
+
+_CREDIT_NOTE_FIELDS = [
+    {
+        "group_key": "creditNote",
+        "group_title_key": "admin.fields.creditNote",
+        "fields": [
+            {"variable": "{{ credit.credit_number }}", "description_key": "admin.fields.creditNumber", "sample_path": "credit.credit_number"},
+            {"variable": "{{ credit_number_prefix }}", "description_key": "admin.fields.creditPrefix", "sample_path": "credit_number_prefix"},
+            {"variable": "{{ credit_number_suffix }}", "description_key": "admin.fields.creditSuffix", "sample_path": "credit_number_suffix"},
+            {"variable": "{{ kind_display }}", "description_key": "admin.fields.creditKind", "sample_path": "kind_display"},
+            {"variable": "{{ credit_for_invoice }}", "description_key": "admin.fields.creditForInvoice", "sample_path": "credit_for_invoice"},
+            {"variable": "{{ credit.reason }}", "description_key": "admin.fields.creditReason", "sample_path": "credit.reason"},
+            {"variable": "{{ credit.amount_chf }}", "description_key": "admin.fields.creditAmount", "sample_path": "credit.amount_chf"},
+            {"variable": "{{ net_chf }}", "description_key": "admin.fields.creditNet", "sample_path": "net_chf"},
+            {"variable": "{{ credit.vat_chf }}", "description_key": "admin.fields.creditVat", "sample_path": "credit.vat_chf"},
+            {"variable": "{{ vat_rate_percent }}", "description_key": "admin.fields.vatRatePercent", "sample_path": "vat_rate_percent"},
+            {"variable": "{{ show_vat }}", "description_key": "admin.fields.creditShowVat", "sample_path": "show_vat"},
+            {"variable": "{{ source_invoice.invoice_number }}", "description_key": "admin.fields.invoiceNumber", "sample_path": "source_invoice.invoice_number"},
+            {"variable": "{{ lang }}", "description_key": "admin.fields.languageCode", "sample_path": "lang"},
+        ],
+    },
+    {
+        "group_key": "formattedDates",
+        "group_title_key": "admin.fields.formattedDates",
+        "fields": [
+            {"variable": "{{ formatted_dates.credit_date }}", "description_key": "admin.fields.creditDate", "sample_path": "formatted_dates.credit_date"},
+            {"variable": "{{ formatted_dates.invoice_date }}", "description_key": "admin.fields.invoiceDate", "sample_path": "formatted_dates.invoice_date"},
+            {"variable": "{{ formatted_dates.period_start }}", "description_key": "admin.fields.periodStart", "sample_path": "formatted_dates.period_start"},
+            {"variable": "{{ formatted_dates.period_end }}", "description_key": "admin.fields.periodEnd", "sample_path": "formatted_dates.period_end"},
+        ],
+    },
+    *[group for group in _INVOICE_FIELDS if group["group_key"] in ("participant", "zev", "issuer")],
+]
+_CREDIT_NOTE_FIELDS.append(_translation_group(_CREDIT_NOTE_TRANSLATION_KEYS))
+
+
 # ── Email catalogs ───────────────────────────────────────────────────────
 
 _EMAIL_FIELDS = {

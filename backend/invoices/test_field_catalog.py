@@ -21,6 +21,7 @@ PDF_TEMPLATE_PATHS = {
     "invoice": "invoices/invoice_pdf.html",
     "contract": "contracts/participant_contract_pdf.html",
     "annual_statement": "invoices/annual_statement_pdf.html",
+    "credit_note": "invoices/credit_note_pdf.html",
 }
 
 # Template-local bindings are not context fields or independent insertions.
@@ -28,6 +29,7 @@ DEFAULT_TEMPLATE_LOCAL_OUTPUTS = {
     "invoice": {"item_count"},
     "contract": {"item", "category", "period"},
     "annual_statement": set(),
+    "credit_note": set(),
 }
 
 

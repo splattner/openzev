@@ -624,6 +624,17 @@ class ZevSerializer(BankIbanValidationMixin, serializers.ModelSerializer):
             raise serializers.ValidationError(exc.messages) from exc
         return value
 
+    credit_note_prefix = serializers.CharField(required=False, allow_blank=True, max_length=10, trim_whitespace=False)
+
+    def validate_credit_note_prefix(self, value):
+        if self.instance is not None and value == self.instance.credit_note_prefix:
+            return value
+        try:
+            INVOICE_PREFIX_VALIDATOR(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
+        return value
+
     def validate_grid_operator_elcom_id(self, value):
         """Only ids from the shipped ElCom list are accepted.
 

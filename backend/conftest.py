@@ -41,11 +41,12 @@ def _no_broker_calls(monkeypatch):
     whether something was queued patch the task themselves, and that patch
     nests inside this one.
     """
-    from invoices.tasks import generate_invoice_pdf_task
+    from invoices.tasks import generate_credit_pdf_task, generate_invoice_pdf_task
     from exports.tasks import run_export_job
     from backups.tasks import run_backup_job, run_restore_job, run_verify_job
 
     monkeypatch.setattr(generate_invoice_pdf_task, "delay", lambda *args, **kwargs: None)
+    monkeypatch.setattr(generate_credit_pdf_task, "delay", lambda *args, **kwargs: None)
     monkeypatch.setattr(run_export_job, "delay", lambda *args, **kwargs: None)
     monkeypatch.setattr(run_backup_job, "delay", lambda *args, **kwargs: None)
     monkeypatch.setattr(run_restore_job, "delay", lambda *args, **kwargs: None)

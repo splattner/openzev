@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { fetchInvoices } from '../lib/api/invoices'
+import { fetchInvoices, listCredits, openCreditPdf } from '../lib/api/invoices'
 import { queryKeys } from '../lib/api/queryKeys'
+import { formatChfAmount } from '../lib/numbers'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { InvoiceAmount, InvoiceLink, InvoicePdfCell, InvoiceRowActions, InvoiceStatusBadge } from '../components/InvoicePresentation'
 import { PageSkeleton } from '../components/PageSkeleton'
@@ -30,6 +31,9 @@ export function MyInvoicesPage() {
             query.state.data?.some((invoice) => isPersonalInvoice(invoice) && invoice.pdf_status === 'pending') ? 15000 : false,
     })
     const invoices = (invoicesQuery.data ?? []).filter(isPersonalInvoice)
+    // The participant's credit notes (#388): the backend scopes them to the account's own.
+    const creditsQuery = useQuery({ queryKey: queryKeys.invoices.credits(), queryFn: () => listCredits() })
+    const credits = creditsQuery.data ?? []
     // Several memberships: a community column, and the header names all of them.
     const showCommunity = (user?.memberships?.length ?? 0) > 1
 
@@ -97,6 +101,48 @@ export function MyInvoicesPage() {
                                                     ariaLabel={t('pages.myInvoices.openPdf', { number: invoice.invoice_number })}
                                                 />
                                             </InvoiceRowActions>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            )}
+
+            {credits.length > 0 && (
+                <section className="table-card" aria-labelledby="my-credits-title">
+                    <h3 id="my-credits-title">{t('pages.myInvoices.credits.title')}</h3>
+                    <p className="muted">{t('pages.myInvoices.credits.description')}</p>
+                    <div className="table-scroll">
+                        <table className="billing-workflow-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">{t('pages.myInvoices.credits.number')}</th>
+                                    <th scope="col">{t('pages.myInvoices.credits.invoice')}</th>
+                                    <th scope="col">{t('pages.myInvoices.credits.date')}</th>
+                                    <th scope="col">{t('pages.myInvoices.credits.amount')}</th>
+                                    <th scope="col">{t('pages.myInvoices.col.actions')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {credits.map((credit) => (
+                                    <tr key={credit.id}>
+                                        <td>{credit.credit_number}</td>
+                                        <td>{credit.source_invoice_number ?? '-'}</td>
+                                        <td>{formatShortDate(credit.created_at.slice(0, 10), settings)}</td>
+                                        <td className="numeric">{formatChfAmount(Number(credit.amount_chf))}</td>
+                                        <td>
+                                            {credit.pdf_url ? (
+                                                <button
+                                                    type="button"
+                                                    className="button button-secondary"
+                                                    aria-label={t('pages.invoiceDetail.credits.openPdf', { number: credit.credit_number })}
+                                                    onClick={() => void openCreditPdf(credit.id)}
+                                                >
+                                                    {t('common.openPdf')}
+                                                </button>
+                                            ) : null}
                                         </td>
                                     </tr>
                                 ))}

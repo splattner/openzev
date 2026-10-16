@@ -211,6 +211,16 @@ Money received for an invoice. Specified in full in `2026-10-payments-and-credit
 
 Ordering `["paid_on", "created_at", "id"]`. Migration `invoices/0023` gives every paid invoice with a non-zero total one `backfill` payment of `total_chf`, dated by the newest `invoice.mark_paid` audit event or else `updated_at` (Swiss civil date). Shown read-only as an inline in the Django admin. Travels in the transfer archive nested under its invoice and in backups (`ZevPart("invoices.Payment", "invoice__zev")`).
 
+### 3.7 Credit (#388, phase 2)
+
+A credit note (Gutschrift) for an invoice that received money. Specified in full in
+`2026-10-payments-and-credits.md` §4.4: `invoices.models.Credit` (`credit_number` unique per ZEV from
+`Zev.credit_note_prefix`/`credit_note_counter`, `kind` `reversal` \| `adjustment`, `source_invoice`
+`PROTECT`, `reason`, gross `amount_chf` > 0, `vat_mode`/`vat_rate`/`vat_chf`/`embedded_vat_chf` worked
+out from the source invoice, `pdf_file`/`pdf_status`, `issuer`/`recipient` copies, `created_by`).
+Read-only in the Django admin. Travels in the transfer archive nested under its invoice and in
+backups (`ZevPart("invoices.Credit", "zev")`, `MEDIA_FIELDS` entry for `pdf_file`).
+
 ---
 
 ### 4.1 States
@@ -345,13 +355,16 @@ Validation: `period_start` must be before `period_end`. On creation the engine a
 | `POST` | `/invoices/{id}/mark-sent/` | `HasZevAccess` | `status == approved` | → `sent`, `sent_at = now()` |
 | `POST` | `/invoices/{id}/mark-paid/` | `HasZevAccess` | `status == sent` | Optional body `{paid_on}` (default today); books the outstanding amount as one `mark_paid` payment (none for a zero outstanding amount) → `paid`. Audit metadata `{payment_id, amount_chf, paid_on}` |
 | `POST` | `/invoices/{id}/cancel/` | `HasZevAccess` | `status ∉ {paid, cancelled}`, no payments | → `cancelled` |
+| `POST` | `/invoices/{id}/correct/` | `HasZevAccess` (write-scoped: managers) | `status == paid`, or `sent` with payments; total > 0; reason required; an adjustment needs `0 < amount_chf ≤ paid − credited` | Body `{kind: reversal \| adjustment, reason, amount_chf?}`; `201 {invoice, credit}`. A reversal credits what was received (less earlier credits) and cancels the invoice. The credit PDF is queued on commit. Audit `invoice.correct` |
+| `GET` | `/invoices/credits/`, `/invoices/credits/{id}/` | scoped (`ZevScopedQuerySetMixin`) | — | Read-only `CreditSerializer`; filters `participant_id`, `source_invoice_id`; a participant sees their own credits |
+| `GET` / `POST` | `/invoices/credits/{id}/pdf/`, `…/generate-pdf/` | scoped / `HasZevAccess` | — | Stored PDF (`404` before the render) / queue a re-render (`202`) |
 | `GET` | `/invoices/{id}/payments/` | `HasZevAccess` + `can_view` (participants `403`) | — | `PaymentSerializer` list |
 | `POST` | `/invoices/{id}/payments/` | `HasZevAccess` (write-scoped: managers) | `status == sent`, total > 0, `0 < amount_chf ≤ outstanding`, `paid_on` not in the future | Body `{amount_chf, paid_on?, note?}`; `201` with the detail `Invoice`; → `paid` once the total is covered. Audit `invoice.payment_record` |
 | `DELETE` | `/invoices/{id}/payments/{payment_id}/` | as POST | invoice `sent` or `paid` | `200` with the detail `Invoice`; `paid` → `sent` when the rest no longer covers the total; `404` for an unknown payment. Audit `invoice.payment_delete` |
 
 Transition rules are implemented centrally in `invoices/workflow.py`
 (`approve_invoice`, `mark_invoice_sent`, `mark_invoice_paid`, `record_payment`,
-`delete_payment`, `cancel_invoice`; `_lock_and_transition` takes an optional
+`delete_payment`, `cancel_invoice`, `correct_invoice`; `_lock_and_transition` takes an optional
 `guard(locked)` that `cancel_invoice` uses to refuse an invoice with payments
 under the row lock). All payment rules (#388) are specified in
 `2026-10-payments-and-credits.md` §4.2.
@@ -663,8 +676,10 @@ emptiness renders only after a successful list result.
 | Approve / mark-sent / mark-paid / cancel | Yes | Yes | No (HTTP 403/404) | No (HTTP 403) |
 | List payments | Yes | Yes | Yes | No (HTTP 403; the invoice shows `paid_chf`/`outstanding_chf` only) |
 | Record / remove a payment | Yes | Yes | No (HTTP 404) | No |
+| Correct an invoice (credit note) | Yes | Yes | No (HTTP 404) | No |
+| Read credit notes | Yes | Yes | Yes | Own only |
 | Generate PDF / send email / retry email | Yes | Yes | No | No |
-| Delete | Any status without payments | Never-approved draft/cancelled without payments | No | No |
+| Delete | Any status without payments or credit notes | Never-approved draft/cancelled without payments | No | No |
 | PDF template read/write | Yes | No (HTTP 403) | No | No |
 | Contract PDF template read/write | Yes | No (HTTP 403) | No | No |
 | Dashboard | Yes | No (HTTP 403) | No | No |

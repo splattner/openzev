@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Invoice, InvoiceItem, EmailLog, Payment
+from .models import Credit, Invoice, InvoiceItem, EmailLog, Payment
 
 
 class InvoiceItemInline(admin.TabularInline):
@@ -44,3 +44,25 @@ class InvoiceItemAdmin(admin.ModelAdmin):
 class EmailLogAdmin(admin.ModelAdmin):
     list_display = ("invoice", "recipient", "status", "sent_at")
     readonly_fields = ("created_at",)
+
+
+@admin.register(Credit)
+class CreditAdmin(admin.ModelAdmin):
+    """Credit notes are issued by the correction workflow and never edited."""
+
+    list_display = ("credit_number", "kind", "participant", "zev", "source_invoice", "amount_chf", "created_at")
+    list_filter = ("kind", "zev")
+    search_fields = ("credit_number", "source_invoice__invoice_number")
+    date_hierarchy = "created_at"
+
+    def get_readonly_fields(self, request, obj=None):
+        return [field.name for field in self.model._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

@@ -36,7 +36,7 @@ from .generated_chart_tokens import (
     _CHART_MUTED,
 )
 from .document_parties import issuer_context
-from .models import billed_invoices, sent_to_participant
+from .models import Credit, CreditKind, billed_invoices, sent_to_participant
 from .pdf import _format_date_value, _render_template
 
 ANNUAL_STATEMENT_TEMPLATE = "invoices/annual_statement_pdf.html"
@@ -73,6 +73,7 @@ ANNUAL_TRANSLATIONS: dict[str, dict[str, str]] = {
         "vat_col": "MwSt.",
         "total_col": "Total",
         "no_invoices": "Keine Rechnungen für dieses Jahr.",
+        "credit_note": "Gutschrift",
         "savings_title": "Ersparnisse durch lokale Solarenergie",
         "savings_local_label": "Lokale ZEV-Energie (tatsächlich verrechnet)",
         "savings_grid_label": "Hypothetische Netzkosten (gleiche kWh)",
@@ -111,6 +112,7 @@ ANNUAL_TRANSLATIONS: dict[str, dict[str, str]] = {
         "vat_col": "TVA",
         "total_col": "Total",
         "no_invoices": "Aucune facture pour cette année.",
+        "credit_note": "Note de crédit",
         "savings_title": "Économies grâce à l'énergie solaire locale",
         "savings_local_label": "Énergie locale CEL (effectivement facturée)",
         "savings_grid_label": "Coût réseau hypothétique (mêmes kWh)",
@@ -149,6 +151,7 @@ ANNUAL_TRANSLATIONS: dict[str, dict[str, str]] = {
         "vat_col": "IVA",
         "total_col": "Totale",
         "no_invoices": "Nessuna fattura per quest'anno.",
+        "credit_note": "Nota di credito",
         "savings_title": "Risparmi grazie all'energia solare locale",
         "savings_local_label": "Energia locale CEL (effettivamente fatturata)",
         "savings_grid_label": "Costo rete ipotetico (stesso kWh)",
@@ -187,6 +190,7 @@ ANNUAL_TRANSLATIONS: dict[str, dict[str, str]] = {
         "vat_col": "VAT",
         "total_col": "Total",
         "no_invoices": "No invoices for this year.",
+        "credit_note": "Credit note",
         "savings_title": "Savings from Local Solar Energy",
         "savings_local_label": "Local ZEV energy (actually billed)",
         "savings_grid_label": "Hypothetical grid cost (same kWh)",
@@ -623,6 +627,26 @@ def generate_annual_statement_pdf(
         sum_subtotal += inv.subtotal_chf
         sum_vat += inv.vat_chf
         sum_total += inv.total_chf
+
+    # Partial credits (#388) reduce what the year billed. A full reversal is
+    # not listed: its invoice is cancelled and already left out above.
+    credits = Credit.objects.filter(
+        kind=CreditKind.ADJUSTMENT, source_invoice__in=year_invoices_qs,
+    ).select_related("source_invoice").order_by("created_at")
+    for credit in credits:
+        net = credit.amount_chf - credit.vat_chf
+        invoice_rows.append({
+            "invoice_number": credit.credit_number,
+            "period_start_formatted": _format_date_value(credit.source_invoice.period_start, date_pattern),
+            "period_end_formatted": _format_date_value(credit.source_invoice.period_end, date_pattern),
+            "status_display": tr["credit_note"],
+            "subtotal_chf": f"{-net:.2f}",
+            "vat_chf": f"{-credit.vat_chf:.2f}",
+            "total_chf": f"{-credit.amount_chf:.2f}",
+        })
+        sum_subtotal -= net
+        sum_vat -= credit.vat_chf
+        sum_total -= credit.amount_chf
 
     invoice_totals = {
         "subtotal_chf": f"{sum_subtotal:.2f}",

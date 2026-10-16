@@ -203,15 +203,17 @@ openzev-export-<community>-<date>.zip
   invoices.json          [{"id", "participant_id", <INVOICE_FIELDS>,
                            "items": [{"id", <INVOICE_ITEM_FIELDS>}],
                            "payments": [{<PAYMENT_FIELDS>}],
+                           "credits": [{<CREDIT_FIELDS>}],
                            "dynamic_evidence": [{"dynamic_source": {<DYNAMIC_SOURCE_FIELDS>},
                              "tariff_id_snapshot", "evidence_from", "evidence_to"}]}]
   readings/<meter>.csv   one file per meter
   invoices/pdf/<invoice_number>.pdf   one file per invoice that has a rendered PDF
+  invoices/pdf/credit-<credit_number>-<hash>.pdf   one per credit note that has one
 ```
 
 Field lists (`ZEV_FIELDS`, `PARTY_FIELDS`, `PARTY_ROLE_FIELDS`, `PARTICIPANT_FIELDS`, `METERING_POINT_FIELDS`,
 `ASSIGNMENT_FIELDS`, `TARIFF_FIELDS`, `TARIFF_PERIOD_FIELDS`, `INVOICE_FIELDS`,
-`INVOICE_ITEM_FIELDS`, `PAYMENT_FIELDS`, `DYNAMIC_SOURCE_FIELDS`) are hand-written in `schema.py` — a file format with a
+`INVOICE_ITEM_FIELDS`, `PAYMENT_FIELDS`, `CREDIT_FIELDS`, `DYNAMIC_SOURCE_FIELDS`) are hand-written in `schema.py` — a file format with a
 version, not a mirror of the serializers. `user` (Participant) is absent by
 design (as `Zev.owner` was, before #761 removed it); imported participants arrive unlinked. `disabled_at`/
 `disabled_by`/`disabled_reason` (Zev) are absent for the same reason plus one
@@ -237,6 +239,16 @@ the import time (`_import_invoices`), and an archive without `payments` gives a
 paid invoice with a non-zero total one `backfill` payment of `total_chf`, dated by
 `sent_at` or else the period end (`_import_payments`) — the same rule as migration
 `invoices/0023`.
+Each invoice also nests its `credits` (#388 phase 2; `CREDIT_FIELDS = credit_number, kind, reason,
+amount_chf, vat_mode, vat_rate, vat_chf, embedded_vat_chf, issuer, recipient, created_at`; the
+participant and source invoice are the enclosing invoice's, `created_by` does not travel), and
+`ZEV_FIELDS` carries `credit_note_prefix` and `credit_note_counter`. All optional with no
+format-version bump: an older archive has no credits and keeps the defaults. The importer
+(`_import_credits`) recreates the credits with `pdf_status = none` and pushes `credit_note_counter`
+past the highest imported credit number; the counts gain a `credits` sub-count of the invoices
+section. A credit's PDF bytes go into the `invoice_pdfs` section under
+`credit_pdf_member_name(credit_number)` (`invoices/pdf/credit-…pdf`) and are restored by
+`_import_invoice_pdfs`.
 `READING_CSV_COLUMNS = ("meter_id", "timestamp",
 "energy_kwh", "direction", "resolution", "import_source")` — the same layout the
 normal CSV metering import reads, plus `resolution`/`import_source` so nothing is

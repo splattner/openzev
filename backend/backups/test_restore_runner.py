@@ -18,7 +18,7 @@ from backups.models import BackupDestination, BackupJob, BackupJobScope, BackupJ
 from backups.test_destinations import FakeS3
 from backups.test_restore_zev import zev_rows
 from exports.models import ExportJob
-from invoices.models import Invoice
+from invoices.models import Credit, Invoice
 from metering.models import MeterReading
 from zev.models import Participant, Zev
 
@@ -64,6 +64,7 @@ class RestoreRunnerTestCase(TestCase):
 
     def damage(self):
         Zev.objects.filter(pk=self.alpha_id).update(name="Damaged")
+        Credit.objects.filter(zev_id=self.alpha_id).delete()
         Participant.objects.filter(zev_id=self.alpha_id, party__first_name="Alice").delete()
         MeterReading.objects.filter(metering_point__zev_id=self.alpha_id).delete()
 
@@ -263,6 +264,7 @@ class FailedRestoreTests(RestoreRunnerTestCase):
     @override_settings(BACKUP_REQUIRE_ENCRYPTION=True, BACKUP_ENCRYPTION_KEYS=[])
     def test_a_real_restore_of_a_deleted_community_needs_no_safety_backup(self):
         """No safety backup means no new key requirement."""
+        Credit.objects.filter(zev_id=self.alpha_id).delete()
         Invoice.objects.filter(zev_id=self.alpha_id).delete()
         Zev.objects.filter(pk=self.alpha_id).delete()
         self.assertFalse(Zev.objects.filter(pk=self.alpha_id).exists())

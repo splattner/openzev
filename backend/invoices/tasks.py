@@ -358,6 +358,40 @@ def generate_invoice_pdf_task(self, invoice_id: str):
 
 
 @shared_task(bind=True, max_retries=1)
+def generate_credit_pdf_task(self, credit_id: str):
+    """Render one credit note's PDF off the request thread (#388)."""
+    from .credit_pdf import save_credit_pdf
+    from .models import Credit, InvoicePdfStatus
+
+    try:
+        credit = Credit.objects.select_related("zev", "participant__party", "source_invoice").get(pk=credit_id)
+    except Credit.DoesNotExist:
+        logger.error("Credit %s not found for PDF generation", credit_id)
+        return
+
+    try:
+        save_credit_pdf(credit)
+    except Credit.DoesNotExist:
+        logger.info("Credit %s was deleted before its PDF finished", credit_id)
+    except SoftTimeLimitExceeded:
+        raise
+    except Exception as exc:
+        logger.error("PDF generation failed for credit note %s: %s", credit.credit_number, exc)
+        Credit.objects.filter(pk=credit.pk).update(pdf_status=InvoicePdfStatus.FAILED)
+        record_audit_event(
+            action_category=AuditActionCategory.INVOICE,
+            action_type="credit.generate_pdf",
+            target_type="invoices.Credit",
+            target=credit,
+            target_id=str(credit.pk),
+            target_display=credit.credit_number,
+            summary=f"PDF generation failed for credit note {credit.credit_number}.",
+            status=AuditEventStatus.FAILED,
+            source=AuditEventSource.CELERY,
+        )
+
+
+@shared_task(bind=True, max_retries=1)
 def generate_zev_invoices_task(self, zev_id: str, period_start: str, period_end: str):
     """Generate invoices for all participants of a ZEV in the background."""
     from datetime import date

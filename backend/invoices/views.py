@@ -19,9 +19,9 @@ from allocation.validity import active_during
 from zev.models import Zev, Participant
 from zev import access
 from zev.scoping import ZevScopedQuerySetMixin
-from .models import Invoice, InvoicePdfStatus, InvoiceStatus, EmailLog, Payment, sent_to_participant
+from .models import Credit, Invoice, InvoicePdfStatus, InvoiceStatus, EmailLog, Payment, sent_to_participant
 from .serializers import (
-    InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
+    CorrectInvoiceSerializer, CreditSerializer, InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
     GenerateZevInvoicesSerializer, MarkPaidSerializer, PaymentSerializer,
     RecordPaymentSerializer,
 )
@@ -29,6 +29,7 @@ from . import access_tokens
 from .engine import DynamicTariffError, generate_invoice, preflight_dynamic_prices
 from .pdf import InvoicePdfSupersededError, save_invoice_pdf
 from .tasks import (
+    generate_credit_pdf_task,
     generate_invoice_pdf_task,
     generate_zev_invoices_task,
     generate_zev_pdfs_task,
@@ -40,6 +41,7 @@ from .workflow import (
     approve_invoice,
     cancel_invoice,
     can_delete_invoice,
+    correct_invoice,
     delete_payment,
     mark_invoice_paid,
     mark_invoice_sent,
@@ -164,7 +166,7 @@ class InvoiceViewSet(
         # database cost the payload change just removed. getattr because schema
         # generation instantiates the view without an action.
         if getattr(self, "action", None) != "list":
-            queryset = queryset.prefetch_related("items", "email_logs", "payments")
+            queryset = queryset.prefetch_related("items", "email_logs", "payments", "credits")
         else:
             # last_email_status/log_id ride a subquery annotation inside the
             # invoice SELECT, no per-row N+1. Both use the same deterministic
@@ -285,6 +287,18 @@ class InvoiceViewSet(
         denial = _deny_if_zev_disabled(request, invoice, action_type="invoice.delete", denied_verb="invoice deletion")
         if denial is not None:
             return denial
+        if invoice.credits.exists():
+            _record_invoice_event(
+                request=request,
+                action_type="invoice.delete",
+                summary=f"Denied invoice deletion for {_invoice_target_display(invoice)}: credit notes issued.",
+                status=AuditEventStatus.DENIED,
+                invoice=invoice,
+            )
+            return Response(
+                {"error": "Invoices with credit notes cannot be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if invoice.payments.exists():
             _record_invoice_event(
                 request=request,
@@ -669,7 +683,7 @@ class InvoiceViewSet(
 
     def _perform_status_transition(
         self, request, *, action_type, workflow_fn, denied_verb, success_summary,
-        metadata=None, invoice=None, response_status=status.HTTP_200_OK,
+        metadata=None, invoice=None, response_status=status.HTTP_200_OK, respond=None,
     ):
         """Shared body for the status-transition and payment actions below.
 
@@ -677,7 +691,8 @@ class InvoiceViewSet(
         on an invalid transition) and phrasing for the audit log; this method
         owns the get-object/try-except/audit-event/response shape they all
         share identically. ``metadata`` builds the audit metadata from the
-        workflow's ``before`` dict.
+        workflow's ``before`` dict; ``respond(invoice, before)`` builds the
+        response body when it is not the bare invoice.
         """
         invoice = invoice or self.get_object()
         denial = _deny_if_zev_disabled(request, invoice, action_type=action_type, denied_verb=denied_verb)
@@ -703,7 +718,10 @@ class InvoiceViewSet(
             metadata=metadata(before) if metadata else None,
         )
         # The workflow wrote payments behind the prefetch this instance carries.
-        getattr(invoice, "_prefetched_objects_cache", {}).pop("payments", None)
+        for relation in ("payments", "credits"):
+            getattr(invoice, "_prefetched_objects_cache", {}).pop(relation, None)
+        if respond is not None:
+            return Response(respond(invoice, before), status=response_status)
         return Response(InvoiceSerializer(invoice, context={"request": request}).data, status=response_status)
 
     @action(detail=True, methods=["post"], url_path="approve",
@@ -801,6 +819,43 @@ class InvoiceViewSet(
                 "payment_id": str(payment.pk),
                 "amount_chf": f"{payment.amount_chf:.2f}",
                 "paid_on": payment.paid_on.isoformat(),
+            },
+        )
+
+    @action(detail=True, methods=["post"], url_path="correct",
+            permission_classes=[IsAuthenticated, HasZevAccess])
+    def correct(self, request, pk=None):
+        """Correct a paid invoice (or a sent one with payments) by issuing a
+        credit note: a full reversal that cancels it, or a partial credit."""
+        body = CorrectInvoiceSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        data = body.validated_data
+        if data["kind"] == "adjustment" and "amount_chf" not in data:
+            raise ValidationError({"amount_chf": ["The credit amount is required for a partial credit."]})
+        context = {"request": request}
+        return self._perform_status_transition(
+            request,
+            action_type="invoice.correct",
+            workflow_fn=lambda invoice: correct_invoice(
+                invoice,
+                kind=data["kind"],
+                reason=data["reason"],
+                amount_chf=data.get("amount_chf"),
+                user=request.user,
+            ),
+            denied_verb="correction",
+            success_summary=lambda invoice: f"Corrected invoice {_invoice_target_display(invoice)}.",
+            metadata=lambda before: {
+                "kind": before["credit"].kind,
+                "credit_id": str(before["credit"].pk),
+                "credit_number": before["credit"].credit_number,
+                "amount_chf": f"{before['credit'].amount_chf:.2f}",
+                "reason": before["credit"].reason,
+            },
+            response_status=status.HTTP_201_CREATED,
+            respond=lambda invoice, before: {
+                "invoice": InvoiceSerializer(invoice, context=context).data,
+                "credit": CreditSerializer(before["credit"], context=context).data,
             },
         )
 
@@ -1027,3 +1082,74 @@ class InvoiceViewSet(
         period = invoices_with_pdf[0].period_start.isoformat()
         response["Content-Disposition"] = content_disposition("attachment", f"invoices-{period}.zip")
         return response
+
+
+class CreditViewSet(ZevScopedQuerySetMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """Credit notes (#388), read-only: they are issued by ``invoices/{id}/correct/``.
+
+    Scoped like the invoices: an admin sees all, managers and viewers their
+    ZEVs, a participant their own — from the moment the credit exists, and
+    after they left the ZEV, as with their invoices.
+    """
+
+    serializer_class = CreditSerializer
+    permission_classes = [IsAuthenticated]
+    zev_lookup = "zev"
+    participant_path = "participant"
+    participant_access_survives_end = True
+
+    def get_queryset(self):
+        queryset = Credit.objects.select_related("zev", "participant__party", "source_invoice", "created_by")
+        return self.scope_queryset(queryset)
+
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
+        if self.action != "list":
+            return queryset
+        for param, lookup in (("participant_id", "participant_id"), ("source_invoice_id", "source_invoice_id")):
+            raw = self.request.query_params.get(param)
+            if raw:
+                if not _is_uuid(raw):
+                    raise ValidationError({param: ["Must be a valid UUID."]})
+                queryset = queryset.filter(**{lookup: raw})
+        return queryset
+
+    @action(detail=True, methods=["get"], url_path="pdf", permission_classes=[IsAuthenticated])
+    def download_pdf(self, request, pk=None):
+        """Serve the stored credit note, authenticated and ZEV-scoped."""
+        credit = self.get_object()
+        if not credit.pdf_file:
+            return Response({"error": "No PDF generated yet."}, status=status.HTTP_404_NOT_FOUND)
+        return FileResponse(
+            credit.pdf_file.open("rb"), content_type="application/pdf",
+            filename=sanitize_filename(f"{credit.credit_number}.pdf"),
+        )
+
+    @action(detail=True, methods=["post"], url_path="generate-pdf",
+            permission_classes=[IsAuthenticated, HasZevAccess])
+    def generate_pdf(self, request, pk=None):
+        """Re-render the credit note's PDF (managers); queued like the first render."""
+        credit = self.get_object()
+        if not request.user.is_admin and credit.zev.disabled_at is not None:
+            return Response(
+                {"error": "This ZEV is disabled. Ask an admin to re-enable it first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        Credit.objects.filter(pk=credit.pk).update(pdf_status=InvoicePdfStatus.PENDING)
+        try:
+            generate_credit_pdf_task.delay(str(credit.pk))
+        except Exception:
+            logger.exception("Could not queue the PDF for credit note %s", credit.credit_number)
+            Credit.objects.filter(pk=credit.pk).update(pdf_status=InvoicePdfStatus.FAILED)
+            return Response({"error": "Could not queue the PDF."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.INVOICE,
+            action_type="credit.generate_pdf",
+            summary=f"Queued PDF generation for credit note {credit.credit_number}.",
+            target_type="invoices.Credit",
+            target=credit,
+            target_id=str(credit.pk),
+            target_display=credit.credit_number,
+        )
+        return Response({"pdf_status": InvoicePdfStatus.PENDING}, status=status.HTTP_202_ACCEPTED)

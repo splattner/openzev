@@ -21,6 +21,11 @@ invoice and moves it to ``paid`` once the amount due is covered;
 ``mark_invoice_paid`` books the outstanding amount in one go. An invoice with
 payments is never cancelled or deleted directly.
 
+Corrections (#388): ``correct_invoice`` is the one way out of ``paid`` and the
+only cancellation of an invoice that received money. It issues a ``Credit``
+(credit note): a full reversal credits what was received and cancels the
+invoice; a partial credit leaves the invoice as it is.
+
 Concurrency (#572): every transition below checks and writes the row's
 *current* database state inside one locked transaction (``SELECT ... FOR
 UPDATE``), never the possibly-stale status of whatever ``Invoice`` instance
@@ -37,13 +42,15 @@ lock is acquired *after* the slow part (SMTP delivery) has already
 completed in the caller, not held across it.
 """
 
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
-from .models import Invoice, InvoicePdfStatus, InvoiceStatus, Payment
+from zev.models import VatMode
+
+from .models import Credit, CreditKind, Invoice, InvoicePdfStatus, InvoiceStatus, Payment
 
 
 class InvoiceWorkflowError(Exception):
@@ -252,6 +259,8 @@ def delete_payment(payment: Payment) -> dict:
         locked = Invoice.objects.select_for_update().get(pk=payment.invoice_id)
         if locked.status not in (InvoiceStatus.SENT, InvoiceStatus.PAID):
             raise InvoiceWorkflowError("Payments of a cancelled invoice cannot be removed.")
+        if Credit.objects.filter(source_invoice_id=locked.pk).exists():
+            raise InvoiceWorkflowError("Payments of an invoice with credit notes cannot be removed.")
         before_status = locked.status
         Payment.objects.filter(pk=payment.pk).delete()
         if locked.status == InvoiceStatus.PAID and paid_chf(locked.pk) != amount_due(locked):
@@ -273,13 +282,127 @@ def cancel_invoice(invoice: Invoice) -> dict:
         to_status=InvoiceStatus.CANCELLED,
         invalid_message=lambda current: (
             "Invoice is already cancelled." if current == InvoiceStatus.CANCELLED
-            else "Paid invoices cannot be cancelled."
+            else "Paid invoices cannot be cancelled. Correct the invoice instead."
         ),
         guard=lambda locked: (
-            "Invoices with recorded payments cannot be cancelled."
+            "Invoices with recorded payments cannot be cancelled. Correct the invoice instead."
             if Payment.objects.filter(invoice_id=locked.pk).exists() else None
         ),
     )
+
+
+_CENT = Decimal("0.01")
+
+
+def invoice_vat_mode(invoice: Invoice) -> str:
+    """The VAT mode an invoice was issued under, worked out from its fields:
+    ``Invoice`` does not store it and ``Zev.vat_mode`` may have changed since."""
+    if invoice.embedded_vat_chf is not None:
+        return VatMode.INCLUSIVE
+    if invoice.vat_base_chf is not None or invoice.vat_chf != 0:
+        return VatMode.REGISTERED
+    return VatMode.NOT_REGISTERED
+
+
+def credit_vat_split(source: Invoice, amount: Decimal) -> dict:
+    """The VAT figures of a credit of ``amount`` (gross) against ``source``.
+
+    A credit over the invoice's full total copies its VAT exactly. Any other
+    amount is scaled: a registered invoice takes ``amount × rate / (1 + rate)``;
+    an inclusive one takes the same share of its embedded VAT as ``amount`` is
+    of the total (the inclusive invoice stores no rate); a non-registered one
+    carries none.
+    """
+    mode = invoice_vat_mode(source)
+    if amount == source.total_chf:
+        return {
+            "vat_mode": mode, "vat_rate": source.vat_rate, "vat_chf": source.vat_chf,
+            "embedded_vat_chf": source.embedded_vat_chf,
+        }
+    vat_chf, embedded = Decimal("0"), None
+    if mode == VatMode.REGISTERED:
+        vat_chf = (amount * source.vat_rate / (1 + source.vat_rate)).quantize(_CENT, rounding=ROUND_HALF_UP)
+    elif mode == VatMode.INCLUSIVE:
+        embedded = (source.embedded_vat_chf * amount / source.total_chf).quantize(_CENT, rounding=ROUND_HALF_UP)
+    return {"vat_mode": mode, "vat_rate": source.vat_rate, "vat_chf": vat_chf, "embedded_vat_chf": embedded}
+
+
+def credited_chf(invoice_pk) -> Decimal:
+    """Sum of the credit notes issued for an invoice."""
+    return Credit.objects.filter(source_invoice_id=invoice_pk).aggregate(
+        total=Sum("amount_chf")
+    )["total"] or Decimal("0")
+
+
+def correct_invoice(
+    invoice: Invoice, *, kind: str, reason: str, amount_chf: Decimal | None = None, user=None,
+) -> dict:
+    """Correct an invoice that received money by issuing a credit note.
+
+    Returns the ``before`` diff dict with the new ``credit`` under its own key.
+
+    * ``reversal``: credits what was received, less any earlier partial credit,
+      and cancels the invoice. The period can then be regenerated.
+    * ``adjustment``: credits ``amount_chf`` (up to what was received and not
+      yet credited) and leaves the invoice as it is.
+
+    Only a ``paid`` invoice, or a ``sent`` one with payments, qualifies: a sent
+    invoice nobody paid is simply cancelled. A producer payout (total ≤ 0) is
+    out of scope.
+    """
+    reason = (reason or "").strip()
+    with transaction.atomic():
+        locked = Invoice.objects.select_for_update().select_related("zev", "participant__party").get(pk=invoice.pk)
+        received = paid_chf(locked.pk)
+        if locked.status not in (InvoiceStatus.SENT, InvoiceStatus.PAID):
+            _mirror_status(invoice, locked)
+            raise InvoiceWorkflowError(
+                "Invoice is already cancelled." if locked.status == InvoiceStatus.CANCELLED
+                else "Only paid invoices, or sent invoices with payments, can be corrected. "
+                     "Cancel an invoice that has no payments instead."
+            )
+        if locked.status == InvoiceStatus.SENT and received <= 0:
+            raise InvoiceWorkflowError(
+                "Only paid invoices, or sent invoices with payments, can be corrected. "
+                "Cancel a sent invoice that has no payments instead."
+            )
+        if locked.total_chf <= 0:
+            raise InvoiceWorkflowError("Invoices with nothing to collect (payouts) cannot be corrected.")
+        if kind not in CreditKind.values:
+            raise InvoiceWorkflowError("Unknown correction kind.")
+        if not reason:
+            raise InvoiceWorkflowError("A reason is required.")
+
+        creditable = received - credited_chf(locked.pk)
+        if kind == CreditKind.REVERSAL:
+            amount = creditable
+            if amount <= 0:
+                raise InvoiceWorkflowError("Everything received for this invoice has already been credited.")
+        else:
+            if amount_chf is None or amount_chf <= 0:
+                raise InvoiceWorkflowError("The credit amount must be positive.")
+            if amount_chf > creditable:
+                raise InvoiceWorkflowError(f"The credit exceeds the creditable amount of CHF {creditable:.2f}.")
+            amount = amount_chf
+
+        credit = Credit.objects.create(
+            credit_number=locked.zev.next_credit_note_number(),
+            zev=locked.zev, participant=locked.participant, kind=kind, source_invoice=locked,
+            reason=reason, amount_chf=amount, issuer=locked.issuer, recipient=locked.recipient,
+            pdf_status=InvoicePdfStatus.PENDING, created_by=user,
+            **credit_vat_split(locked, amount),
+        )
+        before_status = locked.status
+        if kind == CreditKind.REVERSAL:
+            locked.status = InvoiceStatus.CANCELLED
+            locked.updated_at = timezone.now()
+            locked.save(update_fields=["status", "updated_at"])
+        # The render reads the committed credit, so it is queued once it is there.
+        from .tasks import generate_credit_pdf_task
+        transaction.on_commit(lambda: generate_credit_pdf_task.delay(str(credit.pk)), robust=True)
+
+    _mirror_status(invoice, locked)
+    return {"status": before_status, "credit": credit}
 
 
 def record_email_delivery(invoice: Invoice, sent_at) -> str:

@@ -36,6 +36,8 @@ export function InvoicePaymentsCard({
     const payments = invoice.payments ?? []
     const outstanding = Number(invoice.outstanding_chf ?? 0)
     const canRecord = canManage && invoice.status === 'sent'
+    // Once credit notes exist the payments they were issued against are fixed.
+    const hasCredits = (invoice.credits ?? []).length > 0
     // A payout (negative total) or a zero total is settled in one step.
     const collectsMoney = Number(invoice.total_chf) > 0
 
@@ -124,7 +126,7 @@ export function InvoicePaymentsCard({
                                     <td>{payment.created_by_name ?? <span className="muted">-</span>}</td>
                                     {canManage ? (
                                         <td className="numeric">
-                                            {invoice.status !== 'cancelled' ? (
+                                            {invoice.status !== 'cancelled' && !hasCredits ? (
                                                 <button
                                                     type="button"
                                                     className="table-inline-link"

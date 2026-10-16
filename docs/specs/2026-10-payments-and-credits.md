@@ -1,7 +1,7 @@
 # Feature Spec: Payments, credit notes and corrections of paid invoices (#388)
 
 - Spec ID: SPEC-2026-10-payments-and-credits
-- Status: In Progress (phase 1, payments and `approved_at`, implemented)
+- Status: In Progress (phase 1, payments and `approved_at`, and phase 2, credit notes and corrections, implemented)
 - Scope: Major
 - Type: Feature
 - Owners: Sebastian Plattner
@@ -216,8 +216,8 @@ civil date of the newest successful `AuditEvent` with `action_type = "invoice.ma
 | `vat_rate` | `DecimalField(5, 4)` | — | Copied from `source_invoice.vat_rate` |
 | `vat_chf` | `DecimalField(10, 2)` | `0` | VAT contained in `amount_chf`, see below |
 | `embedded_vat_chf` | `DecimalField(10, 2, null=True)` | — | For `inclusive` only |
-| `refunded_chf` | `DecimalField(10, 2)` | `0` | Phase 3 |
-| `refunded_on` | `DateField(null=True)` | — | Phase 3 |
+| `refunded_chf` | `DecimalField(10, 2)` | `0` | Phase 3 (not yet on the model) |
+| `refunded_on` | `DateField(null=True)` | — | Phase 3 (not yet on the model) |
 | `pdf_file`, `pdf_status` | as on `Invoice` | | Same render pipeline and status semantics as `InvoicePdfStatus` |
 | `issuer`, `recipient` | `JSONField` | | Copied from `source_invoice` (frozen since approval, #761) |
 | `created_by` | `ForeignKey(User, SET_NULL, null=True)` | | |
@@ -471,8 +471,10 @@ export interface Payment {
   partial credit, reason (required), amount (partial only, capped). It explains what happens: the
   invoice is cancelled, a credit note over CHF x is issued, and the period can be regenerated. The
   action appears on `paid` invoices and on `sent` invoices with payments.
-- **`InvoiceDetailPage.tsx`**: a "Credit notes" card (number, kind, amount, remaining, PDF). A
-  cancelled original links to its credit note and the replacement.
+- **`InvoiceDetailPage.tsx`**: a "Credit notes" card (`InvoiceCreditsCard`: number, date, kind, amount,
+  reason, PDF) that also carries the "Correct invoice" action. The original lists its own credit notes;
+  a link from the cancelled original to its replacement is not built. Removing a payment is hidden once
+  credits exist.
 - **`MyInvoicesPage.tsx`**: the participant's credit notes with PDF download.
 - `Credit` type and `listCredits`, `getCredit`, `correctInvoice`, `downloadCreditPdf`.
 
@@ -499,7 +501,7 @@ export interface Payment {
 
 ## 9. Test plan
 
-Phases 2 and 3 list the intended tests; their names and counts are filled in when they land.
+Phase 3 lists the intended tests; their names and counts are filled in when they land.
 
 ### Phase 1 — `invoices/test_payments.py` (31 tests)
 
@@ -548,14 +550,57 @@ lists payments with the summary and "Mark rest as paid"; recording a payment thr
 (defaults to the outstanding amount, calls `recordPayment`, reports the new invoice); a payout
 offers only mark-paid; a viewer with no payments sees no card.
 
-### Phase 2 — `invoices/test_credits.py` (new)
+### Phase 2 — `invoices/test_credits.py` (48 tests)
 
-Reversal of a paid invoice (status, credit = `paid_chf`, number from its own sequence), reversal of
-an underpaid invoice (credit = paid, VAT scaled), adjustment within the cap and above it, refusal on
-`total_chf <= 0`, refusal on a `sent` invoice without payments, the VAT split for each `vat_mode`,
-`delete_payment` refused once a credit exists, regeneration after a reversal, credit PDF render and
-download, participant visibility, transfer/backup/purge round-trips, audit events, annual statement
-with an adjustment credit.
+**`CreditWorkflowTests`** (21): `test_reversal_of_paid_invoice_cancels_it_and_credits_what_was_paid`,
+`test_credit_numbers_use_their_own_sequence`, `test_credit_note_prefix_is_configurable`,
+`test_reversal_of_underpaid_sent_invoice_credits_the_payments_and_scales_vat`,
+`test_full_reversal_copies_the_vat_exactly`, `test_full_reversal_copies_the_embedded_vat_of_an_inclusive_invoice`,
+`test_vat_split_per_mode_for_a_partial_amount`, `test_the_vat_mode_comes_from_the_invoice_not_from_the_zev`,
+`test_adjustment_within_the_cap_keeps_the_invoice`,
+`test_adjustments_are_capped_by_what_was_paid_less_earlier_credits`,
+`test_adjustment_needs_a_positive_amount`, `test_reversal_after_an_adjustment_credits_the_rest`,
+`test_nothing_left_to_reverse_is_refused`, `test_payout_invoices_are_refused`,
+`test_sent_invoice_without_payments_is_refused`, `test_other_statuses_are_refused`,
+`test_a_reason_is_required`, `test_a_correction_is_not_repeatable_after_a_reversal`,
+`test_delete_payment_is_refused_once_a_credit_exists`, `test_cancel_points_to_the_correction`,
+`test_the_credit_amount_must_be_positive_in_the_database`.
+
+**`CreditApiTests`** (16): `test_correct_returns_the_invoice_and_the_credit` (`201`),
+`test_correct_validates_the_body`, `test_guard_failure_returns_400_and_audits_the_denial`,
+`test_audit_event_carries_the_credit`, `test_viewer_cannot_correct` (`404`),
+`test_participant_cannot_correct`, `test_disabled_zev_refuses_non_admins_but_not_admins`,
+`test_admin_delete_is_refused_once_a_credit_exists`, `test_removing_a_payment_is_refused_once_a_credit_exists`,
+`test_regeneration_after_a_reversal_keeps_the_cancelled_original`,
+`test_credit_list_is_scoped_and_filterable`, `test_participant_sees_only_their_own_credits`,
+`test_participant_sees_the_credits_on_their_invoice`,
+`test_credit_pdf_is_404_before_the_render_and_served_after`,
+`test_generate_pdf_queues_a_render_for_managers_only`, `test_credits_are_read_only`.
+
+**`CreditPdfTests`** (7): `test_task_renders_and_stores_the_pdf`,
+`test_rendering_again_replaces_the_stored_file`, `test_a_failed_render_is_recorded`,
+`test_the_context_names_the_invoice_the_reason_and_the_vat`,
+`test_no_vat_breakdown_unless_the_invoice_was_registered`, `test_the_document_is_in_the_invoice_language`,
+`test_the_template_is_editable_and_previewable_by_admins`.
+
+**`AnnualStatementCreditTests`** (4): `test_an_adjustment_is_a_negative_row_and_reduces_the_totals`,
+`test_a_reversal_is_not_listed_and_leaves_no_trace_in_the_totals`,
+`test_an_adjustment_on_an_invoice_reversed_later_is_dropped_with_it`,
+`test_an_adjustment_outside_the_year_is_not_listed`.
+
+Also changed: `zev/test_transfer.py` (`RoundTripTests::test_credits_round_trip_and_push_the_counter`;
+`SchemaParityTests` covers `CREDIT_FIELDS`), `zev/test_purge.py` (the credit is deleted before its
+invoice and counted), `zev/tests.py` seed tests (the closed month now holds one reversal and one
+adjustment), the `backups` restore tests (credits are removed before their invoices), and
+`invoices/test_field_catalog.py` (the `credit_note` template).
+
+### Phase 2 — frontend, `frontend/tests/invoice-credits.test.ts` (7 tests)
+
+`creditableChf` (received less credited); `canCorrectInvoice` (paid, or sent with payments, for a
+manager; not for a viewer, an unpaid, cancelled, payout or fully credited invoice);
+`InvoiceCreditsCard` lists the credit notes with the PDF action, stays hidden with nothing to show or
+do, and issues a partial credit through the dialog (reason trimmed, amount capped, `correctInvoice`
+called); `InvoicePaymentsCard` offers removing a payment only while no credit note exists.
 
 ### Phase 3 — `invoices/test_credit_application.py` (new)
 

@@ -113,6 +113,7 @@ SUBCOUNT_SECTIONS = {
     "parties": SECTION_PARTICIPANTS,
     "party_roles": SECTION_PARTICIPANTS,
     "buildings": SECTION_METERING_POINTS,
+    "credits": SECTION_INVOICES,
     "supplementary_readings": SECTION_SUPPLEMENTARY,
 }
 
@@ -147,6 +148,9 @@ ZEV_FIELDS = (
     "billing_interval",
     "invoice_prefix",
     "invoice_counter",
+    # Optional (#388): an older archive keeps the defaults.
+    "credit_note_prefix",
+    "credit_note_counter",
     "contract_counter",
     "invoice_language",
     "payment_term_days",
@@ -367,6 +371,23 @@ PAYMENT_FIELDS = (
     "paid_on",
     "note",
     "source",
+)
+
+# Nested under each invoice as ``credits`` (#388), the credit notes issued for
+# it. Optional: an older archive has none. The PDF bytes travel in the
+# ``invoice_pdfs`` section, keyed by ``credit_number``.
+CREDIT_FIELDS = (
+    "credit_number",
+    "kind",
+    "reason",
+    "amount_chf",
+    "vat_mode",
+    "vat_rate",
+    "vat_chf",
+    "embedded_vat_chf",
+    "issuer",
+    "recipient",
+    "created_at",
 )
 
 INVOICE_ITEM_FIELDS = (

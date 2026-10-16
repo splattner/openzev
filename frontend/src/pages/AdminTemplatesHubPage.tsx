@@ -10,7 +10,7 @@ export type AdminTemplatesTab = 'pdf' | 'email'
 
 type TemplateKey = PdfTemplateTab | EmailTemplateKey
 
-const pdfTemplates: PdfTemplateTab[] = ['invoice', 'contract', 'annual_statement']
+const pdfTemplates: PdfTemplateTab[] = ['invoice', 'contract', 'annual_statement', 'credit_note']
 const emailTemplates: EmailTemplateKey[] = [...EMAIL_TEMPLATE_KEYS]
 
 /**

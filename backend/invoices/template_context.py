@@ -11,7 +11,7 @@ from decimal import Decimal
 
 from .annual_statement import ANNUAL_TRANSLATIONS, _build_monthly_chart_svg
 from .contract_translations import CONTRACT_TRANSLATIONS
-from .pdf_translations import INVOICE_TRANSLATIONS
+from .pdf_translations import CREDIT_TRANSLATIONS, INVOICE_TRANSLATIONS
 
 
 class _Obj:
@@ -351,5 +351,46 @@ def build_sample_annual_statement_context() -> dict:
         },
         "formatted_dates": {
             "statement_date": "01.01.2026",
+        },
+    }
+
+
+def build_sample_credit_note_context() -> dict:
+    tr = dict(CREDIT_TRANSLATIONS["en"])
+    tr["notes_question"] = tr["notes_question"].format(email="info@example.com")
+    issuer = _sample_issuer()
+    recipient = {
+        "name": "Hans Beispiel", "name_addition": "", "address_line1": "Musterstrasse 42",
+        "address_line2": "", "postal_code": "3000", "city": "Bern", "email": "hans@example.com",
+    }
+    return {
+        "credit": _Obj(
+            credit_number="CN-00001",
+            reason="The meter reading for March was too high.",
+            amount_chf="108.11",
+            vat_chf="8.11",
+            kind="adjustment",
+        ),
+        "source_invoice": _Obj(invoice_number="INV-2026-001"),
+        "lang": "en",
+        "tr": tr,
+        "kind_display": tr["kind_values"]["adjustment"],
+        "credit_number_prefix": "CN-",
+        "credit_number_suffix": "00001",
+        "credit_for_invoice": tr["credit_for_invoice"].format(number="INV-2026-001", date="01.04.2026"),
+        "show_vat": True,
+        "net_chf": "100.00",
+        "vat_rate_percent": "8.1",
+        "issuer": issuer,
+        "recipient": recipient,
+        "representative": _sample_representative(),
+        "owner_participant": _Obj(full_name="Maria Muster"),
+        "participant": _Obj(full_name="Hans Beispiel", **{k: v for k, v in recipient.items() if k != "name"}),
+        "zev": _Obj(name="Solar Community Example", vat_number="CHE-123.456.789", bank_iban="CH93 0076 2011 6238 5295 7"),
+        "formatted_dates": {
+            "credit_date": "15.04.2026",
+            "invoice_date": "01.04.2026",
+            "period_start": "01.03.2026",
+            "period_end": "31.03.2026",
         },
     }

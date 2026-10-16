@@ -278,6 +278,16 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
                         />
                         {inlineError('invoice_prefix')}
                     </label>
+                    <label data-zev-field="credit_note_prefix">
+                        <span>{t('pages.zevSettings.fields.creditNotePrefix')}</span>
+                        <input
+                            value={form.credit_note_prefix ?? ''}
+                            disabled={readOnly}
+                            {...describeInvalid('credit_note_prefix')}
+                            onChange={(event) => onChange({ credit_note_prefix: event.target.value })}
+                        />
+                        {inlineError('credit_note_prefix')}
+                    </label>
                     <div className="grid-span-full payment-recipient-section">
                         <strong>{t('pages.zevSettings.fields.paymentRecipientHeader')}</strong>
                         <p className="muted">{t('pages.zevSettings.fields.paymentRecipientHint')}</p>

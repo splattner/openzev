@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 from zev import access
-from .models import Invoice, InvoiceItem, EmailLog, Payment
+from .models import Credit, CreditKind, Invoice, InvoiceItem, EmailLog, Payment
 from .description_utils import strip_period_suffix
 
 
@@ -54,6 +54,59 @@ class RecordPaymentSerializer(serializers.Serializer):
 
 class MarkPaidSerializer(serializers.Serializer):
     paid_on = serializers.DateField(required=False)
+
+
+class CorrectInvoiceSerializer(serializers.Serializer):
+    kind = serializers.ChoiceField(choices=CreditKind.choices)
+    reason = serializers.CharField(max_length=2000)
+    amount_chf = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+
+
+class CreditSerializer(serializers.ModelSerializer):
+    """A credit note, read-only. ``remaining_chf``/``status`` already have their
+    final shape: until credits are applied to invoices or refunded (phase 3) a
+    credit is open and nothing has been used."""
+
+    participant_name = serializers.SerializerMethodField()
+    source_invoice_number = serializers.SerializerMethodField()
+    remaining_chf = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    pdf_url = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Credit
+        fields = [
+            "id", "credit_number", "zev", "participant", "participant_name", "kind",
+            "source_invoice", "source_invoice_number", "reason", "amount_chf", "vat_mode",
+            "vat_rate", "vat_chf", "embedded_vat_chf", "remaining_chf", "status", "pdf_url",
+            "pdf_status", "created_by_name", "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_participant_name(self, obj) -> str:
+        return (obj.recipient or {}).get("name") or obj.participant.full_name
+
+    def get_source_invoice_number(self, obj) -> str | None:
+        return obj.source_invoice.invoice_number if obj.source_invoice_id else None
+
+    def get_remaining_chf(self, obj) -> str:
+        return f"{obj.amount_chf:.2f}"
+
+    def get_status(self, obj) -> str:
+        return "open"
+
+    def get_pdf_url(self, obj) -> str | None:
+        request = self.context.get("request")
+        if obj.pdf_file and request:
+            return request.build_absolute_uri(f"/api/v1/invoices/credits/{obj.pk}/pdf/")
+        return None
+
+    def get_created_by_name(self, obj) -> str | None:
+        user = obj.created_by
+        if user is None:
+            return None
+        return user.get_full_name() or user.email
 
 
 class InvoiceListSerializer(serializers.ModelSerializer):
@@ -185,6 +238,16 @@ class InvoiceSerializer(InvoiceListSerializer):
     email_logs = EmailLogSerializer(many=True, read_only=True)
     access_link = serializers.SerializerMethodField()
     payments = serializers.SerializerMethodField()
+    credits = serializers.SerializerMethodField()
+
+    def get_credits(self, obj) -> list[dict]:
+        """The credit notes issued for this invoice. Unlike the payments, the
+        participant sees these: a credit note exists from the moment it is
+        issued."""
+        credits = getattr(obj, "_prefetched_objects_cache", {}).get("credits")
+        if credits is None:
+            credits = obj.credits.select_related("source_invoice", "participant__party", "created_by")
+        return CreditSerializer(credits, many=True, context=self.context).data
 
     def get_payments(self, obj) -> list[dict] | None:
         """The payment history, for the ZEV's managers and viewers only; a

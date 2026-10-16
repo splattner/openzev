@@ -251,6 +251,7 @@ export interface Zev {
     grid_connection_point?: string
     billing_interval: string
     invoice_prefix?: string
+    credit_note_prefix?: string
     invoice_language?: 'de' | 'fr' | 'it' | 'en'
     payment_term_days?: number
     bank_iban?: string
@@ -281,6 +282,7 @@ export interface ZevInput {
     grid_connection_point?: string
     billing_interval: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
     invoice_prefix?: string
+    credit_note_prefix?: string
     invoice_language?: 'de' | 'fr' | 'it' | 'en'
     payment_term_days?: number
     bank_iban?: string
@@ -1139,6 +1141,8 @@ export interface Invoice {
     outstanding_chf?: string
     /** Detail reads for the ZEV's managers and viewers; null for a participant. */
     payments?: Payment[] | null
+    /** Credit notes issued for this invoice (#388); the participant sees them too. */
+    credits?: Credit[]
     pdf_url?: string | null
     /**
      * Where the document is, as distinct from the invoice's own `status`.
@@ -1157,6 +1161,40 @@ export interface Invoice {
      * The retry endpoint is log-scoped, so the email-delivery tab needs the
      * log id to offer an inline retry off the list payload. */
     last_email_log_id?: string | null
+}
+
+export type CreditKind = 'reversal' | 'adjustment'
+
+/** A credit note (#388): money owed back for an invoice. */
+export interface Credit {
+    id: string
+    credit_number: string
+    zev: string
+    participant: string
+    participant_name: string
+    kind: CreditKind
+    source_invoice: string | null
+    source_invoice_number: string | null
+    reason: string
+    /** Gross. */
+    amount_chf: string
+    vat_mode: 'not_registered' | 'registered' | 'inclusive'
+    vat_rate: string
+    vat_chf: string
+    embedded_vat_chf: string | null
+    /** Until credits are applied or refunded, the whole amount. */
+    remaining_chf: string
+    status: 'open'
+    pdf_url: string | null
+    pdf_status: InvoicePdfStatus
+    created_by_name: string | null
+    created_at: string
+}
+
+/** Answer of `POST invoices/{id}/correct/`. */
+export interface CorrectInvoiceResponse {
+    invoice: Invoice
+    credit: Credit
 }
 
 /** Money received for an invoice (#388). */

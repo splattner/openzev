@@ -100,6 +100,10 @@ class Zev(models.Model):
     )
     invoice_prefix = models.CharField(max_length=10, default="INV", help_text="Prefix for invoice numbers")
     invoice_counter = models.PositiveIntegerField(default=1, help_text="Auto-incremented invoice number")
+    # Credit notes (#388) count on their own sequence, so the invoice numbers
+    # stay gap-free.
+    credit_note_prefix = models.CharField(max_length=10, default="CN", help_text="Prefix for credit note numbers")
+    credit_note_counter = models.PositiveIntegerField(default=1, help_text="Auto-incremented credit note number")
     contract_counter = models.PositiveIntegerField(
         default=1, help_text="Auto-incremented participation-contract document number"
     )
@@ -233,6 +237,16 @@ class Zev(models.Model):
             locked = Zev.objects.select_for_update(no_key=True).get(pk=self.pk)
             num = f"{locked.invoice_prefix}-{locked.invoice_counter:05d}"
             Zev.objects.filter(pk=locked.pk).update(invoice_counter=models.F("invoice_counter") + 1)
+            self.refresh_from_db()
+        return num
+
+    def next_credit_note_number(self) -> str:
+        """Allocate a credit note number from its own prefix/counter, under the
+        same row lock as :meth:`next_invoice_number`."""
+        with transaction.atomic():
+            locked = Zev.objects.select_for_update(no_key=True).get(pk=self.pk)
+            num = f"{locked.credit_note_prefix}-{locked.credit_note_counter:05d}"
+            Zev.objects.filter(pk=locked.pk).update(credit_note_counter=models.F("credit_note_counter") + 1)
             self.refresh_from_db()
         return num
 

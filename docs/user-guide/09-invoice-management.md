@@ -462,6 +462,30 @@ removed.
 Invoices that were marked paid before payments were recorded have one payment
 for their total, dated when they were marked paid.
 
+## Correcting a paid invoice with a credit note
+
+A paid invoice (or a sent one that has received payments) is not cancelled or
+deleted; it is corrected with a **credit note** (Gutschrift). Open the invoice
+and click **Correct invoice** in the **Credit notes** card, then choose:
+
+- **Reverse the invoice** - credits everything received for the invoice and
+  cancels it. The cancelled invoice stays, with its number. Afterwards generate
+  the period again to issue a replacement.
+- **Credit part of it** - credits an amount you enter (at most what was
+  received and not yet credited) and leaves the invoice as it is. Use it for an
+  overcharge.
+
+Enter a **reason**; it is printed on the credit note. Credit notes have their
+own numbers (prefix **CN** by default, changeable in the community settings
+under *Billing & payment*) and a PDF you can open from the card, based on the
+**Credit Note PDF Template** that admins can edit under *Templates*. Participants see their
+credit notes on the invoice and under **My invoices**.
+
+Once a credit note exists, the invoice's payments can no longer be removed and
+the invoice can no longer be deleted. Invoices with nothing to collect (a
+producer payout) can't be corrected this way. An adjustment credit also shows
+as a negative row in the participant's annual statement.
+
 ## Deleting Invoices
 
 Invoices can be deleted to clean up incorrect or test data.
@@ -473,7 +497,7 @@ Invoices can be deleted to clean up incorrect or test data.
 
 - **Draft** invoices, and **Cancelled** invoices that were never approved —
   **More → Delete invoice** is available to managers.
-- **Any status** — admins can delete, as long as the invoice has no payments.
+- **Any status** — admins can delete, as long as the invoice has no payments or credit notes.
 
 Deletion is permanent; the invoice is removed from the database.
 

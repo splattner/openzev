@@ -23,7 +23,7 @@ from backups.registry import ZEV_SECTIONS
 from backups.test_archive import build
 from backups.test_restore_instance import lines, plain_value, put_lines, snapshot, tamper
 from exports.models import ExportJob
-from invoices.models import ContractIssue, Invoice, InvoiceStatus
+from invoices.models import ContractIssue, Credit, Invoice, InvoiceStatus
 from metering.models import MeterReading
 from testing.helpers import make_user
 from zev.models import MeteringPoint, Participant, Zev, ZevAccessGrant
@@ -82,6 +82,8 @@ class ZevRestoreTestCase(TestCase):
     def damage_alpha(self):
         """Change alpha the way a bad week might: rename it, lose people and readings, add an invoice."""
         Zev.objects.filter(pk=self.alpha_id).update(name="Damaged")
+        # A credited invoice is protected, so the credit notes go first.
+        Credit.objects.filter(zev_id=self.alpha_id).delete()
         Participant.objects.filter(zev_id=self.alpha_id, party__first_name="Alice").delete()
         MeterReading.objects.filter(metering_point__zev_id=self.alpha_id).delete()
 
@@ -128,6 +130,7 @@ class ReplaceInPlaceTests(ZevRestoreTestCase):
         self.assertEqual(snapshot()["audit.AuditEvent"], trail)
 
     def test_a_deleted_community_is_recreated_and_its_old_audit_events_stay_as_they_were(self):
+        Credit.objects.filter(zev_id=self.alpha_id).delete()
         Invoice.objects.filter(zev_id=self.alpha_id).delete()
         Zev.objects.filter(pk=self.alpha_id).delete()
         orphaned = snapshot()["audit.AuditEvent"]
@@ -258,6 +261,7 @@ class AccountRelinkTests(ZevRestoreTestCase):
 
     def test_a_recreated_community_does_not_need_its_former_managers(self):
         # Nothing in a community requires an account since Zev.owner went (#761).
+        Credit.objects.all().delete()
         Invoice.objects.all().delete()
         Zev.objects.all().delete()
         self.world.owner.delete()
@@ -464,6 +468,7 @@ class SafetyBackupTests(ZevRestoreTestCase):
         safety.assert_not_called()
 
     def test_it_is_not_taken_for_a_community_that_does_not_exist_yet(self):
+        Credit.objects.filter(zev_id=self.alpha_id).delete()
         Invoice.objects.filter(zev_id=self.alpha_id).delete()
         Zev.objects.filter(pk=self.alpha_id).delete()
         safety = mock.Mock()
@@ -542,6 +547,7 @@ class AccessGrantRestoreTests(ZevRestoreTestCase):
 
     def test_a_recreated_community_starts_without_managers(self):
         # Grants are not restored; an admin grants access afterwards.
+        Credit.objects.filter(zev_id=self.alpha_id).delete()
         Invoice.objects.filter(zev_id=self.alpha_id).delete()
         Zev.objects.filter(pk=self.alpha_id).delete()
         restore_from(self.raw, self.alpha_id)

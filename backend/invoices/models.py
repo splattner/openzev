@@ -3,7 +3,7 @@ import uuid
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
-from zev.models import Zev, Participant
+from zev.models import Zev, Participant, VatMode
 from tariffs.models import TariffCategory
 
 
@@ -192,6 +192,62 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment {self.amount_chf} CHF on {self.paid_on} for {self.invoice_id}"
+
+
+class CreditKind(models.TextChoices):
+    REVERSAL = "reversal", "Full reversal"
+    ADJUSTMENT = "adjustment", "Partial credit"
+
+
+class Credit(models.Model):
+    """A credit note (Gutschrift): money owed back for an invoice (#388).
+
+    A reversal credits what was received for an invoice and cancels it; an
+    adjustment corrects an overcharge and leaves the invoice in place. The
+    document is frozen at issue: ``issuer``/``recipient`` are copies of the
+    invoice's, and the VAT figures are worked out once from the source
+    invoice's own VAT mode, never from the ZEV's current one.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    credit_number = models.CharField(max_length=50)
+    # PROTECT like Invoice.zev; ``zev/purge.py`` deletes credits first.
+    zev = models.ForeignKey(Zev, on_delete=models.PROTECT, related_name="credits")
+    participant = models.ForeignKey(Participant, on_delete=models.CASCADE, related_name="credits")
+    kind = models.CharField(max_length=20, choices=CreditKind.choices)
+    # Required for now; nullable so a goodwill credit can come later.
+    source_invoice = models.ForeignKey(
+        Invoice, on_delete=models.PROTECT, null=True, blank=True, related_name="credits"
+    )
+    reason = models.TextField()
+    # Gross.
+    amount_chf = models.DecimalField(max_digits=10, decimal_places=2)
+    vat_mode = models.CharField(max_length=20, choices=VatMode.choices)
+    vat_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0)
+    # The VAT contained in ``amount_chf`` (registered mode).
+    vat_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # Non-recoverable VAT contained in ``amount_chf`` (inclusive mode).
+    embedded_vat_chf = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    pdf_file = models.FileField(upload_to="invoices/credits/", blank=True, null=True)
+    pdf_status = models.CharField(
+        max_length=20, choices=InvoicePdfStatus.choices, default=InvoicePdfStatus.NONE,
+    )
+    issuer = models.JSONField(default=dict, blank=True)
+    recipient = models.JSONField(default=dict, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["zev", "credit_number"], name="unique_credit_number_per_zev"),
+            models.CheckConstraint(condition=models.Q(amount_chf__gt=0), name="credit_amount_positive"),
+        ]
+
+    def __str__(self):
+        return f"Credit {self.credit_number} ({self.amount_chf} CHF)"
 
 
 class InvoiceDynamicSourceEvidence(models.Model):

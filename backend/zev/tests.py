@@ -27,7 +27,7 @@ from zev.management.commands.seed_demo import (
 	quarter_start,
 	years_before,
 )
-from invoices.models import ContractIssue, EmailLog, Invoice, InvoiceStatus
+from invoices.models import ContractIssue, Credit, EmailLog, Invoice, InvoiceStatus
 from metering.models import ImportLog, MeterReading, ReadingDirection, ReadingResolution
 from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
 from tariffs.models import BillingMode, PeriodType, Tariff
@@ -1357,14 +1357,19 @@ class SeedDemoSecondCommunitySeedTests(TestCase):
 				status__in=[InvoiceStatus.PAID, InvoiceStatus.CANCELLED],
 			).exists()
 		)
-		# Closed month: everything settled, at most one invoice cancelled.
+		# Closed month: everything settled, at most one invoice cancelled in error
+		# and one reversed by a credit note (whose replacement is a draft).
 		closed_statuses = set(
 			Invoice.objects.filter(zev=self.zev, period_start=closed_start).values_list("status", flat=True)
 		)
-		self.assertTrue(closed_statuses.issubset({InvoiceStatus.PAID, InvoiceStatus.CANCELLED}))
+		self.assertTrue(closed_statuses.issubset({InvoiceStatus.PAID, InvoiceStatus.CANCELLED, InvoiceStatus.DRAFT}))
 		self.assertLessEqual(
 			Invoice.objects.filter(zev=self.zev, period_start=closed_start, status=InvoiceStatus.CANCELLED).count(),
-			1,
+			2,
+		)
+		self.assertEqual(
+			sorted(Credit.objects.filter(zev=self.zev).values_list("kind", flat=True)),
+			["adjustment", "reversal"],
 		)
 
 	def test_re_seeding_the_second_community_is_idempotent(self):

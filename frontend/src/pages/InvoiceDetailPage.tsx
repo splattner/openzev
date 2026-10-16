@@ -15,6 +15,8 @@ import { useAuth } from '../lib/auth'
 import { scopeNoteKey, shellRoleForZev } from '../lib/communityAccess'
 import { PdfPreview } from '../components/PdfPreview'
 import { InvoiceAccessLinkCard } from '../features/invoices/InvoiceAccessLinkCard'
+import { InvoiceCreditsCard } from '../features/invoices/InvoiceCreditsCard'
+import { canCorrectInvoice } from '../features/invoices/invoiceCredits'
 import { InvoicePaymentsCard } from '../features/invoices/InvoicePaymentsCard'
 import type { Invoice } from '../types/api'
 
@@ -105,6 +107,7 @@ export function InvoiceDetailPage() {
         void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.lists() })
         void queryClient.invalidateQueries({ queryKey: ['invoices', 'period-overview'] })
         void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.mine() })
+        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.credits() })
         for (const key of ['readiness', 'readiness-list', 'attention']) {
             void queryClient.invalidateQueries({ queryKey: ['invoices', key] })
         }
@@ -163,6 +166,11 @@ export function InvoiceDetailPage() {
             {/* `payments` is null for a participant, who sees the totals only. */}
             {!isParticipant && inv.payments != null && (
                 <InvoicePaymentsCard invoice={inv} canManage={canManageAccessLink} onChanged={handleInvoiceChanged} />
+            )}
+
+            {/* A credit note exists for the participant from the moment it is issued. */}
+            {((inv.credits ?? []).length > 0 || canCorrectInvoice(inv, canManageAccessLink)) && (
+                <InvoiceCreditsCard invoice={inv} canManage={canManageAccessLink} onChanged={handleInvoiceChanged} />
             )}
 
             {canManageAccessLink && inv.access_link != null && (
