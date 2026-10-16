@@ -77,8 +77,9 @@ under either split key.
 |---|---|
 | `admin` | Read and write charges of every ZEV |
 | `zev_owner` | Read and write charges of their ZEVs |
-| `manager` (ZEV grant) | Same as tariffs: follows the access mode of `zev.access` (`HasZevAccess`) |
-| `participant` | No access to the endpoint. Sees the resulting invoice line like any other line. |
+| `manager` (ZEV grant) | Read and write charges of the ZEV |
+| `viewer` (ZEV grant) | Read only |
+| `participant` | 403 on the endpoint (`participant_path = None`). Sees the resulting invoice line like any other line. |
 | `guest` | None |
 
 The viewset uses `[IsAuthenticated, HasZevAccess]` and `ZevScopedQuerySetMixin`, as
@@ -111,20 +112,20 @@ The viewset uses `[IsAuthenticated, HasZevAccess]` and `ZevScopedQuerySetMixin`,
 
 ### 4.2 Who bears a charge
 
-`invoices/charges.py::charge_bearers(charge) -> list[Participant]`: participants of `charge.zev`
-whose `[valid_from, valid_to]` contains `charge_date` (`_overlaps(valid_from, valid_to, d, d)`),
-intersected with `charge.participants` when `allocation == selected_participants`. Ordered by
-`pk` for determinism.
+`invoices/charges.py::bearers_among(participants, day, allocation, selected_ids)` (in memory) and its
+wrappers `bearers_for(zev, day, allocation, selected)` and `charge_bearers(charge)`: participants of
+the ZEV whose `[valid_from, valid_to]` contains `charge_date`, intersected with the selection when
+`allocation == selected_participants`. Ordered by `pk` for determinism.
 
 Membership is evaluated on `charge_date` alone, never on the invoice period. This is what makes a
 single-participant and a batch generation agree: both call the same function, and the shares do not
 depend on which other invoices exist (the lesson of `_count_active_participants_by_month`).
 
-Share of participant *p*, `n` = number of bearers, `Σw` = sum of their `allocation_weight`:
+Shares come from `split_charge(amount, split_key, bearers)`. For participant *p*, `n` = number of bearers, `Σw` = sum of their `allocation_weight`:
 
 - `split_key == equal` (or `n == 1`): `amount_chf / n`
 - `split_key == weight`: `amount_chf × p.allocation_weight / Σw`; a bearer whose weight is 0 gets
-  no line (zero-weight members are skipped as in §4.6 of the baseline spec).
+  no line (as zero-weight members of a weight-split shared fee).
 
 A share is quantized to `0.01` with `ROUND_HALF_UP`. A share that rounds to `0.00` yields no line.
 No bearer (`n == 0`, or `Σw == 0`) yields no line for anybody and is reported by readiness.
@@ -134,12 +135,11 @@ No bearer (`n == 0`, or `Σw == 0`) yields no line for anybody and is reported b
 `ItemAccumulator` is keyed by tariff (group key, `_tariff_bears_input_vat`, sort order, item type
 and description all read the tariff), so charges do **not** go through it. Instead:
 
-1. After `_build_item_payloads(...)`, `generate_invoice` calls
-   `invoices.charges.price_charges(participant, period_start, period_end)`, which returns a list of
-   `ChargeLine(charge, total_chf)` for charges with `period_start <= charge_date <= period_end`
-   whose bearers include the participant. One query for the ZEV's charges in the period
-   (`prefetch_related("participants")`); bearers are computed from the participants already loaded
-   in `InvoiceGenerationContext` where available, and queried once otherwise.
+1. After `_build_item_payloads(...)`, `generate_invoice` reads
+   `generation_context.charge_lines(zev, participant.pk)`: the `ChargeLine(charge, total_chf, shared)`
+   entries of charges with `period_start <= charge_date <= period_end` that the participant bears
+   (`invoices/charges.py::charge_lines_by_participant`: one charge query with
+   `prefetch_related("participants")`, one participants query).
 2. `charges_chf = Σ line.total_chf`. `subtotal = subtotal + charges_chf`.
 3. `vat_base_chf = subtotal − producer_credit_chf − Σ pass_through lines` (§4.4).
 4. `InvoiceItem` rows are created for each line, appended after the tariff items:
@@ -153,14 +153,15 @@ and description all read the tariff), so charges do **not** go through it. Inste
 | `unit` | `flat` |
 | `unit_price_chf` | the share |
 | `total_chf` | the share |
-| `sort_order` | `CHARGE_SORT_ORDER = 950` (after every `CATEGORY_SORT_ORDER` + type + mode sum); ties by `charge_date`, `created_at` |
+| `sort_order` | `CHARGE_SORT_ORDER = 950` (after every `CATEGORY_SORT_ORDER` + type + mode sum); ties fall to `InvoiceItem.Meta.ordering` (description) |
 
 `InvoiceItem` carries no foreign key to `Charge`. An invoice is a finished document (same stance as
 `tariff_category` in `zev/transfer/schema.py`): later edits or deletion of the charge never alter
 it.
 
-`InvoiceGenerationContext` gains no cache for charges; the query is one indexed range lookup per
-invoice.
+`InvoiceGenerationContext` gains `charge_lines(zev, participant_id)`, which loads every charge of the
+period once (`charge_lines_by_participant`) and serves the whole batch from it; the single-invoice
+path builds a context of its own and so reads the same data.
 
 ### 4.4 VAT
 
@@ -187,9 +188,10 @@ Swiss VAT rules / the owner's tax adviser before release.**
 `generate_invoice` reads them again.
 
 **Freezing without a link.** A charge is *locked* when any of its bearers has an invoice for which
-`locked_overlapping_invoices(bearer, charge_date, charge_date)` is non-empty (status past draft or
-cancelled-and-ever-approved, ADR 0037). A locked charge refuses `PATCH` and `DELETE` with 409 and
-`code: "charge_locked"`. The same predicate refuses a `POST`/`PATCH` that would create a charge
+`engine.locked_overlapping_invoices(bearer, charge_date, charge_date)` is non-empty (status past
+`draft`, not `cancelled`; the rule regeneration uses). `charges.charge_lock(charge)` answers it for
+one charge and `charges.locked_charge_ids(charges)` for a list in two queries. A locked charge refuses `PATCH` and `DELETE` with 409,
+`{"code": "charge_locked", "detail", "invoice_number"}`, and a `DENIED` audit event. The same predicate refuses a `POST`/`PATCH` that would create a charge
 for a date with a locked bearer invoice (400 on `charge_date`, message naming the invoice number
 and telling the owner to pick a date in a later period). This guarantees a charge is never
 silently missing from an issued invoice, and that shares are never half-issued.
@@ -205,11 +207,13 @@ regenerated. `compute_readiness` therefore gains a `charges` step:
 | A charge in the period has no bearer | `warn`, `detail_data = {"unbilled_charges": [descriptions]}` |
 
 Bearers of a locked charge are, by definition, not drafts, so a locked charge never produces
-`todo`. The step is added in `_bulk_period_readiness` (data loaded in `_load_bulk`, one query for
-charges in the span), between `generated` and `approved`: `_select_next_action` returns the first
+`todo`. The step is added in `_bulk_period_readiness` (`BulkData.charges` and `BulkData.drafts`,
+loaded in `_load_bulk`: one query for the charges in the span, one for draft invoices only when
+there are charges), between `generated` and `approved`: `_select_next_action` returns the first
 `todo`/`warn` step, and stale drafts must be regenerated before they are approved.
 `NEXT_ACTION_BY_STEP["charges"] = "generate"` reuses the existing action, so no new frontend
-next-action value is needed.
+next-action value is needed (it is also what a `warn` step points at; the warning text carries the
+meaning).
 
 ### 4.6 `TariffCategory.OTHER`
 
@@ -219,44 +223,48 @@ must be handled because unknown categories are silently dropped by the PDF group
 - `Tariff.category` must not accept `other`: `Tariff.clean()` rejects it (the choices stay on the
   field, since `InvoiceItem.tariff_category` shares the enum). The tariff serializer exposes only
   the four tariff categories in its schema documentation.
-- `invoices/pdf.py::_group_items_by_category`: add `other` to `labels` and `ordered_categories`
-  (last). New translation key `cat_other` in `pdf_translations.py` (de "Weitere Kosten", fr "Autres
-  frais", it "Altri costi", en "Other charges"). `unit_label` for `flat` resolves to
-  `unit_flat` ("pauschal" / "forfait" / "forfait" / "flat").
+- `invoices/pdf.py::_group_items_by_category`: `other` is in `labels` and `ordered_categories`
+  (last). New keys in `pdf_translations.py::INVOICE_TRANSLATIONS`: `cat_other` (de "Weitere Kosten",
+  fr "Autres frais", it "Altri costi", en "Other charges") and `unit_flat` ("pauschal" / "forfait" /
+  "forfait" / "flat"), the label of `unit == "flat"`.
 - `CATEGORY_SORT_ORDER` is left untouched (charges use `CHARGE_SORT_ORDER`).
-- `invoices/views_public.py` and `financial_summary.py` pass `tariff_category` through as a value;
-  `financial_summary.py` gets the translated label for `other`.
+- `invoices/views_public.py` passes `tariff_category` through as a value; `financial_summary.py` only
+  labels the column. `tariff_overview.py` labels tariff categories only, so charges never reach it.
 - Frontend: `Tariff['category']` stays four values; `InvoiceItem['tariff_category']` and the
   invoice presentation get a fifth (§7).
 
-Migration: `tariffs/00xx` altering the `choices` of `Tariff.category` and
-`invoices/00xx` creating `Charge` and altering `InvoiceItem.tariff_category` choices. No data
+Migrations: `tariffs/0020_variable_charges` altering the `choices` of `Tariff.category`;
+`invoices/0026_variable_charges` creating `Charge` and altering the `InvoiceItem.tariff_category`
+choices. No data
 migration. Rollback: drop the `Charge` table; invoices that carry an `other` line keep it as a
 plain value.
 
 ## 5. API contracts
 
-All under `/api/v1/`, registered in `invoices/urls.py`, viewset
-`invoices/views_charges.py::ChargeViewSet(ZevScopedQuerySetMixin, AuditedUpdateMixin, ModelViewSet)`.
+All under `/api/v1/invoices/`, registered in `invoices/urls.py` (`router.register("charges", ...)`),
+viewset `invoices/views_charges.py::ChargeViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin,
+ZevScopedQuerySetMixin, ModelViewSet)`, `zev_lookup = "zev"`, `participant_path = None`,
+`scope_parent_path = ("zev",)`.
 
 | Method & path | Behaviour |
 |---|---|
-| `GET /charges/` | ZEV-scoped list. Filters: `zev`, `period_start` + `period_end` (charges dated within), `participant`. |
+| `GET /charges/` | ZEV-scoped, paginated list; `is_locked` for the whole page is computed in two queries. Filters: `zev_id` (scoping mixin), `period_start` / `period_end` (charge date within), `participant` (charges for everyone plus those naming that participant). |
 | `POST /charges/` | Create. 400 on validation errors (§4.1, §4.5). |
 | `GET /charges/{id}/` | Detail. |
 | `PATCH /charges/{id}/` | Update; 409 `charge_locked` when locked. |
-| `DELETE /charges/{id}/` | Delete; 409 `charge_locked` when locked. Drafts that carried it keep the line until regenerated, and the readiness `charges` step is not shown for a deleted charge. |
-| `GET /charges/{id}/preview/` | Read-only: `{"bearers": [{"participant", "name", "share_chf"}], "total_billed_chf", "unrecovered_chf"}` for the dialog's "who pays what" table. Uses §4.2 exactly. |
+| `DELETE /charges/{id}/` | Delete; 409 `charge_locked` when locked. Drafts that carried the line keep it until regenerated. |
+| `POST /charges/preview/` | Read-only, nothing saved. Takes the create payload, validates it exactly like a create (a date an issued invoice covers is refused) and answers `{"bearers": [{"participant", "name", "share_chf"}], "total_billed_chf", "unrecovered_chf"}` for the dialog's "who pays what" table, using §4.2 and §4.3 unchanged. |
 
-`ChargeSerializer` fields: `id`, `zev`, `description`, `amount_chf`, `charge_date`, `allocation`,
+Validation order in `ChargeSerializer.validate`: the caller must manage the ZEV (before anything
+names an invoice or participant of it), participants belong to the ZEV, participants are set only for
+`selected_participants`, then the lock check on the date. `ChargeSerializer` fields: `id`, `zev`, `description`, `amount_chf`, `charge_date`, `allocation`,
 `split_key`, `vat_treatment`, `participants` (list of participant ids; write), `is_locked`
 (read-only), `created_at`, `updated_at`. `zev` is writable only on create and must be one the user
 can access.
 
-Audit (`AuditActionCategory.INVOICE`, `record_audit_event`): `charge.create`, `charge.update`,
-`charge.delete`, `charge.delete_denied` (locked). Redaction: the `description` is free text and is
-treated like a participant note: stored in event metadata for owners and admins only, per
-`2026-05-audit-log-and-operational-traceability.md`.
+Audit (`AuditActionCategory.INVOICE`): `charge.create`, `charge.update` (with the field diff),
+`charge.delete`, and `charge.update_denied` / `charge.delete_denied` (status `denied`, locked). The
+target display is the description; metadata carries `zev_id` and `charge_date`.
 
 ## 6. Async and integration behavior
 
@@ -266,12 +274,19 @@ is covered by the participant row lock already taken by `generate_invoice` (ADR 
 `PATCH` that would lock-check a bearer takes the same `Participant` rows `FOR UPDATE` in `pk`
 order, so a charge cannot change between the lock check and the invoice write.
 
-**Transfer archive.** New section `charges` (`SECTION_CHARGES`, file `charges.json`), depending on
-`participants` (it references them). Row: `{"id", <CHARGE_FIELDS>, "participant_ids": [...]}`.
+**Transfer archive.** New section `charges` (`SECTION_CHARGES`, file `charges.json`), ordered after
+`tariffs`, depending on `participants`. Row: `{"id", <CHARGE_FIELDS>, "participant_ids": [...]}`,
 `CHARGE_FIELDS = (description, amount_chf, charge_date, allocation, split_key, vat_treatment)`.
-Importing an archive older than this version simply lacks the section. Invoices stay
-independent of charges (they carry no link), so the invoices section keeps its
-`("participants",)` dependency. Archive format version is bumped by one.
+`FORMAT_VERSION` 7 → 8 (7 and older stay readable; they simply lack the section). The importer
+(`_import_charges`) maps `participant_ids` through the archive-id map, drops unknown ids with a
+warning, and reports a `selected_participants` charge left with no bearer as an error, which rejects
+the import as any section error does. Invoices stay independent of charges, so the invoices section
+keeps its `("participants",)` dependency.
+
+**Backups** (`2026-09-backup-and-restore.md`): `backups/registry.py` gets a `charges` section
+(`ZevPart("invoices.Charge", "zev")`, after `participants`); Django's serialization carries the
+`participants` many-to-many inline. `backups.test_archive.CoverageTests` enforces that every model is
+registered or excluded.
 
 **MCP server** (`2026-09-mcp-server.md`): unchanged. Charges are not exposed; `explain_invoice`
 already explains `FEE` lines from their description.

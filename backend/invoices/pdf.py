@@ -128,12 +128,14 @@ def _group_items_by_category(items, period_start: date, period_end: date, tr: di
         TariffCategory.GRID_FEES: tr["cat_grid_fees"],
         TariffCategory.LEVIES: tr["cat_levies"],
         TariffCategory.METERING: tr["cat_metering"],
+        TariffCategory.OTHER: tr["cat_other"],
     }
     ordered_categories = [
         TariffCategory.ENERGY,
         TariffCategory.GRID_FEES,
         TariffCategory.LEVIES,
         TariffCategory.METERING,
+        TariffCategory.OTHER,
     ]
     grouped = []
     for category in ordered_categories:
@@ -145,6 +147,8 @@ def _group_items_by_category(items, period_start: date, period_end: date, tr: di
             if item.unit == "month":
                 unit_key = "unit_month_sg" if item.quantity_kwh == 1 else "unit_month_pl"
                 unit_label = tr[unit_key]
+            elif item.unit == "flat":
+                unit_label = tr["unit_flat"]
             else:
                 unit_label = item.unit
             prepared_items.append(

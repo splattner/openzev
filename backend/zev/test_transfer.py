@@ -294,7 +294,7 @@ class ArchiveShapeTests(TestCase):
         )
         with zipfile.ZipFile(io.BytesIO(export_to_bytes(self.zev))) as archive:
             names = archive.namelist()
-        self.assertTrue(all(name.startswith(("readings/", "manifest", "zev.", "participants", "parties", "party_roles", "buildings", "metering", "tariffs", "invoices")) for name in names))
+        self.assertTrue(all(name.startswith(("readings/", "manifest", "zev.", "participants", "parties", "party_roles", "buildings", "metering", "tariffs", "charges", "invoices")) for name in names))
         self.assertNotIn("../../etc/passwd.csv", names)
         self.assertTrue(any(name.startswith("readings/.._.._etc_passwd-") for name in names))
 

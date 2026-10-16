@@ -105,6 +105,8 @@ ZEV_SECTIONS: tuple[tuple[str, tuple[ZevPart, ...]], ...] = (
             ZevPart("tariffs.TariffPeriod", "tariff__zev"),
         ),
     ),
+    # After participants: a charge may name the participants who bear it.
+    ("charges", (ZevPart("invoices.Charge", "zev"),)),
     (
         "readings",
         (ZevPart("metering.MeterReading", "metering_point__zev", ("metering_point_id", "timestamp", "direction")),),

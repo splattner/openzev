@@ -7,7 +7,7 @@ from django.db.models import DecimalField, OuterRef, Subquery, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from zev.models import Zev, Participant, VatMode
-from tariffs.models import TariffCategory
+from tariffs.models import SplitKey, TariffCategory
 
 
 class InvoiceStatus(models.TextChoices):
@@ -403,6 +403,55 @@ class InvoiceItem(models.Model):
 
     def __str__(self):
         return f"{self.description}: {self.quantity_kwh} {self.unit} × {self.unit_price_chf} = {self.total_chf} CHF"
+
+
+class ChargeAllocation(models.TextChoices):
+    ALL_PARTICIPANTS = "all_participants", "All participants"
+    SELECTED_PARTICIPANTS = "selected_participants", "Selected participants"
+
+
+class ChargeVatTreatment(models.TextChoices):
+    TAXABLE = "taxable", "Taxable"
+    # An expense passed on at cost in the participant's name and for their
+    # account: kept out of the VAT base of a registered ZEV.
+    PASS_THROUGH = "pass_through", "Pass-through"
+
+
+class Charge(models.Model):
+    """A one-off cost passed on to participants (#924): postage, a repair.
+
+    Not a tariff: it has no validity range and never appears on the contract
+    or the tariff overview. The engine reads it when it generates an invoice,
+    so a regenerated draft carries it again; an issued invoice keeps its line
+    whatever happens to the charge afterwards.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    zev = models.ForeignKey(Zev, on_delete=models.CASCADE, related_name="charges")
+    description = models.CharField(max_length=200)
+    # The total passed on, before it is split between the participants.
+    amount_chf = models.DecimalField(max_digits=10, decimal_places=2)
+    charge_date = models.DateField()
+    allocation = models.CharField(
+        max_length=24, choices=ChargeAllocation.choices, default=ChargeAllocation.ALL_PARTICIPANTS,
+    )
+    split_key = models.CharField(max_length=10, choices=SplitKey.choices, default=SplitKey.EQUAL)
+    vat_treatment = models.CharField(
+        max_length=12, choices=ChargeVatTreatment.choices, default=ChargeVatTreatment.TAXABLE,
+    )
+    participants = models.ManyToManyField(Participant, blank=True, related_name="charges")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-charge_date", "-created_at", "id"]
+        indexes = [models.Index(fields=["zev", "charge_date"], name="charge_zev_date_idx")]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(amount_chf__gt=0), name="charge_amount_positive"),
+        ]
+
+    def __str__(self):
+        return f"{self.description} ({self.amount_chf} CHF, {self.charge_date})"
 
 
 class PdfTemplate(models.Model):
