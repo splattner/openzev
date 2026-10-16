@@ -1197,6 +1197,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#correcting-a-paid-invoice-with-a-credit-note" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correcting a paid invoice with a credit note
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#deleting-invoices" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1984,6 +1995,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#correcting-a-paid-invoice-with-a-credit-note" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correcting a paid invoice with a credit note
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#deleting-invoices" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2555,6 +2577,27 @@ cover the total goes back to <code>Sent</code>. Payments of a cancelled invoice 
 removed.</p>
 <p>Invoices that were marked paid before payments were recorded have one payment
 for their total, dated when they were marked paid.</p>
+<h2 id="correcting-a-paid-invoice-with-a-credit-note">Correcting a paid invoice with a credit note<a class="headerlink" href="#correcting-a-paid-invoice-with-a-credit-note" title="Permanent link">&para;</a></h2>
+<p>A paid invoice (or a sent one that has received payments) is not cancelled or
+deleted; it is corrected with a <strong>credit note</strong> (Gutschrift). Open the invoice
+and click <strong>Correct invoice</strong> in the <strong>Credit notes</strong> card, then choose:</p>
+<ul>
+<li><strong>Reverse the invoice</strong> - credits everything received for the invoice and
+  cancels it. The cancelled invoice stays, with its number. Afterwards generate
+  the period again to issue a replacement.</li>
+<li><strong>Credit part of it</strong> - credits an amount you enter (at most what was
+  received and not yet credited) and leaves the invoice as it is. Use it for an
+  overcharge.</li>
+</ul>
+<p>Enter a <strong>reason</strong>; it is printed on the credit note. Credit notes have their
+own numbers (prefix <strong>CN</strong> by default, changeable in the community settings
+under <em>Billing &amp; payment</em>) and a PDF you can open from the card, based on the
+<strong>Credit Note PDF Template</strong> that admins can edit under <em>Templates</em>. Participants see their
+credit notes on the invoice and under <strong>My invoices</strong>.</p>
+<p>Once a credit note exists, the invoice's payments can no longer be removed and
+the invoice can no longer be deleted. Invoices with nothing to collect (a
+producer payout) can't be corrected this way. An adjustment credit also shows
+as a negative row in the participant's annual statement.</p>
 <h2 id="deleting-invoices">Deleting Invoices<a class="headerlink" href="#deleting-invoices" title="Permanent link">&para;</a></h2>
 <p>Invoices can be deleted to clean up incorrect or test data.</p>
 <ol>
@@ -2565,7 +2608,7 @@ for their total, dated when they were marked paid.</p>
 <ul>
 <li><strong>Draft</strong> invoices, and <strong>Cancelled</strong> invoices that were never approved —
   <strong>More → Delete invoice</strong> is available to managers.</li>
-<li><strong>Any status</strong> — admins can delete, as long as the invoice has no payments.</li>
+<li><strong>Any status</strong> — admins can delete, as long as the invoice has no payments or credit notes.</li>
 </ul>
 <p>Deletion is permanent; the invoice is removed from the database.</p>
 <h2 id="reports-annual-report-statements-and-tax-overviews">Reports: Annual Report, Statements and Tax Overviews<a class="headerlink" href="#reports-annual-report-statements-and-tax-overviews" title="Permanent link">&para;</a></h2>
