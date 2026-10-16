@@ -1,5 +1,46 @@
 # Changelog
 
+## [1.25.0](https://github.com/splattner/openzev/compare/v1.24.0...v1.25.0) (2026-10-16)
+
+
+### Features
+
+* **accounts:** forgot-password flow for accounts with a password ([#1011](https://github.com/splattner/openzev/issues/1011)) ([0495b1f](https://github.com/splattner/openzev/commit/0495b1f3c4d9b715857be061af5c4b5c1e2ed9fe)), closes [#1006](https://github.com/splattner/openzev/issues/1006)
+* **infra:** switch broker/cache from Redis to Valkey ([#998](https://github.com/splattner/openzev/issues/998)) ([76d95dc](https://github.com/splattner/openzev/commit/76d95dcfaa1e5f23ad6b78c8ee577ee62242601c)), closes [#975](https://github.com/splattner/openzev/issues/975)
+* **invoices:** apply credit notes to the next invoice and refund them ([#1047](https://github.com/splattner/openzev/issues/1047)) ([7bd90a5](https://github.com/splattner/openzev/commit/7bd90a5db29d57e6739dd984d31191fceff0c5f8))
+* **invoices:** correct paid invoices with credit notes ([#1044](https://github.com/splattner/openzev/issues/1044)) ([cbc7511](https://github.com/splattner/openzev/commit/cbc7511dea1387ec6d6d5c010d6774bd65bf37f4))
+* **invoices:** record payments and keep issued invoices ([#1036](https://github.com/splattner/openzev/issues/1036)) ([68b4579](https://github.com/splattner/openzev/commit/68b45791bc467e691050d1d49ae84de70f9b8b35))
+* **metering:** clarify terminology and improve point management ([#999](https://github.com/splattner/openzev/issues/999)) ([6a61936](https://github.com/splattner/openzev/commit/6a619364955213e0dfb920f1b556cbbee7cca30e))
+* **reports:** show producers' uplift of local sales over the feed-in tariff ([#991](https://github.com/splattner/openzev/issues/991)) ([952054c](https://github.com/splattner/openzev/commit/952054cba0d5c0c896e30d55e0e1a191ba10323b))
+* **zev:** let the create-with-owner wizard use an existing account as the owner ([#1010](https://github.com/splattner/openzev/issues/1010)) ([0a9f45c](https://github.com/splattner/openzev/commit/0a9f45ce8e05d2e33475464245ba40ab77c241cc))
+
+
+### Bug Fixes
+
+* **accounts:** make the account email unique ([#1008](https://github.com/splattner/openzev/issues/1008)) ([4b17e05](https://github.com/splattner/openzev/commit/4b17e050313be46603d4a37560122ddcf2fa64c8))
+* **auth:** lock participant links during party changes ([#1000](https://github.com/splattner/openzev/issues/1000)) ([fac18d8](https://github.com/splattner/openzev/commit/fac18d8939f7dcf790dca63af05e677be1949859))
+* **auth:** preserve participant passwords and secure link recovery ([#1003](https://github.com/splattner/openzev/issues/1003)) ([5c2af67](https://github.com/splattner/openzev/commit/5c2af67075dafa0c9bf6c9ed5c255807f0b7426c))
+* **auth:** require independent credentials on promotion ([#1039](https://github.com/splattner/openzev/issues/1039)) ([5999347](https://github.com/splattner/openzev/commit/5999347b423de80bb2d1190dc3a3eb5674568b55))
+* **dev:** stop the dev stack leaking Postgres connections ([#1031](https://github.com/splattner/openzev/issues/1031)) ([3168b21](https://github.com/splattner/openzev/commit/3168b217b77af554d31de06bbe43ea4087bf3677)), closes [#1014](https://github.com/splattner/openzev/issues/1014)
+* **invoices:** allocate numbers under a ZEV row lock ([#1021](https://github.com/splattner/openzev/issues/1021)) ([542fb29](https://github.com/splattner/openzev/commit/542fb2914fff067c90a7e47fa9ac1bf1d0b6316a))
+* **invoices:** bucket the annual statement's months in Swiss civil time ([#996](https://github.com/splattner/openzev/issues/996)) ([58fc96e](https://github.com/splattner/openzev/commit/58fc96e290b71ea9448894f9088e1885861799e9))
+* **invoices:** give the credit note row actions proper icon buttons ([#1050](https://github.com/splattner/openzev/issues/1050)) ([7b84bec](https://github.com/splattner/openzev/commit/7b84bec1b12b8084759443f92a41e1c8ab7ec3a3))
+* **invoices:** keep PDFs consistent with approval ([#1022](https://github.com/splattner/openzev/issues/1022)) ([5c4b9ce](https://github.com/splattner/openzev/commit/5c4b9ce80cfb2678787d6ec1f800c3de5771c5fd))
+* **invoices:** serialize generation and protect invoice replacement ([#1043](https://github.com/splattner/openzev/issues/1043)) ([2a10ce8](https://github.com/splattner/openzev/commit/2a10ce83e665e3aebaee685f6c93c8c861a1d6fb))
+* **metering-points:** hide the empty-location line under the meter ID ([#993](https://github.com/splattner/openzev/issues/993)) ([a25fae4](https://github.com/splattner/openzev/commit/a25fae412c0d754af27fc91d6a531da78584a302))
+* **participants:** even out the spacing above the first and below the last row ([#994](https://github.com/splattner/openzev/issues/994)) ([3962b5b](https://github.com/splattner/openzev/commit/3962b5b6432ef15061a24fb3ba781f79399ab78b))
+* **security:** harden production deployments and proxy boundaries ([#1041](https://github.com/splattner/openzev/issues/1041)) ([ecb0c96](https://github.com/splattner/openzev/commit/ecb0c962cc85190ccaa1711269b370c7ec87ee26))
+* **tariffs:** show the averaging window of dynamic prices in the Applies column ([#990](https://github.com/splattner/openzev/issues/990)) ([fd6e072](https://github.com/splattner/openzev/commit/fd6e07287a392c9ddca63eda48b8884b4b61703e))
+* **templates:** keep text readable under highlighted fields in the PDF template editor ([#995](https://github.com/splattner/openzev/issues/995)) ([b432c77](https://github.com/splattner/openzev/commit/b432c774e8ac6e5787cd19a28dc04097a3218bba))
+* **zev:** enforce disabled access on custom actions ([#1038](https://github.com/splattner/openzev/issues/1038)) ([60f6d45](https://github.com/splattner/openzev/commit/60f6d45c934994777aa9b0a4c1a37ebca1ddb86d))
+* **zev:** prevent settings writes from rewinding document counters ([#1042](https://github.com/splattner/openzev/issues/1042)) ([7c4b361](https://github.com/splattner/openzev/commit/7c4b3619f7b3a4524381fd74bb472d5a8d0adcca))
+* **zev:** serialize manager removals and refresh authorization ([#1040](https://github.com/splattner/openzev/issues/1040)) ([00532e1](https://github.com/splattner/openzev/commit/00532e1516053ff10dac0ff6249f98e75e3c63cd))
+
+
+### Performance Improvements
+
+* **metering:** read data-quality readings in one query for all meters ([#997](https://github.com/splattner/openzev/issues/997)) ([4a5e47c](https://github.com/splattner/openzev/commit/4a5e47ce495d0086d40e778857b19d4f7e91d2f6)), closes [#676](https://github.com/splattner/openzev/issues/676)
+
 ## [1.24.0](https://github.com/splattner/openzev/compare/v1.23.0...v1.24.0) (2026-10-13)
 
 
