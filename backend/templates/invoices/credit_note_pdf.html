@@ -37,6 +37,9 @@
             margin-bottom: 6mm;
             font-size: 9pt;
             line-height: 1.5;
+        }
+
+        .credit-reason-text {
             white-space: pre-wrap;
         }
 
@@ -137,7 +140,7 @@
 
         <div class="credit-reason">
             <div class="eyebrow">{{ tr.reason_label }}</div>
-            {{ credit.reason }}
+            <div class="credit-reason-text">{{ credit.reason }}</div>
         </div>
 
         <div class="credit-totals summary-box">

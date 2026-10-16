@@ -60,7 +60,7 @@ function CorrectInvoiceForm({ isPending, creditableChf, onClose, onSubmit }: Omi
             <fieldset className="grid-span-full">
                 <legend>{t('pages.invoiceDetail.credits.kindLabel')}</legend>
                 {(['reversal', 'adjustment'] as const).map((option) => (
-                    <label key={option} className="radio-row">
+                    <label key={option} style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
                         <input
                             type="radio"
                             name="correction-kind"
@@ -70,7 +70,7 @@ function CorrectInvoiceForm({ isPending, creditableChf, onClose, onSubmit }: Omi
                         />
                         <span>
                             <strong>{t(`pages.invoiceDetail.credits.${option}`)}</strong>
-                            <small className="muted block">
+                            <small className="muted" style={{ display: 'block' }}>
                                 {option === 'reversal'
                                     ? t('pages.invoiceDetail.credits.reversalHint', { amount: formatChf(Number(creditableChf)) })
                                     : t('pages.invoiceDetail.credits.adjustmentHint')}
