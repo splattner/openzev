@@ -452,10 +452,14 @@ the invoice and use the **Payments** card:
    bank reference.
 3. Click **Record payment**.
 
+![Record payment dialog](screenshots/08h-record-payment-dialog.png)
+
 A payment short of the total leaves the invoice **Partly paid**: its status
 pill says so, and the payment step in the period table shows it as under way.
 Once the payments cover the total, the invoice becomes `Paid`. **Mark rest as
 paid** records whatever is still outstanding in one go.
+
+![Payments card of a partly paid invoice](screenshots/08f-invoice-payments.png)
 
 An invoice that pays a producer out (a negative total) has no **Record
 payment**: **Mark Paid** records the payout in full.
@@ -483,11 +487,15 @@ and click **Correct invoice** in the **Credit notes** card, then choose:
   received and not yet credited) and leaves the invoice as it is. Use it for an
   overcharge.
 
+![Correct invoice dialog](screenshots/08i-correct-invoice-dialog.png)
+
 Enter a **reason**; it is printed on the credit note. Credit notes have their
 own numbers (prefix **CN** by default, changeable in the community settings
 under *Billing & payment*) and a PDF you can open from the card, based on the
 **Credit Note PDF Template** that admins can edit under *Templates*. Participants see their
 credit notes on the invoice and under **My invoices**.
+
+![Credit note on a reversed invoice](screenshots/08g-invoice-credit-note.png)
 
 Once a credit note exists, the invoice's payments can no longer be removed and
 the invoice can no longer be deleted. Invoices with nothing to collect (a

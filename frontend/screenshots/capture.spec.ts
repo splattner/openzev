@@ -26,6 +26,7 @@ import {
   navigateTo,
   pinDemoZev,
   quantizePng,
+  resetHover,
   resolveDemoZevId,
   screenshotFull as captureFull,
   screenshotViewport as captureViewport,
@@ -49,6 +50,25 @@ const screenshotFull = async (page: Page, name: string) => {
 const screenshotViewport = async (page: Page, name: string) => {
   await captureViewport(page, SCREENSHOT_DIR, name)
   await quantizePng(path.join(SCREENSHOT_DIR, `${name}.png`))
+}
+
+/**
+ * Capture the invoice detail page from the top down to the bottom of `lastCard`,
+ * without the sidebar. For a page whose subject is a card above the embedded
+ * document, which a full-page capture would bury under a PDF viewer.
+ */
+async function screenshotAbovePdf(page: Page, name: string, lastCard: string) {
+  await expect(page.locator('.skeleton-block:visible')).toHaveCount(0, { timeout: 30_000 })
+  await resetHover(page)
+  const box = await page.locator(lastCard).boundingBox()
+  expect(box, `${lastCard} is not on the page`).toBeTruthy()
+  const viewport = page.viewportSize()!
+  const sidebar = 224
+  const height = Math.ceil(box!.y + box!.height) + 12
+  expect(height, `${name}: card ends below the viewport`).toBeLessThanOrEqual(viewport.height)
+  const file = path.join(SCREENSHOT_DIR, `${name}.png`)
+  await page.screenshot({ path: file, clip: { x: sidebar, y: 0, width: viewport.width - sidebar, height } })
+  await quantizePng(file)
 }
 
 const DEMO_DYNAMIC_TARIFF = 'Netznutzung dynamisch'
@@ -350,6 +370,103 @@ test.describe('User Guide Screenshots', () => {
     await assertPdfLoaded(page)
     await closePdfSidebar(page)
     await screenshotFull(page, '08b-invoice-detail')
+  })
+
+  // 08f — Payments card of a partly paid invoice. Cropped above the embedded
+  // document: the card is the subject, and the crop keeps the capture
+  // independent of whether the invoice's PDF has been rendered.
+  test('08f-invoice-payments', async ({ page }) => {
+    const headers = { Authorization: `Bearer ${await getAdminToken(page)}` }
+    const resp = await page.request.get(`${API_BASE}/invoices/invoices/?status=sent&page_size=100`, { headers })
+    expect(resp.ok(), `Invoice list request failed (${resp.status()})`).toBeTruthy()
+    const { results } = await resp.json() as {
+      results: Array<{ id: string; zev_name: string; paid_chf: string; outstanding_chf: string }>
+    }
+    const invoice = results.find(row =>
+      row.zev_name === DEMO_ZEV_NAME && Number(row.paid_chf) > 0 && Number(row.outstanding_chf) > 0)
+    expect(invoice, `No partly paid ${DEMO_ZEV_NAME} invoice — ${SEED_HINT}`).toBeTruthy()
+
+    await navigateTo(page, `/billing/invoices/${invoice!.id}`)
+    await page.locator('#invoice-payments-title').waitFor({ timeout: 10_000 })
+    await screenshotAbovePdf(page, '08f-invoice-payments', '[aria-labelledby="invoice-payments-title"]')
+  })
+
+  // 08g — Credit note card of a reversed invoice: the credit note, where it
+  // was used, and the link to the replacement invoice under the title.
+  test('08g-invoice-credit-note', async ({ page }) => {
+    const headers = { Authorization: `Bearer ${await getAdminToken(page)}` }
+    const listCredits = async () => {
+      const resp = await page.request.get(`${API_BASE}/invoices/credits/`, { headers })
+      expect(resp.ok(), `Credit list request failed (${resp.status()})`).toBeTruthy()
+      const { results } = await resp.json() as {
+        results: Array<{ kind: string; source_invoice: string; pdf_url: string | null }>
+      }
+      return results.find(credit => credit.kind === 'reversal')
+    }
+    let credit = await listCredits()
+    expect(credit, `No reversal credit note — ${SEED_HINT}`).toBeTruthy()
+    // The credit note PDF is rendered by the Celery worker; its row reads
+    // "PDF in preparation" until then.
+    for (let attempt = 0; attempt < 10 && !credit?.pdf_url; attempt++) {
+      await page.waitForTimeout(1500)
+      credit = await listCredits()
+    }
+    expect(credit?.pdf_url, 'Credit note PDF missing — is the Celery worker running?').toBeTruthy()
+
+    await navigateTo(page, `/billing/invoices/${credit!.source_invoice}`)
+    await page.locator('#invoice-credits-title').waitFor({ timeout: 10_000 })
+    await screenshotAbovePdf(page, '08g-invoice-credit-note', '[aria-labelledby="invoice-credits-title"]')
+  })
+
+  // 08h — Record payment dialog, filled in with a partial amount against the
+  // same partly paid invoice 08f shows.
+  test('08h-record-payment-dialog', async ({ page }) => {
+    const headers = { Authorization: `Bearer ${await getAdminToken(page)}` }
+    const resp = await page.request.get(`${API_BASE}/invoices/invoices/?status=sent&page_size=100`, { headers })
+    expect(resp.ok(), `Invoice list request failed (${resp.status()})`).toBeTruthy()
+    const { results } = await resp.json() as {
+      results: Array<{ id: string; zev_name: string; paid_chf: string; outstanding_chf: string }>
+    }
+    const invoice = results.find(row =>
+      row.zev_name === DEMO_ZEV_NAME && Number(row.paid_chf) > 0 && Number(row.outstanding_chf) > 0)
+    expect(invoice, `No partly paid ${DEMO_ZEV_NAME} invoice — ${SEED_HINT}`).toBeTruthy()
+
+    await navigateTo(page, `/billing/invoices/${invoice!.id}`)
+    await page.locator('#invoice-payments-title').waitFor({ timeout: 10_000 })
+    await page.locator('[aria-labelledby="invoice-payments-title"]')
+      .getByRole('button', { name: /zahlung erfassen/i }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await dialog.locator('input[type="number"]').fill((Number(invoice!.outstanding_chf) / 2).toFixed(2))
+    await dialog.locator('input[type="text"]').last().fill('Zahlung per Überweisung')
+    await screenshotViewport(page, '08h-record-payment-dialog')
+  })
+
+  // 08i — Correct invoice dialog on a paid invoice that has no credit note yet,
+  // with a reason entered for the default "reverse the invoice" choice.
+  test('08i-correct-invoice-dialog', async ({ page }) => {
+    const headers = { Authorization: `Bearer ${await getAdminToken(page)}` }
+    const invoicesResp = await page.request.get(`${API_BASE}/invoices/invoices/?status=paid&page_size=100`, { headers })
+    expect(invoicesResp.ok(), `Invoice list request failed (${invoicesResp.status()})`).toBeTruthy()
+    const creditsResp = await page.request.get(`${API_BASE}/invoices/credits/`, { headers })
+    expect(creditsResp.ok(), `Credit list request failed (${creditsResp.status()})`).toBeTruthy()
+    const { results: invoices } = await invoicesResp.json() as {
+      results: Array<{ id: string; zev_name: string; total_chf: string }>
+    }
+    const { results: credits } = await creditsResp.json() as { results: Array<{ source_invoice: string }> }
+    const credited = new Set(credits.map(credit => credit.source_invoice))
+    const invoice = invoices.find(row =>
+      row.zev_name === DEMO_ZEV_NAME && Number(row.total_chf) > 0 && !credited.has(row.id))
+    expect(invoice, `No paid ${DEMO_ZEV_NAME} invoice to correct — ${SEED_HINT}`).toBeTruthy()
+
+    await navigateTo(page, `/billing/invoices/${invoice!.id}`)
+    await page.locator('#invoice-credits-title').waitFor({ timeout: 10_000 })
+    await page.locator('[aria-labelledby="invoice-credits-title"]')
+      .getByRole('button', { name: /rechnung korrigieren/i }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await dialog.locator('textarea').fill('Falscher Zählerstand, Rechnung neu erstellt')
+    await screenshotViewport(page, '08i-correct-invoice-dialog')
   })
 
   // 08c — Participant My Invoices (via impersonation)
