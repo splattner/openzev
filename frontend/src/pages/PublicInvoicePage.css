@@ -48,6 +48,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+.public-invoice-credit {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
 .public-invoice-currency {
   font-size: 0.9rem;
   font-weight: 500;

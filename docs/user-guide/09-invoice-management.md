@@ -489,6 +489,52 @@ the invoice can no longer be deleted. Invoices with nothing to collect (a
 producer payout) can't be corrected this way. An adjustment credit also shows
 as a negative row in the participant's annual statement.
 
+### Credit on the next invoice
+
+A credit note is not paid out by default: **the next invoice the participant
+gets deducts it.** When an invoice is generated, OpenZEV sets the participant's
+open credit notes against the total, oldest first, **after VAT**. The line
+items, the subtotal, the VAT and the total stay as calculated. The invoice shows
+the credit note ("Credit note CN-00001 applied") and an **Amount due**, which
+is what the QR bill, the email and **Record payment** use:
+
+| | |
+| --- | --- |
+| Total | CHF 108.10 |
+| Credit note CN-00001 applied | CHF -50.00 |
+| **Amount due** | **CHF 58.10** |
+
+If the credit is larger than the invoice, the amount due is CHF 0.00 (the QR
+bill is left off) and the rest carries over to the next invoice. An invoice the
+credit covers in full still has to be moved on: click **Mark Paid**, which
+records no payment.
+
+- **Drafts hold credit.** Credit set against a draft is used up while the draft
+  exists. Regenerating the draft, deleting it or cancelling it gives the credit
+  back, and the replacement invoice uses it again.
+- **Cancelling releases credit.** Cancelling an invoice, or reversing it, frees
+  the credit it used so the next invoice can use it. The cancelled invoice keeps
+  showing what it said.
+- **Reversing an invoice that used credit** credits only the cash the
+  participant paid and releases the credit that was applied, so they get back
+  exactly what they paid and used. An invoice settled **by credit alone** can be
+  reversed too: it is cancelled and its credit released, but no credit note is
+  issued because no cash was paid.
+- **Partial credits are limited to cash.** An invoice settled by credit alone
+  can't be credited in part. Reverse it and generate it again instead.
+
+### Refunding a credit note
+
+When a participant leaves, or simply wants the money, pay out what is left of an
+open credit note: in the **Credit notes** card of the invoice it was issued for,
+click the refund icon on the credit note, enter the date it was paid out and an
+optional note (for example the bank reference), and confirm. OpenZEV books the
+whole **remaining** amount as refunded; the credit note then reads **Refunded**.
+The transfer itself happens outside OpenZEV. Credit set against a draft counts
+as used, so it can be refunded only after that draft is deleted or cancelled. A
+credit note shows its status (**Open**, **Used** or **Refunded**), what remains,
+and which invoices it was applied to.
+
 ## Deleting Invoices
 
 Invoices can be deleted to clean up incorrect or test data.

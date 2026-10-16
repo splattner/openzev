@@ -8,7 +8,7 @@ from decimal import Decimal
 
 import pytest
 
-from invoices.models import InvoiceStatus
+from invoices.models import Credit, CreditApplication, InvoiceStatus
 from metering.models import ImportLog, ImportSource, MeterReading, ReadingDirection, ReadingResolution
 from testing.factories import (
     InvoiceFactory,
@@ -170,6 +170,20 @@ class TestFindInvoices:
         assert row["participant_name"] == "Anna Muster"
         assert row["total_chf"] == "42.00"
 
+    def test_rows_carry_the_amount_due_after_credit_and_payments(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        participant = ParticipantFactory(zev=zev)
+        InvoiceFactory(
+            zev=zev, participant=participant, status=InvoiceStatus.SENT,
+            total_chf=Decimal("100.00"), credit_applied_chf=Decimal("30.00"),
+        )
+
+        result = _structured(call_tool(owner_mcp_client, "find_invoices", {"zev_id": str(zev.id)}))
+        row = result["invoices"][0]
+        assert (row["total_chf"], row["credit_applied_chf"], row["amount_due_chf"], row["paid_chf"]) == (
+            "100.00", "30.00", "70.00", "0.00",
+        )
+
     def test_participant_query_filters_by_name(self, owner_mcp_client, owner_user):
         zev = ZevFactory(owner=owner_user)
         anna = ParticipantFactory(zev=zev, first_name="Anna", last_name="Muster")
@@ -238,6 +252,28 @@ class TestExplainInvoice:
         assert result["energy"]["local_share_pct"] == 80.0
         assert result["previous"] is None
         assert result["change"] is None
+
+    def test_names_the_credit_applied_and_the_credit_notes_issued(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        participant = ParticipantFactory(zev=zev)
+        source = InvoiceFactory(zev=zev, participant=participant, period_start=date(2026, 1, 1), period_end=date(2026, 1, 31))
+        credit = Credit.objects.create(
+            zev=zev, participant=participant, source_invoice=source, credit_number="CN-00001", kind="adjustment",
+            reason="Overcharged", amount_chf=Decimal("50.00"), vat_mode="not_registered",
+        )
+        current = InvoiceFactory(
+            zev=zev, participant=participant, period_start=date(2026, 2, 1), period_end=date(2026, 2, 28),
+            total_chf=Decimal("80.00"), credit_applied_chf=Decimal("50.00"),
+        )
+        CreditApplication.objects.create(credit=credit, invoice=current, amount_chf=Decimal("50.00"))
+
+        used = _structured(call_tool(owner_mcp_client, "explain_invoice", {"invoice_id": str(current.id)}))["invoice"]
+        assert (used["total_chf"], used["credit_applied_chf"], used["amount_due_chf"]) == ("80.00", "50.00", "30.00")
+        assert used["credits_applied"] == [{"credit_number": "CN-00001", "amount_chf": "50.00", "released": False}]
+        issued = _structured(call_tool(owner_mcp_client, "explain_invoice", {"invoice_id": str(source.id)}))["invoice"]
+        assert [(c["credit_number"], c["amount_chf"], c["remaining_chf"], c["status"]) for c in issued["credits_issued"]] == [
+            ("CN-00001", "50.00", "0.00", "used"),
+        ]
 
     def test_finds_previous_invoice_and_skips_cancelled(self, owner_mcp_client, owner_user):
         zev = ZevFactory(owner=owner_user)

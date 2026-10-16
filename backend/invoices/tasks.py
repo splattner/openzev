@@ -94,6 +94,7 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
         period_end=formatted_period_end,
         due_date=formatted_due_date,
         total_chf=invoice.total_chf,
+        amount_due_chf=invoice.amount_due_chf,
     )
 
     # Resolution order: per-ZEV override → admin global override → hardcoded default

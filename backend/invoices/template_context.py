@@ -65,10 +65,16 @@ def build_sample_invoice_context() -> dict:
             vat_base_chf="450.00",
             vat_chf="36.45",
             total_chf="486.45",
+            credit_applied_chf="50.00",
+            amount_due_chf="436.45",
             notes="Sample invoice for template preview.",
             zev=_Obj(invoice_language="en"),
         ),
         "vat_rate_percent": Decimal("8.1"),
+        "paid_chf": "0.00",
+        "credit_application_rows": [
+            {"label": tr["credit_applied"].format(number="CN-00001"), "amount_chf": Decimal("-50.00")},
+        ],
         # Zero: the sample has no producer credit to list apart from the VAT.
         "producer_credit_chf": Decimal("0.00"),
         "grouped_items": [

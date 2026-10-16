@@ -101,6 +101,10 @@ def _serialize(invoice) -> dict:
         # the point: "have I paid this?" is the reader's second question.
         "is_paid": invoice.status == InvoiceStatus.PAID,
         "total_chf": str(invoice.total_chf),
+        # What is still to pay after any credit note was set against it; the
+        # QR on the paper asks for this amount.
+        "credit_applied_chf": str(invoice.credit_applied_chf),
+        "amount_due_chf": str(invoice.amount_due_chf),
         "currency": "CHF",
         # Verbatim from the insights page rather than recomputed, so the page
         # and the paper cannot disagree. None when the invoice has no

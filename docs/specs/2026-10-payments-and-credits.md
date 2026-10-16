@@ -1,7 +1,7 @@
 # Feature Spec: Payments, credit notes and corrections of paid invoices (#388)
 
 - Spec ID: SPEC-2026-10-payments-and-credits
-- Status: In Progress (phase 1, payments and `approved_at`, and phase 2, credit notes and corrections, implemented)
+- Status: Implemented (phase 1, payments and `approved_at`; phase 2, credit notes and corrections; phase 3, credit application and refunds)
 - Scope: Major
 - Type: Feature
 - Owners: Sebastian Plattner
@@ -111,8 +111,8 @@ visible to the participant from creation, because a credit note is issued the mo
 | Field | Phase | Type | Default | Notes |
 |---|---|---|---|---|
 | `approved_at` | 1 | `DateTimeField(null=True, blank=True)` | `None` | Stamped by `approve_invoice` and by the batch approval. Never cleared. Read-only in the serializer. |
-| `credit_applied_chf` | 3 | `DecimalField(10, 2)` | `0` | Sum of the invoice's active `CreditApplication` rows |
-| `amount_due_chf` | 3 | `DecimalField(10, 2)` | `0` | `max(total_chf - credit_applied_chf, 0)` when `total_chf > 0`, otherwise `total_chf`. The engine sets it. Migration: `= total_chf`. |
+| `credit_applied_chf` | 3 | `DecimalField(10, 2)` | `0` | What the engine set against the invoice at generation. **Frozen as issued**: releasing the applications on a cancellation does not change it, so a cancelled invoice keeps showing what it said. |
+| `amount_due_chf` | 3 | derived property, no column | — | `max(total_chf - credit_applied_chf, 0)` when `total_chf > 0`, otherwise `total_chf`. Derived because many code paths write `total_chf` directly and a stored column would drift. No data migration. |
 
 Serializer additions: `approved_at`, `paid_chf` (sum of payments), `outstanding_chf` (amount due
 minus `paid_chf`. Before phase 3 the amount due is `total_chf`), and, on the detail serializer, a
@@ -216,8 +216,9 @@ civil date of the newest successful `AuditEvent` with `action_type = "invoice.ma
 | `vat_rate` | `DecimalField(5, 4)` | — | Copied from `source_invoice.vat_rate` |
 | `vat_chf` | `DecimalField(10, 2)` | `0` | VAT contained in `amount_chf`, see below |
 | `embedded_vat_chf` | `DecimalField(10, 2, null=True)` | — | For `inclusive` only |
-| `refunded_chf` | `DecimalField(10, 2)` | `0` | Phase 3 (not yet on the model) |
-| `refunded_on` | `DateField(null=True)` | — | Phase 3 (not yet on the model) |
+| `refunded_chf` | `DecimalField(10, 2)` | `0` | Phase 3. Booked once by `refund_credit`. |
+| `refunded_on` | `DateField(null=True, blank=True)` | — | Phase 3 |
+| `refund_note` | `CharField(500, blank=True)` | `""` | Phase 3 (not in the original table) |
 | `pdf_file`, `pdf_status` | as on `Invoice` | | Same render pipeline and status semantics as `InvoicePdfStatus` |
 | `issuer`, `recipient` | `JSONField` | | Copied from `source_invoice` (frozen since approval, #761) |
 | `created_by` | `ForeignKey(User, SET_NULL, null=True)` | | |
@@ -237,12 +238,23 @@ same way `invoice_counter` is in `zev/transfer/importer.py`).
   into `embedded_vat_chf`, with `vat_chf = 0`. `not_registered` takes `0`.
 
 **Derived balance:** `remaining_chf = amount_chf - Σ active applications - refunded_chf`, exposed as
-a queryset annotation and a serializer field. A derived status is shown in the UI: `open`
+a queryset annotation (`Credit.objects.with_balance()`, a correlated `Subquery`/`Coalesce`, not a join) and a serializer field (computed from the prefetched applications). `with_status()` filters by it. A derived status is shown in the UI: `open`
 (remaining > 0), `used` (remaining = 0 and no refund), `refunded` (`refunded_chf > 0` and
 remaining = 0).
 
 **`correct_invoice(invoice, *, kind, reason, amount_chf=None, user) -> Credit`** in
 `invoices/workflow.py`. It locks the invoice row and, in one transaction:
+
+**Phase 3 rules (decision 8).** The creditable amount stays *cash only*: `paid_chf - credited_chf`. A
+reversal creates a credit note for that cash **and** releases the invoice's active applications, so the
+participant gets back cash plus the old credit, which equals what they paid. If the cash is 0 but active
+applications exist (a `paid` invoice settled by credit alone), the reversal cancels the invoice and
+releases the applications **without** a credit note: `correct_invoice` returns `credit: None` and
+`released_chf`, and the endpoint answers `201 {"invoice": …, "credit": null}`. With neither cash nor
+applications the "already been credited" refusal stays. An adjustment is capped by cash, so an invoice
+settled only by credit cannot be partially credited; it is reversed and regenerated. The audit metadata
+gains `released_chf` (and null `credit_id`/`credit_number` for the credit-less case). The guard "sent
+with no payments: cancel instead" stays.
 
 1. Guards. The invoice is `paid`, or `sent` with `paid_chf > 0`. A `sent` invoice with no payments
    is simply cancelled. `total_chf > 0`. `reason` is not blank.
@@ -321,30 +333,42 @@ change. That is intended and is noted in the user guide.
 | `released_at` | `DateTimeField(null=True)` | Set when an issued invoice using the credit is cancelled. A released application no longer counts. |
 | `created_at` | `DateTimeField(auto_now_add=True)` | |
 
-**Engine:** after totals and VAT, when `total_chf > 0`, `generate_invoice` locks the participant's
-open credits (`select_for_update`, oldest first) and creates applications until `total_chf` is
-covered or the credits run out. Then `credit_applied_chf = Σ` and
-`amount_due_chf = total_chf - credit_applied_chf`. Line items, `subtotal_chf`, `vat_chf` and
+**Engine:** after the invoice row is created, when `total_chf > 0`, `generate_invoice` calls
+`workflow.apply_open_credits`. It locks the participant's credits in the ZEV (`select_for_update`,
+`created_at, id`), then works out each balance in a separate query (PostgreSQL cannot lock rows under
+an aggregate) and creates applications until `total_chf` is covered or the credits run out. Then
+`credit_applied_chf = Σ`. `CreditApplication` has `ordering ["created_at", "id"]` and a check
+constraint `amount_chf > 0`; *active* means `released_at IS NULL`. Line items, `subtotal_chf`, `vat_chf` and
 `total_chf` are untouched, so tariff grouping and the allocation reconciliation tests keep holding.
 When `total_chf <= 0`, no credit is applied.
 
-**Release:** `cancel_invoice` and the reversal in `correct_invoice` set `released_at` on the
-invoice's active applications. Regeneration deletes drafts, and the cascade removes their
+**Release:** `cancel_invoice` (through the `on_transition` hook of `_lock_and_transition`) and the
+reversal in `correct_invoice` set `released_at` on the invoice's active applications inside the same
+locked transaction. Regeneration deletes drafts, and the cascade removes their
 applications.
 
-**Refund:** `refund_credit(credit, *, refunded_on, note, user)` books the whole remaining amount as
-paid out (`refunded_chf += remaining`). Audit event `credit.refund`.
+**Refund:** `refund_credit(credit, *, refunded_on, note="", user=None)` locks the credit, refuses
+"Nothing remains to refund." when remaining ≤ 0 and a `refunded_on` after the Swiss civil date, then books
+the whole remainder (`refunded_chf += remaining`, `refunded_on`, `refund_note`). Credit held by a draft
+counts as applied, so it is not refundable until that draft is deleted or cancelled. Audit event
+`credit.refund`.
+
+**Payments:** `record_payment`, `mark_invoice_paid`, `delete_payment` and `outstanding_chf` use
+`amount_due`. With an amount due of 0 on an invoice with a positive total, `mark_invoice_paid` books no
+payment and moves to `paid`, and `record_payment` refuses ("The credit applied covers this invoice. Mark
+it as paid instead."); payouts keep their message.
 
 **Consumers of `total_chf` → decision:**
 
 | Consumer | Uses |
 |---|---|
 | QR bill amount (`pdf._build_qr_svg`) | `amount_due_chf`. No slip when it is 0 (as today for ≤ 0). |
-| Invoice PDF totals block | `total_chf`, then the lines "Credit CN-… applied" and "Amount due" |
+| Invoice PDF totals block and summary box | `total_chf`, then one "Credit note CN-… applied" line per application and "Amount due" (`credit_application_rows`, translated in de/fr/it/en); the summary box shows the amount due |
+| Public invoice page | Adds `credit_applied_chf` and `amount_due_chf` |
 | Email variables (`email_context`, `Zev` email template help text) | `{total_chf}` unchanged, new `{amount_due_chf}`. The default template switches to `{amount_due_chf}`. |
 | `outstanding_chf`, `record_payment` limit | `amount_due_chf` |
 | Period overview, batch toolbar, `InvoicePeriodRowsTable` | Shows `amount_due_chf` when it differs from `total_chf` |
-| `views_dashboard` revenue | `total_chf` of billed invoices minus adjustment credits |
+| `views_dashboard` revenue | `total_chf` of issued, non-cancelled invoices (all-time, `billed_invoices` without a window) minus adjustment credits whose source is one of them |
 | Annual statement / report / financial summary | `total_chf` (the value billed). Credits listed separately (§4.6). |
 | MCP `find_invoices` / `explain_invoice` | Adds `amount_due_chf`, `paid_chf`, and credits |
 | `field_catalog_data` (template field catalogue) | Adds `amount_due_chf`, `credit_applied_chf`, `paid_chf` |
@@ -372,16 +396,17 @@ created_at` (read-only: everything except `amount_chf, paid_on, note`).
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
 | `invoices/{id}/correct/` | POST | `IsAuthenticated, HasZevAccess`, manager | Body `{kind: "reversal" \| "adjustment", reason, amount_chf?}` → `201 {"invoice": Invoice, "credit": Credit}`. `400` on a guard failure. |
-| `credits/` | GET | `IsAuthenticated` (scoped queryset) | Filters `zev_id`, `participant_id`, `status` (`open`, `used`, `refunded`) |
+| `credits/` | GET | `IsAuthenticated` (scoped queryset) | Filters `zev_id`, `participant_id`, `source_invoice_id`, `status` (`open`, `used`, `refunded`; anything else `400`) |
 | `credits/{id}/` | GET | as list | |
 | `credits/{id}/pdf/` | GET | as list | Like `invoices/{id}/pdf/`, `404` before the render |
 | `credits/{id}/generate-pdf/` | POST | manager | Re-render |
-| `credits/{id}/refund/` | POST | manager | Phase 3. Body `{refunded_on, note?}` → `200 Credit`. `400` when nothing remains. |
+| `credits/{id}/refund/` | POST | manager (`IsAuthenticated, HasZevAccess`, write-scoped: viewer and participant get 404) | Phase 3. Body `{refunded_on, note?}` → `200 Credit`. `400` when nothing remains, for a future date, or a disabled ZEV (non-admin); denials are audited. |
 
 **`CreditSerializer`** — fields `id, credit_number, zev, participant, participant_name, kind,
 source_invoice, source_invoice_number, reason, amount_chf, vat_mode, vat_rate, vat_chf,
-embedded_vat_chf, remaining_chf, refunded_chf, refunded_on, status, pdf_url, pdf_status,
-created_by_name, created_at`. All read-only.
+embedded_vat_chf, remaining_chf, refunded_chf, refunded_on, refund_note, status, applications,
+pdf_url, pdf_status, created_by_name, created_at`. All read-only. `applications` is a nested list
+`[{id, invoice, invoice_number, amount_chf, released_at}]`.
 
 ### 5.3 Audit events
 
@@ -404,16 +429,22 @@ Denied attempts are recorded with `AuditEventStatus.DENIED`, the same way
   `PdfTemplate`s. The content: issuer, recipient, credit number and date, "Credit note for invoice
   INV-… dated …", the reason, the amount with the VAT breakdown for the source's VAT mode, and a
   note that the amount is set against the next invoice or refunded. There is no QR bill.
-- **Transfer archive:** new sections `payments`, `credits`, `credit_applications`, plus
+- **Transfer archive:** payments, credits and `credit_applications` travel nested under their invoice
+  (an application names its credit by `credit_number` and is imported once every credit exists), plus
   `Zev.credit_note_prefix` and `credit_note_counter`. The credit PDF bytes go into the same optional
   PDF section as invoice PDFs. Older archives import without these sections.
 - **Backups:** `ZevPart("invoices.Payment", "invoice__zev")`, `ZevPart("invoices.Credit", "zev")`,
   `ZevPart("invoices.CreditApplication", "credit__zev")`, and a `MEDIA_FIELDS` entry for
   `Credit.pdf_file`.
 - **ZEV purge:** deletes `CreditApplication`, then `Credit`, then invoices (whose cascade removes
-  payments).
-- **Seed demo:** one partly paid invoice, one reversal with its regenerated replacement, one
-  adjustment credit applied to the following period.
+  payments). The Django admin registers `CreditApplication` read-only.
+- **Participant deletion (finding):** deleting a participant who has credit notes raises `ProtectedError`
+  (`Credit.source_invoice` is `PROTECT` since phase 2; `CreditApplication.credit` adds a second
+  block). `RESTRICT` on `CreditApplication.credit` would not change that, so it stays `PROTECT`. Out of
+  scope (§2); pinned by `ParticipantDeletionTests`.
+- **Seed demo:** one partly paid invoice, one reversal with its regenerated replacement (which uses the
+  reversal's credit), one adjustment credit applied to the following period. The corrections are seeded
+  before the open period is billed so its invoices pick the credit up.
 
 ## 7. Frontend
 
@@ -602,29 +633,80 @@ manager; not for a viewer, an unpaid, cancelled, payout or fully credited invoic
 do, and issues a partial credit through the dialog (reason trimmed, amount capped, `correctInvoice`
 called); `InvoicePaymentsCard` offers removing a payment only while no credit note exists.
 
-### Phase 3 — `invoices/test_credit_application.py` (new)
+### Phase 3 — `invoices/test_credit_application.py` (48 tests, 1 PostgreSQL-only)
 
-The engine applies credit after VAT (line items unchanged), floors at zero and carries the
-remainder, several credits oldest first, no application when `total_chf <= 0`, regeneration
-releases (cascade), cancellation releases (`released_at`), refund, QR bill amount = `amount_due_chf`
-and no slip at 0, concurrent generation doesn't double-use a credit (PostgreSQL leg), email
-variable `{amount_due_chf}`.
+**`EngineCreditTests`** (9): `test_credit_is_applied_after_vat_and_the_lines_stay_unchanged`,
+`test_the_amount_due_floors_at_zero_and_the_remainder_carries_forward`,
+`test_several_credits_are_used_oldest_first`, `test_only_the_participants_own_credit_is_used`,
+`test_regeneration_releases_the_credit_and_the_replacement_reuses_it`,
+`test_cancellation_releases_the_credit_and_the_next_invoice_reuses_it`,
+`test_a_draft_holds_its_credit_until_it_is_cancelled`,
+`test_nothing_is_applied_to_an_invoice_with_nothing_to_collect`,
+`test_the_participant_with_a_reversed_invoice_gets_the_cash_back_on_the_replacement`.
+
+**`CorrectionWithAppliedCreditTests`** (6): `test_a_reversal_releases_the_applications_and_credits_the_cash_only`,
+`test_the_reversal_of_a_credit_only_invoice_issues_no_credit_note`,
+`test_an_adjustment_is_capped_by_the_cash_paid`,
+`test_an_invoice_settled_by_credit_alone_cannot_be_partially_credited`,
+`test_a_reversal_with_nothing_to_give_back_is_still_refused`, `test_the_audit_metadata_names_the_released_credit`.
+
+**`PaymentWithAppliedCreditTests`** (5): `test_record_payment_is_limited_to_the_amount_due`,
+`test_a_credit_covered_invoice_takes_no_payment_but_can_be_marked_paid`,
+`test_mark_paid_books_the_rest_of_the_amount_due`, `test_a_payout_keeps_the_existing_message`,
+`test_the_amount_due_is_derived_from_the_total`.
+
+**`RefundWorkflowTests`** (5): `test_refunding_books_the_remainder`, `test_nothing_remains_to_refund_twice`,
+`test_the_refund_date_cannot_be_in_the_future`,
+`test_credit_held_by_a_draft_is_not_refundable_until_the_draft_is_gone`,
+`test_a_partly_used_credit_reads_open_until_refunded`.
+
+**`RefundAndCreditApiTests`** (8): `test_a_manager_refunds_the_remainder` (response, audit event),
+`test_nothing_remains_returns_400_and_audits_the_denial`, `test_the_body_is_validated`,
+`test_a_viewer_cannot_refund`, `test_a_participant_cannot_refund_their_own_credit`,
+`test_a_disabled_zev_refuses_non_admins_but_not_admins`, `test_the_credit_list_filters_by_status`,
+`test_the_credit_shows_where_it_was_applied`.
+
+**`InvoiceSerializerTests`** (5): `test_list_and_detail_carry_the_amount_due`,
+`test_the_participant_sees_the_credit_applied_to_their_invoice`,
+`test_a_released_application_stays_visible_as_released`,
+`test_the_list_query_count_does_not_grow_with_invoices`, `test_the_public_payload_carries_the_amount_due`.
+
+**`AmountDueDocumentTests`** (7): `test_the_qr_amount_is_the_amount_due`,
+`test_there_is_no_qr_slip_when_the_credit_covers_the_invoice`, `test_the_pdf_lists_the_credit_and_the_amount_due`,
+`test_the_pdf_has_no_credit_lines_without_credit`, `test_the_credit_lines_are_translated`,
+`test_the_email_variable_is_the_amount_due`, `test_the_default_email_asks_for_the_amount_due`.
+
+**Others** (3): `DashboardRevenueTests::test_revenue_is_billed_less_partial_credits`,
+`ParticipantDeletionTests::test_a_participant_with_credit_notes_cannot_be_deleted`,
+`ConcurrentApplicationTests::test_two_generations_do_not_use_one_credit_twice` (PostgreSQL only,
+`TransactionTestCase` and two threads; skipped on SQLite, where row locks do not exist).
+
+Also changed: `zev/test_transfer.py` (`RoundTripTests::test_credit_applications_and_refunds_round_trip`;
+`SchemaParityTests` covers `CREDIT_APPLICATION_FIELDS`; `export_and_clear` deletes applications first),
+`zev/test_purge.py` (applications deleted and counted), `zev/tests.py` seed test (the adjustment is applied
+to the open month), `invoices/test_readiness.py` (query budget 10 to 11 for the credit applications),
+`invoices/test_credits.py` (`released_chf` in the audit metadata), `mcp_server/tests/test_tools.py`
+(`find_invoices` amount due, `explain_invoice` credits applied and issued), `invoices/test_field_catalog.py`
+(unchanged, green with the new tokens).
 
 ### Frontend
 
-`npm run lint`, `lint:style`, hex check, `test:unit` (status badge "partly paid", amount-due
-rendering), `build`. Screenshots of the payment and correction dialogs at desktop and ~400px width.
+`frontend/tests/invoice-credit-application.test.ts` (10 tests): amount-due helpers and rendering, the
+credit breakdown, reversal availability with applications only, the dialog without a partial credit for a
+credit-only invoice, record-payment visibility by amount due, refund visibility and the refund dialog.
+`invoice-credits.test.ts` keeps its 7 (fixture gains the new fields). `npm run lint`, `lint:style`, hex check,
+`test:unit`, `build` pass.
 
 ### Acceptance criteria
 
-- [ ] A partly paid invoice shows what was received and what is outstanding. Mark-paid still works
+- [x] A partly paid invoice shows what was received and what is outstanding. Mark-paid still works
       in one click.
-- [ ] No invoice that was ever approved is deleted by regeneration or by a non-admin.
-- [ ] A paid invoice can be reversed. The original stays as cancelled with its number, a credit note
+- [x] No invoice that was ever approved is deleted by regeneration or by a non-admin.
+- [x] A paid invoice can be reversed. The original stays as cancelled with its number, a credit note
       PDF references it, and the period can be regenerated.
-- [ ] An overcharge can be credited partially without cancelling the invoice.
-- [ ] The next invoice deducts the credit after VAT. The QR bill asks for the amount due, never less
+- [x] An overcharge can be credited partially without cancelling the invoice.
+- [x] The next invoice deducts the credit after VAT. The QR bill asks for the amount due, never less
       than zero. The remainder is carried forward.
-- [ ] A remaining credit can be marked as refunded.
-- [ ] The financial summary, annual statement and annual report agree on which invoices count.
-- [ ] Payments, credits and applications survive the transfer archive and a backup/restore.
+- [x] A remaining credit can be marked as refunded.
+- [x] The financial summary, annual statement and annual report agree on which invoices count.
+- [x] Payments, credits and applications survive the transfer archive and a backup/restore.

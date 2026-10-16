@@ -31,6 +31,7 @@ from invoices.models import (
     DEFAULT_INVOICE_EMAIL_SUBJECT,
     ContractIssue,
     Credit,
+    CreditApplication,
     EmailLog,
     Invoice,
     InvoiceStatus,
@@ -1134,6 +1135,9 @@ class Command(BaseCommand):
         # Credit notes protect their source invoice, so they go first.
         credits = Credit.objects.filter(source_invoice__in=invoices)
         stale |= {name for name in credits.values_list("pdf_file", flat=True) if name}
+        # A credit protects against deletion while an invoice (maybe another
+        # one) still holds an application of it.
+        CreditApplication.objects.filter(Q(credit__in=credits) | Q(invoice__in=invoices)).delete()
         credits.delete()
         invoices.delete()
         if stale:
@@ -1367,10 +1371,12 @@ class Command(BaseCommand):
         closed_invoices = self._seed_invoices(
             zev, closed_start, closed_end, closed=True,
         )
+        # The corrections come before the open period is billed, so its
+        # invoices pick up the credit note the partial credit left open (#388).
+        self._seed_credits(closed_invoices, closed_start, closed_end)
         invoices = self._seed_invoices(
             zev, invoice_period_start, invoice_period_end,
         )
-        self._seed_credits(closed_invoices, closed_start, closed_end)
         return SecondCommunitySeed(
             open_invoices=invoices,
             open_start=invoice_period_start,
@@ -2212,10 +2218,10 @@ class Command(BaseCommand):
             invoice.approved_at = issued_at
             invoice.sent_at = issued_at
             invoice.save(update_fields=["status", "approved_at", "sent_at"])
-        if len(invoices) > 3 and invoices[3].total_chf > 1:
+        if len(invoices) > 3 and invoices[3].amount_due_chf > 1:
             Payment.objects.create(
                 invoice=invoices[3],
-                amount_chf=(invoices[3].total_chf / 2).quantize(Decimal("0.01")),
+                amount_chf=(invoices[3].amount_due_chf / 2).quantize(Decimal("0.01")),
                 paid_on=min(invoices[3].period_end + timedelta(days=10), djtimezone.localdate()),
                 note="Teilzahlung",
             )
@@ -2224,7 +2230,9 @@ class Command(BaseCommand):
 
     def _seed_credits(self, closed_invoices: list[Invoice], period_start: date, period_end: date) -> None:
         """Correct two of the settled invoices (#388): the first is reversed and
-        re-issued as a draft, the second gets a partial credit."""
+        re-issued as a draft, the second gets a partial credit. That credit note
+        stays open until the next period's invoice for the participant is
+        generated, which applies it."""
         payable = [
             invoice for invoice in closed_invoices
             if invoice.status == InvoiceStatus.PAID and invoice.total_chf > 1

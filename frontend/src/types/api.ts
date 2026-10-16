@@ -1124,6 +1124,10 @@ export interface Invoice {
     vat_base_chf?: string | null
     vat_chf?: string
     total_chf: string
+    /** Credit notes set against this invoice at generation (#388); frozen as issued. */
+    credit_applied_chf?: string
+    /** `max(total - credit applied, 0)` for an invoice that collects money; the total otherwise. */
+    amount_due_chf?: string
     total_local_kwh?: string
     total_grid_kwh?: string
     total_feed_in_kwh?: string
@@ -1143,6 +1147,8 @@ export interface Invoice {
     payments?: Payment[] | null
     /** Credit notes issued for this invoice (#388); the participant sees them too. */
     credits?: Credit[]
+    /** Credit notes used by this invoice, released ones included (detail only; the participant sees them too). */
+    credit_applications?: InvoiceCreditApplication[]
     pdf_url?: string | null
     /**
      * Where the document is, as distinct from the invoice's own `status`.
@@ -1165,6 +1171,27 @@ export interface Invoice {
 
 export type CreditKind = 'reversal' | 'adjustment'
 
+/** The part of a credit note set against an invoice, seen from the invoice (#388). */
+export interface InvoiceCreditApplication {
+    id: string
+    credit: string
+    credit_number: string
+    amount_chf: string
+    /** Set once the invoice was cancelled and the credit freed again. */
+    released_at: string | null
+}
+
+/** The part of a credit note set against an invoice, seen from the credit. */
+export interface CreditApplication {
+    id: string
+    invoice: string
+    invoice_number: string
+    amount_chf: string
+    released_at: string | null
+}
+
+export type CreditStatus = 'open' | 'used' | 'refunded'
+
 /** A credit note (#388): money owed back for an invoice. */
 export interface Credit {
     id: string
@@ -1182,9 +1209,14 @@ export interface Credit {
     vat_rate: string
     vat_chf: string
     embedded_vat_chf: string | null
-    /** Until credits are applied or refunded, the whole amount. */
+    /** Amount less the active applications and what was refunded. */
     remaining_chf: string
-    status: 'open'
+    refunded_chf: string
+    refunded_on: string | null
+    refund_note: string
+    /** `open` while money remains, then `used` (set against invoices) or `refunded`. */
+    status: CreditStatus
+    applications: CreditApplication[]
     pdf_url: string | null
     pdf_status: InvoicePdfStatus
     created_by_name: string | null
@@ -1194,7 +1226,8 @@ export interface Credit {
 /** Answer of `POST invoices/{id}/correct/`. */
 export interface CorrectInvoiceResponse {
     invoice: Invoice
-    credit: Credit
+    /** `null` when reversing an invoice settled by credit alone: nothing was paid, so nothing is credited. */
+    credit: Credit | null
 }
 
 /** Money received for an invoice (#388). */
@@ -2106,6 +2139,8 @@ export interface PublicInvoice {
     status: string
     is_paid: boolean
     total_chf: string
+    credit_applied_chf: string
+    amount_due_chf: string
     currency: string
     /** Null when the invoice has no consumption — then no QR was printed either. */
     energy_summary: {

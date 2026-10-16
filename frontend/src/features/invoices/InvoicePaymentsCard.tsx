@@ -10,6 +10,7 @@ import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { formatChf, formatChfAmount } from '../../lib/numbers'
 import { useToast } from '../../lib/toast'
 import type { Invoice, Payment } from '../../types/api'
+import { amountDueChf } from './invoiceCredits'
 import { RecordPaymentModal } from './RecordPaymentModal'
 
 /**
@@ -38,8 +39,8 @@ export function InvoicePaymentsCard({
     const canRecord = canManage && invoice.status === 'sent'
     // Once credit notes exist the payments they were issued against are fixed.
     const hasCredits = (invoice.credits ?? []).length > 0
-    // A payout (negative total) or a zero total is settled in one step.
-    const collectsMoney = Number(invoice.total_chf) > 0
+    // A payout, a zero total or an invoice the applied credit covers is settled in one step.
+    const collectsMoney = amountDueChf(invoice) > 0
 
     const recordMutation = useMutation({
         mutationFn: (values: { amount_chf: string; paid_on: string; note: string }) => recordPayment(invoice.id, values),

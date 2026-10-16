@@ -17,6 +17,29 @@ def _invoice_block(data: dict) -> dict:
         "subtotal_chf": chf(data.get("subtotal_chf")),
         "vat_chf": chf(data.get("vat_chf")),
         "total_chf": chf(data.get("total_chf")),
+        "credit_applied_chf": chf(data.get("credit_applied_chf")),
+        "amount_due_chf": chf(data.get("amount_due_chf")),
+        "paid_chf": chf(data.get("paid_chf")),
+        "outstanding_chf": chf(data.get("outstanding_chf")),
+        # Credit notes set against this invoice, and credit notes issued for it.
+        "credits_applied": [
+            {
+                "credit_number": application.get("credit_number"),
+                "amount_chf": chf(application.get("amount_chf")),
+                "released": application.get("released_at") is not None,
+            }
+            for application in data.get("credit_applications") or []
+        ],
+        "credits_issued": [
+            {
+                "credit_number": credit.get("credit_number"),
+                "kind": credit.get("kind"),
+                "amount_chf": chf(credit.get("amount_chf")),
+                "remaining_chf": chf(credit.get("remaining_chf")),
+                "status": credit.get("status"),
+            }
+            for credit in data.get("credits") or []
+        ],
     }
     if data.get("vat_rate") is not None:
         block["vat_rate"] = data["vat_rate"]

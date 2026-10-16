@@ -180,6 +180,9 @@ def _build_qr_svg(invoice, issuer: dict | None = None, recipient: dict | None = 
     (``invoices.document_parties``), so the slip of an approved invoice never
     changes with later edits.
     """
+    if invoice.amount_due_chf <= 0:
+        # Nothing to pay: a payout, or an invoice the credit applied covers.
+        return None
     if issuer is None or recipient is None:
         issuer, recipient = copy_for_render(invoice)
     iban = _normalize_text(issuer.get("iban")).replace(" ", "")
@@ -211,7 +214,7 @@ def _build_qr_svg(invoice, issuer: dict | None = None, recipient: dict | None = 
             account=iban,
             creditor=creditor,
             debtor=debtor,
-            amount=str(invoice.total_chf),
+            amount=str(invoice.amount_due_chf),
             currency="CHF",
             language=lang,
             additional_information=invoice.invoice_number or "",
@@ -331,6 +334,18 @@ def _build_template_context(
     # Convert the stored fraction (0.0810) to percent form (8.1).
     vat_rate_percent = Decimal(invoice.vat_rate or 0) * 100
 
+    # Credit notes set against this invoice, listed after the total (#388).
+    credit_application_rows = []
+    if invoice.credit_applied_chf:
+        for application in invoice.credit_applications.select_related("credit"):
+            credit_application_rows.append({
+                "label": tr["credit_applied"].format(number=application.credit.credit_number),
+                "amount_chf": -application.amount_chf,
+            })
+    # Each credit line and the amount-due line add a row to the totals block.
+    if credit_application_rows:
+        content_mm += _TABLE_ROW_MM * (len(credit_application_rows) + 1)
+
     # Producer credits, listed after the VAT (#957); None when there are none
     # or the invoice has no recorded VAT base.
     producer_credit_chf = None
@@ -341,6 +356,7 @@ def _build_template_context(
         "invoice": invoice,
         "vat_rate_percent": vat_rate_percent,
         "producer_credit_chf": producer_credit_chf,
+        "credit_application_rows": credit_application_rows,
         "invoice_number_prefix": invoice_number_prefix,
         "invoice_number_suffix": invoice_number_suffix,
         "grouped_items": grouped_items,

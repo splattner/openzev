@@ -33,6 +33,7 @@ from .schema import (
     INVOICE_FIELDS,
     INVOICE_ITEM_FIELDS,
     PAYMENT_FIELDS,
+    CREDIT_APPLICATION_FIELDS,
     CREDIT_FIELDS,
     INVOICE_PDFS_DIR,
     MANIFEST_NAME,
@@ -231,6 +232,10 @@ def _export_invoices(zev):
             ],
             "payments": [_fields(payment, PAYMENT_FIELDS) for payment in invoice.payments.all()],
             "credits": [_fields(credit, CREDIT_FIELDS) for credit in invoice.credits.all()],
+            "credit_applications": [
+                {"credit_number": application.credit.credit_number, **_fields(application, CREDIT_APPLICATION_FIELDS)}
+                for application in invoice.credit_applications.all()
+            ],
             "dynamic_evidence": [
                 {
                     "dynamic_source": _fields(evidence.source, DYNAMIC_SOURCE_FIELDS),
@@ -245,7 +250,7 @@ def _export_invoices(zev):
         # the data and would dominate the archive size. See the issue's note —
         # a regenerated PDF uses today's template, so this is not the right
         # answer if original documents have to be retained.
-        for invoice in Invoice.objects.filter(zev=zev).prefetch_related("items", "payments", "credits", "dynamic_evidence__source").order_by("period_start", "invoice_number")
+        for invoice in Invoice.objects.filter(zev=zev).prefetch_related("items", "payments", "credits", "credit_applications__credit", "dynamic_evidence__source").order_by("period_start", "invoice_number")
     ]
 
 
@@ -443,6 +448,7 @@ def _write_archive(zev, sections, fileobj, *, instance_name=""):
             invoices = _export_invoices(zev)
             counts[SECTION_INVOICES] = len(invoices)
             counts["credits"] = sum(len(invoice["credits"]) for invoice in invoices)
+            counts["credit_applications"] = sum(len(invoice["credit_applications"]) for invoice in invoices)
             archive.writestr(SECTION_FILES[SECTION_INVOICES], _dump(invoices))
 
         if SECTION_INVOICE_PDFS in sections:

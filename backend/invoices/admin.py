@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Credit, Invoice, InvoiceItem, EmailLog, Payment
+from .models import Credit, CreditApplication, Invoice, InvoiceItem, EmailLog, Payment
 
 
 class InvoiceItemInline(admin.TabularInline):
@@ -54,6 +54,26 @@ class CreditAdmin(admin.ModelAdmin):
     list_filter = ("kind", "zev")
     search_fields = ("credit_number", "source_invoice__invoice_number")
     date_hierarchy = "created_at"
+
+    def get_readonly_fields(self, request, obj=None):
+        return [field.name for field in self.model._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(CreditApplication)
+class CreditApplicationAdmin(admin.ModelAdmin):
+    """Credit applied to an invoice by the engine; never edited by hand."""
+
+    list_display = ("credit", "invoice", "amount_chf", "released_at", "created_at")
+    search_fields = ("credit__credit_number", "invoice__invoice_number")
 
     def get_readonly_fields(self, request, obj=None):
         return [field.name for field in self.model._meta.fields]

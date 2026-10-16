@@ -35,6 +35,7 @@ const credit: Credit = {
     id: 'c1', credit_number: 'CN-00001', zev: 'z1', participant: 'p1', participant_name: 'Anna', kind: 'adjustment',
     source_invoice: 'i1', source_invoice_number: 'INV-1', reason: 'Overcharged', amount_chf: '10.00',
     vat_mode: 'not_registered', vat_rate: '0.0000', vat_chf: '0.00', embedded_vat_chf: null, remaining_chf: '10.00',
+    refunded_chf: '0.00', refunded_on: null, refund_note: '', applications: [],
     status: 'open', pdf_url: 'http://x/pdf/', pdf_status: 'ready', created_by_name: 'Olga', created_at: '2026-03-02T08:00:00Z',
 }
 

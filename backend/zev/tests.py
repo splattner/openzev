@@ -1371,6 +1371,17 @@ class SeedDemoSecondCommunitySeedTests(TestCase):
 			sorted(Credit.objects.filter(zev=self.zev).values_list("kind", flat=True)),
 			["adjustment", "reversal"],
 		)
+		# The credit notes do not stay open: the reversal's replacement draft and
+		# the next month's invoice each use the one their participant holds.
+		reversal = Credit.objects.get(zev=self.zev, kind="reversal")
+		adjustment = Credit.objects.get(zev=self.zev, kind="adjustment")
+		self.assertEqual(
+			reversal.applications.get().invoice.period_start, closed_start,
+		)
+		applied = adjustment.applications.get()
+		self.assertEqual(applied.invoice.period_start, open_start)
+		self.assertEqual(applied.invoice.participant_id, adjustment.participant_id)
+		self.assertEqual(applied.invoice.credit_applied_chf, applied.amount_chf)
 
 	def test_re_seeding_the_second_community_is_idempotent(self):
 		first = self._seed()

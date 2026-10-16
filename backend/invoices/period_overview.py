@@ -47,7 +47,9 @@ def compute_period_overview(*, zev, period_start: date_type, period_end: date_ty
         period_start=period_start,
         period_end=period_end,
     ).select_related("participant__party", "zev").order_by("-created_at", "-id")
-    invoice_rows = invoice_rows.prefetch_related("items", "email_logs", "payments").annotate(
+    invoice_rows = invoice_rows.prefetch_related(
+        "items", "email_logs", "payments", "credits__applications__invoice", "credit_applications__credit",
+    ).annotate(
         last_email_status=Subquery(
             EmailLog.objects.filter(invoice=OuterRef("pk")).order_by("-created_at", "-id").values("status")[:1]
         )

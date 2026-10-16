@@ -19,7 +19,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
-from invoices.models import Credit, Invoice, InvoiceItem, InvoiceStatus, Payment
+from invoices.models import Credit, CreditApplication, Invoice, InvoiceItem, InvoiceStatus, Payment
 from metering.models import ImportLog, MeterReading, ReadingResolution, SupplementarySource
 from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
@@ -153,6 +153,7 @@ def export_and_clear(zev, sections=None):
     else. ``Invoice.zev`` is PROTECT, so invoices go first.
     """
     raw = export_to_bytes(zev, sections)
+    CreditApplication.objects.filter(credit__zev=zev).delete()
     Credit.objects.filter(zev=zev).delete()
     Invoice.objects.filter(zev=zev).delete()
     zev.delete()
@@ -471,6 +472,42 @@ class RoundTripTests(TestCase):
         )
         self.assertEqual(credit.participant_id, invoice.participant_id)
         self.assertEqual(credit.zev.credit_note_counter, 2)
+
+    def test_credit_applications_and_refunds_round_trip(self):
+        credit = Credit.objects.get(zev=self.source)
+        Credit.objects.filter(pk=credit.pk).update(
+            refunded_chf=Decimal("1.00"), refunded_on=date(2026, 3, 1), refund_note="Bank transfer",
+        )
+        later = Invoice.objects.create(
+            zev=self.source, participant=credit.participant, invoice_number="TRF-00003",
+            period_start=date(2026, 2, 1), period_end=date(2026, 2, 28), status=InvoiceStatus.DRAFT,
+            total_chf=Decimal("10.00"), credit_applied_chf=Decimal("2.00"),
+        )
+        CreditApplication.objects.create(credit=credit, invoice=later, amount_chf=Decimal("2.00"))
+        released = Invoice.objects.create(
+            zev=self.source, participant=credit.participant, invoice_number="TRF-00004",
+            period_start=date(2026, 3, 1), period_end=date(2026, 3, 31), status=InvoiceStatus.CANCELLED,
+            approved_at=datetime(2026, 4, 1, 8, 0, tzinfo=timezone.utc),
+            total_chf=Decimal("1.00"), credit_applied_chf=Decimal("1.00"),
+        )
+        CreditApplication.objects.create(
+            credit=credit, invoice=released, amount_chf=Decimal("1.00"),
+            released_at=datetime(2026, 4, 2, 8, 0, tzinfo=timezone.utc),
+        )
+
+        result = self._import()
+
+        imported = Credit.objects.get(zev_id=result["zev_id"])
+        self.assertEqual(
+            (imported.refunded_chf, imported.refunded_on, imported.refund_note),
+            (Decimal("1.00"), date(2026, 3, 1), "Bank transfer"),
+        )
+        self.assertEqual(result["counts"]["credit_applications"], 2)
+        applied = imported.applications.get(released_at__isnull=True)
+        self.assertEqual((applied.invoice.invoice_number, applied.amount_chf), ("TRF-00003", Decimal("2.00")))
+        self.assertEqual(applied.invoice.credit_applied_chf, Decimal("2.00"))
+        self.assertEqual(imported.applications.exclude(released_at__isnull=True).get().invoice.invoice_number, "TRF-00004")
+        self.assertEqual(imported.remaining(), Decimal("5.40") - Decimal("2.00") - Decimal("1.00"))
 
     def test_an_archive_from_before_payments_settles_its_paid_invoices(self):
         raw = export_and_clear(self.source)
@@ -1202,6 +1239,7 @@ class SchemaParityTests(TestCase):
         "INVOICE_ITEM_FIELDS": InvoiceItem,
         "PAYMENT_FIELDS": Payment,
         "CREDIT_FIELDS": Credit,
+        "CREDIT_APPLICATION_FIELDS": CreditApplication,
         "SUPPLEMENTARY_SOURCE_FIELDS": SupplementarySource,
     }
 
@@ -1270,6 +1308,8 @@ class SchemaParityTests(TestCase):
         "CREDIT_FIELDS": {
             "id", "zev", "participant", "source_invoice", "pdf_file", "pdf_status", "created_by",
         },
+        # Nested under the invoice that used the credit; the credit travels by ``credit_number``.
+        "CREDIT_APPLICATION_FIELDS": {"id", "credit", "invoice"},
         # A source travels by ``meter_id`` and the archive ``participant_id``. Nothing that holds
         # a secret or describes a live connection travels: the credential and push token, the
         # on/off switch and status, the sync bookkeeping and the last comparison with the meter all

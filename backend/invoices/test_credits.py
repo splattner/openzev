@@ -291,7 +291,7 @@ class CreditApiTests(TestCase):
         self.assertEqual(event.status, AuditEventStatus.SUCCESS)
         self.assertEqual(event.metadata_json, {
             "kind": "adjustment", "credit_id": response.data["credit"]["id"], "credit_number": "CN-00001",
-            "amount_chf": "10.00", "reason": "Overcharged",
+            "amount_chf": "10.00", "released_chf": "0.00", "reason": "Overcharged",
         })
 
     def test_viewer_cannot_correct(self):

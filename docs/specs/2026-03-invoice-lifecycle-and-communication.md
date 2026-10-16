@@ -71,6 +71,7 @@ lifecycle from scratch.
 | `vat_base_chf` | `Decimal(10,2)` (nullable) | What `vat_chf` was charged on, under `vat_mode = registered`: `subtotal_chf` without the producer-credit lines (see tariffs spec §4.8). Null under the other VAT modes and on invoices issued before the field existed, whose VAT base is `subtotal_chf` |
 | `vat_chf` | `Decimal(10,2)` | `(vat_base_chf ?? subtotal_chf) × vat_rate` |
 | `total_chf` | `Decimal(10,2)` | `subtotal_chf + vat_chf` (producer credits stay in the subtotal, so they are still settled against the invoice) |
+| `credit_applied_chf` | `Decimal(10,2)` | Credit notes the engine set against the invoice at generation, after VAT (default `0`). Frozen as issued: cancelling the invoice releases the applications but leaves it. The amount due is the derived model property `amount_due_chf` = `max(total_chf − credit_applied_chf, 0)` when `total_chf > 0`, else `total_chf`; it is not stored (`2026-10-payments-and-credits.md` §4.7) |
 | `pdf_file` | `FileField` | Uploaded PDF path (`invoices/pdf/`) |
 | `sent_at` | `DateTimeField` (nullable) | Timestamp of most recent email send |
 | `approved_at` | `DateTimeField` (nullable) | Stamped by `approve_invoice` and by `approve-all`; never cleared, not even on cancellation. An invoice with it set — or, for rows written without the workflow, with status `approved`/`sent`/`paid` (`invoices.models.issued()`) — is *issued* and is never deleted by regeneration or by a non-admin (§4.4, §4.5, ADR 0037). Backfilled by migration `invoices/0023` from the newest `invoice.approve` audit event, else `sent_at`, else `updated_at` for approved/sent/paid rows |
@@ -221,6 +222,10 @@ out from the source invoice, `pdf_file`/`pdf_status`, `issuer`/`recipient` copie
 Read-only in the Django admin. Travels in the transfer archive nested under its invoice and in
 backups (`ZevPart("invoices.Credit", "zev")`, `MEDIA_FIELDS` entry for `pdf_file`).
 
+Phase 3 adds `refunded_chf`, `refunded_on`, `refund_note` to the credit and the model
+`CreditApplication` (`credit` `PROTECT`, `invoice` `CASCADE`, `amount_chf` > 0, `released_at`): the part of
+a credit set against an invoice. Specified in `2026-10-payments-and-credits.md` §4.4 and §4.7.
+
 ---
 
 ### 4.1 States
@@ -260,9 +265,9 @@ draft ──────→ approved ──────→ sent ─────�
 | `sent` | `paid` | `POST /invoices/{id}/mark-paid/` | Status must be `sent`; books the outstanding amount as one payment |
 | `sent` | `paid` | `POST /invoices/{id}/payments/` | Status must be `sent`; the payment brings the received sum up to the total |
 | `paid` | `sent` | `DELETE /invoices/{id}/payments/{payment_id}/` | Removing a payment leaves the total uncovered |
-| `draft` | `cancelled` | `POST /invoices/{id}/cancel/` | Status ≠ `paid` and ≠ `cancelled`; no payments recorded |
-| `approved` | `cancelled` | `POST /invoices/{id}/cancel/` | Same guard |
-| `sent` | `cancelled` | `POST /invoices/{id}/cancel/` | Same guard |
+| `draft` | `cancelled` | `POST /invoices/{id}/cancel/` | Status ≠ `paid` and ≠ `cancelled`; no payments recorded. Releases the invoice's credit applications (`released_at`) in the same transaction (`_lock_and_transition(on_transition=…)`) |
+| `approved` | `cancelled` | `POST /invoices/{id}/cancel/` | Same guard and release |
+| `sent` | `cancelled` | `POST /invoices/{id}/cancel/` | Same guard and release |
 | `paid` | (none) | — | Cannot be cancelled |
 
 **Invalid transitions** return HTTP `400` with a descriptive error message.
@@ -358,9 +363,10 @@ Validation: `period_start` must be before `period_end`. On creation the engine a
 | `POST` | `/invoices/{id}/mark-sent/` | `HasZevAccess` | `status == approved` | → `sent`, `sent_at = now()` |
 | `POST` | `/invoices/{id}/mark-paid/` | `HasZevAccess` | `status == sent` | Optional body `{paid_on}` (default today); books the outstanding amount as one `mark_paid` payment (none for a zero outstanding amount) → `paid`. Audit metadata `{payment_id, amount_chf, paid_on}` |
 | `POST` | `/invoices/{id}/cancel/` | `HasZevAccess` | `status ∉ {paid, cancelled}`, no payments | → `cancelled` |
-| `POST` | `/invoices/{id}/correct/` | `HasZevAccess` (write-scoped: managers) | `status == paid`, or `sent` with payments; total > 0; reason required; an adjustment needs `0 < amount_chf ≤ paid − credited` | Body `{kind: reversal \| adjustment, reason, amount_chf?}`; `201 {invoice, credit}`. A reversal credits what was received (less earlier credits) and cancels the invoice. The credit PDF is queued on commit. Audit `invoice.correct` |
+| `POST` | `/invoices/{id}/correct/` | `HasZevAccess` (write-scoped: managers) | `status == paid`, or `sent` with payments; total > 0; reason required; an adjustment needs `0 < amount_chf ≤ paid − credited` | Body `{kind: reversal \| adjustment, reason, amount_chf?}`; `201 {invoice, credit}`. A reversal credits the cash received (less earlier credits), cancels the invoice and releases the credit applied to it; an invoice settled by credit alone is reversed without a credit note (`credit: null`). An adjustment is capped by cash. The credit PDF is queued on commit. Audit `invoice.correct` (metadata adds `released_chf`) |
 | `GET` | `/invoices/credits/`, `/invoices/credits/{id}/` | scoped (`ZevScopedQuerySetMixin`) | — | Read-only `CreditSerializer`; filters `participant_id`, `source_invoice_id`; a participant sees their own credits |
 | `GET` / `POST` | `/invoices/credits/{id}/pdf/`, `…/generate-pdf/` | scoped / `HasZevAccess` | — | Stored PDF (`404` before the render) / queue a re-render (`202`) |
+| `POST` | `/invoices/credits/{id}/refund/` | `HasZevAccess` (write-scoped: managers) | Something remains; `refunded_on` not in the future | Body `{refunded_on, note?}`; `200 Credit`. Books the remainder as refunded. Audit `credit.refund` |
 | `GET` | `/invoices/{id}/payments/` | `HasZevAccess` + `can_view` (participants `403`) | — | `PaymentSerializer` list |
 | `POST` | `/invoices/{id}/payments/` | `HasZevAccess` (write-scoped: managers) | `status == sent`, total > 0, `0 < amount_chf ≤ outstanding`, `paid_on` not in the future | Body `{amount_chf, paid_on?, note?}`; `201` with the detail `Invoice`; → `paid` once the total is covered. Audit `invoice.payment_record` |
 | `DELETE` | `/invoices/{id}/payments/{payment_id}/` | as POST | invoice `sent` or `paid` | `200` with the detail `Invoice`; `paid` → `sent` when the rest no longer covers the total; `404` for an unknown payment. Audit `invoice.payment_delete` |
@@ -511,7 +517,7 @@ recipient copy frozen on an issued invoice; the PDF keeps the billed copy.
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `GET` | `/invoices/dashboard/` | `admin` only | Aggregated stats: ZEV count, participant count, invoice counts by status, total revenue, recent invoices, email stats |
+| `GET` | `/invoices/dashboard/` | `admin` only | Aggregated stats: ZEV count, participant count, invoice counts by status, total revenue, recent invoices, email stats. `total_revenue` is the `total_chf` of issued, non-cancelled invoices (the `billed_invoices` rule without a window) less the adjustment credits issued against those invoices |
 
 ### 5.6a Readiness and attention
 
@@ -731,6 +737,7 @@ Email subjects and bodies resolve through a three-tier fallback chain:
 | `{period_end}` | Formatted per `AppSettings.date_format_short` |
 | `{due_date}` | Payment due date, formatted per `AppSettings.date_format_short`; empty string if the invoice has no `due_date` |
 | `{total_chf}` | Invoice total amount |
+| `{amount_due_chf}` | Amount still to pay: the total less any credit applied (equals `{total_chf}` without credit). The default body uses it ("Amount due: CHF …"); stored per-ZEV and global templates keep their text |
 
 Templates are rendered with `config.safe_format.safe_format`, which resolves
 bare named placeholders and rejects attribute/item traversal. If rendering
@@ -926,6 +933,8 @@ The invoice PDF template receives:
 | `representative` | The representative toward the grid operator on `period_end` (`build_representative`: `party`, `kind`, `organisation_name`, `name_addition`, `name`, `name_lines`, address, `email`, `phone`), live, or `None` |
 | `owner_participant` | Deprecated alias: the issuer copy shaped like a participant (`full_name`, address fields, `email`, `phone`; `IssuerView`), or `None` when the issuer is the ZEV name alone. The built-in template uses `issuer.*` |
 | `participant` | The billed participant, with `full_name`, `title`, `first_name`, `last_name`, address fields and `email` answered from the recipient copy (`FrozenView`); anything else reads the live row |
+| `credit_application_rows` | One `{label, amount_chf}` per credit note applied (`tr.credit_applied` with the credit number; the amount negated), empty without credit. With rows, the totals block lists them after the total and closes with an "Amount due" row (`tr.amount_due`, `invoice.amount_due_chf`), and the summary box shows the amount due instead of the total |
+| `paid_chf` | Sample/catalogue value for the amount received (`"0.00"` in the sample context) |
 | `qr_svg` | Swiss QR-Rechnung SVG (or `None`) |
 | `energy_chart_svg` | Period-comparison stacked bar chart SVG (or `None`) |
 | `hourly_profile_chart_svg` | Average hourly consumption profile chart SVG (or `None`) |
@@ -964,7 +973,7 @@ A QR-Rechnung SVG is generated from the invoice's copy (§3.1a) when:
 - **Creditor** (issuer copy): `name`, `address_line1`, `postal_code`, `city` — all non-empty.
 - **Debtor** (recipient copy): same fields — all non-empty.
 
-If any required field is missing, QR generation is skipped (logged as warning).
+If any required field is missing, or the invoice's `amount_due_chf` is zero or less (a payout, or credit covering the invoice), QR generation is skipped. The QR amount is `amount_due_chf`, not `total_chf`.
 The `qrbill` Python library generates the SVG.
 
 When the invoice content is short enough (`inline_qr_payment` is `true`), the
@@ -1060,7 +1069,8 @@ Two shapes, split by cost. `InvoiceListSerializer` returns all invoice fields pl
 - `paid_chf`: sum of the invoice's payments as a 2-decimal string — on list
   pages from a `paid_sum` `Subquery` annotation, on detail shapes from the
   prefetched `payments`.
-- `outstanding_chf`: `total_chf − paid_chf`, or `"0.00"` for a cancelled invoice.
+- `credit_applied_chf` (a model column) and `amount_due_chf` (read-only, the derived property) as 2-decimal strings.
+- `outstanding_chf`: `amount_due_chf − paid_chf`, or `"0.00"` for a cancelled invoice.
 
 `InvoiceSerializer` subclasses it and adds the nested read-only relations:
 - `items`: nested `InvoiceItemSerializer` (read-only).
@@ -1068,8 +1078,10 @@ Two shapes, split by cost. `InvoiceListSerializer` returns all invoice fields pl
 - `payments`: nested `PaymentSerializer` list (`id, invoice, amount_chf, paid_on,
   note, source, created_by_name, created_at`) for callers with
   `zev.access.can_view` on the invoice's ZEV; `null` for a participant.
+- `credits`: the credit notes issued for the invoice (nested `CreditSerializer`), visible to the participant.
+- `credit_applications`: `[{id, credit, credit_number, amount_chf, released_at}]`, the credit notes set against the invoice (released ones included), visible to the participant. Detail shape only.
 
-`InvoiceViewSet.get_serializer_class()` returns the list variant for `action == "list"` and the full one everywhere else (retrieve, the workflow actions that echo an invoice back, and `compute_period_overview`, which builds `InvoiceSerializer` directly). `get_queryset()` matches: the `prefetch_related("items", "email_logs", "payments")` is applied for every action *except* `list` (the period overview prefetches the same three), so the database cost drops with the payload rather than being paid for fields that are no longer rendered.
+`InvoiceViewSet.get_serializer_class()` returns the list variant for `action == "list"` and the full one everywhere else (retrieve, the workflow actions that echo an invoice back, and `compute_period_overview`, which builds `InvoiceSerializer` directly). `get_queryset()` matches: the `prefetch_related("items", "email_logs", "payments", "credits__applications__invoice", "credit_applications__credit")` is applied for every action *except* `list` (the period overview prefetches the same set), so the database cost drops with the payload rather than being paid for fields that are no longer rendered.
 
 The split exists because the list is the one unbounded read: `AdminInvoicesContent` passes no ZEV filter and walks every invoice in the instance one page at a time, so each nested line item and email-log row is paid for once per invoice across the whole dataset. Measured on 50 invoices × 8 items, one page went from 151.4 KiB to 33.2 KiB (4.6×, 78% smaller) and from 4 queries to 2; at the client walker's 200-page cap that is 29.6 MiB → 6.5 MiB. No list consumer reads the nested arrays — `AdminInvoicesContent` renders `invoice_number`/`zev_name`/`participant_name`/period/`total_chf`/`status`, and `BillingEmailsPage` reads the annotated latest-email fields before loading history on demand. In `frontend/src/types/api.ts` both fields are optional (`items?`, `email_logs?`). See #488.
 

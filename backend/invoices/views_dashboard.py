@@ -8,6 +8,8 @@ queries ``Invoice.objects`` unscoped rather than the viewset's tenant-scoped
 an oversight; on its own admin-only view it reads as the intent it is.
 """
 
+from decimal import Decimal
+
 from django.db.models import Count, Q, Sum
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -15,7 +17,7 @@ from rest_framework.views import APIView
 from accounts.permissions import IsAdmin
 from zev.models import Participant, Zev
 
-from .models import EmailLog, Invoice, InvoiceStatus
+from .models import Credit, CreditKind, EmailLog, Invoice, InvoiceStatus, issued
 
 RECENT_INVOICE_LIMIT = 10
 
@@ -40,7 +42,15 @@ class InvoiceDashboardView(APIView):
             sent_count=Count("id", filter=Q(status=InvoiceStatus.SENT)),
             paid_count=Count("id", filter=Q(status=InvoiceStatus.PAID)),
             cancelled_count=Count("id", filter=Q(status=InvoiceStatus.CANCELLED)),
-            total_revenue=Sum("total_chf", filter=Q(status__in=[InvoiceStatus.SENT, InvoiceStatus.PAID])),
+        )
+        # Revenue is what was billed: issued, not cancelled (the rule of
+        # ``billed_invoices``, without a window), less the partial credits
+        # issued against those invoices. A reversal's source is cancelled and
+        # already out of the first sum.
+        billed = Invoice.objects.filter(issued()).exclude(status=InvoiceStatus.CANCELLED)
+        total_revenue = (billed.aggregate(total=Sum("total_chf"))["total"] or Decimal("0")) - (
+            Credit.objects.filter(kind=CreditKind.ADJUSTMENT, source_invoice__in=billed)
+            .aggregate(total=Sum("amount_chf"))["total"] or Decimal("0")
         )
 
         email_stats = EmailLog.objects.aggregate(
@@ -68,7 +78,7 @@ class InvoiceDashboardView(APIView):
                 "sent": invoice_stats["sent_count"] or 0,
                 "paid": invoice_stats["paid_count"] or 0,
                 "cancelled": invoice_stats["cancelled_count"] or 0,
-                "total_revenue": float(invoice_stats["total_revenue"] or 0),
+                "total_revenue": float(total_revenue),
             },
             "emails": {
                 "total": email_stats["total_emails"],

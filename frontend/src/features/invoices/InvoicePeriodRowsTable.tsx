@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faBuilding, faSpinner } from '@fortawesome/free-solid-svg-icons'
 import type { ActionMenuItem } from '../../components/ActionMenu'
-import { InvoiceAmount, InvoiceLink, InvoiceRowActions } from '../../components/InvoicePresentation'
+import { InvoiceAmount, InvoiceLink, InvoiceRowActions, InvoiceTotal } from '../../components/InvoicePresentation'
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { InvoiceProgressLegend, InvoiceRowProgress } from './InvoiceRowProgress'
 import { invoiceStepReasonText } from './invoiceRowText'
@@ -122,7 +122,7 @@ export function InvoicePeriodRowsTable({
                   </td>
                   <td role="cell" className="numeric invoice-row-total">
                     {live && <span className="invoice-row-currency">CHF </span>}
-                    <InvoiceAmount value={live?.total_chf ?? null} currency={false} />
+                    {live ? <InvoiceTotal invoice={live} currency={false} /> : <InvoiceAmount value={null} currency={false} />}
                   </td>
                   <td role="cell" className="invoice-actions-cell">
                     <InvoiceRowActions primary={getPrimaryRowAction(row)} menuItems={getRowMenuItems(row)} variant="secondary" iconOnlyMenu />

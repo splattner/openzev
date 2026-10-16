@@ -38,7 +38,7 @@ amount already paid carried forward to the next invoice.
   Credit notes have their own number sequence per ZEV and copy the VAT rate and VAT mode of the
   source invoice.
 - **A credit is applied after VAT and never makes an invoice negative.** A later invoice deducts
-  open credits from its `total_chf` to get `amount_due_chf`, floored at zero. Any remainder stays on
+  open credits from its `total_chf` to get `amount_due_chf` (a derived property, not a stored column), floored at zero. Any remainder stays on
   the credit. `total_chf` keeps its meaning: the value of the invoice.
 - **A participant/period may hold several invoices, but at most one that isn't cancelled.**
 - **Invoices with a total of zero or less (net payouts to a producer) can't be corrected yet.**

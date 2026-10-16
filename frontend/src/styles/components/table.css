@@ -281,6 +281,26 @@
   align-content: start;
 }
 
+/* The total, each credit note applied and the amount due (#388). */
+.invoice-credit-breakdown {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  max-width: 28rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.invoice-credit-breakdown > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.invoice-credit-breakdown dt,
+.invoice-credit-breakdown dd {
+  margin: 0;
+}
+
 /* Feature flags: the switch column, wide enough for the longest state label. */
 
 .feature-toggle-col {

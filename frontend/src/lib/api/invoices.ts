@@ -3,6 +3,7 @@ import type {
   CorrectInvoiceResponse,
   Credit,
   CreditKind,
+  CreditStatus,
   DashboardStats,
   EmailLog,
   EmailTemplateResponse,
@@ -226,8 +227,14 @@ export async function correctInvoice(
   return data
 }
 
-export async function listCredits(params?: { zev_id?: string; participant_id?: string; source_invoice_id?: string }): Promise<Credit[]> {
+export async function listCredits(params?: { zev_id?: string; participant_id?: string; source_invoice_id?: string; status?: CreditStatus }): Promise<Credit[]> {
   return fetchAllPages<Credit>('/invoices/credits/', params)
+}
+
+/** Pays out what remains of a credit note (managers). */
+export async function refundCredit(creditId: string, body: { refunded_on: string; note?: string }): Promise<Credit> {
+  const { data } = await api.post<Credit>(`/invoices/credits/${creditId}/refund/`, body)
+  return data
 }
 
 export async function getCredit(creditId: string): Promise<Credit> {

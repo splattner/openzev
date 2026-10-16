@@ -19,11 +19,11 @@ from allocation.validity import active_during
 from zev.models import Zev, Participant
 from zev import access
 from zev.scoping import ZevScopedQuerySetMixin
-from .models import Credit, Invoice, InvoicePdfStatus, InvoiceStatus, EmailLog, Payment, sent_to_participant
+from .models import Credit, CreditStatus, Invoice, InvoicePdfStatus, InvoiceStatus, EmailLog, Payment, sent_to_participant
 from .serializers import (
     CorrectInvoiceSerializer, CreditSerializer, InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
     GenerateZevInvoicesSerializer, MarkPaidSerializer, PaymentSerializer,
-    RecordPaymentSerializer,
+    RecordPaymentSerializer, RefundCreditSerializer,
 )
 from . import access_tokens
 from .engine import DynamicTariffError, generate_invoice, preflight_dynamic_prices
@@ -46,6 +46,7 @@ from .workflow import (
     mark_invoice_paid,
     mark_invoice_sent,
     record_payment,
+    refund_credit,
 )
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, record_audit_event
@@ -166,7 +167,10 @@ class InvoiceViewSet(
         # database cost the payload change just removed. getattr because schema
         # generation instantiates the view without an action.
         if getattr(self, "action", None) != "list":
-            queryset = queryset.prefetch_related("items", "email_logs", "payments", "credits")
+            queryset = queryset.prefetch_related(
+                "items", "email_logs", "payments", "credits__applications__invoice",
+                "credit_applications__credit",
+            )
         else:
             # last_email_status/log_id ride a subquery annotation inside the
             # invoice SELECT, no per-row N+1. Both use the same deterministic
@@ -718,7 +722,7 @@ class InvoiceViewSet(
             metadata=metadata(before) if metadata else None,
         )
         # The workflow wrote payments behind the prefetch this instance carries.
-        for relation in ("payments", "credits"):
+        for relation in ("payments", "credits", "credit_applications"):
             getattr(invoice, "_prefetched_objects_cache", {}).pop(relation, None)
         if respond is not None:
             return Response(respond(invoice, before), status=response_status)
@@ -846,16 +850,19 @@ class InvoiceViewSet(
             denied_verb="correction",
             success_summary=lambda invoice: f"Corrected invoice {_invoice_target_display(invoice)}.",
             metadata=lambda before: {
-                "kind": before["credit"].kind,
-                "credit_id": str(before["credit"].pk),
-                "credit_number": before["credit"].credit_number,
-                "amount_chf": f"{before['credit'].amount_chf:.2f}",
-                "reason": before["credit"].reason,
+                "kind": data["kind"],
+                "credit_id": str(before["credit"].pk) if before["credit"] else None,
+                "credit_number": before["credit"].credit_number if before["credit"] else None,
+                "amount_chf": f"{before['credit'].amount_chf:.2f}" if before["credit"] else "0.00",
+                "released_chf": f"{before['released_chf']:.2f}",
+                "reason": data["reason"].strip(),
             },
             response_status=status.HTTP_201_CREATED,
             respond=lambda invoice, before: {
                 "invoice": InvoiceSerializer(invoice, context=context).data,
-                "credit": CreditSerializer(before["credit"], context=context).data,
+                "credit": (
+                    CreditSerializer(before["credit"], context=context).data if before["credit"] else None
+                ),
             },
         )
 
@@ -1099,13 +1106,20 @@ class CreditViewSet(ZevScopedQuerySetMixin, mixins.ListModelMixin, mixins.Retrie
     participant_access_survives_end = True
 
     def get_queryset(self):
-        queryset = Credit.objects.select_related("zev", "participant__party", "source_invoice", "created_by")
+        queryset = Credit.objects.select_related(
+            "zev", "participant__party", "source_invoice", "created_by"
+        ).prefetch_related("applications__invoice")
         return self.scope_queryset(queryset)
 
     def filter_queryset(self, queryset):
         queryset = super().filter_queryset(queryset)
         if self.action != "list":
             return queryset
+        raw_status = self.request.query_params.get("status")
+        if raw_status:
+            if raw_status not in CreditStatus.values:
+                raise ValidationError({"status": [f"Must be one of: {', '.join(CreditStatus.values)}."]})
+            queryset = queryset.with_status(raw_status)
         for param, lookup in (("participant_id", "participant_id"), ("source_invoice_id", "source_invoice_id")):
             raw = self.request.query_params.get(param)
             if raw:
@@ -1153,3 +1167,54 @@ class CreditViewSet(ZevScopedQuerySetMixin, mixins.ListModelMixin, mixins.Retrie
             target_display=credit.credit_number,
         )
         return Response({"pdf_status": InvoicePdfStatus.PENDING}, status=status.HTTP_202_ACCEPTED)
+
+    @action(detail=True, methods=["post"], url_path="refund",
+            permission_classes=[IsAuthenticated, HasZevAccess])
+    def refund(self, request, pk=None):
+        """Pay out what remains of a credit (managers): the remainder is booked
+        as refunded. The queryset is write-scoped for POST, so a viewer or a
+        participant gets a 404."""
+        credit = self.get_object()
+        body = RefundCreditSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        data = body.validated_data
+
+        def audit(summary, *, event_status=None, metadata=None):
+            kwargs = {"status": event_status} if event_status else {}
+            record_audit_event(
+                request=request,
+                action_category=AuditActionCategory.INVOICE,
+                action_type="credit.refund",
+                summary=summary,
+                target_type="invoices.Credit",
+                target=credit,
+                target_id=str(credit.pk),
+                target_display=credit.credit_number,
+                metadata=metadata,
+                **kwargs,
+            )
+
+        if not request.user.is_admin and credit.zev.disabled_at is not None:
+            audit(
+                f"Denied refund for {credit.credit_number}: ZEV is disabled.", event_status=AuditEventStatus.DENIED,
+            )
+            return Response(
+                {"error": "This ZEV is disabled. Ask an admin to re-enable it first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            booked = refund_credit(
+                credit, refunded_on=data["refunded_on"], note=data.get("note", ""), user=request.user,
+            )
+        except InvoiceWorkflowError as exc:
+            audit(
+                f"Denied refund for {credit.credit_number}: {exc.user_message}", event_status=AuditEventStatus.DENIED,
+            )
+            return Response({"error": exc.user_message}, status=status.HTTP_400_BAD_REQUEST)
+        audit(
+            f"Refunded credit note {credit.credit_number}.",
+            metadata={"amount_chf": f"{booked['amount']:.2f}", "refunded_on": data["refunded_on"].isoformat()},
+        )
+        # The workflow wrote behind the prefetch this instance carries.
+        getattr(credit, "_prefetched_objects_cache", {}).pop("applications", None)
+        return Response(CreditSerializer(credit, context={"request": request}).data)

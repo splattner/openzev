@@ -1794,8 +1794,9 @@ class PeriodOverviewQueryBudgetTests(ReadinessTestCase):
         self.assertIsNotNone(rows[0]["invoice"])
         self.assertEqual(len(rows[0]["invoice"]["email_logs"]), 1)
         # Same participant serialised three times over: bounded queries, not
-        # one extra lookup per invoice per poll.
-        self.assertLessEqual(len(captured), 10)
+        # one extra lookup per invoice per poll (the 11th is the credit
+        # applications the detail shape now carries).
+        self.assertLessEqual(len(captured), 11)
 
 
 class GenerationConflictTests(ReadinessTestCase):

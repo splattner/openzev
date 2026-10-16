@@ -32,7 +32,7 @@ from django.db import DataError, IntegrityError, transaction
 from django.utils import timezone
 
 from invoices.models import (
-    Credit, Invoice, InvoiceDynamicSourceEvidence, InvoiceItem, InvoicePdfStatus, InvoiceStatus, Payment,
+    Credit, CreditApplication, Invoice, InvoiceDynamicSourceEvidence, InvoiceItem, InvoicePdfStatus, InvoiceStatus, Payment,
 )
 from tariffs.dynamic.evidence import lock_sources, record_invoice_evidence
 from metering.importers.csv_importer import _parse_datetime_utc, _parse_decimal
@@ -76,6 +76,7 @@ from .schema import (
     INVOICE_FIELDS,
     INVOICE_ITEM_FIELDS,
     PAYMENT_FIELDS,
+    CREDIT_APPLICATION_FIELDS,
     CREDIT_FIELDS,
     MANIFEST_NAME,
     METERING_POINT_FIELDS,
@@ -796,6 +797,43 @@ def _import_credits(invoice, raw, position):
             Credit.objects.filter(pk=credit.pk).update(created_at=created_at)
 
 
+def _import_credit_applications(archive, zev, collector):
+    """Create the credit applications of every invoice (#388), once all
+    invoices and credit notes exist: an invoice may use a credit issued for
+    another one. Returns how many were created. An older archive carries none."""
+    invoices = {i.invoice_number: i for i in Invoice.objects.filter(zev=zev)}
+    credits = {c.credit_number: c for c in Credit.objects.filter(zev=zev)}
+    count = 0
+    for position, raw in enumerate(_load_json(archive, SECTION_FILES[SECTION_INVOICES]), start=1):
+        entries = raw.get("credit_applications") or []
+        invoice = invoices.get(str(raw.get("invoice_number")))
+        if invoice is None:
+            continue  # failed validation in the invoices pass; already reported
+        for entry in entries:
+            label = f'{invoice.invoice_number} / {entry.get("credit_number")}'
+            credit = credits.get(str(entry.get("credit_number")))
+            if credit is None:
+                collector.add(
+                    SECTION_INVOICES, position, label,
+                    {"credit_number": ["No imported credit note matches this credit application."]},
+                )
+                continue
+            fields = _pick(entry, CREDIT_APPLICATION_FIELDS, position, SECTION_INVOICES)
+            created_at = fields.pop("created_at", None)
+            try:
+                with transaction.atomic():
+                    application = CreditApplication(credit=credit, invoice=invoice, **fields)
+                    application.full_clean(exclude=["credit", "invoice", "created_at"])
+                    application.save()
+                    if created_at:
+                        CreditApplication.objects.filter(pk=application.pk).update(created_at=created_at)
+            except (DjangoValidationError, ValueError, TypeError, IntegrityError) as exc:
+                collector.add(SECTION_INVOICES, position, label, exc)
+                continue
+            count += 1
+    return count
+
+
 def _trailing_number(invoice_number):
     """The numeric tail of ``INV-00042`` — 42 — or 0 when there is not one.
 
@@ -1321,6 +1359,7 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
             zev.invoice_counter = next_counter
             zev.save(update_fields=["invoice_counter"])
 
+        summary["counts"]["credit_applications"] = _import_credit_applications(archive, zev, collector)
         credit_numbers = list(Credit.objects.filter(zev=zev).values_list("credit_number", flat=True))
         summary["counts"]["credits"] = len(credit_numbers)
         next_credit_counter = max(

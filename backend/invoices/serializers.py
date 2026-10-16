@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 from zev import access
-from .models import Credit, CreditKind, Invoice, InvoiceItem, EmailLog, Payment
+from .models import Credit, CreditApplication, CreditKind, Invoice, InvoiceItem, EmailLog, Payment
 from .description_utils import strip_period_suffix
 
 
@@ -62,10 +62,38 @@ class CorrectInvoiceSerializer(serializers.Serializer):
     amount_chf = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
 
 
+class RefundCreditSerializer(serializers.Serializer):
+    refunded_on = serializers.DateField()
+    note = serializers.CharField(max_length=500, required=False, allow_blank=True, default="")
+
+
+class CreditApplicationSerializer(serializers.ModelSerializer):
+    """Where a credit went: the invoice it was set against. ``released_at`` is
+    set once that invoice was cancelled and the credit freed again."""
+
+    invoice_number = serializers.CharField(source="invoice.invoice_number", read_only=True)
+
+    class Meta:
+        model = CreditApplication
+        fields = ["id", "invoice", "invoice_number", "amount_chf", "released_at"]
+        read_only_fields = fields
+
+
+class InvoiceCreditApplicationSerializer(serializers.ModelSerializer):
+    """The credit a given invoice used, seen from the invoice."""
+
+    credit_number = serializers.CharField(source="credit.credit_number", read_only=True)
+
+    class Meta:
+        model = CreditApplication
+        fields = ["id", "credit", "credit_number", "amount_chf", "released_at"]
+        read_only_fields = fields
+
+
 class CreditSerializer(serializers.ModelSerializer):
-    """A credit note, read-only. ``remaining_chf``/``status`` already have their
-    final shape: until credits are applied to invoices or refunded (phase 3) a
-    credit is open and nothing has been used."""
+    """A credit note, read-only. ``remaining_chf`` and ``status`` are derived
+    from the applications (prefetched, ``applications__invoice``) and the
+    refund: ``open`` while money remains, then ``used`` or ``refunded``."""
 
     participant_name = serializers.SerializerMethodField()
     source_invoice_number = serializers.SerializerMethodField()
@@ -73,13 +101,15 @@ class CreditSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     pdf_url = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
+    applications = CreditApplicationSerializer(many=True, read_only=True)
 
     class Meta:
         model = Credit
         fields = [
             "id", "credit_number", "zev", "participant", "participant_name", "kind",
             "source_invoice", "source_invoice_number", "reason", "amount_chf", "vat_mode",
-            "vat_rate", "vat_chf", "embedded_vat_chf", "remaining_chf", "status", "pdf_url",
+            "vat_rate", "vat_chf", "embedded_vat_chf", "remaining_chf", "refunded_chf",
+            "refunded_on", "refund_note", "status", "applications", "pdf_url",
             "pdf_status", "created_by_name", "created_at",
         ]
         read_only_fields = fields
@@ -91,10 +121,10 @@ class CreditSerializer(serializers.ModelSerializer):
         return obj.source_invoice.invoice_number if obj.source_invoice_id else None
 
     def get_remaining_chf(self, obj) -> str:
-        return f"{obj.amount_chf:.2f}"
+        return f"{obj.remaining():.2f}"
 
     def get_status(self, obj) -> str:
-        return "open"
+        return obj.status
 
     def get_pdf_url(self, obj) -> str | None:
         request = self.context.get("request")
@@ -127,6 +157,7 @@ class InvoiceListSerializer(serializers.ModelSerializer):
     last_email_log_id = serializers.SerializerMethodField()
     paid_chf = serializers.SerializerMethodField()
     outstanding_chf = serializers.SerializerMethodField()
+    amount_due_chf = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = Invoice
@@ -154,6 +185,7 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             "vat_chf",
             "embedded_vat_chf",
             "total_chf",
+            "credit_applied_chf",
             "period_start",
             "period_end",
             "zev",
@@ -178,7 +210,7 @@ class InvoiceListSerializer(serializers.ModelSerializer):
     def get_outstanding_chf(self, obj) -> str:
         if obj.status == "cancelled":
             return "0.00"
-        return f"{obj.total_chf - self._paid(obj):.2f}"
+        return f"{obj.amount_due_chf - self._paid(obj):.2f}"
 
     def get_pdf_url(self, obj) -> str | None:
         if obj.pdf_file:
@@ -239,6 +271,15 @@ class InvoiceSerializer(InvoiceListSerializer):
     access_link = serializers.SerializerMethodField()
     payments = serializers.SerializerMethodField()
     credits = serializers.SerializerMethodField()
+    credit_applications = serializers.SerializerMethodField()
+
+    def get_credit_applications(self, obj) -> list[dict]:
+        """The credit notes set against this invoice. The participant sees them
+        too: they are on their own invoice."""
+        applications = getattr(obj, "_prefetched_objects_cache", {}).get("credit_applications")
+        if applications is None:
+            applications = obj.credit_applications.select_related("credit")
+        return InvoiceCreditApplicationSerializer(applications, many=True).data
 
     def get_credits(self, obj) -> list[dict]:
         """The credit notes issued for this invoice. Unlike the payments, the
@@ -246,7 +287,9 @@ class InvoiceSerializer(InvoiceListSerializer):
         issued."""
         credits = getattr(obj, "_prefetched_objects_cache", {}).get("credits")
         if credits is None:
-            credits = obj.credits.select_related("source_invoice", "participant__party", "created_by")
+            credits = obj.credits.select_related("source_invoice", "participant__party", "created_by").prefetch_related(
+                "applications__invoice"
+            )
         return CreditSerializer(credits, many=True, context=self.context).data
 
     def get_payments(self, obj) -> list[dict] | None:

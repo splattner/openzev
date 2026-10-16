@@ -575,8 +575,8 @@
                 </aside>
                 {% else %}
                 <div class="amount-card">
-                    <div class="eyebrow">{{ tr.total }}</div>
-                    <span class="amount">CHF {{ invoice.total_chf|floatformat:2 }}</span>
+                    <div class="eyebrow">{% if credit_application_rows %}{{ tr.amount_due }}{% else %}{{ tr.total }}{% endif %}</div>
+                    <span class="amount">CHF {% if credit_application_rows %}{{ invoice.amount_due_chf|floatformat:2 }}{% else %}{{ invoice.total_chf|floatformat:2 }}{% endif %}</span>
                 </div>
                 {% endif %}
             </section>
@@ -660,6 +660,18 @@
                             <td>{{ tr.total }}</td>
                             <td class="numeric">CHF {{ invoice.total_chf|floatformat:2 }}</td>
                         </tr>
+                        {% for row in credit_application_rows %}
+                        <tr>
+                            <td>{{ row.label }}</td>
+                            <td class="numeric">CHF {{ row.amount_chf|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if credit_application_rows %}
+                        <tr class="grand-total">
+                            <td>{{ tr.amount_due }}</td>
+                            <td class="numeric">CHF {{ invoice.amount_due_chf|floatformat:2 }}</td>
+                        </tr>
+                        {% endif %}
                     </table>
                 </div>
             </section>

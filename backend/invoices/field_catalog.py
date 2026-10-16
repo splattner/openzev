@@ -42,6 +42,7 @@ def build_sample_invoice_email_context() -> dict:
         period_end="31.01.2026",
         due_date="14.02.2026",
         total_chf="486.45",
+        amount_due_chf="436.45",
     )
 
 

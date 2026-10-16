@@ -16,7 +16,7 @@ import { scopeNoteKey, shellRoleForZev } from '../lib/communityAccess'
 import { PdfPreview } from '../components/PdfPreview'
 import { InvoiceAccessLinkCard } from '../features/invoices/InvoiceAccessLinkCard'
 import { InvoiceCreditsCard } from '../features/invoices/InvoiceCreditsCard'
-import { canCorrectInvoice } from '../features/invoices/invoiceCredits'
+import { amountDueChf, canCorrectInvoice, hasCreditApplied } from '../features/invoices/invoiceCredits'
 import { InvoicePaymentsCard } from '../features/invoices/InvoicePaymentsCard'
 import type { Invoice } from '../types/api'
 
@@ -24,7 +24,7 @@ import { usePdfObjectUrl } from '../lib/usePdfObjectUrl'
 import { PageHeader } from '../components/PageHeader'
 import { Notice } from '../components/Notice'
 import { StatCard } from '../components/StatCard'
-import { InvoiceStatusBadge } from '../components/InvoicePresentation'
+import { InvoiceCreditBreakdown, InvoiceStatusBadge } from '../components/InvoicePresentation'
 import { formatChfAmount, formatKwh } from '../lib/numbers'
 
 export function InvoiceDetailPage() {
@@ -113,6 +113,13 @@ export function InvoiceDetailPage() {
         }
     }
 
+    // A refund leaves the invoice's own payload alone but changes what its credit notes show.
+    const handleCreditChanged = () => {
+        if (invoiceId) void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.detail(invoiceId) })
+        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.credits() })
+        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.mine() })
+    }
+
     const handleGeneratePdf = async () => {
         if (!invoiceId) return
         setGenerating(true)
@@ -153,9 +160,13 @@ export function InvoiceDetailPage() {
             <div className="invoice-figures">
                 <section className="stat-grid">
                     <StatCard accent label={t('pages.invoiceDetail.total')} value={formatChfAmount(Number(inv.total_chf))} currency="CHF" />
+                    {hasCreditApplied(inv) && (
+                        <StatCard label={t('invoice.amountDue')} value={formatChfAmount(amountDueChf(inv))} currency="CHF" />
+                    )}
                     <StatCard label={t('pages.invoiceDetail.subtotal')} value={inv.subtotal_chf != null ? formatChfAmount(Number(inv.subtotal_chf)) : null} currency="CHF" />
                     <StatCard label={t('pages.invoiceDetail.vat')} value={inv.vat_chf != null ? formatChfAmount(Number(inv.vat_chf)) : null} currency="CHF" />
                 </section>
+                <InvoiceCreditBreakdown invoice={inv} />
                 <section className="stat-grid" aria-label={t('pages.invoiceDetail.energyTotals')}>
                     <StatCard label={t('pages.invoiceDetail.local')} value={formatKwh(Number(inv.total_local_kwh ?? 0))} unit="kWh" />
                     <StatCard label={t('pages.invoiceDetail.grid')} value={formatKwh(Number(inv.total_grid_kwh ?? 0))} unit="kWh" />
@@ -170,7 +181,12 @@ export function InvoiceDetailPage() {
 
             {/* A credit note exists for the participant from the moment it is issued. */}
             {((inv.credits ?? []).length > 0 || canCorrectInvoice(inv, canManageAccessLink)) && (
-                <InvoiceCreditsCard invoice={inv} canManage={canManageAccessLink} onChanged={handleInvoiceChanged} />
+                <InvoiceCreditsCard
+                    invoice={inv}
+                    canManage={canManageAccessLink}
+                    onChanged={handleInvoiceChanged}
+                    onCreditChanged={handleCreditChanged}
+                />
             )}
 
             {canManageAccessLink && inv.access_link != null && (

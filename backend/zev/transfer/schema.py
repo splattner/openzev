@@ -114,6 +114,7 @@ SUBCOUNT_SECTIONS = {
     "party_roles": SECTION_PARTICIPANTS,
     "buildings": SECTION_METERING_POINTS,
     "credits": SECTION_INVOICES,
+    "credit_applications": SECTION_INVOICES,
     "supplementary_readings": SECTION_SUPPLEMENTARY,
 }
 
@@ -352,6 +353,8 @@ INVOICE_FIELDS = (
     "vat_chf",
     "embedded_vat_chf",
     "total_chf",
+    # Optional (#388): the credit applied; an older archive has none.
+    "credit_applied_chf",
     "sent_at",
     # Optional (#388): an archive written before it existed infers it on
     # import from status and ``sent_at``.
@@ -385,8 +388,22 @@ CREDIT_FIELDS = (
     "vat_rate",
     "vat_chf",
     "embedded_vat_chf",
+    # Optional: an archive from before refunds imports a credit nobody paid out.
+    "refunded_chf",
+    "refunded_on",
+    "refund_note",
     "issuer",
     "recipient",
+    "created_at",
+)
+
+# Nested under the invoice that used the credit as ``credit_applications``
+# (#388), next to the ``credit_number`` that names the credit. The credit may
+# sit under another invoice, so these are imported once every credit exists.
+# Optional: an older archive has none.
+CREDIT_APPLICATION_FIELDS = (
+    "amount_chf",
+    "released_at",
     "created_at",
 )
 

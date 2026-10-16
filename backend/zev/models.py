@@ -15,7 +15,7 @@ DEFAULT_EMAIL_BODY_TEMPLATE = (
     "Dear {participant_name},\n\n"
     "Please find your energy invoice for the period "
     "{period_start} to {period_end} attached.\n\n"
-    "Total: CHF {total_chf}\n\n"
+    "Amount due: CHF {amount_due_chf}\n\n"
     "Kind regards,\n{zev_name}"
 )
 
@@ -153,7 +153,7 @@ class Zev(models.Model):
             "Subject line template for invoice emails. "
             "Leave blank to use the system default. "
             "Available variables: {invoice_number}, {zev_name}, {participant_name}, "
-            "{period_start}, {period_end}, {due_date}, {total_chf}."
+            "{period_start}, {period_end}, {due_date}, {total_chf}, {amount_due_chf}."
         ),
     )
     email_body_template = models.TextField(
@@ -163,7 +163,7 @@ class Zev(models.Model):
             "Body template for invoice emails. "
             "Leave blank to use the system default. "
             "Available variables: {invoice_number}, {zev_name}, {participant_name}, "
-            "{period_start}, {period_end}, {due_date}, {total_chf}."
+            "{period_start}, {period_end}, {due_date}, {total_chf}, {amount_due_chf}."
         ),
     )
     local_tariff_notes = models.TextField(

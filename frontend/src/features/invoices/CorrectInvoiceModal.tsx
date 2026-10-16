@@ -12,8 +12,12 @@ export type CorrectInvoiceValues = { kind: CreditKind; reason: string; amount_ch
 type CorrectInvoiceModalProps = {
     isOpen: boolean
     isPending: boolean
-    /** What was received for the invoice and not yet credited; a partial credit may not exceed it. */
+    /** What was received in cash for the invoice and not yet credited; a partial credit may not exceed it. */
     creditableChf: string
+    /** Credit applied to the invoice that a reversal releases again (CHF); `0.00` when none. */
+    creditAppliedChf: string
+    /** A partial credit needs cash to credit; an invoice settled by credit alone can only be reversed. */
+    canAdjust: boolean
     onClose: () => void
     onSubmit: (values: CorrectInvoiceValues) => void
 }
@@ -29,12 +33,14 @@ export function CorrectInvoiceModal({ isOpen, ...rest }: CorrectInvoiceModalProp
     )
 }
 
-function CorrectInvoiceForm({ isPending, creditableChf, onClose, onSubmit }: Omit<CorrectInvoiceModalProps, 'isOpen'>) {
+function CorrectInvoiceForm({ isPending, creditableChf, creditAppliedChf, canAdjust, onClose, onSubmit }: Omit<CorrectInvoiceModalProps, 'isOpen'>) {
     const { t } = useTranslation()
     const [kind, setKind] = useState<CreditKind>('reversal')
     const [reason, setReason] = useState('')
     const [amount, setAmount] = useState('')
 
+    const cashCreditable = Number(creditableChf) > 0
+    const creditApplied = Number(creditAppliedChf) > 0
     const value = Number(amount)
     const amountError = kind !== 'adjustment'
         ? null
@@ -66,18 +72,28 @@ function CorrectInvoiceForm({ isPending, creditableChf, onClose, onSubmit }: Omi
                             name="correction-kind"
                             value={option}
                             checked={kind === option}
+                            disabled={option === 'adjustment' && !canAdjust}
                             onChange={() => setKind(option)}
                         />
                         <span>
                             <strong>{t(`pages.invoiceDetail.credits.${option}`)}</strong>
                             <small className="muted" style={{ display: 'block' }}>
                                 {option === 'reversal'
-                                    ? t('pages.invoiceDetail.credits.reversalHint', { amount: formatChf(Number(creditableChf)) })
-                                    : t('pages.invoiceDetail.credits.adjustmentHint')}
+                                    ? cashCreditable
+                                        ? t('pages.invoiceDetail.credits.reversalHint', { amount: formatChf(Number(creditableChf)) })
+                                        : t('pages.invoiceDetail.credits.reversalNoCashHint')
+                                    : canAdjust
+                                        ? t('pages.invoiceDetail.credits.adjustmentHint')
+                                        : t('pages.invoiceDetail.credits.adjustmentNoCashHint')}
                             </small>
                         </span>
                     </label>
                 ))}
+                {creditApplied ? (
+                    <p className="muted m-0">
+                        {t('pages.invoiceDetail.credits.releasesCredit', { amount: formatChf(Number(creditAppliedChf)) })}
+                    </p>
+                ) : null}
             </fieldset>
             {kind === 'adjustment' ? (
                 <label className="grid-span-full">

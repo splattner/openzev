@@ -43,6 +43,7 @@ from metering.models import MeterReading, ReadingDirection
 from .band_labels import band_description, translations_for as band_translations_for
 from .document_parties import build_issuer, build_recipient
 from .models import Invoice, InvoiceItem, InvoiceStatus
+from .workflow import apply_open_credits
 
 logger = logging.getLogger(__name__)
 
@@ -1949,6 +1950,9 @@ def generate_invoice(
         issuer=generation_context.issuer(zev),
         recipient=build_recipient(participant),
     )
+    # Open credit notes are set against the total after VAT; lines and totals
+    # stay as computed. A replaced draft was deleted above, so its credit is free.
+    apply_open_credits(invoice)
 
     # ─── 9. Create line items ─────────────────────────────────────────────
     items = []

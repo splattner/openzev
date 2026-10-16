@@ -469,6 +469,7 @@ produced by the engine:
 | `vat_chf` | `(vat_base_chf ?? subtotal_chf) × vat_rate`, rounded to 0.01 |
 | `embedded_vat_chf` | Non-recoverable VAT folded into the line totals under `vat_mode = inclusive`; null otherwise (§4.8) |
 | `total_chf` | `subtotal_chf + vat_chf` |
+| `credit_applied_chf` | Open credit notes of the participant set against the total after VAT (default 0), see §4.9. The derived model property `amount_due_chf` is `max(total_chf − credit_applied_chf, 0)` for a positive total, else `total_chf` |
 
 **InvoiceItem** (one per tariff per bucket):
 
@@ -1086,6 +1087,18 @@ generation date never selects the rate, and pre-2018 periods (no seeded rate)
 resolve to zero.
 
 Rationale and alternatives: ADR 0016.
+
+### 4.9 Credit application (#388)
+
+After the invoice row exists (step 8) and only when `total_chf > 0`, `generate_invoice` calls
+`workflow.apply_open_credits(invoice)`. It locks the participant's credits in the ZEV
+(`select_for_update`, oldest `created_at, id` first; the balances are computed afterwards in separate
+queries because PostgreSQL cannot lock rows under an aggregate), and creates one `CreditApplication`
+per credit with money remaining until `total_chf` is covered or the credits run out. The sum goes to
+`credit_applied_chf`. Line items, `subtotal_chf`, `vat_chf` and `total_chf` are untouched, so tariff
+grouping and the allocation reconciliation hold. Regeneration deletes replaceable drafts first
+(`_discard_replaceable_invoices`), whose applications cascade away, so the replacement sees the credit
+as free. Specified in `2026-10-payments-and-credits.md` §4.7.
 
 ---
 

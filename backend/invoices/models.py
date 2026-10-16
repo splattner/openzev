@@ -1,7 +1,10 @@
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.db import models
+from django.db.models import DecimalField, OuterRef, Subquery, Sum
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from zev.models import Zev, Participant, VatMode
 from tariffs.models import TariffCategory
@@ -118,6 +121,12 @@ class Invoice(models.Model):
         max_digits=10, decimal_places=2, null=True, blank=True
     )
     total_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # Open credit notes set against this invoice at generation, after VAT (#388).
+    # Frozen as issued: releasing the applications on a cancellation leaves it,
+    # so a cancelled invoice keeps showing what it said. The amount due is
+    # derived (``amount_due_chf``), never stored, because many code paths write
+    # ``total_chf`` directly and a second column would drift.
+    credit_applied_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     # Document
     pdf_file = models.FileField(upload_to="invoices/pdf/", blank=True, null=True)
     # Set to READY inside the same conditional UPDATE that stores the file, so
@@ -153,6 +162,14 @@ class Invoice(models.Model):
 
     def __str__(self):
         return f"Invoice {self.invoice_number} - {self.participant.full_name} ({self.period_start} – {self.period_end})"
+
+    @property
+    def amount_due_chf(self):
+        """What the participant is asked to pay: the total less the credit
+        applied, never below zero. A payout (total <= 0) is not reduced."""
+        if self.total_chf > 0:
+            return max(self.total_chf - self.credit_applied_chf, Decimal("0"))
+        return self.total_chf
 
 
 class Payment(models.Model):
@@ -199,6 +216,51 @@ class CreditKind(models.TextChoices):
     ADJUSTMENT = "adjustment", "Partial credit"
 
 
+class CreditStatus(models.TextChoices):
+    OPEN = "open", "Open"
+    USED = "used", "Used"
+    REFUNDED = "refunded", "Refunded"
+
+
+def credit_status(remaining: Decimal, refunded: Decimal) -> str:
+    """The derived state of a credit: money left, used up, or paid out."""
+    if remaining > 0:
+        return CreditStatus.OPEN
+    return CreditStatus.REFUNDED if refunded > 0 else CreditStatus.USED
+
+
+class CreditQuerySet(models.QuerySet):
+    def with_balance(self):
+        """Annotate ``remaining_chf`` = amount - active applications - refunded.
+
+        A correlated subquery rather than a join + Sum, so rows don't multiply
+        and the queryset stays safe to combine with other joins.
+        """
+        applied = (
+            CreditApplication.objects.filter(credit=OuterRef("pk"), released_at__isnull=True)
+            .order_by()
+            .values("credit")
+            .annotate(total=Sum("amount_chf"))
+            .values("total")
+        )
+        money = DecimalField(max_digits=10, decimal_places=2)
+        return self.annotate(
+            remaining_chf=models.F("amount_chf")
+            - Coalesce(Subquery(applied, output_field=money), Decimal("0"), output_field=money)
+            - models.F("refunded_chf")
+        )
+
+    def with_status(self, status: str):
+        """Filter by the derived status (``open``, ``used`` or ``refunded``)."""
+        queryset = self.with_balance()
+        if status == CreditStatus.OPEN:
+            return queryset.filter(remaining_chf__gt=0)
+        queryset = queryset.filter(remaining_chf__lte=0)
+        if status == CreditStatus.REFUNDED:
+            return queryset.filter(refunded_chf__gt=0)
+        return queryset.filter(refunded_chf__lte=0)
+
+
 class Credit(models.Model):
     """A credit note (Gutschrift): money owed back for an invoice (#388).
 
@@ -228,6 +290,11 @@ class Credit(models.Model):
     vat_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     # Non-recoverable VAT contained in ``amount_chf`` (inclusive mode).
     embedded_vat_chf = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    # Paid out instead of set against an invoice (phase 3). Booked once, for
+    # whatever remained at that moment (``workflow.refund_credit``).
+    refunded_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    refunded_on = models.DateField(null=True, blank=True)
+    refund_note = models.CharField(max_length=500, blank=True, default="")
     pdf_file = models.FileField(upload_to="invoices/credits/", blank=True, null=True)
     pdf_status = models.CharField(
         max_length=20, choices=InvoicePdfStatus.choices, default=InvoicePdfStatus.NONE,
@@ -239,6 +306,8 @@ class Credit(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+    objects = CreditQuerySet.as_manager()
+
     class Meta:
         ordering = ["-created_at", "id"]
         constraints = [
@@ -248,6 +317,40 @@ class Credit(models.Model):
 
     def __str__(self):
         return f"Credit {self.credit_number} ({self.amount_chf} CHF)"
+
+    def remaining(self) -> Decimal:
+        """Amount left, from the (prefetched) applications."""
+        applied = sum((a.amount_chf for a in self.applications.all() if a.released_at is None), Decimal("0"))
+        return self.amount_chf - applied - self.refunded_chf
+
+    @property
+    def status(self) -> str:
+        return credit_status(self.remaining(), self.refunded_chf)
+
+
+class CreditApplication(models.Model):
+    """Part of a credit note set against an invoice at generation (#388).
+
+    Active while ``released_at`` is empty. Deleting a never-issued draft
+    removes its applications (CASCADE) and so frees the credit; cancelling an
+    issued invoice stamps ``released_at`` instead, keeping the history.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    credit = models.ForeignKey(Credit, on_delete=models.PROTECT, related_name="applications")
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="credit_applications")
+    amount_chf = models.DecimalField(max_digits=10, decimal_places=2)
+    released_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(amount_chf__gt=0), name="credit_application_amount_positive"),
+        ]
+
+    def __str__(self):
+        return f"{self.amount_chf} CHF of {self.credit_id} on {self.invoice_id}"
 
 
 class InvoiceDynamicSourceEvidence(models.Model):
@@ -400,7 +503,7 @@ DEFAULT_INVOICE_EMAIL_BODY = (
     "Dear {participant_name},\n\n"
     "Please find your energy invoice for the period "
     "{period_start} to {period_end} attached.\n\n"
-    "Total: CHF {total_chf}\n\n"
+    "Amount due: CHF {amount_due_chf}\n\n"
     "Kind regards,\n{zev_name}"
 )
 
