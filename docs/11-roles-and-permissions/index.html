@@ -2886,7 +2886,8 @@ access remains; participant links stay refused. Use <a href="#user-cannot-login"
 <li><strong>Delete</strong> — only available for accounts that do not belong to a community.
   Unlink the account from its participant first. An account that is a
   community's last manager cannot be deleted either: give someone else manager
-  access first.</li>
+  access first. If the account's relationships change while deletion is waiting,
+  OpenZEV refuses the deletion; review its community access and retry.</li>
 </ul>
 <h2 id="data-privacy-and-scoping">Data Privacy and Scoping<a class="headerlink" href="#data-privacy-and-scoping" title="Permanent link">&para;</a></h2>
 <p>OpenZEV enforces data boundaries:</p>
