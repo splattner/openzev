@@ -120,36 +120,38 @@ export function InvoiceCreditsCard({
                                         ))}
                                     </td>
                                     <td>{credit.reason}</td>
-                                    <td className="numeric">
-                                        {credit.pdf_url ? (
-                                            <button
-                                                type="button"
-                                                className="table-inline-link"
-                                                aria-label={t('pages.invoiceDetail.credits.openPdf', { number: credit.credit_number })}
-                                                title={t('pages.invoiceDetail.credits.openPdf', { number: credit.credit_number })}
-                                                disabled={pdfMutation.isPending}
-                                                onClick={() => pdfMutation.mutate(credit.id)}
-                                            >
-                                                <FontAwesomeIcon icon={faFilePdf} fixedWidth />
-                                            </button>
-                                        ) : (
-                                            <span className="muted">
-                                                {credit.pdf_status === 'failed'
-                                                    ? t('pages.invoiceDetail.credits.pdfFailed')
-                                                    : t('pages.invoiceDetail.credits.pdfPending')}
-                                            </span>
-                                        )}
-                                        {canRefundCredit(credit, canManage) ? (
-                                            <button
-                                                type="button"
-                                                className="table-inline-link"
-                                                aria-label={t('pages.invoiceDetail.credits.refund', { number: credit.credit_number })}
-                                                title={t('pages.invoiceDetail.credits.refund', { number: credit.credit_number })}
-                                                onClick={() => setRefunding(credit)}
-                                            >
-                                                <FontAwesomeIcon icon={faHandHoldingDollar} fixedWidth />
-                                            </button>
-                                        ) : null}
+                                    <td className="actions-cell">
+                                        <div className="actions-cell-content">
+                                            {credit.pdf_url ? (
+                                                <button
+                                                    type="button"
+                                                    className="button button-secondary button-compact button-icon"
+                                                    aria-label={t('pages.invoiceDetail.credits.openPdf', { number: credit.credit_number })}
+                                                    title={t('pages.invoiceDetail.credits.openPdf', { number: credit.credit_number })}
+                                                    disabled={pdfMutation.isPending}
+                                                    onClick={() => pdfMutation.mutate(credit.id)}
+                                                >
+                                                    <FontAwesomeIcon icon={faFilePdf} fixedWidth />
+                                                </button>
+                                            ) : (
+                                                <span className="muted">
+                                                    {credit.pdf_status === 'failed'
+                                                        ? t('pages.invoiceDetail.credits.pdfFailed')
+                                                        : t('pages.invoiceDetail.credits.pdfPending')}
+                                                </span>
+                                            )}
+                                            {canRefundCredit(credit, canManage) ? (
+                                                <button
+                                                    type="button"
+                                                    className="button button-secondary button-compact button-icon"
+                                                    aria-label={t('pages.invoiceDetail.credits.refund', { number: credit.credit_number })}
+                                                    title={t('pages.invoiceDetail.credits.refund', { number: credit.credit_number })}
+                                                    onClick={() => setRefunding(credit)}
+                                                >
+                                                    <FontAwesomeIcon icon={faHandHoldingDollar} fixedWidth />
+                                                </button>
+                                            ) : null}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
