@@ -521,6 +521,22 @@ class InvoiceSerializerTests(TestCase):
         self.assertEqual(detail["amount_due_chf"], "58.10")
         self.assertIsNone(detail["payments"])
 
+    def test_an_application_names_the_invoice_its_credit_came_from(self):
+        source = _invoice(self.zev, self.participant, InvoiceStatus.CANCELLED, period=(date(2025, 1, 1), date(2025, 1, 31)))
+        Credit.objects.filter(pk=self.credit.pk).update(source_invoice=source)
+        auth(self.client, self.owner)
+        application = self.client.get(f"{INVOICES}/{self.invoice.pk}/").data["credit_applications"][0]
+        self.assertEqual(
+            (application["credit_source_invoice"], application["credit_source_invoice_number"]),
+            (str(source.pk), source.invoice_number),
+        )
+
+    def test_an_application_without_a_source_invoice_says_so(self):
+        auth(self.client, self.owner)
+        application = self.client.get(f"{INVOICES}/{self.invoice.pk}/").data["credit_applications"][0]
+        self.assertIsNone(application["credit_source_invoice"])
+        self.assertIsNone(application["credit_source_invoice_number"])
+
     def test_a_released_application_stays_visible_as_released(self):
         cancel_invoice_target = _invoice(self.zev, self.participant, InvoiceStatus.DRAFT, total="10.00", applied="10.00")
         other = _credit(self.zev, self.participant, "10.00")

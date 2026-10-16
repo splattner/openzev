@@ -64,36 +64,6 @@ export function InvoiceTotal({ invoice, currency = true }: {
     )
 }
 
-/**
- * The total, each credit note applied and the amount due (#388). Renders
- * nothing unless credit was applied.
- */
-export function InvoiceCreditBreakdown({ invoice }: {
-    invoice: Pick<Invoice, 'status' | 'total_chf' | 'credit_applied_chf' | 'amount_due_chf' | 'credit_applications'>
-}) {
-    const { t } = useTranslation()
-    if (!hasCreditApplied(invoice)) return null
-    const applications = invoice.credit_applications ?? []
-    return (
-        <dl className="invoice-credit-breakdown" aria-label={t('invoice.creditBreakdown')}>
-            <div>
-                <dt>{t('pages.invoiceDetail.total')}</dt>
-                <dd>{formatChf(Number(invoice.total_chf))}</dd>
-            </div>
-            {applications.map((application) => (
-                <div key={application.id}>
-                    <dt>{t('invoice.creditApplied', { number: application.credit_number })}</dt>
-                    <dd>{formatChf(-Number(application.amount_chf))}</dd>
-                </div>
-            ))}
-            <div>
-                <dt><strong>{t('invoice.amountDue')}</strong></dt>
-                <dd><strong>{formatChf(amountDueChf(invoice))}</strong></dd>
-            </div>
-        </dl>
-    )
-}
-
 /** Presentation only: callers decide whether PDF access is allowed and pass local pending state. */
 export function InvoicePdfCell({ invoice, pending = false, showReadyStatus = true, keepExistingDuringPending = false, buttonClassName = 'table-inline-link', ariaLabel }: {
     invoice: Invoice | null

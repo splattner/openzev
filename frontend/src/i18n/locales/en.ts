@@ -260,8 +260,6 @@ export const en = {
             partlyPaid: 'Partly paid',
         },
         amountDue: 'Amount due',
-        creditApplied: 'Credit note {{number}} applied',
-        creditBreakdown: 'Total, credit applied and amount due',
     },
     email: {
         statistics: 'Email Statistics',
@@ -1218,6 +1216,8 @@ export const en = {
             row: {
                 joined: 'Joined {{date}}',
                 left: 'Left {{date}}',
+                replaces: 'Replaces',
+                moreReplaced: '+{{count}} more',
             },
             issues: {
                 meteringNoPoints: 'No metering points assigned',
@@ -2745,6 +2745,19 @@ export const en = {
             local: 'Local',
             grid: 'Grid',
             feedIn: 'Feed-in',
+            replaces: 'Replaces',
+            replacedBy: 'Replaced by',
+            amountDueHint: 'Amount due after credit: {{amount}}',
+            appliedCredits: {
+                title: 'Credit applied',
+                description: 'Credit notes set against this invoice. Only the amount due is collected.',
+                item: 'Item',
+                amount: 'Amount (CHF)',
+                invoiceTotal: 'Invoice total',
+                credit: 'Credit note {{number}}',
+                fromInvoice: 'from invoice',
+                amountDue: 'Amount due',
+            },
             generatingPdf: 'Generating the invoice document\u2026',
             payments: {
                 title: 'Payments',

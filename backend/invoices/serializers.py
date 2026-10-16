@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 from zev import access
-from .models import Credit, CreditApplication, CreditKind, Invoice, InvoiceItem, EmailLog, Payment
+from .models import Credit, CreditApplication, CreditKind, Invoice, InvoiceItem, InvoiceStatus, EmailLog, Payment
 from .description_utils import strip_period_suffix
 
 
@@ -83,11 +83,20 @@ class InvoiceCreditApplicationSerializer(serializers.ModelSerializer):
     """The credit a given invoice used, seen from the invoice."""
 
     credit_number = serializers.CharField(source="credit.credit_number", read_only=True)
+    credit_source_invoice = serializers.UUIDField(source="credit.source_invoice_id", read_only=True)
+    credit_source_invoice_number = serializers.SerializerMethodField()
 
     class Meta:
         model = CreditApplication
-        fields = ["id", "credit", "credit_number", "amount_chf", "released_at"]
+        fields = [
+            "id", "credit", "credit_number", "credit_source_invoice",
+            "credit_source_invoice_number", "amount_chf", "released_at",
+        ]
         read_only_fields = fields
+
+    def get_credit_source_invoice_number(self, obj) -> str | None:
+        source = obj.credit.source_invoice
+        return source.invoice_number if source else None
 
 
 class CreditSerializer(serializers.ModelSerializer):
@@ -272,6 +281,41 @@ class InvoiceSerializer(InvoiceListSerializer):
     payments = serializers.SerializerMethodField()
     credits = serializers.SerializerMethodField()
     credit_applications = serializers.SerializerMethodField()
+    replaces = serializers.SerializerMethodField()
+    replaced_by = serializers.SerializerMethodField()
+
+    @staticmethod
+    def _same_period(obj) -> list:
+        """The participant's other invoices for the exact same period, newest
+        first. The period overview hands them in (``_same_period_invoices``)
+        from the rows it already loaded; a single read queries once."""
+        siblings = obj.__dict__.get("_same_period_invoices")
+        if siblings is None:
+            siblings = list(
+                Invoice.objects.filter(
+                    zev_id=obj.zev_id, participant_id=obj.participant_id,
+                    period_start=obj.period_start, period_end=obj.period_end,
+                ).exclude(pk=obj.pk).only("id", "invoice_number", "status", "created_at").order_by("-created_at", "-id")
+            )
+            obj._same_period_invoices = siblings
+        return siblings
+
+    def get_replaces(self, obj) -> list[dict]:
+        """The cancelled invoices this one took the place of, newest first: a
+        correction or a cancel-and-regenerate leaves them behind."""
+        return [
+            {"id": str(s.pk), "invoice_number": s.invoice_number}
+            for s in self._same_period(obj)
+            if s.status == InvoiceStatus.CANCELLED and s.created_at < obj.created_at
+        ]
+
+    def get_replaced_by(self, obj) -> dict | None:
+        """For a cancelled invoice, the newest invoice issued for the same
+        participant and period after it; ``None`` until one exists."""
+        if obj.status != InvoiceStatus.CANCELLED:
+            return None
+        newer = next((s for s in self._same_period(obj) if s.created_at > obj.created_at), None)
+        return {"id": str(newer.pk), "invoice_number": newer.invoice_number} if newer else None
 
     def get_credit_applications(self, obj) -> list[dict]:
         """The credit notes set against this invoice. The participant sees them

@@ -251,8 +251,6 @@ export const fr = {
             partlyPaid: 'Partiellement payé',
         },
         amountDue: 'Montant dû',
-        creditApplied: 'Avoir {{number}} imputé',
-        creditBreakdown: 'Total, avoir imputé et montant dû',
     },
     email: {
         statistics: 'Statistiques e-mail',
@@ -1209,6 +1207,8 @@ export const fr = {
             row: {
                 joined: 'Entrée le {{date}}',
                 left: 'Sortie le {{date}}',
+                replaces: 'Remplace',
+                moreReplaced: '+{{count}} de plus',
             },
             issues: {
                 meteringNoPoints: 'Aucun point de mesure attribué',
@@ -2734,6 +2734,19 @@ export const fr = {
             local: 'Local',
             grid: 'Réseau',
             feedIn: 'Injection',
+            replaces: 'Remplace',
+            replacedBy: 'Remplacée par',
+            amountDueHint: 'Montant dû après avoir : {{amount}}',
+            appliedCredits: {
+                title: 'Avoirs imputés',
+                description: 'Avoirs imputés sur cette facture. Seul le montant dû est encaissé.',
+                item: 'Poste',
+                amount: 'Montant (CHF)',
+                invoiceTotal: 'Total de la facture',
+                credit: 'Avoir {{number}}',
+                fromInvoice: 'de la facture',
+                amountDue: 'Montant dû',
+            },
             generatingPdf: 'Génération du document de facture…',
             payments: {
                 title: 'Paiements',

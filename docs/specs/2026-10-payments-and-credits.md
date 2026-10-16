@@ -504,7 +504,7 @@ export interface Payment {
   action appears on `paid` invoices and on `sent` invoices with payments.
 - **`InvoiceDetailPage.tsx`**: a "Credit notes" card (`InvoiceCreditsCard`: number, date, kind, amount,
   reason, PDF) that also carries the "Correct invoice" action. The original lists its own credit notes;
-  a link from the cancelled original to its replacement is not built. Removing a payment is hidden once
+  the cancelled original and its replacement link to each other (`replaced_by` / `replaces`, phase 3). Removing a payment is hidden once
   credits exist.
 - **`MyInvoicesPage.tsx`**: the participant's credit notes with PDF download.
 - `Credit` type and `listCredits`, `getCredit`, `correctInvoice`, `downloadCreditPdf`.
@@ -514,8 +514,18 @@ export interface Payment {
 - Invoice totals in `InvoicePresentation.tsx`, `InvoicePeriodRowsTable.tsx`, `MyInvoicesPage.tsx`,
   `PublicInvoicePage.tsx` and `ParticipantInvoicesCard.tsx` show "Amount due" when it differs from
   the total.
+- **`InvoiceDetailPage.tsx`**: the accent "Total" tile carries "Amount due after credit: CHF x" as its
+  hint, and a "Credit applied" card (`InvoiceAppliedCreditsCard`, below the figures, above the payments)
+  sets out the invoice as the PDF prints it: a two-column table (item, amount in CHF) with the invoice
+  total, one negative row per unreleased application ("Credit note CN-…", with "from invoice" and a link
+  to the credit's source invoice) and an "Amount due" footer row. It renders only when
+  `hasCreditApplied` holds (credit applied, amount due differs from the total, not cancelled).
 - Refund action on an open credit, for managers.
-- `Invoice` gains `credit_applied_chf`, `amount_due_chf`, `credit_applications`.
+- `Invoice` gains `credit_applied_chf`, `amount_due_chf`, `credit_applications`. Each application carries
+  `credit_source_invoice` and `credit_source_invoice_number` (null for a credit without a source invoice).
+- A corrected invoice no longer drops out of sight once the period is regenerated: the invoice gains
+  `replaces` and `replaced_by` (see the lifecycle baseline), the Billing row shows "Replaces INV-x
+  (Cancelled)" and the detail pages link the cancelled original and its replacement both ways.
 
 ## 8. Risks and mitigations
 
@@ -692,9 +702,10 @@ to the open month), `invoices/test_readiness.py` (query budget 10 to 11 for the 
 ### Frontend
 
 `frontend/tests/invoice-credit-application.test.ts` (10 tests): amount-due helpers and rendering, the
-credit breakdown, reversal availability with applications only, the dialog without a partial credit for a
+"Credit applied" card (rows, source-invoice link, amount-due footer, hidden on a cancelled invoice), reversal availability with applications only, the dialog without a partial credit for a
 credit-only invoice, record-payment visibility by amount due, refund visibility and the refund dialog.
-`invoice-credits.test.ts` keeps its 7 (fixture gains the new fields). `npm run lint`, `lint:style`, hex check,
+`invoice-row-layout.test.ts` gains 2 (the "Replaces" line and its link, nothing when nothing was replaced) and
+`invoice-detail-replacement.test.ts` (3 tests) covers the header links both ways. `invoice-credits.test.ts` keeps its 7 (fixture gains the new fields). `npm run lint`, `lint:style`, hex check,
 `test:unit`, `build` pass.
 
 ### Acceptance criteria

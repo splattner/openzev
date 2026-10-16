@@ -251,8 +251,6 @@ export const de = {
             partlyPaid: 'Teilweise bezahlt',
         },
         amountDue: 'Zu zahlen',
-        creditApplied: 'Gutschrift {{number}} verrechnet',
-        creditBreakdown: 'Total, verrechnete Gutschrift und zu zahlender Betrag',
     },
     email: {
         statistics: 'E-Mail-Statistiken',
@@ -1209,6 +1207,8 @@ export const de = {
             row: {
                 joined: 'Eintritt {{date}}',
                 left: 'Austritt {{date}}',
+                replaces: 'Ersetzt',
+                moreReplaced: '+{{count}} weitere',
             },
             issues: {
                 meteringNoPoints: 'Keine Messpunkte zugewiesen',
@@ -2734,6 +2734,19 @@ export const de = {
             local: 'Intern',
             grid: 'Netz',
             feedIn: 'Einspeisung',
+            replaces: 'Ersetzt',
+            replacedBy: 'Ersetzt durch',
+            amountDueHint: 'Zu zahlen nach Gutschrift: {{amount}}',
+            appliedCredits: {
+                title: 'Verrechnete Gutschriften',
+                description: 'Gutschriften, die mit dieser Rechnung verrechnet wurden. Eingefordert wird nur der zu zahlende Betrag.',
+                item: 'Position',
+                amount: 'Betrag (CHF)',
+                invoiceTotal: 'Rechnungstotal',
+                credit: 'Gutschrift {{number}}',
+                fromInvoice: 'aus Rechnung',
+                amountDue: 'Zu zahlen',
+            },
             generatingPdf: 'Rechnungsdokument wird erstellt…',
             payments: {
                 title: 'Zahlungen',

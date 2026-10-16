@@ -251,8 +251,6 @@ export const it = {
             partlyPaid: 'Pagato in parte',
         },
         amountDue: 'Importo dovuto',
-        creditApplied: 'Nota di credito {{number}} imputata',
-        creditBreakdown: 'Totale, credito imputato e importo dovuto',
     },
     email: {
         statistics: 'Statistiche e-mail',
@@ -1209,6 +1207,8 @@ export const it = {
             row: {
                 joined: 'Entrata il {{date}}',
                 left: 'Uscita il {{date}}',
+                replaces: 'Sostituisce',
+                moreReplaced: '+{{count}} altre',
             },
             issues: {
                 meteringNoPoints: 'Nessun punto di misura assegnato',
@@ -2734,6 +2734,19 @@ export const it = {
             local: 'Locale',
             grid: 'Rete',
             feedIn: 'Immissione',
+            replaces: 'Sostituisce',
+            replacedBy: 'Sostituita da',
+            amountDueHint: 'Importo dovuto dopo il credito: {{amount}}',
+            appliedCredits: {
+                title: 'Note di credito imputate',
+                description: 'Note di credito imputate a questa fattura. Viene incassato solo l\'importo dovuto.',
+                item: 'Voce',
+                amount: 'Importo (CHF)',
+                invoiceTotal: 'Totale fattura',
+                credit: 'Nota di credito {{number}}',
+                fromInvoice: 'dalla fattura',
+                amountDue: 'Importo dovuto',
+            },
             generatingPdf: 'Creazione del documento di fattura…',
             payments: {
                 title: 'Pagamenti',

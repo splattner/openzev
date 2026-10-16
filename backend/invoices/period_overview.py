@@ -48,7 +48,7 @@ def compute_period_overview(*, zev, period_start: date_type, period_end: date_ty
         period_end=period_end,
     ).select_related("participant__party", "zev").order_by("-created_at", "-id")
     invoice_rows = invoice_rows.prefetch_related(
-        "items", "email_logs", "payments", "credits__applications__invoice", "credit_applications__credit",
+        "items", "email_logs", "payments", "credits__applications__invoice", "credit_applications__credit__source_invoice",
     ).annotate(
         last_email_status=Subquery(
             EmailLog.objects.filter(invoice=OuterRef("pk")).order_by("-created_at", "-id").values("status")[:1]
@@ -56,7 +56,12 @@ def compute_period_overview(*, zev, period_start: date_type, period_end: date_ty
     )
     invoice_map: dict[int, Invoice] = {}
     for invoice in invoice_rows:
-        invoice_map.setdefault(invoice.participant_id, invoice)
+        current = invoice_map.setdefault(invoice.participant_id, invoice)
+        # The older ones (cancelled, replaced) feed the row invoice's
+        # ``replaces`` without a query per row.
+        current.__dict__.setdefault("_same_period_invoices", [])
+        if current is not invoice:
+            current._same_period_invoices.append(invoice)
 
     # Generation eligibility for rows without a usable exact-period invoice,
     # from one bounded overlap query (no per-participant lookups): locked

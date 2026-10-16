@@ -12,7 +12,9 @@ import {
     canRefundCredit,
     hasCreditApplied,
 } from '../src/features/invoices/invoiceCredits'
-import { InvoiceCreditBreakdown, InvoiceTotal } from '../src/components/InvoicePresentation'
+import { MemoryRouter } from 'react-router-dom'
+import { InvoiceTotal } from '../src/components/InvoicePresentation'
+import { InvoiceAppliedCreditsCard } from '../src/features/invoices/InvoiceAppliedCreditsCard'
 import { InvoiceCreditsCard } from '../src/features/invoices/InvoiceCreditsCard'
 import { InvoicePaymentsCard } from '../src/features/invoices/InvoicePaymentsCard'
 import { ToastProvider } from '../src/lib/toast'
@@ -42,7 +44,10 @@ vi.mock('../src/lib/api/invoices', () => ({
     deletePayment: vi.fn(),
 }))
 
-const application = { id: 'a1', credit: 'c0', credit_number: 'CN-00000', amount_chf: '30.00', released_at: null }
+const application = {
+    id: 'a1', credit: 'c0', credit_number: 'CN-00000', credit_source_invoice: 'i0', credit_source_invoice_number: 'INV-0',
+    amount_chf: '30.00', released_at: null,
+}
 
 // 100.00 total, 30.00 settled by credit, 70.00 paid in cash.
 const partlyCredit: Invoice = {
@@ -105,11 +110,17 @@ describe('amount due', () => {
         act(() => plain.root.unmount())
         plain.container.remove()
 
-        const breakdown = await render(createElement(InvoiceCreditBreakdown, { invoice: partlyCredit }))
-        expect(breakdown.container.textContent).toContain('CN-00000')
-        expect(breakdown.container.textContent).toContain('invoice.amountDue')
-        act(() => breakdown.root.unmount())
-        breakdown.container.remove()
+        const card = await render(createElement(MemoryRouter, null, createElement(InvoiceAppliedCreditsCard, { invoice: partlyCredit })))
+        expect(card.container.textContent).toContain('CN-00000')
+        expect(card.container.querySelector('a[href="/billing/invoices/i0"]')?.textContent).toBe('INV-0')
+        expect(card.container.querySelector('tfoot')?.textContent).toContain('70.00')
+        act(() => card.root.unmount())
+        card.container.remove()
+
+        const none = await render(createElement(MemoryRouter, null, createElement(InvoiceAppliedCreditsCard, { invoice: { ...partlyCredit, status: 'cancelled' } })))
+        expect(none.container.querySelector('section')).toBeNull()
+        act(() => none.root.unmount())
+        none.container.remove()
     })
 })
 

@@ -169,7 +169,7 @@ class InvoiceViewSet(
         if getattr(self, "action", None) != "list":
             queryset = queryset.prefetch_related(
                 "items", "email_logs", "payments", "credits__applications__invoice",
-                "credit_applications__credit",
+                "credit_applications__credit__source_invoice",
             )
         else:
             # last_email_status/log_id ride a subquery annotation inside the

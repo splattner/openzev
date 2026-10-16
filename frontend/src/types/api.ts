@@ -1149,6 +1149,10 @@ export interface Invoice {
     credits?: Credit[]
     /** Credit notes used by this invoice, released ones included (detail only; the participant sees them too). */
     credit_applications?: InvoiceCreditApplication[]
+    /** Cancelled invoices for the same participant and period this one took the place of, newest first (detail and period overview). */
+    replaces?: InvoiceRef[]
+    /** For a cancelled invoice: the newest invoice issued after it for the same participant and period. */
+    replaced_by?: InvoiceRef | null
     pdf_url?: string | null
     /**
      * Where the document is, as distinct from the invoice's own `status`.
@@ -1172,10 +1176,19 @@ export interface Invoice {
 export type CreditKind = 'reversal' | 'adjustment'
 
 /** The part of a credit note set against an invoice, seen from the invoice (#388). */
+/** Another invoice, by id and number only. */
+export interface InvoiceRef {
+    id: string
+    invoice_number: string
+}
+
 export interface InvoiceCreditApplication {
     id: string
     credit: string
     credit_number: string
+    /** The invoice the credit note was issued for; null for a credit without one. */
+    credit_source_invoice: string | null
+    credit_source_invoice_number: string | null
     amount_chf: string
     /** Set once the invoice was cancelled and the credit freed again. */
     released_at: string | null

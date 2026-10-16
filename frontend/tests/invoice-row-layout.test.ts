@@ -205,6 +205,22 @@ describe('invoice period row layout', () => {
         expect(row.children[2].textContent).toBe('-')
     })
 
+    it('names the cancelled invoice the current one replaces, and links to it', () => {
+        const { container } = mount([{
+            ...base,
+            invoice: { ...invoice, replaces: [{ id: 'i0', invoice_number: 'INV-0' }, { id: 'i00', invoice_number: 'INV-00' }] },
+        }])
+        const identity = rowsOf(container)[0].children[0]
+        expect(identity.textContent).toContain('pages.invoices.row.replaces INV-0 (invoice.status.cancelled) pages.invoices.row.moreReplaced')
+        expect([...identity.querySelectorAll('a')].map((a) => a.getAttribute('href')))
+            .toEqual(['/billing/invoices/i1', '/billing/invoices/i0'])
+    })
+
+    it('says nothing about replacement when nothing was replaced', () => {
+        const { container } = mount([{ ...base, invoice: { ...invoice, replaces: [] } }])
+        expect(container.textContent).not.toContain('pages.invoices.row.replaces')
+    })
+
     it('keeps ineligible, incomplete metering and blocked rows visible', () => {
         const { container } = mount([
             {

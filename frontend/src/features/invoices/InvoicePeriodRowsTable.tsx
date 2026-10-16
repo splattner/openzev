@@ -90,6 +90,15 @@ export function InvoicePeriodRowsTable({
                           {!live && ` (${t('invoice.status.cancelled')})`}
                         </span>
                       ) : null}
+                      {/* A correction or a cancel-and-regenerate leaves the earlier invoice behind. */}
+                      {invoice?.replaces?.length ? (
+                        <span>
+                          {t('pages.invoices.row.replaces')}{' '}
+                          <InvoiceLink invoice={invoice.replaces[0]} from="/billing/invoices" period={period} />
+                          {` (${t('invoice.status.cancelled')})`}
+                          {invoice.replaces.length > 1 && ` ${t('pages.invoices.row.moreReplaced', { count: invoice.replaces.length - 1 })}`}
+                        </span>
+                      ) : null}
                       {!live && work.generating ? (
                         <span className="invoice-row-pending">
                           <FontAwesomeIcon icon={faSpinner} spin fixedWidth aria-hidden="true" />

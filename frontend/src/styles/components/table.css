@@ -281,24 +281,27 @@
   align-content: start;
 }
 
-/* The total, each credit note applied and the amount due (#388). */
-.invoice-credit-breakdown {
-  display: grid;
-  gap: 0.25rem;
-  margin: 0;
-  max-width: 28rem;
-  font-variant-numeric: tabular-nums;
+/* Invoice total, credit notes applied, amount due (#388): the sum line closes the table. */
+.credit-statement tfoot td {
+  font-weight: 600;
+  border-top: 1px solid var(--border-default);
 }
 
-.invoice-credit-breakdown > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
+.credit-statement th.numeric {
+  text-align: right;
 }
 
-.invoice-credit-breakdown dt,
-.invoice-credit-breakdown dd {
-  margin: 0;
+/* The item column takes the slack, so the amounts line up at the right edge. */
+.credit-statement th:first-child {
+  width: 100%;
+}
+
+.credit-statement td.numeric {
+  white-space: nowrap;
+}
+
+.credit-statement-source {
+  display: block;
 }
 
 /* Feature flags: the switch column, wide enough for the longest state label. */

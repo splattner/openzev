@@ -1079,9 +1079,11 @@ Two shapes, split by cost. `InvoiceListSerializer` returns all invoice fields pl
   note, source, created_by_name, created_at`) for callers with
   `zev.access.can_view` on the invoice's ZEV; `null` for a participant.
 - `credits`: the credit notes issued for the invoice (nested `CreditSerializer`), visible to the participant.
-- `credit_applications`: `[{id, credit, credit_number, amount_chf, released_at}]`, the credit notes set against the invoice (released ones included), visible to the participant. Detail shape only.
+- `credit_applications`: `[{id, credit, credit_number, credit_source_invoice, credit_source_invoice_number, amount_chf, released_at}]`, the credit notes set against the invoice (released ones included), visible to the participant. Detail shape only.
+- `replaces`: `[{id, invoice_number}]`, the participant's cancelled invoices for the exact same ZEV and period created before this one, newest first (what a correction or a cancel-and-regenerate left behind). Detail shape only.
+- `replaced_by`: `{id, invoice_number}` or `null`. For a cancelled invoice, the newest invoice for the same participant and period created after it (any status); always `null` for an invoice that is not cancelled. Both read the same-period siblings once per invoice (`InvoiceSerializer._same_period`, one query); `compute_period_overview` hands them in as `_same_period_invoices` from the rows it already loaded, so the overview adds no query per row or per replaced invoice.
 
-`InvoiceViewSet.get_serializer_class()` returns the list variant for `action == "list"` and the full one everywhere else (retrieve, the workflow actions that echo an invoice back, and `compute_period_overview`, which builds `InvoiceSerializer` directly). `get_queryset()` matches: the `prefetch_related("items", "email_logs", "payments", "credits__applications__invoice", "credit_applications__credit")` is applied for every action *except* `list` (the period overview prefetches the same set), so the database cost drops with the payload rather than being paid for fields that are no longer rendered.
+`InvoiceViewSet.get_serializer_class()` returns the list variant for `action == "list"` and the full one everywhere else (retrieve, the workflow actions that echo an invoice back, and `compute_period_overview`, which builds `InvoiceSerializer` directly). `get_queryset()` matches: the `prefetch_related("items", "email_logs", "payments", "credits__applications__invoice", "credit_applications__credit__source_invoice")` is applied for every action *except* `list` (the period overview prefetches the same set), so the database cost drops with the payload rather than being paid for fields that are no longer rendered.
 
 The split exists because the list is the one unbounded read: `AdminInvoicesContent` passes no ZEV filter and walks every invoice in the instance one page at a time, so each nested line item and email-log row is paid for once per invoice across the whole dataset. Measured on 50 invoices × 8 items, one page went from 151.4 KiB to 33.2 KiB (4.6×, 78% smaller) and from 4 queries to 2; at the client walker's 200-page cap that is 29.6 MiB → 6.5 MiB. No list consumer reads the nested arrays — `AdminInvoicesContent` renders `invoice_number`/`zev_name`/`participant_name`/period/`total_chf`/`status`, and `BillingEmailsPage` reads the annotated latest-email fields before loading history on demand. In `frontend/src/types/api.ts` both fields are optional (`items?`, `email_logs?`). See #488.
 
@@ -1270,6 +1272,7 @@ visibility, restored access, and strict selection with a second membership.
 | `test_workflow.py` | `StaleInstanceConcurrencyTests` | §5.3 concurrency (#572): a stale-in-memory `cancel_invoice`/`approve_invoice`/`mark_invoice_sent` cannot undo a transition another already-loaded instance committed first (a `paid` invoice survives a stale cancel, a `cancelled` one survives a stale mark-sent/approve); a stale `record_email_delivery` never raises and never resurrects a status past cancellation, but still records `sent_at` and reports the row's real prior status; a second stale cancel is reported as "already cancelled", not the original status |
 | `test_workflow.py` | `test_concurrent_cancel_and_mark_paid_serialize_on_the_row_lock` (PostgreSQL only — CI's PostgreSQL leg) | §5.3 concurrency (#572): two genuinely overlapping transactions — one holding the invoice row lock, the other running real `mark_invoice_paid` — serialize on that lock (verified via `pg_blocking_pids`) rather than racing; the second sees the first's committed `cancelled` status and correctly refuses |
 | `test_period_overview.py` | `InvoicePeriodOverviewTests` | §5.5: metering completeness, missing-day detection, partial-assignment windows, no-assignment exclusion, cross-ZEV permission denial, whom a row bills (`test_row_names_who_it_bills`: kind, name addition, participation dates and party; `test_meter_labels_use_location_or_meter_id`: location/ID fallback) |
+| `test_invoice_replacement.py` | `InvoiceReplacementTests` | `replaces` newest first and `replaced_by` pointing to the newest invoice, no `replaced_by` before a replacement exists, other periods and participants unrelated, the period-overview row invoice carrying `replaces`, and no extra query per replaced invoice in the overview (6 tests) |
 | `test_period_overview_unit.py` | `ComputePeriodOverviewTests` (10 tests) | §5.5 unit level: complete/incomplete participants, single missing day, exclusion without assignment, partial-assignment required-day windows and gaps, invoice period matching, row ordering, multiple-metering-point counts |
 | `test_readiness.py` | 22 test classes (106 tests) | §5.6a: cockpit period resolution, bulk parity and stable query count, exact historical periods, running-versus-ended lifecycle metadata, first-run/awaiting/caught-up states, structured step details, attention and RBAC |
 | `test_engine_edge_cases.py` | `InvoiceMathEdgeCaseTests` | Edge cases: monthly fee month-boundary counting, tariff validity windows, zero/negative fees, rounding |
@@ -1312,7 +1315,12 @@ visibility, restored access, and strict selection with a second membership.
   the period and meter locations when a party has several participations.
   Repeated parties are determined before filtering. The invoice number is the
   identity cell's only link; stored PDFs open from the row menu. Cancelled
-  invoices retain their link but have no billed amount.
+  invoices retain their link but have no billed amount. When the row's invoice
+  `replaces` earlier ones, a "Replaces INV-x (Cancelled)" line links the newest
+  of them, with "+n more" for the rest.
+- `InvoiceDetailPage` header meta adds "Replaced by INV-x" on a cancelled
+  invoice with a `replaced_by`, and "Replaces INV-x, INV-y" when `replaces` is
+  not empty; both links keep the page's return state.
 - `invoiceRowState.ts` derives five steps (metering, invoice, approved, sent,
   paid), each done, open, active or in trouble. Reasons identify invoice/PDF
   generation, email delivery, metering gaps, locked overlaps and failures.

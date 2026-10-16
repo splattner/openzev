@@ -224,7 +224,10 @@ Each row in the table represents one **participant** who had active metering-poi
   recipient as billed. **Joined**/**Left** dates explain participation inside the period.
 - The invoice number opens details and retains the period for return navigation.
   Rows without an invoice show **Not created** or **Creating invoice…**;
-  cancelled invoices retain their link and show no billed amount.
+  cancelled invoices retain their link and show no billed amount. When an
+  invoice was cancelled and the period generated again, the row shows the new
+  invoice and **Replaces OZV-00014 (Cancelled)** beneath it, linking to the
+  cancelled one.
 - Problems name missing meters and days, an overlapping locked invoice,
   a failed PDF, a failed email, or an approved invoice whose participant has no
   email address (deliver it yourself, then **Mark as Sent**). A settled invoice
@@ -473,7 +476,9 @@ and click **Correct invoice** in the **Credit notes** card, then choose:
 
 - **Reverse the invoice** - credits everything received for the invoice and
   cancels it. The cancelled invoice stays, with its number. Afterwards generate
-  the period again to issue a replacement.
+  the period again to issue a replacement. The two invoices link to each other:
+  the replacement says **Replaces …** under its title, the cancelled one
+  **Replaced by …**.
 - **Credit part of it** - credits an amount you enter (at most what was
   received and not yet credited) and leaves the invoice as it is. Use it for an
   overcharge.
