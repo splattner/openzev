@@ -211,7 +211,11 @@ function ChargeForm({ isPending, zevId, charge, participants, onClose, onSubmit 
                                 </table>
                             </div>
                             {unrecovered !== 0 ? (
-                                <p className="muted">{t('pages.charges.preview.unrecovered', { amount: formatChf(unrecovered) })}</p>
+                                <p className="muted">
+                                    {unrecovered > 0
+                                        ? t('pages.charges.preview.unrecovered', { amount: formatChf(unrecovered) })
+                                        : t('pages.charges.preview.overbilled', { amount: formatChf(-unrecovered) })}
+                                </p>
                             ) : null}
                         </>
                     )

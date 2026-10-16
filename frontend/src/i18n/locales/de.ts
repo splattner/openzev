@@ -1632,6 +1632,7 @@ export const de = {
                 participant: 'Teilnehmender',
                 share: 'Anteil',
                 unrecovered: 'Durch Rundung bleiben {{amount}} unverrechnet.',
+                overbilled: 'Durch Rundung werden {{amount}} mehr als der Gesamtbetrag verrechnet.',
             },
             messages: {
                 created: 'Position hinzugefügt.',

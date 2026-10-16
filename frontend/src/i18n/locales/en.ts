@@ -1643,6 +1643,7 @@ export const en = {
                 participant: 'Participant',
                 share: 'Share',
                 unrecovered: 'Rounding leaves {{amount}} unrecovered.',
+                overbilled: 'Rounding bills {{amount}} more than the total.',
             },
             messages: {
                 created: 'Charge added.',

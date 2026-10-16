@@ -1632,6 +1632,7 @@ export const fr = {
                 participant: 'Participant',
                 share: 'Part',
                 unrecovered: 'L’arrondi laisse {{amount}} non facturé.',
+                overbilled: 'L’arrondi facture {{amount}} de plus que le total.',
             },
             messages: {
                 created: 'Frais ajouté.',

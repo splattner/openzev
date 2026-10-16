@@ -1,4 +1,4 @@
-import { faLock, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faEllipsis, faLock, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useMemo, useState } from 'react'
@@ -159,6 +159,13 @@ export function ChargesPage() {
             ),
         },
         {
+            id: 'amount_chf',
+            accessorFn: (charge) => Number(charge.amount_chf),
+            header: t('pages.charges.columns.amount'),
+            meta: { numeric: true },
+            cell: ({ row }) => formatChfAmount(Number(row.original.amount_chf)),
+        },
+        {
             id: 'bearers',
             header: t('pages.charges.columns.bearers'),
             enableSorting: false,
@@ -169,13 +176,6 @@ export function ChargesPage() {
             accessorKey: 'vat_treatment',
             header: t('pages.charges.columns.vat'),
             cell: ({ row }) => t(`pages.charges.vatTreatment.${row.original.vat_treatment}`),
-        },
-        {
-            id: 'amount_chf',
-            accessorFn: (charge) => Number(charge.amount_chf),
-            header: t('pages.charges.columns.amount'),
-            meta: { numeric: true },
-            cell: ({ row }) => formatChfAmount(Number(row.original.amount_chf)),
         },
         {
             id: 'actions',
@@ -189,10 +189,11 @@ export function ChargesPage() {
                     <ActionMenu
                         label={t('common.actions')}
                         iconOnly
+                        icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
                         items={[
                             {
                                 key: 'edit',
-                                label: charge.is_locked ? t('pages.charges.lockedHint') : t('common.edit'),
+                                label: t('common.edit'),
                                 icon: <FontAwesomeIcon icon={faPen} fixedWidth />,
                                 onClick: () => openEdit(charge),
                                 disabled: charge.is_locked,

@@ -1632,6 +1632,7 @@ export const it = {
                 participant: 'Partecipante',
                 share: 'Quota',
                 unrecovered: 'L’arrotondamento lascia {{amount}} non fatturati.',
+                overbilled: 'L’arrotondamento fattura {{amount}} in più rispetto al totale.',
             },
             messages: {
                 created: 'Costo aggiunto.',
