@@ -6,6 +6,7 @@ const CATEGORY_ORDER: PublicInvoiceItem['category'][] = [
     'grid_fees',
     'levies',
     'metering',
+    'other',
 ]
 
 export interface PublicInvoiceGroup {

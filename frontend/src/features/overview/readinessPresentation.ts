@@ -48,6 +48,14 @@ export function stepDetailText(step: ReadinessStep, t: TFunction): string | null
                 names,
             })
         }
+        case 'charges': {
+            if (step.status === 'todo') return d('chargesTodo', { count: step.detail_data?.stale_drafts ?? 0 })
+            if (step.status !== 'warn') return null
+            return d('chargesWarn', {
+                count: (step.detail_data?.unbilled_charges ?? []).length + (step.detail_data?.more_unbilled ?? 0),
+                names: (step.detail_data?.unbilled_charges ?? []).join(', '),
+            })
+        }
         case 'approved':
             if (step.status !== 'todo') return null
             return d('approvedTodo', { count: step.count })

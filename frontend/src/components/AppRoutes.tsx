@@ -34,6 +34,7 @@ const MagicSignInPage = lazy(async () => ({ default: (await import('../pages/Mag
 const ParticipantOnboardingPage = lazy(async () => ({ default: (await import('../pages/ParticipantOnboardingPage')).ParticipantOnboardingPage }))
 const PublicInvoicePage = lazy(async () => ({ default: (await import('../pages/PublicInvoicePage')).PublicInvoicePage }))
 const ParticipantsPage = lazy(async () => ({ default: (await import('../pages/ParticipantsPage')).ParticipantsPage }))
+const ChargesPage = lazy(async () => ({ default: (await import('../pages/ChargesPage')).ChargesPage }))
 const TariffsPage = lazy(async () => ({ default: (await import('../pages/TariffsPage')).TariffsPage }))
 const ConfirmEmailChangePage = lazy(async () => ({ default: (await import('../pages/ConfirmEmailChangePage')).ConfirmEmailChangePage }))
 const ForgotPasswordPage = lazy(async () => ({ default: (await import('../pages/ForgotPasswordPage')).ForgotPasswordPage }))
@@ -213,6 +214,14 @@ export function AppRoutes() {
             element={
               <ProtectedRoute allowedRoles={ZEV_SCOPE}>
                 <TariffsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="charges"
+            element={
+              <ProtectedRoute allowedRoles={ZEV_SCOPE}>
+                <ChargesPage />
               </ProtectedRoute>
             }
           />

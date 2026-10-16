@@ -1315,10 +1315,13 @@ export interface InvoicePeriodOverview {
     rows: InvoicePeriodParticipantRow[]
 }
 
+/** The groups an invoice's lines fall under: the four tariff categories, plus the one-off charges (#924). */
+export type InvoiceItemCategory = 'energy' | 'grid_fees' | 'levies' | 'metering' | 'other'
+
 export interface InvoiceItem {
     id: string
     item_type: string
-    tariff_category: 'energy' | 'grid_fees' | 'levies' | 'metering'
+    tariff_category: InvoiceItemCategory
     description: string
     quantity_kwh: string
     unit: string
@@ -1348,6 +1351,7 @@ export type ReadinessStepKey =
     | 'tariffs'
     | 'generated'
     | 'generation_conflicts'
+    | 'charges'
     | 'approved'
     | 'sent'
     | 'paid'
@@ -1395,6 +1399,11 @@ export interface ReadinessStepDetailData {
     more_conflicts?: number
     /** paid todo: active invoices not yet paid. */
     unpaid?: number
+    /** charges todo: drafts generated before a charge changed. */
+    stale_drafts?: number
+    /** charges warn: charges nobody can be billed for (first three descriptions). */
+    unbilled_charges?: string[]
+    more_unbilled?: number
 }
 
 /** One participant blocked by locked overlapping invoices. */
@@ -2109,7 +2118,7 @@ export interface VseTariffImportResult {
     errors: Array<{ name: string; error: string }>
 }
 
-export type TransferSectionName = 'zev' | 'participants' | 'metering_points' | 'tariffs' | 'readings' | 'supplementary_data' | 'invoices' | 'invoice_pdfs'
+export type TransferSectionName = 'zev' | 'participants' | 'metering_points' | 'tariffs' | 'charges' | 'readings' | 'supplementary_data' | 'invoices' | 'invoice_pdfs'
 
 export interface ZevArchiveImportResult {
     zev_id: string
@@ -2121,7 +2130,7 @@ export interface ZevArchiveImportResult {
 
 /** One line on a publicly-viewable invoice (see `PublicInvoice`). */
 export interface PublicInvoiceItem {
-    category: 'energy' | 'grid_fees' | 'levies' | 'metering'
+    category: InvoiceItemCategory
     description: string
     quantity: string
     unit: string
@@ -2408,4 +2417,38 @@ export interface RestoreJobInput {
     dry_run: boolean
     force?: boolean
     safety_destination_id?: string
+}
+
+// ---------------------------------------------------------------------------
+// One-off charges (#924)
+// ---------------------------------------------------------------------------
+
+export type ChargeAllocation = 'all_participants' | 'selected_participants'
+export type ChargeSplitKey = 'equal' | 'weight'
+export type ChargeVatTreatment = 'taxable' | 'pass_through'
+
+export interface Charge {
+    id: string
+    zev: string
+    description: string
+    amount_chf: string
+    charge_date: string
+    allocation: ChargeAllocation
+    split_key: ChargeSplitKey
+    vat_treatment: ChargeVatTreatment
+    /** Ids of the participants who bear it; empty unless `allocation` is `selected_participants`. */
+    participants: string[]
+    /** An issued invoice carries (or can no longer pick up) the charge: it cannot be changed or deleted. */
+    is_locked: boolean
+    created_at: string
+    updated_at: string
+}
+
+export type ChargeInput = Omit<Charge, 'id' | 'is_locked' | 'created_at' | 'updated_at'>
+
+export interface ChargePreview {
+    bearers: Array<{ participant: string; name: string; share_chf: string }>
+    total_billed_chf: string
+    /** What the split leaves over after rounding each share to the centime. */
+    unrecovered_chf: string
 }

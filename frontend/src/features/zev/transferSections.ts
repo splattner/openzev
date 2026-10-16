@@ -26,6 +26,7 @@ export const DEFAULT_SECTIONS: TransferSection[] = [
   { name: 'participants', requires: [] },
   { name: 'metering_points', requires: ['participants'] },
   { name: 'tariffs', requires: [] },
+  { name: 'charges', requires: ['participants'] },
   { name: 'readings', requires: ['metering_points'] },
   { name: 'supplementary_data', requires: ['metering_points', 'participants'] },
   { name: 'invoices', requires: ['participants'] },
