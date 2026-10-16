@@ -2861,6 +2861,11 @@ access remains; participant links stay refused. Use <a href="#user-cannot-login"
 <li>API access is also scoped—a participant token can only fetch own data</li>
 </ul>
 <h3 id="zev-isolation">ZEV Isolation<a class="headerlink" href="#zev-isolation" title="Permanent link">&para;</a></h3>
+<p>Disabled communities remain readable through manager or viewer access;
+participant-only access is suspended. Only admins may modify community data
+or re-enable it, except that managers may revoke invoice access links.
+Bulk import-history deletion is rejected if the selection includes a disabled
+community.</p>
 <ul>
 <li>A manager of ZEV A <strong>cannot</strong> see ZEV B's data unless it has access there too</li>
 <li>Tariffs, metering points, and invoices are entirely isolated by ZEV</li>
