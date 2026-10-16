@@ -2495,6 +2495,11 @@ only through authenticated API endpoints.</p>
 <h3 id="5-create-the-first-admin-account">5. Create the first admin account<a class="headerlink" href="#5-create-the-first-admin-account" title="Permanent link">&para;</a></h3>
 <p>See <a href="#creating-the-first-admin-account">Creating the first admin account</a> below.</p>
 <h3 id="6-back-up-and-update">6. Back up and update<a class="headerlink" href="#6-back-up-and-update" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p><strong>Credential-provenance upgrade:</strong> when upgrading across <code>accounts.0028</code>/<code>0029</code>,
+use the <a href="https://github.com/splattner/openzev/blob/main/docs/credential-provenance-upgrade.md">maintenance rollout</a> instead of
+the ordinary restart commands below. Old and new authentication workers must not overlap.</p>
+</blockquote>
 <ul>
 <li>Set up backups of the database <strong>and</strong> the <code>backend_media</code> volume (invoice
   PDFs) before billing real participants — see <a href="../18-backups/">Backups</a>.</li>
@@ -2555,7 +2560,8 @@ supports Container Manager.</p>
   to <code>http://localhost:8080</code>. Set <code>ALLOWED_HOSTS</code>, <code>CSRF_TRUSTED_ORIGINS</code>,
   <code>FRONTEND_URL</code> and the passkey settings in <code>.env</code> to that address as in
   step 2, and forward the name and ports from your router.</li>
-<li><strong>Updating.</strong> Replace <code>docker-compose.yml</code> with the new release's file (or
+<li><strong>Updating.</strong> Follow the <a href="#6-back-up-and-update">upgrade warning</a> before restarting.
+  Replace <code>docker-compose.yml</code> with the new release's file (or
   set <code>OPENZEV_VERSION</code> in <code>.env</code>), then over SSH run <code>sudo docker compose pull</code>
   followed by <code>sudo docker compose up -d</code> in the project folder. Make a backup
   first.</li>
@@ -2579,7 +2585,7 @@ also contains <code>docker-compose.yml</code>, which builds the frontend (nginx)
 backend as two containers — use the service name <code>backend</code> instead of <code>app</code>
 there. Pass <code>-f docker-compose.fullstack.yml</code> to every <code>docker compose</code> command
 for the fullstack stack. To update, check out the new tag and run the <code>up</code>
-command again.</p>
+command again, subject to the <a href="#6-back-up-and-update">upgrade warning</a>.</p>
 <h2 id="production-on-kubernetes-helm">Production on Kubernetes (Helm)<a class="headerlink" href="#production-on-kubernetes-helm" title="Permanent link">&para;</a></h2>
 <p>The Helm chart deploys the frontend, backend, a Celery worker, one Celery Beat
 scheduler, an Ingress and a volume for invoice files. It does <strong>not</strong> deploy
@@ -2604,6 +2610,9 @@ helm<span class="w"> </span>upgrade<span class="w"> </span>--install<span class=
 <p><a href="#creating-the-first-admin-account">Create the first admin account</a>.</p>
 </li>
 </ol>
+<p>For an existing installation crossing the credential-provenance boundary, follow
+the <a href="https://github.com/splattner/openzev/blob/main/docs/credential-provenance-upgrade.md">maintenance rollout</a>; a normal rolling
+Helm upgrade is insufficient.</p>
 <p>The ingress needs TLS for the same reason as above (<code>Secure</code> cookies), and the
 backend runs the same configuration check on start. For every chart value,
 including TLS, existing secrets and <code>NUM_PROXIES</code> behind an ingress, see the

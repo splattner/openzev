@@ -709,6 +709,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#giving-a-participant-independent-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Giving a Participant Independent Access
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#other-account-actions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2195,6 +2206,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#giving-a-participant-independent-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Giving a Participant Independent Access
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#other-account-actions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2812,14 +2834,28 @@ belongs to:</p>
    person who rents in two communities keeps one login</li>
 <li>To detach an account again, choose <strong>Unlink</strong> (the account itself stays as it is)</li>
 </ol>
+<h3 id="giving-a-participant-independent-access">Giving a Participant Independent Access<a class="headerlink" href="#giving-a-participant-independent-access" title="Permanent link">&para;</a></h3>
 <p>Independent-access accounts are admins, accounts allowed to create a community,
 and current/former manager/viewer grant or issuer/representative role holders.
 They use their normal login; participant links are refused, including after
 accepted access is revoked or admin/self-setup privileges are removed.</p>
-<p>An existing linked account without a password, enabled sign-in provider or
-passkey needs an access invitation before you assign a managing role. A party
+<p>An existing linked account without an independently established password, enabled
+sign-in provider or passkey needs an access invitation before you assign a managing
+role. Credentials enrolled through participant links do not count. A party
 without an account can hold a role; invite it to enable sign-in. Giving manager/viewer access
 sends that invitation and ends their earlier participant links, sessions and API keys.
+It also removes passwords, authenticator setup, passkeys and recovery codes enrolled
+through participant links. The participant opens the invitation in their own inbox
+and sets up fresh credentials. Independently established logins survive promotion;
+external providers that verified the account email count even if linked while the
+account was participant-only. Participant-session linking requires that proof;
+an unrelated provider identity cannot establish ownership of the participant account.
+The upgrade signs existing participant-only accounts out once. Their older local
+credentials require an invitation before promotion unless an independent identity
+qualifies; existing independent-access accounts keep their login. Recovery codes
+created through participant links are removed too, even if an independent factor
+survives. Sign in with that factor and regenerate recovery codes before relying on
+them again.
 Managers can start this flow only for participant accounts confined to their
 community; ask an admin for other accounts. Failed delivery leaves the invitation
 pending: use <strong>Resend invitation</strong> on the access row.</p>
@@ -2973,9 +3009,10 @@ it takes a few extra steps. Under <strong>My Account → Profile → Email addre
 </ol>
 <p>The old address is emailed afterwards, so a change you did not make does not go unnoticed. The
 link works once, and stops working if your password or address changes before you use it.</p>
-<p>Participant-only email addresses remain manager-maintained, even after choosing a
-password. Passwordless accounts also cannot change their email themselves. An
-administrator can change an account's address under <strong>Platform → Accounts → Edit</strong>.</p>
+<p>Participant-only email addresses remain manager-maintained after choosing a password.
+Other accounts without an independently established password also cannot change
+their email themselves. An administrator can change an account's address under
+<strong>Platform → Accounts → Edit</strong>.</p>
 <h3 id="signing-out-other-devices">Signing out other devices<a class="headerlink" href="#signing-out-other-devices" title="Permanent link">&para;</a></h3>
 <p>Under <strong>My Account → Security → Sessions</strong>, <strong>Sign out other devices</strong> ends every session except the
 one you are using. Do it if you lost a device or suspect someone else has access. There is no list
@@ -3038,18 +3075,27 @@ access under <strong>ZEV settings → People &amp; access</strong>.</p>
 <li>Check the account under <strong>Platform → Accounts → Users</strong>: is it active, and
    has it ever signed in?</li>
 <li><strong>Participant-only account:</strong> a manager of the community sends or copies the onboarding link
-   again from the <strong>⋯</strong> menu on the participant's row. It signs them in, and they
-   choose a new password.</li>
+   again from the <strong>⋯</strong> menu on the participant's row. Sign in and complete
+   two-factor authentication if enabled, then open <strong>My Account → Security</strong>.
+   Choose <strong>Reset password</strong> within 15 minutes and set a new password without
+   entering the old one. After the deadline, request a fresh sign-in link.
+   An account without a password shows the initial password setup instead.
+   Copying a link alone does not change the password.</li>
 <li>
-<p><strong>Account with a password:</strong> the user chooses <strong>Forgot your password?</strong> on the
-   sign-in page and follows the emailed link (needs working
-   <a href="../10-email-configuration/">email delivery</a>). Without email, or for an account that
-   only uses an external sign-in provider, someone with server access
-   sets a new password on the command line (the user then signs in with it; the
+<p><strong>Account with a password:</strong> choose <strong>Forgot your password?</strong> on the sign-in
+   page and follow the emailed link (requires working
+   <a href="../10-email-configuration/">email delivery</a>). This proves ownership of the
+   account's mailbox and establishes a password for independent access.
+   Without email, or for an account that only uses an external sign-in provider,
+   someone with server access verifies the account owner's identity and sets a
+   new password on the command line (the user then signs in with it; the
    service is <code>backend</code> instead of <code>app</code> in a two-container source build):</p>
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>app<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>changepassword<span class="w"> </span>&lt;username&gt;
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>app<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>recover_password<span class="w"> </span>&lt;username&gt;
 </code></pre></div>
-<p>The username is shown in the <strong>Account</strong> column of the accounts list.</p>
+<p>The username is shown in the <strong>Account</strong> column of the accounts list. This
+ operation establishes an independent password and signs out existing sessions.
+ Django admin's password-change form performs the same recovery. Plain Django
+ <code>changepassword</code> changes only the hash and does not establish independent ownership.</p>
 </li>
 <li>
 <p><strong>Locked out by two-factor:</strong> see <a href="#locked-out">Locked out?</a></p>
