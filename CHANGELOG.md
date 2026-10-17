@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.26.0](https://github.com/splattner/openzev/compare/v1.25.0...v1.26.0) (2026-10-17)
+
+
+### Features
+
+* **analytics:** scoped analytics dataset API and analytics tokens ([#1058](https://github.com/splattner/openzev/issues/1058)) ([#1072](https://github.com/splattner/openzev/issues/1072)) ([0a89e9d](https://github.com/splattner/openzev/commit/0a89e9daee2f78061f0606cc72cbc9b900cee0ea))
+* **invoices:** bill one-off and variable charges to participants (backend) ([#1053](https://github.com/splattner/openzev/issues/1053)) ([aaaafd2](https://github.com/splattner/openzev/commit/aaaafd2259c52be425692521e0d4a749a860fe1f))
+* **invoices:** charges page and invoice grouping for one-off charges ([#1055](https://github.com/splattner/openzev/issues/1055)) ([d93fe50](https://github.com/splattner/openzev/commit/d93fe50cfa240b9da08cbda88d273709493f5166))
+
+
+### Bug Fixes
+
+* **invoices:** review fixes for one-off charges ([#924](https://github.com/splattner/openzev/issues/924)) ([#1056](https://github.com/splattner/openzev/issues/1056)) ([d35ed8a](https://github.com/splattner/openzev/commit/d35ed8a321644be36a938b18d910ca0050ea204b))
+
 ## [1.25.0](https://github.com/splattner/openzev/compare/v1.24.0...v1.25.0) (2026-10-16)
 
 
