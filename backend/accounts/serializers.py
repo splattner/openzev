@@ -324,7 +324,12 @@ class PublicAppSettingsSerializer(serializers.ModelSerializer):
 
 
 class AppSettingsSerializer(serializers.ModelSerializer):
-    """Admin read and write serializer: date formats plus the MFA policy."""
+    """Admin read and write serializer: date formats, the MFA policy and the analytics privacy threshold."""
+
+    # What an empty ``analytics_min_participants_for_aggregate`` resolves to, and the lowest value
+    # it may take, so the form can show both without knowing the environment.
+    analytics_min_participants_default = serializers.SerializerMethodField()
+    analytics_min_participants_floor = serializers.SerializerMethodField()
 
     class Meta:
         model = AppSettings
@@ -334,9 +339,22 @@ class AppSettingsSerializer(serializers.ModelSerializer):
             "date_time_format",
             "mfa_required",
             "mfa_grace_period_days",
+            "analytics_min_participants_for_aggregate",
+            "analytics_min_participants_default",
+            "analytics_min_participants_floor",
             "updated_at",
         ]
         read_only_fields = ["updated_at"]
+
+    def get_analytics_min_participants_default(self, obj) -> int:
+        from analytics.policy import platform_default
+
+        return platform_default()
+
+    def get_analytics_min_participants_floor(self, obj) -> int:
+        from analytics.policy import AGGREGATE_FLOOR
+
+        return AGGREGATE_FLOOR
 
     def validate_mfa_required(self, value):
         # The model's clean() is not run by a DRF serializer; share its rules

@@ -3899,6 +3899,15 @@ export const fr = {
                 label: 'Sauvegarde',
             },
         },
+        analyticsPrivacy: {
+            title: 'Confidentialité des analyses',
+            description: 'Les totaux de toute la ZEV dans les données d’analyse ne sont montrés à un participant que pour les communautés d’au moins ce nombre de participants. En dessous, « le total de la ZEV moins le mien » révélerait le profil de charge d’une autre personne. Les gestionnaires et les admins voient toujours les totaux.',
+            label: 'Nombre minimal de participants pour les totaux de la ZEV',
+            hint: 'Vide : valeur par défaut de la plateforme ({{default}}). Au moins {{floor}} ; compté chaque jour de la période.',
+            invalid: 'Saisissez un nombre entier de {{floor}} à 100, ou laissez le champ vide.',
+            saved: 'Confidentialité des analyses enregistrée.',
+            saveFailed: 'Impossible d’enregistrer ce réglage.',
+        },
         mfaPolicy: {
             title: 'Politique d\'authentification à deux facteurs',
             loadError: 'Impossible de charger la politique.',

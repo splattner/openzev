@@ -38,7 +38,9 @@ the invoices.
 - **ZEV-wide totals** (`group_by=zev`) are shown to participants only when at least
   five participants shared the ZEV on every day of the range. In a smaller community
   "the ZEV total minus mine" would be somebody else's load profile. Managers always
-  see the totals. The threshold is `ANALYTICS_MIN_PARTICIPANTS_FOR_ZEV_AGGREGATE`.
+  see the totals. An administrator can change the number under **Platform → Settings →
+  Security → Analytics privacy** (never below 3); left empty it follows the platform
+  default, which is 5 unless `ANALYTICS_MIN_PARTICIPANTS_FOR_ZEV_AGGREGATE` says otherwise.
 
 Data from your own system behind the meter (see [Your Own Energy Data](20-energy-data.md))
 is not part of the dataset.

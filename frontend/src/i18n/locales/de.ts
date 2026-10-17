@@ -3899,6 +3899,15 @@ export const de = {
                 label: 'Datensicherung',
             },
         },
+        analyticsPrivacy: {
+            title: 'Datenschutz bei Analysen',
+            description: 'ZEV-weite Summen in den Analysedaten sehen Teilnehmende nur in Gemeinschaften mit mindestens so vielen Teilnehmenden. Darunter würde «ZEV-Summe minus mein Verbrauch» das Lastprofil einer anderen Person verraten. Verwalter und Admins sehen die Summen immer.',
+            label: 'Mindestzahl Teilnehmende für ZEV-weite Summen',
+            hint: 'Leer verwendet den Standard der Plattform ({{default}}). Mindestens {{floor}}; gezählt an jedem Tag des Zeitraums.',
+            invalid: 'Geben Sie eine ganze Zahl von {{floor}} bis 100 ein oder lassen Sie das Feld leer.',
+            saved: 'Datenschutz bei Analysen gespeichert.',
+            saveFailed: 'Die Einstellung konnte nicht gespeichert werden.',
+        },
         mfaPolicy: {
             title: 'Richtlinie zur Zwei-Faktor-Authentifizierung',
             loadError: 'Die Richtlinie konnte nicht geladen werden.',

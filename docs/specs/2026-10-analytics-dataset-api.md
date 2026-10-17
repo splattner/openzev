@@ -107,7 +107,7 @@ flagged. It appears in Platform → Settings → Functions with its description.
 |---|---|---|---|
 | `ANALYTICS_MAX_READINGS` | same | 300000 | readings of the ZEV in the range one request may scan |
 | `ANALYTICS_MAX_ROWS` | same | 200000 | output rows per request |
-| `ANALYTICS_MIN_PARTICIPANTS_FOR_ZEV_AGGREGATE` | same | 5 | *k*, see §6 |
+| `ANALYTICS_MIN_PARTICIPANTS_FOR_ZEV_AGGREGATE` | same | 5 | the platform default of *k*, see §6; an admin overrides it with `AppSettings.analytics_min_participants_for_aggregate`, and *k* is never below 3 |
 | `DEFAULT_THROTTLE_RATES["analytics_token"]` | `ANALYTICS_TOKEN_THROTTLE_RATE` | `1200/hour` | per token |
 
 `analytics` is added to `INSTALLED_APPS`; `config/urls.py` mounts `api/v1/analytics/`.
@@ -206,11 +206,27 @@ For a caller with `full = False`:
    reported, but with `metering_point = null`: the meter id would name a neighbour's connection.
    Such energy is also not addressable through the `metering_point` filter. Personal meters are named.
 3. `group_by=zev` is refused (`aggregate_suppressed`) unless every day of the range that had any
-   eligible participant had at least *k* of them (`ANALYTICS_MIN_PARTICIPANTS_FOR_ZEV_AGGREGATE`,
-   default 5; days with none are ignored; a range with no eligible participant at all is refused).
+   eligible participant had at least *k* of them (days with none are ignored; a range with no eligible
+   participant at all is refused). *k* is `analytics.policy.min_participants_for_zev_aggregate()`: the
+   admin's `AppSettings.analytics_min_participants_for_aggregate` when set, else the platform default
+   (`ANALYTICS_MIN_PARTICIPANTS_FOR_ZEV_AGGREGATE`, 5), and never below `AGGREGATE_FLOOR` = 3 whichever way it
+   is set (with 2 participants, "total minus mine" is exactly the other person's profile). The setting is
+   edited under Platform → Settings → Security (§6a).
 4. A participant whose record has ended, or any participant of a disabled ZEV, sees nothing.
 
 Admin, manager and viewer visibility is never reduced by *k*.
+
+### 6a. The threshold setting
+
+`accounts.AppSettings.analytics_min_participants_for_aggregate`: `PositiveSmallIntegerField`, null, blank,
+validators 3 to 100; `null` follows the platform default. Migration `accounts/0030`. Exposed to admins only,
+through `AppSettingsSerializer`: the field (writable), `analytics_min_participants_default` (read-only: what
+`null` resolves to, already clamped to the floor) and `analytics_min_participants_floor` (read-only, 3), so
+the form needs no knowledge of the environment. `PublicAppSettingsSerializer` is unchanged. A write is an
+`app_settings.update` audit event with a before/after diff of the field. The serializer refuses a value
+below the floor, above 100 or not an integer (`400`); `null` clears it. The settings card is
+`features/settings/AnalyticsPrivacySection.tsx` (a number input whose placeholder is the platform default,
+`min` = the floor, client-side refusal of out-of-range input, Save disabled while invalid).
 
 Existing behaviour not changed here: the participant dashboard already returns ZEV totals
 (`zev_totals`) without a minimum size. Aligning it is a separate decision.
@@ -294,7 +310,7 @@ No server code beyond §5/§8. Shipped artefacts:
 
 The datasource provisioning and the example dashboard were checked by hand against Grafana (current OSS image) with the Infinity plugin, reading a seeded ZEV from a running backend with a token: the datasource provisions, the three panels draw the expected values (60 % self-sufficiency for 12 of 20 kWh local, one stacked series per participant, local vs grid per hour). There is no automated test for them.
 
-## 11. Tests (`backend/analytics/`, 79 tests)
+## 11. Tests (`backend/analytics/`, 99 tests)
 
 Shared fixture `analytics/testing.py` (`Community`: four participants, one community-mode meter,
 known 10 kWh consumed / 6 kWh produced per interval; `enable_tokens`).
@@ -302,6 +318,7 @@ known 10 kWh consumed / 6 kWh produced per interval; `enable_tokens`).
 | Module | Count | Covers |
 |---|---|---|
 | `test_series.py` | 34 | ZEV totals split local/grid/feed-in; community meter shared by weight; parity with `dashboard-summary` `participant_stats`; meter + holder grouping; filters; unassigned energy kept with `participant = null`; hourly and 15-minute Swiss buckets; `bucket_start` for DST days, month, week, year, autumn hour (10 parametrised cases); CSV header/rows; span, reading, row limits; 422 on inconsistent readings; invalid parameters (6 cases); required `from`/`to`; unknown ZEV; empty range |
+| `test_policy.py` | 20 | threshold resolution (default, env, admin value over env, the floor for env and for a row written around the validators); the series follows the setting (default suppresses, lower shows, inclusive at *k*, managers never held back); admin read of value/default/floor, the default shown is the effective one, set and clear, refused values (6 cases), partial updates leave it alone, a participant cannot change it and does not see it, audit diff |
 | `test_scoping.py` | 17 | anonymous 401; manager own ZEV / other ZEV 403; admin any; viewer; stranger 403; participant own rows only; own meter named, shared meter not; foreign `participant` filter 403; shared meter not addressable; other-ZEV participant 403; ZEV totals suppressed below *k*, shown at *k*, never for managers; ended participant; disabled ZEV; manager-and-participant sees all |
 | `test_tokens.py` | 28 | create + secret once + hash only; audit without secret; participant/manager/viewer creation rules; foreign ZEV; participant of another ZEV; expiry in the past; tokens/keys cannot mint tokens; flag off hides endpoints; ZEV token reads without naming the ZEV; other ZEV 403; participant token narrowing (own, manager-made); reaches nothing else; garbage/foreign tokens 401; session still works; `last_used_at`; revoke (+audit); expired; flag off stops tokens; creator losing access; participant leaving; inactive creator; disabled ZEV; per-token throttle; list/revoke visibility (manager, participant, admin) |
 

@@ -16,6 +16,7 @@ from django.db import connection, models, transaction
 from django.utils import timezone
 
 from allocation.validity import active_during, active_on
+from analytics.policy import AGGREGATE_FLOOR
 from . import mfa_crypto
 
 
@@ -502,6 +503,16 @@ class AppSettings(models.Model):
     # on gives every existing account a full grace period
     # instead of locking out anyone whose account is older than the policy.
     mfa_policy_changed_at = models.DateTimeField(null=True, blank=True, editable=False)
+    # How many participants must have shared a ZEV on every day of a range before a participant
+    # may see ZEV-wide totals in the analytics dataset (SPEC-2026-analytics-dataset-api §6).
+    # ``None``: the platform default (``ANALYTICS_MIN_PARTICIPANTS_FOR_ZEV_AGGREGATE``). Never
+    # below ``analytics.policy.AGGREGATE_FLOOR``, whichever way it is set.
+    analytics_min_participants_for_aggregate = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(AGGREGATE_FLOOR), MaxValueValidator(100)],
+        help_text="Empty: the platform default.",
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     MFA_POLICY_FIELDS = ("mfa_required", "mfa_grace_period_days")

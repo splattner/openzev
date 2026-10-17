@@ -700,6 +700,7 @@ def app_settings(request):
         "date_time_format",
         "mfa_required",
         "mfa_grace_period_days",
+        "analytics_min_participants_for_aggregate",
     ]
     before = {field: getattr(settings_instance, field) for field in settings_fields}
     serializer = AppSettingsSerializer(settings_instance, data=request.data, partial=True)

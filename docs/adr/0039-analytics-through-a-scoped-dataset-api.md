@@ -45,7 +45,7 @@ database credentials.**
    `zev.access`: an admin, manager or viewer sees the whole ZEV; a participant sees only the
    rows attributed to their own live participant records. A community-mode share of a meter held
    by somebody else is reported without naming the meter. ZEV-wide totals are shown to a
-   participant only when at least *k* participants (default 5, `ANALYTICS_MIN_PARTICIPANTS_FOR_ZEV_AGGREGATE`)
+   participant only when at least *k* participants (platform default 5 from `ANALYTICS_MIN_PARTICIPANTS_FOR_ZEV_AGGREGATE`, overridable by an admin in Settings, never below 3)
    shared the ZEV on every day of the range, because with fewer, "ZEV total minus me" is
    somebody else's load profile.
 4. **Tools that cannot hold a session use a scoped token**, not a database login and not a

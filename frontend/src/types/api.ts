@@ -137,6 +137,12 @@ export interface AppSettings {
     /** Every account must hold a second factor (a passkey or TOTP). Admin-only. */
     mfa_required?: boolean
     mfa_grace_period_days?: number
+    /** Participants needed on every day of a range before a participant sees ZEV-wide analytics totals; `null` follows the platform default. Admin-only. */
+    analytics_min_participants_for_aggregate?: number | null
+    /** What `null` resolves to (the environment's value, never below the floor). Admin-only, read-only. */
+    analytics_min_participants_default?: number
+    /** The lowest value that can be set. Admin-only, read-only. */
+    analytics_min_participants_floor?: number
     updated_at: string
 }
 
@@ -146,6 +152,7 @@ export interface AppSettingsInput {
     date_time_format?: DateTimeFormat
     mfa_required?: boolean
     mfa_grace_period_days?: number
+    analytics_min_participants_for_aggregate?: number | null
 }
 
 /** Admin-only platform health snapshot (nav-regroup phase 3):

@@ -3910,6 +3910,15 @@ export const en = {
                 label: 'Backup',
             },
         },
+        analyticsPrivacy: {
+            title: 'Analytics privacy',
+            description: 'ZEV-wide totals in the analytics data are shown to a participant only for communities of at least this many participants. Below it, "the ZEV total minus mine" would reveal a neighbour\'s load profile. Managers and admins always see the totals.',
+            label: 'Minimum participants for ZEV-wide totals',
+            hint: 'Empty uses the platform default ({{default}}). At least {{floor}}; counted on every day of the range.',
+            invalid: 'Enter a whole number from {{floor}} to 100, or leave it empty.',
+            saved: 'Analytics privacy saved.',
+            saveFailed: 'Could not save the analytics privacy setting.',
+        },
         mfaPolicy: {
             title: 'Two-factor authentication policy',
             loadError: 'Could not load the policy.',

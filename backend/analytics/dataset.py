@@ -38,6 +38,8 @@ from allocation.windows import AssignmentWindows
 from metering.models import MeterReading
 from zev.models import AllocationMode, MeteringPoint, Participant
 
+from .policy import min_participants_for_zev_aggregate
+
 GRANULARITIES = ("15min", "hour", "day", "week", "month", "year")
 GROUP_BYS = ("metering_point", "participant", "zev")
 DIRECTIONS = ("in", "out")
@@ -295,7 +297,7 @@ def _zev_rows(query: SeriesQuery, visibility: Visibility, start_dt, end_dt) -> l
     """ZEV-wide physical totals per bucket and direction."""
     if not visibility.full:
         shares_by_date = eligible_participant_shares(query.zev, query.start, query.end)
-        minimum = settings.ANALYTICS_MIN_PARTICIPANTS_FOR_ZEV_AGGREGATE
+        minimum = min_participants_for_zev_aggregate()
         if _min_participants(shares_by_date) < minimum:
             raise DatasetError(
                 f"ZEV-wide totals are shown to participants only for communities with at least "

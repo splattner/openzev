@@ -3899,6 +3899,15 @@ export const it = {
                 label: 'Backup',
             },
         },
+        analyticsPrivacy: {
+            title: 'Privacy delle analisi',
+            description: 'I totali dell’intera ZEV nei dati di analisi sono mostrati a un partecipante solo per comunità con almeno questo numero di partecipanti. Sotto questa soglia, «il totale della ZEV meno il mio» rivelerebbe il profilo di carico di un’altra persona. Gestori e amministratori vedono sempre i totali.',
+            label: 'Numero minimo di partecipanti per i totali della ZEV',
+            hint: 'Vuoto: valore predefinito della piattaforma ({{default}}). Almeno {{floor}}; conteggiato ogni giorno del periodo.',
+            invalid: 'Inserisci un numero intero da {{floor}} a 100, oppure lascia il campo vuoto.',
+            saved: 'Privacy delle analisi salvata.',
+            saveFailed: 'Impossibile salvare questa impostazione.',
+        },
         mfaPolicy: {
             title: 'Criterio di autenticazione a due fattori',
             loadError: 'Impossibile caricare il criterio.',
