@@ -80,6 +80,10 @@ An API key is also what an AI assistant uses to read your OpenZEV data — see
 [Connecting an AI Assistant](19-ai-assistants.md) if you want to ask Claude,
 Cursor or n8n questions about a ZEV instead of calling the API by hand.
 
+For charts, [Analytics and Grafana](21-analytics-and-grafana.md) describes the read-only
+analytics endpoint and the narrower analytics tokens, which suit a dashboard better than a
+key that carries your whole account.
+
 ## What a key can and cannot do
 
 A key **acts with your permissions**. A participant's key sees only that

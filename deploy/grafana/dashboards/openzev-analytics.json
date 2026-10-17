@@ -1,0 +1,308 @@
+{
+  "uid": "openzev-analytics",
+  "title": "OpenZEV analytics",
+  "tags": [
+    "openzev"
+  ],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "time": {
+    "from": "now-12M/M",
+    "to": "now/M"
+  },
+  "timezone": "Europe/Zurich",
+  "templating": {
+    "list": [
+      {
+        "name": "baseUrl",
+        "type": "constant",
+        "label": "OpenZEV URL",
+        "query": "https://openzev.example.com",
+        "hide": 2,
+        "current": {
+          "value": "https://openzev.example.com",
+          "text": "https://openzev.example.com"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Self-sufficiency per month",
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "openzev"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "openzev"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "${baseUrl}/api/v1/analytics/series/",
+          "url_options": {
+            "method": "GET",
+            "params": [
+              {
+                "key": "from",
+                "value": "${__from:date:YYYY-MM-DD}"
+              },
+              {
+                "key": "to",
+                "value": "${__to:date:YYYY-MM-DD}"
+              },
+              {
+                "key": "granularity",
+                "value": "month"
+              },
+              {
+                "key": "group_by",
+                "value": "zev"
+              },
+              {
+                "key": "direction",
+                "value": "in"
+              }
+            ]
+          },
+          "root_selector": "results",
+          "columns": [
+            {
+              "selector": "bucket_start",
+              "text": "time",
+              "type": "timestamp"
+            },
+            {
+              "selector": "total_kwh",
+              "text": "total_kwh",
+              "type": "number"
+            },
+            {
+              "selector": "local_kwh",
+              "text": "local_kwh",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "binary",
+            "alias": "Self-sufficiency",
+            "binary": {
+              "left": "local_kwh",
+              "operator": "/",
+              "right": "total_kwh"
+            },
+            "replaceFields": true
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Consumption per participant and month (kWh)",
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "openzev"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "openzev"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "${baseUrl}/api/v1/analytics/series/",
+          "url_options": {
+            "method": "GET",
+            "params": [
+              {
+                "key": "from",
+                "value": "${__from:date:YYYY-MM-DD}"
+              },
+              {
+                "key": "to",
+                "value": "${__to:date:YYYY-MM-DD}"
+              },
+              {
+                "key": "granularity",
+                "value": "month"
+              },
+              {
+                "key": "group_by",
+                "value": "participant"
+              },
+              {
+                "key": "direction",
+                "value": "in"
+              }
+            ]
+          },
+          "root_selector": "results",
+          "columns": [
+            {
+              "selector": "bucket_start",
+              "text": "time",
+              "type": "timestamp"
+            },
+            {
+              "selector": "participant",
+              "text": "participant",
+              "type": "string"
+            },
+            {
+              "selector": "total_kwh",
+              "text": "total_kwh",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "participant"
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatth",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Hourly consumption: local vs grid (kWh)",
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "openzev"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "openzev"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "${baseUrl}/api/v1/analytics/series/",
+          "url_options": {
+            "method": "GET",
+            "params": [
+              {
+                "key": "from",
+                "value": "${__from:date:YYYY-MM-DD}"
+              },
+              {
+                "key": "to",
+                "value": "${__to:date:YYYY-MM-DD}"
+              },
+              {
+                "key": "granularity",
+                "value": "hour"
+              },
+              {
+                "key": "group_by",
+                "value": "zev"
+              },
+              {
+                "key": "direction",
+                "value": "in"
+              }
+            ]
+          },
+          "root_selector": "results",
+          "columns": [
+            {
+              "selector": "bucket_start",
+              "text": "time",
+              "type": "timestamp"
+            },
+            {
+              "selector": "local_kwh",
+              "text": "local_kwh",
+              "type": "number"
+            },
+            {
+              "selector": "grid_kwh",
+              "text": "grid_kwh",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatth",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

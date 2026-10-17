@@ -514,6 +514,7 @@ link the invoice breakdown to `/admin/invoices` and email statistics to
     - Displays the registered feature flags in a table with toggle switches.
     - A flag whose row has `follows_default` (a flag with a computed default, such as `supplementary_energy_data_enabled`, until an admin chooses) shows its current effective value and a hint that it follows the instance's default; toggling it stores a choice (`follows_default` becomes `false`). Every flag reads as its effective value, so a flag whose `controlled_by_env` is true (a `FEATURE_<NAME>` variable is set) shows the variable's name and a disabled switch. A toggle also invalidates the system health and energy data queries. See [ADR 0033](../adr/0033-energy-data-flag-follows-the-integration-key.md).
     - Toggling uses `updateFeatureFlag` and invalidates `['feature-flags']` after success.
+    - `analytics_tokens_enabled` (default off) gates creating analytics tokens and authenticating with them ([SPEC-2026-analytics-dataset-api](2026-10-analytics-dataset-api.md) §4.2); its description comes from the backend registry.
 - **OAuth tab:**
     - Uses `fetchOAuthProviderConfigs` with query key `['oauth-provider-configs']`.
     - Displays configured providers in a table with enabled badges and compact Edit/Delete actions.

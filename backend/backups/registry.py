@@ -129,6 +129,8 @@ ZEV_SECTIONS: tuple[tuple[str, tuple[ZevPart, ...]], ...] = (
             ZevPart("metering.SupplementaryReading", "metering_point__zev", ("metering_point_id", "timestamp")),
         ),
     ),
+    # Hashed like ApiKey, so restoring one only restores a credential that already existed.
+    ("analytics", (ZevPart("analytics.AnalyticsToken", "zev"),)),
     ("import_logs", (ZevPart("metering.ImportLog", "zev"),)),
     (
         "invoices",

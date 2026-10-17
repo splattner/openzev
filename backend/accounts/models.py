@@ -560,6 +560,7 @@ class FeatureFlag(models.Model):
     PARTICIPANT_GEOCODING_ENABLED = "participant_geocoding_enabled"
     MCP_SERVER_ENABLED = "mcp_server_enabled"
     SUPPLEMENTARY_ENERGY_DATA_ENABLED = "supplementary_energy_data_enabled"
+    ANALYTICS_TOKENS_ENABLED = "analytics_tokens_enabled"
 
     name = models.CharField(max_length=100, unique=True)
     description = models.CharField(max_length=255, blank=True, default="")
@@ -833,6 +834,15 @@ FeatureFlag.register(
         "Allow AI assistants to read OpenZEV data through the MCP endpoint (/api/v1/mcp/) "
         "using a user's API key. Answers are sent to the assistant's LLM provider, "
         "which may be a third party outside Switzerland."
+    ),
+)
+FeatureFlag.register(
+    FeatureFlag.ANALYTICS_TOKENS_ENABLED,
+    default=False,
+    description=(
+        "Let managers and participants create read-only analytics tokens, so tools such as "
+        "Grafana can read their metering data from /api/v1/analytics/series/. The data leaves "
+        "OpenZEV to wherever that tool runs."
     ),
 )
 
