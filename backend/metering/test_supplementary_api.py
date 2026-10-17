@@ -4,11 +4,14 @@ from datetime import date, datetime, timezone as dt_timezone
 from unittest import mock
 
 from django.test import override_settings
+from django.utils import timezone
+from rest_framework.test import APIClient
 
 from audit.models import AuditEvent
 from metering.models import SupplementaryReading, SupplementarySource, SupplementaryStatus
 from metering.supplementary import providers
 from metering.supplementary.testing import (
+    INGEST_URL,
     INTEGRATION_KEY,
     SOURCES_URL,
     SupplementaryApiTestCase,
@@ -438,3 +441,74 @@ class EligibleMeteringPointTests(SupplementaryApiTestCase):
 
     def test_anonymous_is_refused(self):
         self.assertEqual(client_for(None).get(self.URL).status_code, 401)
+
+
+class RevokePushTokenTests(SupplementaryApiTestCase):
+    def setUp(self):
+        super().setUp()
+        created = self.create_push_source().json()
+        self.token = created["push_token"]
+        self.source = SupplementarySource.objects.get(pk=created["id"])
+        self.url = f"{SOURCES_URL}{self.source.pk}/revoke-push-token/"
+        SupplementaryReading.objects.create(
+            source=self.source, metering_point=self.point, timestamp=datetime(2026, 7, 1, tzinfo=dt_timezone.utc),
+            consumption_kwh=1, production_kwh=1, import_kwh=0, export_kwh=0,
+        )
+
+    def test_the_token_is_issued_with_a_creation_time(self):
+        self.assertIsNotNone(self.source.push_token_created_at)
+        self.assertIsNone(self.source.push_token_last_used_at)
+
+    def test_holder_revokes_the_token_and_keeps_source_and_readings(self):
+        response = client_for(self.holder_user).post(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["push_token_prefix"])
+        self.source.refresh_from_db()
+        self.assertIsNone(self.source.push_token_prefix)
+        self.assertEqual(self.source.push_token_hash, "")
+        self.assertIsNone(self.source.push_token_created_at)
+        self.assertTrue(self.source.enabled)
+        self.assertEqual(self.source.readings.count(), 1)
+
+    def test_the_revoked_token_stops_working(self):
+        client_for(self.holder_user).post(self.url)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token}")
+        self.assertEqual(client.post(INGEST_URL, {"readings": []}, format="json").status_code, 401)
+
+    def test_rotate_issues_a_new_token_afterwards(self):
+        client = client_for(self.holder_user)
+        client.post(self.url)
+        rotated = client.post(f"{SOURCES_URL}{self.source.pk}/rotate-push-token/").json()
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.push_token_prefix, rotated["push_token_prefix"])
+        self.assertIsNotNone(self.source.push_token_created_at)
+
+    def test_revoking_twice_is_a_400(self):
+        client = client_for(self.holder_user)
+        client.post(self.url)
+        self.assertEqual(client.post(self.url).status_code, 400)
+
+    def test_admin_may_manager_viewer_and_others_may_not(self):
+        self.assertEqual(client_for(self.manager).post(self.url).status_code, 403)
+        self.assertEqual(client_for(self.viewer).post(self.url).status_code, 403)
+        self.assertEqual(client_for(self.other_user).post(self.url).status_code, 404)
+        self.assertEqual(client_for(self.admin).post(self.url).status_code, 200)
+
+    def test_it_is_audited_without_the_secret(self):
+        prefix = self.source.push_token_prefix
+        client_for(self.holder_user).post(self.url)
+        event = AuditEvent.objects.get(action_type="supplementary_source.revoke_push_token")
+        self.assertEqual(event.metadata_json["prefix"], prefix)
+        self.assertNotIn(self.token, str(event.metadata_json) + event.summary)
+
+    def test_a_solar_manager_source_has_no_push_token_to_revoke(self):
+        SupplementarySource.objects.filter(pk=self.source.pk).update(provider="solar_manager")
+        self.assertEqual(client_for(self.holder_user).post(self.url).status_code, 400)
+
+    def test_a_disabled_zev_hides_the_source_from_its_participant(self):
+        self.zev.disabled_at = timezone.now()
+        self.zev.save()
+        self.assertEqual(client_for(self.holder_user).post(self.url).status_code, 404)
+        self.source.refresh_from_db()
+        self.assertIsNotNone(self.source.push_token_prefix)

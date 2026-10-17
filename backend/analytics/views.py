@@ -1,5 +1,4 @@
 from django.db import transaction
-from django.db.models import Q
 from django.http import Http404
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
@@ -14,7 +13,6 @@ from accounts.authentication import ApiKeyAuthentication, CookieJWTAuthenticatio
 from accounts.throttling import ApiKeyRateThrottle
 from audit.models import AuditActionCategory
 from audit.services import record_audit_event
-from zev import access
 from zev.models import Zev
 
 from .authentication import AnalyticsTokenAuthentication, AnalyticsTokenThrottle, tokens_enabled
@@ -112,7 +110,7 @@ def _audit(request, action_type, token, summary, metadata):
 class AnalyticsTokenViewSet(
     mixins.ListModelMixin, mixins.CreateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet,
 ):
-    """Create, list and revoke analytics tokens.
+    """Create, list and revoke your own analytics tokens (an admin sees and revokes all).
 
     Session-authenticated only: a token or API key cannot mint further credentials,
     so revoking a leaked one achieves something. Answers ``404`` while
@@ -136,7 +134,9 @@ class AnalyticsTokenViewSet(
         user = self.request.user
         if user.is_admin:
             return qs
-        return qs.filter(Q(created_by=user) | Q(zev_id__in=access.managed_zev_ids(user)))
+        # Private to the creator: a participant's token is their own business, and a manager
+        # who can read the whole ZEV has no need to see or revoke it (SPEC-2026-tokens-and-keys §3).
+        return qs.filter(created_by=user)
 
     @extend_schema(request=AnalyticsTokenCreateSerializer, responses={201: AnalyticsTokenSerializer})
     def create(self, request, *args, **kwargs):

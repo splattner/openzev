@@ -466,6 +466,68 @@ export interface ApiKeyInput {
     expires_at?: string | null
 }
 
+/** The three bearer credentials OpenZEV issues (SPEC-2026-tokens-and-keys). */
+export type CredentialKind = 'api_key' | 'analytics' | 'energy_push'
+
+/** What a credential can do: an API key acts as its owner, the others are narrower. */
+export type CredentialAccess = 'read_write' | 'read_only' | 'read' | 'write_readings'
+
+export interface CredentialScope {
+    zev: string | null
+    zev_name: string | null
+    participant: string | null
+    participant_name: string | null
+    metering_point: string | null
+    meter_id: string | null
+}
+
+/** One row of the Tokens & keys list. Never carries a secret. */
+export interface AccessCredential {
+    kind: CredentialKind
+    id: string
+    name: string
+    /** Namespace and prefix, e.g. `ozv_3f9a1c04b7e2`. */
+    prefix: string
+    access: CredentialAccess
+    scope: CredentialScope
+    created_at: string | null
+    expires_at: string | null
+    last_used_at: string | null
+    status: 'active' | 'expired' | 'revoked'
+    actions: Array<'revoke' | 'rotate'>
+    /** Frontend path where the thing behind the credential is managed (energy data sources). */
+    manage_url: string | null
+}
+
+export interface MyCredentialsResponse {
+    credentials: AccessCredential[]
+    can_create: { api_key: boolean; analytics: boolean }
+}
+
+/** A row as the admin console sees it: plus its owner and, for revoked ones, when. */
+export interface AdminAccessCredential extends AccessCredential {
+    owner: { id: number; username: string; email: string }
+    revoked_at: string | null
+}
+
+export interface AnalyticsTokenInput {
+    name: string
+    zev: string
+    participant?: string | null
+    expires_at?: string | null
+}
+
+/** The one response that carries the secret. It is never retrievable again. */
+export interface AnalyticsTokenWithSecret {
+    id: string
+    name: string
+    zev: string
+    participant: string | null
+    prefix: string
+    expires_at: string | null
+    token: string
+}
+
 export interface OAuthLoginInitiateResponse {
     redirect_url: string
 }
@@ -732,6 +794,8 @@ export interface SupplementarySource {
     reconciliation: SupplementaryReconciliation
     has_credential: boolean
     push_token_prefix: string | null
+    push_token_created_at: string | null
+    push_token_last_used_at: string | null
     created_at: string
     updated_at: string
 }

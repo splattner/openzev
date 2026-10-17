@@ -88,17 +88,9 @@ one participant of it) and nothing else, expires, and can be revoked on its own.
 An administrator first switches on **Platform → Settings → Functions → analytics
 tokens**, because a token lets data leave OpenZEV for wherever the tool runs.
 
-Tokens are created through the API for now; a screen for it is planned. Sign in
-(a token cannot create tokens, and neither can an API key), then:
-
-```http
-POST /api/v1/analytics/tokens/
-{"name": "Grafana", "zev": "<zev-id>"}
-```
-
-Add `"participant": "<participant-id>"` to limit it to one participant. Managers and
-viewers can create ZEV-wide tokens; participants can create a token for themselves;
-managers can create one for a participant. The answer contains the token **once**:
+Create one under **Account → Tokens & keys → New analytics token**: give it a name,
+choose what it may read (a whole community you can view, or only your own data in it)
+and an expiry. Administrators can choose any community. The token is shown **once**:
 
 ```text
 oza_3f9a1c04b7e2_kR8vN2pQ...
@@ -111,10 +103,11 @@ curl -H "Authorization: Bearer oza_3f9a1c04b7e2_kR8vN2pQ..." \
   "https://your-openzev.example.com/api/v1/analytics/series/?from=2026-06-01&to=2026-06-30"
 ```
 
-A token that is scoped to a ZEV needs no `zev` parameter. `GET /api/v1/analytics/tokens/`
-lists the tokens you created (managers also see those of their ZEVs) and
-`DELETE /api/v1/analytics/tokens/<id>/` revokes one at once. Creating and revoking
-are in the audit log.
+A token that is scoped to a ZEV needs no `zev` parameter. The tab lists your tokens and
+revokes one at once; the same is available as `GET /api/v1/analytics/tokens/` and
+`DELETE /api/v1/analytics/tokens/<id>/`. A token is private to the account that created
+it: a manager does not see a participant's tokens (an administrator can list and revoke
+every credential on the platform). Creating and revoking are in the audit log.
 
 A token is only as strong as the account behind it: if its creator loses access to the
 ZEV (or a participant leaves), the token stops working.

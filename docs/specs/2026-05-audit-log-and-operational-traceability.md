@@ -423,6 +423,7 @@ The first implementation slices must instrument these existing modules:
 | `backend/invoices/views.py` | generate, generate-all, approve, mark-sent, mark-paid, cancel, delete, generate-pdf, send-email, retry-email |
 | `backend/metering/views.py` | import preview/import commit/delete-data and import log–adjacent actions |
 | `backend/invoices/tasks.py` | send-email queued/success/failure/retry outcome, including a `FAILED` `invoice.email_task` event when pre-send PDF conflicts exhaust all retries |
+| `backend/metering/supplementary/views.py` | `supplementary_source.revoke_push_token` (category `metering`, metadata `prefix`; never the token), see SPEC-2026-tokens-and-keys §5.3 |
 | `backend/analytics/views.py` | `analytics_token.create` and `analytics_token.revoke` (category `auth`, target `analytics.AnalyticsToken`, `zev` set; metadata never carries the secret); series reads are not audited, see SPEC-2026-analytics-dataset-api §8 |
 | `backend/mcp_server/views.py` | `mcp.tool.call` (category `system`, source `mcp`) once per MCP `tools/call` — success/failed/denied; see SPEC-2026-mcp-server §8 |
 

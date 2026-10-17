@@ -42,8 +42,7 @@ exploration and saved views build on this endpoint later.
 ### Out of scope
 
 - The in-app **Analysis** page, curated charts, Perspective / DuckDB-WASM, saved views (#1058 parts 2).
-- A **frontend UI for tokens** (create/list/revoke). The endpoints exist and are documented; the
-  API-keys page is the model for it. Until then tokens are created with the API (user guide §).
+- A **frontend UI for tokens**: delivered by [SPEC-2026-tokens-and-keys](2026-10-tokens-and-keys.md) (Account → Tokens & keys).
 - The **hourly allocation fact table** and Parquet/Arrow output. Measured numbers are in §9; the
   fact table is a follow-up decision.
 - Supplementary (behind-the-meter) data in the dataset (`source` is reserved for it, §5.4).
@@ -233,7 +232,7 @@ flag is off):
 
 | Method | Path | Behaviour |
 |---|---|---|
-| `GET` | `/analytics/tokens/` | non-revoked tokens: own, plus those of ZEVs the caller manages; admin: all |
+| `GET` | `/analytics/tokens/` | non-revoked tokens the caller created; admin: all (private to the creator since SPEC-2026-tokens-and-keys §3; managers no longer see a participant's tokens) |
 | `POST` | `/analytics/tokens/` | body `{name, zev, participant?, expires_at?}`; `201` with the token fields and **`token`** (the secret, shown once) |
 | `DELETE` | `/analytics/tokens/{id}/` | revokes (`revoked_at`), `204`; same visibility as the list (a foreign token is `404`) |
 
@@ -321,7 +320,7 @@ Validation: `ruff check .`, `manage.py check`, `makemigrations --check`, full `p
 ## 13. Follow-ups
 
 1. Hourly allocation fact table (§9) once the caps hurt in practice.
-2. Frontend: token management on the API-keys page; the Analysis page with curated Recharts views;
+2. Frontend: the Analysis page with curated Recharts views;
    Perspective / DuckDB-WASM exploration; saved views.
 3. Supplementary data as `source = "supplementary"`.
 4. Parquet/Arrow output for the in-browser engine.

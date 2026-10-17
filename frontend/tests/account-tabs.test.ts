@@ -21,7 +21,7 @@ vi.mock('../src/features/account/PasswordCard', () => ({ PasswordCard: () => cre
 vi.mock('../src/features/account/LinkedAccountsCard', () => ({ LinkedAccountsCard: () => createElement('div', null, 'linked-card') }))
 vi.mock('../src/features/account/SessionsCard', () => ({ SessionsCard: () => createElement('div', null, 'sessions-card') }))
 vi.mock('../src/features/account/TwoFactorSection', () => ({ TwoFactorSection: () => createElement('div', null, 'two-factor-card') }))
-vi.mock('../src/features/account/ApiKeysSection', () => ({ ApiKeysSection: () => createElement('div', null, 'api-keys-card') }))
+vi.mock('../src/features/account/TokensSection', () => ({ TokensSection: () => createElement('div', null, 'tokens-card') }))
 
 const params = (query: string) => new URLSearchParams(query)
 
@@ -31,8 +31,12 @@ describe('resolveAccountTab', () => {
     })
 
     it('honours an explicit valid tab', () => {
-        expect(resolveAccountTab(params('tab=api-keys'), { mustChangePassword: false })).toBe('api-keys')
+        expect(resolveAccountTab(params('tab=tokens'), { mustChangePassword: false })).toBe('tokens')
         expect(resolveAccountTab(params('tab=security'), { mustChangePassword: false })).toBe('security')
+    })
+
+    it('still opens the tab that used to be called API keys', () => {
+        expect(resolveAccountTab(params('tab=api-keys'), { mustChangePassword: false })).toBe('tokens')
     })
 
     it('falls back for an unknown tab rather than showing an empty page', () => {
@@ -114,13 +118,12 @@ describe('account page tabs', () => {
         expect(text).toContain('password-card')
         expect(text).toContain('linked-card')
         expect(text).toContain('two-factor-card')
-        expect(text).not.toContain('api-keys-card')
+        expect(text).not.toContain('tokens-card')
     })
 
-    it('shows API keys on their own tab', async () => {
-        const container = await render('/account?tab=api-keys')
-
-        expect(visibleText(container)).toContain('api-keys-card')
+    it('shows tokens and keys on their own tab, also for the old ?tab=api-keys link', async () => {
+        expect(visibleText(await render('/account?tab=tokens'))).toContain('tokens-card')
+        expect(visibleText(await render('/account?tab=api-keys'))).toContain('tokens-card')
     })
 
     it('switches tabs and records the choice in the URL', async () => {
@@ -133,11 +136,11 @@ describe('account page tabs', () => {
     })
 
     it('keeps every panel mounted, so one-time secrets survive a tab switch', async () => {
-        // Recovery codes and a new API key are shown once, in component state.
+        // Recovery codes and a new token or key are shown once, in component state.
         const container = await render('/account?tab=security')
 
         expect(container.textContent).toContain('two-factor-card')
-        expect(container.textContent).toContain('api-keys-card')
+        expect(container.textContent).toContain('tokens-card')
     })
 
     it('lands a forced password change on Security and keeps the banner above the tabs', async () => {

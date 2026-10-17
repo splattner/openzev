@@ -537,6 +537,8 @@ Helper `accounts.jwt_utils.make_jwt_for_user(user, *, impersonated_by=None, part
 
 `analytics.authentication.AnalyticsTokenAuthentication` (`backend/analytics/authentication.py`) is a second non-user credential, accepted only by `GET /api/v1/analytics/series/` (SPEC-2026-analytics-dataset-api §8): `Authorization: Bearer oza_<prefix>_<secret>`, `request.user` anonymous and `request.auth` the `AnalyticsToken`, scoped to one ZEV or one participant, and re-checked per request against its creator's current access. It passes on any bearer value that is not shaped `oza_…`, so session JWTs still authenticate on that view. Every other endpoint answers `401` for it.
 
+`GET /api/v1/auth/me/credentials/` and `GET /api/v1/auth/credentials/` (admin) list API keys, analytics tokens and energy data push tokens in one shape (SPEC-2026-tokens-and-keys §5). Session-only: they authenticate with `CookieJWTAuthentication` alone and are absent from `ACCOUNTS_API_KEY_ALLOWLIST`.
+
 ### 5.1a Last-login tracking
 
 `User.last_login` (Django's own `AbstractUser` field; no migration) is stamped

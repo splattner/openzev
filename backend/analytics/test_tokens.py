@@ -256,15 +256,21 @@ def test_tokens_are_throttled_per_token(community):
 
 # ── who sees and revokes which tokens ───────────────────────────────────────
 
-def test_a_manager_sees_and_revokes_tokens_of_their_zev_but_not_of_others(community, other):
+def test_a_manager_neither_sees_nor_revokes_a_participants_token(community, other):
     alice_token = create(community.alice_user, community, participant=str(community.alice.pk)).json()
     foreign = create(other.manager, other).json()
 
     manager = client_for(community.manager)
-    listed = {t["id"] for t in manager.get(TOKENS).json()}
-    assert listed == {alice_token["id"]}
+    assert manager.get(TOKENS).json() == []
+    assert manager.delete(f"{TOKENS}{alice_token['id']}/").status_code == 404
     assert manager.delete(f"{TOKENS}{foreign['id']}/").status_code == 404
-    assert manager.delete(f"{TOKENS}{alice_token['id']}/").status_code == 204
+    assert series(bearer(alice_token["token"])).status_code == 200  # untouched
+
+
+def test_a_manager_sees_the_tokens_they_made_themself(community):
+    mine = create(community.manager, community).json()
+
+    assert [t["id"] for t in client_for(community.manager).get(TOKENS).json()] == [mine["id"]]
 
 
 def test_a_participant_sees_only_their_own_tokens(community):

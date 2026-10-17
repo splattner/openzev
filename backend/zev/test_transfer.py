@@ -1321,6 +1321,8 @@ class SchemaParityTests(TestCase):
             "credential_encrypted",
             "push_token_prefix",
             "push_token_hash",
+            "push_token_created_at",
+            "push_token_last_used_at",
             "enabled",
             "status",
             "last_sync_at",
