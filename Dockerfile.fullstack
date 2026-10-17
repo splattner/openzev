@@ -7,7 +7,7 @@ ARG VITE_API_BASE_URL=/api/v1
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN npm run build
 
-FROM python:3.14-slim
+FROM python:3.15-slim
 
 ARG OCI_TITLE="OpenZEV Fullstack"
 ARG OCI_DESCRIPTION="OpenZEV fullstack container with backend API and frontend assets"
