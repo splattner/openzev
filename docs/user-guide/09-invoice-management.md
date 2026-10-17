@@ -57,6 +57,14 @@ still hold meter assignments, appear under **Community notices**. Tariff
 coverage, metering gaps, unassigned readings and setup state are already
 covered by readiness steps or setup guidance.
 
+### Charges step
+
+When the community has [one-off charges](07-tariff-configuration.md#one-off-charges)
+in a period, the period card gains a **Charges** step between generating and
+approving. It asks you to regenerate draft invoices that were created before a
+charge was added or changed, and warns about a charge nobody can be billed for
+(no member on its date). It stays out of the list for periods without charges.
+
 ## Participant View: My Invoices
 
 Participants open **My invoices** (`/me/invoices`) in the sidebar to see the
@@ -314,6 +322,9 @@ While an invoice is a **Draft**, **More → Regenerate invoice** replaces it wit
 freshly calculated one. Use this after correcting metering data or tariff
 configuration. Approved, sent and paid invoices are locked and cannot be
 regenerated.
+
+Regeneration keeps one-off [charges](07-tariff-configuration.md#one-off-charges):
+they are stored separately and added to the new draft again.
 
 > **Tip:** You can generate invoices even when metering data is incomplete, but totals may be inaccurate. It is best to resolve missing data first.
 

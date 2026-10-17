@@ -1,7 +1,7 @@
 # Feature Spec: One-off and variable charges (#924)
 
 - Spec ID: SPEC-2026-10-variable-charges
-- Status: Draft
+- Status: Completed
 - Scope: Major
 - Type: Feature
 - Owners: Sebastian Plattner
@@ -97,18 +97,19 @@ The viewset uses `[IsAuthenticated, HasZevAccess]` and `ZevScopedQuerySetMixin`,
 | `description` | CharField(200) | required, non-blank after strip; printed on the invoice |
 | `amount_chf` | Decimal(10, 2) | `> 0`; the **total** the ZEV passes on |
 | `charge_date` | DateField | required |
-| `allocation` | CharField(20) | `ChargeAllocation`: `all_participants` \| `selected_participants`; default `all_participants` |
+| `allocation` | CharField(24) | `ChargeAllocation`: `all_participants` \| `selected_participants`; default `all_participants` |
 | `split_key` | CharField(10) | `SplitKey` (`tariffs.models`); default `equal`; ignored when exactly one participant bears the charge |
 | `vat_treatment` | CharField(12) | `ChargeVatTreatment`: `taxable` \| `pass_through`; default `taxable`; no inference |
 | `participants` | M2M `Participant` | `related_name="charges"`; non-empty iff `allocation == selected_participants`, empty otherwise |
 | `created_at` / `updated_at` | DateTime | `auto_now_add` / `auto_now` |
 
-`Meta.ordering = ["-charge_date", "-created_at"]`; index on `(zev, charge_date)`.
+`Meta.ordering = ["-charge_date", "-created_at", "id"]`; index on `(zev, charge_date)`.
 `CheckConstraint(amount_chf__gt=0)`.
 
-`Charge.clean()` (called by the serializer's `validate`, since the M2M cannot be validated in
-`Model.clean`): `description` stripped and non-empty; every selected participant belongs to
-`zev`; the selection is empty for `all_participants` and non-empty for `selected_participants`.
+The model has no `clean()`: the M2M cannot be validated in `Model.clean`, so `ChargeSerializer.validate`
+carries the rules (§5): `description` stripped and non-empty; every selected participant belongs to
+`zev`; the selection is empty for `all_participants` and non-empty for `selected_participants`. The
+database enforces only the `amount_chf > 0` constraint.
 
 ### 4.2 Who bears a charge
 
@@ -292,13 +293,13 @@ edited (ADR 0037).
 `tariffs`, depending on `participants`. Row: `{"id", <CHARGE_FIELDS>, "participant_ids": [...]}`,
 `CHARGE_FIELDS = (description, amount_chf, charge_date, allocation, split_key, vat_treatment)`.
 `FORMAT_VERSION` 7 → 8 (7 and older stay readable; they simply lack the section). The importer
-(`_import_charges`) maps `participant_ids` through the archive-id map, drops unknown ids with a
-warning, and reports a `selected_participants` charge left with no bearer as an error, which rejects
+(`_import_charges`) maps `participant_ids` through the archive-id map, drops ids it did not import with a
+warning (`collector.warn`), and reports a `selected_participants` charge left with no bearer as an error, which rejects
 the import as any section error does. Invoices stay independent of charges, so the invoices section
 keeps its `("participants",)` dependency.
 
 **Backups** (`2026-09-backup-and-restore.md`): `backups/registry.py` gets a `charges` section
-(`ZevPart("invoices.Charge", "zev")`, after `participants`); Django's serialization carries the
+(`ZevPart("invoices.Charge", "zev")`, after `tariffs`); Django's serialization carries the
 `participants` many-to-many inline. `backups.test_archive.CoverageTests` enforces that every model is
 registered or excluded.
 
@@ -314,27 +315,31 @@ allowedRoles={ZEV_SCOPE}`), linked from the same navigation group as Tariffs; fo
 `2026-04-frontend-management-page-design.md` (DataTable, one primary action, `ActionMenu` for the
 row, `FormModal`).
 
-- List: date, description, amount, bearers ("All participants" / "3 participants" / the single
-  name), VAT treatment, a lock badge when `is_locked`.
-- Filter tabs by period (reusing `PeriodSelector`).
-- Create/edit dialog: description, amount, date, "Who pays": *All participants* | *Selected
-  participants*; participant multi-select when selected; split key (hidden for exactly one
-  participant); VAT treatment with an explanatory hint. The live "who pays what" table comes from
-  the `preview` data and warns when a bearer would be missing, when the date falls in a locked
-  period, and about the centime remainder.
-- Locked charges: edit and delete actions disabled with a tooltip pointing to the correction
-  flow.
+- List (`DataTable`): date, description (with an *Invoiced* lock badge when `is_locked`), amount,
+  paid by ("All participants" / "N participants" / the single name), VAT treatment, and an
+  `ActionMenu` (`faEllipsis`) with edit and delete. Writes are gated with `useWriteScope`.
+- No period filter: the list shows the ZEV's charges newest first.
+- Create/edit dialog (`ChargeFormModal`, `chargeForm.ts`): description, amount, date, "Who pays":
+  *All participants* | *Selected participants*; participant multi-select when selected; split key
+  (hidden for exactly one participant); VAT treatment with an explanatory hint. The live "who pays
+  what" table is the `POST /charges/preview/` response (debounced query) with notes for a nobody-bills
+  date, and for rounding that leaves an amount `unrecovered` or `overbilled`. Field errors from a
+  400 (including the locked-date error on `charge_date`) are mapped onto the fields.
+- Locked charges: edit and delete are disabled in the menu; the badge tooltip points to the
+  correction flow.
 
 ### 7.2 Readiness and invoice cockpit
 
-`BillingPeriodCard` / the readiness step list render the new `charges` step: `todo` links to the
-period's invoice list with the text "N draft invoices predate a charge change. Regenerate them."
-and `warn` names the unbilled charges. Keys `readiness.steps.charges.*` in all four locales.
+`readinessPresentation.ts` renders the `charges` step: `todo` reads "N draft invoice(s) predate a
+charge change. Regenerate them." (`detail_data.stale_drafts`) and `warn` names the unbilled
+charges (`unbilled_charges`, `more_unbilled`). Keys
+`pages.dashboard.cockpit.stepLabels.charges` and `stepDetails.chargesTodo/chargesWarn` in all four
+locales. `BillingPeriodCard` hides a verified `charges` step whose count is 0.
 
 ### 7.3 Invoice presentation
 
-`InvoicePresentation` and the invoice detail group lines by `tariff_category`; add the `other`
-group (label `invoice.categories.other`), and the `flat` unit label. No hardcoded text; keys added
+The public invoice page (`features/publicInvoice/grouping.ts`) gains the `other` group (label
+`pages.publicInvoice.categories.other`) and the `flat` unit label (`pages.publicInvoice.unitFlat`). No hardcoded text; keys added
 to `frontend/src/i18n/locales/{de,fr,it,en}`.
 
 ### TypeScript types (`frontend/src/types/api.ts`)
@@ -403,9 +408,9 @@ stays the four values. `ReadinessStep` key union gains `'charges'`.
 
 ### Frontend
 
-- Unit tests for the charge form schema (selected participants required, amount > 0) and the
-  preview table.
-- Invoice presentation renders the `other` group.
+- `tests/charges.test.ts` (11 tests): form validation (selected participants required, amount > 0),
+  input mapping, bearers label.
+- `tests/public-invoice.test.ts` renders the `other` group.
 - i18n key parity across the four locales (existing check).
 
 ### Manual verification

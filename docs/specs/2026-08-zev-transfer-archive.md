@@ -108,7 +108,11 @@ commit — a failed audit must not cause a duplicate import on client retry).
 
 ## 6. Archive format (`backend/zev/transfer/schema.py`)
 
-`FORMAT_VERSION = 7`, `SUPPORTED_FORMAT_VERSIONS = {1, 2, 3, 4, 5, 6, 7}`. Version 7
+`FORMAT_VERSION = 8`, `SUPPORTED_FORMAT_VERSIONS = {1, 2, 3, 4, 5, 6, 7, 8}`. Version 8
+(SPEC-2026-10-variable-charges §6) adds the section `charges` (`SECTION_CHARGES`, requires
+`participants`; `charges.json`, one entry per `Charge` with `CHARGE_FIELDS` and, for a charge borne by
+selected participants, the archive ids of those participants), and the optional invoice field
+`pass_through_chf`. An older archive imports without either. Version 7
 (SPEC-2026-supplementary-energy-data §10) adds the **opt-in** section `supplementary_data`
 (`SECTION_SUPPLEMENTARY`, requires `metering_points` and `participants`, listed in `OPT_IN_SECTIONS`:
 an export that names no sections leaves it out, because it is a participant's own household
@@ -173,12 +177,13 @@ refused outright (`ArchiveError`, a `ValueError` subclass).
 Sections (order = write and import order, a correctness constraint):
 
 ```python
-SECTIONS = ("zev", "participants", "metering_points", "tariffs", "readings", "invoices", "invoice_pdfs")
+SECTIONS = ("zev", "participants", "metering_points", "tariffs", "charges", "readings", "invoices", "invoice_pdfs")  # plus opt-in supplementary_data
 SECTION_DEPENDENCIES = {
     "zev": (),
     "participants": (),
     "metering_points": ("participants",),   # assignments point at participants
     "tariffs": (),
+    "charges": ("participants",),           # a charge may name its bearers
     "readings": ("metering_points",),
     "invoices": ("participants",),          # deliberately NOT tariffs
     "invoice_pdfs": ("invoices",),          # a PDF means nothing without its invoice

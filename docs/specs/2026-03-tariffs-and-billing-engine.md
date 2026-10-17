@@ -422,6 +422,15 @@ Two consequences are worth knowing here, because they follow from the shape of
 Full mapping table, the constructs that are refused, and the fetch guards:
 `2026-09-vse-tariff-import.md`.
 
+### 3.2d One-off charges and `TariffCategory.OTHER`
+
+A cost that happens once is not a tariff: it is a `Charge` (`invoices/models.py`),
+specified in [2026-10-variable-charges.md](2026-10-variable-charges.md). The
+engine adds each bearer's share after the tariff lines (`charges.py`,
+`engine.py`), as an `InvoiceItem` with `item_type = fee`, `tariff_category =
+other`, `unit = flat`, quantity 1 and `sort_order = 950`. `TariffCategory.OTHER`
+exists only for these lines: `Tariff.clean` rejects it for a tariff.
+
 ### 3.3 Energy types
 
 | Value | Meaning |
@@ -1030,6 +1039,12 @@ windows, and the rate active on `period_end` applies to the whole invoice.
 that had a non-empty `vat_number` into it (the number is now required in this
 mode and forbidden in the other two).
 
+**One-off charges** (`Charge.vat_treatment`) are billed as entered in every mode and add to
+`subtotal_chf`. Under `registered`, a `pass_through` charge (an expense passed on at cost in the
+participant's name) stays out of the VAT base: `vat_base_chf = subtotal_chf − Σ producer-credit
+groups − Σ pass-through charge shares`. A `taxable` charge is part of the base. `inclusive` does not
+gross charges up and `embedded_vat_chf` is unaffected.
+
 **Producer credits do not reduce the VAT base** (`registered` only). What the ZEV
 pays a producer for the solar electricity it takes over — the `producer_credit`
 and `shared_producer_credit` accumulator buckets (`PRODUCER_CREDIT_BUCKETS`) — is
@@ -1184,6 +1199,7 @@ callbacks and each mutation's API dispatch check the current scope token.
 | `billing_mode ∈ {energy, percentage_of_energy}` and `energy_type = local` | `local_energy` |
 | Fixed-fee mode with `fixed_price_chf < 0` | `credit` |
 | Fixed-fee mode with `fixed_price_chf ≥ 0` | `fee` |
+| A `Charge` share (no tariff) | `fee`, `tariff_category = other`, `unit = flat` |
 
 ### 7.2 Description generation
 
@@ -1242,6 +1258,9 @@ sort_order = category_rank + energy_type_rank + billing_mode_rank
 | | | | | | | `shared_yearly_fee` | 7 |
 
 Within the same sort order, items are sorted by `tariff.name` (case-insensitive).
+
+Charge lines use the fixed `CHARGE_SORT_ORDER = 950`, after every tariff line, ordered by
+`charge_date` then creation time.
 
 ---
 
@@ -1497,6 +1516,12 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 | Swiss civil-date matching at 23:30/00:30 boundaries, the same instant expressed in UTC and CEST (`test_matching_uses_the_swiss_civil_date_of_the_timestamp`) | §4.3 civil-date assignment matching |
 | Conservation invariants (Σ local == pool; producer sold == consumer local) | §4.3 pool conservation |
 | Exact Decimal arithmetic where floats would drift | §4.3/5 Decimal end-to-end billing contract |
+
+### Backend (`invoices/test_charges.py`, `invoices/test_charges_api.py`)
+
+One-off charges: bearers on the charge date, equal and weight split, per-share rounding, VAT
+treatments in each mode, survival across regeneration, the issued-invoice lock, the readiness step,
+and the charge API. Listed in [2026-10-variable-charges.md](2026-10-variable-charges.md#9-test-plan).
 
 ### Backend (`invoices/test_shared_fee.py`)
 
