@@ -29,6 +29,8 @@ from invoices.contract_pdf import issue_contract_pdf
 from invoices.engine import generate_invoice, generate_invoices_for_zev
 from invoices.models import (
     DEFAULT_INVOICE_EMAIL_SUBJECT,
+    Charge,
+    ChargeAllocation,
     ContractIssue,
     Credit,
     CreditApplication,
@@ -851,6 +853,7 @@ class Command(BaseCommand):
             year=end_date.year - 1,
             skip_period=(invoice_period_start, invoice_period_end),
         )
+        self._seed_charges(zev, invoice_period_start, invoice_period_end)
         seeded_invoices = self._seed_invoices(zev, invoice_period_start, invoice_period_end)
         # Maria has moved away; her issued invoices keep their address copy.
         former_participant.address_line1 = "Alte Sonnenbergstrasse 123, Haus C, Appartement 42"
@@ -2166,6 +2169,27 @@ class Command(BaseCommand):
                 weekdays=period.get("weekdays", ""),
             )
         return tariff
+
+    def _seed_charges(self, zev: Zev, period_start: date, period_end: date) -> None:
+        """Two one-off charges (#924) in the open quarter, before its invoices are
+        generated, so they appear as "Other charges" lines and in the period's
+        charges table."""
+        Charge.objects.filter(zev=zev).delete()
+        Charge.objects.create(
+            zev=zev,
+            description="Porto Rechnungsversand",
+            amount_chf=Decimal("12.00"),
+            charge_date=period_start + timedelta(days=20),
+            allocation=ChargeAllocation.ALL_PARTICIPANTS,
+        )
+        Charge.objects.create(
+            zev=zev,
+            description="Ersatz Schliesszylinder Technikraum",
+            amount_chf=Decimal("85.00"),
+            charge_date=period_end - timedelta(days=12),
+            allocation=ChargeAllocation.ALL_PARTICIPANTS,
+            split_key="weight",
+        )
 
     def _seed_invoices(
         self,

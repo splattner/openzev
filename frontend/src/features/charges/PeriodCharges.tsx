@@ -1,4 +1,4 @@
-import { faEllipsis, faLock, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faEllipsis, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useMemo, useState } from 'react'
@@ -220,9 +220,7 @@ export function PeriodCharges({ zevId, periodStart, periodEnd, periodLocked }: P
             </div>
 
             {periodLocked ? (
-                <p className="muted m-0">
-                    <FontAwesomeIcon icon={faLock} fixedWidth /> {t('pages.charges.periodLocked')}
-                </p>
+                <Notice tone="warning">{t('pages.charges.periodLocked')}</Notice>
             ) : null}
 
             {chargesQuery.isError ? (
@@ -231,8 +229,6 @@ export function PeriodCharges({ zevId, periodStart, periodEnd, periodLocked }: P
                 </Notice>
             ) : chargesQuery.isLoading ? (
                 <p className="muted">{t('common.loading')}</p>
-            ) : charges.length === 0 ? (
-                <p className="muted">{t('pages.charges.emptyPeriod')}</p>
             ) : (
                 <div className="table-card">
                     <DataTable
@@ -240,6 +236,7 @@ export function PeriodCharges({ zevId, periodStart, periodEnd, periodLocked }: P
                         columns={columns}
                         getRowId={(charge) => charge.id}
                         initialSorting={[{ id: 'charge_date', desc: false }]}
+                        emptyMessage={t('pages.charges.emptyPeriod')}
                     />
                 </div>
             )}

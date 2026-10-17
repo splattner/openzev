@@ -321,8 +321,9 @@ period overview has loaded (also when the period has no invoice rows). Props: `z
   `charges.list(zevId, periodStart, periodEnd)`): date, description, amount, paid by ("All
   participants" / "N participants" / the single name), VAT treatment, and an `ActionMenu`
   (`faEllipsis`) with edit and delete. Writes are gated with `useWriteScope`.
-- Locked period: no *Add charge* button, no row actions, and a note ("An invoice of this period has
-  been approved, so its charges can no longer change"). An empty period says so in one line.
+- Locked period: no *Add charge* button, no row actions, and a warning `Notice` ("An invoice of this
+  period has been approved, so its charges can no longer change"). The table is rendered even when
+  the period has no charges; its single row says so (`pages.charges.emptyPeriod`).
 - Create/edit dialog (`ChargeFormModal`, `chargeForm.ts`): description, amount, date, "Who pays":
   *All participants* | *Selected participants*; participant multi-select when selected; split key
   (hidden for exactly one participant); VAT treatment with an explanatory hint. The **date is limited

@@ -882,6 +882,8 @@ invoices as its own line, under **Other charges**.
 Because the charge lives apart from the invoice, it **survives regeneration**:
 regenerate a draft as often as you like and the line comes back.
 
+![The Charges section under a period's invoices, with the note that an approved invoice freezes it](screenshots/08j-period-charges.png)
+
 ### Adding a charge
 
 Choose **Add charge** and fill in:
@@ -939,7 +941,7 @@ those drafts under the **Charges** step so you don't forget.
 As soon as **any** invoice of the period is approved (or sent or paid; a
 cancelled one does not count), the period's charges are **frozen**: you cannot
 add, edit or delete any of them, and the **Add charge** button is replaced by a
-note. This holds for the whole community, not only the people who pay the
+warning. This holds for the whole community, not only the people who pay the
 charge, so the period is always billed from one set of charges. To change
 something afterwards, correct the invoice (see
 [Correcting a paid invoice](09-invoice-management.md#correcting-a-paid-invoice-with-a-credit-note)),

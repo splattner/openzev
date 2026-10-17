@@ -470,6 +470,18 @@ test.describe('User Guide Screenshots', () => {
   })
 
   // 08c — Participant My Invoices (via impersonation)
+  // 08j — the period's one-off charges, under its invoices. The demo bills the
+  // seeded charges in the last complete quarter, so the section shows them
+  // together with the note that approved invoices freeze the period.
+  test('08j-period-charges', async ({ page }) => {
+    await navigateTo(page, '/billing/invoices')
+    const section = page.locator('.period-charges')
+    await expect(section.locator('tbody tr').first(), `Period charges missing — ${SEED_HINT}`).toBeVisible({ timeout: 10_000 })
+    await resetHover(page)
+    await section.screenshot({ path: path.join(SCREENSHOT_DIR, '08j-period-charges.png') })
+    await quantizePng(path.join(SCREENSHOT_DIR, '08j-period-charges.png'))
+  })
+
   test('08c-my-invoices', async ({ page }) => {
     await impersonateDemoParticipant(page, { requireSentInvoice: true })
     await navigateTo(page, '/me/invoices')
