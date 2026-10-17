@@ -19,7 +19,11 @@ You can usually skip a full spec for small bugfixes, copy updates, or isolated U
 
 Exception: when refactoring or standardizing frontend CRUD / management-page UX,
 use `2026-04-frontend-management-page-design.md` as the reference spec even if
-the change is mostly presentational.
+the change is mostly presentational. For container choices and
+component guidance, also consult the draft
+`2026-10-ui-patterns-and-component-catalog.md`; it is validated on the tariff
+screen first (`2026-10-tariff-split-view.md`) and then rolled out in phases,
+pending pilot validation and ADR 0039 acceptance.
 
 ## Quality standard
 
@@ -76,6 +80,7 @@ work.
 | Change area | Reference spec |
 |---|---|
 | Frontend CRUD / management-page cleanup, action hierarchy, section-vs-tab decisions, icon usage, responsive CRUD layouts | `2026-04-frontend-management-page-design.md` |
+| Which container a task opens in, the detail pane, component reuse, forms, labels and counts | `2026-10-ui-patterns-and-component-catalog.md` (Draft, pending pilot validation and ADR 0039 acceptance; pilot in `2026-10-tariff-split-view.md`) |
 
 ## Conventions
 
