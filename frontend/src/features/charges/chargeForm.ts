@@ -72,3 +72,8 @@ export function bearersLabel(
     if (charge.participants.length === 1) return names.get(charge.participants[0]) ?? t('pages.charges.bearers.one')
     return t('pages.charges.bearers.selected', { count: charge.participants.length })
 }
+
+/** ``day`` pulled into [min, max]; ISO dates compare as strings. */
+export function clampDate(day: string, min: string, max: string): string {
+    return day < min ? min : day > max ? max : day
+}

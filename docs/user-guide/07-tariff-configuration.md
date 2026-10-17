@@ -875,8 +875,9 @@ contract or invoice.
 
 A tariff describes a price that recurs. A cost that happens **once** — postage
 for the invoice run, a repair, a one-time fee — is not a tariff. Record it as a
-**charge** under **Setup → Charges** (`/charges`) and OpenZEV puts it on the
-right invoices as its own line, under **Other charges**.
+**charge** in the **Charges** section under the period's invoices
+(**Billing → Invoices**, pick the period) and OpenZEV puts it on the right
+invoices as its own line, under **Other charges**.
 
 Because the charge lives apart from the invoice, it **survives regeneration**:
 regenerate a draft as often as you like and the line comes back.
@@ -889,7 +890,7 @@ Choose **Add charge** and fill in:
 | --- | --- |
 | **Description** | What appears on the invoice line, e.g. *Postage, March invoice run* |
 | **Total amount (CHF)** | The whole cost, greater than zero |
-| **Date** | Decides which invoice carries the charge (see below) |
+| **Date** | Decides who pays (see below); limited to the period you are working in |
 | **Who pays** | *All participants*, or *Selected participants* |
 | **Split** | *Equally* or *By weight* (the participants' [allocation weight](03-participant-management.md#allocation-weight)); only shown when more than one person pays |
 | **VAT** | *Taxable* or *Pass-through* (see below) |
@@ -933,11 +934,19 @@ already carry it keep the old line until you regenerate them — the
 [Overview](09-invoice-management.md#billing-work-by-period-overview) lists
 those drafts under the **Charges** step so you don't forget.
 
-Once an **issued** invoice (approved, sent or paid, not cancelled) covers the
-charge date for one of the people who pay, the charge is **locked**, marked
-*Invoiced* in the list. It cannot be edited or deleted, and you cannot add or
-move a charge onto such a date: correct the invoice instead (see
-[Correcting a paid invoice](09-invoice-management.md#correcting-a-paid-invoice-with-a-credit-note)).
+### The period locks with the first approval
+
+As soon as **any** invoice of the period is approved (or sent or paid; a
+cancelled one does not count), the period's charges are **frozen**: you cannot
+add, edit or delete any of them, and the **Add charge** button is replaced by a
+note. This holds for the whole community, not only the people who pay the
+charge, so the period is always billed from one set of charges. To change
+something afterwards, correct the invoice (see
+[Correcting a paid invoice](09-invoice-management.md#correcting-a-paid-invoice-with-a-credit-note)),
+or record the cost in a later period.
+
+Add every charge **before** you approve the first invoice of the period, then
+regenerate the drafts.
 
 Charges are part of a [ZEV export archive](17-zev-transfer.md) and of backups.
 

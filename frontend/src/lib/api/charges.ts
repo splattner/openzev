@@ -4,9 +4,12 @@ import { fetchAllPages } from './pagination'
 
 const BASE = '/invoices/charges/'
 
-/** The one-off charges of a community, newest first. */
-export async function fetchCharges(zevId?: string): Promise<Charge[]> {
-  return fetchAllPages<Charge>(BASE, zevId ? { zev_id: zevId } : undefined)
+/** The one-off charges of a community, newest first; with a period, those dated within it. */
+export async function fetchCharges(
+  zevId?: string,
+  period?: { period_start: string; period_end: string },
+): Promise<Charge[]> {
+  return fetchAllPages<Charge>(BASE, { ...(zevId ? { zev_id: zevId } : {}), ...period })
 }
 
 export async function createCharge(payload: ChargeInput): Promise<Charge> {

@@ -10,6 +10,7 @@ import { Notice } from '../../components/Notice'
 import { previewCharge } from '../../lib/api/charges'
 import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
+import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { todayBusinessIso } from '../../lib/dates'
 import { formatChf } from '../../lib/numbers'
 import type { Charge, Participant } from '../../types/api'
@@ -17,6 +18,7 @@ import {
     chargeFieldErrors,
     chargeInputFrom,
     chargeToValues,
+    clampDate,
     emptyChargeValues,
     type ChargeFormValues,
 } from './chargeForm'
@@ -28,6 +30,9 @@ type ChargeFormModalProps = {
     /** The charge being edited; none creates one. */
     charge: Charge | null
     participants: Participant[]
+    /** The period being edited: a charge is dated within it. */
+    minDate: string
+    maxDate: string
     onClose: () => void
     onSubmit: (values: NonNullable<ReturnType<typeof chargeInputFrom>>) => void
 }
@@ -58,16 +63,18 @@ function useSettled<T>(value: T, delayMs = 350): T {
     return settled
 }
 
-function ChargeForm({ isPending, zevId, charge, participants, onClose, onSubmit }: Omit<ChargeFormModalProps, 'isOpen'>) {
+function ChargeForm({ isPending, zevId, charge, participants, minDate, maxDate, onClose, onSubmit }: Omit<ChargeFormModalProps, 'isOpen'>) {
     const { t } = useTranslation()
+    const { settings } = useAppSettings()
     const [values, setValues] = useState<ChargeFormValues>(
-        () => (charge ? chargeToValues(charge) : emptyChargeValues(todayBusinessIso())),
+        () => (charge ? chargeToValues(charge) : emptyChargeValues(clampDate(todayBusinessIso(), minDate, maxDate))),
     )
     const [submitted, setSubmitted] = useState(false)
     const patch = (next: Partial<ChargeFormValues>) => setValues((previous) => ({ ...previous, ...next }))
 
     const errors = chargeFieldErrors(values)
-    const input = chargeInputFrom(values, zevId)
+    const dateOutside = !!values.chargeDate && (values.chargeDate < minDate || values.chargeDate > maxDate)
+    const input = dateOutside ? null : chargeInputFrom(values, zevId)
     const settledInput = useSettled(input)
     const preview = useQuery({
         queryKey: queryKeys.charges.preview(settledInput),
@@ -124,8 +131,22 @@ function ChargeForm({ isPending, zevId, charge, participants, onClose, onSubmit 
             </label>
             <label>
                 <span>{t('pages.charges.fields.chargeDate')}</span>
-                <CivilDateInput value={values.chargeDate} onChange={(chargeDate) => patch({ chargeDate })} clearable={false} />
-                <small className="muted">{t('pages.charges.fields.chargeDateHint')}</small>
+                <CivilDateInput
+                    value={values.chargeDate}
+                    onChange={(chargeDate) => patch({ chargeDate })}
+                    minDate={minDate}
+                    maxDate={maxDate}
+                    clearable={false}
+                />
+                {showErrors && dateOutside ? (
+                    <small className="text-error">{t('pages.charges.errors.dateOutside')}</small>
+                ) : null}
+                <small className="muted">
+                    {t('pages.charges.fields.chargeDateHint', {
+                        from: formatShortDate(minDate, settings),
+                        to: formatShortDate(maxDate, settings),
+                    })}
+                </small>
             </label>
 
             <label className="grid-span-full">

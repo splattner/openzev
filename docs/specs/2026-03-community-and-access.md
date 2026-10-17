@@ -1702,7 +1702,6 @@ reaches every ZEV-scope route and sees its pages read-only
 | `/metering-data` | any authenticated | alias → `/metering/chart`, except `?tab=quality` → guarded `/metering/quality`; `tab` is always stripped, remaining params preserved |
 | `/imports` | ZEV scope | alias → `/metering/imports` (query preserved) |
 | `/tariffs` | ZEV scope | `TariffsPage` |
-| `/charges` | ZEV scope | `ChargesPage` — one-off charges (SPEC-2026-10-variable-charges) |
 | `/billing/invoices` · `/billing/emails` | ZEV scope | `BillingHubPage tab=…` (invoices · email delivery/history + retry) |
 | `/billing/statements` | any authenticated | alias → `/reports` (the annual-statement ZIP moved there with the other yearly documents) |
 | `/billing/periods` | ZEV scope | compatibility alias → `/`, where period work lives on manager Overview |
@@ -1769,7 +1768,7 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 | My invoices (`/me/invoices`) | shell role `participant` or `former` (a former participant sees only this entry) |
 | Annual statement (`/me/statement`) | shell role `participant` (consumption is available on the participant dashboard) |
 | My metering points (`/me/metering-points`) | shell role `participant` (not `former`); for a participant it also lights on `/metering/chart` and `/metering/points`, which they reach from it (they have no Metering hub entry); also `admin`, `manager` or `viewer` who personally hold a flagged metering point in the selected community while the energy data feature is on |
-| Setup group (participants, metering points `/metering/points`, tariffs, charges `/charges`, ZEV settings `/zev-settings`) | `isZevScope` (audit logs live in the ZEV settings hub; no standalone entry) |
+| Setup group (participants, metering points `/metering/points`, tariffs, ZEV settings `/zev-settings`) | `isZevScope` (audit logs live in the ZEV settings hub; no standalone entry) |
 | Feasibility (`/feasibility`, standalone entry below Setup) | `isZevScope` + `feasibility_calculator_enabled` (planning tool, not a setup step) |
 | Platform group (four entries: Overview `/admin`, Accounts `/admin/accounts`, Templates `/admin/templates`, Settings `/admin/system-settings`) | `role == 'admin'` (ZEVs/API keys/invoices/audit-logs/pdf+email templates live as hub tabs) |
 

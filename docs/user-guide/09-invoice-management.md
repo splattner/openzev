@@ -57,7 +57,10 @@ still hold meter assignments, appear under **Community notices**. Tariff
 coverage, metering gaps, unassigned readings and setup state are already
 covered by readiness steps or setup guidance.
 
-### Charges step
+### Charges section and step
+
+Below the invoice table, the **Charges** section lists the period's one-off
+charges and, until an invoice of the period is approved, offers **Add charge**.
 
 When the community has [one-off charges](07-tariff-configuration.md#one-off-charges)
 in a period, the period card gains a **Charges** step between generating and

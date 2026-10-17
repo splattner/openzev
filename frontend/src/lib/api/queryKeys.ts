@@ -36,7 +36,8 @@ export const queryKeys = {
   },
   charges: {
     lists: () => ['charges', 'list'] as const,
-    list: (zevId?: string) => ['charges', 'list', zevId ?? 'all'] as const,
+    list: (zevId?: string, periodStart?: string, periodEnd?: string) =>
+      ['charges', 'list', zevId ?? 'all', periodStart ?? null, periodEnd ?? null] as const,
     preview: (payload: unknown) => ['charges', 'preview', payload] as const,
   },
   feasibility: {

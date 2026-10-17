@@ -4,6 +4,7 @@ import {
     chargeFieldErrors,
     chargeInputFrom,
     chargeToValues,
+    clampDate,
     emptyChargeValues,
     type ChargeFormValues,
 } from '../src/features/charges/chargeForm'
@@ -110,5 +111,13 @@ describe('readiness charges step', () => {
 
     it('says nothing when everything is billed', () => {
         expect(stepDetailText(step({ status: 'done', count: 3 }), t)).toBeNull()
+    })
+})
+
+describe('clampDate', () => {
+    it('keeps a day inside the period and pulls the others to its edges', () => {
+        expect(clampDate('2026-11-05', '2026-10-01', '2026-12-31')).toBe('2026-11-05')
+        expect(clampDate('2026-09-30', '2026-10-01', '2026-12-31')).toBe('2026-10-01')
+        expect(clampDate('2027-01-01', '2026-10-01', '2026-12-31')).toBe('2026-12-31')
     })
 })

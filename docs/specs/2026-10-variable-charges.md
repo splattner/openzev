@@ -59,7 +59,7 @@ under either split key.
 | Readiness | A `charges` step on the period readiness payload |
 | PDF / public invoice | `other` category group; `flat` unit label |
 | Transfer archive | New `charges` section |
-| Frontend | Charges page, readiness hint, TypeScript types, i18n (de/fr/it/en) |
+| Frontend | A Charges section on the period's invoice page, readiness hint, TypeScript types, i18n (de/fr/it/en) |
 | Docs | Baseline spec updates, user-guide chapter |
 
 ### Out of scope
@@ -84,7 +84,7 @@ under either split key.
 
 The viewset uses `[IsAuthenticated, HasZevAccess]` and `ZevScopedQuerySetMixin`, as
 `TariffViewSet` does. Writes on a disabled ZEV are refused the way tariff writes are
-(`tariffs/test_disabled_zev.py`). Frontend route: `ProtectedRoute` with `ZEV_SCOPE`, as `/tariffs`.
+(`tariffs/test_disabled_zev.py`). The UI is a section of the Billing → Invoices page (§7.1), so it is visible to the same `ZEV_SCOPE` roles as that page.
 
 ## 4. Data model
 
@@ -308,25 +308,30 @@ already explains `FEE` lines from their description.
 
 ## 7. Frontend
 
-### 7.1 `ChargesPage` (`frontend/src/pages/ChargesPage.tsx`)
+### 7.1 `PeriodCharges` (`frontend/src/features/charges/PeriodCharges.tsx`)
 
-Route `/charges` (lazy-loaded in `AppRoutes.tsx` beside `tariffs`, `ProtectedRoute
-allowedRoles={ZEV_SCOPE}`), linked from the same navigation group as Tariffs; follows
-`2026-04-frontend-management-page-design.md` (DataTable, one primary action, `ActionMenu` for the
-row, `FormModal`).
+There is no page of its own and no navigation entry. `InvoicesPage` (`/billing/invoices`) renders
+`PeriodCharges` below the period's invoice table whenever the account manages the ZEV and the
+period overview has loaded (also when the period has no invoice rows). Props: `zevId`,
+`periodStart`, `periodEnd`, `periodLocked`.
 
-- List (`DataTable`): date, description (with an *Invoiced* lock badge when `is_locked`), amount,
-  paid by ("All participants" / "N participants" / the single name), VAT treatment, and an
-  `ActionMenu` (`faEllipsis`) with edit and delete. Writes are gated with `useWriteScope`.
-- No period filter: the list shows the ZEV's charges newest first.
+- `periodLocked` is true when any overview row's invoice has a status other than `draft` or
+  `cancelled`, the same rule as §4.5. The backend stays the authority (a stale page gets a 409/400).
+- List (`DataTable`, oldest first), fetched with `period_start`/`period_end` (query key
+  `charges.list(zevId, periodStart, periodEnd)`): date, description, amount, paid by ("All
+  participants" / "N participants" / the single name), VAT treatment, and an `ActionMenu`
+  (`faEllipsis`) with edit and delete. Writes are gated with `useWriteScope`.
+- Locked period: no *Add charge* button, no row actions, and a note ("An invoice of this period has
+  been approved, so its charges can no longer change"). An empty period says so in one line.
 - Create/edit dialog (`ChargeFormModal`, `chargeForm.ts`): description, amount, date, "Who pays":
   *All participants* | *Selected participants*; participant multi-select when selected; split key
-  (hidden for exactly one participant); VAT treatment with an explanatory hint. The live "who pays
-  what" table is the `POST /charges/preview/` response (debounced query) with notes for a nobody-bills
-  date, and for rounding that leaves an amount `unrecovered` or `overbilled`. Field errors from a
-  400 (including the locked-date error on `charge_date`) are mapped onto the fields.
-- Locked charges: edit and delete are disabled in the menu; the badge tooltip points to the
-  correction flow.
+  (hidden for exactly one participant); VAT treatment with an explanatory hint. The **date is limited
+  to the period** (`minDate`/`maxDate` on the date input, a field error otherwise, and the form is
+  not submittable); it defaults to today clamped into the period (`clampDate`). The limit is a UI
+  convenience: the API accepts any date that is not locked. The live "who pays what" table is the
+  `POST /charges/preview/` response (debounced query) with notes for a nobody-bills date, and for
+  rounding that leaves an amount `unrecovered` or `overbilled`. Field errors from a 400 are mapped
+  onto the fields.
 
 ### 7.2 Readiness and invoice cockpit
 
@@ -408,8 +413,8 @@ stays the four values. `ReadinessStep` key union gains `'charges'`.
 
 ### Frontend
 
-- `tests/charges.test.ts` (11 tests): form validation (selected participants required, amount > 0),
-  input mapping, bearers label.
+- `tests/charges.test.ts` (12 tests): form validation (selected participants required, amount > 0),
+  input mapping, bearers label, `clampDate`.
 - `tests/public-invoice.test.ts` renders the `other` group.
 - i18n key parity across the four locales (existing check).
 

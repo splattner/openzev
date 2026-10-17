@@ -3,35 +3,38 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ActionMenu } from '../components/ActionMenu'
-import { ConfirmDialog, consumeReportedError, useConfirmDialog } from '../components/ConfirmDialog'
-import { DataTable, type ColumnDef } from '../components/DataTable'
-import { EmptyState } from '../components/EmptyState'
-import { Notice } from '../components/Notice'
-import { PageHeader } from '../components/PageHeader'
-import { PageSkeleton } from '../components/PageSkeleton'
-import { ScopeGuard } from '../components/ScopeGuard'
-import { bearersLabel } from '../features/charges/chargeForm'
-import { ChargeFormModal } from '../features/charges/ChargeFormModal'
-import { createCharge, deleteCharge, fetchCharges, updateCharge } from '../lib/api/charges'
-import { formatApiError } from '../lib/api/errors'
-import { queryKeys } from '../lib/api/queryKeys'
-import { fetchParticipants } from '../lib/api/zev'
-import { formatShortDate, useAppSettings } from '../lib/appSettings'
-import { useAuth } from '../lib/auth'
-import { useCommunityAccess, useScopeNote } from '../lib/communityAccess'
-import { useManagedZev } from '../lib/managedZev'
-import { formatChfAmount } from '../lib/numbers'
-import { useToast } from '../lib/toast'
-import { useWriteScope } from '../lib/useWriteScope'
-import type { Charge } from '../types/api'
+import { ActionMenu } from '../../components/ActionMenu'
+import { ConfirmDialog, consumeReportedError, useConfirmDialog } from '../../components/ConfirmDialog'
+import { DataTable, type ColumnDef } from '../../components/DataTable'
+import { Notice } from '../../components/Notice'
+import { createCharge, deleteCharge, fetchCharges, updateCharge } from '../../lib/api/charges'
+import { formatApiError } from '../../lib/api/errors'
+import { queryKeys } from '../../lib/api/queryKeys'
+import { fetchParticipants } from '../../lib/api/zev'
+import { formatShortDate, useAppSettings } from '../../lib/appSettings'
+import { useAuth } from '../../lib/auth'
+import { useCommunityAccess } from '../../lib/communityAccess'
+import { formatChfAmount } from '../../lib/numbers'
+import { useToast } from '../../lib/toast'
+import { useWriteScope } from '../../lib/useWriteScope'
+import type { Charge } from '../../types/api'
+import { bearersLabel } from './chargeForm'
+import { ChargeFormModal } from './ChargeFormModal'
+
+type PeriodChargesProps = {
+    zevId: string
+    periodStart: string
+    periodEnd: string
+    /** An invoice of the period is approved or further: the charges are frozen. */
+    periodLocked: boolean
+}
 
 /**
- * One-off costs passed on to participants (#924): postage, a repair. Each is
- * recorded once and billed on the invoice whose period contains its date; it
- * is locked once such an invoice has been issued.
+ * The one-off costs billed in one period (#924): postage, a repair. Shown under
+ * the period's invoices, since that is where they end up. New charges are dated
+ * within the period; once an invoice of it is approved the list is read-only.
  */
-export function ChargesPage() {
+export function PeriodCharges({ zevId, periodStart, periodEnd, periodLocked }: PeriodChargesProps) {
     const { t } = useTranslation()
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
@@ -39,45 +42,41 @@ export function ChargesPage() {
     const { user } = useAuth()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
     const cancelConfirmation = useEffectEvent(handleCancel)
-    const { selectedZevId, selectedZev } = useManagedZev()
-    const scopeNote = useScopeNote()
     const { canWriteSelectedCommunity } = useCommunityAccess()
     const { scope, isCurrent, assertWritable } = useWriteScope(
-        { selectedZevId, canWrite: canWriteSelectedCommunity, accountId: user?.id },
+        { selectedZevId: zevId, canWrite: canWriteSelectedCommunity, accountId: user?.id },
         t('common.error'),
     )
-    const readOnly = !canWriteSelectedCommunity
+    const canEdit = canWriteSelectedCommunity && !periodLocked
     const [formOpen, setFormOpen] = useState(false)
     const [editing, setEditing] = useState<Charge | null>(null)
 
-    const enabled = !!selectedZevId && selectedZev?.id === selectedZevId
     const chargesQuery = useQuery({
-        queryKey: queryKeys.charges.list(selectedZevId || undefined),
-        queryFn: () => fetchCharges(selectedZevId || undefined),
-        enabled,
+        queryKey: queryKeys.charges.list(zevId, periodStart, periodEnd),
+        queryFn: () => fetchCharges(zevId, { period_start: periodStart, period_end: periodEnd }),
     })
     const participantsQuery = useQuery({
-        queryKey: queryKeys.zev.participants(selectedZevId || undefined),
+        queryKey: queryKeys.zev.participants(zevId),
         queryFn: fetchParticipants,
-        enabled,
     })
     const participants = useMemo(
-        () => (participantsQuery.data ?? []).filter((participant) => participant.zev === selectedZevId),
-        [participantsQuery.data, selectedZevId],
+        () => (participantsQuery.data ?? []).filter((participant) => participant.zev === zevId),
+        [participantsQuery.data, zevId],
     )
     const participantNames = useMemo(
         () => new Map(participants.map((participant) => [participant.id, participant.display_name || participant.full_name || ''])),
         [participants],
     )
 
+    // A dialog belongs to one period of one community: never let it survive a change.
     useEffect(() => {
         setFormOpen(false)
         setEditing(null)
         cancelConfirmation()
-    }, [selectedZevId, user?.id, readOnly])
+    }, [zevId, user?.id, canEdit, periodStart, periodEnd])
 
-    const invalidate = (zevId: string | null) => {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.charges.list(zevId || undefined) })
+    const invalidate = () => {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.charges.lists() })
         // A charge changes what the period's readiness reports (stale drafts).
         void queryClient.invalidateQueries({ queryKey: ['invoices'] })
     }
@@ -92,7 +91,7 @@ export function ChargesPage() {
             return id ? updateCharge(id, payload) : createCharge(payload)
         },
         onSuccess: (_, variables) => {
-            invalidate(variables.scope.selectedZevId ?? null)
+            invalidate()
             if (!isCurrent(variables.scope)) return
             setFormOpen(false)
             setEditing(null)
@@ -111,7 +110,7 @@ export function ChargesPage() {
             return deleteCharge(charge.id)
         },
         onSuccess: (_, variables) => {
-            invalidate(variables.scope.selectedZevId ?? null)
+            invalidate()
             if (isCurrent(variables.scope)) pushToast(t('pages.charges.messages.deleted'), 'success')
         },
         onError: (error, variables) => {
@@ -147,16 +146,7 @@ export function ChargesPage() {
             id: 'description',
             accessorKey: 'description',
             header: t('pages.charges.columns.description'),
-            cell: ({ row }) => (
-                <>
-                    {row.original.description}
-                    {row.original.is_locked ? (
-                        <span className="badge badge-info" title={t('pages.charges.lockedHint')}>
-                            <FontAwesomeIcon icon={faLock} fixedWidth /> {t('pages.charges.locked')}
-                        </span>
-                    ) : null}
-                </>
-            ),
+            cell: ({ row }) => row.original.description,
         },
         {
             id: 'amount_chf',
@@ -184,7 +174,7 @@ export function ChargesPage() {
             meta: { numeric: true },
             cell: ({ row }) => {
                 const charge = row.original
-                if (readOnly) return null
+                if (!canEdit || charge.is_locked) return null
                 return (
                     <ActionMenu
                         label={t('common.actions')}
@@ -196,14 +186,12 @@ export function ChargesPage() {
                                 label: t('common.edit'),
                                 icon: <FontAwesomeIcon icon={faPen} fixedWidth />,
                                 onClick: () => openEdit(charge),
-                                disabled: charge.is_locked,
                             },
                             {
                                 key: 'delete',
                                 label: t('common.delete'),
                                 icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
                                 onClick: () => confirmDelete(charge),
-                                disabled: charge.is_locked,
                                 danger: true,
                             },
                         ]}
@@ -212,63 +200,65 @@ export function ChargesPage() {
             },
         },
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    ], [t, settings, participantNames, readOnly, scope])
+    ], [t, settings, participantNames, canEdit, scope])
 
     const charges = chargesQuery.data ?? []
 
     return (
-        <div className="page-stack">
-            <PageHeader
-                eyebrow={selectedZev?.name}
-                communitySwitch
-                scopeNote={scopeNote}
-                title={t('pages.charges.title')}
-                description={t('pages.charges.description')}
-                actions={!readOnly ? (
-                    <button type="button" className="button button-primary" onClick={openCreate}>
+        <section className="period-charges" aria-labelledby="period-charges-title">
+            <div className="period-charges-header">
+                <div>
+                    <h3 id="period-charges-title" className="m-0">{t('pages.charges.title')}</h3>
+                    <p className="muted m-0">{t('pages.charges.description')}</p>
+                </div>
+                {canWriteSelectedCommunity && !periodLocked ? (
+                    <button type="button" className="button button-secondary" onClick={openCreate}>
                         <FontAwesomeIcon icon={faPlus} fixedWidth />
                         {t('pages.charges.create')}
                     </button>
-                ) : undefined}
-            />
-            <ScopeGuard skeleton="table">
-                {chargesQuery.isLoading ? <PageSkeleton variant="table" /> : chargesQuery.isError ? (
-                    <Notice tone="error" onRetry={() => void chargesQuery.refetch()} isRetrying={chargesQuery.isFetching}>
-                        {t('common.error')}
-                    </Notice>
-                ) : charges.length === 0 ? (
-                    <EmptyState
-                        titleKey="pages.charges.emptyState.title"
-                        descriptionKey="pages.charges.emptyState.description"
-                        actions={!readOnly ? [{ labelKey: 'pages.charges.create', onClick: openCreate, variant: 'primary', icon: faPlus }] : []}
-                    />
-                ) : (
-                    <div className="table-card">
-                        <DataTable
-                            data={charges}
-                            columns={columns}
-                            getRowId={(charge) => charge.id}
-                            initialSorting={[{ id: 'charge_date', desc: true }]}
-                        />
-                    </div>
-                )}
-            </ScopeGuard>
+                ) : null}
+            </div>
 
-            {selectedZevId ? (
-                <ChargeFormModal
-                    isOpen={formOpen}
-                    isPending={saveMutation.isPending}
-                    zevId={selectedZevId}
-                    charge={editing}
-                    participants={participants}
-                    onClose={() => { setFormOpen(false); setEditing(null) }}
-                    onSubmit={(payload) => saveMutation.mutate({ payload, id: editing?.id ?? null, scope })}
-                />
+            {periodLocked ? (
+                <p className="muted m-0">
+                    <FontAwesomeIcon icon={faLock} fixedWidth /> {t('pages.charges.periodLocked')}
+                </p>
             ) : null}
+
+            {chargesQuery.isError ? (
+                <Notice tone="error" onRetry={() => void chargesQuery.refetch()} isRetrying={chargesQuery.isFetching}>
+                    {t('common.error')}
+                </Notice>
+            ) : chargesQuery.isLoading ? (
+                <p className="muted">{t('common.loading')}</p>
+            ) : charges.length === 0 ? (
+                <p className="muted">{t('pages.charges.emptyPeriod')}</p>
+            ) : (
+                <div className="table-card">
+                    <DataTable
+                        data={charges}
+                        columns={columns}
+                        getRowId={(charge) => charge.id}
+                        initialSorting={[{ id: 'charge_date', desc: false }]}
+                    />
+                </div>
+            )}
+
+            <ChargeFormModal
+                isOpen={formOpen}
+                isPending={saveMutation.isPending}
+                zevId={zevId}
+                charge={editing}
+                participants={participants}
+                minDate={periodStart}
+                maxDate={periodEnd}
+                onClose={() => { setFormOpen(false); setEditing(null) }}
+                onSubmit={(payload) => saveMutation.mutate({ payload, id: editing?.id ?? null, scope })}
+            />
 
             {dialog && (
                 <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />
             )}
-        </div>
+        </section>
     )
 }

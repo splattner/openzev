@@ -278,7 +278,6 @@ export function Layout() {
                                 <SidebarLink to="/participants" label={t('nav.participants')} icon={<UsersIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/metering/points" label={t('nav.meteringPoints')} icon={<PlugIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/tariffs" label={t('nav.tariffs')} icon={<TagIcon />} collapsed={isNavigationCollapsed} />
-                                <SidebarLink to="/charges" label={t('nav.charges')} icon={<ChargeIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/zev-settings" label={t('nav.zevSettings')} icon={<SettingsIcon />} collapsed={isNavigationCollapsed} />
                             </div>
                         )}
@@ -491,10 +490,6 @@ function EnergyIcon() {
 
 function TagIcon() {
     return <IconSvg path="m20.59 13.41-7.18 7.18a2 2 0 0 1-2.83 0L3 13V3h10l7.59 7.59a2 2 0 0 1 0 2.82ZM7.5 7.5h.01" />
-}
-
-function ChargeIcon() {
-    return <IconSvg path="M12 3v18m4-14.5C16 5 14.2 4 12 4S8 5 8 7s1.8 3 4 3 4 1 4 3-1.8 3-4 3-4-1-4-2.5" />
 }
 
 function InvoiceIcon() {
