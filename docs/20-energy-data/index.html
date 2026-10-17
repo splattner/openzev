@@ -1884,7 +1884,10 @@ read. Only the time you held the metering point is stored.</p>
 <p>If you do not use Solar Manager — for instance with Home Assistant, n8n or a
 script — choose <strong>Push / file</strong> when you connect. You get a <strong>push token</strong>
 shown <strong>once</strong>; copy it right away. OpenZEV stores only a hash, so if you lose
-it you issue a new one (<strong>New push token</strong>), which stops the old one at once.</p>
+it you issue a new one (<strong>New push token</strong>), which stops the old one at once.
+The token also appears under <strong>Account → Tokens &amp; keys</strong> with when it was issued and last
+used; there you can issue a new one or revoke it. Revoking drops only the token: the source
+and its readings stay, and the device is rejected until you issue a new token.</p>
 <p>Send readings with an HTTP <code>POST</code>:</p>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">"https://your-openzev.example.com/api/v1/metering/supplementary/ingest/"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer ozs_abcd1234_yourtoken"</span><span class="w"> </span><span class="se">\</span>
