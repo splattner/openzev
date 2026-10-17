@@ -1935,7 +1935,8 @@ def generate_invoice(
         (p["total"] for p in item_payloads if p["bucket"] in PRODUCER_CREDIT_BUCKETS),
         Decimal("0"),
     )
-    vat_base_chf = subtotal - producer_credit_chf - pass_through_total(charge_lines)
+    pass_through_chf = pass_through_total(charge_lines)
+    vat_base_chf = subtotal - producer_credit_chf - pass_through_chf
     vat_rate = _resolve_vat_rate(zev, period_end)
     vat_chf = (vat_base_chf * vat_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     total_chf = subtotal + vat_chf
@@ -1962,6 +1963,7 @@ def generate_invoice(
         subtotal_chf=subtotal,
         vat_rate=vat_rate,
         vat_base_chf=vat_base_chf if zev.vat_mode == VatMode.REGISTERED else None,
+        pass_through_chf=pass_through_chf if zev.vat_mode == VatMode.REGISTERED else Decimal("0"),
         vat_chf=vat_chf,
         embedded_vat_chf=embedded_vat_chf if zev.vat_mode == VatMode.INCLUSIVE else None,
         total_chf=total_chf,

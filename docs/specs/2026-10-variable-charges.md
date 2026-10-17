@@ -141,7 +141,10 @@ and description all read the tariff), so charges do **not** go through it. Inste
    (`invoices/charges.py::charge_lines_by_participant`: one charge query with
    `prefetch_related("participants")`, one participants query).
 2. `charges_chf = Σ line.total_chf`. `subtotal = subtotal + charges_chf`.
-3. `vat_base_chf = subtotal − producer_credit_chf − Σ pass_through lines` (§4.4).
+3. `pass_through_chf = Σ pass_through lines`; `vat_base_chf = subtotal − producer_credit_chf −
+   pass_through_chf` (§4.4). `Invoice.pass_through_chf` (`Decimal(10,2)`, default 0, migration
+   `0027_invoice_pass_through`) records it, for `registered` ZEVs only, so the PDF can list it apart
+   from producer credits.
 4. `InvoiceItem` rows are created for each line, appended after the tariff items:
 
 | `InvoiceItem` field | Value |
@@ -176,6 +179,13 @@ path builds a context of its own and so reads the same data.
 The `inclusive` rule differs from levies and grid fees on purpose: those are tariff prices stored
 net, whereas the owner enters a charge from a receipt, so the figure is already what was paid.
 `embedded_vat_chf` is therefore not affected by charges.
+
+**PDF totals.** `_build_template_context` derives `producer_credit_chf = subtotal − vat_base −
+pass_through_chf` (or `None` when zero) and exposes `pass_through_chf` (or `None`). The totals block
+shows the *Supplies subtotal* (`vat_base_chf`) whenever either is set, then the VAT, then an
+*Expenses passed on (no VAT)* row (`tr.pass_through`), then the producer remuneration, then the
+total. `pass_through_chf` is in the transfer archive (optional field) and in the PDF-template field
+catalog (`admin.fields.passThrough`).
 
 `pass_through` corresponds to an expense reimbursement billed in the participant's name and for
 their account (Auslagenersatz). Whether a given cost qualifies is a tax question; the application

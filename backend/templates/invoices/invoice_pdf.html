@@ -636,7 +636,7 @@
                 <div class="totals">
                     <table>
                         <tr>
-                            {% if producer_credit_chf %}
+                            {% if producer_credit_chf or pass_through_chf %}
                             <td>{{ tr.supplies_subtotal }}</td>
                             <td class="numeric">CHF {{ invoice.vat_base_chf|floatformat:2 }}</td>
                             {% else %}
@@ -648,6 +648,12 @@
                         <tr>
                             <td>{{ tr.vat }} ({{ vat_rate_percent|floatformat:1 }}%)</td>
                             <td class="numeric">CHF {{ invoice.vat_chf|floatformat:2 }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if pass_through_chf %}
+                        <tr>
+                            <td>{{ tr.pass_through }}</td>
+                            <td class="numeric">CHF {{ pass_through_chf|floatformat:2 }}</td>
                         </tr>
                         {% endif %}
                         {% if producer_credit_chf %}

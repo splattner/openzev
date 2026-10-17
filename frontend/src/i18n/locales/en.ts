@@ -318,6 +318,7 @@ export const en = {
             vatAmount: 'VAT amount (CHF)',
             vatBase: 'VAT base (CHF)',
             producerCredit: 'Producer remuneration (CHF)',
+            passThrough: 'Expenses passed on (CHF)',
             total: 'Total (CHF)',
             invoiceNotes: 'Notes',
             formattedDates: 'Dates',

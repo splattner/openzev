@@ -367,6 +367,8 @@ INVOICE_FIELDS = (
     "subtotal_chf",
     "vat_rate",
     "vat_base_chf",
+    # Optional (#924): the pass-through charges inside the subtotal.
+    "pass_through_chf",
     "vat_chf",
     "embedded_vat_chf",
     "total_chf",

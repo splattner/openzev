@@ -309,6 +309,7 @@ export const de = {
             vatAmount: 'MWST-Betrag (CHF)',
             vatBase: 'MWST-Basis (CHF)',
             producerCredit: 'Vergütung Produktion (CHF)',
+            passThrough: 'Auslagenersatz (CHF)',
             total: 'Total (CHF)',
             invoiceNotes: 'Bemerkungen',
             formattedDates: 'Daten',

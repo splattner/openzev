@@ -205,6 +205,7 @@ def test_a_pass_through_charge_is_billed_but_not_taxed():
     assert (invoice.subtotal_chf, invoice.vat_base_chf, invoice.vat_chf, invoice.total_chf) == (
         Decimal("150.00"), Decimal("50.00"), Decimal("4.05"), Decimal("154.05"),
     )
+    assert invoice.pass_through_chf == Decimal("100.00")
 
 
 @pytest.mark.parametrize("mode", [VatMode.NOT_REGISTERED, VatMode.INCLUSIVE])

@@ -350,16 +350,18 @@ def _build_template_context(
     if credit_application_rows:
         content_mm += _TABLE_ROW_MM * (len(credit_application_rows) + 1)
 
-    # Producer credits, listed after the VAT (#957); None when there are none
-    # or the invoice has no recorded VAT base.
+    # Producer credits (#957) and pass-through charges (#924) sit outside the
+    # VAT base and are listed after the VAT; None when there are none or the
+    # invoice has no recorded VAT base.
     producer_credit_chf = None
     if invoice.vat_base_chf is not None:
-        producer_credit_chf = (invoice.subtotal_chf - invoice.vat_base_chf) or None
+        producer_credit_chf = (invoice.subtotal_chf - invoice.vat_base_chf - invoice.pass_through_chf) or None
 
     return {
         "invoice": invoice,
         "vat_rate_percent": vat_rate_percent,
         "producer_credit_chf": producer_credit_chf,
+        "pass_through_chf": invoice.pass_through_chf or None,
         "credit_application_rows": credit_application_rows,
         "invoice_number_prefix": invoice_number_prefix,
         "invoice_number_suffix": invoice_number_suffix,

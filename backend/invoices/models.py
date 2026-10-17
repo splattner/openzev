@@ -111,6 +111,9 @@ class Invoice(models.Model):
     vat_base_chf = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
+    # The pass-through charges (#924) inside ``subtotal_chf``, which stay out of
+    # ``vat_base_chf`` and are listed apart from the VAT on the invoice.
+    pass_through_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     vat_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     # Non-recoverable VAT already contained in the line totals, for a ZEV on
     # VatMode.INCLUSIVE. Not charged and not shown on the participant invoice

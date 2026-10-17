@@ -309,6 +309,7 @@ export const fr = {
             vatAmount: 'Montant TVA (CHF)',
             vatBase: 'Base TVA (CHF)',
             producerCredit: 'Rémunération de la production (CHF)',
+            passThrough: 'Remboursement de débours (CHF)',
             total: 'Total (CHF)',
             invoiceNotes: 'Remarques',
             formattedDates: 'Dates',
