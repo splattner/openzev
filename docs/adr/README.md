@@ -42,6 +42,8 @@ This directory captures key architectural decisions for OpenZEV.
 - [0036: Explicit participant-link password recovery](0036-explicit-participant-link-password-recovery.md)
 - [0037: Issued invoices are corrected by credit note, never deleted](0037-issued-invoices-are-corrected-not-deleted.md) (amends 0006; Proposed)
 - [0038: Order invoice-generation locks with restore and approval](0038-invoice-generation-lock-order.md)
+- [0039: Choose containers by task; validate the tariff split view first](0039-overlay-and-disclosure-pattern-rules.md) (Proposed)
+- [0040: Share repeated UI behavior when it has real consumers](0040-overlay-wrappers-not-mantine-primitives.md) (Proposed)
 
 ## Conventions
 

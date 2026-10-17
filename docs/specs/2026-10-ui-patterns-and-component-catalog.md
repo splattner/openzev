@@ -1,4 +1,4 @@
-# Reference Spec: UI patterns and component catalog
+# Feature Spec: UI patterns and component catalog
 
 - Spec ID: SPEC-2026-10-ui-patterns
 - Status: Draft
@@ -6,499 +6,625 @@
 - Type: Change
 - Owners: Core maintainers
 - Created: 2026-10-15
-- Target Release: Ongoing reference (rollout in §11)
+- Updated: 2026-10-16
+- Target Release: Ongoing reference; tariff pilot first (§11)
 - Related Issues: n/a
-- Related ADRs: [0035](../adr/0035-overlay-and-disclosure-pattern-rules.md), [0032](../adr/0032-one-visual-language-for-screen-and-documents.md)
+- Related ADRs: [0039](../adr/0039-overlay-and-disclosure-pattern-rules.md), [0040](../adr/0040-overlay-wrappers-not-mantine-primitives.md), [0032](../adr/0032-one-visual-language-for-screen-and-documents.md)
 - Impacted Areas: frontend, docs
 
 ---
 
+This branch defines a proposal; it does not implement the UI described below.
+The revised direction is a tariff pilot followed by gradual adoption, pending
+validation and acceptance of ADRs 0039/0040. Existing accepted guidance remains
+authoritative until the relevant replacement is accepted and implemented.
+Baseline specs and the user guide continue to describe the shipped UI.
+
 ## 1. Problem and outcome
 
-`2026-08-ui-redesign-pdf-style` §15 defines how the app *looks* (tokens, shell,
-page anatomy, sheets, buttons, pills). `2026-04-frontend-management-page-design`
-defines the shared primitives and the structure of a CRUD page. Neither says
-**which container or component to use for a given job**, and the code shows it:
+The primary audience is an occasional, nontechnical community manager.
+The goal is understandable, predictable tasks with a useful overview and
+reliable return navigation. Code consistency supports that goal; differing
+widths or component imports alone do not justify changing a workflow.
 
-| Observation (2026-10-15) | Evidence |
+`2026-08-ui-redesign-pdf-style` §15 defines the current visual system.
+`2026-04-frontend-management-page-design` defines existing shared primitives
+and management-page structure. This reference adds task-based container
+choices, a component catalog, and form/action/feedback guidance.
+
+### Current observations (2026-10-16, commit `ecb0c962`)
+
+| Observation | Evidence and implication |
 |---|---|
-| Ten different modal widths | `FormModal` is used in 33 files; 20 call sites set `maxWidth` explicitly, to 560 (×2), 600, 620, 640 (×6), 720, 760 (×2), 900, 960 (×3), 1000 (×2) or 1080px; the rest take the 600px default |
-| Three drawers, three implementations | `TariffDetailDrawer`, `AuditEventDrawer`, `MeteringGapsDrawer` — raw Mantine `Drawer`; two share copy-pasted non-modal overrides, widths are `clamp(720px,60vw,1080px)`, `min(100vw,560px)`, `min(100vw,32rem)`; heading level `h3` vs Mantine title |
-| A modal opened on top of a drawer | Tariff detail drawer → `TariffFormModal` / `TariffVersionModal` / `TariffPeriodFormModal` |
-| Wizards inside modals | `ZevListPage` 4-step create plus a done screen (960px), `ImportWizardModal` (1080px) |
-| Three disclosure mechanisms | native `<details>` (`BillingPeriodCard`, `BillingPeriodsPage`), hand-rolled `aria-expanded` buttons (`ZevEmailTemplateFields`, `RawMeteringTable`, `MeteringGapsDrawer`, `MeteringPointRow`, `TariffCategorySections`) |
-| Library used directly in pages | 19 page/feature files import `@mantine/core` (`Tabs` ×9, `Switch`, `Drawer` ×3, `Skeleton`, `Menu`, `Popover`, `Chip`, `TextInput`, `Autocomplete`) |
-| Button variants beyond the system | one `button danger`, one `button button-primary button-outline`, 151 `<button>` elements without the `button` class, 571 `style={{}}` props |
+| Tariff detail covers part of the list | `TariffDetailDrawer.tsx` uses an overlay sized `clamp(720px, 60vw, 1080px)`. The uncovered list remains interactive, but space is not reserved for it. |
+| The list already provides substantial pricing detail | `TariffCategorySections.tsx` shows prices, schedules, validity, notes and warnings; extra detail adds version history, actions and, for dynamic tariffs, charts and price records. |
+| Tariff editing varies in complexity | `TariffFormModal.tsx` branches during creation, but an existing static-energy version can expose mainly dates and notes. Rename is one field; new-version and period tasks have their own dialogs. |
+| Detail selection already supports links | `TariffsPage.tsx` stores series/version selection in URL parameters, but replaces history on open/close. The validity filter is local state. |
+| Forms do not yet provide the proposed protection | Tariff forms lack a dirty-close guard; save errors are primarily toasts or a shared error banner. Submit is disabled while saving, but fields remain editable. |
+| Existing responsive tables can be reused | Participants and invoices share the `table-card invoice-rows` treatment. Their container-based responsive rules support a list narrowed by a detail panel. |
+| Other surfaces differ for real reasons | Audit and tariff drawers are non-modal; metering gaps uses Mantine's modal defaults. ZEV creation and imports have different steps, state and recovery needs. |
 
-The outcome is a single reference a contributor (human or agent) can follow
-when adding a page or dialog: **a decision rule for where content opens**, a
-**catalogue of the components to use** (and which not to hand-roll), the
-**standards for forms, actions, feedback and states**, and the **checks**
-that keep it that way. Round 1 (this spec) is definition only. Round 2 (§11)
-aligns existing code.
+These observations are inputs to the pilot, not a backlog of mandatory
+migrations. Static inline styles, component-owned buttons, native disclosures
+and direct library imports must be assessed before being classified as defects.
 
 ## 2. Scope
 
-### In scope
+### In scope for this proposal
 
 | Area | Details |
 |---|---|
-| Container choice | Decision rule: dialog / modal / drawer / page / disclosure (§5, §6) |
-| New shared components | `Drawer`, `Disclosure`, `AppTabs`, `FormModal` `size` (§7) |
-| Standards | Forms (§8), actions (§9), feedback and states (§10) |
-| Catalogue | One table of every shared component with *use when* / *do not use when* (§4) |
-| Enforcement | Review checklist and an automated guard (§12) |
-| Rollout | Inventory of known deviations, migration order (§11) |
+| Container choice | Panels with viewing/editing modes, standalone short dialogs, pages when genuinely needed, and inline disclosure (§5–§6) |
+| Tariff pilot | Table styling, current/upcoming/history hierarchy, reserved detail pane, mobile replacement view, and return navigation (§5.1) |
+| Forms | Simple editing, discard protection, validation, pending and error behavior (§8) |
+| Labels | Useful counts, quiet classifications, actionable issues and audience-specific statuses (§10) |
+| Catalog and reuse | Existing primitives first; shared components only for demonstrated repetition (§4, §7) |
+| Rollout and checks | Validate the tariff pilot before wider adoption; ordinary compiler/lint checks plus contextual review (§11–§12) |
 
 ### Out of scope
 
-- Visual styling: tokens, colour, type, sheets, pills, buttons (SPEC-2026-08 §15 stays authoritative).
-- Structure of a CRUD page and the behaviour of the existing primitives (SPEC-2026-04 stays authoritative; this spec links to it rather than copying it).
-- PDF layout, backend, API shapes.
-- Wrapping Mantine *form controls* (§7.4, ADR 0035 alternative 4).
-- Implementing any of §7 or §11; this spec defines them.
+- UI implementation in this documentation branch.
+- Broad visual redesign: palette, typography, badge shapes, shadows and brand
+  tokens. The limited label-usage guidance in §10 is in scope; the visual
+  baseline otherwise remains authoritative.
+- Backend behavior, API shapes, billing calculations, permissions and data models.
+- PDF implementation or changes to existing issued documents. §10.3 records
+  document-facing label decisions for separate follow-up.
+- Automatic migration of audit/gaps drawers, ZEV creation, imports or every
+  existing form. Each workflow needs its own assessment.
+- Wrapping every Mantine control, compulsory footer renames, new custom
+  pattern-checking scripts, or a fixed app-wide modal-width conversion.
+
+Illustrative labels below must use translation keys in implementation.
+Count-bearing messages use locale-aware pluralization when a count is useful.
 
 ## 3. Actors, permissions, and ZEV scope
 
-No change. Permission-dependent visibility of actions follows SPEC-2026-04 §3
-and the page's role rules; a read-only role sees the same container with the
-write actions absent (never a disabled form).
+Existing role and ZEV access rules remain unchanged. Read-only users can inspect
+the same information; write actions are absent rather than presented as
+disabled forms. Important issues remain visible even when the reader cannot fix
+them. A fix is actionable only when authorized and available.
 
-## 4. Component catalogue
+Account, community or capability changes must clear unauthorized selections,
+detail data and drafts. Preserve `useWriteScope` protections: obsolete mutation
+completions must not reopen detail, move focus, announce success or select data
+in a replacement scope. Invalidate the originating community's queries as today.
 
-Contracts of existing components live in SPEC-2026-04 §4.1 (and `index.css`
-classes in §4.2); this table says **when** to reach for them. A row marked
-**new** is defined in §7.
+## 4. Component catalog
+
+Existing contracts live in SPEC-2026-04 §4.1–§4.3. Proposed reuse candidates
+in §7 are not prerequisites for the pilot.
 
 ### 4.1 Page structure
 
-| Need | Use | Do not |
-|---|---|---|
-| Page title, scope kicker, description, page-level actions | `PageHeader` | hand-written `<h1>` or `.page-header` markup |
-| A page's loading / error / content states | `PageState` + `PageSkeleton` | a "Loading…" text card |
-| Community scope handling | `ScopeGuard` | re-implementing "no community" branches |
-| Mutually exclusive views of one subject (document-like) | `AppTabs` (**new**; today `Tabs` + `app-tabs` classNames) | hand-rolled tab strips; tabs for a filter (use `FilterTabs`) |
-| Counted, mutually exclusive filters of a list | `FilterTabs` | `AppTabs` |
-| Period / interval | `PeriodSelector`, `YearPicker` | bare date inputs for billing periods |
-| Row of filters + period | `.filter-bar` | a sheet around filters |
-| List actions on the page | `Toolbar` | ad hoc flex rows |
-| KPI tiles | `StatCard` in `.stat-grid` | custom number tiles |
-| Tabular records | `DataTable`, or the row-table classes for billing/participant/tariff lists | `<table>` without the table classes |
-| Empty list | `EmptyState` | free text in a `.card` |
+| Need | Use |
+|---|---|
+| Page title, scope, description and page actions | `PageHeader` |
+| Loading, error and content states | `PageState` + `PageSkeleton` |
+| Community-scope handling | `ScopeGuard` |
+| Mutually exclusive document-like views | Mantine `Tabs` with existing `app-tabs` classes; `AppTabs` if extracted (§7.4) |
+| Mutually exclusive list filters | `FilterTabs`; counts only when useful (§10.1) |
+| Period or interval | `PeriodSelector`, `YearPicker` |
+| Filter row / list actions | `.filter-bar` / `Toolbar` |
+| Useful KPI tiles | `StatCard` in `.stat-grid`; no totals added just to fill tiles |
+| Tabular records | `DataTable` or existing billing/participant row-table classes |
+| Empty list | `EmptyState`, with a permitted corrective action where useful |
 
-### 4.2 Content containers
+Rows need a named keyboard-accessible activation control. Use links for routed
+navigation and buttons for an in-place preview; row clicking is an additional
+convenience. Do not expose navigation as `role="button"`.
 
-| Need | Use | Reference |
-|---|---|---|
-| Grouped content on a page | `.card` / `.table-card` sheet with a `.card-header` or `.section-title` | SPEC-2026-08 §15.3 |
-| Named group of fields in a form | `.form-section` + `.form-section-header` | §8 |
-| Secondary content on the same page | `Disclosure` (**new**) | §6.3 |
-| Inline message about state | `Notice` | §10 |
-| Transient result of an action | `useToast` | §10 |
-
-### 4.3 Overlays
-
-| Need | Use | Reference |
-|---|---|---|
-| Confirm or destructive action | `ConfirmDialog` / `useConfirmDialog` | §5 |
-| Short task that blocks the page | `FormModal` with a `size` | §5, §7.1 |
-| Detail of / edit a record, list stays usable | `Drawer` (**new**) | §5, §7.2 |
-| Long, multi-section, multi-step or linkable flow | routed page | §5 |
-| Menu of row/page actions | `ActionMenu` | §9 |
-| Small contextual panel anchored to a control | Mantine `Popover` wrapped by the owning component (e.g. `PeriodSelector`, `CommunitySwitcher`) | — |
-
-Popovers, menus and date pickers outrank a modal through `lib/zLayers.ts`
-(`Z_MODAL` 1000 < `Z_POPOVER` 1100 < `Z_TOAST` 1200); a new overlay takes its
-z-index from there, never a literal.
-
-### 4.4 Actions and fields
+### 4.2 Containers and actions
 
 | Need | Use |
 |---|---|
-| Any button | `.button` plus one variant (§9); never a bare `<button>` for a visible action |
-| Row/page overflow actions | `ActionMenu` |
-| Form footer | `FormModalFooter` (**to be generalised for drawers and pages, §8.3**) |
-| Text-like inputs, selects, date fields | native fields or Mantine controls as themed by `mantineTheme.ts`; never set field height with `size` |
-| Status label | `.badge-*` for state, `.badge-tag` for attributes (SPEC-2026-04 §4.2) |
+| Grouped page content | Existing `.card` / `.table-card` sheets |
+| Named form-field group | `.form-section` + `.form-section-header` |
+| Secondary content within a view | Native disclosure or existing row expansion (§6.3) |
+| Record inspection/editing beside a list | Reserved panel with viewing/editing modes when both panes fit (§6.2) |
+| Standalone short edit/create task without a detail panel | `FormModal` |
+| Destructive or consequential confirmation | `ConfirmDialog` / `useConfirmDialog` |
+| Secondary row/page actions | `ActionMenu` |
+| Inline state or error message | `Notice` |
+| Transient action feedback | `useToast`; never the sole persistent error record |
+| Form footer | Existing `FormModalFooter` where suitable (§7.6) |
+| Fields | Existing themed native/Mantine controls |
+| Labels, issues and counts | Decide usefulness and audience before presentation (§10) |
+
+Menus and pickers belong to their owning surface. Overlay z-indices come from
+`lib/zLayers.ts`; an in-flow panel does not need a new overlay layer.
 
 ## 5. Decision rule: where does it open?
 
-Read top to bottom; take the first row that fits.
+Choose the smallest surface that makes the task understandable. Container
+choice follows actual content and use, not the name "create", "edit" or "wizard".
+Equivalent tasks should behave consistently; explain meaningful exceptions.
 
-| # | The user is… | Container | Why |
-|---|---|---|---|
-| 1 | Confirming or cancelling a destructive or high-impact action | `ConfirmDialog` | Small, blocking, one decision. Required for every destructive action (SPEC-2026-04 §7.3) |
-| 2 | Looking at, or editing, a record **in a list they stay in** (they will open the next one) | `Drawer` — reading and editing in the same drawer | Keeps the list in view and usable; one container per record (rule A) |
-| 3 | Doing a short, self-contained task, creating a record with no detail view, or answering a single question | `FormModal` | Blocks the page on purpose; ends in Save/Cancel |
-| 4 | Working through a long form (more than ~12 fields or more than one `form-section`), several steps, a flow with its own sub-states, or anything someone might link to or reload | Routed page | Needs a URL, room, the browser's back button and the `ScopeGuard` |
-| 5 | Reading secondary content that belongs to what is on screen | Disclosure (§6.3) | No new surface, no context loss |
+| User task | Starting choice |
+|---|---|
+| View/edit a record with an existing detail panel | Viewing/editing modes in that same panel, with space reserved for the list |
+| Short, self-contained task without a detail panel | Form dialog |
+| Short additional information belonging to a row | Inline expansion |
+| Secondary material most visits do not need | Disclosure |
+| High-impact decision | Confirmation dialog |
+| Work that genuinely outgrows a usable dialog, needs independent navigation or substantial recovery | Assess a page, with task-specific acceptance criteria |
 
-Rules that cut across the table:
+Multiple sections, several steps, charts or a large width are reasons to
+inspect usability, not automatic page mandates. A short wizard may remain a
+dialog. Substantial draft recovery needs a separate storage and navigation
+decision; putting a step in the URL is not recovery.
 
-- **A. The container of a record's detail is the container of its form.**
-  If the record has a detail drawer, create and edit happen in that drawer
-  (§7.2: *reading* ↔ *editing* mode, same width, same header). If it has no
-  detail view, create and edit use `FormModal`. Do not give one record both.
-- **B. Nothing stacks on a drawer except `ConfirmDialog`.** A modal never opens
-  from a drawer. A popover or menu inside a drawer is fine.
-- **C. At most two layers.** Modal over page, or `ConfirmDialog` over modal /
-  drawer. A form that needs a sub-form (e.g. a dynamic source inside a tariff)
-  uses an inline sub-section or a disclosure, not a second modal; the sole
-  existing stack (`TariffFormModal` → `DynamicSourceFormModal`) is a listed
-  exception (§11).
-- **D. A wizard is a page.** More than one step means rule 4. A modal may
-  show a fixed two-part flow (e.g. choose a file → confirm) only when both
-  parts fit `lg`; anything longer or with step state the user can lose on
-  reload is a page.
-- **E. If a modal needs `xl`, ask whether it is a page.** `xl` is for wide
-  read-mostly content (tables, previews, import review), not for long forms.
-- **F. Create buttons.** The page's primary create action opens the same
-  container as edit (rule A) — `+ New tariff` opens the drawer in
-  *editing* mode on a blank record.
-- **G. Mobile.** A `Drawer` and a modal take the full width at ≤ 768px
-  (the `min(100vw, …)` already in the scale); nothing is hidden behind
-  hover.
+### 5.1 Tariff pilot
+
+**Files to start from:** `TariffsPage.tsx`, `TariffCategorySections.tsx/.css`,
+`TariffDetailDrawer.tsx/.css`, `TariffToolbar.tsx`, the existing tariff form
+dialogs, `useTariffCrud.ts` and `useTariffVersions.ts`, all under their current
+`frontend/src/pages/` or `frontend/src/features/tariffs/` paths.
+
+The route remains `/tariffs`. Keep the existing
+`queryKeys.tariffs.series(selectedZevId || undefined)` query and
+`fetchTariffSeries` client contract; no new backend response shape is required.
+
+**Overview and information order**
+
+- Show **Current**, then **Upcoming**, with **History** collapsed by default.
+  Preserve the energy/grid fees/levies/metering category order inside each.
+- A series with current and future versions can appear in both corresponding
+  sections. Each row shows the relevant version, with the nearest upcoming
+  version first. History provides access to past versions even when the same
+  series still has a current version.
+- Within details, prioritize current information, then future changes, then
+  past versions. An explicitly selected historical/future version remains
+  selected and is clearly identified. Full history and technical source
+  information are available on demand; important warnings stay visible.
+- Historical rows use readable grey styling and explicit historical context.
+  They remain accessible and can expose permitted corrections. "Past" does
+  not mean "disabled". A genuinely disabled record/action also states why,
+  including when it is historical.
+- Use plain validity dates instead of rounded validity pills. Do not add
+  tariff/fee/band/version totals unless they help a concrete task (§10.1).
+
+**Table and detail layout**
+
+- Follow the existing participants/invoices table treatment, including sheet
+  headers, aligned columns, row separators and action hierarchy.
+- On suitable desktop widths, selecting a tariff opens its panel in viewing
+  mode beside the list. It reserves space: it must not cover or cut off the
+  list. Both panes scroll independently; the detail heading and X remain easy
+  to reach.
+- The narrowed list reflows using container width, like participants/invoices:
+  a table where it fits and compact stacked rows where it does not. Preserve
+  prices, units and their corresponding bands/schedules together. Add short
+  visible labels only where needed to understand values after headers disappear.
+- Tooltips explain ambiguous or truncated information; they are supplementary.
+  Essential meaning remains available on touch, and explanatory interactions
+  also support keyboard focus. The same principle should guide billing when
+  that layout is next revisited; billing redesign is not part of this pilot.
+- When two usable panes do not fit, including phones around 400px, the selected
+  detail occupies the available tariff content area instead of the list. It is
+  the same screen and detail body, with X to return; no new detail route is
+  required. The same viewing/editing modes work at both widths, preserving an
+  active draft across layout changes. The replaced list is hidden from the
+  accessibility tree and tab sequence until it is shown again.
+- Exact pane widths and the responsive breakpoint are pilot outputs, validated
+  on a normal laptop and phone. Do not require a squeezed two-pane layout.
+
+**Navigation and editing**
+
+- Preserve existing `tariff`/`version` query-parameter deep links and unrelated
+  query parameters. `tariff` uses the existing `seriesKeyOf` value (ZEV and
+  name). Opening detail from the list creates one history step; switching
+  tariffs within the open pane or changing the displayed version replaces
+  that step. Browser Back returns to the list.
+- X returns to the known originating list state. Direct entry has an explicit
+  same-screen list fallback; do not navigate to an unrelated external origin.
+  Back/Forward, X and reload must agree about the selection.
+- Preserve available filters, ordering, list scroll and selection through
+  inspection and panel editing. Closing the pane expands the list
+  without losing its position. Do not add new sorting/filter features solely
+  to satisfy this preservation requirement.
+- Selecting a tariff starts in viewing mode. **Edit** replaces its detail
+  body with prefilled fields in the same pane; the title and selected tariff
+  stay recognizable. Only fields permitted by the existing API become editable;
+  immutable identity fields retain their current restrictions.
+- Rename, Schedule price change and period changes use the same panel's
+  focused editing mode, seeded from the selected record/version. **New tariff**
+  opens the panel with a blank creation form. Reuse the existing form logic
+  independently of its current modal shell; do not require an extra edit dialog.
+- Save returns to viewing mode on the saved tariff/version. Cancel returns
+  to the original viewing context, asking before discarding changed values.
+  Cancelling creation restores the previous selection or the list when there
+  was none. Test realistic creation and many-band changes before proposing a
+  larger surface; there is no blanket move to routed forms.
+- Guard unsaved changes before X, Cancel, Escape, browser Back, navigation or
+  selecting another tariff/version. Choosing to stay preserves both the
+  draft and original selection. Confirmations use the existing modal manager
+  for focus and inertness; the editing panel itself remains non-modal.
+- **Schedule price change** is the prominent task-oriented action for future
+  prices; ordinary edits remain separate. Show the effective date and
+  resulting prices before submission, without a redundant confirmation step.
+- After a successful create or scheduled change, select the resulting
+  tariff/version. Preserve selection through rename, including updating the
+  name-derived series URL key. Obsolete scoped completions cannot select
+  anything (§3). No billing/versioning semantics change is implied.
+- Viewing/editing mode does not add another history entry. Reload warns about
+  a dirty form and returns to the linked saved data in viewing mode; no draft
+  recovery or additional editing route is introduced.
 
 ## 6. Interaction standards
 
-### 6.1 Modal (`FormModal`)
+### 6.1 Dialog
 
-- Title in the header (`h2`), close button, header closes with the documents'
-  rule (SPEC-2026-08 §15.3). Footer is a right-aligned `.dialog-actions`:
-  **Cancel** (`button-secondary`) then the primary action. The primary button
-  is a `type="submit"` of the modal's `<form>`; Enter submits.
-- Escape and scrim click close it unless the form is dirty, in which case
-  closing asks first (`ConfirmDialog`, "Discard changes?"). A modal with no
-  editable fields closes without asking.
-- Focus, stacking, inertness and restoration: SPEC-2026-04 §4.1
-  ([dialog behavior](2026-04-frontend-management-page-design.md#dialog-behavior)).
-- `size` instead of `maxWidth` (§7.1).
+- Use the existing `FormModal` header, `h2`, divider and close control.
+  Footer order is Cancel then the primary submit action.
+- Use native `<form onSubmit>` and `type="submit"`; preserve Enter behavior
+  in multiline and composite controls.
+- X, Cancel, Escape, scrim click and in-app navigation share a dirty guard:
+  changed unsaved values prompt **Discard changes?**; unchanged/read-only
+  content closes immediately. Browser reload/tab close uses `beforeunload`.
+- Explicit discard clears the short-form draft. Reopening starts from saved
+  data/defaults. Reload warnings do not imply recovery after reload.
+- Preserve existing `useDialogBehavior.ts` / `dialogInertness.ts` ownership,
+  focus restoration and linked-popup behavior. Escape closes the topmost
+  picker or confirmation before its parent.
+- Standalone short tasks can still use dialogs. Records with a panel use
+  its editing mode (§6.2). A discard/destructive confirmation can sit over
+  either surface; underlying content is inert. Use an inline subsection
+  for related sub-forms where practical instead of stacking edit dialogs.
 
-### 6.2 Drawer
+### 6.2 Panel with viewing and editing modes
 
-- Anchored right, full height, non-modal: no focus trap, no scroll lock, no
-  dimming scrim; the page behind stays usable. Escape closes it when focus is
-  inside it. Opening another record **swaps the contents** in place.
-- Header: `h2` title, optional one muted facts line, optional status pill,
-  close button; it closes with the same rule as the modal header. Actions
-  specific to the record (Edit, New version, Delete…) sit in the body's first
-  `.actions-row`, primary first, destructive ones quiet and behind
-  `ConfirmDialog` (§9).
-- **Reading mode** is the default. **Editing mode** replaces the body with a
-  form (§8) and a sticky footer (Cancel / Save); the header stays so the user
-  knows which record is being edited. Saving returns to reading mode on the
-  saved record; Cancel returns without saving.
-- **Dirty guard.** A drawer in editing mode with changes confirms before it is
-  closed, or before the selection changes to another record
-  (`ConfirmDialog`, "Discard changes?"). A drawer in reading mode never asks.
-- Because it is non-modal, the drawer is exposed as a labelled complementary
-  region, not as a modal dialog (verify in implementation, §7.2).
-- Closing animation: the drawer keeps showing the last record until it has
-  slid out (the pattern `TariffDetailDrawer` and `MeteringGapsDrawer`
-  hand-roll); `useRetained` (§7.2) does this once.
+- The tariff panel is in-flow reserved layout, with no dimming scrim, page
+  scroll lock or focus trap. Its presence does not hide part of the list.
+- Render a region labelled by its `h2` title, without `aria-modal`. A muted
+  facts line is optional when useful; there is no default status/count badge.
+- In viewing mode, opening another record replaces the content immediately;
+  editing first follows the dirty guard below. Move focus to the detail title
+  on intentional open; return to the invoking control on close. If that
+  control disappeared, use the list's heading as a usable fallback.
+- Keep the record's primary action easy to find. Lower-frequency actions use
+  the existing secondary/overflow hierarchy. Destructive actions require
+  confirmation.
+- Viewing mode is the default. Edit shows saved values as prefilled fields
+  in the panel body, with Cancel/Save kept reachable. Saving returns to
+  viewing the saved result; cancelling returns to the original context.
+  Read-only users have no editing mode or write controls.
+- The non-modal list stays available while editing. Before a selection/version
+  change, dismissal or navigation would replace a dirty form, confirm discard.
+  A rejected discard leaves the form and selection intact. Scope/access
+  changes still clear unauthorized data immediately (§3).
+- Move focus to the form's first editable field on entering edit mode and
+  return to its initiating action on Cancel, or the saved record heading when
+  that action no longer exists. Do not trap focus within the editing panel.
+- A confirmation makes the panel, list and their unrelated popovers inert;
+  popovers owned by the active dialog remain interactive. The panel does not
+  independently change attributes owned by the modal manager.
+- If an exit animation retains content, retain only through that exit and
+  clear on scope/access change before rendering. Ignore a stale exit callback
+  after reopening; never show a previous authorized record while new data is
+  null. Do not add an animation or retention helper just to satisfy this rule.
 
-### 6.3 Disclosure — three shapes
+These are the tariff pilot's requirements. Other existing drawers keep their
+interaction until separately assessed; there is no compulsory mobile route or
+change from modal to non-modal for every drawer.
 
-| Shape | Use when | Implementation | State |
-|---|---|---|---|
-| **Section disclosure** | Secondary content inside a sheet or form that most visits do not need (completed history, details, a field reference) | `Disclosure` (**new**), native `<details>`/`<summary>` | closed by default; not in the URL |
-| **Row expansion** | One row reveals a short block directly beneath it that shares the row's context; several may be open (assignments under a metering point) | chevron `button.button-ghost.button-compact` with `aria-expanded` and `aria-controls` → a detail row; the whole pattern keeps `MeteringPointRow` as the reference implementation | local; independent per row |
-| **Show more** | A list longer than the screen needs (first 3 gaps) | a `button-ghost` toggle with `aria-expanded`/`aria-controls` and a count ("Show all 12") | local |
+### 6.3 Disclosure
 
-**Row expansion or drawer?** If the detail has its own actions, a chart or
-table, more than about a screenful of content, or needs to be compared while
-the list stays scrolled, it is a **drawer** (rule 2). If it is a short
-read-mostly block with at most one action, it is **row expansion**.
-**Disclosure or tab?** If the user needs the content *instead of* the main
-content, it is a tab; if they need it *beside* it, a disclosure.
-
-### 6.4 Page (rule 4)
-
-A routed page follows the SPEC-2026-04 §7.1 shell. Long forms group into
-`.form-section`s on one or more sheets and save with a single sticky action
-row; a multi-step flow shows its steps as a numbered list at the top of the
-page and keeps the current step in the URL (`?step=`), so Back and reload
-work. Leaving with unsaved changes asks (`ConfirmDialog`).
-
-## 7. New and changed components (to implement in Round 2)
-
-### 7.1 `FormModal`: `size`
-
-**File:** `frontend/src/components/FormModal.tsx`
-
-| `size` | `max-width` | Typical content |
+| Shape | Use | State |
 |---|---|---|
-| `sm` (default) | 640px | up to ~8 fields, one column or a 2-column `.form-grid`, short workflows, bulk-delete / link-account style dialogs |
-| `md` | 760px | forms with a read-only summary beside the fields, two `.form-section`s |
-| `lg` | 960px | wide forms, two-part flows, previews |
-| `xl` | 1080px | wide read-mostly content: price history, import review (rule E) |
+| Section disclosure | Secondary content inside a sheet/form, history or technical detail | Native `details/summary`; usually closed initially |
+| Row expansion | Information best understood beneath its row | A named button with `aria-expanded` and `aria-controls`; independent local state |
+| Show more | A deliberately shortened list | Existing ghost button; explain what it reveals, with a count only if useful |
 
-`maxWidth` is removed from the props; a call site passes a size name or
-nothing. `.form-modal` keeps `width: 90%` and `90dvh` (SPEC-2026-04 §4.2).
-`ConfirmDialog` stays 400px and is not sized by the caller. Existing widths
-snap to the nearest size: 560/600/620/640 → `sm`; 720/760 → `md`; 900/960 →
-`lg`; 1000/1080 → `xl`.
+Reuse `MeteringPointRow` for row expansion and billing periods for collapsed
+history. Actions alone do not force expansion into a drawer: existing
+assignment rows already contain several actions. Choose a tab when content
+replaces the working view; choose disclosure when it supplements that view.
 
-### 7.2 `Drawer`
+### 6.4 Pages and longer workflows
 
-**File:** `frontend/src/components/Drawer.tsx`
+Use the existing management-page shell when a task has demonstrated the need
+for a page. Long forms can group related fields and keep the save action
+reachable. A multi-step workflow needs a separate decision about steps,
+navigation, drafts, files and job state before migration.
 
-```typescript
-interface DrawerProps {
-    opened: boolean
-    onClose: () => void
-    title: ReactNode            // rendered as the h2; also names the region
-    meta?: ReactNode            // one muted facts line under the title
-    badge?: ReactNode           // at most one state pill
-    size?: 'md' | 'lg'          // default 'md'
-    children: ReactNode         // body; the caller renders reading/editing mode
-    footer?: ReactNode          // sticky; used in editing mode (Cancel / Save)
-    returnFocusRef?: RefObject<HTMLElement | null>
-}
-```
+`ZevListPage` creation and `ImportWizardModal` are assessment candidates,
+not committed page conversions. A URL step does not retain a File object,
+preview, entered values or upload/import job. Specify what survives close,
+Back, reload and a later visit if recovery is needed; do not introduce
+persistent storage for every form by default.
 
-| `size` | Width | Typical content |
-|---|---|---|
-| `md` | `min(100vw, 35rem)` | key/value detail, a short list, a short form (audit event, metering gaps) |
-| `lg` | `clamp(720px, 60vw, 1080px)` | rich detail with a table or chart and an edit form (tariff series) |
+## 7. Shared components: extract demonstrated repetition
 
-Owns, once: non-modal behaviour (`trapFocus={false}`, `lockScroll={false}`,
-pointer events on the panel only), the overlay shadow token (`--shadow-overlay`;
-the raw `rgba` literal in today's drawers goes), `Z_DRAWER` in
-`lib/zLayers.ts` (below `Z_MODAL`, so a `ConfirmDialog` outranks it), the
-Escape handler (only when focus is inside the drawer or its linked popups,
-consistent with `lib/popupKeyboard.ts`), the header anatomy of §6.2, the
-close button (`aria-label` `common.close`) and the ARIA role. Sizing goes
-through Mantine's `size` prop, not `styles.content.width`: the drawer's
-`flex-basis` otherwise wins (the cause of the 440px bug noted in
-`AuditEventDrawer`).
+### 7.1 Dialog sizing
 
-Helper: `useRetained<T>(value: T | null): T | null` in
-`frontend/src/lib/useRetained.ts` returns the last non-null value so content
-survives the closing animation.
+Use a few shared named sizes chosen for content, preserving a genuinely
+compact option. Do not snap every 480/520/560px dialog to a 640px minimum.
+Exact widths/defaults require pilot screenshots before becoming a contract.
+Existing responsive bounds and no-horizontal-overflow requirements remain.
 
-**ARIA is to be verified, not assumed:** Mantine's drawer sets
-`role="dialog"` with `aria-modal`; the wrapper must remove `aria-modal` for a
-non-modal drawer and label the region by its title. Cover it in the test plan
-(§12).
+`FormModal` currently accepts `maxWidth`. If a `size` API is introduced,
+keep every intermediate build valid: preserve compatible existing callers
+until migrated, or migrate all affected callers atomically. Width-only
+changes must include visual checks. Other dialogs do not need migration
+merely because the tariff pilot lands.
 
-### 7.3 `Disclosure`
+### 7.2 Panel and drawer reuse
 
-**File:** `frontend/src/components/Disclosure.tsx`
+Start with the existing tariff feature component and responsive row styles.
+Extract shared layout, focus or dismissal behavior only when another real
+consumer benefits. Do not build a generic Mantine `Drawer` wrapper as a
+prerequisite for an in-flow tariff panel.
 
-```typescript
-interface DisclosureProps {
-    summary: ReactNode
-    defaultOpen?: boolean       // default false
-    children: ReactNode
-    className?: string
-}
-```
+If existing overlay drawers are later consolidated, assess modal semantics,
+focus, Escape ownership, retained data and scope clearing for each consumer.
+Share behavior without silently changing metering gaps' modal interaction.
 
-Renders `<details className="disclosure">` with a `<summary>`; the chevron,
-focus ring and hover come from one `.disclosure` rule in `index.css`.
-`.overview-period-details` and `.overview-period-history` become modifiers or
-disappear. Show-more and row expansion keep their buttons (§6.3) but take their
-classes from one `.disclosure-toggle` helper.
+### 7.3 Disclosure reuse
 
-### 7.4 `AppTabs`
+Native `details/summary` and existing expansion buttons remain valid.
+A small `Disclosure` component is appropriate when repeated styling pays
+for it; do not replace every native disclosure or introduce a separate
+show-more abstraction merely to normalize syntax.
 
-**File:** `frontend/src/components/AppTabs.tsx`
+### 7.4 Tabs reuse
 
-A thin wrapper over Mantine `Tabs` that fixes the `classNames` mapping
-(`root: 'app-tabs'`, `list: 'app-tabs-list'`, `tab: 'app-tabs-tab'`) and
-re-exports `List`, `Tab`, `Panel`. Contract unchanged from SPEC-2026-04 §4.1
-(all panels under one root, real `tabpanel`s, no hand-rolled strips). Pages
-and features import `AppTabs`, not `Tabs` from `@mantine/core`.
+An `AppTabs` wrapper may remove repeated Mantine class mappings
+(`root: app-tabs`, `list: app-tabs-list`, `tab: app-tabs-tab`).
+Preserve Mantine props, refs, keyboard behavior and `List`/`Tab`/`Panel`;
+all panels remain under one root. Merge extra classes without losing shared
+ones. Do not mandate a tab migration before the pilot is validated.
 
 ### 7.5 What stays direct
 
-`ActionMenu` already wraps `Menu`; `PeriodSelector`, `CommunitySwitcher` and
-`PageSkeleton` keep their Mantine imports because they *are* the wrappers.
-Form controls (`TextInput`, `Autocomplete`, `DatePickerInput`, `Switch`,
-`Chip`, `Popover` inside a field) remain importable from `@mantine/core` in
-page/feature code: `mantineTheme.ts` already makes them consistent and the
-cost of a wrapper per control is not paid back yet. If two pages start to
-configure the same control differently, add a wrapper then.
+Existing `ActionMenu`, `PeriodSelector`, `CommunitySwitcher` and
+`PageSkeleton` already own their library usage. Themed form controls remain
+directly importable from Mantine. A wrapper needs repeated behavior or
+configuration to consolidate; library usage alone is not a defect.
+
+### 7.6 Footer reuse
+
+The pilot provides a real non-modal form consumer for Cancel/Save.
+Reuse `FormModalFooter` behavior where suitable; generalize its name/API only
+as needed by that consumer. The panel owns placement and sticky positioning.
+Do not rename every dialog consumer as an unrelated prerequisite or add a
+general sticky/container-detection API.
 
 ## 8. Forms
 
 ### 8.1 Layout
 
-- One `<form>` per container; native `<form onSubmit>`; the primary action is
-  its `type="submit"` button.
-- Fields sit in `.form-grid` (2 columns, collapsing to 1 at narrow widths);
-  a field that needs the full row uses `.grid-span-full`. One column inside a
-  `sm` modal or a drawer when the labels are long.
-- More than one topic → `.form-section` with a `.form-section-header` kicker
-  (as in `ZevGeneralSettingsFields`). No nested cards inside a form.
-- Label above the control, optional helper text below it, error below the
-  helper (the Mantine `InputWrapper` order that `mantineTheme.ts` also
-  applies to native fields). Required fields are marked with the shared
-  required marker, never with free text in the label.
-- Field height, radius, label and helper type come from the field tokens;
-  never solve a layout problem with a per-field `size` (SPEC-2026-04 §4.2).
+Use existing `.form-grid`, `.grid-span-full` and `.form-section` patterns.
+Short forms are one column where appropriate; larger layouts can use two
+columns when they fit. Avoid nested cards around field groups. Labels,
+helper text, required markers and control geometry follow the existing field
+tokens and theme; do not adjust individual field sizes to solve page layout.
 
-### 8.2 Validation and errors
+### 8.2 Validation, saving and drafts
 
-- Validate on submit and, per field, on blur after the field was touched;
-  show the message under the field. A server error that belongs to a field is
-  mapped onto it; one that does not is a `Notice` (role `alert`) at the top of
-  the form.
-- A failed submit never closes the container, keeps the values and moves
-  focus to the first invalid field.
-- Pending state disables only the submit button and sets `aria-busy`; the
-  form stays readable.
+- First validate on submit, then update affected errors as the user corrects
+  those fields. Do not show errors during the first entry into a field.
+  Native constraints and server validation still apply.
+- Show field errors by the field. Map server field errors there too; show
+  non-field failures in a persistent `Notice` within the form. A toast
+  alone is insufficient. Keep values and focus the first invalid field when
+  applicable; keep a general error readable when no field is invalid.
+- During save, visibly show progress, prevent duplicate submissions and
+  temporarily prevent further edits while leaving values readable. Mark the
+  form busy. On success, return the panel to viewing mode on the resulting
+  selection (§5.1), or close a standalone dialog. On failure, retain the form,
+  values and error for correction/retry.
+- Preserve mutation scope and lifetime handling. Closing a form cannot be
+  described as cancelling a request already sent. If dismissal/navigation is
+  offered during a pending save, explain that it may still complete; apply
+  its completion only to the originating scope and current editing instance.
+- Short tariff forms need discard protection, not persistent drafts.
+  Explicit discard resets; reopening reads saved data. Longer workflow
+  recovery remains a separate assessment (§6.4).
 
-### 8.3 Footer
+### 8.3 Actions
 
-`FormModalFooter` becomes `FormFooter` (same props plus `sticky`), usable in a
-modal, a drawer (sticky, bottom of the panel) and a page (sticky action row).
-Cancel is always `button-secondary` on the left of Save; the labels are
-`common.cancel` and `common.save` (or `common.create` for a new record). A
-destructive action does not live in the footer; it is a quiet button in the
-body or an `ActionMenu` item, behind `ConfirmDialog`.
+Reuse the existing footer behavior: Cancel as `type="button"`, then the primary
+`type="submit"` button. The existing footer disables submit during
+pending; the owning form supplies progress, field locking, dirty guard and
+error behavior. Retain native submit semantics.
+
+Use task-oriented labels such as Save changes, Create tariff or Schedule
+price change. Destructive operations stay separate from the save footer and
+require `ConfirmDialog`.
 
 ## 9. Actions
 
-The hierarchy table of SPEC-2026-04 §7.3 stays authoritative (primary →
-secondary → overflow → destructive). Added here:
+SPEC-2026-04's hierarchy remains the reference: primary, secondary, overflow,
+destructive. Reuse existing `.button` variants and `ActionMenu`; do not
+reformat component-owned controls into action buttons indiscriminately.
 
-| Level | Class | Notes |
-|---|---|---|
-| Page primary | `button button-primary` | at most one per page header or toolbar |
-| Row / card main action | `button button-outline button-compact` | SPEC-2026-08 §15.3 |
-| Secondary | `button button-secondary` (`button-compact` in rows and drawers) | |
-| Tertiary / toggles | `button button-ghost` (`button-compact`) | disclosure, show more |
-| Destructive in a row | `button button-secondary button-destructive` or a compact `button-danger` | quiet until hover |
-| Destructive in `ConfirmDialog` | solid `button-danger` | |
+- One clear primary action per header/toolbar or task context.
+- Frequent row actions use the shared compact outlined treatment.
+- Lower-frequency actions go in overflow; destructive actions are quiet until
+  the explicit confirmation.
+- Keep visible labels on primary mobile actions.
+- Disabled controls explain why, near the control when needed for understanding.
+  Tooltips can supplement that explanation but must not be the only route to
+  essential information.
 
-- The `button` base class is required on every visible action; a bare
-  `<button>` is only for controls with their own component (tab, menu item,
-  switch). The two stray forms (`button danger`, `button button-primary
-  button-outline`) are errors.
-- Icon + text is the default (SPEC-2026-04 §4.3); icon-only needs an
-  accessible name and a tooltip.
-- More than two non-destructive actions on a row → `ActionMenu` (SPEC-2026-04
-  §7.3).
+## 10. Feedback, labels and states
 
-## 10. Feedback and states
+### 10.1 Usefulness before decoration
 
-| Situation | Component | Rule |
-|---|---|---|
-| Page or panel is loading | `PageSkeleton` | never a text "Loading…" |
-| A content query failed | `PageState` / `Notice` (role `alert`) with retry | cached data may stay visible beside a warning (SPEC-2026-04 §4.1) |
-| Nothing to show | `EmptyState` (CTA when the user can fix it) | |
-| A form or step needs attention | `Notice` inside the container, near the cause | |
-| An action completed or failed in the background | `useToast` (`success`, `error`, `info`) | short; never the only record of a failure the user must act on |
-| A state of a record | `.badge-*` (state) / `.badge-tag` (attribute) | colour means state only |
-| A destructive or irreversible step | `ConfirmDialog` | names the object and the consequence |
+A label or count earns its place by helping its audience understand, compare
+or act. Being present in the data model is not sufficient.
 
-## 11. Risks, rollout, and known deviations
+| Information | Proposed treatment |
+|---|---|
+| Counts | Omit by default. Add only for a concrete task, such as meaningful filtered populations or affected records; not decorative tariff/fee/band/version totals. |
+| Classification, such as participant roles | Quiet neutral tags like the existing participant role tags are acceptable where they help identify the record. Plain metadata text is also valid. |
+| Ordinary dates and validity | Plain, understandable dates/text; historical records are visibly muted but readable. |
+| Useful workflow distinctions | Keep precise neutral labels where they help distinguish records; avoid repeating a status already established by a section heading. |
+| Generic normal state | Omit redundant decoration such as a coloured "In Bearbeitung" that adds no useful next-step information. |
+| Concrete issue | Concise warning/error text linked to a useful explanation or corrective action when available and permitted. |
+| Success | Transient confirmation when useful; do not mark every healthy record with a green badge. |
 
-### 11.1 Rollout (Round 2, each step independently mergeable)
+The existing participants **Kein Messpunkt** treatment is the attention
+reference: red issue text, a real link/action for authorized users, and no
+filled capsule. A destination should help resolve that specific issue.
+Read-only users still see the issue and useful explanation, without a false
+click affordance. Not every important issue has an immediate fix.
 
-1. **Components:** add `Drawer`, `useRetained`, `Disclosure`, `AppTabs`,
-   `FormModal` `size`, `FormFooter`, `Z_DRAWER`; tests (§12). No page changes.
-2. **Modals:** replace every explicit `maxWidth` with a `size` (20 call sites; the mapping
-   in §7.1). Remove `maxWidth` from the props.
-3. **Drawers:** move `AuditEventDrawer` and `MeteringGapsDrawer` onto
-   `Drawer` (read-only, small); then `TariffDetailDrawer`.
-4. **Tariff edit into the drawer** (rule A): fold `TariffFormModal`,
-   `TariffVersionModal` and `TariffPeriodFormModal` into the drawer's editing
-   mode; this is the largest change and removes the modal-over-drawer case.
-5. **Disclosure:** convert the two `<details>` and the hand-rolled toggles
-   (§6.3).
-6. **Tabs:** swap the nine `Tabs` imports for `AppTabs`.
-7. **Buttons and inline styles:** fix the two stray variants, add the base
-   class to bare action `<button>`s, move static `style={{}}` into
-   `index.css` (SPEC-2026-04 §4.2 already allows this per page).
-8. **Wizards:** decide per flow (rule D): `ZevListPage` create wizard
-   (4 steps plus done, 960px) and `ImportWizardModal` (1080px) are candidates for
-   pages.
+Routine state does not automatically earn colour. Keep warning/error meaning
+and text together; never rely on colour alone. Neutral classification tags
+remain valid. This proposal changes usage guidance, not the global badge
+shape or palette.
 
-### 11.2 Known deviations until migrated
+### 10.2 Feedback and wording
 
-| Deviation | Rule | Plan |
-|---|---|---|
-| `TariffFormModal`, `TariffVersionModal`, `TariffPeriodFormModal` open over `TariffDetailDrawer` | A, B | step 4 |
-| `TariffFormModal` → `DynamicSourceFormModal` | C | inline sub-section in step 4 |
-| `ZevListPage` 4-step create modal, `ImportWizardModal` | D | step 8 |
-| Ten `FormModal` widths | §7.1 | step 2 |
-| Three drawer implementations | §7.2 | step 3 |
-| 9 direct `Tabs` imports, 3 direct `Drawer` imports in pages/features | §7.4 | steps 3, 6 |
+| Situation | Component / behavior |
+|---|---|
+| Initial structured loading | `PageSkeleton` |
+| Bounded operation | Local progress indication, keeping useful content visible |
+| Background refresh | Preserve content; warning beside cached data if refresh fails |
+| Content query failure | `PageState` / `Notice` with retry |
+| Empty content | `EmptyState`, with an authorized helpful action |
+| Form failure | Persistent inline field errors or `Notice`; preserve values |
+| Action completion | Brief `useToast`, without duplicating permanent page information |
+
+Prefer the concrete condition or next step over vague workflow text.
+"Processing…" describes work actually running; it should not substitute for
+"Awaiting review" or another known condition. Existing overview
+"In Bearbeitung" is an example to revisit, not a homepage change in the pilot.
+Keep important explanations visible and include an action when one exists.
+
+### 10.3 Audience-specific invoice labels (separate implementation)
+
+| Audience / surface | Decision |
+|---|---|
+| Staff management interface | Useful internal Draft/Approved/Sent/Paid distinctions can remain, quietly presented. |
+| Participant-facing screens | Focus on meaningful payment information, such as Payment due, Overdue or Paid, using reliable current data. |
+| Ordinary issued invoice document | No status label. Internal approval/delivery states belong in staff UI; current payment status belongs in the participant screen. |
+| Draft or cancelled document | A prominent plain Draft or Cancelled marking, sufficient to explain how to interpret the document. |
+
+This branch records the audience rule only. The default invoice PDF currently
+prints its status unconditionally; it has no separate prominent draft or
+cancelled marking. PDF changes, custom-template implications and accurate
+handling of stored documents need separate invoice-lifecycle work. Do not
+silently regenerate issued PDFs or imply that a stored PDF reflects live
+payment state. Update the owning baseline, templates, translations and tests
+when that follow-up is implemented.
+
+## 11. Rollout and risks
+
+### 11.1 Order of work
+
+1. **Revise the proposal (this branch).** Record the agreed direction in this
+   reference and proposed ADRs. Keep current-behavior baselines and user-guide
+   instructions accurate; do not describe the pilot as already shipped.
+2. **Tariff pilot.** Reuse the existing feature components to implement §5.1
+   and relevant form/label behavior. Deliver complete navigation, responsive
+   layout and scope/access handling together, without changing tariff billing
+   semantics or requiring new detail routes.
+3. **Validate before generalizing.** Review realistic screenshots and actual
+   interactions on a normal laptop and phone (§12). Record chosen widths and
+   breakpoint, and revise the proposal where real examples expose problems.
+4. **Accept proven guidance.** Resolve ADR status after pilot validation.
+   Incorporate a short review checklist without changing the existing CI
+   policy. Apply component rules only when the components exist.
+5. **Adopt gradually.** New work uses the accepted patterns. Existing screens
+   migrate when meaningfully changed; do not turn every known difference into
+   an immediate migration obligation. Extract shared components when repeated
+   use pays for them.
+
+With the pilot implementation, update affected sections of
+`2026-03-tariffs-and-billing-engine.md`,
+`2026-04-frontend-management-page-design.md` and
+`2026-08-ui-redesign-pdf-style.md`. Update
+`2026-03-community-and-access.md` if its documented URL/history behavior
+changes, and the matching user-guide chapter. Regenerate guide screenshots as
+a set using the existing screenshot workflow when needed.
+
+### 11.2 Assessment candidates, not compulsory migrations
+
+| Candidate | What must be assessed before changes |
+|---|---|
+| Audit detail / metering gaps | Actual browsing needs, modal semantics, mobile behavior and reuse payoff |
+| ZEV create / import wizard | Fit, meaningful work at risk, files/jobs, recovery and navigation; several steps alone do not require pages |
+| Dialog widths | Content fit and screenshots; preserve compact cases |
+| Tabs / disclosures / footer | Repeated configuration or a real additional consumer, not naming consistency alone |
+| Overview status decoration / billing narrow labels | Useful information, meaningful actions and comprehension when those screens are revisited |
+| Invoice document labels | Recipient usefulness, draft/cancelled markings, stored-document and custom-template implications |
 
 ### 11.3 Risks
 
-| Risk | Impact | Mitigation |
-|---|---|---|
-| Editing in the drawer is a large change for the tariff forms | Medium | Own PR (step 4); the modals stay until it lands, so nothing is blocked |
-| Non-modal drawer plus a dirty form lets the user navigate away unnoticed | Medium | Dirty guard (§6.2) with a test |
-| Snapping widths changes a few dialogs by up to 60px | Low | Screenshot the affected modals in Round 2 |
-| The rules harden into dogma where a case really differs | Low | A deviation is allowed with a comment naming the rule and the reason; the guard (§12) supports an inline allow |
-| Mantine's drawer ARIA may not be correctable through props | Medium | Verify first (§7.2); fall back to a thin custom panel for the non-modal case |
+| Risk | Mitigation |
+|---|---|
+| Split view is cramped on ordinary laptops | Validate real widths and reflow; switch to one visible pane when both cannot be useful |
+| Navigation loses place or exits the app unexpectedly | Preserve list state; distinguish in-app open from direct entry; test X, Back, Forward and reload |
+| Historical grey looks disabled | Keep text readable, historical context explicit and permitted actions accessible; explain actual disablement separately |
+| New badge guidance is mistaken for a global restyle | Restrict implementation to the pilot; track other screens and PDF work separately |
+| Shared abstractions precede useful behavior | Start in feature code; extract demonstrated repetition after validation |
+| Old data or delayed saves affect a new scope | Retain existing write-scope guards and clear unauthorized selection/drafts immediately |
 
-## 12. Test plan and enforcement
+## 12. Validation and enforcement
 
-### Frontend (Round 2)
+### Pilot acceptance
 
-- `frontend/tests/drawer.test.ts`: non-modal (no focus trap, page behind not
-  inert, no scroll lock); no `aria-modal`; labelled by its title; Escape closes
-  it only when focus is inside; content is retained through close; both sizes
-  map to the specified widths; dirty guard blocks close and selection change.
-- `frontend/tests/disclosure.test.ts`: closed by default, `defaultOpen`, toggles
-  with Enter and Space, summary is the focus target.
-- `frontend/tests/form-modal.test.ts` (extend): `size` maps to the four widths;
-  default is `sm`; `maxWidth` is no longer accepted.
-- `frontend/tests/app-tabs.test.ts`: class mapping and `aria-controls`
-  resolution.
-- Browser tests for a `ConfirmDialog` opened from a drawer (focus returns to
-  the drawer's opener, drawer inert only while the dialog is open).
-- Standard checks: `npm run lint`, `npm run lint:style`,
-  `node ../scripts/check-frontend-hex.mjs`, `npm run test:unit`, `npm run build`.
+Use realistic examples: a simple fixed fee, current plus scheduled prices,
+historical and genuinely disabled entries/actions, multiple bands, and an
+extensive dynamic tariff. Check ordinary laptop widths and around 400px,
+as well as the chosen layout boundary.
 
-### Guard
+| Scenario | Required observation |
+|---|---|
+| Overview hierarchy | Current then Upcoming, collapsed History; correct prices/version in each section; no gratuitous counts |
+| Historical / disabled | Grey but readable history; separate explicit reason for true disablement |
+| Desktop split view | List stays fully visible, reflows by container width, and scrolls independently from details |
+| Narrow view | One usable pane, X returns to the list, no horizontal overflow or detached price/unit/schedule |
+| Value comprehension | Short labels only where needed; touch/focus-accessible explanations; long translations wrap |
+| Detail selection | Direct links and reload show intended series/version; Back/Forward and X retain correct list state |
+| Editing | Prefilled fields in the same panel; Save/Cancel return to viewing, table remains available; mobile reflow preserves the draft |
+| Save / failure | Visible pending state, no duplicate submit or lost late edits, result selected; errors and values remain on failure |
+| Dirty dismissal | Panel guards X, Cancel, Escape, Back, navigation and tariff/version selection; standalone dialogs also guard scrim; reload warning; explicit discard resets |
+| Scope / async lifetime | Old-scope data cleared, late completions cannot select/reopen unrelated detail or replace a newer edit; rename preserves selection |
+| Keyboard | Named row controls, correct focus targets, no panel focus trap, picker Escape before parent, modal ownership intact |
 
-`scripts/check-ui-patterns.mjs`, run in `pr-quality.yml` next to the hex
-sweep, fails on:
+Use screenshots for human design review and browser assertions for behavior;
+screenshots alone do not prove keyboard operation, inertness or restoration.
+Add focused tests near affected tariff and dialog tests during implementation;
+this proposal does not claim those tests already exist.
 
-1. `@mantine/core` imports of `Drawer` or `Tabs` outside `components/`;
-2. `maxWidth=` on `FormModal`;
-3. a `className="button …"` using a class outside the §9 table;
-4. `<Drawer` rendered under `pages/` or `features/` (use the component).
+Run frontend CI checks for the pilot:
+`npm run lint`, `npm run lint:style`,
+`node ../scripts/check-frontend-hex.mjs`, `npm run test:unit`,
+`npm run build`. Use the pinned Node version. Check the running dev stack
+at desktop/phone widths, inspect console errors, and include keyboard operation
+and long translated labels. Preserve existing accessibility requirements.
+Retain the WCAG 2.2 AA baseline: appropriate semantics, visible keyboard focus,
+focus not obscured, target-size requirements, forced-colour support, and text
+alongside meaningful colours. Announce progress/results appropriately without
+duplicating notifications.
 
-A line may opt out with `// ui-patterns-allow: <rule>, <reason>`; each allow is
-listed by the script's summary so they stay visible. Rules not checkable by
-text (A–G) are enforced by review.
+### Lightweight enforcement
 
-### Review checklist (PR template and the `pr-review` skill)
+Use TypeScript and ordinary lint rules for contracts that have actually landed.
+An import restriction is appropriate only when an accepted wrapper exists,
+covers its consumers and preserves their behavior; scope exceptions narrowly
+with an explanation. Do not ban every direct Mantine import or introduce a new
+pattern-checking script. Review container choice and label usefulness in context.
 
-- [ ] The container for each new piece of content follows §5 (or a deviation is
-  commented with the rule and the reason).
-- [ ] New dialogs use a `size` from §7.1; new drawers a `size` from §7.2.
-- [ ] No modal opens from a drawer other than `ConfirmDialog`.
-- [ ] Buttons follow §9; forms follow §8; states and messages follow §10.
-- [ ] Shared components from §4 are used instead of re-implemented.
-- [ ] User-facing text is translated.
+### Proposed review checklist
 
-### Acceptance criteria
+- [ ] The task uses the simplest usable container; a meaningful exception is explained.
+- [ ] The panel leaves the list usable, including at narrow widths.
+- [ ] Existing components/styles are reused; new abstractions have real consumers.
+- [ ] Forms preserve context, protect unsaved work and show actionable errors.
+- [ ] Labels/counts help their audience; issues have useful next steps where available.
+- [ ] Permissions, scope transitions, keyboard access and translated text remain correct.
+- [ ] The changed workflow has appropriate automated checks and visual/behavior review.
 
-- [ ] A contributor can pick the container for a new feature from §5 alone.
-- [ ] Every shared component in `frontend/src/components/` appears in §4 or in
-  SPEC-2026-04 §4.1.
-- [ ] `AGENTS.md` links this spec next to the management-page reference spec.
-- [ ] Round 2 steps 1–3 are merged and the guard passes with no allow other
-  than those listed in §11.2.
+### Acceptance criteria for this documentation branch
 
-## 13. Open questions
-
-1. **Tariff creation.** Rule F makes `+ New tariff` open the drawer in editing
-   mode. A tariff has a long form (billing mode, bands, dynamic source); rule 4
-   says "long → page". Should tariff create/edit be a page (`/tariffs/:id`)
-   with the drawer as a read-only preview, instead of editing in the drawer?
-2. **Drawer on mobile.** At ≤ 768px an `lg` drawer is a full-screen sheet. Is a
-   full-screen drawer-with-form acceptable, or should editing navigate to a
-   page on phones?
-3. **`DataTable` row click.** Should a row click open the drawer everywhere (as
-   tariffs do), or only through a named link, to keep text selection and
-   copy working?
+- [x] Spec and proposed ADRs agree on the tariff split view with viewing/editing modes and gradual adoption.
+- [x] Proposed behavior is clearly separated from current implementation.
+- [x] Other drawers, wizards and footer names are assessment candidates, not mandatory migrations.
+- [x] Badge usage and recipient-facing document decisions are recorded with implementation scope explicit.
+- [x] Existing catalog entries and evidence resolve to the referenced code.
+- [x] No new UI, route, wrapper, lint restriction or PDF change is claimed as shipped.
