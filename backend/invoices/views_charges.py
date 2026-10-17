@@ -20,8 +20,8 @@ from .models import Charge
 from .serializers import ChargeSerializer
 
 LOCKED_MESSAGE = (
-    "An invoice carrying this charge has already been issued. "
-    "Correct the invoice instead of changing the charge."
+    "An invoice of this period has already been approved, so its charges can no longer change. "
+    "Correct the invoice instead."
 )
 
 

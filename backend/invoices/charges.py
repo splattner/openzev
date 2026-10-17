@@ -2,7 +2,7 @@
 
 Kept apart from ``engine`` so the charge API can answer "who pays what" with
 exactly the code the invoice engine bills with; the engine imports this module,
-never the other way round (the lock check imports the engine lazily).
+never the other way round.
 """
 from dataclasses import dataclass
 from datetime import date
@@ -111,59 +111,42 @@ def pass_through_total(lines: list[ChargeLine]) -> Decimal:
     )
 
 
-def locked_invoice_for(day: date, bearers: list[Participant]):
-    """An issued invoice that already covers ``day`` for one of the bearers.
+def locked_invoice_for(zev, day: date):
+    """An issued invoice of the ZEV that already covers ``day``.
 
-    Same rule as invoice regeneration (``engine.locked_overlapping_invoices``):
-    past draft and not cancelled. A charge such an invoice cannot pick up must
-    not be added or changed, and one it carries must not change under it.
+    The rule is the ZEV's, not the bearers': once any invoice of a period is
+    past draft and not cancelled (the status test of regeneration, see
+    ``engine.locked_overlapping_invoices``), the period takes no new charge and
+    the charges dated in it stay as they were. A period is then billed from
+    one set of charges, however far its invoices have got.
     """
-    from .engine import locked_overlapping_invoices
-
-    for participant in bearers:
-        invoice = locked_overlapping_invoices(participant, day, day).first()
-        if invoice is not None:
-            return invoice
-    return None
+    return (
+        Invoice.objects.filter(zev=zev, period_start__lte=day, period_end__gte=day)
+        .exclude(status__in=[InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED])
+        .order_by("period_start", "period_end", "id")
+        .first()
+    )
 
 
 def charge_lock(charge: Charge):
-    return locked_invoice_for(charge.charge_date, charge_bearers(charge))
+    return locked_invoice_for(charge.zev, charge.charge_date)
 
 
 def locked_charge_ids(charges) -> set[UUID]:
-    """Which of ``charges`` are locked, in two queries for the whole list.
-
-    The rule is ``charge_lock``'s: a bearer has an invoice past draft that
-    covers the charge date. Cancelled invoices do not count, as in
-    ``engine.locked_overlapping_invoices``.
-    """
+    """Which of ``charges`` are locked, in one query for the whole list."""
     charges = list(charges)
     if not charges:
         return set()
-    zev_ids = {charge.zev_id for charge in charges}
-    participants_by_zev: dict[UUID, list[Participant]] = {}
-    for participant in Participant.objects.filter(zev_id__in=zev_ids):
-        participants_by_zev.setdefault(participant.zev_id, []).append(participant)
     issued = list(
         Invoice.objects.filter(
-            zev_id__in=zev_ids,
+            zev_id__in={charge.zev_id for charge in charges},
             period_start__lte=max(charge.charge_date for charge in charges),
             period_end__gte=min(charge.charge_date for charge in charges),
         )
         .exclude(status__in=[InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED])
-        .values_list("participant_id", "period_start", "period_end")
+        .values_list("zev_id", "period_start", "period_end")
     )
-    locked = set()
-    for charge in charges:
-        bearers = bearers_among(
-            participants_by_zev.get(charge.zev_id, []), charge.charge_date, charge.allocation,
-            [p.pk for p in charge.participants.all()],
-        )
-        bearer_ids = {p.pk for p in bearers}
-        if any(
-            participant_id in bearer_ids and start <= charge.charge_date <= end
-            for participant_id, start, end in issued
-        ):
-            locked.add(charge.pk)
-    return locked
+    return {
+        charge.pk for charge in charges
+        if any(zev_id == charge.zev_id and start <= charge.charge_date <= end for zev_id, start, end in issued)
+    }

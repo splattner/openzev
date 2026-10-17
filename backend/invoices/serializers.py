@@ -454,13 +454,10 @@ class ChargeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"participants": ["Participants can only be chosen for selected participants."]}
             )
-        locked = charge_rules.locked_invoice_for(
-            state["charge_date"],
-            charge_rules.bearers_for(zev, state["charge_date"], state["allocation"], selected),
-        )
+        locked = charge_rules.locked_invoice_for(zev, state["charge_date"])
         if locked is not None:
             raise serializers.ValidationError({"charge_date": [
-                f"Invoice {locked.invoice_number} has already been issued for this date. "
-                "Choose a date in a later period."
+                f"Invoice {locked.invoice_number} of this period has already been approved, "
+                "so no charge can be added to it. Choose a date in a later period."
             ]})
         return attrs

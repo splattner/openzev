@@ -197,14 +197,17 @@ Swiss VAT rules / the owner's tax adviser before release.**
 **Regeneration.** Charges live outside the invoice, so `_discard_replaceable_invoices` followed by
 `generate_invoice` reads them again.
 
-**Freezing without a link.** A charge is *locked* when any of its bearers has an invoice for which
-`engine.locked_overlapping_invoices(bearer, charge_date, charge_date)` is non-empty (status past
-`draft`, not `cancelled`; the rule regeneration uses). `charges.charge_lock(charge)` answers it for
-one charge and `charges.locked_charge_ids(charges)` for a list in two queries. A locked charge refuses `PATCH` and `DELETE` with 409,
-`{"code": "charge_locked", "detail", "invoice_number"}`, and a `DENIED` audit event. The same predicate refuses a `POST`/`PATCH` that would create a charge
-for a date with a locked bearer invoice (400 on `charge_date`, message naming the invoice number
-and telling the owner to pick a date in a later period). This guarantees a charge is never
-silently missing from an issued invoice, and that shares are never half-issued.
+**Freezing without a link.** A charge is *locked* when **any** invoice of its ZEV covering
+`charge_date` is past `draft` and not `cancelled` (the status rule regeneration uses, see
+`engine.locked_overlapping_invoices`), whoever the invoice is for. A period is therefore billed from
+one set of charges: once the first invoice is approved, nothing is added, edited or deleted in it.
+`charges.locked_invoice_for(zev, day)` answers it for a date, `charges.charge_lock(charge)` for one
+charge and `charges.locked_charge_ids(charges)` for a list in one query. A locked charge refuses
+`PATCH` and `DELETE` with 409, `{"code": "charge_locked", "detail", "invoice_number"}`, and a
+`DENIED` audit event. The same predicate refuses a `POST`/`PATCH` that would put a charge on a locked
+date (400 on `charge_date`, message naming the invoice number and telling the owner to pick a date in
+a later period). This guarantees a charge is never silently missing from an issued invoice, and that
+shares are never half-issued.
 
 **Stale drafts.** A draft is created before a charge is added and approved without it unless
 regenerated. `compute_readiness` therefore gains a `charges` step:
@@ -216,8 +219,8 @@ regenerated. `compute_readiness` therefore gains a `charges` step:
 | At least one bearer's draft invoice for the period has `created_at < charge.updated_at` | `todo`, `detail_data = {"stale_drafts": N}`, link to the invoice list |
 | A charge in the period has no bearer | `warn`, `detail_data = {"unbilled_charges": [descriptions]}` |
 
-Bearers of a locked charge are, by definition, not drafts, so a locked charge never produces
-`todo`. The step is added in `_bulk_period_readiness` (`BulkData.charges` and `BulkData.drafts`,
+A locked charge never changes, so it only produces `todo` for a draft generated before it was
+added. The step is added in `_bulk_period_readiness` (`BulkData.charges` and `BulkData.drafts`,
 loaded in `_load_bulk`: one query for the charges in the span, one for draft invoices only when
 there are charges), between `generated` and `approved`: `_select_next_action` returns the first
 `todo`/`warn` step, and stale drafts must be regenerated before they are approved.
@@ -279,10 +282,11 @@ target display is the description; metadata carries `zev_id` and `charge_date`.
 ## 6. Async and integration behavior
 
 No new task. `generate_invoices_for_zev` and `generate_invoice` are unchanged except for the charge
-step; failures stay isolated per participant (ADR 0011). A charge inside the generation lock window
-is covered by the participant row lock already taken by `generate_invoice` (ADR 0038): a concurrent
-`PATCH` that would lock-check a bearer takes the same `Participant` rows `FOR UPDATE` in `pk`
-order, so a charge cannot change between the lock check and the invoice write.
+step; failures stay isolated per participant (ADR 0011). The charge endpoints take no row locks (§4.5 is a check, not a lock): a charge written in the instant
+between a generation reading the period's charges and an approval can miss that invoice. This is
+accepted because the `charges` readiness step then asks for the draft to be regenerated (the charge's
+`updated_at` is newer than the draft's `created_at`), and an approved invoice is corrected, not
+edited (ADR 0037).
 
 **Transfer archive.** New section `charges` (`SECTION_CHARGES`, file `charges.json`), ordered after
 `tariffs`, depending on `participants`. Row: `{"id", <CHARGE_FIELDS>, "participant_ids": [...]}`,
@@ -387,8 +391,8 @@ stays the four values. `ReadinessStep` key union gains `'charges'`.
   consumption gets an invoice holding only the charge.
 - VAT: `registered` + `taxable` adds VAT; `pass_through` excluded from `vat_base_chf`;
   `not_registered` and `inclusive` bill as entered with `embedded_vat_chf` unchanged.
-- Freeze: `PATCH`/`DELETE` of a locked charge → 409; create for a date with a locked bearer invoice →
-  400; editing the charge after issue never changes the issued invoice.
+- Freeze: `PATCH`/`DELETE` of a locked charge → 409; create for a date any issued invoice of the ZEV covers →
+  400, also when that invoice is not a bearer's; editing the charge after issue never changes the issued invoice.
 - API: ZEV scoping, role matrix (owner/manager/participant/guest), disabled ZEV writes refused,
   audit events written, `preview` matches the engine.
 - Readiness: stale draft → `todo`; no bearer → `warn`; clean → `done`.

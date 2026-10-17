@@ -180,6 +180,21 @@ def test_an_issued_invoice_locks_the_charge(owner_client, zev):
     ).count() == 2
 
 
+def test_any_issued_invoice_of_the_period_locks_the_charge_not_only_a_bearers(owner_client, zev):
+    # The charge is borne by one member; another member's invoice is the one issued.
+    bearer = factories.ParticipantFactory(zev=zev, valid_from=JAN)
+    other = factories.ParticipantFactory(zev=zev, valid_from=JAN)
+    created = owner_client.post(
+        URL, payload(zev, allocation="selected_participants", participants=[str(bearer.pk)]), format="json",
+    )
+    assert created.status_code == 201
+    issue(generate_invoice(other, JAN, JAN_END))
+
+    assert owner_client.get(f"{URL}{created.data['id']}/").data["is_locked"] is True
+    assert owner_client.patch(f"{URL}{created.data['id']}/", {"amount_chf": "5.00"}, format="json").status_code == 409
+    assert owner_client.post(URL, payload(zev, charge_date="2026-01-25"), format="json").status_code == 400
+
+
 def test_a_cancelled_unissued_invoice_does_not_lock(owner_client, zev):
     charge_id, invoice = issued_charge(owner_client, zev)
     invoice.status = InvoiceStatus.CANCELLED
