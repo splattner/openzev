@@ -1,7 +1,7 @@
 import { faPlus, faFloppyDisk } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CivilDateInput } from '../../components/CivilDateInput'
 import { FormModal } from '../../components/FormModal'
@@ -20,6 +20,7 @@ import {
     chargeToValues,
     clampDate,
     emptyChargeValues,
+    participantLabels,
     type ChargeFormValues,
 } from './chargeForm'
 
@@ -83,6 +84,10 @@ function ChargeForm({ isPending, zevId, charge, participants, minDate, maxDate, 
         retry: false,
     })
     const showErrors = submitted
+    const labels = useMemo(
+        () => participantLabels(participants, (day) => formatShortDate(day, settings), t),
+        [participants, settings, t],
+    )
 
     const handleSubmit = (event: FormEvent) => {
         event.preventDefault()
@@ -170,7 +175,7 @@ function ChargeForm({ isPending, zevId, charge, participants, minDate, maxDate, 
                                 checked={values.participants.includes(participant.id)}
                                 onChange={() => toggleParticipant(participant.id)}
                             />
-                            <span>{participant.display_name || participant.full_name}</span>
+                            <span>{labels.get(participant.id)}</span>
                         </label>
                     ))}
                     {showErrors && errors.participants ? <small className="text-error">{t('pages.charges.errors.participants')}</small> : null}
@@ -224,7 +229,7 @@ function ChargeForm({ isPending, zevId, charge, participants, minDate, maxDate, 
                                     <tbody>
                                         {preview.data.bearers.map((bearer) => (
                                             <tr key={bearer.participant}>
-                                                <td>{bearer.name}</td>
+                                                <td>{labels.get(bearer.participant) ?? bearer.name}</td>
                                                 <td className="numeric">{formatChf(Number(bearer.share_chf))}</td>
                                             </tr>
                                         ))}

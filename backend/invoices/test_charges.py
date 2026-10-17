@@ -208,6 +208,19 @@ def test_a_pass_through_charge_is_billed_but_not_taxed():
     assert invoice.pass_through_chf == Decimal("100.00")
 
 
+def test_a_share_of_a_thousand_francs_or_more_can_be_invoiced():
+    # The flat line's unit price holds the share; a narrow column overflowed
+    # on PostgreSQL from CHF 1,000.
+    zev = factories.ZevFactory()
+    (first,) = members(zev, 1)
+    charge(zev, amount="12345.67", description="Dach")
+
+    invoice = generate_invoice(first, JAN, JAN_END)
+
+    (item,) = charge_items(invoice)
+    assert (item.unit_price_chf, item.total_chf) == (Decimal("12345.67"), Decimal("12345.67"))
+
+
 @pytest.mark.parametrize("mode", [VatMode.NOT_REGISTERED, VatMode.INCLUSIVE])
 def test_other_vat_modes_bill_the_charge_as_entered(mode):
     zev = factories.ZevFactory(vat_mode=mode)
@@ -244,6 +257,30 @@ def test_a_draft_that_predates_a_charge_change_asks_for_regeneration():
     (first,) = members(zev, 1)
     generate_invoice(first, JAN, JAN_END)
     charge(zev)
+
+    step, _order = charges_step(zev)
+    assert (step["status"], step["detail_data"]["stale_drafts"]) == ("todo", 1)
+
+    generate_invoice(first, JAN, JAN_END)
+    assert charges_step(zev)[0]["status"] == "done"
+
+
+@pytest.mark.parametrize("change", ["delete", "move_date", "remove_bearer"])
+def test_a_draft_billing_a_charge_that_no_longer_applies_asks_for_regeneration(change):
+    zev = factories.ZevFactory()
+    first, second = members(zev, 2)
+    made = charge(zev, participants=[first, second])
+    generate_invoice(first, JAN, JAN_END)
+    assert charges_step(zev)[0]["status"] == "done"
+
+    if change == "delete":
+        made.delete()
+    elif change == "move_date":
+        made.charge_date = date(2026, 2, 15)
+        made.save()
+    else:
+        made.participants.set([second])
+        made.save()
 
     step, _order = charges_step(zev)
     assert (step["status"], step["detail_data"]["stale_drafts"]) == ("todo", 1)

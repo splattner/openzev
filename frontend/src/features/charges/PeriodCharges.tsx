@@ -18,7 +18,7 @@ import { formatChfAmount } from '../../lib/numbers'
 import { useToast } from '../../lib/toast'
 import { useWriteScope } from '../../lib/useWriteScope'
 import type { Charge } from '../../types/api'
-import { bearersLabel } from './chargeForm'
+import { bearersLabel, participantLabels } from './chargeForm'
 import { ChargeFormModal } from './ChargeFormModal'
 
 type PeriodChargesProps = {
@@ -44,7 +44,7 @@ export function PeriodCharges({ zevId, periodStart, periodEnd, periodLocked }: P
     const cancelConfirmation = useEffectEvent(handleCancel)
     const { canWriteSelectedCommunity } = useCommunityAccess()
     const { scope, isCurrent, assertWritable } = useWriteScope(
-        { selectedZevId: zevId, canWrite: canWriteSelectedCommunity, accountId: user?.id },
+        { selectedZevId: zevId, canWrite: canWriteSelectedCommunity, accountId: user?.id, scopeKey: `${periodStart}/${periodEnd}` },
         t('common.error'),
     )
     const canEdit = canWriteSelectedCommunity && !periodLocked
@@ -64,8 +64,8 @@ export function PeriodCharges({ zevId, periodStart, periodEnd, periodLocked }: P
         [participantsQuery.data, zevId],
     )
     const participantNames = useMemo(
-        () => new Map(participants.map((participant) => [participant.id, participant.display_name || participant.full_name || ''])),
-        [participants],
+        () => participantLabels(participants, (day) => formatShortDate(day, settings), t),
+        [participants, settings, t],
     )
 
     // A dialog belongs to one period of one community: never let it survive a change.

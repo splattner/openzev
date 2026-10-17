@@ -1595,6 +1595,8 @@ export const it = {
                 chargeDateHint: 'Scegliete una data dal {{from}} al {{to}}.',
                 allocation: 'Chi paga',
                 participants: 'Partecipanti',
+                participantValidity: 'dal {{from}} al {{to}}',
+                participantValiditySince: 'dal {{from}}',
                 splitKey: 'Ripartizione',
                 vatTreatment: 'IVA',
             },

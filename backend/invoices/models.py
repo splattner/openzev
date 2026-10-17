@@ -397,7 +397,9 @@ class InvoiceItem(models.Model):
     description = models.CharField(max_length=500)
     quantity_kwh = models.DecimalField(max_digits=12, decimal_places=4, default=0)
     unit = models.CharField(max_length=20, default="kWh")
-    unit_price_chf = models.DecimalField(max_digits=8, decimal_places=5, default=0)
+    # Wide enough for a one-off charge billed as one flat line (up to a charge's
+    # own CHF 99,999,999.99), not just for a per-kWh rate.
+    unit_price_chf = models.DecimalField(max_digits=13, decimal_places=5, default=0)
     total_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     sort_order = models.PositiveSmallIntegerField(default=0)
 

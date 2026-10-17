@@ -6,10 +6,11 @@ import {
     chargeToValues,
     clampDate,
     emptyChargeValues,
+    participantLabels,
     type ChargeFormValues,
 } from '../src/features/charges/chargeForm'
 import { stepDetailText } from '../src/features/overview/readinessPresentation'
-import type { Charge, ReadinessStep } from '../src/types/api'
+import type { Charge, MeteringPoint, Participant, ReadinessStep } from '../src/types/api'
 
 const t = ((key: string, options?: Record<string, unknown>) =>
     options ? `${key}:${JSON.stringify(options)}` : key) as never
@@ -91,6 +92,42 @@ describe('bearersLabel', () => {
         expect(bearersLabel({ allocation: 'selected_participants', participants: ['p1'] }, names, t)).toBe('Alice Muster')
         expect(bearersLabel({ allocation: 'selected_participants', participants: ['p1', 'p2'] }, names, t))
             .toBe('pages.charges.bearers.selected:{"count":2}')
+    })
+})
+
+describe('participantLabels', () => {
+    const point = (meter_id: string, location_description = ''): MeteringPoint => ({ meter_id, location_description }) as MeteringPoint
+    const participant = (id: string, party: string, overrides: Partial<Participant> = {}): Participant => ({
+        id, party, display_name: id.startsWith('ben') ? 'Mr. Ben Consumer' : 'Alice Muster',
+        valid_from: '2026-01-01', valid_to: null, metering_points: [], ...overrides,
+    }) as Participant
+    const date = (day: string) => `<${day}>`
+
+    it('leaves a party with one participation as its plain name', () => {
+        const labels = participantLabels([participant('alice', 'a'), participant('ben', 'b')], date, t)
+        expect([...labels.values()]).toEqual(['Alice Muster', 'Mr. Ben Consumer'])
+    })
+
+    it('tells a party’s participations apart by their meters’ locations', () => {
+        const labels = participantLabels([
+            participant('ben-1', 'b', { metering_points: [point('M-1', 'Garage'), point('M-2')] }),
+            participant('ben-2', 'b', { metering_points: [point('M-3', 'Apartment 3')] }),
+        ], date, t)
+        expect(labels.get('ben-1')).toBe('Mr. Ben Consumer (Garage, M-2)')
+        expect(labels.get('ben-2')).toBe('Mr. Ben Consumer (Apartment 3)')
+    })
+
+    it('adds the validity where the locations still do not tell them apart', () => {
+        const labels = participantLabels([
+            participant('ben-1', 'b', { valid_to: '2026-03-31', metering_points: [point('M-1', 'Apartment')] }),
+            participant('ben-2', 'b', { valid_from: '2026-04-01', metering_points: [point('M-9', 'Apartment')] }),
+        ], date, t)
+        expect(labels.get('ben-1')).toBe(
+            'Mr. Ben Consumer (Apartment, pages.charges.fields.participantValidity:{"from":"<2026-01-01>","to":"<2026-03-31>"})',
+        )
+        expect(labels.get('ben-2')).toBe(
+            'Mr. Ben Consumer (Apartment, pages.charges.fields.participantValiditySince:{"from":"<2026-04-01>"})',
+        )
     })
 })
 

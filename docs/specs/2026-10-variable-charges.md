@@ -155,7 +155,7 @@ and description all read the tariff), so charges do **not** go through it. Inste
 | `description` | charge description, plus a translated suffix when more than one participant bears it (`charge_shared_marker`: "share of community costs" in de/fr/it/en, mirroring `shared_monthly_*`) |
 | `quantity_kwh` | `1` |
 | `unit` | `flat` |
-| `unit_price_chf` | the share |
+| `unit_price_chf` | the share (the column is `Decimal(13,5)`, migration `invoices.0028`, so a share of CHF 1,000 or more fits) |
 | `total_chf` | the share |
 | `sort_order` | `CHARGE_SORT_ORDER = 950` (after every `CATEGORY_SORT_ORDER` + type + mode sum); ties fall to `InvoiceItem.Meta.ordering` (description) |
 
@@ -216,14 +216,22 @@ regenerated. `compute_readiness` therefore gains a `charges` step:
 | Condition | `StepResult` |
 |---|---|
 | No charge dated in the period | `done`, count 0 |
-| Every charge in the period has bearers and no bearer's draft is older than the charge's `updated_at` | `done`, count = charges |
-| At least one bearer's draft invoice for the period has `created_at < charge.updated_at` | `todo`, `detail_data = {"stale_drafts": N}`, link to the invoice list |
+| Every charge in the period has bearers and every draft bills exactly the charges that apply to it | `done`, count = charges |
+| At least one draft invoice of the period is stale (below), counted once per draft | `todo`, `detail_data = {"stale_drafts": N}`, link to the invoice list |
 | A charge in the period has no bearer | `warn`, `detail_data = {"unbilled_charges": [descriptions]}` |
+
+A draft is stale when the charge lines it holds (the items with `sort_order == CHARGE_SORT_ORDER`: their
+count and total) differ from the charges that apply to its participant now (those dated in the draft's own
+period, split by `bearers_among`/`split_charge`), or when it was created before the `updated_at` of one of
+those charges. The first test is what catches a charge that was deleted, re-dated out of the period or
+taken off the participant after the draft was generated, none of which leaves a charge to compare
+`updated_at` with.
 
 A locked charge never changes, so it only produces `todo` for a draft generated before it was
 added. The step is added in `_bulk_period_readiness` (`BulkData.charges` and `BulkData.drafts`,
-loaded in `_load_bulk`: one query for the charges in the span, one for draft invoices only when
-there are charges), between `generated` and `approved`: `_select_next_action` returns the first
+loaded in `_load_bulk`: one query for the draft invoices of the span, one for the charges over the span
+widened to the drafts' own periods, and, when there are drafts, one for the charge lines the drafts hold
+(`BulkData.draft_charge_lines`)), between `generated` and `approved`: `_select_next_action` returns the first
 `todo`/`warn` step, and stale drafts must be regenerated before they are approved.
 `NEXT_ACTION_BY_STEP["charges"] = "generate"` reuses the existing action, so no new frontend
 next-action value is needed (it is also what a `warn` step points at; the warning text carries the
@@ -299,9 +307,13 @@ the import as any section error does. Invoices stay independent of charges, so t
 keeps its `("participants",)` dependency.
 
 **Backups** (`2026-09-backup-and-restore.md`): `backups/registry.py` gets a `charges` section
-(`ZevPart("invoices.Charge", "zev")`, after `tariffs`); Django's serialization carries the
-`participants` many-to-many inline. `backups.test_archive.CoverageTests` enforces that every model is
-registered or excluded.
+(`ZevPart("invoices.Charge", "zev")`, after `tariffs`). Backup serialization skips many-to-many fields
+(`backups.archive._serialized_fields`), so the `participants` selection is backed up as the auto-created
+join table, a second part of the same section (`ZevPart("invoices.Charge_participants", "charge__zev")`,
+written after the charges, loaded after the participants); without it a restored `selected_participants`
+charge would bill nobody. The join table has an integer key, so restore resets its sequence like the other
+integer-keyed tables. `backups.test_archive.CoverageTests` enforces that every model is registered or
+excluded, and counts auto-created join tables when it checks for stale entries.
 
 **MCP server** (`2026-09-mcp-server.md`): unchanged. Charges are not exposed; `explain_invoice`
 already explains `FEE` lines from their description.
@@ -326,7 +338,9 @@ period overview has loaded (also when the period has no invoice rows). Props: `z
   the period has no charges; its single row says so (`pages.charges.emptyPeriod`).
 - Create/edit dialog (`ChargeFormModal`, `chargeForm.ts`): description, amount, date, "Who pays":
   *All participants* | *Selected participants*; participant multi-select when selected; split key
-  (hidden for exactly one participant); VAT treatment with an explanatory hint. The **date is limited
+  (hidden for exactly one participant); a participation is named by `participantLabels`: its name, plus
+  its meters' locations (as the invoice rows do) when its party holds several participations, plus its
+  validity where the locations still do not tell them apart, in the picker, the preview and the list; VAT treatment with an explanatory hint. The **date is limited
   to the period** (`minDate`/`maxDate` on the date input, a field error otherwise, and the form is
   not submittable); it defaults to today clamped into the period (`clampDate`). The limit is a UI
   convenience: the API accepts any date that is not locked. The live "who pays what" table is the
@@ -388,6 +402,7 @@ stays the four values. `ReadinessStep` key union gains `'charges'`.
 | Shared amount under-recovered by up to `n/2` centimes | Documented and shown in the dialog; identical to shared fees (#465) |
 | Membership changes after the charge was entered change the shares | Bearers are computed at generation time from `charge_date`; the preview and the invoice use the same function; issued invoices are frozen |
 | Archive round-trip loses charges | `charges` section, tested round-trip |
+| Backup/restore loses a charge's selected participants | The join table is a registered part of the `charges` section; the backup round trip covers it |
 
 ## 9. Test plan
 
@@ -406,7 +421,9 @@ stays the four values. `ReadinessStep` key union gains `'charges'`.
   400, also when that invoice is not a bearer's; editing the charge after issue never changes the issued invoice.
 - API: ZEV scoping, role matrix (owner/manager/participant/guest), disabled ZEV writes refused,
   audit events written, `preview` matches the engine.
-- Readiness: stale draft → `todo`; no bearer → `warn`; clean → `done`.
+- Readiness: stale draft → `todo`; a draft whose charge was deleted, re-dated out of the period or taken
+  off its participant → `todo`; no bearer → `warn`; clean → `done`.
+- A share of CHF 1,000 or more is invoiced (the PostgreSQL leg of CI is what exercises the column width).
 - `tariffs/tests.py`: `Tariff` rejects category `other`.
 - PDF: `other` group rendered last with `flat` label in all four languages; guard test over all
   `TariffCategory` values.
@@ -414,8 +431,9 @@ stays the four values. `ReadinessStep` key union gains `'charges'`.
 
 ### Frontend
 
-- `tests/charges.test.ts` (12 tests): form validation (selected participants required, amount > 0),
-  input mapping, bearers label, `clampDate`.
+- `tests/charges.test.ts`: form validation (selected participants required, amount > 0),
+  input mapping, bearers label, `clampDate`, `participantLabels`.
+- `tests/overview-period-cards.test.ts`: the stale-charges step is the card's primary step when `generated` is done.
 - `tests/public-invoice.test.ts` renders the `other` group.
 - i18n key parity across the four locales (existing check).
 

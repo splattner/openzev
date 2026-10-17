@@ -145,7 +145,7 @@ statements stay live renders; contracts freeze through `ContractIssue`.
 | `description` | `CharField(500)` | Human-readable line description |
 | `quantity_kwh` | `Decimal(12,4)` | Quantity (kWh or months) |
 | `unit` | `CharField(20)` | `kWh` or `month` |
-| `unit_price_chf` | `Decimal(8,5)` | Price per unit |
+| `unit_price_chf` | `Decimal(13,5)` | Price per unit (wide enough for a one-off charge's flat line) |
 | `total_chf` | `Decimal(10,2)` | `quantity × unit_price`, rounded |
 | `sort_order` | `PositiveSmallIntegerField` | Display ordering |
 
@@ -539,7 +539,7 @@ approved | sent | paid;
 statuses ∈ ok | warn | todo | done (never `blocked` — data quality is
 soft-gated). `count`/`total` are real: `generated` compares invoices present
 against billable participants; approve/send/paid run over the period's active
-(non-cancelled) invoices. The `charges` step (#924, between `generated` and `approved`, `next_action: generate`) is `todo` while a draft was created before a charge dated in the period was last changed, `warn` for a charge nobody bears, and otherwise `ok`/hidden when the period has no charges; `detail_data` carries `stale_drafts`, `unbilled_charges`, `more_unbilled`. `detail` is an English API fallback never rendered;
+(non-cancelled) invoices. The `charges` step (#924, between `generated` and `approved`, `next_action: generate`) is `todo` while a draft was created before a charge dated in the period was last changed or no longer holds the charge lines that apply to it (a charge deleted, re-dated or taken off the participant), `warn` for a charge nobody bears, and otherwise `ok`/hidden when the period has no charges; `detail_data` carries `stale_drafts`, `unbilled_charges`, `more_unbilled`. `detail` is an English API fallback never rendered;
 the UI localizes from `detail_data`. Both single-period and bulk readiness
 ignore failed email attempts for paid/cancelled invoices, and count the newest
 attempt for every other invoice in the exact period. Cross-period alerts remain

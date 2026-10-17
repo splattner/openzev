@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from decimal import Decimal
 
 from django.db.models import Exists, F, OuterRef, Q, Subquery, Window
 from django.db.models.functions import RowNumber
@@ -21,8 +22,8 @@ from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory
 from zev.models import PARTY_NAME_FIELDS, MeteringPoint, MeteringPointAssignment, Participant
 from zev.iban import is_valid_iban
 
-from .charges import bearers_among, split_charge
-from .models import Charge, EmailLog, Invoice, InvoiceStatus
+from .charges import CHARGE_SORT_ORDER, bearers_among, split_charge
+from .models import Charge, EmailLog, Invoice, InvoiceItem, InvoiceStatus
 
 
 # Billing-period alignment
@@ -487,8 +488,10 @@ class BulkData:
     invoice_rows: list[tuple[int, int, date, date, str, str]]  # (id, pid, ps, pe, status, number)
     latest_email_status: dict[int, str]  # per invoice id
     charges: list[Charge] = field(default_factory=list)  # dated in the span, participants prefetched
-    # Draft invoices in the span: (participant id, period start, period end, created_at)
+    # Draft invoices in the span: (invoice id, participant id, period start, period end, created_at)
     drafts: list[tuple] = field(default_factory=list)
+    # What each draft already bills as one-off charges: invoice id -> (lines, total)
+    draft_charge_lines: dict = field(default_factory=dict)
 
 
 def _newest_email_logs_qs(zev):
@@ -557,20 +560,28 @@ def _load_bulk(zev, span_start: date, span_end: date) -> BulkData:
         "invoice_id", "status"
     ):
         latest_email_status.setdefault(invoice_id, status)
+    drafts = list(
+        Invoice.objects.filter(
+            zev=zev, status=InvoiceStatus.DRAFT,
+            period_start__lte=span_end, period_end__gte=span_start,
+        ).values_list("id", "participant_id", "period_start", "period_end", "created_at")
+    )
+    # A draft carries the charges dated in its own period, which may reach past
+    # the span, so the charges are read over the drafts' reach too.
+    charge_start = min([span_start, *(draft[2] for draft in drafts)])
+    charge_end = max([span_end, *(draft[3] for draft in drafts)])
     charges = list(
-        Charge.objects.filter(zev=zev, charge_date__gte=span_start, charge_date__lte=span_end)
+        Charge.objects.filter(zev=zev, charge_date__gte=charge_start, charge_date__lte=charge_end)
         .prefetch_related("participants")
         .order_by("charge_date", "created_at", "id")
     )
-    drafts = (
-        list(
-            Invoice.objects.filter(
-                zev=zev, status=InvoiceStatus.DRAFT,
-                period_start__lte=span_end, period_end__gte=span_start,
-            ).values_list("participant_id", "period_start", "period_end", "created_at")
-        )
-        if charges else []
-    )
+    draft_charge_lines: dict = {}
+    if drafts:
+        for invoice_id, total in InvoiceItem.objects.filter(
+            invoice_id__in=[draft[0] for draft in drafts], sort_order=CHARGE_SORT_ORDER,
+        ).values_list("invoice_id", "total_chf"):
+            lines, running = draft_charge_lines.get(invoice_id, (0, Decimal("0")))
+            draft_charge_lines[invoice_id] = (lines + 1, running + total)
     return BulkData(
         meter_id_by_mp=meter_id_by_mp,
         participants=participants,
@@ -583,6 +594,7 @@ def _load_bulk(zev, span_start: date, span_end: date) -> BulkData:
         latest_email_status=latest_email_status,
         charges=charges,
         drafts=drafts,
+        draft_charge_lines=draft_charge_lines,
     )
 
 
@@ -832,28 +844,35 @@ def _bulk_invoice_steps(data: BulkData, period_start: date, period_end: date) ->
 def _bulk_charges(data: BulkData, period_start: date, period_end: date) -> StepResult:
     """One-off charges (#924) dated in the period.
 
-    ``todo`` when a bearer's draft was generated before the charge last changed
-    (it would be approved without it); ``warn`` when nobody can be billed for a
-    charge. An issued invoice is never stale: the charge is locked then.
+    ``todo`` when a draft no longer bills the charges that apply to it (it would
+    be approved with a line that is gone, or without one that is new): a charge
+    changed after the draft was generated, or was deleted, re-dated or taken off
+    a participant. ``warn`` when nobody can be billed for a charge. An issued
+    invoice is never stale: the charge is locked then.
     """
-    charges = [c for c in data.charges if period_start <= c.charge_date <= period_end]
     participants = list(data.participants.values())
-    stale = 0
-    unbilled: list[str] = []
-    for charge in charges:
+    shares_by_charge = {}
+    for charge in data.charges:
         bearers = bearers_among(
             participants, charge.charge_date, charge.allocation, [p.pk for p in charge.participants.all()],
         )
-        shares = split_charge(charge.amount_chf, charge.split_key, bearers)
-        if not shares:
-            unbilled.append(charge.description)
-        stale += sum(
-            1
-            for participant_id, draft_start, draft_end, created_at in data.drafts
-            if participant_id in shares
-            and draft_start <= charge.charge_date <= draft_end
-            and created_at < charge.updated_at
-        )
+        shares_by_charge[charge.pk] = split_charge(charge.amount_chf, charge.split_key, bearers)
+    charges = [c for c in data.charges if period_start <= c.charge_date <= period_end]
+    unbilled = [c.description for c in charges if not shares_by_charge[c.pk]]
+    stale = 0
+    for invoice_id, participant_id, draft_start, draft_end, created_at in data.drafts:
+        if draft_start > period_end or draft_end < period_start:
+            continue
+        due = [
+            c for c in data.charges
+            if draft_start <= c.charge_date <= draft_end and participant_id in shares_by_charge[c.pk]
+        ]
+        expected = (len(due), sum((shares_by_charge[c.pk][participant_id] for c in due), Decimal("0")))
+        if (
+            data.draft_charge_lines.get(invoice_id, (0, Decimal("0"))) != expected
+            or any(created_at < c.updated_at for c in due)
+        ):
+            stale += 1
     link = f"/billing/invoices?period_start={period_start.isoformat()}&period_end={period_end.isoformat()}"
     detail_data = {}
     if stale:

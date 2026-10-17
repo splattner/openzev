@@ -105,8 +105,17 @@ ZEV_SECTIONS: tuple[tuple[str, tuple[ZevPart, ...]], ...] = (
             ZevPart("tariffs.TariffPeriod", "tariff__zev"),
         ),
     ),
-    # After participants: a charge may name the participants who bear it.
-    ("charges", (ZevPart("invoices.Charge", "zev"),)),
+    # After participants: a charge may name the participants who bear it. The
+    # selection is a many-to-many, which the serializer skips (see the module
+    # docstring), so its auto-created join table is backed up as a model of its
+    # own — without it a restored charge would bill nobody.
+    (
+        "charges",
+        (
+            ZevPart("invoices.Charge", "zev"),
+            ZevPart("invoices.Charge_participants", "charge__zev"),
+        ),
+    ),
     (
         "readings",
         (ZevPart("metering.MeterReading", "metering_point__zev", ("metering_point_id", "timestamp", "direction")),),

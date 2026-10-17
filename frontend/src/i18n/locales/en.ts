@@ -1606,6 +1606,8 @@ export const en = {
                 chargeDateHint: 'Choose a date from {{from}} to {{to}}.',
                 allocation: 'Who pays',
                 participants: 'Participants',
+                participantValidity: 'from {{from}} to {{to}}',
+                participantValiditySince: 'since {{from}}',
                 splitKey: 'Split',
                 vatTreatment: 'VAT',
             },

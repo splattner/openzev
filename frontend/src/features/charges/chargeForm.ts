@@ -1,4 +1,4 @@
-import type { Charge, ChargeInput } from '../../types/api'
+import type { Charge, ChargeInput, Participant } from '../../types/api'
 
 /** The form's own state: strings, as typed, converted to a `ChargeInput` only when valid. */
 export type ChargeFormValues = {
@@ -76,4 +76,48 @@ export function bearersLabel(
 /** ``day`` pulled into [min, max]; ISO dates compare as strings. */
 export function clampDate(day: string, min: string, max: string): string {
     return day < min ? min : day > max ? max : day
+}
+
+type Translate = (key: string, options?: Record<string, unknown>) => string
+
+/**
+ * How each participation is named where one is picked or listed. A party can
+ * hold several participations (a flat and a parking space) under one name, so
+ * those carry their meters' locations, as the invoice rows do, and their
+ * validity where the locations still do not tell them apart.
+ */
+export function participantLabels(
+    participants: Participant[],
+    formatDate: (day: string) => string,
+    t: Translate,
+): Map<string, string> {
+    const nameOf = (participant: Participant) => participant.display_name || participant.full_name || ''
+    const partyOf = (participant: Participant) => participant.party ?? participant.id
+    const partySize = new Map<string, number>()
+    for (const participant of participants) {
+        partySize.set(partyOf(participant), (partySize.get(partyOf(participant)) ?? 0) + 1)
+    }
+    const labelWith = (participant: Participant, withValidity: boolean) => {
+        if ((partySize.get(partyOf(participant)) ?? 0) < 2) return nameOf(participant)
+        const details = [
+            ...new Set((participant.metering_points ?? []).map((point) => point.location_description?.trim() || point.meter_id)),
+        ].sort()
+        if (withValidity) {
+            details.push(
+                participant.valid_to
+                    ? t('pages.charges.fields.participantValidity', { from: formatDate(participant.valid_from), to: formatDate(participant.valid_to) })
+                    : t('pages.charges.fields.participantValiditySince', { from: formatDate(participant.valid_from) }),
+            )
+        }
+        return details.length > 0 ? `${nameOf(participant)} (${details.join(', ')})` : nameOf(participant)
+    }
+    const plain = new Map(participants.map((participant) => [participant.id, labelWith(participant, false)]))
+    const counts = new Map<string, number>()
+    for (const label of plain.values()) counts.set(label, (counts.get(label) ?? 0) + 1)
+    return new Map(
+        participants.map((participant) => [
+            participant.id,
+            (counts.get(plain.get(participant.id)!) ?? 0) > 1 ? labelWith(participant, true) : plain.get(participant.id)!,
+        ]),
+    )
 }

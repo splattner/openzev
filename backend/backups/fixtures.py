@@ -21,7 +21,7 @@ from django.utils import timezone
 from accounts.models import FeatureFlag, OAuthProvider, UserRole, VatRate
 from audit.models import AuditActionCategory, AuditEvent
 from audit.services import record_audit_event
-from invoices.models import ContractIssue, EmailLog, Invoice, InvoiceAccessToken
+from invoices.models import Charge, ChargeAllocation, ContractIssue, EmailLog, Invoice, InvoiceAccessToken
 from metering.models import ImportLog, SupplementaryReading, SupplementarySource
 from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
 from testing.helpers import make_user
@@ -90,6 +90,11 @@ def build_world() -> World:
         participant=alice, prefix="onb-alpha", secret="o" * 32,
         expires_at=timezone.now() + timedelta(days=30),
     )
+    charge = Charge.objects.create(
+        zev=alpha, description="Postage", amount_chf=Decimal("30.00"), charge_date=date(2026, 1, 15),
+        allocation=ChargeAllocation.SELECTED_PARTICIPANTS,
+    )
+    charge.participants.set([alice])
     ImportLog.objects.create(zev=alpha, imported_by=owner, source="csv", filename="alpha.csv", rows_total=3)
     ContractIssue.objects.create(
         zev=alpha, participant=alice, version=1, document_number="C-ALPHA-1", language="de",
