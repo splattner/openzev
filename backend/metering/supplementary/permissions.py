@@ -24,13 +24,14 @@ from zev import access
 from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, Participant
 
 # Capabilities, ordered by how much they let a caller do to someone else's data.
-OWNER_ONLY = frozenset({"partial_update_all", "test", "sync", "rotate_push_token", "import_csv"})
+OWNER_ONLY = frozenset({"partial_update_all", "test", "sync", "rotate_push_token", "revoke_push_token", "import_csv"})
 OWNER_OR_MANAGER = frozenset({"partial_update_enabled", "destroy", "disconnect", "purge"})
 
 ACTION_CAPABILITY = {
     "test": "test",
     "sync": "sync",
     "rotate_push_token": "rotate_push_token",
+    "revoke_push_token": "revoke_push_token",
     "import_csv": "import_csv",
     "destroy": "destroy",
     "disconnect": "disconnect",

@@ -37,7 +37,7 @@ can tell (`404`, whether or not they are signed in).
 The assistant authenticates the same way a script does — see
 [API Keys](16-api-keys.md) for the full picture. For an assistant:
 
-1. Open **Account → API keys**.
+1. Open **Account → Tokens & keys**.
 2. Choose **New API key**.
 3. Give it a name that says what it's for — `claude-code-mcp` beats `key 3`.
 4. Tick **Read-only key**. Every tool in this release only reads, so a

@@ -16,7 +16,7 @@ vi.mock('@mantine/core', () => {
     return { Tabs: Object.assign(wrapper, { List: wrapper, Tab: wrapper, Panel: wrapper }) }
 })
 vi.mock('../src/components/ConfirmDialog', () => ({ ConfirmDialog: () => null, useConfirmDialog: () => ({}) }))
-vi.mock('../src/features/account/ApiKeysSection', () => ({ ApiKeysSection: () => null }))
+vi.mock('../src/features/account/TokensSection', () => ({ TokensSection: () => null }))
 vi.mock('../src/features/account/LinkedAccountsCard', () => ({ LinkedAccountsCard: () => null }))
 vi.mock('../src/features/account/PasswordCard', () => ({ PasswordCard: () => null }))
 vi.mock('../src/features/account/ProfileCard', () => ({ ProfileCard: () => null }))

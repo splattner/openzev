@@ -190,6 +190,14 @@ class PushAuthenticationTests(IngestTestCase):
         self.assertEqual(self.push([reading_payload(quarter_hours(1)[0])], token=old).status_code, 401)
         self.assertEqual(self.push([reading_payload(quarter_hours(1)[0])], token=rotated["push_token"]).status_code, 200)
 
+    def test_first_use_is_recorded_and_not_rewritten_within_the_window(self):
+        self.assertIsNone(SupplementarySource.objects.get(pk=self.source.pk).push_token_last_used_at)
+        self.push([reading_payload(quarter_hours(1)[0])])
+        first = SupplementarySource.objects.get(pk=self.source.pk).push_token_last_used_at
+        self.assertIsNotNone(first)
+        self.push([reading_payload(quarter_hours(1)[0])])
+        self.assertEqual(SupplementarySource.objects.get(pk=self.source.pk).push_token_last_used_at, first)
+
     def test_a_disabled_source_answers_403(self):
         client_for(self.manager).patch(f"{SOURCES_URL}{self.source.pk}/", {"enabled": False}, format="json")
         response = self.push([reading_payload(quarter_hours(1)[0])])

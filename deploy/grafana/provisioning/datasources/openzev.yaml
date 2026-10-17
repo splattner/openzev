@@ -1,0 +1,17 @@
+# Grafana datasource for the OpenZEV analytics dataset (Infinity plugin).
+# Needs: GF_INSTALL_PLUGINS=yesoreyeram-infinity-datasource
+# and OPENZEV_URL (e.g. https://openzev.example.com) plus OPENZEV_ANALYTICS_TOKEN
+# (an `oza_…` token, see docs/user-guide/21-analytics-and-grafana.md) in Grafana's environment.
+apiVersion: 1
+
+datasources:
+  - name: OpenZEV
+    uid: openzev
+    type: yesoreyeram-infinity-datasource
+    access: proxy
+    jsonData:
+      auth_method: bearerToken
+      allowedHosts:
+        - ${OPENZEV_URL}
+    secureJsonData:
+      bearerToken: ${OPENZEV_ANALYTICS_TOKEN}

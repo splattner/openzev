@@ -97,7 +97,7 @@ class SupplementarySourceViewSet(
     # in SupplementarySourcePermission instead of by the mixin's manager-only write scope.
     viewer_allowed_actions = frozenset(
         {"create", "partial_update", "destroy", "disconnect", "purge", "test", "sync",
-         "rotate_push_token", "import_csv"}
+         "rotate_push_token", "revoke_push_token", "import_csv"}
     )
     scope_parent_path = None
 
@@ -327,6 +327,26 @@ class SupplementarySourceViewSet(
                 f"Issued a new push token for the energy data source of {source.metering_point.meter_id}.",
             )
         return Response({"push_token": token, "push_token_prefix": source.push_token_prefix})
+
+    @action(detail=True, methods=["post"], url_path="revoke-push-token")
+    def revoke_push_token(self, request, pk=None):
+        """Drop the push token. The source and its readings stay; rotate issues a new token."""
+        source = self.get_object()
+        self._refuse_if_zev_disabled(source)
+        if source.provider != "push":
+            raise ValidationError({"detail": "Only push sources have a push token."})
+        if not source.push_token_prefix:
+            raise ValidationError({"detail": "This source has no push token."})
+        prefix = source.push_token_prefix
+        with transaction.atomic():
+            source.revoke_push_token()
+            source.save()
+            _audit(
+                request, "revoke_push_token", source,
+                f"Revoked the push token of the energy data source of {source.metering_point.meter_id}.",
+                metadata={"prefix": prefix},
+            )
+        return Response(self.get_serializer(source).data)
 
     @action(detail=True, methods=["post"], url_path="import-csv", parser_classes=[MultiPartParser, FormParser])
     def import_csv(self, request, pk=None):

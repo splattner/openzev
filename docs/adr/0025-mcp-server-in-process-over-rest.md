@@ -86,7 +86,7 @@ Positive:
   API key, paste a URL into the assistant.
 - Access control has exactly one implementation. A tool cannot return data the same user could
   not fetch from the REST API, and a future fix to a permission class fixes MCP too.
-- A leaked MCP credential is an ordinary API key: visible in **Account → API keys**, revocable
+- A leaked MCP credential is an ordinary API key: visible in **Account → Tokens & keys**, revocable
   on its own, read-only if created that way, and traceable in the audit log.
 - Write tools (a later iteration) inherit the workflow checks for free by dispatching to the
   existing `POST` actions (`approve`, `send-all`, …).

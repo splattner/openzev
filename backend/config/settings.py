@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     "backups",
     "privacy",
     "mcp_server",
+    "analytics",
 ]
 
 MIDDLEWARE = [
@@ -194,6 +195,8 @@ REST_FRAMEWORK = {
         # Per-IP budgets for the public auth endpoints (accounts.throttling).
         # Per push token (supplementary energy data); a 15-minute feed needs 4/hour.
         "supplementary_push": env("SUPPLEMENTARY_PUSH_THROTTLE_RATE", default="120/hour"),
+        # Per analytics token; a Grafana dashboard refreshing a handful of panels every 30 s needs ~600/hour.
+        "analytics_token": env("ANALYTICS_TOKEN_THROTTLE_RATE", default="1200/hour"),
         "auth_login": env("AUTH_LOGIN_THROTTLE_RATE", default="40/hour"),
         "auth_refresh": env("AUTH_REFRESH_THROTTLE_RATE", default="60/hour"),
         "auth_register": env("AUTH_REGISTER_THROTTLE_RATE", default="10/hour"),
@@ -254,6 +257,21 @@ API_KEY_DEFAULT_EXPIRY_DAYS = env.int("API_KEY_DEFAULT_EXPIRY_DAYS", default=365
 # amplification of key authentication; see ApiKeyAuthentication._touch.
 API_KEY_LAST_USED_RESOLUTION = timedelta(
     minutes=env.int("API_KEY_LAST_USED_RESOLUTION_MINUTES", default=5)
+)
+
+# ── Analytics dataset (SPEC-2026-analytics-dataset-api) ──────────────────────
+# The dataset is computed per request from the allocation read model, so its cost
+# grows with the readings scanned. Past this many readings in the requested ZEV
+# and range the request is refused with a hint to narrow it, rather than tying up
+# a worker; the hourly fact table that lifts the limit is a follow-up.
+ANALYTICS_MAX_READINGS = env.int("ANALYTICS_MAX_READINGS", default=300_000)
+# Output rows per request (JSON or CSV).
+ANALYTICS_MAX_ROWS = env.int("ANALYTICS_MAX_ROWS", default=200_000)
+# A participant sees ZEV-wide totals only when at least this many participants
+# shared the ZEV on every day of the range: with fewer, "ZEV total minus me" is
+# another person's load profile.
+ANALYTICS_MIN_PARTICIPANTS_FOR_ZEV_AGGREGATE = env.int(
+    "ANALYTICS_MIN_PARTICIPANTS_FOR_ZEV_AGGREGATE", default=5
 )
 
 # ── Two-factor authentication (MFA) ────────────────────────────────────────────

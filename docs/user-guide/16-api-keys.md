@@ -1,5 +1,10 @@
 # API Keys
 
+!!! note "Tokens & keys"
+    **Account → Tokens & keys** lists every credential you have: API keys, [analytics tokens](21-analytics-and-grafana.md#analytics-tokens)
+    and [energy data tokens](20-energy-data.md#send-the-data-yourself-push-or-file), with what each one can do, when it
+    was last used and when it expires, and revokes any of them.
+
 API keys let you call the OpenZEV API from a script — pull consumption data into
 a spreadsheet, feed a dashboard, or automate a step of your billing run — without
 storing your password anywhere.
@@ -14,7 +19,7 @@ up in the audit log under its own name.
 
 ![Account API keys tab](screenshots/16c-account-api-keys.png)
 
-1. Open **Account → API keys**.
+1. Open **Account → Tokens & keys**.
 2. Choose **New API key**.
 3. Give it a name describing what will use it — `nightly consumption export`
    beats `key 1` when you are deciding six months later whether it is still
@@ -79,6 +84,10 @@ try calls from the browser.
 An API key is also what an AI assistant uses to read your OpenZEV data — see
 [Connecting an AI Assistant](19-ai-assistants.md) if you want to ask Claude,
 Cursor or n8n questions about a ZEV instead of calling the API by hand.
+
+For charts, [Analytics and Grafana](21-analytics-and-grafana.md) describes the read-only
+analytics endpoint and the narrower analytics tokens, which suit a dashboard better than a
+key that carries your whole account.
 
 ## What a key can and cannot do
 

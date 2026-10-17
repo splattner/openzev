@@ -93,6 +93,11 @@ export async function rotateSupplementaryPushToken(id: string): Promise<{ push_t
   return data
 }
 
+/** Drops the push token only; the source and its readings stay. Rotate issues a new one. */
+export async function revokeSupplementaryPushToken(id: string): Promise<void> {
+  await api.post(`${BASE}${id}/revoke-push-token/`)
+}
+
 export async function importSupplementaryCsv(
   id: string,
   file: File,

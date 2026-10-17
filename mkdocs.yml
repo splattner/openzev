@@ -125,6 +125,7 @@ nav:
   - Automation:
       - API Keys: 16-api-keys.md
       - AI Assistants (MCP): 19-ai-assistants.md
+      - Analytics and Grafana: 21-analytics-and-grafana.md
   - Reference:
       - Troubleshooting: 12-troubleshooting.md
       - Glossary: 15-glossary.md

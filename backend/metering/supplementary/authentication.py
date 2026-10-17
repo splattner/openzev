@@ -8,7 +8,9 @@ and ``request.auth`` is the source.
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
+from django.utils import timezone
 from drf_spectacular.extensions import OpenApiAuthenticationExtension
 from rest_framework import exceptions
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
@@ -18,6 +20,16 @@ from rest_framework.throttling import SimpleRateThrottle
 from accounts.api_keys import split_key, verify_secret
 
 from ..models import PUSH_TOKEN_NAMESPACE, SupplementarySource
+
+
+def _touch(source) -> None:
+    """Record use at most once per resolution window, as ``ApiKeyAuthentication._touch`` does."""
+    now = timezone.now()
+    last = source.push_token_last_used_at
+    if last is not None and now - last < settings.API_KEY_LAST_USED_RESOLUTION:
+        return
+    SupplementarySource.objects.filter(pk=source.pk).update(push_token_last_used_at=now)
+    source.push_token_last_used_at = now
 
 
 class SupplementaryPushAuthentication(BaseAuthentication):
@@ -46,6 +58,7 @@ class SupplementaryPushAuthentication(BaseAuthentication):
         # not whether a prefix exists.
         if source is None or not source.push_token_hash or not verify_secret(secret, source.push_token_hash):
             raise invalid
+        _touch(source)
         return AnonymousUser(), source
 
     def authenticate_header(self, request):

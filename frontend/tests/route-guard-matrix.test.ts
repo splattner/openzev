@@ -73,7 +73,7 @@ vi.mock('../src/pages/AdminEmailTemplatesPage', () => ({ AdminEmailTemplatesPage
 vi.mock('../src/pages/AdminInvoicesPage', () => ({ AdminInvoicesContent: marker('admin-invoices') }))
 vi.mock('../src/pages/AdminAuditLogsPage', () => ({ AuditLogsPage: marker('audit-logs') }))
 vi.mock('../src/pages/AdminAccountsPage', () => ({ AdminAccountsPage: marker('admin-accounts') }))
-vi.mock('../src/pages/AdminApiKeysPage', () => ({ AdminApiKeysPage: marker('admin-api-keys') }))
+vi.mock('../src/pages/AdminCredentialsPage', () => ({ AdminCredentialsPage: marker('admin-credentials') }))
 vi.mock('../src/pages/ZevListPage', () => ({ ZevListPage: marker('admin-zevs') }))
 vi.mock('../src/pages/ParticipantsPage', () => ({ ParticipantsPage: marker('participants') }))
 vi.mock('../src/pages/ZevSettingsPage', () => ({
@@ -197,6 +197,7 @@ const MATRIX: Array<{ path: string; marker: string; allow: Record<ShellRole, boo
     { path: '/admin/audit-logs', marker: 'admin-overview-hub', allow: { admin: true, manager: false, viewer: false, participant: false, former: false, none: false } },
     { path: '/admin/health', marker: 'admin-overview-hub', allow: { admin: true, manager: false, viewer: false, participant: false, former: false, none: false } },
     { path: '/admin/accounts', marker: 'admin-accounts-hub', allow: { admin: true, manager: false, viewer: false, participant: false, former: false, none: false } },
+    { path: '/admin/accounts/tokens', marker: 'admin-accounts-hub', allow: { admin: true, manager: false, viewer: false, participant: false, former: false, none: false } },
     { path: '/admin/accounts/api-keys', marker: 'admin-accounts-hub', allow: { admin: true, manager: false, viewer: false, participant: false, former: false, none: false } },
     { path: '/admin/api-keys', marker: 'admin-accounts-hub', allow: { admin: true, manager: false, viewer: false, participant: false, former: false, none: false } },
     { path: '/admin/templates', marker: 'admin-templates-hub', allow: { admin: true, manager: false, viewer: false, participant: false, former: false, none: false } },
