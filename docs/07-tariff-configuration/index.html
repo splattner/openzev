@@ -1319,6 +1319,89 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#one-off-charges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One-off Charges
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="One-off Charges">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-charge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a charge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-date-decides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The date decides
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rounding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rounding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VAT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changing-and-deleting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing and deleting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-period-locks-with-the-first-approval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The period locks with the first approval
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#tariff-tips" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2386,6 +2469,89 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#one-off-charges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One-off Charges
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="One-off Charges">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-charge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a charge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-date-decides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The date decides
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rounding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rounding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VAT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changing-and-deleting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing and deleting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-period-locks-with-the-first-approval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The period locks with the first approval
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#tariff-tips" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3348,6 +3514,110 @@ Metering) — the same grouping and order as an invoice's line items.</p>
 community's managers and viewers, and admins, can download it; there is nothing on this document a
 participant does not already see broken out on their own participation
 contract or invoice.</p>
+<h2 id="one-off-charges">One-off Charges<a class="headerlink" href="#one-off-charges" title="Permanent link">&para;</a></h2>
+<p>A tariff describes a price that recurs. A cost that happens <strong>once</strong> — postage
+for the invoice run, a repair, a one-time fee — is not a tariff. Record it as a
+<strong>charge</strong> in the <strong>Charges</strong> section under the period's invoices
+(<strong>Billing → Invoices</strong>, pick the period) and OpenZEV puts it on the right
+invoices as its own line, under <strong>Other charges</strong>.</p>
+<p>Because the charge lives apart from the invoice, it <strong>survives regeneration</strong>:
+regenerate a draft as often as you like and the line comes back.</p>
+<p><img alt="The Charges section under a period's invoices, with the note that an approved invoice freezes it" src="../screenshots/08j-period-charges.png" /></p>
+<h3 id="adding-a-charge">Adding a charge<a class="headerlink" href="#adding-a-charge" title="Permanent link">&para;</a></h3>
+<p>Choose <strong>Add charge</strong> and fill in:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Description</strong></td>
+<td>What appears on the invoice line, e.g. <em>Postage, March invoice run</em></td>
+</tr>
+<tr>
+<td><strong>Total amount (CHF)</strong></td>
+<td>The whole cost, greater than zero</td>
+</tr>
+<tr>
+<td><strong>Date</strong></td>
+<td>Decides who pays (see below); limited to the period you are working in</td>
+</tr>
+<tr>
+<td><strong>Who pays</strong></td>
+<td><em>All participants</em>, or <em>Selected participants</em></td>
+</tr>
+<tr>
+<td><strong>Split</strong></td>
+<td><em>Equally</em> or <em>By weight</em> (the participants' <a href="../03-participant-management/#allocation-weight">allocation weight</a>); only shown when more than one person pays</td>
+</tr>
+<tr>
+<td><strong>VAT</strong></td>
+<td><em>Taxable</em> or <em>Pass-through</em> (see below)</td>
+</tr>
+</tbody>
+</table>
+<p>A live <strong>Who pays what</strong> table under the form shows each participant's share
+before you save. It uses the same calculation the invoice does.</p>
+<h3 id="the-date-decides">The date decides<a class="headerlink" href="#the-date-decides" title="Permanent link">&para;</a></h3>
+<p>A charge is billed on the invoice whose period contains its <strong>date</strong>, and the
+people who pay are the members <strong>on that date</strong>. Somebody who joined after the
+date is not charged; somebody who left before it is not either. Both a single
+invoice and a batch run therefore agree on who pays what.</p>
+<h3 id="rounding">Rounding<a class="headerlink" href="#rounding" title="Permanent link">&para;</a></h3>
+<p>Each share is rounded to the centime on its own, exactly as for
+<a href="#shared-fees">shared fees</a>. CHF 10.00 divided between three people bills
+CHF 3.33 each, CHF 9.99 in total. The form tells you when rounding leaves part
+of the amount unrecovered (or bills slightly more than the total). A share that
+rounds to zero is left off.</p>
+<h3 id="vat">VAT<a class="headerlink" href="#vat" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Treatment</th>
+<th>Use it for</th>
+<th>Effect on a VAT-registered community</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Taxable</strong> (default)</td>
+<td>Your own service or cost</td>
+<td>Part of the VAT base: VAT is added on top</td>
+</tr>
+<tr>
+<td><strong>Pass-through</strong></td>
+<td>An expense you pay in the participant's name and pass on at cost</td>
+<td>No VAT is added</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Check with your tax adviser</strong> that a cost really qualifies as a
+pass-through before you use it. OpenZEV applies the choice you make; it does
+not judge it.</p>
+</blockquote>
+<p>If the community is not VAT-registered, or folds VAT into its prices, the
+charge is billed as entered.</p>
+<h3 id="changing-and-deleting">Changing and deleting<a class="headerlink" href="#changing-and-deleting" title="Permanent link">&para;</a></h3>
+<p>Edit or delete a charge from the row's actions menu. Draft invoices that
+already carry it keep the old line until you regenerate them — the
+<a href="../09-invoice-management/#billing-work-by-period-overview">Overview</a> lists
+those drafts under the <strong>Charges</strong> step so you don't forget.</p>
+<h3 id="the-period-locks-with-the-first-approval">The period locks with the first approval<a class="headerlink" href="#the-period-locks-with-the-first-approval" title="Permanent link">&para;</a></h3>
+<p>As soon as <strong>any</strong> invoice of the period is approved (or sent or paid; a
+cancelled one does not count), the period's charges are <strong>frozen</strong>: you cannot
+add, edit or delete any of them, and the <strong>Add charge</strong> button is replaced by a
+warning. This holds for the whole community, not only the people who pay the
+charge, so the period is always billed from one set of charges. To change
+something afterwards, correct the invoice (see
+<a href="../09-invoice-management/#correcting-a-paid-invoice-with-a-credit-note">Correcting a paid invoice</a>),
+or record the cost in a later period.</p>
+<p>Add every charge <strong>before</strong> you approve the first invoice of the period, then
+regenerate the drafts.</p>
+<p>Charges are part of a <a href="../17-zev-transfer/">ZEV export archive</a> and of backups.</p>
 <h2 id="tariff-tips">Tariff Tips<a class="headerlink" href="#tariff-tips" title="Permanent link">&para;</a></h2>
 <p><strong>Use consistent naming:</strong> Helps operators find right tariff.</p>
 <ul>
@@ -3361,6 +3631,7 @@ contract or invoice.</p>
 <ul>
 <li><strong>Check data quality:</strong> <a href="../06-metering-analysis/">Metering Analysis</a></li>
 <li><strong>Understand allocation:</strong> <a href="../08-billing-allocation-explained/">How Energy Allocation Works</a></li>
+<li><strong>Bill a one-off cost:</strong> <a href="#one-off-charges">One-off Charges</a></li>
 <li><strong>Generate invoices:</strong> <a href="../09-invoice-management/">Invoice Management</a></li>
 </ul>
 

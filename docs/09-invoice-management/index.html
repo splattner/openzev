@@ -955,6 +955,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Billing Work by Period (Overview)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#charges-section-and-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Charges section and step
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1781,6 +1798,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Billing Work by Period (Overview)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#charges-section-and-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Charges section and step
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2231,6 +2265,14 @@ Alerts without a billing period, including participant validity endings that
 still hold meter assignments, appear under <strong>Community notices</strong>. Tariff
 coverage, metering gaps, unassigned readings and setup state are already
 covered by readiness steps or setup guidance.</p>
+<h3 id="charges-section-and-step">Charges section and step<a class="headerlink" href="#charges-section-and-step" title="Permanent link">&para;</a></h3>
+<p>Below the invoice table, the <strong>Charges</strong> section lists the period's one-off
+charges and, until an invoice of the period is approved, offers <strong>Add charge</strong>.</p>
+<p>When the community has <a href="../07-tariff-configuration/#one-off-charges">one-off charges</a>
+in a period, the period card gains a <strong>Charges</strong> step between generating and
+approving. It asks you to regenerate draft invoices that were created before a
+charge was added or changed, and warns about a charge nobody can be billed for
+(no member on its date). It stays out of the list for periods without charges.</p>
 <h2 id="participant-view-my-invoices">Participant View: My Invoices<a class="headerlink" href="#participant-view-my-invoices" title="Permanent link">&para;</a></h2>
 <p>Participants open <strong>My invoices</strong> (<code>/me/invoices</code>) in the sidebar to see the
 invoices issued to them — invoice number, period, total, status, and a link to
@@ -2500,6 +2542,8 @@ The regeneration rules below apply to overlapping billing periods.</p>
 freshly calculated one. Use this after correcting metering data or tariff
 configuration. Approved, sent and paid invoices are locked and cannot be
 regenerated.</p>
+<p>Regeneration keeps one-off <a href="../07-tariff-configuration/#one-off-charges">charges</a>:
+they are stored separately and added to the new draft again.</p>
 <blockquote>
 <p><strong>Tip:</strong> You can generate invoices even when metering data is incomplete, but totals may be inaccurate. It is best to resolve missing data first.</p>
 </blockquote>
