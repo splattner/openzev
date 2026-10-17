@@ -34,7 +34,6 @@ The container runtime may be Docker or Podman — check which is available (`com
 - Frontend (Vite, HMR): http://localhost:5173 — source is bind-mounted, so edits apply without a restart
 - Backend API: http://localhost:8001/api/v1
 - Seed demo data: `docker compose -f docker-compose.dev.yml exec backend python manage.py seed_demo` — demo admin is `admin@openzev.local` / `admin1234`
-- If the backend starts failing with Postgres `too many clients already`, restart the backend container to release its connections.
 
 ### Backend
 

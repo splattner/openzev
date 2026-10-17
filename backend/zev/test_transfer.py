@@ -19,7 +19,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
-from invoices.models import Invoice, InvoiceItem, InvoiceStatus
+from invoices.models import Credit, CreditApplication, Invoice, InvoiceItem, InvoiceStatus, Payment
 from metering.models import ImportLog, MeterReading, ReadingResolution, SupplementarySource
 from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
@@ -120,6 +120,14 @@ def build_populated_zev(owner, *, name="Transfer ZEV", meter_prefix="TR"):
         description="Solar energy", quantity_kwh=Decimal("100.0000"),
         unit_price_chf=Decimal("0.42000"), total_chf=Decimal("42.00"),
     )
+    Invoice.objects.filter(pk=invoice.pk).update(approved_at=datetime(2026, 2, 2, 8, 0, tzinfo=timezone.utc))
+    Payment.objects.create(invoice=invoice, amount_chf=Decimal("20.00"), paid_on=date(2026, 2, 20), note="Teilzahlung")
+    Credit.objects.create(
+        zev=zev, participant=alice, source_invoice=invoice, credit_number="CN-00001", kind="adjustment",
+        reason="Overcharged", amount_chf=Decimal("5.40"), vat_mode="registered",
+        vat_rate=Decimal("0.0800"), vat_chf=Decimal("0.40"),
+    )
+    Zev.objects.filter(pk=zev.pk).update(credit_note_counter=2)
     return zev
 
 
@@ -145,6 +153,8 @@ def export_and_clear(zev, sections=None):
     else. ``Invoice.zev`` is PROTECT, so invoices go first.
     """
     raw = export_to_bytes(zev, sections)
+    CreditApplication.objects.filter(credit__zev=zev).delete()
+    Credit.objects.filter(zev=zev).delete()
     Invoice.objects.filter(zev=zev).delete()
     zev.delete()
     return raw
@@ -441,6 +451,78 @@ class RoundTripTests(TestCase):
         self.assertEqual(invoice.total_local_sold_kwh, Decimal("200.0000"))
         self.assertEqual(invoice.local_sale_chf, Decimal("40.00"))
         self.assertEqual(invoice.local_sale_feed_in_chf, Decimal("16.00"))
+
+    def test_payments_and_approval_round_trip(self):
+        result = self._import()
+        invoice = Invoice.objects.get(zev_id=result["zev_id"])
+        self.assertEqual(invoice.approved_at, datetime(2026, 2, 2, 8, 0, tzinfo=timezone.utc))
+        payment = invoice.payments.get()
+        self.assertEqual(
+            (payment.amount_chf, payment.paid_on, payment.note, payment.source),
+            (Decimal("20.00"), date(2026, 2, 20), "Teilzahlung", Payment.Source.MANUAL),
+        )
+
+    def test_credits_round_trip_and_push_the_counter(self):
+        result = self._import()
+        invoice = Invoice.objects.get(zev_id=result["zev_id"])
+        credit = invoice.credits.get()
+        self.assertEqual(
+            (credit.credit_number, credit.kind, credit.amount_chf, credit.vat_chf, credit.reason),
+            ("CN-00001", "adjustment", Decimal("5.40"), Decimal("0.40"), "Overcharged"),
+        )
+        self.assertEqual(credit.participant_id, invoice.participant_id)
+        self.assertEqual(credit.zev.credit_note_counter, 2)
+
+    def test_credit_applications_and_refunds_round_trip(self):
+        credit = Credit.objects.get(zev=self.source)
+        Credit.objects.filter(pk=credit.pk).update(
+            refunded_chf=Decimal("1.00"), refunded_on=date(2026, 3, 1), refund_note="Bank transfer",
+        )
+        later = Invoice.objects.create(
+            zev=self.source, participant=credit.participant, invoice_number="TRF-00003",
+            period_start=date(2026, 2, 1), period_end=date(2026, 2, 28), status=InvoiceStatus.DRAFT,
+            total_chf=Decimal("10.00"), credit_applied_chf=Decimal("2.00"),
+        )
+        CreditApplication.objects.create(credit=credit, invoice=later, amount_chf=Decimal("2.00"))
+        released = Invoice.objects.create(
+            zev=self.source, participant=credit.participant, invoice_number="TRF-00004",
+            period_start=date(2026, 3, 1), period_end=date(2026, 3, 31), status=InvoiceStatus.CANCELLED,
+            approved_at=datetime(2026, 4, 1, 8, 0, tzinfo=timezone.utc),
+            total_chf=Decimal("1.00"), credit_applied_chf=Decimal("1.00"),
+        )
+        CreditApplication.objects.create(
+            credit=credit, invoice=released, amount_chf=Decimal("1.00"),
+            released_at=datetime(2026, 4, 2, 8, 0, tzinfo=timezone.utc),
+        )
+
+        result = self._import()
+
+        imported = Credit.objects.get(zev_id=result["zev_id"])
+        self.assertEqual(
+            (imported.refunded_chf, imported.refunded_on, imported.refund_note),
+            (Decimal("1.00"), date(2026, 3, 1), "Bank transfer"),
+        )
+        self.assertEqual(result["counts"]["credit_applications"], 2)
+        applied = imported.applications.get(released_at__isnull=True)
+        self.assertEqual((applied.invoice.invoice_number, applied.amount_chf), ("TRF-00003", Decimal("2.00")))
+        self.assertEqual(applied.invoice.credit_applied_chf, Decimal("2.00"))
+        self.assertEqual(imported.applications.exclude(released_at__isnull=True).get().invoice.invoice_number, "TRF-00004")
+        self.assertEqual(imported.remaining(), Decimal("5.40") - Decimal("2.00") - Decimal("1.00"))
+
+    def test_an_archive_from_before_payments_settles_its_paid_invoices(self):
+        raw = export_and_clear(self.source)
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            invoices = json.loads(archive.read("invoices.json"))
+        for entry in invoices:
+            entry.pop("payments")
+            entry.pop("approved_at")
+            entry["status"] = InvoiceStatus.PAID
+        result = self._import(rewrite_archive(raw, replace={"invoices.json": invoices}))
+        invoice = Invoice.objects.get(zev_id=result["zev_id"])
+        self.assertIsNotNone(invoice.approved_at)
+        payment = invoice.payments.get()
+        self.assertEqual(payment.amount_chf, invoice.total_chf)
+        self.assertEqual(payment.source, Payment.Source.BACKFILL)
 
     def test_the_counter_is_pushed_past_the_imported_numbering(self):
         """Otherwise the first billing run mints a number the ZEV already has."""
@@ -1155,6 +1237,9 @@ class SchemaParityTests(TestCase):
         "TARIFF_PERIOD_FIELDS": TariffPeriod,
         "INVOICE_FIELDS": Invoice,
         "INVOICE_ITEM_FIELDS": InvoiceItem,
+        "PAYMENT_FIELDS": Payment,
+        "CREDIT_FIELDS": Credit,
+        "CREDIT_APPLICATION_FIELDS": CreditApplication,
         "SUPPLEMENTARY_SOURCE_FIELDS": SupplementarySource,
     }
 
@@ -1217,6 +1302,14 @@ class SchemaParityTests(TestCase):
             "updated_at",
         },
         "INVOICE_ITEM_FIELDS": {"id", "invoice"},
+        # Nested under its invoice; ``created_by`` is an account.
+        "PAYMENT_FIELDS": {"id", "invoice", "created_by", "created_at"},
+        # Nested under its invoice; the PDF travels in ``invoice_pdfs``.
+        "CREDIT_FIELDS": {
+            "id", "zev", "participant", "source_invoice", "pdf_file", "pdf_status", "created_by",
+        },
+        # Nested under the invoice that used the credit; the credit travels by ``credit_number``.
+        "CREDIT_APPLICATION_FIELDS": {"id", "credit", "invoice"},
         # A source travels by ``meter_id`` and the archive ``participant_id``. Nothing that holds
         # a secret or describes a live connection travels: the credential and push token, the
         # on/off switch and status, the sync bookkeeping and the last comparison with the meter all

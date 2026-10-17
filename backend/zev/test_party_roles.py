@@ -276,8 +276,9 @@ class PartyRoleMigrationTests(TransactionTestCase):
         executor.migrate(executor.loader.graph.leaf_nodes())
 
     def test_the_owner_party_becomes_issuer_and_landowner_from_the_first_dated_document(self):
-        old = self.migrate(self.BEFORE)
         owner, other = make_user("mig_role_owner"), make_user("mig_role_other")
+        # The rollback also removes newer accounts fields; create current users first.
+        old = self.migrate(self.BEFORE)
         Zev_, Party_, Participant_ = (old.get_model("zev", name) for name in ("Zev", "Party", "Participant"))
         zev = Zev_.objects.create(name="Mig", owner_id=owner.pk, start_date=date(2026, 1, 1))
         own_party = Party_.objects.create(zev=zev, last_name="Owner", sort_name="Owner")
@@ -302,6 +303,32 @@ class PartyRoleMigrationTests(TransactionTestCase):
 
 class PartyWriteApiTests(TestCase):
     """Managers add, edit and delete parties and assign and end roles; viewers only read."""
+
+    def test_role_manager_can_give_up_their_own_role(self):
+        from zev import access
+
+        for kind in ("replace", "end"):
+            with self.subTest(kind=kind):
+                zev = create_managed_zev(name=f"Self handoff {kind}", owner=self.manager)
+                actor = make_user(f"self_handoff_{kind}")
+                current = Party.objects.create(zev=zev, user=actor, last_name="Current issuer")
+                row = assign_role(zev, current, PartyRole.ISSUER, date(2020, 1, 1))
+                authenticate(self.client, actor)
+                if kind == "replace":
+                    successor = Party.objects.create(zev=zev, user=self.manager, last_name="Successor")
+                    response = self.client.post("/api/v1/zev/party-roles/", {
+                        "zev": str(zev.pk), "party": str(successor.pk), "role": PartyRole.ISSUER,
+                        "valid_from": "2026-01-01",
+                    }, format="json")
+                    self.assertEqual(response.status_code, 201, response.data)
+                else:
+                    response = self.client.post(f"/api/v1/zev/party-roles/{row.pk}/end/", {
+                        "last_day": "2019-12-31",
+                    }, format="json")
+                    self.assertEqual(response.status_code, 204, response.data)
+                access.invalidate(actor)
+                self.assertFalse(access.can_manage(actor, zev))
+                self.assertTrue(access.can_manage(self.manager, zev))
 
     def setUp(self):
         self.manager = make_user("pw_manager", UserRole.USER)

@@ -16,14 +16,16 @@ from django.db.models import Prefetch, Q
 from django.utils.text import slugify
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.mail import EmailMessage
+from django.http import Http404
 from django.utils import timezone
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.settings import api_settings as jwt_settings
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
-from . import mfa, mfa_crypto, notifications
+from . import email_change, magic_links, mfa, mfa_crypto, notifications
 from config.safe_format import render_with_fallback
 from config.cache import delete_if_value
 from .api_keys import default_api_key_expiry, generate_key
@@ -49,7 +51,7 @@ from .serializers import (
     WebAuthnCredentialSerializer,
 )
 from .authentication import enforce_csrf
-from .jwt_utils import make_jwt_for_user, record_login
+from .jwt_utils import is_participant_link_session, make_jwt_for_user, password_recovery_deadline, record_login
 from .session_revocation import (
     is_session_current,
     keep_current_session,
@@ -109,7 +111,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             # 2026-09-two-factor-authentication.md §5.1.
             return Response({
                 "mfa_required": True,
-                "mfa_token": mfa.issue_challenge(user),
+                "mfa_token": mfa.issue_challenge(user, participant_link=user.password_from_participant_link),
                 "methods": mfa.challenge_methods(user),
             })
 
@@ -153,22 +155,23 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 
 class TokenMfaView(APIView):
-    """Second step of a two-step login: exchanges a challenge token plus a
-    TOTP or recovery code for a session.
-
-    ``AllowAny`` like ``CustomTokenObtainPairView`` — the caller has proven a
-    password moments ago, not a bearer credential this request carries.
-    """
+    """Exchange a first-factor challenge and TOTP/recovery code for a session."""
 
     permission_classes = [AllowAny]
     throttle_classes = [AuthMfaThrottle]
 
+    @transaction.atomic
     def post(self, request, *args, **kwargs):
         mfa_token = str(request.data.get("mfa_token") or "")
         code = str(request.data.get("code") or "")
 
         try:
-            user = mfa.resolve_challenge(mfa_token)
+            user, participant_link, password_recovery = mfa.resolve_challenge(mfa_token, lock=True)
+            if participant_link:
+                from zev.services import requires_independent_login
+
+                if requires_independent_login(user):
+                    raise mfa.MfaChallengeError("invalid_challenge")
         except mfa.MfaChallengeError as exc:
             self._record_challenge_failed(request, reason=exc.reason)
             return Response({"detail": "Invalid or expired code."}, status=status.HTTP_400_BAD_REQUEST)
@@ -178,11 +181,14 @@ class TokenMfaView(APIView):
             self._record_challenge_failed(request, reason=reason, user=user)
             return Response({"detail": "Invalid or expired code."}, status=status.HTTP_400_BAD_REQUEST)
 
-        tokens = make_jwt_for_user(user)
+        if password_recovery:
+            magic_links.retire_pending_password(user)
+        tokens = make_jwt_for_user(user, participant_link=participant_link, password_recovery=password_recovery)
         response = Response({"detail": "Login successful."})
         set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
         record_login(user)
 
+        first_factor = "participant_link" if password_recovery else "password"
         record_audit_event(
             request=request,
             action_category=AuditActionCategory.AUTH,
@@ -191,9 +197,12 @@ class TokenMfaView(APIView):
             target=user,
             target_id=str(user.pk),
             target_display=user.email or user.username,
-            summary=f"Password login succeeded for {user.email or user.username}.",
+            summary=f"Login succeeded for {user.email or user.username}.",
             user=user,
-            metadata={"method": "password+totp" if method == "totp" else "recovery_code"},
+            metadata={
+                "method": f"{first_factor}+totp" if method == "totp" else "recovery_code",
+                "first_factor": first_factor, "second_factor": method,
+            },
         )
         if method == "recovery_code":
             remaining = user.mfa_recovery_codes.filter(used_at__isnull=True).count()
@@ -405,37 +414,16 @@ class UserDetailView(AuditedUpdateMixin, generics.RetrieveUpdateDestroyAPIView):
 
     def perform_destroy(self, instance):
         user_display = instance.email or instance.username
-        if instance.is_admin and not User.objects.filter(role=UserRole.ADMIN).exclude(pk=instance.pk).exists():
-            record_audit_event(
-                request=self.request,
-                action_category=AuditActionCategory.AUTH,
-                action_type="user.delete",
-                target_type="accounts.User",
-                target=instance,
-                target_id=str(instance.pk),
-                target_display=user_display,
-                summary=f"Denied deletion of last admin {user_display}.",
-                status=AuditEventStatus.DENIED,
-            )
-            raise PermissionDenied("Cannot delete the last admin account.")
-        if instance.participations.exists():
-            record_audit_event(
-                request=self.request,
-                action_category=AuditActionCategory.AUTH,
-                action_type="user.delete",
-                target_type="accounts.User",
-                target=instance,
-                target_id=str(instance.pk),
-                target_display=user_display,
-                summary=f"Denied deletion of linked user {user_display}.",
-                status=AuditEventStatus.DENIED,
-            )
-            raise PermissionDenied("Linked participant accounts cannot be deleted.")
         user_id = str(instance.pk)
         try:
-            # Its manager grants and its party's login go with the account; a
-            # ZEV it alone manages would be left without a manager.
-            with zev_access.keeping_a_manager(*zev_access.managed_zev_ids(instance)):
+            with zev_access.keeping_a_manager(account=instance) as instance:
+                zev_access.refresh_write_access(self.request.user)
+                self.check_permissions(self.request)
+                user_display = instance.email or instance.username
+                if instance.is_admin and not User.objects.filter(role=UserRole.ADMIN).exclude(pk=instance.pk).exists():
+                    raise PermissionDenied("Cannot delete the last admin account.")
+                if instance.participations.exists():
+                    raise PermissionDenied("Linked participant accounts cannot be deleted.")
                 # Record before delete so the actor FK is valid;
                 # on_delete=SET_NULL nullifies it when the user row goes.
                 record_audit_event(
@@ -448,7 +436,17 @@ class UserDetailView(AuditedUpdateMixin, generics.RetrieveUpdateDestroyAPIView):
                     summary=f"Deleted user {user_display}.",
                 )
                 instance.delete()
-        except zev_access.NoManagerLeft:
+        except User.DoesNotExist as exc:
+            raise Http404 from exc
+        except (zev_access.NoManagerLeft, zev_access.AccountRelationshipsChanged,
+                PermissionDenied, DjangoPermissionDenied) as exc:
+            changed = isinstance(exc, zev_access.AccountRelationshipsChanged)
+            if changed:
+                detail = "This account's relationships changed. Retry deletion."
+            elif isinstance(exc, zev_access.NoManagerLeft):
+                detail = zev_access.NO_MANAGER_LEFT
+            else:
+                detail = str(exc)
             record_audit_event(
                 request=self.request,
                 action_category=AuditActionCategory.AUTH,
@@ -456,10 +454,14 @@ class UserDetailView(AuditedUpdateMixin, generics.RetrieveUpdateDestroyAPIView):
                 target_type="accounts.User",
                 target_id=user_id,
                 target_display=user_display,
-                summary=f"Denied deletion of {user_display}, the last manager of a ZEV.",
+                summary=f"Denied deletion of {user_display}: {detail}",
                 status=AuditEventStatus.DENIED,
             )
-            raise PermissionDenied(zev_access.NO_MANAGER_LEFT)
+            if changed:
+                raise ValidationError({"detail": detail}) from exc
+            if isinstance(exc, zev_access.NoManagerLeft):
+                raise PermissionDenied(detail) from exc
+            raise
 
 
 class VatRateListCreateView(generics.ListCreateAPIView):
@@ -538,16 +540,24 @@ class VatRateDetailView(generics.RetrieveUpdateDestroyAPIView):
         )
 
 
-def _serialize_me(user):
+def _serialize_me(user, token=None):
     """Serialize the current user with what the shell needs: every community
     it relates to (``memberships``) and whether it may set up a ZEV."""
     data = UserSerializer(user).data
     # Whether this account can re-authenticate with a password, which is what
-    # the email-change form needs. Participants and OAuth-only accounts cannot.
+    # the email-change form needs. Passwordless accounts cannot.
     data["has_usable_password"] = user.has_usable_password()
+    deadline = password_recovery_deadline(token, user)
+    data["password_recovery_expires_at"] = deadline.isoformat() if deadline else None
     # Every ZEV the account relates to, with its grant and participant rows
     # there — what the frontend's community switcher lists (#761).
     data["memberships"] = zev_access.memberships_for(user)
+    data["can_change_email"] = (
+        user.has_usable_password() and not user.password_from_participant_link
+        and not email_change.is_managed(
+            user, has_participations=any(row["participants"] for row in data["memberships"]),
+        )
+    )
     data["may_create_zev"] = user.may_create_zev
     return data
 
@@ -562,7 +572,7 @@ def me(request):
     the impersonation banner without reading any token from storage.
     """
     if request.method == "GET":
-        data = _serialize_me(request.user)
+        data = _serialize_me(request.user, request.auth)
         token = request.auth
         # An API key authenticates as exactly one user and carries no
         # impersonation state, so only JWTs are inspected for the claim.
@@ -584,7 +594,20 @@ def me(request):
     serializer = SelfUserSerializer(request.user, data=request.data, partial=True, context={"request": request})
     serializer.is_valid(raise_exception=True)
     serializer.save()
-    return Response(_serialize_me(serializer.instance))
+    return Response(_serialize_me(serializer.instance, request.auth))
+
+
+def _finish_password_change(request, user):
+    """Retire old credentials and keep the caller signed in; caller holds the user lock."""
+    revoke_sessions(user)
+    metadata = {
+        "onboarding_links_revoked": zev_onboarding.revoke_active_for_user(user),
+        "magic_links_revoked": magic_links.revoke_for_user(user),
+    }
+    response = Response({"detail": "Password updated successfully."})
+    keep_current_session(request, response, user)
+    transaction.on_commit(lambda: notifications.notify(user, "password_changed", request=request))
+    return response, metadata
 
 
 @api_view(["POST"])
@@ -595,23 +618,58 @@ def change_password(request):
         serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        # Password changes retire other sessions; this authenticated caller keeps theirs.
-        revoke_sessions(request.user)
-        links_revoked = zev_onboarding.revoke_active_for_user(request.user)
-        response = Response({"detail": "Password updated successfully."})
-        keep_current_session(request, response, request.user)
-    record_audit_event(
-        request=request,
-        action_category=AuditActionCategory.AUTH,
-        action_type="password.change",
-        target_type="accounts.User",
-        target=request.user,
-        target_id=str(request.user.pk),
-        target_display=request.user.email or request.user.username,
-        summary="Changed account password.",
-        metadata={"onboarding_links_revoked": links_revoked},
-    )
-    notifications.notify(request.user, "password_changed", request=request)
+        response, metadata = _finish_password_change(request, request.user)
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.AUTH,
+            action_type="password.change",
+            target_type="accounts.User",
+            target=request.user,
+            target_id=str(request.user.pk),
+            target_display=request.user.email or request.user.username,
+            summary="Changed account password.",
+            metadata=metadata,
+        )
+    return response
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def reset_password(request):
+    """Replace a participant password using a completed link login."""
+    with transaction.atomic():
+        user = lock_current_session(request)
+        if password_recovery_deadline(request.auth, user) is None:
+            record_audit_event(
+                request=request, action_category=AuditActionCategory.AUTH,
+                action_type="password.reset", status=AuditEventStatus.DENIED,
+                target=user, target_type="accounts.User", target_id=str(user.pk),
+                target_display=user.email or user.username,
+                summary="Denied password recovery without a live participant-link session.",
+            )
+            return Response(
+                {"detail": "Sign in through a fresh participant link to reset your password.",
+                 "code": "password_recovery_required"}, status=status.HTTP_403_FORBIDDEN,
+            )
+        new_password = request.data.get("new_password") if isinstance(request.data, dict) else None
+        if not isinstance(new_password, str) or not new_password:
+            return Response({"detail": "new_password is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages}, status=status.HTTP_400_BAD_REQUEST)
+        user.set_password(new_password)
+        user.password_from_participant_link = True
+        user.must_change_password = False
+        user.save(update_fields=["password", "password_from_participant_link", "must_change_password"])
+        response, metadata = _finish_password_change(request, user)
+        record_audit_event(
+            request=request, action_category=AuditActionCategory.AUTH, action_type="password.reset",
+            target=user, target_type="accounts.User", target_id=str(user.pk),
+            target_display=user.email or user.username,
+            summary="Recovered participant password.",
+            metadata=metadata,
+        )
     return response
 
 
@@ -968,7 +1026,7 @@ def verify_email(request):
     if mfa.requires_challenge(user):
         return Response({
             "mfa_required": True,
-            "mfa_token": mfa.issue_challenge(user),
+            "mfa_token": mfa.issue_challenge(user, participant_link=user.password_from_participant_link),
             "methods": mfa.challenge_methods(user),
             "purpose": token.purpose,
         })
@@ -984,19 +1042,9 @@ def verify_email(request):
 @permission_classes([IsAuthenticated])
 @transaction.atomic
 def set_initial_password(request):
-    """Set a password for a freshly verified account that has no usable password yet.
-
-    Spec 2026-09-two-factor-authentication.md's door table lists this as
-    door 3, "unaffected — same as email verification". It genuinely needs no
-    MFA check, but for a different reason than that entry implies: unlike
-    ``verify_email``, this is ``IsAuthenticated`` — the caller already holds
-    a valid session (minted by ``verify_email`` or a magic/onboarding link
-    moments earlier). There is no unauthenticated session-minting moment
-    here to challenge; this only refreshes an already-authenticated
-    session's JWT claims after the password write.
-    """
-    new_password = request.data.get("new_password", "")
-    if not new_password:
+    """Set a password for an authenticated passwordless or pending-change account."""
+    new_password = request.data.get("new_password") if isinstance(request.data, dict) else None
+    if not isinstance(new_password, str) or not new_password:
         return Response({"detail": "new_password is required."}, status=status.HTTP_400_BAD_REQUEST)
 
     user = lock_current_session(request)
@@ -1022,13 +1070,12 @@ def set_initial_password(request):
     except DjangoValidationError as exc:
         return Response({"detail": exc.messages}, status=status.HTTP_400_BAD_REQUEST)
 
+    was_pending = user.must_change_password
     user.set_password(new_password)
+    user.password_from_participant_link = is_participant_link_session(request.auth)
     user.must_change_password = False
-    user.save(update_fields=["password", "must_change_password"])
-    revoke_sessions(user)
-
-    # The link's purpose is fulfilled once a password exists.
-    links_revoked = zev_onboarding.revoke_active_for_user(user)
+    user.save(update_fields=["password", "password_from_participant_link", "must_change_password"])
+    response, metadata = _finish_password_change(request, user)
 
     record_audit_event(
         request=request,
@@ -1038,15 +1085,12 @@ def set_initial_password(request):
         target=user,
         target_id=str(user.pk),
         target_display=user.email or user.username,
-        summary="Set initial password and completed first-login requirement.",
-        changes=build_diff({"must_change_password": True}, {"must_change_password": False}, ["must_change_password"]),
-        metadata={"onboarding_links_revoked": links_revoked},
+        summary="Set account password.",
+        changes=build_diff({"must_change_password": was_pending}, {"must_change_password": False}, ["must_change_password"]),
+        metadata=metadata,
     )
 
-    # Issue fresh tokens so the updated claims (must_change_password=False) take effect
-    tokens = make_jwt_for_user(user)
-    response = Response({"detail": "Password set successfully."})
-    set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
+    response.data["detail"] = "Password set successfully."
     return response
 
 
@@ -1104,7 +1148,7 @@ class TotpDeviceView(APIView):
             existing.delete()
 
         secret = pyotp.random_base32()
-        device = TotpDevice(user=request.user)
+        device = TotpDevice(user=request.user, from_participant_link=is_participant_link_session(request.auth))
         try:
             device.set_secret(secret)
         except mfa_crypto.MfaNotConfigured:
@@ -1183,8 +1227,12 @@ class TotpEnrolConfirmView(APIView):
         # kill the printout they are holding. Only a first factor issues.
         first_factor = not mfa.has_any_factor(request.user)
         device.confirmed_at = timezone.now()
-        device.save(update_fields=["confirmed_at"])
-        recovery_codes = mfa.issue_recovery_codes(request.user) if first_factor else []
+        # Either ceremony step can expose the factor to a participant-link holder.
+        device.from_participant_link = device.from_participant_link or is_participant_link_session(request.auth)
+        device.save(update_fields=["confirmed_at", "from_participant_link"])
+        recovery_codes = []
+        if first_factor:
+            recovery_codes = mfa.issue_recovery_codes(request.user, participant_link=device.from_participant_link)
 
         record_audit_event(
             request=request,
@@ -1214,7 +1262,9 @@ class MfaRecoveryCodesView(APIView):
         if not mfa.has_any_factor(request.user):
             return Response({"detail": "Two-factor authentication is not enabled."}, status=status.HTTP_400_BAD_REQUEST)
 
-        recovery_codes = mfa.issue_recovery_codes(request.user)
+        recovery_codes = mfa.issue_recovery_codes(
+            request.user, participant_link=is_participant_link_session(request.auth),
+        )
 
         record_audit_event(
             request=request,

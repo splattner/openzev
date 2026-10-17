@@ -3,6 +3,23 @@ fullnameOverride: ""
 
 commonLabels: {}
 
+# Set true only for local development; production renders reject placeholder secrets.
+debug: false
+
+# Shared workload defaults: every workload runs as UID 10001 with privilege
+# escalation disabled. Override per component as needed.
+x-podSecurityContext: &defaultPodSecurityContext
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+x-securityContext: &defaultSecurityContext
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+  readOnlyRootFilesystem: false # nginx and PDF rendering need writable runtime paths.
+
 # Public frontend base URL used by backend-generated links/redirects
 # (verification emails and OAuth callback redirects).
 frontendUrl: "http://localhost:5173"
@@ -68,9 +85,17 @@ backend:
     type: ClusterIP
     port: 8000
   podAnnotations: {}
-  podSecurityContext: {}
-  securityContext: {}
-  resources: {}
+  secureSslRedirect: true
+  hstsSeconds: 31536000
+  podSecurityContext: *defaultPodSecurityContext
+  securityContext: *defaultSecurityContext
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -86,9 +111,7 @@ backend:
   # Defaults to corsAllowedOrigins when left empty.
   # Example: "https://openzev.example.com"
   csrfTrustedOrigins: ""
-  # Trusted X-Forwarded-For hops (default 0 = REMOTE_ADDR only, safe).
-  # Set to 1 only if every public path reaches the backend through one
-  # sanitising hop; see "Reverse proxies and NUM_PROXIES" in charts/openzev/README.md.
+  # Trusted forwarded-address count; also gates HTTPS detection. See the README.
   numProxies: 0
 
 worker:
@@ -105,9 +128,15 @@ worker:
     - -l
     - info
   podAnnotations: {}
-  podSecurityContext: {}
-  securityContext: {}
-  resources: {}
+  podSecurityContext: *defaultPodSecurityContext
+  securityContext: *defaultSecurityContext
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -132,9 +161,15 @@ beat:
     - --scheduler
     - django_celery_beat.schedulers:DatabaseScheduler
   podAnnotations: {}
-  podSecurityContext: {}
-  securityContext: {}
-  resources: {}
+  podSecurityContext: *defaultPodSecurityContext
+  securityContext: *defaultSecurityContext
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -150,9 +185,15 @@ frontend:
     type: ClusterIP
     port: 80
   podAnnotations: {}
-  podSecurityContext: {}
-  securityContext: {}
-  resources: {}
+  podSecurityContext: *defaultPodSecurityContext
+  securityContext: *defaultSecurityContext
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
   nodeSelector: {}
   tolerations: []
   affinity: {}

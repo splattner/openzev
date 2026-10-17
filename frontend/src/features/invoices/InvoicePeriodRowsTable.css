@@ -1,0 +1,30 @@
+/* The amount column's header names the currency; card mode shows it inline. */
+
+.invoice-row-currency {
+  display: none;
+}
+
+@container (max-width: 46rem) {
+  /* The header that names the currency is out of sight here. */
+  .invoice-row-currency {
+    display: inline;
+  }
+}
+
+.invoice-row-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--ink-soft);
+}
+
+.metering-missing-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.8rem;
+}
+
+.metering-missing-list li + li {
+  margin-top: 0.12rem;
+}
+

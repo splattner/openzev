@@ -98,7 +98,10 @@ Participants **cannot**:
 - Create tariffs or invoices
 
 Every participant gets an account when they are added; the onboarding link
-is how they first sign in to it. The **Invitation** status icon shows that
+is how they first sign in to it. In **Account → Security**, they can choose a
+password without entering an old one. Their chosen password survives changes
+to participant details and subsequent link sign-ins. Their email address remains
+manager-maintained on the participant record. The **Invitation** status icon shows that
 link's state: *Not invited* (no link
 sent yet), *Invited* (sent, not used yet, with its expiry date), *Invitation
 link used*, *Expired* (with the expiry date) or *Revoked* (by you, or
@@ -125,15 +128,36 @@ An entry also shows the roles the participant holds in the community today:
 
 ### A Participant Forgot Their Password
 
-There is no "forgot password" link on the login page. Send or copy the
+An account with a chosen password can use **Forgot your password?** on the login
+page to request an emailed reset link. For a participant-only account, you can also send or copy the
 onboarding link for a participant-only account from **⋯** on their entry: it signs
-them in, and they then choose a new password. If their invoices carry the
+them in. After completing any two-factor check, they open **Account → Security**
+and choose **Reset password**, then enter and confirm
+a new password. This action is available for **15 minutes after link sign-in**;
+if it expires, they sign in through a participant link again. Signing in through a link
+keeps an existing password unless an administrator has required a password change.
+If their invoices carry the
 [participant QR code](02-zev-setup.md#participant-access-from-the-invoice),
 they can also request a sign-in link themselves from the page it opens.
 
-For accounts with independent access, use their external sign-in provider or
-ask someone with server access to reset the password; see
+Successful recovery signs out other devices and revokes all onboarding and
+invoice sign-in links for the account across its communities. The device used
+for recovery stays signed in. If an earlier version already removed a password,
+it cannot be restored; the participant chooses a new one. The emailed reset also
+revokes sign-in links, then asks the participant to sign in normally with the new
+password and any required second factor.
+
+For accounts with independent access, use **Forgot your password?** if they have
+a password, or their external sign-in provider. If neither is available, ask
+someone with server access to recover the account; see
 [Roles and Permissions](11-roles-and-permissions.md#user-cannot-login).
+
+### Give a Participant Independent Access
+
+Credentials created through participant links cannot carry independent access.
+Giving manager/viewer access sends an invitation unless an independent login
+already exists; see [promotion and recovery](11-roles-and-permissions.md#giving-a-participant-independent-access)
+for the required steps and upgrade effects.
 
 ## Participation Contract
 

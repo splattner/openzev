@@ -23,7 +23,7 @@ from metering.models import MeterReading
 from . import access, onboarding
 from .models import MANAGING_ROLES, Building, Zev, Participant, Party, PartyRole, MeteringPoint, MeteringPointAssignment, ZevPartyRole
 from .buildings import ensure_initial_building
-from .parties import assign_role, end_role, set_landowner_building
+from .parties import assign_role, end_role, lock_role_assignment, lock_role_end, set_landowner_building
 from .purge import ZevPurgeError, purge_zev
 from .scoping import ZevScopedQuerySetMixin
 from .serializers import (
@@ -58,6 +58,7 @@ from .services import (
     LinkRefused,
     create_zev_for_existing_owner,
     get_participant_onboarding_link,
+    lock_participant_account,
     send_participant_onboarding_link,
 )
 from .transfer import (
@@ -575,7 +576,15 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         try:
             # The issuer's or representative's participant may carry the ZEV's only manager.
             with access.keeping_a_manager(participant.zev_id):
+                lock_participant_account(participant)
+                participant.refresh_from_db()
+                access.refresh_write_access(request.user, participant.zev)
+                self.check_object_permissions(request, participant)
                 self.perform_destroy(participant)
+        except Participant.DoesNotExist as exc:
+            raise Http404 from exc
+        except DjangoValidationError as exc:
+            raise django_validation_error(exc) from exc
         except access.NoManagerLeft:
             return Response({"detail": access.NO_MANAGER_LEFT}, status=status.HTTP_400_BAD_REQUEST)
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -656,6 +665,7 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
 
         from invoices.contract_pdf import issue_contract_pdf
 
+        self.assert_target_not_disabled(participant)
         issue, created = issue_contract_pdf(participant, issued_by=request.user)
         if created:
             record_audit_event(
@@ -714,12 +724,36 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         # others, whatever else it does (#761). Only admins are kept apart: they
         # need no relationship to any ZEV, and a participant row would make one
         # appear in a community it does not belong to.
-        if account.is_admin:
-            return Response({"detail": "Admin accounts cannot be linked to a participant."}, status=status.HTTP_400_BAD_REQUEST)
-
-        participant.user = account
         try:
-            participant.save(update_fields=["user", "updated_at"])
+            with transaction.atomic():
+                access.lock_zevs(participant.zev_id)
+                participant.user = account
+                previous = lock_participant_account(participant, for_save=True, update_fields={"user"})
+                account.refresh_from_db()
+                access.refresh_write_access(request.user, participant.zev)
+                self.check_object_permissions(request, participant)
+                if not request.user.is_admin:
+                    return self._deny_non_admin(
+                        request, pk, action_suffix="link_account",
+                        summary="Denied participant account link by non-admin.",
+                        detail="Only admins can link accounts.",
+                    )
+                if account.is_admin:
+                    return Response({"detail": "Admin accounts cannot be linked to a participant."},
+                                    status=status.HTTP_400_BAD_REQUEST)
+                participant.save(update_fields=["user", "updated_at"])
+                record_audit_event(
+                    request=request,
+                    action_category=AuditActionCategory.PARTICIPANT,
+                    action_type="participant.link_account",
+                    target_type="zev.Participant",
+                    target=participant,
+                    target_id=str(participant.pk),
+                    target_display=participant.full_name,
+                    summary=f"Linked account {account.username} to participant {participant.full_name}.",
+                    changes={"user": {"before": str(previous["user_id"]) if previous["user_id"] else None,
+                                      "after": str(account.id)}},
+                )
         except Participant.DoesNotExist as exc:
             raise Http404 from exc
         except DjangoValidationError as exc:
@@ -727,17 +761,6 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
             if "user" in error.detail:
                 error.detail["user_id"] = error.detail.pop("user")
             raise error from exc
-        record_audit_event(
-            request=request,
-            action_category=AuditActionCategory.PARTICIPANT,
-            action_type="participant.link_account",
-            target_type="zev.Participant",
-            target=participant,
-            target_id=str(participant.pk),
-            target_display=participant.full_name,
-            summary=f"Linked account {account.username} to participant {participant.full_name}.",
-            changes={"user": {"before": None, "after": str(account.id)}},
-        )
         serializer = self.get_serializer(participant)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -752,37 +775,45 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
             )
 
         participant = self.get_object()
-        if participant.user is None:
-            return Response({"detail": "Participant has no linked account."}, status=status.HTTP_400_BAD_REQUEST)
-
         # The account itself is left as it is: what it may do elsewhere comes
         # from its other rows and grants, not from a role (#761).
-        unlinked_account = participant.user
         try:
             # The issuer's or representative's account may be the ZEV's only manager.
             with access.keeping_a_manager(participant.zev_id):
+                lock_participant_account(participant)
+                participant.refresh_from_db()
+                access.refresh_write_access(request.user, participant.zev)
+                self.check_object_permissions(request, participant)
+                if not request.user.is_admin:
+                    return self._deny_non_admin(
+                        request, pk, action_suffix="unlink_account",
+                        summary="Denied participant account unlink by non-admin.",
+                        detail="Only admins can unlink accounts.",
+                    )
+                if participant.user is None:
+                    return Response({"detail": "Participant has no linked account."}, status=status.HTTP_400_BAD_REQUEST)
+                unlinked_account = participant.user
                 participant.user = None
                 participant.save(update_fields=["user", "updated_at"])
                 # Keep detachment and revocation under the participant lock.
                 onboarding.revoke_active_for_participant(participant)
+                record_audit_event(
+                    request=request,
+                    action_category=AuditActionCategory.PARTICIPANT,
+                    action_type="participant.unlink_account",
+                    target_type="zev.Participant",
+                    target=participant,
+                    target_id=str(participant.pk),
+                    target_display=participant.full_name,
+                    summary=f"Unlinked account {unlinked_account.username} from participant {participant.full_name}.",
+                    changes={"user": {"before": str(unlinked_account.id), "after": None}},
+                )
         except Participant.DoesNotExist as exc:
             raise Http404 from exc
         except DjangoValidationError as exc:
             raise django_validation_error(exc) from exc
         except access.NoManagerLeft:
-            participant.user = unlinked_account
             return Response({"detail": access.NO_MANAGER_LEFT}, status=status.HTTP_400_BAD_REQUEST)
-        record_audit_event(
-            request=request,
-            action_category=AuditActionCategory.PARTICIPANT,
-            action_type="participant.unlink_account",
-            target_type="zev.Participant",
-            target=participant,
-            target_id=str(participant.pk),
-            target_display=participant.full_name,
-            summary=f"Unlinked account {unlinked_account.username} from participant {participant.full_name}.",
-            changes={"user": {"before": str(unlinked_account.id), "after": None}},
-        )
         serializer = self.get_serializer(participant)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1200,6 +1231,9 @@ class ZevPartyRoleViewSet(ZevScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet)
         self.assert_within_scope(data)
         try:
             with transaction.atomic():
+                lock_role_assignment(data["zev"], data["party"], data["role"])
+                access.refresh_write_access(request.user, data["zev"])
+                self.assert_within_scope(data)
                 row = assign_role(
                     data["zev"], data["party"], data["role"], data["valid_from"],
                     valid_to=data.get("valid_to"), building=data.get("building"),
@@ -1252,6 +1286,9 @@ class ZevPartyRoleViewSet(ZevScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet)
         last_day = payload.validated_data["last_day"]
         try:
             with transaction.atomic():
+                lock_role_end(row)
+                access.refresh_write_access(request.user, row.zev)
+                self.check_object_permissions(request, row)
                 # The event names the row as it was; an end before the start deletes it.
                 ended = end_role(row, last_day)
                 self._audit(

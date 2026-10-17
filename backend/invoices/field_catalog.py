@@ -10,12 +10,14 @@ from .email_context import (
 from .field_catalog_data import (
     _ANNUAL_STATEMENT_FIELDS,
     _CONTRACT_FIELDS,
+    _CREDIT_NOTE_FIELDS,
     _EMAIL_FIELDS,
     _INVOICE_FIELDS,
 )
 from .template_context import (
     build_sample_annual_statement_context,
     build_sample_contract_context,
+    build_sample_credit_note_context,
     build_sample_invoice_context,
 )
 
@@ -23,6 +25,7 @@ PDF_SAMPLE_CONTEXTS = {
     "invoice": build_sample_invoice_context,
     "contract": build_sample_contract_context,
     "annual_statement": build_sample_annual_statement_context,
+    "credit_note": build_sample_credit_note_context,
 }
 
 
@@ -39,6 +42,7 @@ def build_sample_invoice_email_context() -> dict:
         period_end="31.01.2026",
         due_date="14.02.2026",
         total_chf="486.45",
+        amount_due_chf="436.45",
     )
 
 
@@ -100,6 +104,7 @@ PDF_FIELD_CATALOGS = {
     "invoice": _INVOICE_FIELDS,
     "contract": _CONTRACT_FIELDS,
     "annual_statement": _ANNUAL_STATEMENT_FIELDS,
+    "credit_note": _CREDIT_NOTE_FIELDS,
 }
 
 EMAIL_FIELD_CATALOGS = _EMAIL_FIELDS

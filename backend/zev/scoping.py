@@ -35,6 +35,14 @@ from rest_framework.permissions import SAFE_METHODS
 from . import access
 
 
+def assert_zev_not_disabled(user, zev):
+    """Reject writes to disabled ZEVs unless the user is an admin."""
+    if not user.is_admin and zev is not None and zev.disabled_at is not None:
+        raise serializers.ValidationError(
+            {"detail": "This ZEV is disabled. Ask an admin to re-enable it first."}
+        )
+
+
 class ZevScopedQuerySetMixin:
     """Mixin for DRF viewsets that scopes reads and writes by ZEV relationship.
 
@@ -228,30 +236,12 @@ class ZevScopedQuerySetMixin:
         return target
 
     def assert_target_not_disabled(self, instance):
-        """Refuse a write to an *existing* row under a disabled ZEV, admin
-        exempt.
+        """Guard the existing row's ZEV, even when the payload omits its parent.
 
-        The existing-row counterpart of ``assert_within_scope``'s disabled
-        check: that one only fires when the payload names the ZEV relation,
-        so a ``PATCH`` editing some other field of a row already sitting
-        under a disabled ZEV would otherwise sail through untouched. This is
-        what gives ``Tariff``/``TariffPeriod``/``MeterReading`` the
-        object-level protection ``BaseZevScopedPermission.
-        has_object_permission`` already gives ``Participant``/
-        ``MeteringPoint``/``MeteringPointAssignment``/``Zev`` — those four
-        don't use this mixin's ``perform_update``/``perform_destroy`` to get
-        it, since they have that permission class instead, so this check is
-        redundant-but-harmless for them. ``Invoice`` needed a separate fix
-        (see ``invoices.views._deny_if_zev_disabled``): it barely uses these
-        two methods at all, mutating almost entirely through custom actions.
+        CRUD hooks call this below; custom writes must call it before mutating.
         """
-        if self.request.user.is_admin:
-            return
-        zev = self._zev_of(instance)
-        if zev is not None and zev.disabled_at is not None:
-            raise serializers.ValidationError(
-                {"detail": "This ZEV is disabled. Ask an admin to re-enable it first."}
-            )
+        if not self.request.user.is_admin:
+            assert_zev_not_disabled(self.request.user, self._zev_of(instance))
 
     def perform_create(self, serializer):
         self.assert_within_scope(serializer.validated_data)

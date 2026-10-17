@@ -99,6 +99,8 @@ class RoleAccessTests(TestCase):
 
     def test_a_passwordless_account_needs_an_access_invitation_before_a_managing_role(self):
 
+        self.issuer_account.set_unusable_password()
+        self.issuer_account.save(update_fields=["password"])
         account = ensure_participant_account(self.issuer)
         client = APIClient()
         authenticate(client, account)
@@ -177,6 +179,8 @@ class RoleAccessTests(TestCase):
 
     def test_a_passwordless_account_cannot_be_linked_to_an_existing_managing_party(self):
 
+        self.issuer_account.set_unusable_password()
+        self.issuer_account.save(update_fields=["password"])
         account = ensure_participant_account(self.issuer)
         party = Party.objects.create(zev=self.zev, last_name="Representative")
         assign_role(self.zev, party, PartyRole.REPRESENTATIVE, date(2026, 1, 1))

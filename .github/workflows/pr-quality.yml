@@ -79,11 +79,34 @@ jobs:
             - name: Install chart check dependency
               run: python -m pip install PyYAML==6.0.3
 
-            - name: Lint chart
-              run: helm lint ./charts/openzev
-
             - name: Check rendered routing and security settings
               run: python scripts/check-helm-render.py
+
+            - name: Lint chart
+              run: |
+                  helm lint ./charts/openzev --set debug=true \
+                    --set backend.secureSslRedirect=false --set backend.hstsSeconds=0
+                  helm lint ./charts/openzev \
+                    --set secretKey.existingSecret.name=openzev-django-secret \
+                    --set database.existingSecret.name=openzev-db-secret \
+                    --set frontendUrl=https://openzev.example.com \
+                    --set backend.numProxies=1
+
+    production-image-smoke:
+        name: Production image runtime checks
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+            - name: Build backend, frontend, and fullstack images
+              run: |
+                  docker build -f backend/Dockerfile -t openzev-smoke-backend .
+                  docker build -f frontend/Dockerfile -t openzev-smoke-frontend .
+                  docker build -f Dockerfile.fullstack -t openzev-smoke-fullstack .
+
+            - name: Check startup, media migration, transport, and logs
+              run: python scripts/check-production-images.py
 
     backend-check-test:
         name: Backend checks and tests (${{ matrix.database }})

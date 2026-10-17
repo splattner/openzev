@@ -1,5 +1,9 @@
 import type {
   AnnualReport,
+  CorrectInvoiceResponse,
+  Credit,
+  CreditKind,
+  CreditStatus,
   DashboardStats,
   EmailLog,
   EmailTemplateResponse,
@@ -195,9 +199,65 @@ export async function markInvoiceSent(invoiceId: string): Promise<Invoice> {
   return data
 }
 
-export async function markInvoicePaid(invoiceId: string): Promise<Invoice> {
-  const { data } = await api.post<Invoice>(`/invoices/invoices/${invoiceId}/mark-paid/`)
+/** Books the outstanding amount as one payment; `paidOn` defaults to today. */
+export async function markInvoicePaid(invoiceId: string, paidOn?: string): Promise<Invoice> {
+  const { data } = await api.post<Invoice>(`/invoices/invoices/${invoiceId}/mark-paid/`, paidOn ? { paid_on: paidOn } : {})
   return data
+}
+
+export async function recordPayment(
+  invoiceId: string,
+  body: { amount_chf: string; paid_on?: string; note?: string },
+): Promise<Invoice> {
+  const { data } = await api.post<Invoice>(`/invoices/invoices/${invoiceId}/payments/`, body)
+  return data
+}
+
+export async function deletePayment(invoiceId: string, paymentId: string): Promise<Invoice> {
+  const { data } = await api.delete<Invoice>(`/invoices/invoices/${invoiceId}/payments/${paymentId}/`)
+  return data
+}
+
+/** Corrects a paid invoice with a credit note: a full reversal (cancels it) or a partial credit. */
+export async function correctInvoice(
+  invoiceId: string,
+  body: { kind: CreditKind; reason: string; amount_chf?: string },
+): Promise<CorrectInvoiceResponse> {
+  const { data } = await api.post<CorrectInvoiceResponse>(`/invoices/invoices/${invoiceId}/correct/`, body)
+  return data
+}
+
+export async function listCredits(params?: { zev_id?: string; participant_id?: string; source_invoice_id?: string; status?: CreditStatus }): Promise<Credit[]> {
+  return fetchAllPages<Credit>('/invoices/credits/', params)
+}
+
+/** Pays out what remains of a credit note (managers). */
+export async function refundCredit(creditId: string, body: { refunded_on: string; note?: string }): Promise<Credit> {
+  const { data } = await api.post<Credit>(`/invoices/credits/${creditId}/refund/`, body)
+  return data
+}
+
+export async function getCredit(creditId: string): Promise<Credit> {
+  const { data } = await api.get<Credit>(`/invoices/credits/${creditId}/`)
+  return data
+}
+
+/** Fetch the credit note's authenticated PDF blob. */
+export async function downloadCreditPdf(creditId: string): Promise<Blob> {
+  const response = await api.get<Blob>(`/invoices/credits/${creditId}/pdf/`, { responseType: 'blob' })
+  return response.data
+}
+
+/** Open the credit note's PDF in a new tab via object URL. */
+export async function openCreditPdf(creditId: string): Promise<void> {
+  const blob = await downloadCreditPdf(creditId)
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.target = '_blank'
+  anchor.rel = 'noreferrer'
+  anchor.click()
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
 
 export async function deleteInvoice(invoiceId: string): Promise<void> {
@@ -268,7 +328,7 @@ export async function resetAnnualStatementPdfTemplate(): Promise<PdfTemplateMuta
  * returns the raw bytes as a Blob for an object-URL iframe. */
 export async function previewPdfTemplateBlob(
   content: string,
-  templateType: 'invoice' | 'contract' | 'annual_statement',
+  templateType: 'invoice' | 'contract' | 'annual_statement' | 'credit_note',
   signal?: AbortSignal,
 ): Promise<Blob> {
   const response = await api.post(
@@ -277,6 +337,21 @@ export async function previewPdfTemplateBlob(
     { responseType: 'blob', headers: { Accept: 'application/pdf' }, signal },
   )
   return response.data as Blob
+}
+
+export async function fetchCreditNotePdfTemplate(): Promise<PdfTemplateResponse> {
+  const { data } = await api.get<PdfTemplateResponse>('/invoices/invoices/credit-note-pdf-template/')
+  return data
+}
+
+export async function updateCreditNotePdfTemplate(content: string): Promise<PdfTemplateMutationResponse> {
+  const { data } = await api.patch<PdfTemplateMutationResponse>('/invoices/invoices/credit-note-pdf-template/', { content })
+  return data
+}
+
+export async function resetCreditNotePdfTemplate(): Promise<PdfTemplateMutationResponse> {
+  const { data } = await api.delete<PdfTemplateMutationResponse>('/invoices/invoices/credit-note-pdf-template/')
+  return data
 }
 
 export async function fetchEmailTemplate(templateKey: string): Promise<EmailTemplateResponse> {

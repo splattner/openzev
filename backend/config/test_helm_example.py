@@ -1,13 +1,12 @@
 """Keep the Helm chart's documented production example deployable.
 
 `charts/openzev/README.md` presents its "Example values" block as a complete
-production-oriented configuration. The chart never sets `DEBUG`, which
-defaults to `False`, and the backend image runs `manage.py migrate` before
+production-oriented configuration. The chart defaults `DEBUG` to `False`,
+and the backend image runs `manage.py migrate` before
 gunicorn (`backend/Dockerfile`), so a values file that trips a production
 system check (`accounts.E003`-`E009`) stops the pod at startup. The chart CI
-job only runs `helm lint`/`helm template` against the development defaults in
-`values.yaml`, so this test is the guard that maps the documented example
-onto the settings the template would produce and runs `manage.py check`.
+jobs render the documented example separately; this test maps it onto the
+settings the template would produce and runs `manage.py check`.
 """
 
 import re
@@ -101,3 +100,9 @@ class HelmExampleValuesTests(SimpleTestCase):
         else:
             effective_key = str(secret.get("value") or "")
         validate_secret_key(False, effective_key)
+
+    def test_example_enables_trusted_https_transport(self):
+        backend = _example_values().get("backend") or {}
+        self.assertEqual(backend.get("numProxies"), 1)
+        self.assertIs(backend.get("secureSslRedirect"), True)
+        self.assertEqual(backend.get("hstsSeconds"), 31536000)

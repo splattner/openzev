@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-12
+- Amended by: [ADR 0035](0035-fresh-independent-credentials-on-promotion.md)
 
 ## Context
 

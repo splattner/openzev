@@ -1,0 +1,35 @@
+/* Email subject/body: label row carries the source badge and the action
+   above the field; default mode shows the platform text read-only. */
+
+.zev-email-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.zev-email-label-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.zev-email-label-row > button {
+  margin-left: auto;
+}
+
+.zev-email-default-preview {
+  margin: 0;
+  padding: 0.625rem var(--field-padding-inline);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--field-radius);
+  background: var(--surface);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.zev-email-fields-toggle {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+

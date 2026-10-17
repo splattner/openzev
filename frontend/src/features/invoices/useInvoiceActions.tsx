@@ -48,8 +48,15 @@ function isSendable(row: InvoicePeriodParticipantRow): boolean {
     return row.invoice?.status === 'approved' && !!row.participant_email
 }
 
+/**
+ * Mirrors the backend: an invoice with payments is never deleted; admins may
+ * delete any other; managers only a draft or cancelled invoice that was never
+ * approved, since an issued one keeps its number for good (ADR 0037).
+ */
 export function hasDeletePermission(invoice: Invoice, role: string | undefined): boolean {
-    return invoice.status === 'draft' || invoice.status === 'cancelled' || role === 'admin'
+    if (Number(invoice.paid_chf ?? 0) !== 0) return false
+    if (role === 'admin') return true
+    return (invoice.status === 'draft' || invoice.status === 'cancelled') && !invoice.approved_at
 }
 
 export function useInvoiceActions({
@@ -214,7 +221,7 @@ export function useInvoiceActions({
     })
 
     const markPaidMutation = useMutation({
-        mutationFn: markInvoicePaid,
+        mutationFn: (invoiceId: string) => markInvoicePaid(invoiceId),
         onSuccess: () => {
             pushToast(t('pages.invoices.messages.markedPaid'), 'success')
             invalidatePeriodOverview()

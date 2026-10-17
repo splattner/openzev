@@ -132,7 +132,8 @@ class AuthMfaThrottle(SimpleRateThrottle):
 
         token = (request.data or {}).get("mfa_token", "")
         try:
-            ident = str(mfa.resolve_challenge(token).pk)
+            user, _, _ = mfa.resolve_challenge(token)
+            ident = str(user.pk)
         except mfa.MfaChallengeError:
             ident = self.get_ident(request)
         return self.cache_format % {"scope": self.scope, "ident": ident}

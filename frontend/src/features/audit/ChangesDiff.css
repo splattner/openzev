@@ -1,0 +1,37 @@
+/* Diff table: before/after per changed field. */
+
+.audit-diff {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.audit-diff th {
+  text-align: left;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0.35rem 0.55rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.audit-diff td {
+  padding: 0.4rem 0.55rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.audit-diff-before {
+  color: var(--danger-700);
+  background: rgba(248, 113, 113, 0.08);
+  text-decoration: line-through;
+  text-decoration-color: rgba(185, 28, 28, 0.45);
+}
+
+.audit-diff-after {
+  color: var(--success-600);
+  background: rgba(74, 222, 128, 0.1);
+}
+

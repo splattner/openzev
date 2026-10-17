@@ -17,7 +17,7 @@ from functools import lru_cache
 from typing import Iterable, NamedTuple
 from uuid import UUID
 
-from django.db import models, transaction
+from django.db import connection, models, transaction
 from django.utils import timezone
 
 from billiard.exceptions import SoftTimeLimitExceeded
@@ -43,6 +43,7 @@ from metering.models import MeterReading, ReadingDirection
 from .band_labels import band_description, translations_for as band_translations_for
 from .document_parties import build_issuer, build_recipient
 from .models import Invoice, InvoiceItem, InvoiceStatus
+from .workflow import apply_open_credits
 
 logger = logging.getLogger(__name__)
 
@@ -265,19 +266,25 @@ def _discard_replaceable_invoices(participant, period_start, period_end) -> None
 
     A draft or cancelled invoice overlapping this period is replaced; anything
     further along its lifecycle has been sent to somebody and must not be
-    silently rewritten.
+    silently rewritten. A cancelled invoice that was ever approved stays, with
+    its number, next to the new one (ADR 0037).
     """
     overlapping = Invoice.objects.filter(
         participant=participant,
         period_start__lte=period_end,
         period_end__gte=period_start,
     )
+    # Hold every overlapping row so approval cannot commit between the status
+    # check and the deletion below; approval takes the same row lock.
+    list(overlapping.order_by("pk").select_for_update().values_list("pk", flat=True))
     locked = locked_overlapping_invoices(participant, period_start, period_end).first()
     if locked:
         raise ValueError(
             f"Invoice {locked.invoice_number} already has status '{locked.status}' and cannot be regenerated."
         )
-    overlapping.filter(status__in=[InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED]).delete()
+    overlapping.filter(
+        status__in=[InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED], approved_at__isnull=True,
+    ).delete()
 
 
 # ─── Pricing state ────────────────────────────────────────────────────────────
@@ -1616,13 +1623,23 @@ def generate_invoice(
 ) -> Invoice:
     """
     Generate (or regenerate) an invoice for a participant for the given period.
-    Existing DRAFT invoice for the same period will be replaced.
-    Raises ValueError if a non-draft, non-cancelled invoice already exists.
+    Replaces overlapping drafts and never-approved cancelled invoices.
+    Raises ValueError if an approved, sent or paid invoice overlaps.
 
     Batch callers pass an ``InvoiceGenerationContext`` with precomputed
     ZEV-period denominators. The single-invoice path omits it and derives the
     same values on demand.
     """
+    # Match restore's ZEV-first order without serializing other generators (ADR 0038).
+    if connection.vendor == "postgresql":
+        with connection.cursor() as cursor:
+            cursor.execute(
+                'SELECT "id" FROM "zev_zev" WHERE "id" = %s FOR KEY SHARE',
+                [participant.zev_id],
+            )
+    # Lock even when no invoice exists, before checking or deleting overlaps.
+    # Selecting only the PK avoids locking a shared party via the manager's join.
+    Participant.objects.select_for_update().values("pk").get(pk=participant.pk)
     zev = participant.zev
 
     if generation_context is not None:
@@ -1933,6 +1950,9 @@ def generate_invoice(
         issuer=generation_context.issuer(zev),
         recipient=build_recipient(participant),
     )
+    # Open credit notes are set against the total after VAT; lines and totals
+    # stay as computed. A replaced draft was deleted above, so its credit is free.
+    apply_open_credits(invoice)
 
     # ─── 9. Create line items ─────────────────────────────────────────────
     items = []
@@ -2024,20 +2044,6 @@ def generate_invoices_for_zev(zev: Zev, period_start: date, period_end: date) ->
             raise
         except Exception as exc:
             logger.exception("Invoice generation failed for participant %s", participant.full_name)
-            # next_invoice_number() bumps zev.invoice_counter in memory; the
-            # savepoint rollback restores the row but not the instance, and every
-            # participant shares the same zev object (p.zev is zev). Re-sync so the
-            # next participant reuses the number the failed one gave back instead of
-            # skipping it and then colliding on a stale +1.
-            try:
-                zev.refresh_from_db(fields=["invoice_counter"])
-            except Exception:
-                # Don't mask the original failure; if we cannot re-sync, subsequent
-                # participants will fail early on the (likely unreachable) DB anyway.
-                logger.exception(
-                    "Could not re-sync invoice counter after failure for participant %s",
-                    participant.full_name,
-                )
             failure = {
                 "participant_id": str(participant.id),
                 "participant_name": participant.full_name,

@@ -1,0 +1,41 @@
+/* ── Mantine Tabs (.app-tabs) ────────────────────────────────────────────── */
+
+/* Mantine v9 only emits hashed classes, so these hooks are applied via the
+   Tabs classNames prop: root app-tabs, list app-tabs-list, tab app-tabs-tab. */
+.app-tabs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+}
+
+/* The strip under a page header: its hairline is the header's rule, the
+   active tab's underline the forest accent. */
+.app-tabs-list {
+  gap: 1.5rem;
+}
+
+.app-tabs-list::before {
+  border-color: var(--border-default);
+}
+
+.app-tabs-tab {
+  padding: 0.6rem 0.125rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.app-tabs-tab:hover {
+  background-color: transparent;
+  color: var(--text-primary);
+}
+
+.app-tabs-tab:not([data-active]):hover {
+  border-color: var(--border-strong);
+}
+
+.app-tabs-tab[data-active] {
+  color: var(--text-heading);
+  font-weight: 650;
+  border-bottom-color: var(--accent-rule);
+}

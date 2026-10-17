@@ -45,42 +45,43 @@ class MfaChallengeError(Exception):
         super().__init__(reason)
 
 
-def issue_challenge(user: User) -> str:
-    """Sign a token naming ``user``, valid for MFA_CHALLENGE_TTL.
+def issue_challenge(
+    user: User, *, participant_link: bool = False, password_recovery: bool = False,
+) -> str:
+    """Sign the user/session for MFA_CHALLENGE_TTL.
 
-    Deliberately a signed value, not a JWT: no authentication class in this
-    project parses ``TimestampSigner`` output, so this token is structurally
-    incapable of authenticating a request even if a bug tried to use it as
-    one — see ``test_challenge_token_cannot_authenticate_a_request``.
+    Authentication classes do not accept this TimestampSigner format as a JWT.
     """
     signer = signing.TimestampSigner(salt=MFA_CHALLENGE_SALT)
-    return signer.sign_object({"user": user.pk, "sv": user.session_version})
+    return signer.sign_object({
+        "user": user.pk, "sv": user.session_version, "participant_link": participant_link,
+        "password_recovery": password_recovery,
+    })
 
 
-def resolve_challenge(token: str) -> User:
-    """Resolve a challenge token to its user.
-
-    Raises ``MfaChallengeError`` (reason "expired_challenge" or
-    "invalid_challenge") rather than leaking which case applies to the
-    caller — only the audit log's reason field distinguishes them.
-    """
+def _challenge_payload(token: str) -> dict:
     signer = signing.TimestampSigner(salt=MFA_CHALLENGE_SALT)
     try:
-        payload = signer.unsign_object(token or "", max_age=MFA_CHALLENGE_TTL)
+        return signer.unsign_object(token or "", max_age=MFA_CHALLENGE_TTL)
     except signing.SignatureExpired:
         raise MfaChallengeError("expired_challenge") from None
     except (signing.BadSignature, ValueError, TypeError):
         raise MfaChallengeError("invalid_challenge") from None
 
+
+def resolve_challenge(token: str, *, lock: bool = False) -> tuple[User, bool, bool]:
+    """Return user, credential origin and recovery proof; locking requires an outer transaction."""
+    payload = _challenge_payload(token)
     try:
-        user = User.objects.get(pk=payload["user"], is_active=True)
+        users = User.objects.locked() if lock else User.objects.all()
+        user = users.get(pk=payload["user"], is_active=True)
+        if lock:
+            # Recheck expiry after waiting for the user lock.
+            payload = _challenge_payload(token)
         if payload["sv"] != user.session_version:
             raise MfaChallengeError("invalid_challenge")
-        return user
+        return user, payload.get("participant_link", False), payload.get("password_recovery", False)
     except (User.DoesNotExist, ValueError, TypeError, KeyError):
-        # A malformed payload (missing keys, wrong types) can only come from a
-        # token this process did not issue — the signing key differs — but
-        # defence in depth is free.
         raise MfaChallengeError("invalid_challenge") from None
 
 
@@ -237,7 +238,7 @@ def verify_mfa_code(user: User, raw_code: str) -> tuple[bool, str | None, str | 
 RECOVERY_CODE_COUNT = 10
 
 
-def issue_recovery_codes(user: User) -> list[str]:
+def issue_recovery_codes(user: User, *, participant_link: bool = False) -> list[str]:
     """Replace ``user``'s recovery codes with a fresh set of
     ``RECOVERY_CODE_COUNT``, returned in plaintext — the only time they ever
     are. Used both at first confirmation and at explicit regeneration; either
@@ -246,7 +247,7 @@ def issue_recovery_codes(user: User) -> list[str]:
     plaintext_codes = []
     for _ in range(RECOVERY_CODE_COUNT):
         raw = secrets.token_hex(5)
-        MfaRecoveryCode.objects.create(user=user, code_hash=hash_secret(raw))
+        MfaRecoveryCode.objects.create(user=user, code_hash=hash_secret(raw), from_participant_link=participant_link)
         plaintext_codes.append(f"{raw[:5]}-{raw[5:]}")
     return plaintext_codes
 

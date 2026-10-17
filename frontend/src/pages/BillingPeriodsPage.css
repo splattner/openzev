@@ -1,0 +1,121 @@
+/* ── Billing hub: the current period card ───────────────────────────── */
+
+.billing-current-period {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.billing-current-period .eyebrow,
+.billing-current-period .muted {
+  margin: 0;
+}
+
+.billing-current-period-range {
+  display: block;
+  margin: 0.25rem 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Overview: one card per period, with independent issues kept together. */
+
+.overview-period-section-title {
+  margin: 0 0 1rem;
+}
+
+.overview-period-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.overview-period-details {
+  width: 100%;
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.overview-period-details summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  list-style: none;
+}
+
+.overview-period-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.overview-period-details summary::after {
+  content: '+';
+}
+
+.overview-period-details[open] summary::after {
+  content: '−';
+}
+
+.overview-period-details ul {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 0;
+}
+
+.overview-period-details li {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.65rem 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.overview-period-history {
+  border-top: 1px solid var(--border-default);
+  margin-top: 0;
+  padding-top: 1rem;
+}
+
+.overview-period-history li {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+}
+
+.overview-history-range {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-period-details summary:focus-visible {
+  outline: 2px solid var(--interactive);
+  outline-offset: 4px;
+}
+
+.overview-community-notices h3,
+.overview-caught-up h3 {
+  margin: 0.5rem 0;
+}
+
+.overview-community-notices li + li {
+  margin-top: 0.5rem;
+}
+
+@media (width <= 1150px) {
+  .overview-period-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (width <= 700px) {
+  .overview-period-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+

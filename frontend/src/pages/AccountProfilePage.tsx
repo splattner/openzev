@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePageNavigation } from '../lib/usePageNavigation'
 import { Tabs } from '@mantine/core'
@@ -28,6 +28,7 @@ export function AccountProfilePage() {
     const { user } = useAuth()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
+    const oauthHandled = useRef(false)
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
     const activeTab = resolveAccountTab(searchParams, { mustChangePassword: Boolean(user?.must_change_password) })
@@ -35,6 +36,8 @@ export function AccountProfilePage() {
     // Handle oauth_linked / oauth_error query params (the OAuth link callback
     // redirects here). resolveAccountTab has already opened Security for them.
     useEffect(() => {
+        if (oauthHandled.current) return
+        oauthHandled.current = true
         const linked = searchParams.get('oauth_linked')
         const oauthError = searchParams.get('oauth_error')
         if (linked === 'true') {
@@ -45,7 +48,9 @@ export function AccountProfilePage() {
                 params.set('tab', 'security')
             })
         } else if (oauthError) {
-            pushToast(t('auth.oauth.errors.generic', { code: oauthError }), 'error')
+            pushToast(oauthError === 'email_not_verified'
+                ? t('account.linkEmailNotVerified')
+                : t('auth.oauth.errors.generic', { code: oauthError }), 'error')
             updateParams(params => {
                 params.delete('oauth_error')
                 params.set('tab', 'security')

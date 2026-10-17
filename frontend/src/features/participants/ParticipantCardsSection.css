@@ -1,0 +1,128 @@
+/* ── Participant rows: the invoice rows plus address and validity columns ── */
+
+.participant-name-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.participant-name-button:hover,
+.participant-name-button:focus-visible {
+  text-decoration: underline;
+}
+
+/* A missing detail is the way to fix it: red text, or its icon, that opens
+   the edit dialog or the metering points. */
+
+.participant-fix {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+}
+
+:is(a, button).participant-fix {
+  cursor: pointer;
+}
+
+:is(a, button).participant-fix:not(.participant-fix--icon):is(:hover, :focus-visible) {
+  text-decoration: underline;
+}
+
+:is(a, button).participant-fix--icon:hover {
+  background: var(--danger-100);
+}
+
+.participant-fix svg {
+  font-size: 0.75em;
+}
+
+.participant-fix--icon svg {
+  font-size: inherit;
+}
+
+.participant-rows .participant-row-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.participant-row-address,
+.participant-row-validity,
+.participant-rows .invoice-row-total {
+  font-size: 0.875rem;
+}
+
+.participant-row-address > span,
+.participant-row-validity > span,
+.participant-row-weight {
+  display: block;
+}
+
+.participant-row-validity {
+  width: 1%;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.participant-row-weight {
+  font-size: 0.8125rem;
+}
+
+/* Cards: who and share, then where and since when, then status and the menu. */
+
+@container (max-width: 46rem) {
+  .invoice-rows.participant-rows tbody tr {
+    grid-template:
+      'who total' auto
+      'address validity' auto
+      'progress actions' auto / minmax(0, 1fr) auto;
+  }
+
+  .participant-row-address {
+    grid-area: address;
+  }
+
+  .participant-rows .participant-row-validity {
+    grid-area: validity;
+    width: auto;
+    text-align: end;
+  }
+
+  /* No divider under the last card: the sheet's edge closes it. */
+  .invoice-rows.participant-rows tbody tr:last-child {
+    border-bottom-color: transparent;
+  }
+
+  .invoice-rows.participant-rows .invoice-actions-cell .invoice-row-actions {
+    justify-content: flex-end;
+  }
+}
+
+/* Phones: the status icons and the buttons each take a full line, so the
+   buttons never widen the share column or crowd the icons. */
+
+@container (max-width: 28rem) {
+  .invoice-rows.participant-rows tbody tr {
+    grid-template:
+      'who total' auto
+      'address validity' auto
+      'progress progress' auto
+      'actions actions' auto / minmax(0, 1fr) auto;
+  }
+
+  .invoice-rows.participant-rows .invoice-actions-cell .invoice-row-actions {
+    justify-content: flex-start;
+  }
+}
+

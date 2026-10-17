@@ -9,11 +9,27 @@ inline.
 State machine::
 
     draft ──approve──▶ approved ──mark_sent──▶ sent ──mark_paid──▶ paid
-      │                   │                      │
-      └───────cancel──────┴──────────cancel──────┘        (paid is final)
+      │                   │                      │  ◀─delete_payment─┘
+      └───────cancel──────┴──────────cancel──────┘
 
-    cancelled is terminal (but draft/cancelled invoices may be regenerated
-    by the engine).
+    cancelled is terminal. A draft or cancelled invoice that was never
+    approved may be replaced by the engine; one that was approved is kept for
+    good (``approved_at``, ADR 0037).
+
+Payments (#388): ``record_payment`` books money received against a sent
+invoice and moves it to ``paid`` once the amount due is covered;
+``mark_invoice_paid`` books the outstanding amount in one go. An invoice with
+payments is never cancelled or deleted directly.
+
+Corrections (#388): ``correct_invoice`` is the one way out of ``paid`` and the
+only cancellation of an invoice that received money. It issues a ``Credit``
+(credit note): a full reversal credits what was received and cancels the
+invoice; a partial credit leaves the invoice as it is.
+
+Credit application (#388, phase 3): the engine sets open credit notes against
+a new invoice (``apply_open_credits``), after VAT. Cancelling an invoice, or
+reversing it with ``correct_invoice``, releases its applications; the credit is
+then free for the next invoice. ``refund_credit`` pays what remains out.
 
 Concurrency (#572): every transition below checks and writes the row's
 *current* database state inside one locked transaction (``SELECT ... FOR
@@ -31,10 +47,17 @@ lock is acquired *after* the slow part (SMTP delivery) has already
 completed in the caller, not held across it.
 """
 
+from decimal import ROUND_HALF_UP, Decimal
+
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 
-from .models import Invoice, InvoiceStatus
+from zev.models import VatMode
+
+from .models import (
+    Credit, CreditApplication, CreditKind, Invoice, InvoicePdfStatus, InvoiceStatus, Payment,
+)
 
 
 class InvoiceWorkflowError(Exception):
@@ -51,7 +74,9 @@ class InvoiceWorkflowError(Exception):
         self.user_message: str = message
 
 
-def _lock_and_transition(invoice, *, allowed_from, to_status, invalid_message, extra_fields=None):
+def _lock_and_transition(
+    invoice, *, allowed_from, to_status, invalid_message, extra_fields=None, guard=None, on_transition=None,
+):
     """Validate and apply a status transition against the row's committed
     state, then mirror the result onto the caller's ``invoice`` instance.
 
@@ -59,7 +84,11 @@ def _lock_and_transition(invoice, *, allowed_from, to_status, invalid_message, e
     refused unless the row's *current* status (re-read under a row lock, not
     whatever ``invoice.status`` held when it was loaded) is one of them.
     ``invalid_message`` is called with that current status to build the
-    ``InvoiceWorkflowError`` message when the guard fails.
+    ``InvoiceWorkflowError`` message when the guard fails. ``guard``, if given,
+    is called with the locked row and returns a refusal message or ``None``.
+    A callable ``extra_fields`` builds its values from the locked row.
+    ``on_transition``, if given, is called with the locked row inside the same
+    transaction, after the status is saved.
 
     On success, the written fields are copied back onto ``invoice`` so the
     caller keeps its own instance — with its prefetched relations — for
@@ -69,12 +98,20 @@ def _lock_and_transition(invoice, *, allowed_from, to_status, invalid_message, e
     happened using a stale value.
     """
     with transaction.atomic():
-        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        rows = Invoice.objects.select_for_update(of=("self",))
+        if to_status == InvoiceStatus.APPROVED:
+            rows = rows.select_related("zev", "participant__party")
+        locked = rows.get(pk=invoice.pk)
         allowed = {allowed_from} if isinstance(allowed_from, str) else set(allowed_from)
         if locked.status not in allowed:
             invoice.status = locked.status
             raise InvoiceWorkflowError(invalid_message(locked.status))
+        refusal = guard(locked) if guard else None
+        if refusal:
+            raise InvoiceWorkflowError(refusal)
 
+        if callable(extra_fields):
+            extra_fields = extra_fields(locked)
         before_status = locked.status
         locked.status = to_status
         locked.updated_at = timezone.now()
@@ -84,6 +121,8 @@ def _lock_and_transition(invoice, *, allowed_from, to_status, invalid_message, e
                 setattr(locked, field, value)
                 update_fields.append(field)
         locked.save(update_fields=update_fields)
+        if on_transition:
+            on_transition(locked)
 
     invoice.status = locked.status
     invoice.updated_at = locked.updated_at
@@ -96,17 +135,29 @@ def _lock_and_transition(invoice, *, allowed_from, to_status, invalid_message, e
 def approve_invoice(invoice: Invoice) -> dict:
     """Transition draft → approved. Returns the ``before`` diff dict.
 
-    Writes the issuer/recipient copy a last time: from here on it is frozen,
-    and every render of the invoice shows exactly this (#761).
+    Freeze a fresh party copy and clear the PDF reference in one transaction.
     """
     from .document_parties import build_copy
+    from .pdf import delete_stored_pdf
+
+    def approval_fields(locked):
+        fields = build_copy(locked)
+        if locked.pdf_file:
+            storage = locked.pdf_file.storage
+            stored_name = locked.pdf_file.name
+            transaction.on_commit(lambda: delete_stored_pdf(storage, stored_name))
+        return {
+            **fields, "pdf_file": "", "pdf_status": InvoicePdfStatus.NONE,
+            # Never cleared: from here on the invoice is issued (ADR 0037).
+            "approved_at": timezone.now(),
+        }
 
     return _lock_and_transition(
         invoice,
         allowed_from=InvoiceStatus.DRAFT,
         to_status=InvoiceStatus.APPROVED,
         invalid_message=lambda _current: "Only draft invoices can be approved.",
-        extra_fields=build_copy(invoice),
+        extra_fields=approval_fields,
     )
 
 
@@ -121,27 +172,352 @@ def mark_invoice_sent(invoice: Invoice) -> dict:
     )
 
 
-def mark_invoice_paid(invoice: Invoice) -> dict:
-    """Transition sent → paid. Returns the ``before`` diff dict."""
-    return _lock_and_transition(
-        invoice,
-        allowed_from=InvoiceStatus.SENT,
-        to_status=InvoiceStatus.PAID,
-        invalid_message=lambda _current: "Only sent invoices can be marked as paid.",
+def paid_chf(invoice_pk) -> Decimal:
+    """Sum of the payments recorded for an invoice."""
+    return Payment.objects.filter(invoice_id=invoice_pk).aggregate(
+        total=Sum("amount_chf")
+    )["total"] or Decimal("0")
+
+
+def amount_due(invoice: Invoice) -> Decimal:
+    """What the invoice asks the participant to pay: the total less the credit
+    applied, never below zero. Negative for a producer payout."""
+    return invoice.amount_due_chf
+
+
+def credit_remaining(credit_pk) -> Decimal:
+    """What is left of a credit: amount less its active applications and what
+    was refunded. Queried, not read from a prefetch, so callers can decide on
+    it after taking the row lock."""
+    credit = Credit.objects.get(pk=credit_pk)
+    applied = CreditApplication.objects.filter(credit_id=credit_pk, released_at__isnull=True).aggregate(
+        total=Sum("amount_chf")
+    )["total"] or Decimal("0")
+    return credit.amount_chf - applied - credit.refunded_chf
+
+
+def apply_open_credits(invoice: Invoice) -> Decimal:
+    """Set the participant's open credit notes against a new invoice, oldest
+    first, until its total is covered or the credits run out. Returns the
+    amount applied (also stored on ``invoice.credit_applied_chf``).
+
+    Called by the engine inside its transaction, after the invoice exists. The
+    line items, subtotal, VAT and total are not touched. Nothing is applied to
+    an invoice with nothing to collect (total <= 0).
+
+    The credit rows are locked first and the balances worked out afterwards in
+    separate queries: ``FOR UPDATE`` cannot be combined with an aggregate on
+    PostgreSQL. Two concurrent generations for one participant serialize on
+    these locks, so a credit is never used twice.
+    """
+    if invoice.total_chf <= 0:
+        return Decimal("0")
+    credit_ids = list(
+        Credit.objects.select_for_update(of=("self",))
+        .filter(zev_id=invoice.zev_id, participant_id=invoice.participant_id)
+        .order_by("created_at", "id")
+        .values_list("pk", flat=True)
     )
+    to_cover = invoice.total_chf
+    applied = Decimal("0")
+    for credit_id in credit_ids:
+        if to_cover <= 0:
+            break
+        remaining = credit_remaining(credit_id)
+        if remaining <= 0:
+            continue
+        amount = min(remaining, to_cover)
+        CreditApplication.objects.create(credit_id=credit_id, invoice=invoice, amount_chf=amount)
+        applied += amount
+        to_cover -= amount
+    if applied:
+        invoice.credit_applied_chf = applied
+        invoice.save(update_fields=["credit_applied_chf"])
+    return applied
+
+
+def release_credit_applications(invoice_pk) -> Decimal:
+    """Free the credit an invoice used (it was cancelled). Returns the amount.
+    ``credit_applied_chf`` stays as issued."""
+    active = CreditApplication.objects.filter(invoice_id=invoice_pk, released_at__isnull=True)
+    released = active.aggregate(total=Sum("amount_chf"))["total"] or Decimal("0")
+    active.update(released_at=timezone.now())
+    return released
+
+
+def _mirror_status(invoice: Invoice, locked: Invoice) -> None:
+    invoice.status = locked.status
+    invoice.updated_at = locked.updated_at
+
+
+def record_payment(invoice: Invoice, *, amount_chf: Decimal, paid_on, note: str = "", user=None) -> dict:
+    """Book a payment against a sent invoice. Returns the ``before`` diff dict
+    with the new ``payment`` under its own key.
+
+    A positive amount due takes partial payments up to the outstanding amount;
+    a payout (amount due ≤ 0) is only settled in full, through
+    :func:`mark_invoice_paid`. The invoice turns ``paid`` once the payments
+    cover the amount due.
+    """
+    with transaction.atomic():
+        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if locked.status != InvoiceStatus.SENT:
+            _mirror_status(invoice, locked)
+            raise InvoiceWorkflowError(
+                "Invoice is already fully paid." if locked.status == InvoiceStatus.PAID
+                else "Only sent invoices can receive payments."
+            )
+        due = amount_due(locked)
+        if due <= 0:
+            raise InvoiceWorkflowError(
+                "The credit applied covers this invoice. Mark it as paid instead."
+                if locked.total_chf > 0 else "This invoice has nothing to collect. Mark it as paid instead."
+            )
+        if amount_chf <= 0:
+            raise InvoiceWorkflowError("The payment amount must be positive.")
+        if paid_on > timezone.localdate():
+            raise InvoiceWorkflowError("The payment date cannot be in the future.")
+        outstanding = due - paid_chf(locked.pk)
+        if amount_chf > outstanding:
+            raise InvoiceWorkflowError(f"The payment exceeds the outstanding amount of CHF {outstanding:.2f}.")
+
+        payment = Payment.objects.create(
+            invoice=locked, amount_chf=amount_chf, paid_on=paid_on, note=note,
+            source=Payment.Source.MANUAL, created_by=user,
+        )
+        before_status = locked.status
+        if amount_chf == outstanding:
+            locked.status = InvoiceStatus.PAID
+        locked.updated_at = timezone.now()
+        locked.save(update_fields=["status", "updated_at"])
+
+    _mirror_status(invoice, locked)
+    return {"status": before_status, "payment": payment}
+
+
+def mark_invoice_paid(invoice: Invoice, *, paid_on=None, user=None) -> dict:
+    """Transition sent → paid, booking the outstanding amount as one payment.
+
+    Returns the ``before`` diff dict with the payment (``None`` when nothing
+    was outstanding, e.g. a zero total) under ``payment``.
+    """
+    paid_on = paid_on or timezone.localdate()
+    with transaction.atomic():
+        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if locked.status != InvoiceStatus.SENT:
+            _mirror_status(invoice, locked)
+            raise InvoiceWorkflowError("Only sent invoices can be marked as paid.")
+        if paid_on > timezone.localdate():
+            raise InvoiceWorkflowError("The payment date cannot be in the future.")
+        outstanding = amount_due(locked) - paid_chf(locked.pk)
+        payment = None
+        if outstanding != 0:
+            payment = Payment.objects.create(
+                invoice=locked, amount_chf=outstanding, paid_on=paid_on,
+                source=Payment.Source.MARK_PAID, created_by=user,
+            )
+        before_status = locked.status
+        locked.status = InvoiceStatus.PAID
+        locked.updated_at = timezone.now()
+        locked.save(update_fields=["status", "updated_at"])
+
+    _mirror_status(invoice, locked)
+    return {"status": before_status, "payment": payment}
+
+
+def delete_payment(payment: Payment) -> dict:
+    """Remove a payment entered by mistake. Returns the ``before`` diff dict.
+
+    A paid invoice whose payments no longer cover the amount due goes back to
+    ``sent`` — the only way out of ``paid`` besides a correction.
+    """
+    with transaction.atomic():
+        locked = Invoice.objects.select_for_update().get(pk=payment.invoice_id)
+        if locked.status not in (InvoiceStatus.SENT, InvoiceStatus.PAID):
+            raise InvoiceWorkflowError("Payments of a cancelled invoice cannot be removed.")
+        if Credit.objects.filter(source_invoice_id=locked.pk).exists():
+            raise InvoiceWorkflowError("Payments of an invoice with credit notes cannot be removed.")
+        before_status = locked.status
+        Payment.objects.filter(pk=payment.pk).delete()
+        if locked.status == InvoiceStatus.PAID and paid_chf(locked.pk) != amount_due(locked):
+            locked.status = InvoiceStatus.SENT
+        locked.updated_at = timezone.now()
+        locked.save(update_fields=["status", "updated_at"])
+
+    payment.invoice.status = locked.status
+    payment.invoice.updated_at = locked.updated_at
+    return {"status": before_status}
 
 
 def cancel_invoice(invoice: Invoice) -> dict:
-    """Cancel a not-yet-paid invoice. Returns the ``before`` diff dict."""
+    """Cancel a not-yet-paid invoice without payments. Returns the ``before``
+    diff dict."""
     return _lock_and_transition(
         invoice,
         allowed_from={InvoiceStatus.DRAFT, InvoiceStatus.APPROVED, InvoiceStatus.SENT},
         to_status=InvoiceStatus.CANCELLED,
         invalid_message=lambda current: (
             "Invoice is already cancelled." if current == InvoiceStatus.CANCELLED
-            else "Paid invoices cannot be cancelled."
+            else "Paid invoices cannot be cancelled. Correct the invoice instead."
         ),
+        guard=lambda locked: (
+            "Invoices with recorded payments cannot be cancelled. Correct the invoice instead."
+            if Payment.objects.filter(invoice_id=locked.pk).exists() else None
+        ),
+        on_transition=lambda locked: release_credit_applications(locked.pk),
     )
+
+
+_CENT = Decimal("0.01")
+
+
+def invoice_vat_mode(invoice: Invoice) -> str:
+    """The VAT mode an invoice was issued under, worked out from its fields:
+    ``Invoice`` does not store it and ``Zev.vat_mode`` may have changed since."""
+    if invoice.embedded_vat_chf is not None:
+        return VatMode.INCLUSIVE
+    if invoice.vat_base_chf is not None or invoice.vat_chf != 0:
+        return VatMode.REGISTERED
+    return VatMode.NOT_REGISTERED
+
+
+def credit_vat_split(source: Invoice, amount: Decimal) -> dict:
+    """The VAT figures of a credit of ``amount`` (gross) against ``source``.
+
+    A credit over the invoice's full total copies its VAT exactly. Any other
+    amount is scaled: a registered invoice takes ``amount × rate / (1 + rate)``;
+    an inclusive one takes the same share of its embedded VAT as ``amount`` is
+    of the total (the inclusive invoice stores no rate); a non-registered one
+    carries none.
+    """
+    mode = invoice_vat_mode(source)
+    if amount == source.total_chf:
+        return {
+            "vat_mode": mode, "vat_rate": source.vat_rate, "vat_chf": source.vat_chf,
+            "embedded_vat_chf": source.embedded_vat_chf,
+        }
+    vat_chf, embedded = Decimal("0"), None
+    if mode == VatMode.REGISTERED:
+        vat_chf = (amount * source.vat_rate / (1 + source.vat_rate)).quantize(_CENT, rounding=ROUND_HALF_UP)
+    elif mode == VatMode.INCLUSIVE:
+        embedded = (source.embedded_vat_chf * amount / source.total_chf).quantize(_CENT, rounding=ROUND_HALF_UP)
+    return {"vat_mode": mode, "vat_rate": source.vat_rate, "vat_chf": vat_chf, "embedded_vat_chf": embedded}
+
+
+def credited_chf(invoice_pk) -> Decimal:
+    """Sum of the credit notes issued for an invoice."""
+    return Credit.objects.filter(source_invoice_id=invoice_pk).aggregate(
+        total=Sum("amount_chf")
+    )["total"] or Decimal("0")
+
+
+def correct_invoice(
+    invoice: Invoice, *, kind: str, reason: str, amount_chf: Decimal | None = None, user=None,
+) -> dict:
+    """Correct an invoice that received money by issuing a credit note.
+
+    Returns the ``before`` diff dict with the new ``credit`` under its own key
+    (``None`` when the reversal of a credit-only invoice has no cash to give
+    back) and the ``released_chf`` of credit freed again.
+
+    * ``reversal``: credits the cash received, less any earlier partial credit,
+      cancels the invoice and releases the credit that was applied to it, so
+      the participant gets back exactly what they paid and used. An invoice
+      settled entirely by credit is cancelled and releases its credit without
+      issuing a credit note. The period can then be regenerated.
+    * ``adjustment``: credits ``amount_chf`` (up to the cash received and not
+      yet credited) and leaves the invoice as it is. Applied credit is not
+      creditable: reverse and regenerate instead.
+
+    Only a ``paid`` invoice, or a ``sent`` one with payments, qualifies: a sent
+    invoice nobody paid is simply cancelled. A producer payout (total ≤ 0) is
+    out of scope.
+    """
+    reason = (reason or "").strip()
+    with transaction.atomic():
+        locked = Invoice.objects.select_for_update().select_related("zev", "participant__party").get(pk=invoice.pk)
+        received = paid_chf(locked.pk)
+        if locked.status not in (InvoiceStatus.SENT, InvoiceStatus.PAID):
+            _mirror_status(invoice, locked)
+            raise InvoiceWorkflowError(
+                "Invoice is already cancelled." if locked.status == InvoiceStatus.CANCELLED
+                else "Only paid invoices, or sent invoices with payments, can be corrected. "
+                     "Cancel an invoice that has no payments instead."
+            )
+        if locked.status == InvoiceStatus.SENT and received <= 0:
+            raise InvoiceWorkflowError(
+                "Only paid invoices, or sent invoices with payments, can be corrected. "
+                "Cancel a sent invoice that has no payments instead."
+            )
+        if locked.total_chf <= 0:
+            raise InvoiceWorkflowError("Invoices with nothing to collect (payouts) cannot be corrected.")
+        if kind not in CreditKind.values:
+            raise InvoiceWorkflowError("Unknown correction kind.")
+        if not reason:
+            raise InvoiceWorkflowError("A reason is required.")
+
+        creditable = received - credited_chf(locked.pk)
+        has_applications = CreditApplication.objects.filter(invoice_id=locked.pk, released_at__isnull=True).exists()
+        if kind == CreditKind.REVERSAL:
+            amount = creditable
+            if amount <= 0 and not has_applications:
+                raise InvoiceWorkflowError("Everything received for this invoice has already been credited.")
+        else:
+            if amount_chf is None or amount_chf <= 0:
+                raise InvoiceWorkflowError("The credit amount must be positive.")
+            if amount_chf > creditable:
+                raise InvoiceWorkflowError(f"The credit exceeds the creditable amount of CHF {creditable:.2f}.")
+            amount = amount_chf
+
+        credit = None
+        if amount > 0:
+            credit = Credit.objects.create(
+                credit_number=locked.zev.next_credit_note_number(),
+                zev=locked.zev, participant=locked.participant, kind=kind, source_invoice=locked,
+                reason=reason, amount_chf=amount, issuer=locked.issuer, recipient=locked.recipient,
+                pdf_status=InvoicePdfStatus.PENDING, created_by=user,
+                **credit_vat_split(locked, amount),
+            )
+        before_status = locked.status
+        released = Decimal("0")
+        if kind == CreditKind.REVERSAL:
+            locked.status = InvoiceStatus.CANCELLED
+            locked.updated_at = timezone.now()
+            locked.save(update_fields=["status", "updated_at"])
+            released = release_credit_applications(locked.pk)
+        if credit is not None:
+            # The render reads the committed credit, so it is queued once it is there.
+            from .tasks import generate_credit_pdf_task
+            transaction.on_commit(lambda: generate_credit_pdf_task.delay(str(credit.pk)), robust=True)
+
+    _mirror_status(invoice, locked)
+    return {"status": before_status, "credit": credit, "released_chf": released}
+
+
+def refund_credit(credit: Credit, *, refunded_on, note: str = "", user=None) -> dict:
+    """Pay out what remains of a credit instead of setting it against an
+    invoice. Returns ``{"amount": Decimal}`` for the audit event.
+
+    The whole remainder is booked at once (``refunded_chf += remaining``), so
+    the credit reads ``refunded``. Credit held by a draft counts as applied: it
+    is not refundable until that draft is deleted or cancelled.
+    """
+    with transaction.atomic():
+        locked = Credit.objects.select_for_update().get(pk=credit.pk)
+        remaining = credit_remaining(locked.pk)
+        if remaining <= 0:
+            raise InvoiceWorkflowError("Nothing remains to refund.")
+        if refunded_on > timezone.localdate():
+            raise InvoiceWorkflowError("The refund date cannot be in the future.")
+        locked.refunded_chf += remaining
+        locked.refunded_on = refunded_on
+        locked.refund_note = (note or "").strip()
+        locked.save(update_fields=["refunded_chf", "refunded_on", "refund_note"])
+
+    credit.refunded_chf = locked.refunded_chf
+    credit.refunded_on = locked.refunded_on
+    credit.refund_note = locked.refund_note
+    return {"amount": remaining}
 
 
 def record_email_delivery(invoice: Invoice, sent_at) -> str:
@@ -176,5 +552,9 @@ def record_email_delivery(invoice: Invoice, sent_at) -> str:
 
 
 def can_delete_invoice(invoice: Invoice) -> bool:
-    """Non-admins may only delete draft or cancelled invoices."""
-    return invoice.status in (InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED)
+    """Non-admins may only delete draft or cancelled invoices that were never
+    approved: an issued invoice keeps its number for good (ADR 0037)."""
+    return (
+        invoice.status in (InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED)
+        and invoice.approved_at is None
+    )

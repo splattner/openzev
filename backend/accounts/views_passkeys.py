@@ -17,7 +17,7 @@ from audit.services import record_audit_event
 
 from . import mfa, notifications, passkeys
 from .cookies import set_auth_cookies
-from .jwt_utils import make_jwt_for_user, record_login
+from .jwt_utils import is_participant_link_session, make_jwt_for_user, record_login
 from .models import User, WebAuthnCredential
 from .session_revocation import lock_current_session
 from .serializers import WebAuthnCredentialSerializer
@@ -99,6 +99,7 @@ class PasskeyRegisterCompleteView(APIView):
             with transaction.atomic():
                 stored = WebAuthnCredential.objects.create(
                     user=user,
+                    from_participant_link=is_participant_link_session(request.auth),
                     credential_id=verified.credential_id,
                     public_key=verified.credential_public_key,
                     sign_count=verified.sign_count,
@@ -111,7 +112,9 @@ class PasskeyRegisterCompleteView(APIView):
             # registered (to this or another account).
             return Response({"detail": "This passkey is already registered."}, status=status.HTTP_409_CONFLICT)
 
-        recovery_codes = mfa.issue_recovery_codes(user) if first_factor else []
+        recovery_codes = mfa.issue_recovery_codes(
+            user, participant_link=stored.from_participant_link,
+        ) if first_factor else []
 
         _audit(
             request, "auth.passkey.registered", user,
@@ -211,7 +214,10 @@ class PasskeyAuthenticateCompleteView(APIView):
             return Response(GENERIC_FAILURE, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            locked = WebAuthnCredential.objects.select_for_update().get(pk=stored.pk)
+            locked = WebAuthnCredential.objects.select_for_update().filter(pk=stored.pk).first()
+            if locked is None:
+                self._failed(request, "credential_removed", user)
+                return Response(GENERIC_FAILURE, status=status.HTTP_400_BAD_REQUEST)
             if passkeys.is_sign_count_regression(locked.sign_count, verified.new_sign_count):
                 regression = True
             else:
@@ -229,7 +235,7 @@ class PasskeyAuthenticateCompleteView(APIView):
             )
             return Response(GENERIC_FAILURE, status=status.HTTP_400_BAD_REQUEST)
 
-        tokens = make_jwt_for_user(user)
+        tokens = make_jwt_for_user(user, participant_link=locked.from_participant_link)
         response = Response({"detail": "Login successful."})
         set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
         record_login(user)

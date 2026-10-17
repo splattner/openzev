@@ -30,54 +30,6 @@ This document tracks shipped features, active work, planned ideas, and deferred 
 
 ---
 
-## Competitive Landscape
-
-> **⚠ Historical snapshot — dated May 2026.** This section records the competitive
-> landscape and product/regulatory claims as of that date and may have aged. Treat
-> it as research context only; current status lives below under each theme.
-
-Research conducted May 2026. Primary source: **PVshare** (pvshare.ch) — the leading Swiss vZEV/LEG SaaS billing platform.
-
-### PVshare at a glance
-
-PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) targeting self-managing vZEV/LEG responsible parties in Switzerland. Its strengths are:
-
-- Fully automated data ingestion via swisseldex / SDAT-CH-Hub; billing on autopilot with manual approval gate.
-- Supports both **vZEV** and **LEG** (Lokale Elektrizitätsgemeinschaft, new 2026 Swiss law).
-- All participants get read-only self-service access to their own stats and invoices via email auto-linking (no admin invite flow required).
-- Guided founding wizard with document templates for grid operator correspondence.
-- Configurable billing interval (monthly → annual, changeable any time) — already matched in OpenZEV.
-- Demand tariff (Leistungstarif, e.g. CKW) and HT/NT tariff support — OpenZEV has HT/NT but not demand tariffs.
-- Day-exact proration for mid-period participant/meter changes — OpenZEV has validity windows; proration in billing engine needs validation.
-- Status-check page: proactive, one-click config validation with fix hints.
-- Partner/billing-service access model (third-party can manage ZEV on behalf of responsible party).
-
-### OpenZEV differentiators
-
-- **Open source / self-hosted** — no per-participant cost, no vendor lock-in, data sovereignty guaranteed.
-- **Fine-grained audit log** — full event stream with actor, payload diff, async correlation.
-- **Role hierarchy** — `admin`, `zev_owner`, `participant`, `guest` vs. PVshare's two-tier model.
-- **Multi-ZEV admin** — single admin instance can govern many ZEVs across organizations.
-- **API-first** — REST API allows custom integrations and automation scripts.
-
-### Feature gaps identified
-
-| PVshare feature | OpenZEV status | Roadmap action |
-|---|---|---|
-| LEG (Lokale Elektrizitätsgemeinschaft) support | Planned — billing-model spec exists | Invoicing & Billing — LEG billing model (high) |
-| Demand tariff (Leistungstarif) | Not supported | Metering & Data Quality — demand tariff (high), #529 |
-| Participant self-service onboarding via email auto-link | Partial — QR/magic-link access shipped; operator-sent onboarding link shipped (#712) | Participants & Community — email auto-link (medium) |
-| Invoice run reject + auto-recalculate workflow | Approve/cancel only | Invoicing & Billing (medium) |
-| Vacant unit auto-billing to ZEV responsible | Not explicit | Invoicing & Billing (medium) |
-| Proactive status-check page for ZEV owners | Partial — readiness/attention cockpit shipped | Participant Self-Service — status-check page (medium) |
-| Guided vZEV founding wizard with document templates | Setup wizard partial | Participants & Community (medium) |
-| vZEV profit/feasibility calculator | Shipped | See Invoicing & Billing |
-| BFE reference market price auto-fetch | Shipped | See Metering & Data Quality — BFE reference price |
-| CO₂ savings display in participant statistics | Not present | Participant Self-Service (low) |
-| Partner / third-party billing access model | Not present | Participants & Community (low) |
-
----
-
 ## Themes
 
 - [Invoicing & Billing](#invoicing--billing)
@@ -308,7 +260,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | UI redesign + print parity | `shipped` | — | [spec](specs/2026-08-ui-redesign-pdf-style.md), [ADR 0014](adr/0014-print-parity-and-ui-tokens.md) |
 | Backend test suite (pytest, per-app test modules) | `shipped` | — | — |
 | Integrated backup and restore — scheduled, encrypted, verifiable backups to local/S3 with retention, whole-instance recovery from the command line, per-ZEV rollback with a safety backup | `shipped` | — | [spec](specs/2026-09-backup-and-restore.md), [ADR 0023](adr/0023-backup-archives-preserve-keys.md), [ADR 0024](adr/0024-backup-encryption-key.md), #767. Replaces the `pg_dump`-only guidance, which omits `MEDIA_ROOT`. Not built: real-object-store (S3) smoke test, Helm provisioning of a shared local destination volume |
-| Helm chart maturity (resource limits, liveness probes, secrets management) | `idea` | `medium` | Current chart is functional but minimal |
+| Helm chart maturity (resource limits, liveness probes, secrets management) | `in-progress` | `medium` | Non-root images, fail-closed secrets, resource bounds, and transport hardening; NetworkPolicy remains deployment-specific follow-up |
 | Observability — structured application logging and metrics endpoint | `idea` | `medium` | No Prometheus metrics or structured log format today |
 | End-to-end test suite (Playwright or similar) | `idea` | `medium` | Playwright is used for automated user-guide screenshots; no interactive end-to-end coverage of user flows yet |
 | Frontend component-level unit tests | `shipped` | — | `npm run test:unit` (Vitest) covers API helpers, reducers and page-level logic |

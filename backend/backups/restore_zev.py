@@ -45,7 +45,7 @@ from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.db.models import Q
 
 from zev.models import MANAGING_ROLES
-from zev.services import has_login_credentials, is_pending_invitation, protect_account_login
+from zev.services import has_independent_login_credentials, is_pending_invitation, protect_account_login
 
 
 from . import archive
@@ -279,7 +279,7 @@ def evaluate(facts: ArchiveFacts, *, force: bool, exclude_job=None) -> dict:
     without_login = [
         user.email or user.username
         for user in get_user_model().objects.filter(pk__in=relinked, independent_login_required=False).order_by("pk")
-        if not has_login_credentials(user) and not is_pending_invitation(user)
+        if not has_independent_login_credentials(user) and not is_pending_invitation(user)
     ]
     conflicts += [_conflict("login_setup_required", d, overridable=False) for d in _listed(without_login)]
 

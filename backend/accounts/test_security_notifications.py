@@ -7,6 +7,7 @@ Spec: docs/specs/2026-03-community-and-access.md §5.6c.
 from unittest import mock
 
 import pyotp
+from cryptography.fernet import Fernet
 from django.core import mail
 from django.test import TestCase
 from django.test.utils import override_settings
@@ -18,14 +19,15 @@ from . import notifications
 from .models import TotpDevice, UserRole
 from .tasks import send_security_notification
 from .test_mfa import RECOVERY_CODES_URL, TOTP_CONFIRM_URL, TOTP_DEVICE_URL
-from .test_passkeys import (
+from testing.passkeys import (
     ORIGIN,
     PASSKEYS_URL,
     RP_ID,
-    TEST_KEY,
     SoftAuthenticator,
     register_passkey,
 )
+
+TEST_KEY = Fernet.generate_key().decode()
 
 CHANGE_PASSWORD = "/api/v1/auth/me/change-password/"
 
@@ -163,9 +165,10 @@ class NotificationHookTests(TestCase):
         self.assertIn('"Work laptop"', mail.outbox[0].body)
 
     def test_changing_the_password_sends_a_notice(self):
-        response = self.client.post(
-            CHANGE_PASSWORD, {"old_password": "pass1234", "new_password": "Uniquely-Long-9164!"}, format="json"
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                CHANGE_PASSWORD, {"old_password": "pass1234", "new_password": "Uniquely-Long-9164!"}, format="json"
+            )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(_subjects(), ["Your OpenZEV password was changed"])
 
@@ -219,13 +222,14 @@ class SendingCanNeverBreakTheAction(TestCase):
 
     def test_a_broker_outage_does_not_fail_the_password_change(self):
         with mock.patch.object(send_security_notification, "delay", side_effect=ConnectionError("broker down")):
-            with self.assertLogs("accounts.notifications", level="ERROR"):
+            with self.assertLogs("accounts.notifications", level="ERROR"), self.captureOnCommitCallbacks(execute=True):
                 response = self.client.post(CHANGE_PASSWORD, self.body, format="json")
         self.assertEqual(response.status_code, 200)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password("Uniquely-Long-9164!"))
 
     def test_a_mail_failure_does_not_fail_the_password_change(self):
-        with mock.patch("accounts.notifications.EmailMessage.send", side_effect=OSError("smtp down")):
+        with mock.patch("accounts.notifications.EmailMessage.send", side_effect=OSError("smtp down")), \
+                self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(CHANGE_PASSWORD, self.body, format="json")
         self.assertEqual(response.status_code, 200)

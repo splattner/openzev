@@ -11,7 +11,7 @@ from audit.models import AuditEvent
 from backups import tasks
 from backups.fixtures import build_world
 from backups.models import BackupDestination, BackupJob, BackupJobStatus, RestoreJob
-from invoices.models import Invoice
+from invoices.models import Credit, Invoice
 from testing.helpers import authenticate
 
 BASE = "/api/v1/backups"
@@ -111,6 +111,7 @@ class CreateTests(RestoreApiTestCase):
         self.assertEqual(preview.status_code, 202)
         RestoreJob.objects.all().delete()
         zev_id = self.world.alpha.pk
+        Credit.objects.filter(zev=self.world.alpha).delete()
         Invoice.objects.filter(zev=self.world.alpha).delete()
         self.world.alpha.delete()
         recreation, _ = self.create({"dry_run": False, "target_zev_id": str(zev_id)})

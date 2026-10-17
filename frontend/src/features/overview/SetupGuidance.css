@@ -1,0 +1,36 @@
+/* ── Setup guidance — the Overview start page (spec §7) ─────────────── */
+
+.setup-guidance-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.setup-guidance-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.setup-guidance-icon {
+  color: var(--text-muted);
+}
+
+.setup-guidance-list li[data-complete="true"] .setup-guidance-icon {
+  color: var(--success-700);
+}
+
+.setup-guidance-list a {
+  color: var(--interactive);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.setup-guidance-list a:hover {
+  color: var(--interactive-hover);
+  text-decoration: underline;
+}
+

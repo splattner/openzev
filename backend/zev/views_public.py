@@ -19,7 +19,7 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from accounts import mfa
+from accounts import magic_links, mfa
 from accounts.cookies import set_auth_cookies
 from accounts.jwt_utils import make_jwt_for_user, record_login
 from accounts.throttling import OnboardingLinkThrottle
@@ -57,7 +57,7 @@ def onboarding_consume(request):
         lock_participant_account(participant)
         # Revocation may have committed since resolve(); lock after the participant.
         token.refresh_from_db(from_queryset=ParticipantOnboardingToken.objects.select_for_update())
-        if token.revoked_at is not None or token.is_expired:
+        if onboarding.resolve(prefix, secret) is None:
             raise LinkRefused(code="token_unavailable")
         user = link_account_for(participant)
     except (LinkRefused, Participant.DoesNotExist, ParticipantOnboardingToken.DoesNotExist, DjangoValidationError) as exc:
@@ -107,11 +107,12 @@ def onboarding_consume(request):
         # 2026-09-two-factor-authentication.md §5.4 door 6.
         return Response({
             "mfa_required": True,
-            "mfa_token": mfa.issue_challenge(user),
+            "mfa_token": mfa.issue_challenge(user, participant_link=True, password_recovery=True),
             "methods": mfa.challenge_methods(user),
         })
 
-    tokens = make_jwt_for_user(user)
+    magic_links.retire_pending_password(user)
+    tokens = make_jwt_for_user(user, participant_link=True, password_recovery=True)
     response = Response({
         "detail": "Signed in.",
         "zev_name": participant.zev.name,

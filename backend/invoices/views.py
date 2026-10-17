@@ -1,9 +1,11 @@
 import io
 import logging
+import uuid
 import zipfile
 from datetime import date as date_type
 
-from django.db.models import OuterRef, Subquery
+from django.db.models import OuterRef, Subquery, Sum
+from django.utils import timezone
 from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -17,16 +19,17 @@ from allocation.validity import active_during
 from zev.models import Zev, Participant
 from zev import access
 from zev.scoping import ZevScopedQuerySetMixin
-from .document_parties import build_issuer, build_recipient
-from .models import Invoice, InvoicePdfStatus, InvoiceStatus, EmailLog, sent_to_participant
+from .models import Credit, CreditStatus, Invoice, InvoicePdfStatus, InvoiceStatus, EmailLog, Payment, sent_to_participant
 from .serializers import (
-    InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
-    GenerateZevInvoicesSerializer
+    CorrectInvoiceSerializer, CreditSerializer, InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
+    GenerateZevInvoicesSerializer, MarkPaidSerializer, PaymentSerializer,
+    RecordPaymentSerializer, RefundCreditSerializer,
 )
 from . import access_tokens
 from .engine import DynamicTariffError, generate_invoice, preflight_dynamic_prices
-from .pdf import save_invoice_pdf
+from .pdf import InvoicePdfSupersededError, save_invoice_pdf
 from .tasks import (
+    generate_credit_pdf_task,
     generate_invoice_pdf_task,
     generate_zev_invoices_task,
     generate_zev_pdfs_task,
@@ -38,8 +41,12 @@ from .workflow import (
     approve_invoice,
     cancel_invoice,
     can_delete_invoice,
+    correct_invoice,
+    delete_payment,
     mark_invoice_paid,
     mark_invoice_sent,
+    record_payment,
+    refund_credit,
 )
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, record_audit_event
@@ -65,6 +72,26 @@ def _record_invoice_event(*, invoice: Invoice | None = None, target_id: str = ""
         target_display=target_display or (_invoice_target_display(invoice) if invoice else ""),
         **kwargs,
     )
+
+
+def _payment_metadata(before: dict) -> dict | None:
+    """Audit metadata for the payment a workflow call booked, if any."""
+    payment = before.get("payment")
+    if payment is None:
+        return None
+    return {
+        "payment_id": str(payment.pk),
+        "amount_chf": f"{payment.amount_chf:.2f}",
+        "paid_on": payment.paid_on.isoformat(),
+    }
+
+
+def _is_uuid(value) -> bool:
+    try:
+        uuid.UUID(str(value))
+    except ValueError:
+        return False
+    return True
 
 
 def _deny_if_zev_disabled(request, invoice: Invoice, *, action_type: str, denied_verb: str):
@@ -140,7 +167,10 @@ class InvoiceViewSet(
         # database cost the payload change just removed. getattr because schema
         # generation instantiates the view without an action.
         if getattr(self, "action", None) != "list":
-            queryset = queryset.prefetch_related("items", "email_logs")
+            queryset = queryset.prefetch_related(
+                "items", "email_logs", "payments", "credits__applications__invoice",
+                "credit_applications__credit__source_invoice",
+            )
         else:
             # last_email_status/log_id ride a subquery annotation inside the
             # invoice SELECT, no per-row N+1. Both use the same deterministic
@@ -150,9 +180,17 @@ class InvoiceViewSet(
                 .order_by("-created_at", "-id")
                 .values("status", "id")[:1]
             )
+            paid = (
+                Payment.objects.filter(invoice=OuterRef("pk"))
+                .order_by()
+                .values("invoice")
+                .annotate(total=Sum("amount_chf"))
+                .values("total")
+            )
             queryset = queryset.annotate(
                 last_email_status=Subquery(latest_log.values("status")[:1]),
                 last_email_log_id=Subquery(latest_log.values("id")[:1]),
+                paid_sum=Subquery(paid[:1]),
             )
         return self.scope_queryset(queryset)
 
@@ -253,6 +291,30 @@ class InvoiceViewSet(
         denial = _deny_if_zev_disabled(request, invoice, action_type="invoice.delete", denied_verb="invoice deletion")
         if denial is not None:
             return denial
+        if invoice.credits.exists():
+            _record_invoice_event(
+                request=request,
+                action_type="invoice.delete",
+                summary=f"Denied invoice deletion for {_invoice_target_display(invoice)}: credit notes issued.",
+                status=AuditEventStatus.DENIED,
+                invoice=invoice,
+            )
+            return Response(
+                {"error": "Invoices with credit notes cannot be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if invoice.payments.exists():
+            _record_invoice_event(
+                request=request,
+                action_type="invoice.delete",
+                summary=f"Denied invoice deletion for {_invoice_target_display(invoice)}: payments recorded.",
+                status=AuditEventStatus.DENIED,
+                invoice=invoice,
+            )
+            return Response(
+                {"error": "Invoices with recorded payments cannot be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if not request.user.is_admin and not can_delete_invoice(invoice):
             _record_invoice_event(
                 request=request,
@@ -262,7 +324,10 @@ class InvoiceViewSet(
                 invoice=invoice,
                 changes={"status": {"before": invoice.status, "after": invoice.status}},
             )
-            return Response({"error": "Only draft or cancelled invoices can be deleted."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Only draft or cancelled invoices that were never approved can be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         invoice_number = _invoice_target_display(invoice)
         invoice_id = str(invoice.pk)
         participant_id = str(invoice.participant_id)
@@ -512,11 +577,25 @@ class InvoiceViewSet(
         denial = _deny_if_zev_disabled(request, invoice, action_type="invoice.generate_pdf", denied_verb="PDF generation")
         if denial is not None:
             return denial
+        pdf_state = {
+            "updated_at": invoice.updated_at, "pdf_file": invoice.pdf_file.name,
+            "status": invoice.status,
+        }
         try:
             save_invoice_pdf(invoice)
+        except InvoicePdfSupersededError:
+            return Response(
+                {"error": "Invoice changed while generating the PDF. Please try again."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except Invoice.DoesNotExist:
+            return Response(
+                {"error": "Invoice was deleted while generating the PDF."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         except Exception as exc:
             logger.exception("PDF generation failed for invoice %s", invoice.invoice_number)
-            Invoice.objects.filter(pk=invoice.pk).update(pdf_status=InvoicePdfStatus.FAILED)
+            Invoice.objects.filter(pk=invoice.pk, **pdf_state).update(pdf_status=InvoicePdfStatus.FAILED)
             _record_invoice_event(
                 request=request,
                 action_type="invoice.generate_pdf",
@@ -606,15 +685,20 @@ class InvoiceViewSet(
         )
         return Response(self.get_serializer(invoice).data)
 
-    def _perform_status_transition(self, request, *, action_type, workflow_fn, denied_verb, success_summary):
-        """Shared body for the four status-transition actions below.
+    def _perform_status_transition(
+        self, request, *, action_type, workflow_fn, denied_verb, success_summary,
+        metadata=None, invoice=None, response_status=status.HTTP_200_OK, respond=None,
+    ):
+        """Shared body for the status-transition and payment actions below.
 
         Each just picks a workflow function (which raises InvoiceWorkflowError
         on an invalid transition) and phrasing for the audit log; this method
         owns the get-object/try-except/audit-event/response shape they all
-        share identically.
+        share identically. ``metadata`` builds the audit metadata from the
+        workflow's ``before`` dict; ``respond(invoice, before)`` builds the
+        response body when it is not the bare invoice.
         """
-        invoice = self.get_object()
+        invoice = invoice or self.get_object()
         denial = _deny_if_zev_disabled(request, invoice, action_type=action_type, denied_verb=denied_verb)
         if denial is not None:
             return denial
@@ -635,8 +719,14 @@ class InvoiceViewSet(
             summary=success_summary(invoice),
             invoice=invoice,
             changes=build_diff(before, {"status": invoice.status}, ["status"]),
+            metadata=metadata(before) if metadata else None,
         )
-        return Response(InvoiceSerializer(invoice, context={"request": request}).data)
+        # The workflow wrote payments behind the prefetch this instance carries.
+        for relation in ("payments", "credits", "credit_applications"):
+            getattr(invoice, "_prefetched_objects_cache", {}).pop(relation, None)
+        if respond is not None:
+            return Response(respond(invoice, before), status=response_status)
+        return Response(InvoiceSerializer(invoice, context={"request": request}).data, status=response_status)
 
     @action(detail=True, methods=["post"], url_path="approve",
             permission_classes=[IsAuthenticated, HasZevAccess])
@@ -665,13 +755,115 @@ class InvoiceViewSet(
     @action(detail=True, methods=["post"], url_path="mark-paid",
             permission_classes=[IsAuthenticated, HasZevAccess])
     def mark_paid(self, request, pk=None):
-        """Record that a sent invoice has been paid."""
+        """Record that a sent invoice has been paid in full: books the
+        outstanding amount as one payment."""
+        body = MarkPaidSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
         return self._perform_status_transition(
             request,
             action_type="invoice.mark_paid",
-            workflow_fn=mark_invoice_paid,
+            workflow_fn=lambda invoice: mark_invoice_paid(
+                invoice, paid_on=body.validated_data.get("paid_on"), user=request.user,
+            ),
             denied_verb="mark-paid",
             success_summary=lambda invoice: f"Marked invoice {_invoice_target_display(invoice)} as paid.",
+            metadata=_payment_metadata,
+        )
+
+    @action(detail=True, methods=["get", "post"], url_path="payments",
+            permission_classes=[IsAuthenticated, HasZevAccess])
+    def payments(self, request, pk=None):
+        """List an invoice's payments, or record one (managers)."""
+        if request.method == "GET":
+            invoice = self.get_object()
+            if not access.can_view(request.user, invoice.zev):
+                return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+            return Response(PaymentSerializer(invoice.payments.all(), many=True).data)
+
+        body = RecordPaymentSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        data = body.validated_data
+        return self._perform_status_transition(
+            request,
+            action_type="invoice.payment_record",
+            workflow_fn=lambda invoice: record_payment(
+                invoice,
+                amount_chf=data["amount_chf"],
+                paid_on=data.get("paid_on") or timezone.localdate(),
+                note=data.get("note", ""),
+                user=request.user,
+            ),
+            denied_verb="payment",
+            success_summary=lambda invoice: (
+                f"Recorded a payment of CHF {data['amount_chf']:.2f} for invoice {_invoice_target_display(invoice)}."
+            ),
+            metadata=_payment_metadata,
+            response_status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["delete"], url_path=r"payments/(?P<payment_id>[^/.]+)",
+            permission_classes=[IsAuthenticated, HasZevAccess])
+    def remove_payment(self, request, pk=None, payment_id=None):
+        """Remove a payment entered by mistake (managers)."""
+        invoice = self.get_object()
+        payment = invoice.payments.filter(pk=payment_id).first() if _is_uuid(payment_id) else None
+        if payment is None:
+            return Response({"error": "Payment not found."}, status=status.HTTP_404_NOT_FOUND)
+        payment.invoice = invoice
+        return self._perform_status_transition(
+            request,
+            invoice=invoice,
+            action_type="invoice.payment_delete",
+            workflow_fn=lambda _invoice: delete_payment(payment),
+            denied_verb="payment removal",
+            success_summary=lambda inv: (
+                f"Removed a payment of CHF {payment.amount_chf:.2f} from invoice {_invoice_target_display(inv)}."
+            ),
+            metadata=lambda _before: {
+                "payment_id": str(payment.pk),
+                "amount_chf": f"{payment.amount_chf:.2f}",
+                "paid_on": payment.paid_on.isoformat(),
+            },
+        )
+
+    @action(detail=True, methods=["post"], url_path="correct",
+            permission_classes=[IsAuthenticated, HasZevAccess])
+    def correct(self, request, pk=None):
+        """Correct a paid invoice (or a sent one with payments) by issuing a
+        credit note: a full reversal that cancels it, or a partial credit."""
+        body = CorrectInvoiceSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        data = body.validated_data
+        if data["kind"] == "adjustment" and "amount_chf" not in data:
+            raise ValidationError({"amount_chf": ["The credit amount is required for a partial credit."]})
+        context = {"request": request}
+        return self._perform_status_transition(
+            request,
+            action_type="invoice.correct",
+            workflow_fn=lambda invoice: correct_invoice(
+                invoice,
+                kind=data["kind"],
+                reason=data["reason"],
+                amount_chf=data.get("amount_chf"),
+                user=request.user,
+            ),
+            denied_verb="correction",
+            success_summary=lambda invoice: f"Corrected invoice {_invoice_target_display(invoice)}.",
+            metadata=lambda before: {
+                "kind": data["kind"],
+                "credit_id": str(before["credit"].pk) if before["credit"] else None,
+                "credit_number": before["credit"].credit_number if before["credit"] else None,
+                "amount_chf": f"{before['credit'].amount_chf:.2f}" if before["credit"] else "0.00",
+                "released_chf": f"{before['released_chf']:.2f}",
+                "reason": data["reason"].strip(),
+            },
+            response_status=status.HTTP_201_CREATED,
+            respond=lambda invoice, before: {
+                "invoice": InvoiceSerializer(invoice, context=context).data,
+                "credit": (
+                    CreditSerializer(before["credit"], context=context).data if before["credit"] else None
+                ),
+            },
         )
 
     @action(detail=True, methods=["post"], url_path="cancel",
@@ -782,19 +974,15 @@ class InvoiceViewSet(
         if error:
             return error
 
-        # One conditional UPDATE per draft, each writing the issuer/recipient
-        # copy a last time (frozen from approval on, #761). A draft approved
-        # or deleted concurrently simply does not count.
-        issuers = {}
         count = 0
-        for draft in invoices.filter(status=InvoiceStatus.DRAFT):
-            if draft.period_end not in issuers:
-                issuers[draft.period_end] = build_issuer(_zev, draft.period_end)
-            count += Invoice.objects.filter(pk=draft.pk, status=InvoiceStatus.DRAFT).update(
-                status=InvoiceStatus.APPROVED,
-                issuer=issuers[draft.period_end],
-                recipient=build_recipient(draft.participant),
-            )
+        drafts = invoices.filter(status=InvoiceStatus.DRAFT).select_related(None).prefetch_related(None).only("pk")
+        for draft in drafts:
+            try:
+                approve_invoice(draft)
+            except (Invoice.DoesNotExist, InvoiceWorkflowError):
+                # A draft changed or deleted concurrently does not count.
+                continue
+            count += 1
         _record_invoice_event(
             request=request,
             action_type="invoice.approve_all",
@@ -901,3 +1089,132 @@ class InvoiceViewSet(
         period = invoices_with_pdf[0].period_start.isoformat()
         response["Content-Disposition"] = content_disposition("attachment", f"invoices-{period}.zip")
         return response
+
+
+class CreditViewSet(ZevScopedQuerySetMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """Credit notes (#388), read-only: they are issued by ``invoices/{id}/correct/``.
+
+    Scoped like the invoices: an admin sees all, managers and viewers their
+    ZEVs, a participant their own — from the moment the credit exists, and
+    after they left the ZEV, as with their invoices.
+    """
+
+    serializer_class = CreditSerializer
+    permission_classes = [IsAuthenticated]
+    zev_lookup = "zev"
+    participant_path = "participant"
+    participant_access_survives_end = True
+
+    def get_queryset(self):
+        queryset = Credit.objects.select_related(
+            "zev", "participant__party", "source_invoice", "created_by"
+        ).prefetch_related("applications__invoice")
+        return self.scope_queryset(queryset)
+
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
+        if self.action != "list":
+            return queryset
+        raw_status = self.request.query_params.get("status")
+        if raw_status:
+            if raw_status not in CreditStatus.values:
+                raise ValidationError({"status": [f"Must be one of: {', '.join(CreditStatus.values)}."]})
+            queryset = queryset.with_status(raw_status)
+        for param, lookup in (("participant_id", "participant_id"), ("source_invoice_id", "source_invoice_id")):
+            raw = self.request.query_params.get(param)
+            if raw:
+                if not _is_uuid(raw):
+                    raise ValidationError({param: ["Must be a valid UUID."]})
+                queryset = queryset.filter(**{lookup: raw})
+        return queryset
+
+    @action(detail=True, methods=["get"], url_path="pdf", permission_classes=[IsAuthenticated])
+    def download_pdf(self, request, pk=None):
+        """Serve the stored credit note, authenticated and ZEV-scoped."""
+        credit = self.get_object()
+        if not credit.pdf_file:
+            return Response({"error": "No PDF generated yet."}, status=status.HTTP_404_NOT_FOUND)
+        return FileResponse(
+            credit.pdf_file.open("rb"), content_type="application/pdf",
+            filename=sanitize_filename(f"{credit.credit_number}.pdf"),
+        )
+
+    @action(detail=True, methods=["post"], url_path="generate-pdf",
+            permission_classes=[IsAuthenticated, HasZevAccess])
+    def generate_pdf(self, request, pk=None):
+        """Re-render the credit note's PDF (managers); queued like the first render."""
+        credit = self.get_object()
+        if not request.user.is_admin and credit.zev.disabled_at is not None:
+            return Response(
+                {"error": "This ZEV is disabled. Ask an admin to re-enable it first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        Credit.objects.filter(pk=credit.pk).update(pdf_status=InvoicePdfStatus.PENDING)
+        try:
+            generate_credit_pdf_task.delay(str(credit.pk))
+        except Exception:
+            logger.exception("Could not queue the PDF for credit note %s", credit.credit_number)
+            Credit.objects.filter(pk=credit.pk).update(pdf_status=InvoicePdfStatus.FAILED)
+            return Response({"error": "Could not queue the PDF."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.INVOICE,
+            action_type="credit.generate_pdf",
+            summary=f"Queued PDF generation for credit note {credit.credit_number}.",
+            target_type="invoices.Credit",
+            target=credit,
+            target_id=str(credit.pk),
+            target_display=credit.credit_number,
+        )
+        return Response({"pdf_status": InvoicePdfStatus.PENDING}, status=status.HTTP_202_ACCEPTED)
+
+    @action(detail=True, methods=["post"], url_path="refund",
+            permission_classes=[IsAuthenticated, HasZevAccess])
+    def refund(self, request, pk=None):
+        """Pay out what remains of a credit (managers): the remainder is booked
+        as refunded. The queryset is write-scoped for POST, so a viewer or a
+        participant gets a 404."""
+        credit = self.get_object()
+        body = RefundCreditSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        data = body.validated_data
+
+        def audit(summary, *, event_status=None, metadata=None):
+            kwargs = {"status": event_status} if event_status else {}
+            record_audit_event(
+                request=request,
+                action_category=AuditActionCategory.INVOICE,
+                action_type="credit.refund",
+                summary=summary,
+                target_type="invoices.Credit",
+                target=credit,
+                target_id=str(credit.pk),
+                target_display=credit.credit_number,
+                metadata=metadata,
+                **kwargs,
+            )
+
+        if not request.user.is_admin and credit.zev.disabled_at is not None:
+            audit(
+                f"Denied refund for {credit.credit_number}: ZEV is disabled.", event_status=AuditEventStatus.DENIED,
+            )
+            return Response(
+                {"error": "This ZEV is disabled. Ask an admin to re-enable it first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            booked = refund_credit(
+                credit, refunded_on=data["refunded_on"], note=data.get("note", ""), user=request.user,
+            )
+        except InvoiceWorkflowError as exc:
+            audit(
+                f"Denied refund for {credit.credit_number}: {exc.user_message}", event_status=AuditEventStatus.DENIED,
+            )
+            return Response({"error": exc.user_message}, status=status.HTTP_400_BAD_REQUEST)
+        audit(
+            f"Refunded credit note {credit.credit_number}.",
+            metadata={"amount_chf": f"{booked['amount']:.2f}", "refunded_on": data["refunded_on"].isoformat()},
+        )
+        # The workflow wrote behind the prefetch this instance carries.
+        getattr(credit, "_prefetched_objects_cache", {}).pop("applications", None)
+        return Response(CreditSerializer(credit, context={"request": request}).data)

@@ -249,16 +249,24 @@ class InvoiceEngineGuardTests(TestCase):
         resp = self._generate(self.participant.pk)
         self.assertEqual(resp.status_code, 409)
 
-    def test_regenerate_draft_invoice_succeeds(self):
-        make_invoice(self.zev, self.participant, InvoiceStatus.DRAFT)
+    def test_regenerate_sent_invoice_returns_409(self):
+        make_invoice(self.zev, self.participant, InvoiceStatus.SENT)
         resp = self._generate(self.participant.pk)
-        # Engine replaces draft; no 409 expected (may be 201 or other non-conflict)
-        self.assertNotEqual(resp.status_code, 409)
+        self.assertEqual(resp.status_code, 409)
+
+    def test_regenerate_draft_invoice_succeeds(self):
+        original = make_invoice(self.zev, self.participant, InvoiceStatus.DRAFT)
+        resp = self._generate(self.participant.pk)
+        self.assertEqual(resp.status_code, 201)
+        self.assertFalse(Invoice.objects.filter(pk=original.pk).exists())
+        self.assertEqual(Invoice.objects.filter(participant=self.participant).count(), 1)
 
     def test_regenerate_cancelled_invoice_succeeds(self):
-        make_invoice(self.zev, self.participant, InvoiceStatus.CANCELLED)
+        original = make_invoice(self.zev, self.participant, InvoiceStatus.CANCELLED)
         resp = self._generate(self.participant.pk)
-        self.assertNotEqual(resp.status_code, 409)
+        self.assertEqual(resp.status_code, 201)
+        self.assertFalse(Invoice.objects.filter(pk=original.pk).exists())
+        self.assertEqual(Invoice.objects.filter(participant=self.participant).count(), 1)
 
     def test_dynamic_price_gap_returns_actionable_structured_error(self):
         source = DynamicTariffSource.objects.create(

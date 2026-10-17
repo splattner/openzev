@@ -1,0 +1,82 @@
+.login-brand {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border-default);
+  position: relative;
+}
+
+/* The documents' rule under the brand, centred. */
+
+.login-brand::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: calc(50% - 1.75rem);
+  width: 3.5rem;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent-rule);
+}
+
+.login-logo {
+  width: min(100%, 200px);
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.login-register-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+
+.login-divider::before,
+  .login-divider::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid var(--border-default);
+  }
+
+.oauth-provider-list {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+.oauth-provider-button {
+    width: 100%;
+  }
+
+.login-register-inner {
+  display: grid;
+  gap: 1rem;
+  text-align: center;
+  padding: 2rem;
+  border-radius: var(--radius-lg);
+  background: var(--brand-pale);
+  border: 1px solid var(--brand-glow);
+}
+
+.login-register-inner h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--brand-deep);
+}
+
+.login-register-inner p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+

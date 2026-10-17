@@ -1,0 +1,25 @@
+/* Highlighted {{variable}} chips + hover tooltip in the template editor.
+   The chips live in an overlay painted above the textarea, so they multiply
+   into it instead of covering the text underneath. */
+
+.template-var-chip {
+  pointer-events: auto;
+  cursor: help;
+  border-radius: 3px;
+  background: var(--brand-pale);
+  mix-blend-mode: multiply;
+}
+
+.template-var-tooltip {
+  position: absolute;
+  background: var(--brand-deep);
+  color: var(--white);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+

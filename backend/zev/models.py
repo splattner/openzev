@@ -15,7 +15,7 @@ DEFAULT_EMAIL_BODY_TEMPLATE = (
     "Dear {participant_name},\n\n"
     "Please find your energy invoice for the period "
     "{period_start} to {period_end} attached.\n\n"
-    "Total: CHF {total_chf}\n\n"
+    "Amount due: CHF {amount_due_chf}\n\n"
     "Kind regards,\n{zev_name}"
 )
 
@@ -100,6 +100,10 @@ class Zev(models.Model):
     )
     invoice_prefix = models.CharField(max_length=10, default="INV", help_text="Prefix for invoice numbers")
     invoice_counter = models.PositiveIntegerField(default=1, help_text="Auto-incremented invoice number")
+    # Credit notes (#388) count on their own sequence, so the invoice numbers
+    # stay gap-free.
+    credit_note_prefix = models.CharField(max_length=10, default="CN", help_text="Prefix for credit note numbers")
+    credit_note_counter = models.PositiveIntegerField(default=1, help_text="Auto-incremented credit note number")
     contract_counter = models.PositiveIntegerField(
         default=1, help_text="Auto-incremented participation-contract document number"
     )
@@ -149,7 +153,7 @@ class Zev(models.Model):
             "Subject line template for invoice emails. "
             "Leave blank to use the system default. "
             "Available variables: {invoice_number}, {zev_name}, {participant_name}, "
-            "{period_start}, {period_end}, {due_date}, {total_chf}."
+            "{period_start}, {period_end}, {due_date}, {total_chf}, {amount_due_chf}."
         ),
     )
     email_body_template = models.TextField(
@@ -159,7 +163,7 @@ class Zev(models.Model):
             "Body template for invoice emails. "
             "Leave blank to use the system default. "
             "Available variables: {invoice_number}, {zev_name}, {participant_name}, "
-            "{period_start}, {period_end}, {due_date}, {total_chf}."
+            "{period_start}, {period_end}, {due_date}, {total_chf}, {amount_due_chf}."
         ),
     )
     local_tariff_notes = models.TextField(
@@ -224,17 +228,33 @@ class Zev(models.Model):
                  "Clear it, or set the VAT mode to registered."}
             )
 
-    def next_invoice_number(self):
-        num = f"{self.invoice_prefix}-{self.invoice_counter:05d}"
-        Zev.objects.filter(pk=self.pk).update(invoice_counter=models.F("invoice_counter") + 1)
-        self.refresh_from_db()
+    def next_invoice_number(self) -> str:
+        """Allocate from the persisted prefix/counter under a row lock.
+
+        Rolls back with any surrounding transaction.
+        """
+        with transaction.atomic():
+            locked = Zev.objects.select_for_update(no_key=True).get(pk=self.pk)
+            num = f"{locked.invoice_prefix}-{locked.invoice_counter:05d}"
+            Zev.objects.filter(pk=locked.pk).update(invoice_counter=models.F("invoice_counter") + 1)
+            self.refresh_from_db()
+        return num
+
+    def next_credit_note_number(self) -> str:
+        """Allocate a credit note number from its own prefix/counter, under the
+        same row lock as :meth:`next_invoice_number`."""
+        with transaction.atomic():
+            locked = Zev.objects.select_for_update(no_key=True).get(pk=self.pk)
+            num = f"{locked.credit_note_prefix}-{locked.credit_note_counter:05d}"
+            Zev.objects.filter(pk=locked.pk).update(credit_note_counter=models.F("credit_note_counter") + 1)
+            self.refresh_from_db()
         return num
 
     def next_contract_number(self, year: int | None = None) -> str:
         """Next participation-contract document number (per-ZEV sequence).
 
         Format ``CTR-YYYY-NNNN``. The counter is read and incremented under a
-        ``select_for_update`` row lock, so two concurrent issuances cannot
+        ``select_for_update(no_key=True)`` row lock, so concurrent issuances cannot
         derive the same number from a stale counter value. Pass ``year`` to
         pin the year (used by the contract service so its patched clock and
         the rendered document agree). Safe to call inside an outer
@@ -244,7 +264,7 @@ class Zev(models.Model):
         """
         year = year or timezone.localdate().year
         with transaction.atomic():
-            locked = Zev.objects.select_for_update().get(pk=self.pk)
+            locked = Zev.objects.select_for_update(no_key=True).get(pk=self.pk)
             num = f"CTR-{year}-{locked.contract_counter:04d}"
             Zev.objects.filter(pk=locked.pk).update(
                 contract_counter=models.F("contract_counter") + 1

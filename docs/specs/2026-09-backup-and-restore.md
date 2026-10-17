@@ -8,7 +8,7 @@
 - Created: 2026-09-21
 - Target Release: —
 - Related Issues: #767
-- Related ADRs: [0023](../adr/0023-backup-archives-preserve-keys.md), [0024](../adr/0024-backup-encryption-key.md); builds on [0017](../adr/0017-async-export-jobs.md), [0010](../adr/0010-centralized-audit-event-stream.md), [0021](../adr/0021-mfa-secret-encryption-key.md)
+- Related ADRs: [0023](../adr/0023-backup-archives-preserve-keys.md), [0024](../adr/0024-backup-encryption-key.md), [0038](../adr/0038-invoice-generation-lock-order.md); builds on [0017](../adr/0017-async-export-jobs.md), [0010](../adr/0010-centralized-audit-event-stream.md), [0021](../adr/0021-mfa-secret-encryption-key.md)
 - Impacted Areas: backend | frontend | async jobs | docs | infra
 
 ---
@@ -854,7 +854,10 @@ rolls the restore back. A dry run does not promote accounts. Rules, in the order
    before.
 5. **Lock and re-check.** In one transaction: `select_for_update()` on the `Zev` row
    (serialising with contract issuance, which locks it too), then `evaluate` again
-   (deviation 22).
+   (deviation 22). Invoice generation first takes a compatible ZEV key-share lock
+   before locking its participant, preventing an inverted lock order with restore
+   ([ADR 0038](../adr/0038-invoice-generation-lock-order.md)). This coordinates each
+   invoice transaction; it does not detect or pause an entire bulk job.
 6. **Replace**, in that transaction: delete the community's rows dependants-first —
    **not the `Zev` row, not `AuditEvent`** — plus any orphaned issued contract the
    backup also holds; update the `Zev` row in place or insert it; load every other

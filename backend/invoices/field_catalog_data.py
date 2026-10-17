@@ -18,6 +18,9 @@ _INVOICE_FIELDS = [
             {"variable": "{{ invoice.vat_chf }}", "description_key": "admin.fields.vatAmount", "sample_path": "invoice.vat_chf"},
             {"variable": "{{ producer_credit_chf }}", "description_key": "admin.fields.producerCredit", "sample_path": "producer_credit_chf"},
             {"variable": "{{ invoice.total_chf }}", "description_key": "admin.fields.total", "sample_path": "invoice.total_chf"},
+            {"variable": "{{ invoice.credit_applied_chf }}", "description_key": "admin.fields.creditApplied", "sample_path": "invoice.credit_applied_chf"},
+            {"variable": "{{ invoice.amount_due_chf }}", "description_key": "admin.fields.amountDue", "sample_path": "invoice.amount_due_chf"},
+            {"variable": "{{ paid_chf }}", "description_key": "admin.fields.paidChf", "sample_path": "paid_chf"},
             {"variable": "{{ invoice.notes }}", "description_key": "admin.fields.invoiceNotes", "sample_path": "invoice.notes"},
         ],
     },
@@ -100,6 +103,15 @@ _INVOICE_FIELDS = [
             {"variable": "{{ item.unit_label }}", "description_key": "admin.fields.itemUnitLabel", "sample_path": "grouped_items.0.items.0.unit_label"},
             {"variable": "{{ item.unit_price_chf }}", "description_key": "admin.fields.itemUnitPrice", "sample_path": "grouped_items.0.items.0.unit_price_chf"},
             {"variable": "{{ item.total_chf }}", "description_key": "admin.fields.itemTotal", "sample_path": "grouped_items.0.items.0.total_chf"},
+        ],
+    },
+    {
+        "group_key": "creditApplications",
+        "group_title_key": "admin.fields.creditApplications",
+        "fields": [
+            {"variable": "{% for row in credit_application_rows %}", "description_key": "admin.fields.creditApplicationLoop", "sample_path": "credit_application_rows.0.label"},
+            {"variable": "{{ row.label }}", "description_key": "admin.fields.creditApplicationLabel", "sample_path": "credit_application_rows.0.label"},
+            {"variable": "{{ row.amount_chf }}", "description_key": "admin.fields.creditApplicationAmount", "sample_path": "credit_application_rows.0.amount_chf"},
         ],
     },
     {
@@ -422,6 +434,7 @@ _INVOICE_TRANSLATION_KEYS = (
     "access_not_payment",
     "access_title",
     "amount",
+    "amount_due",
     "billing_period",
     "category",
     "chart_description",
@@ -602,6 +615,57 @@ _CONTRACT_FIELDS.append(_translation_group(_CONTRACT_TRANSLATION_KEYS))
 _ANNUAL_STATEMENT_FIELDS.append(_translation_group(_ANNUAL_STATEMENT_TRANSLATION_KEYS))
 
 
+# ── Credit note PDF catalog (#388) ───────────────────────────────────────
+
+_CREDIT_NOTE_TRANSLATION_KEYS = (
+    "billing_period",
+    "credit_date",
+    "credit_label",
+    "kind",
+    "net",
+    "notes_question",
+    "reason_label",
+    "settlement_note",
+    "to",
+    "total",
+    "vat",
+)
+
+_CREDIT_NOTE_FIELDS = [
+    {
+        "group_key": "creditNote",
+        "group_title_key": "admin.fields.creditNote",
+        "fields": [
+            {"variable": "{{ credit.credit_number }}", "description_key": "admin.fields.creditNumber", "sample_path": "credit.credit_number"},
+            {"variable": "{{ credit_number_prefix }}", "description_key": "admin.fields.creditPrefix", "sample_path": "credit_number_prefix"},
+            {"variable": "{{ credit_number_suffix }}", "description_key": "admin.fields.creditSuffix", "sample_path": "credit_number_suffix"},
+            {"variable": "{{ kind_display }}", "description_key": "admin.fields.creditKind", "sample_path": "kind_display"},
+            {"variable": "{{ credit_for_invoice }}", "description_key": "admin.fields.creditForInvoice", "sample_path": "credit_for_invoice"},
+            {"variable": "{{ credit.reason }}", "description_key": "admin.fields.creditReason", "sample_path": "credit.reason"},
+            {"variable": "{{ credit.amount_chf }}", "description_key": "admin.fields.creditAmount", "sample_path": "credit.amount_chf"},
+            {"variable": "{{ net_chf }}", "description_key": "admin.fields.creditNet", "sample_path": "net_chf"},
+            {"variable": "{{ credit.vat_chf }}", "description_key": "admin.fields.creditVat", "sample_path": "credit.vat_chf"},
+            {"variable": "{{ vat_rate_percent }}", "description_key": "admin.fields.vatRatePercent", "sample_path": "vat_rate_percent"},
+            {"variable": "{{ show_vat }}", "description_key": "admin.fields.creditShowVat", "sample_path": "show_vat"},
+            {"variable": "{{ source_invoice.invoice_number }}", "description_key": "admin.fields.invoiceNumber", "sample_path": "source_invoice.invoice_number"},
+            {"variable": "{{ lang }}", "description_key": "admin.fields.languageCode", "sample_path": "lang"},
+        ],
+    },
+    {
+        "group_key": "formattedDates",
+        "group_title_key": "admin.fields.formattedDates",
+        "fields": [
+            {"variable": "{{ formatted_dates.credit_date }}", "description_key": "admin.fields.creditDate", "sample_path": "formatted_dates.credit_date"},
+            {"variable": "{{ formatted_dates.invoice_date }}", "description_key": "admin.fields.invoiceDate", "sample_path": "formatted_dates.invoice_date"},
+            {"variable": "{{ formatted_dates.period_start }}", "description_key": "admin.fields.periodStart", "sample_path": "formatted_dates.period_start"},
+            {"variable": "{{ formatted_dates.period_end }}", "description_key": "admin.fields.periodEnd", "sample_path": "formatted_dates.period_end"},
+        ],
+    },
+    *[group for group in _INVOICE_FIELDS if group["group_key"] in ("participant", "zev", "issuer")],
+]
+_CREDIT_NOTE_FIELDS.append(_translation_group(_CREDIT_NOTE_TRANSLATION_KEYS))
+
+
 # ── Email catalogs ───────────────────────────────────────────────────────
 
 _EMAIL_FIELDS = {
@@ -617,6 +681,7 @@ _EMAIL_FIELDS = {
                 {"variable": "{period_end}", "description_key": "admin.emailTemplates.fields.periodEnd", "sample_path": "period_end"},
                 {"variable": "{due_date}", "description_key": "admin.emailTemplates.fields.dueDate", "sample_path": "due_date"},
                 {"variable": "{total_chf}", "description_key": "admin.emailTemplates.fields.totalChf", "sample_path": "total_chf"},
+                {"variable": "{amount_due_chf}", "description_key": "admin.emailTemplates.fields.amountDueChf", "sample_path": "amount_due_chf"},
             ],
         },
     ],

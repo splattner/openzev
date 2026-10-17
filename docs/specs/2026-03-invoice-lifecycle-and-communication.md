@@ -8,7 +8,7 @@
 - Created: 2026-03-24
 - Target Release: Ongoing baseline
 - Related Issues: n/a (baseline)
-- Related ADRs: 0004, 0006, 0008
+- Related ADRs: 0004, 0006, 0008, 0037, 0038
 - Impacted Areas: backend, frontend, async jobs
 
 ## 1. Problem and outcome
@@ -71,8 +71,10 @@ lifecycle from scratch.
 | `vat_base_chf` | `Decimal(10,2)` (nullable) | What `vat_chf` was charged on, under `vat_mode = registered`: `subtotal_chf` without the producer-credit lines (see tariffs spec §4.8). Null under the other VAT modes and on invoices issued before the field existed, whose VAT base is `subtotal_chf` |
 | `vat_chf` | `Decimal(10,2)` | `(vat_base_chf ?? subtotal_chf) × vat_rate` |
 | `total_chf` | `Decimal(10,2)` | `subtotal_chf + vat_chf` (producer credits stay in the subtotal, so they are still settled against the invoice) |
+| `credit_applied_chf` | `Decimal(10,2)` | Credit notes the engine set against the invoice at generation, after VAT (default `0`). Frozen as issued: cancelling the invoice releases the applications but leaves it. The amount due is the derived model property `amount_due_chf` = `max(total_chf − credit_applied_chf, 0)` when `total_chf > 0`, else `total_chf`; it is not stored (`2026-10-payments-and-credits.md` §4.7) |
 | `pdf_file` | `FileField` | Uploaded PDF path (`invoices/pdf/`) |
 | `sent_at` | `DateTimeField` (nullable) | Timestamp of most recent email send |
+| `approved_at` | `DateTimeField` (nullable) | Stamped by `approve_invoice` and by `approve-all`; never cleared, not even on cancellation. An invoice with it set — or, for rows written without the workflow, with status `approved`/`sent`/`paid` (`invoices.models.issued()`) — is *issued* and is never deleted by regeneration or by a non-admin (§4.4, §4.5, ADR 0037). Backfilled by migration `invoices/0023` from the newest `invoice.approve` audit event, else `sent_at`, else `updated_at` for approved/sent/paid rows |
 | `due_date` | `DateField` (nullable) | Payment due date. Set at generation to the generation date + `Zev.payment_term_days` (per-ZEV, default 30, min 1) |
 | `notes` | `TextField` | Free text |
 | `issuer` | `JSONField` (default `{}`) | Copy of who the invoice is from (§3.1a) |
@@ -104,9 +106,10 @@ participant's address changed (`invoices/document_parties.py`).
 The issuer party is whoever held the `issuer` role on the invoice's
 `period_end` (`issuer_party(zev, day)` → `zev.parties.issuer_on`,
 SPEC-2026-10-zev-parties §4.5, §7.1); without one, the issuer is the ZEV name
-alone (`from_participant: false`). A batch builds the issuer once for its
-period (`InvoiceGenerationContext.issuer`), and `approve-all` once per
-`period_end`.
+alone (`from_participant: false`). A generation batch builds the issuer once
+for its period (`InvoiceGenerationContext.issuer`). Single and batch approval
+both use `approve_invoice`, rebuilding the copy from the locked invoice row
+and freshly loaded related data rather than the caller's cached relations.
 Copies written before parties existed lack the party keys, which read as empty.
 The QR bill names are the `name_lines` on one line, at most 70 characters.
 
@@ -116,9 +119,15 @@ The QR bill names are the `name_lines` on one line, at most 70 characters.
 |---|---|
 | Generation (`engine.generate_invoice`) | Written. A batch builds the issuer once (`InvoiceGenerationContext.issuer`) |
 | Any render while `draft` (`copy_for_render`) | Rebuilt from today's data and stored with a conditional `UPDATE … WHERE status = 'draft'`; if an approval won the race, the approved copy is read back instead |
-| `approve_invoice`, `approve-all` | Written a last time in the same row update as the status |
+| `approve_invoice`, `approve-all` | Written a last time in the same locked row update as the status; `pdf_file` is cleared and `pdf_status` becomes `none` |
 | `approved`, `sent`, `paid`, `cancelled` | Frozen: renders read the stored copy |
 | Any non-draft without a copy (an invoice created without one) | Built from today's data once and stored |
+
+Approval always retires the draft PDF, even when the copy is unchanged: the
+stored copy alone does not prove which data an existing file rendered. The
+old file is deleted best-effort after the approval transaction commits; a
+rollback preserves it. Until a new PDF is generated there is no stored
+download, and email delivery renders one lazily from the approved copy.
 
 Migration `invoices.0019_invoice_issuer_recipient_copy` backfills every
 existing invoice from the data of the migration day (the best available). The
@@ -186,6 +195,37 @@ Since the redesign (see `2026-08-contract-pdf-redesign.md` §12) `PATCH` validat
 
 A row exists only when an admin has customized the template via the admin API (§7.4). `EMAIL_TEMPLATE_DEFAULTS` (`invoices/models.py`) defines the six recognized application keys. Deleting a row normally restores that key's hardcoded subject/body. `participant_magic_link`, `zev_access_invitation` and `zev_access_granted` are the exception at delivery time: when no override exists, the sender chooses the shipped default for the ZEV's invoice language; a saved override still replaces all four language defaults. `participant_invitation` was replaced by `participant_onboarding`, and migration `0017_drop_participant_invitation_template` deletes any legacy row.
 
+### 3.6 Payment (#388)
+
+Money received for an invoice. Specified in full in `2026-10-payments-and-credits.md` §4.2.
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `UUIDField` (PK) | Auto-generated |
+| `invoice` | FK → `Invoice` (`CASCADE`, `related_name="payments"`) | CASCADE keeps the ZEV purge working; the API refuses to cancel or delete an invoice with payments |
+| `amount_chf` | `Decimal(10,2)` | Not zero (`payment_amount_not_zero`); carries the invoice's sign (a producer payout is paid with one negative payment) |
+| `paid_on` | `DateField` | Not in the future |
+| `note` | `CharField(500, blank)` | e.g. a bank reference |
+| `source` | `manual` \| `mark_paid` \| `backfill` | How the row was created |
+| `created_by` | FK → `User` (`SET_NULL`, nullable) | Who recorded it |
+| `created_at` | `DateTimeField` (auto) | |
+
+Ordering `["paid_on", "created_at", "id"]`. Migration `invoices/0023` gives every paid invoice with a non-zero total one `backfill` payment of `total_chf`, dated by the newest `invoice.mark_paid` audit event or else `updated_at` (Swiss civil date). Shown read-only as an inline in the Django admin. Travels in the transfer archive nested under its invoice and in backups (`ZevPart("invoices.Payment", "invoice__zev")`).
+
+### 3.7 Credit (#388, phase 2)
+
+A credit note (Gutschrift) for an invoice that received money. Specified in full in
+`2026-10-payments-and-credits.md` §4.4: `invoices.models.Credit` (`credit_number` unique per ZEV from
+`Zev.credit_note_prefix`/`credit_note_counter`, `kind` `reversal` \| `adjustment`, `source_invoice`
+`PROTECT`, `reason`, gross `amount_chf` > 0, `vat_mode`/`vat_rate`/`vat_chf`/`embedded_vat_chf` worked
+out from the source invoice, `pdf_file`/`pdf_status`, `issuer`/`recipient` copies, `created_by`).
+Read-only in the Django admin. Travels in the transfer archive nested under its invoice and in
+backups (`ZevPart("invoices.Credit", "zev")`, `MEDIA_FIELDS` entry for `pdf_file`).
+
+Phase 3 adds `refunded_chf`, `refunded_on`, `refund_note` to the credit and the model
+`CreditApplication` (`credit` `PROTECT`, `invoice` `CASCADE`, `amount_chf` > 0, `released_at`): the part of
+a credit set against an invoice. Specified in `2026-10-payments-and-credits.md` §4.4 and §4.7.
+
 ---
 
 ### 4.1 States
@@ -201,28 +241,33 @@ for the schema and concurrency guarantees.
 |---|---|
 | `draft` | Generated but not finalized; may be regenerated or deleted |
 | `approved` | Owner has reviewed and finalized; locked against regeneration |
-| `sent` | Delivered to participant (via email or manual mark) |
-| `paid` | Payment received; fully locked |
-| `cancelled` | Voided; may be replaced by a new invoice |
+| `sent` | Delivered to participant (via email or manual mark); "partly paid" when it has payments short of the total (derived, not a status) |
+| `paid` | Payments cover the total; fully locked |
+| `cancelled` | Voided. Replaced by regeneration only if it was never approved; an issued one is kept with its number next to its replacement (ADR 0037) |
+
+Invoice numbers follow the per-ZEV [numbering contract](2026-03-admin-governance-and-settings.md#43-zev-governance-fields);
+failed invoice transactions return their allocation.
 
 ### 4.2 Allowed transitions
 
 ```
 draft ──────→ approved ──────→ sent ──────→ paid
-  │               │              │
-  ├─→ cancelled   ├─→ cancelled  ├─→ cancelled
+  │               │              │  ←─────────┘ (delete_payment)
+  ├─→ cancelled   ├─→ cancelled  ├─→ cancelled (no payments)
   │                                          │
-  └──────────────────────── regeneration ←───┘ (cancelled only)
+  └──────────────────────── regeneration ←───┘ (never-approved cancelled only)
 ```
 
 | From | To | API endpoint | Guard |
 |---|---|---|---|
 | `draft` | `approved` | `POST /invoices/{id}/approve/` | Status must be `draft` |
 | `approved` | `sent` | `POST /invoices/{id}/mark-sent/` | Status must be `approved`; sets `sent_at` |
-| `sent` | `paid` | `POST /invoices/{id}/mark-paid/` | Status must be `sent` |
-| `draft` | `cancelled` | `POST /invoices/{id}/cancel/` | Status ≠ `paid` and ≠ `cancelled` |
-| `approved` | `cancelled` | `POST /invoices/{id}/cancel/` | Same guard |
-| `sent` | `cancelled` | `POST /invoices/{id}/cancel/` | Same guard |
+| `sent` | `paid` | `POST /invoices/{id}/mark-paid/` | Status must be `sent`; books the outstanding amount as one payment |
+| `sent` | `paid` | `POST /invoices/{id}/payments/` | Status must be `sent`; the payment brings the received sum up to the total |
+| `paid` | `sent` | `DELETE /invoices/{id}/payments/{payment_id}/` | Removing a payment leaves the total uncovered |
+| `draft` | `cancelled` | `POST /invoices/{id}/cancel/` | Status ≠ `paid` and ≠ `cancelled`; no payments recorded. Releases the invoice's credit applications (`released_at`) in the same transaction (`_lock_and_transition(on_transition=…)`) |
+| `approved` | `cancelled` | `POST /invoices/{id}/cancel/` | Same guard and release |
+| `sent` | `cancelled` | `POST /invoices/{id}/cancel/` | Same guard and release |
 | `paid` | (none) | — | Cannot be cancelled |
 
 **Invalid transitions** return HTTP `400` with a descriptive error message.
@@ -238,18 +283,22 @@ invoice is in `approved` state, the task **automatically transitions** it to
 | Existing invoice status | Regeneration behavior |
 |---|---|
 | `draft` | Delete and replace with new draft |
-| `cancelled` | Delete and replace with new draft |
+| `cancelled`, never approved (`approved_at` null) | Delete and replace with new draft |
+| `cancelled`, approved before (`approved_at` set) | **Kept** with its number; the new draft is created next to it (ADR 0037) |
 | `approved`, `sent`, `paid` | **Blocked** — raise `ValueError` (HTTP `409 Conflict`) |
 
-Engine regeneration operates inside `@transaction.atomic`.  The match key is
-`(participant, period_start, period_end)`.
+Single and bulk regeneration are atomic and serialized per participant before
+checking inclusive period overlaps (`period_start <= requested_end` and
+`period_end >= requested_start`). Adjacent periods are kept. See the
+[billing-engine guard rails](2026-03-tariffs-and-billing-engine.md#40-guard-rails)
+for the lock order coordinating generation with approval and community restore.
 
 ### 4.5 Deletion rules
 
 | Role | Allowed deletions |
 |---|---|
-| `admin` | Any invoice regardless of status |
-| `zev_owner` | Only `draft` or `cancelled` invoices in their ZEVs |
+| `admin` | Any invoice without payments, regardless of status |
+| `zev_owner` | Only `draft` or `cancelled` invoices in their ZEVs that were never approved (`can_delete_invoice`) and have no payments |
 | `participant` | No deletions (HTTP `403`) |
 
 ---
@@ -312,11 +361,22 @@ Validation: `period_start` must be before `period_end`. On creation the engine a
 |---|---|---|---|---|
 | `POST` | `/invoices/{id}/approve/` | `HasZevAccess` | `status == draft` | → `approved` |
 | `POST` | `/invoices/{id}/mark-sent/` | `HasZevAccess` | `status == approved` | → `sent`, `sent_at = now()` |
-| `POST` | `/invoices/{id}/mark-paid/` | `HasZevAccess` | `status == sent` | → `paid` |
-| `POST` | `/invoices/{id}/cancel/` | `HasZevAccess` | `status ∉ {paid, cancelled}` | → `cancelled` |
+| `POST` | `/invoices/{id}/mark-paid/` | `HasZevAccess` | `status == sent` | Optional body `{paid_on}` (default today); books the outstanding amount as one `mark_paid` payment (none for a zero outstanding amount) → `paid`. Audit metadata `{payment_id, amount_chf, paid_on}` |
+| `POST` | `/invoices/{id}/cancel/` | `HasZevAccess` | `status ∉ {paid, cancelled}`, no payments | → `cancelled` |
+| `POST` | `/invoices/{id}/correct/` | `HasZevAccess` (write-scoped: managers) | `status == paid`, or `sent` with payments; total > 0; reason required; an adjustment needs `0 < amount_chf ≤ paid − credited` | Body `{kind: reversal \| adjustment, reason, amount_chf?}`; `201 {invoice, credit}`. A reversal credits the cash received (less earlier credits), cancels the invoice and releases the credit applied to it; an invoice settled by credit alone is reversed without a credit note (`credit: null`). An adjustment is capped by cash. The credit PDF is queued on commit. Audit `invoice.correct` (metadata adds `released_chf`) |
+| `GET` | `/invoices/credits/`, `/invoices/credits/{id}/` | scoped (`ZevScopedQuerySetMixin`) | — | Read-only `CreditSerializer`; filters `participant_id`, `source_invoice_id`; a participant sees their own credits |
+| `GET` / `POST` | `/invoices/credits/{id}/pdf/`, `…/generate-pdf/` | scoped / `HasZevAccess` | — | Stored PDF (`404` before the render) / queue a re-render (`202`) |
+| `POST` | `/invoices/credits/{id}/refund/` | `HasZevAccess` (write-scoped: managers) | Something remains; `refunded_on` not in the future | Body `{refunded_on, note?}`; `200 Credit`. Books the remainder as refunded. Audit `credit.refund` |
+| `GET` | `/invoices/{id}/payments/` | `HasZevAccess` + `can_view` (participants `403`) | — | `PaymentSerializer` list |
+| `POST` | `/invoices/{id}/payments/` | `HasZevAccess` (write-scoped: managers) | `status == sent`, total > 0, `0 < amount_chf ≤ outstanding`, `paid_on` not in the future | Body `{amount_chf, paid_on?, note?}`; `201` with the detail `Invoice`; → `paid` once the total is covered. Audit `invoice.payment_record` |
+| `DELETE` | `/invoices/{id}/payments/{payment_id}/` | as POST | invoice `sent` or `paid` | `200` with the detail `Invoice`; `paid` → `sent` when the rest no longer covers the total; `404` for an unknown payment. Audit `invoice.payment_delete` |
 
 Transition rules are implemented centrally in `invoices/workflow.py`
-(`approve_invoice`, `mark_invoice_sent`, `mark_invoice_paid`, `cancel_invoice`).
+(`approve_invoice`, `mark_invoice_sent`, `mark_invoice_paid`, `record_payment`,
+`delete_payment`, `cancel_invoice`, `correct_invoice`; `_lock_and_transition` takes an optional
+`guard(locked)` that `cancel_invoice` uses to refuse an invoice with payments
+under the row lock). All payment rules (#388) are specified in
+`2026-10-payments-and-credits.md` §4.2.
 Guard violations raise `InvoiceWorkflowError`; views translate this into a
 `400` response with `{"error": <message>}` and a `denied` audit event. The
 email task's approved→sent auto-transition uses `record_email_delivery` from
@@ -344,7 +404,7 @@ coverage runs against PostgreSQL only (§13, `test_workflow.py`).
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `POST` | `/invoices/{id}/generate-pdf/` | `HasZevAccess` | Generate/regenerate PDF; returns `{pdf_url}` |
+| `POST` | `/invoices/{id}/generate-pdf/` | `HasZevAccess` | Generate/regenerate PDF; returns `{pdf_url}`; `409` if both attempts are superseded, `404` if deleted mid-render, `500` on rendering/storage failure (§8.1) |
 | `POST` | `/invoices/{id}/send-email/` | `HasZevAccess` | Queue email to participant (optional `email` override); returns `{detail}` |
 | `POST` | `/invoices/{id}/retry-email/{email_log_id}/` | `HasZevAccess` | Re-queue a failed email; `400` if already sent or its recipient was swept |
 | `POST` | `/invoices/approve-all/` | `HasZevAccess` | Approve all draft invoices for a ZEV period (`zev_id`, `period_start`, `period_end`); returns `{approved}`; audit-logged (`invoice.approve_all`) |
@@ -352,6 +412,9 @@ coverage runs against PostgreSQL only (§13, `test_workflow.py`).
 | `POST` | `/invoices/download-pdfs/` | `HasZevAccess` | Download all period invoice PDFs as a single ZIP (`{invoice_number}.pdf` entries); `404` when the period has no PDFs |
 
 #### Annual statement / financial summary downloads (frontend location)
+
+Reports follow [access-grants §7.8](2026-10-zev-access-grants.md#78-reports-self-service-invoicesviews_reportspy),
+including strict ZEV selection for participant self-service.
 
 The single-document endpoints below are consumed from the **/reports** route
 (`frontend/src/pages/ReportsPage.tsx`) — the owner/admin Reports view;
@@ -366,7 +429,7 @@ export job, polls its status, and downloads the artifact when it completes
 
 | Method | URL | Permission | Frontend usage |
 |---|---|---|---|
-| `GET` | `/invoices/invoices/annual-statement/` | Authenticated (participant sees own, admin/owner ZEV-scoped) | `downloadAnnualStatement({year}, signal?)` (no `zev_id`, backend scopes by participant) behind the participant Annual Statement tab; owners/admins supply `participant_id` + `zev_id`, which this page does not do. The participant's own download calls `generate_annual_statement_pdf(..., sent_only=True)`, so its invoice table and totals count only invoices already sent to them (§6.1); an owner/admin-requested statement and the whole-ZEV export keep every non-cancelled invoice |
+| `GET` | `/invoices/invoices/annual-statement/` | Authenticated (participant sees own, admin/owner ZEV-scoped) | `downloadAnnualStatement({year}, signal?)` (no `zev_id`, backend scopes by participant) behind the participant Annual Statement tab; owners/admins supply `participant_id` + `zev_id`, which this page does not do. The participant's own download calls `generate_annual_statement_pdf(..., sent_only=True)`, so its invoice table and totals count only invoices already sent to them (§6.1); an owner/admin-requested statement and the whole-ZEV export keep every billed invoice — issued (`approved_at` set or status approved/sent/paid) and not cancelled (`invoices.models.billed_invoices`, the same rule the financial summary and the annual report use; #388) |
 | `GET` | `/invoices/invoices/financial-summary/` | Authenticated (optional `zev_id` / `participant_id`) | `downloadFinancialSummary({year}, signal?)` behind the participant Tax Overview tab; manager card passes `zev_id` |
 
 `ParticipantYearDocuments` shows Annual Statement (generated on entry) and Tax
@@ -380,10 +443,7 @@ an invoice PDF fetch to preserve popup permission. Browser aborts do not stop
 server rendering.
 
 The old synchronous `GET /invoices/invoices/annual-statements-zip/` endpoint is
-gone. Participant self-service resolves to the shared membership
-(`zev.services.own_participant_for_user`) — the same record named by
-`zev_name` on `GET /auth/me/` — so the label and the generated document
-always agree, including for multi-membership users.
+gone.
 
 **Whole-ZEV annual-statement ZIP — export jobs** (`/api/v1/exports/`):
 
@@ -457,7 +517,7 @@ recipient copy frozen on an issued invoice; the PDF keeps the billed copy.
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `GET` | `/invoices/dashboard/` | `admin` only | Aggregated stats: ZEV count, participant count, invoice counts by status, total revenue, recent invoices, email stats |
+| `GET` | `/invoices/dashboard/` | `admin` only | Aggregated stats: ZEV count, participant count, invoice counts by status, total revenue, recent invoices, email stats. `total_revenue` is the `total_chf` of issued, non-cancelled invoices (the `billed_invoices` rule without a window) less the adjustment credits issued against those invoices |
 
 ### 5.6a Readiness and attention
 
@@ -623,8 +683,12 @@ emptiness renders only after a successful list result.
 | Period overview, readiness, download PDFs (ZIP) | Yes | Yes | Yes | No |
 | Generate | Yes | Yes | No | No |
 | Approve / mark-sent / mark-paid / cancel | Yes | Yes | No (HTTP 403/404) | No (HTTP 403) |
+| List payments | Yes | Yes | Yes | No (HTTP 403; the invoice shows `paid_chf`/`outstanding_chf` only) |
+| Record / remove a payment | Yes | Yes | No (HTTP 404) | No |
+| Correct an invoice (credit note) | Yes | Yes | No (HTTP 404) | No |
+| Read credit notes | Yes | Yes | Yes | Own only |
 | Generate PDF / send email / retry email | Yes | Yes | No | No |
-| Delete | Any status | Draft/cancelled only | No | No |
+| Delete | Any status without payments or credit notes | Never-approved draft/cancelled without payments | No | No |
 | PDF template read/write | Yes | No (HTTP 403) | No | No |
 | Contract PDF template read/write | Yes | No (HTTP 403) | No | No |
 | Dashboard | Yes | No (HTTP 403) | No | No |
@@ -673,6 +737,7 @@ Email subjects and bodies resolve through a three-tier fallback chain:
 | `{period_end}` | Formatted per `AppSettings.date_format_short` |
 | `{due_date}` | Payment due date, formatted per `AppSettings.date_format_short`; empty string if the invoice has no `due_date` |
 | `{total_chf}` | Invoice total amount |
+| `{amount_due_chf}` | Amount still to pay: the total less any credit applied (equals `{total_chf}` without credit). The default body uses it ("Amount due: CHF …"); stored per-ZEV and global templates keep their text |
 
 Templates are rendered with `config.safe_format.safe_format`, which resolves
 bare named placeholders and rejects attribute/item traversal. If rendering
@@ -692,12 +757,12 @@ Total rendered output is not capped; repeated fields can amplify it.
 **Execution flow:**
 
 1. Load invoice + participant + ZEV from database.
-2. If invoice has no `pdf_file` → generate and save PDF first.
+2. If invoice has no `pdf_file` → generate and save PDF first. A publication conflict retries the task after 60s before any email is sent. Once all three retries are exhausted, record a `FAILED` `invoice.email_task` audit event (source `celery`) before re-raising the conflict; no `EmailLog` is created. Deletion skips delivery.
 3. Resolve recipient: explicit `recipient_email` parameter, or `participant.email`. Skip if empty.
 4. Render subject and body from ZEV templates (with fallback).
 5. Create `EmailLog` entry with `status = "pending"`.
 6. Build `EmailMessage` with PDF attachment (`invoice_{number}.pdf`, `application/pdf`).
-7. Call `email.send()` — the only step below that may retry the task.
+7. Call `email.send()`.
 8. **On send failure** (steps 6–7 raise):
    - Update `EmailLog`: `status = "failed"`, `error_message = str(exc)`.
    - Record a `FAILED` `invoice.email_sent` audit event.
@@ -754,12 +819,17 @@ The `participant_magic_link`, `zev_access_invitation` and `zev_access_granted` s
 3. Convert HTML → PDF via WeasyPrint through `render_pdf()` in `invoices/pdf_render.py`, which emits **PDF/A-3b** (`PDF_VARIANT = "pdf/a-3b"`) — a long-term archival format suitable for Swiss GeBüV retention, with WeasyPrint adding the XMP identification, sRGB OutputIntent, and font subsets. The same helper renders contract, annual statement, and financial summary PDFs. Because template content is admin-editable, the WeasyPrint fetcher is restricted to `data:` URIs (`ALLOWED_URL_PROTOCOLS` in `pdf_render.py`) — templates embed images as data URIs and cannot make the renderer read local files or request remote URLs.
    Text renders in Inter, the app's face (ADR 0032): the default templates set `var(--font-print)` from `pdf/_tokens.css`, and the generated chart SVGs carry the same stack on their root (`_CHART_FONT_FAMILY`), since inline SVG does not inherit the document font. Inter comes from Debian's `fonts-inter` in the backend images; without it the stack falls back to Helvetica Neue/Helvetica/Arial. The Swiss QR-bill payment part keeps the `qrbill` SVG's own `Arial,Helvetica` stack (resolved to the metric-compatible Liberation Sans in the image), as its standard requires.
 4. Save PDF to `invoice.pdf_file` (`invoices/pdf/invoice_{number}.pdf`).
-   `save_invoice_pdf()` writes the file without saving the (possibly stale)
-   invoice instance, then updates only `pdf_file`/`updated_at` via a
-   conditional `UPDATE` on the primary key — a concurrent approval or other
-   workflow change survives the save. If the row was deleted mid-render the
-   just-written file is removed and `Invoice.DoesNotExist` is raised instead
-   of recreating the record (the render counts as failed).
+   `save_invoice_pdf()` publishes only while the row's status and
+   `issuer`/`recipient` copies still match the render, updating `pdf_file`,
+   `pdf_status = ready`, and `updated_at` together. Other rendered data is
+   outside this guard. Rejected output is deleted and retried once; another
+   conflict raises `InvoicePdfSupersededError` (`409` from `generate-pdf`).
+   Deletion cleans up and raises `Invoice.DoesNotExist` (`404`). PDF tasks skip
+   superseded/deleted work, clearing `pending` to `none` only if the pre-render
+   status, file reference and `updated_at` still match; the email task retries
+   a conflict before sending (§7.2).
+   Genuine failures mark `failed` only if the pre-render status, file reference
+   and `updated_at` still match, preserving a newer publication or transition.
 
 `_render_pdfs()` groups invoices by `(zev_id, period_start, period_end)` and
 builds one `InvoicePdfPeriodContext` per group. The context explicitly
@@ -863,6 +933,8 @@ The invoice PDF template receives:
 | `representative` | The representative toward the grid operator on `period_end` (`build_representative`: `party`, `kind`, `organisation_name`, `name_addition`, `name`, `name_lines`, address, `email`, `phone`), live, or `None` |
 | `owner_participant` | Deprecated alias: the issuer copy shaped like a participant (`full_name`, address fields, `email`, `phone`; `IssuerView`), or `None` when the issuer is the ZEV name alone. The built-in template uses `issuer.*` |
 | `participant` | The billed participant, with `full_name`, `title`, `first_name`, `last_name`, address fields and `email` answered from the recipient copy (`FrozenView`); anything else reads the live row |
+| `credit_application_rows` | One `{label, amount_chf}` per credit note applied (`tr.credit_applied` with the credit number; the amount negated), empty without credit. With rows, the totals block lists them after the total and closes with an "Amount due" row (`tr.amount_due`, `invoice.amount_due_chf`), and the summary box shows the amount due instead of the total |
+| `paid_chf` | Sample/catalogue value for the amount received (`"0.00"` in the sample context) |
 | `qr_svg` | Swiss QR-Rechnung SVG (or `None`) |
 | `energy_chart_svg` | Period-comparison stacked bar chart SVG (or `None`) |
 | `hourly_profile_chart_svg` | Average hourly consumption profile chart SVG (or `None`) |
@@ -901,7 +973,7 @@ A QR-Rechnung SVG is generated from the invoice's copy (§3.1a) when:
 - **Creditor** (issuer copy): `name`, `address_line1`, `postal_code`, `city` — all non-empty.
 - **Debtor** (recipient copy): same fields — all non-empty.
 
-If any required field is missing, QR generation is skipped (logged as warning).
+If any required field is missing, or the invoice's `amount_due_chf` is zero or less (a payout, or credit covering the invoice), QR generation is skipped. The QR amount is `amount_due_chf`, not `total_chf`.
 The `qrbill` Python library generates the SVG.
 
 When the invoice content is short enough (`inline_qr_payment` is `true`), the
@@ -994,15 +1066,28 @@ Two shapes, split by cost. `InvoiceListSerializer` returns all invoice fields pl
   status and retry ID paired even when timestamps tie. The Billing emails tab
   passes it to the log-scoped retry endpoint.
 
+- `paid_chf`: sum of the invoice's payments as a 2-decimal string — on list
+  pages from a `paid_sum` `Subquery` annotation, on detail shapes from the
+  prefetched `payments`.
+- `credit_applied_chf` (a model column) and `amount_due_chf` (read-only, the derived property) as 2-decimal strings.
+- `outstanding_chf`: `amount_due_chf − paid_chf`, or `"0.00"` for a cancelled invoice.
+
 `InvoiceSerializer` subclasses it and adds the nested read-only relations:
 - `items`: nested `InvoiceItemSerializer` (read-only).
 - `email_logs`: nested `EmailLogSerializer` (read-only).
+- `payments`: nested `PaymentSerializer` list (`id, invoice, amount_chf, paid_on,
+  note, source, created_by_name, created_at`) for callers with
+  `zev.access.can_view` on the invoice's ZEV; `null` for a participant.
+- `credits`: the credit notes issued for the invoice (nested `CreditSerializer`), visible to the participant.
+- `credit_applications`: `[{id, credit, credit_number, credit_source_invoice, credit_source_invoice_number, amount_chf, released_at}]`, the credit notes set against the invoice (released ones included), visible to the participant. Detail shape only.
+- `replaces`: `[{id, invoice_number}]`, the participant's cancelled invoices for the exact same ZEV and period created before this one, newest first (what a correction or a cancel-and-regenerate left behind). Detail shape only.
+- `replaced_by`: `{id, invoice_number}` or `null`. For a cancelled invoice, the newest invoice for the same participant and period created after it (any status); always `null` for an invoice that is not cancelled. Both read the same-period siblings once per invoice (`InvoiceSerializer._same_period`, one query); `compute_period_overview` hands them in as `_same_period_invoices` from the rows it already loaded, so the overview adds no query per row or per replaced invoice.
 
-`InvoiceViewSet.get_serializer_class()` returns the list variant for `action == "list"` and the full one everywhere else (retrieve, the workflow actions that echo an invoice back, and `compute_period_overview`, which builds `InvoiceSerializer` directly). `get_queryset()` matches: the `prefetch_related("items", "email_logs")` is applied for every action *except* `list`, so the database cost drops with the payload rather than being paid for fields that are no longer rendered.
+`InvoiceViewSet.get_serializer_class()` returns the list variant for `action == "list"` and the full one everywhere else (retrieve, the workflow actions that echo an invoice back, and `compute_period_overview`, which builds `InvoiceSerializer` directly). `get_queryset()` matches: the `prefetch_related("items", "email_logs", "payments", "credits__applications__invoice", "credit_applications__credit__source_invoice")` is applied for every action *except* `list` (the period overview prefetches the same set), so the database cost drops with the payload rather than being paid for fields that are no longer rendered.
 
 The split exists because the list is the one unbounded read: `AdminInvoicesContent` passes no ZEV filter and walks every invoice in the instance one page at a time, so each nested line item and email-log row is paid for once per invoice across the whole dataset. Measured on 50 invoices × 8 items, one page went from 151.4 KiB to 33.2 KiB (4.6×, 78% smaller) and from 4 queries to 2; at the client walker's 200-page cap that is 29.6 MiB → 6.5 MiB. No list consumer reads the nested arrays — `AdminInvoicesContent` renders `invoice_number`/`zev_name`/`participant_name`/period/`total_chf`/`status`, and `BillingEmailsPage` reads the annotated latest-email fields before loading history on demand. In `frontend/src/types/api.ts` both fields are optional (`items?`, `email_logs?`). See #488.
 
-Read-only fields: `id`, `invoice_number`, `created_at`, `updated_at`, `pdf_file`, plus all billing-engine/workflow fields that never come from client input: `status`, `total_local_kwh`, `total_grid_kwh`, `total_feed_in_kwh`, `total_local_sold_kwh`, `local_sale_chf`, `local_sale_feed_in_chf`, `subtotal_chf`, `vat_rate`, `vat_base_chf`, `vat_chf`, `total_chf`, `period_start`, `period_end`, `zev`, `participant`, `sent_at`, `due_date`. Generic create/update/partial_update endpoints are not exposed; creation happens only via `generate`/`generate-all`, mutations only via the workflow actions.
+Read-only fields: `id`, `invoice_number`, `created_at`, `updated_at`, `pdf_file`, plus all billing-engine/workflow fields that never come from client input: `status`, `total_local_kwh`, `total_grid_kwh`, `total_feed_in_kwh`, `total_local_sold_kwh`, `local_sale_chf`, `local_sale_feed_in_chf`, `subtotal_chf`, `vat_rate`, `vat_base_chf`, `vat_chf`, `total_chf`, `period_start`, `period_end`, `zev`, `participant`, `sent_at`, `approved_at`, `due_date` (plus `pdf_status` and `embedded_vat_chf`). Generic create/update/partial_update endpoints are not exposed; creation happens only via `generate`/`generate-all`, mutations only via the workflow actions.
 
 ### 9.2 InvoiceItemSerializer
 
@@ -1152,7 +1237,7 @@ the cockpit readiness and attention caches.
 |---|---|---|
 | Invalid state transitions exposed in UI/API | High | Centralized transition guards per endpoint + frontend button gating by status |
 | Duplicate or lost email sends | High | Per-attempt `EmailLog` audit trail, bounded retries (max 3) scoped to the SMTP send only — a post-delivery bookkeeping failure cannot trigger one (`#576`) — explicit retry endpoint refuses an already-`sent` log |
-| Regeneration races with approval/sending | Medium | Lifecycle locking: only draft/cancelled invoices may be replaced (`@transaction.atomic`) |
+| Regeneration races with approval/sending | High | Lock overlapping invoice rows before checking their status and deleting them; workflow transitions acquire the same invoice-row lock (§4.4) |
 | QR-Rechnung generation failure | Low | Graceful skip with log warning; invoice renders without QR section |
 | PDF template corruption via admin API | Medium | Templates stored in DB; on-disk default always intact and recoverable via DELETE endpoint |
 | Contract template corruption via admin API | Medium | Same DB-backed recovery mechanism applies |
@@ -1165,29 +1250,40 @@ the cockpit readiness and attention caches.
 
 ### Backend (invoice tests other than PDF)
 
+`test_disabled_zev_reports.py` covers `test_report_visibility` (20 cases),
+`test_self_service_without_ids_returns_after_reenable` (2), and
+`test_explicit_zev_never_falls_back_to_another_membership` (12): role/state
+visibility, restored access, and strict selection with a second membership.
+
 | File | Test class | Validates |
 |---|---|---|
 | `test_document_parties.py` | `CopyContentTests`, `FreezeTests`, `BatchApprovalTests`, `BackfillMigrationTests` (10) | §3.1a: copy content (owner row or ZEV name), a draft follows today's data and stores it, approval freezes it (PDF context and QR bill unchanged after the owner, IBAN and participant move), a missing copy is filled once, a render racing an approval keeps the approved copy, live fields still reachable, `approve-all` writes it, the migration backfill |
+| `test_pdf_approval.py` | Function-based regressions | §3.1a/§8.1: approval invalidation, frozen PDF/QR values, email attachment selection, rollback, missing-PDF/manual-send lifecycle, concurrent publication/failure handling, clearing superseded pending renders, and batch query budget; real PostgreSQL row-lock coverage |
 | `test_invoice_list_filter.py` | `InvoiceStatusFilterTests`, `InvoiceStatusFilterScopingTests` | §5.1: comma-separated `?status=` (single/repeated values, whitespace tolerance, empty = absent, all unknown values → 400, list-only so detail routes are unaffected), status × `zev_id` + role scoping (participant cannot enumerate another ZEV's open invoices), composes with pagination |
 | `test_invoice_list_filter.py` | `InvoiceParticipantAndPeriodFilterTests` | §5.1: `?participant_id=` narrows to that participant and composes with `?status=`, cannot widen an owner's scope, malformed UUID → 400; `?period_from=`/`?period_to=` narrow by period overlap (either alone, both together), malformed date → 400 |
-| `test_participant_invoice_visibility.py` | `ParticipantInvoiceVisibilityTests`, `ParticipantAnnualStatementSentOnlyTests` | §6.1 (#861): participant list shows only sent/paid/cancelled-after-sending invoices, owner list unnarrowed, unsent invoices 404 on detail and `/pdf`, a `sent`/`paid` row without `sent_at` stays visible; `sent_only=True` leaves unsent invoices out of the annual statement, default keeps them, participant download passes `sent_only=True` and owner download `False` |
+| `test_participant_invoice_visibility.py` | `ParticipantInvoiceVisibilityTests`, `ParticipantAnnualStatementSentOnlyTests` | §6.1 (#861): participant list shows only sent/paid/cancelled-after-sending invoices, owner list unnarrowed, unsent invoices 404 on detail and `/pdf`, a `sent`/`paid` row without `sent_at` stays visible; `sent_only=True` leaves unsent invoices out of the annual statement, default keeps every issued invoice (approved and sent, not the draft), participant download passes `sent_only=True` and owner download `False` |
 | `tests.py` | `InvoiceRBACTests` | §6: admin sees all, owner sees own ZEV, participant sees own sent invoices; participant cannot approve/cancel; PDF template access restricted to admin; deletion rules by role and status; generic POST create returns 405 (creation only via generate); serializer ignores forged billing/workflow fields |
 | `tests.py` | `InvoiceBillingIntegrationTests` | §5.2: end-to-end generation via API with metering data; allocation failures reported as 400, not the 409 duplicate-invoice message |
+| `test_payments.py` | `PaymentWorkflowTests` (10), `PaymentApiTests` (12), `RetentionTests` (7), `BillingRuleTests` (1), `BackfillMigrationTests` (1) | §3.6/§4/§5.3 (#388): partial payments keep `sent`, covering payments move to `paid`, over-payment / non-sent / future / non-positive refused, mark-paid books the outstanding amount (dated), a payout is paid with one negative payment, a zero total has none, removing a payment reverts `paid` → `sent`, `approved_at` stamped by approve and approve-all; API echoes `paid_chf`/`outstanding_chf` and payments, list annotation, removal and unknown id, audit events, cancel refused with payments, viewer read-only, participant sees totals but no rows (`payments` null, list `403`), disabled ZEV refused; regeneration keeps an issued cancelled invoice and deletes a never-issued one, owner cannot delete an issued cancelled invoice, admin cannot delete one with payments, period overview shows the replacement and readiness ignores the retained original; `billed_invoices`; the `0023` backfill |
 | `test_workflow.py` | `InvoiceWorkflowTests` | §4.2: approve draft ✓, approve non-draft ✗, mark-sent from approved ✓, mark-sent from draft ✗, mark-paid from sent ✓, mark-paid from draft ✗, cancel from draft/approved/sent ✓, cancel from paid ✗, cancel already-cancelled ✗ |
-| `test_workflow.py` | `InvoiceEngineGuardTests` | §4.4: regenerate approved/paid → 409, regenerate draft/cancelled → success |
+| `test_workflow.py` | `InvoiceEngineGuardTests` | §4.4: regenerate approved/sent/paid → 409; drafts and never-approved cancellations are replaced (201) |
+| `test_generation_race.py` | 9 test functions (11 cases, PostgreSQL only) | §4.4: participant/invoice lock scope, committed outcomes, rollback and community-restore ordering |
 | `test_disabled_zev_invoice_generation.py` | `GenerateSingleInvoiceTests`, `GenerateAllInvoicesTests` | §5.2: ZEV lifecycle phase 2 — `generate`/`generate-all` refuse a disabled ZEV for its owner (400, no invoice created / no task queued) but not for an admin |
 | `test_workflow.py` | `StaleInstanceConcurrencyTests` | §5.3 concurrency (#572): a stale-in-memory `cancel_invoice`/`approve_invoice`/`mark_invoice_sent` cannot undo a transition another already-loaded instance committed first (a `paid` invoice survives a stale cancel, a `cancelled` one survives a stale mark-sent/approve); a stale `record_email_delivery` never raises and never resurrects a status past cancellation, but still records `sent_at` and reports the row's real prior status; a second stale cancel is reported as "already cancelled", not the original status |
 | `test_workflow.py` | `test_concurrent_cancel_and_mark_paid_serialize_on_the_row_lock` (PostgreSQL only — CI's PostgreSQL leg) | §5.3 concurrency (#572): two genuinely overlapping transactions — one holding the invoice row lock, the other running real `mark_invoice_paid` — serialize on that lock (verified via `pg_blocking_pids`) rather than racing; the second sees the first's committed `cancelled` status and correctly refuses |
 | `test_period_overview.py` | `InvoicePeriodOverviewTests` | §5.5: metering completeness, missing-day detection, partial-assignment windows, no-assignment exclusion, cross-ZEV permission denial, whom a row bills (`test_row_names_who_it_bills`: kind, name addition, participation dates and party; `test_meter_labels_use_location_or_meter_id`: location/ID fallback) |
+| `test_invoice_replacement.py` | `InvoiceReplacementTests` | `replaces` newest first and `replaced_by` pointing to the newest invoice, no `replaced_by` before a replacement exists, other periods and participants unrelated, the period-overview row invoice carrying `replaces`, and no extra query per replaced invoice in the overview (6 tests) |
 | `test_period_overview_unit.py` | `ComputePeriodOverviewTests` (10 tests) | §5.5 unit level: complete/incomplete participants, single missing day, exclusion without assignment, partial-assignment required-day windows and gaps, invoice period matching, row ordering, multiple-metering-point counts |
 | `test_readiness.py` | 22 test classes (106 tests) | §5.6a: cockpit period resolution, bulk parity and stable query count, exact historical periods, running-versus-ended lifecycle metadata, first-run/awaiting/caught-up states, structured step details, attention and RBAC |
 | `test_engine_edge_cases.py` | `InvoiceMathEdgeCaseTests` | Edge cases: monthly fee month-boundary counting, tariff validity windows, zero/negative fees, rounding |
 | `test_engine_edge_cases.py` | `InvoiceVatRateSelectionTests` | VAT rate active at period_end, zero VAT when no vat_number |
 | `test_email_formatting.py` | `InvoiceEmailFormattingTests` | §7.1–7.2: date format in email body, custom ZEV templates, auto-transition to sent |
-| `test_email_task.py` | 6 function-based tests | §7.2: missing invoice no-ops, no recipient skips with failed log, success records sent log and transitions status, send failure marks log failed and retries, draft stays draft after send, a post-delivery bookkeeping failure (`#576`) leaves the log `sent` (not `failed`) with exactly one email sent, does not retry, leaves the invoice status as a visible gap, and records a distinct `FAILED` audit event naming the delivery as having happened |
+| `test_email_task.py` | Function-based tests | §7.2: pre-delivery PDF conflict/deletion, audit on exhausted PDF retries, recipient guards, send logging/retry, status transitions, and no duplicate delivery after a bookkeeping failure |
 | `test_reports.py` | `AnnualStatementTests` (11), `FinancialSummaryTests` (6), `MalformedInputTests` (5), `AnnualStatementMonthlyDataTests` (3) | §5.4/§8.2: single-statement report permissions and self-service scoping, malformed/out-of-range input handling, financial-summary fallbacks, `/auth/me` label-vs-download agreement for multi-membership users, and per-timestamp monthly data attribution (ADR 0013). The whole-ZEV ZIP tests moved to `exports/tests.py` with the job flow |
 | `exports/tests.py` | `ExportJobCreateTests` (17), `ExportJobListTests` (4), `ExportJobRunnerTests` (11), `ExportJobDownloadTests` (6), `ExportJobSweepTests` (5), `AnnualStatementExportBuilderTests` (13), `AnnualStatementExportRealRenderTests` (1, slow) | §5.4/§8.1 (ADR 0017): `202` creation with year/participant validation and `queued` audit, unknown or malformed `zev_id` → `404`, in-flight dedupe on the full validated params dict across any matching active job (not just the newest), per-type audit display/summaries/metadata from `ExportDefinition`, enqueue-after-commit wiring, enqueue failure → `503` + `failed`, requester-scoped list/status/download (including loss of ZEV ownership), task-level soft/hard time limits, one-claim duplicate delivery, retention anchored at completion, late completion never resurrecting a swept-failed job, soft time limits aborting a mid-batch render without publishing a (partial) ZIP, partial → completed with `omitted.txt` manifest and counts, all-fail / unexpected / publish failures → `failed` without an artifact, expired → `410` + `expired` flag, sweep file deletion with metadata retention, stale running / lost queued recovery that never fails a job claimed meanwhile (backlog-safe queued window), ZIP entry byte-budget + sanitization rules with pk appended only on collisions (including a final guard against readable names mimicking a pk-suffixed entry), storage roundtrip, and one real-render end-to-end job |
-| `test_invoice_numbering.py` | `TestNumberingIsScopedToTheZev`, `TestDuplicatesWithinOneZevAreStillRejected` | §4.1: two ZEVs on the default `INV` prefix both bill and each counts from 1; a duplicate number within one ZEV is refused at the database level (`bulk_create` bypasses `save()`) |
+| `test_invoice_numbering.py` | `TestInvoiceNumberAllocation`, `TestNumberingIsScopedToTheZev`, `TestDuplicatesWithinOneZevAreStillRejected` | §4.1: persisted numbering state, instance refresh, rollback reuse, and per-ZEV uniqueness |
+| `test_invoice_numbering.py` | `test_concurrent_invoice_allocations_serialize` (2 PostgreSQL cases) | §4.1: overlapping allocations serialize across commit and rollback |
+| `test_invoice_numbering.py` | `test_number_allocation_allows_foreign_key_inserts` (2 PostgreSQL cases) | Invoice and contract allocation locks allow a separate audit-event insert to commit before allocation commits |
 | `test_serializers.py` | `InvoiceDescriptionSerializationTests` | §8.9: period suffix stripping in serializer |
 | `test_template_context.py` | `BuildSampleInvoiceContextTests`, `BuildSampleContractContextTests`, `BuildSampleAnnualStatementContextTests` | §5.7 preview: sample context required keys, invoice number/totals, `grouped_items` structure, formatted dates, recipient address-line preview parity, annual-statement monthly data and chart |
 | `test_field_catalog.py` | `PdfCatalogResolutionTests` (7), `EmailCatalogResolutionTests` (2), `CatalogPayloadShapeTests` (5) | §5.7/§7.4: sample-path resolution, default-template output coverage, unique/current catalog coverage, four shared production email contexts, payload shape, unknown keys, null SVG/translation examples, and representative preview/example parity |
@@ -1203,7 +1299,7 @@ the cockpit readiness and attention caches.
 |---|---|
 | `InvoicePdfQrTests` | §8.4: QR skip on missing debtor data, success path, text/binary writer compatibility, skip on `qrbill` rejection, QR built in all four languages. §8.2: context uses AppSettings date formats, invoice-number prefix/suffix split (hyphen, long prefix, no hyphen), translation dict is not mutated by context building, period-suffix stripping from item descriptions (§8.9), `status_display` translation, empty `due_date` formatting, `inline_qr_payment` enabled for small invoices and disabled for long invoices / invoices with notes / missing IBAN, sample invoice context exposes every key the default template uses. §8.5: energy comparison rendered with and without a prior period. §8.6: energy-flow SVG returns `None` without readings and renders with valid data; energy summary local-share computation and `None` case. §8.7: hourly profile buckets by local time (not UTC), returns `None` for daily-only resolution, and skips readings outside the participant's assignment window (ADR 0013). §8.8: savings `None` cases (no local energy, local rate ≥ grid rate) and bar-percentage computation. Default template structural layout checks (dedicated invoice/payment layouts) |
 | `PeriodParticipantStatsTests` | §8.6: per-timestamp participant stats — mid-period transfer splits readings between both holders, gap readings appear on no participant, stats reconcile with engine invoice totals |
-| `SaveInvoicePdfConcurrencyTests` | §8.1: concurrent approval survives the PDF save (only `pdf_file`/`updated_at` written back); concurrent delete raises instead of resurrecting the row, without orphaning items or files |
+| `SaveInvoicePdfConcurrencyTests` | §8.1: concurrent workflow changes survive the PDF save (only `pdf_file`/`pdf_status`/`updated_at` written back); concurrent delete raises instead of resurrecting the row; database-update failure cleans up the output, and cleanup errors preserve the original failure |
 | `AnnualStatementMonthlyDataTests` | Annual-statement monthly data: per-timestamp attribution across assignment changes, gap readings excluded |
 | `InvoicePdfRenderingTests` | Full WeasyPrint rendering: short invoice → 2 pages, long invoice → 3 pages, savings + many items → 3 pages, all four languages render without error; recipient address-line rendering, escaping and frozen-copy preservation; long-recipient wrapping and QR fallback; inline QR and separate payment slip geometry (106 mm height, bottom-aligned with page bottom) via PDF content-stream inspection; no QR clip rect on the insights page. Regression coverage for the render-time guard: wrapping multi-line descriptions that overflow the inline height estimate still produce exactly one slip (`_count_qr_slips`), and a long dedicated-payment invoice keeps a single bottom-aligned slip on its payment page; a realistic EVU-style invoice with ~5 Abgaben across all four cost categories (energy, grid fees, levies, metering) paginates to ≥3 pages with exactly one slip |
 | `TranslationParityTests` | §8.3: all four locales have identical, non-empty translation keys and identical `status_values` keys |
@@ -1219,7 +1315,12 @@ the cockpit readiness and attention caches.
   the period and meter locations when a party has several participations.
   Repeated parties are determined before filtering. The invoice number is the
   identity cell's only link; stored PDFs open from the row menu. Cancelled
-  invoices retain their link but have no billed amount.
+  invoices retain their link but have no billed amount. When the row's invoice
+  `replaces` earlier ones, a "Replaces INV-x (Cancelled)" line links the newest
+  of them, with "+n more" for the rest.
+- `InvoiceDetailPage` header meta adds "Replaced by INV-x" on a cancelled
+  invoice with a `replaced_by`, and "Replaces INV-x, INV-y" when `replaces` is
+  not empty; both links keep the page's return state.
 - `invoiceRowState.ts` derives five steps (metering, invoice, approved, sent,
   paid), each done, open, active or in trouble. Reasons identify invoice/PDF
   generation, email delivery, metering gaps, locked overlaps and failures.

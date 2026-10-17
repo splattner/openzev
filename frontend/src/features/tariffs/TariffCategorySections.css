@@ -1,0 +1,267 @@
+/* One row per series; details and write actions live in the drawer. */
+
+.tariff-list {
+  container-type: inline-size;
+}
+
+/* Fixed columns, so every category's table lines up under the one above. */
+
+.tariff-table {
+  table-layout: fixed;
+}
+
+.tariff-table td {
+  vertical-align: baseline;
+}
+
+.tariff-table .tariff-table-applies {
+  width: 26%;
+}
+
+.tariff-table .numeric {
+  width: 7.5rem;
+}
+
+.tariff-table .tariff-table-unit {
+  width: 6.5rem;
+}
+
+.tariff-table .tariff-table-valid {
+  width: 10.5rem;
+}
+
+.tariff-table th.numeric {
+  text-align: right;
+}
+
+.tariff-table tbody tr {
+  cursor: pointer;
+}
+
+.tariff-table tbody tr.is-selected > td,
+.tariff-table tbody tr:has(:focus-visible) > td {
+  background: var(--surface);
+}
+
+/* The series whose drawer is open — so it stays identifiable once you've
+   scrolled or the list re-sorts under you. */
+
+.tariff-table tbody tr.is-selected > td:first-child {
+  box-shadow: inset 3px 0 0 var(--brand-mid);
+}
+
+/* An ended version: the whole row a step greyer, ground and text alike, in
+   the neutral of the "ended" pill (the sunken surface reads green). The
+   text stays above 4.5:1 on that ground, where the muted grey would not; a
+   problem pill keeps its own tone. */
+
+.tariff-table tbody tr.is-ended > td,
+.tariff-list .tariff-table tbody tr.is-ended {
+  background: color-mix(in srgb, var(--status-neutral) 60%, var(--surface-card));
+}
+
+.tariff-table tbody tr.is-ended :is(.tariff-select, td, .tariff-table-meta, .tariff-table-notes) {
+  color: color-mix(in srgb, var(--text-body) 50%, var(--text-muted));
+}
+
+.tariff-table-name {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tariff-select {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 650;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tariff-table-meta,
+.tariff-table-notes {
+  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+/* One line, as on the PDF; the full note is its tooltip and in the drawer. */
+
+.tariff-table-notes {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-style: italic;
+}
+
+/* Desktop: each band's hours, price and unit share one baseline. */
+
+.tariff-table-lines > div {
+  overflow: hidden;
+  line-height: 1.5rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tariff-table-bands {
+  display: none;
+}
+
+.tariff-table td.numeric {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+td.tariff-table-unit,
+td.tariff-table-valid {
+  color: var(--text-muted);
+}
+
+.tariff-table-unit,
+.tariff-table-valid {
+  white-space: nowrap;
+}
+
+.tariff-table-valid strong {
+  font-weight: 650;
+  color: var(--text-body);
+}
+
+.tariff-table .tariff-table-open {
+  width: 3.75rem;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.tariff-table td.tariff-table-open {
+  vertical-align: middle;
+}
+
+@container (max-width: 56rem) {
+  /* Small card: tariff on top, one block per band, validity last. */
+  .tariff-table,
+  .tariff-table thead,
+  .tariff-table thead tr,
+  .tariff-table tbody {
+    display: block;
+  }
+
+  .tariff-table thead th:first-child {
+    display: block;
+  }
+
+  /* Out of sight, not out of the accessibility tree. */
+  .tariff-table thead th:not(:first-child) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .tariff-table thead th.tariff-table-bands {
+    display: table-cell;
+  }
+
+  .tariff-list .tariff-table tbody tr {
+    display: grid;
+    grid-template:
+      'tariff tariff open' auto
+      'bands bands open' auto
+      'valid valid open' auto / minmax(0, 1fr) auto auto;
+    gap: 0.25rem 0.625rem;
+    height: auto;
+    padding: 0.75rem var(--sheet-pad-inline);
+    border-bottom: 1px solid var(--border-default);
+  }
+
+  .tariff-list .tariff-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .tariff-list .tariff-table tbody td,
+  .tariff-list .tariff-table tbody tr.is-selected > td:first-child {
+    width: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .tariff-list .tariff-table tbody tr:hover > td {
+    background: var(--surface);
+  }
+
+  .tariff-list .tariff-table tbody tr.is-selected,
+  .tariff-list .tariff-table tbody tr:has(:focus-visible) {
+    background: var(--surface);
+  }
+
+  .tariff-list .tariff-table tbody tr.is-selected {
+    box-shadow: inset 3px 0 0 var(--brand-mid);
+  }
+
+  .tariff-table-tariff {
+    grid-area: tariff;
+  }
+
+  /* Desktop's three parallel columns become one block per band, so a long
+     applicability line can wrap without losing its price. */
+  .tariff-table td.tariff-table-applies,
+  .tariff-table td.numeric,
+  .tariff-table td.tariff-table-unit {
+    display: none;
+  }
+
+  td.tariff-table-bands {
+    display: grid;
+    grid-area: bands;
+    gap: 0.375rem;
+    min-width: 0;
+    width: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .tariff-table-band {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.125rem 0.625rem;
+    min-width: 0;
+  }
+
+  .tariff-table-band-applies {
+    flex: 1 1 12rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .tariff-table-band-price {
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tariff-table-valid {
+    grid-area: valid;
+  }
+
+  .tariff-table td.tariff-table-valid {
+    font-size: 0.8125rem;
+  }
+
+  .tariff-table td.tariff-table-open {
+    grid-area: open;
+    align-self: center;
+    width: auto;
+  }
+}
+

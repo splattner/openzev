@@ -4,6 +4,7 @@ import tempfile
 from datetime import timedelta
 
 from django.test import TestCase, override_settings
+from django.urls import resolve
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -184,7 +185,10 @@ class SystemHealthEndpointTests(HealthTestCase):
     def test_a_failing_probe_degrades_to_unknown_instead_of_breaking_the_tab(self):
         from unittest import mock
 
+        # Load views before patching a function they import, so the mock cannot leak.
+        resolve(HEALTH_URL)
         with mock.patch("backups.health.backup_health", side_effect=RuntimeError("boom")):
             response = self.client.get(HEALTH_URL)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["backups"], {"status": "unknown"})
+        self.assertEqual(self.client.get("/api/v1/backups/status/").status_code, 200)

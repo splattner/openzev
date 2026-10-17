@@ -12,8 +12,12 @@ def build_invoice_email_context(
     period_end: object,
     due_date: object,
     total_chf: object,
+    amount_due_chf: object = None,
 ) -> dict[str, object]:
-    """Return the variables available to the invoice-email subject and body."""
+    """Return the variables available to the invoice-email subject and body.
+
+    ``amount_due_chf`` is the total less any credit applied; it falls back to the
+    total for a caller that has no credit to account for."""
     return {
         "invoice_number": invoice_number,
         "zev_name": zev_name,
@@ -22,6 +26,7 @@ def build_invoice_email_context(
         "period_end": period_end,
         "due_date": due_date,
         "total_chf": total_chf,
+        "amount_due_chf": total_chf if amount_due_chf is None else amount_due_chf,
     }
 
 

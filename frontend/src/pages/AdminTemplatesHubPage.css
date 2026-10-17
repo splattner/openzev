@@ -1,0 +1,44 @@
+/* Templates hub: two labelled tab rows sharing one tab strip — PDF on one
+   line, Email on the next. The fixed tag column keeps both rows left-bound. */
+
+.template-tabs-rows {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.template-tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.template-tab-group {
+  flex: 0 0 4rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.template-tabs-row .app-tabs-list {
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+  /* Keep the 1rem column gap from .app-tabs-list, but wrapped tab lines
+     should sit close together instead of a full gap apart. */
+  row-gap: 0.25rem;
+}
+
+@media (max-width: 540px) {
+  .template-tabs-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .template-tab-group {
+    flex: none;
+  }
+}
+

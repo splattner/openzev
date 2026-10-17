@@ -101,6 +101,7 @@ Use placeholders to personalize emails:
 | `{period_end}` | Billing period end date (formatted per regional settings) | `31.01.2026` |
 | `{due_date}` | Payment due date (formatted per regional settings; empty when unset) | `14.02.2026` |
 | `{total_chf}` | Invoice total in CHF | `123.45` |
+| `{amount_due_chf}` | Amount still to pay in CHF: the total less any credit note applied | `98.45` |
 
 ### Default Template
 
@@ -115,7 +116,7 @@ Dear {participant_name},
 
 Please find your energy invoice for the period {period_start} to {period_end} attached.
 
-Total: CHF {total_chf}
+Amount due: CHF {amount_due_chf}
 
 Kind regards,
 {zev_name}

@@ -110,8 +110,16 @@ spec:
               value: {{ .Values.email.hostUser | quote }}
             - name: DEFAULT_FROM_EMAIL
               value: {{ .Values.email.defaultFromEmail | quote }}
+            - name: DEBUG
+              value: {{ .Values.debug | quote }}
             - name: FRONTEND_URL
               value: {{ .Values.frontendUrl | quote }}
+            - name: NUM_PROXIES
+              value: {{ .Values.backend.numProxies | quote }}
+            - name: SECURE_SSL_REDIRECT
+              value: {{ .Values.backend.secureSslRedirect | quote }}
+            - name: SECURE_HSTS_SECONDS
+              value: {{ .Values.backend.hstsSeconds | int | quote }}
             {{- if .Values.backend.allowedHosts }}
             - name: ALLOWED_HOSTS
               value: {{ .Values.backend.allowedHosts | quote }}
@@ -134,8 +142,6 @@ spec:
             - name: CSRF_TRUSTED_ORIGINS
               value: {{ $csrfTrustedOrigins | quote }}
             {{- end }}
-            - name: NUM_PROXIES
-              value: {{ .Values.backend.numProxies | quote }}
             {{- range $key, $value := .Values.backend.extraEnv }}
             - name: {{ $key }}
               value: {{ $value | quote }}

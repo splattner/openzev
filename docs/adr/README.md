@@ -38,7 +38,10 @@ This directory captures key architectural decisions for OpenZEV.
 - [0032: One visual language for screen and documents](0032-one-visual-language-for-screen-and-documents.md) (amends 0014)
 - [0033: The energy data flag defaults to on once the integration key is configured](0033-energy-data-flag-follows-the-integration-key.md)
 - [0034: Participant links never sign in an account with independent access](0034-participant-links-never-sign-in-independent-accounts.md)
-- [0035: One rule for where content opens — dialog, drawer, page, disclosure](0035-overlay-and-disclosure-pattern-rules.md)
+- [0035: Participant-enrolled credentials cannot carry independent access](0035-fresh-independent-credentials-on-promotion.md) (amends 0034)
+- [0036: Explicit participant-link password recovery](0036-explicit-participant-link-password-recovery.md)
+- [0037: Issued invoices are corrected by credit note, never deleted](0037-issued-invoices-are-corrected-not-deleted.md) (amends 0006; Proposed)
+- [0038: Order invoice-generation locks with restore and approval](0038-invoice-generation-lock-order.md)
 
 ## Conventions
 

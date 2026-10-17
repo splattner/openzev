@@ -1,0 +1,35 @@
+/* Stack by default; use this page's width for the desktop split. */
+
+.feasibility-page {
+  container-type: inline-size;
+}
+
+.feasibility-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.feasibility-layout > * {
+  min-width: 0;
+}
+
+.feasibility-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 1rem;
+}
+
+@container (min-width: 64rem) {
+  .feasibility-layout:not(.feasibility-layout-wide) {
+    grid-template-columns: minmax(20rem, 26.25rem) minmax(0, 1fr);
+  }
+}
+
+@container (min-width: 70rem) {
+  .feasibility-layout-wide {
+    grid-template-columns: minmax(20rem, 33.75rem) minmax(0, 1fr);
+  }
+}
+

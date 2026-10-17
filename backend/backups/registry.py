@@ -124,6 +124,9 @@ ZEV_SECTIONS: tuple[tuple[str, tuple[ZevPart, ...]], ...] = (
         (
             ZevPart("invoices.Invoice", "zev"),
             ZevPart("invoices.InvoiceItem", "invoice__zev"),
+            ZevPart("invoices.Payment", "invoice__zev"),
+            ZevPart("invoices.Credit", "zev"),
+            ZevPart("invoices.CreditApplication", "credit__zev"),
             ZevPart("invoices.InvoiceDynamicSourceEvidence", "invoice__zev"),
             ZevPart("invoices.InvoiceAccessToken", "invoice__zev"),
             ZevPart("invoices.EmailLog", "invoice__zev"),
@@ -138,7 +141,10 @@ ZEV_SECTIONS: tuple[tuple[str, tuple[ZevPart, ...]], ...] = (
 # coverage test that fails if a backed-up model gains a ``FileField`` not
 # listed here — the omission that made the old ``pg_dump`` guidance lose every
 # invoice PDF.
-MEDIA_FIELDS: tuple[tuple[str, str, str], ...] = (("invoices.Invoice", "pdf_file", "zev"),)
+MEDIA_FIELDS: tuple[tuple[str, str, str], ...] = (
+    ("invoices.Invoice", "pdf_file", "zev"),
+    ("invoices.Credit", "pdf_file", "zev"),
+)
 
 # ── deliberately not backed up ───────────────────────────────────────────────
 

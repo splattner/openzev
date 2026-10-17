@@ -33,7 +33,7 @@ from backups.registry import (
     ZEV_SECTIONS,
     backed_up_labels,
 )
-from invoices.models import ContractIssue, Invoice
+from invoices.models import ContractIssue, Credit, Invoice
 from metering.models import ImportLog, MeterReading
 from zev.models import Participant, Zev
 from zev.test_transfer import rewrite_archive
@@ -557,6 +557,7 @@ class RoundTripTests(TestCase):
         # Wipe the community. Invoices are PROTECT, so they go first; contract
         # issues and audit rows are SET_NULL, so they survive as orphans and the
         # reload must update them in place rather than duplicate them.
+        Credit.objects.filter(zev=alpha).delete()
         Invoice.objects.filter(zev=alpha).delete()
         alpha.delete()
         self.assertFalse(MeterReading.objects.filter(metering_point__zev_id=alpha_id).exists())

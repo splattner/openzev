@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faBuilding, faSpinner } from '@fortawesome/free-solid-svg-icons'
 import type { ActionMenuItem } from '../../components/ActionMenu'
-import { InvoiceAmount, InvoiceLink, InvoiceRowActions } from '../../components/InvoicePresentation'
+import { InvoiceAmount, InvoiceLink, InvoiceRowActions, InvoiceTotal } from '../../components/InvoicePresentation'
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { InvoiceProgressLegend, InvoiceRowProgress } from './InvoiceRowProgress'
 import { invoiceStepReasonText } from './invoiceRowText'
@@ -90,6 +90,15 @@ export function InvoicePeriodRowsTable({
                           {!live && ` (${t('invoice.status.cancelled')})`}
                         </span>
                       ) : null}
+                      {/* A correction or a cancel-and-regenerate leaves the earlier invoice behind. */}
+                      {invoice?.replaces?.length ? (
+                        <span>
+                          {t('pages.invoices.row.replaces')}{' '}
+                          <InvoiceLink invoice={invoice.replaces[0]} from="/billing/invoices" period={period} />
+                          {` (${t('invoice.status.cancelled')})`}
+                          {invoice.replaces.length > 1 && ` ${t('pages.invoices.row.moreReplaced', { count: invoice.replaces.length - 1 })}`}
+                        </span>
+                      ) : null}
                       {!live && work.generating ? (
                         <span className="invoice-row-pending">
                           <FontAwesomeIcon icon={faSpinner} spin fixedWidth aria-hidden="true" />
@@ -122,7 +131,7 @@ export function InvoicePeriodRowsTable({
                   </td>
                   <td role="cell" className="numeric invoice-row-total">
                     {live && <span className="invoice-row-currency">CHF </span>}
-                    <InvoiceAmount value={live?.total_chf ?? null} currency={false} />
+                    {live ? <InvoiceTotal invoice={live} currency={false} /> : <InvoiceAmount value={null} currency={false} />}
                   </td>
                   <td role="cell" className="invoice-actions-cell">
                     <InvoiceRowActions primary={getPrimaryRowAction(row)} menuItems={getRowMenuItems(row)} variant="secondary" iconOnlyMenu />

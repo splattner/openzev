@@ -1,0 +1,565 @@
+/* ── App shell: forest sidebar + paper workspace ───────────────────────────
+   The sidebar is deep forest: sage text, white for what is current. */
+
+.shell {
+  display: grid;
+  grid-template-columns: 14rem minmax(0, 1fr);
+  min-height: 100vh;
+  transition: grid-template-columns 0.2s ease;
+}
+
+.shell.shell-collapsed {
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 0.75rem 0.75rem;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  transition: padding 0.2s ease;
+  height: 100dvh;
+  position: sticky;
+  top: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sidebar-line) transparent;
+
+  /* The forest ring would vanish on the forest; the account panel, a white
+     sheet, takes it back. */
+  --focus-ring: var(--white);
+}
+
+.sidebar.collapsed {
+  padding-inline: 0.625rem;
+}
+
+.sidebar-top {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  min-height: 4.5rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-bottom: 0.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sidebar-line) transparent;
+  align-content: start;
+}
+
+.sidebar-fixed {
+  display: grid;
+  gap: 0.875rem;
+  flex-shrink: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  grid-template-rows: auto minmax(0, auto);
+  scrollbar-width: thin;
+  scrollbar-color: var(--sidebar-line) transparent;
+}
+
+.sidebar-fixed::-webkit-scrollbar,
+.sidebar-top::-webkit-scrollbar,
+.table-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.sidebar-fixed::-webkit-scrollbar-thumb,
+.sidebar-top::-webkit-scrollbar-thumb,
+.table-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+}
+
+.sidebar-fixed::-webkit-scrollbar-track,
+.sidebar-top::-webkit-scrollbar-track,
+.table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Horizontal lockup: the logo's mark beside its wordmark. */
+
+.sidebar-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding-left: 0.375rem;
+}
+
+.sidebar-brand {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.sidebar-brand-mark {
+  display: block;
+  width: 2.125rem;
+  height: 2.125rem;
+  flex-shrink: 0;
+}
+
+.sidebar-brand-wordmark {
+  display: block;
+  width: auto;
+  height: 1.125rem;
+  min-width: 0;
+}
+
+.sidebar-collapse-button {
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--sidebar-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sidebar-collapse-button:hover {
+  background: var(--sidebar-hover);
+  color: var(--white);
+}
+
+.sidebar-collapse-button svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.nav-list {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.nav-link {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.625rem;
+  min-height: 2.25rem;
+  border-radius: var(--radius-sm);
+  color: var(--sidebar-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.nav-link:hover {
+  background: var(--sidebar-hover);
+  color: var(--white);
+}
+
+/* Current page: a pale row in deep forest. */
+
+.nav-link.active {
+  background: var(--sidebar-active);
+  color: var(--brand-deep);
+  font-weight: 600;
+}
+
+.nav-section {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.nav-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nav-icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.nav-label {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* First labelled group — same clearance as nav-standalone, no divider. */
+
+.nav-section-start {
+  margin-top: 0.75rem;
+}
+
+.nav-section-end {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--sidebar-line);
+}
+
+.nav-standalone {
+  margin-top: 0.75rem;
+}
+
+/* Short viewports: tighten sidebar rhythm. */
+
+@media (max-height: 50rem) {
+  .sidebar {
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+  }
+
+  .nav-link {
+    min-height: 2rem;
+    padding-block: 0.3rem;
+  }
+
+  .nav-section-start,
+  .nav-section-end,
+  .nav-standalone {
+    margin-top: 0.5rem;
+  }
+}
+
+.nav-group-label {
+  padding: 0.5rem 0.625rem 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sidebar-text);
+  opacity: 0.8;
+}
+
+/* ── Account: the signed-in person at the foot ──────────────────────────────
+   A plain row on the sidebar, set off by the footer's hairline: the name
+   and the up/down selector mark. */
+
+.sidebar-footer {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--sidebar-line);
+}
+
+.sidebar-user .user-menu-trigger {
+  width: 100%;
+  min-width: 0;
+  gap: 0.625rem;
+  padding: 0.5rem;
+  border-color: transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--white);
+  transition: background-color 0.15s ease;
+}
+
+.sidebar-user .user-menu-trigger:hover,
+.sidebar-user .user-menu-trigger[aria-expanded='true'] {
+  background: var(--sidebar-hover);
+}
+
+/* On the account page the account row is the current place, marked like
+   the current navigation row. */
+
+.sidebar-user .user-menu-trigger.is-current {
+  background: var(--sidebar-active);
+}
+
+.sidebar-user .user-menu-trigger.is-current .user-meta strong,
+.sidebar-user .user-menu-trigger.is-current .user-menu-caret {
+  color: var(--brand-deep);
+}
+
+.sidebar-user .user-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-user .user-meta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--white);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.user-menu-caret {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--sidebar-text);
+}
+
+.user-menu-caret svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Collapsed rail: the selector mark alone. */
+
+.shell-collapsed .sidebar-user .user-meta {
+  display: none;
+}
+
+.shell-collapsed .sidebar-user .user-menu-trigger {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+/* The account panel opens upwards over the navigation, inside the sidebar. */
+
+.sidebar-user .user-menu-dropdown {
+  top: auto;
+  right: 0;
+  bottom: calc(100% + 0.375rem);
+  left: 0;
+  min-width: 0;
+  --focus-ring: var(--brand-mid);
+}
+
+/* The panel's first line: which login this is, for people with several. */
+
+.user-menu-email {
+  overflow: hidden;
+  margin-bottom: 0.25rem;
+  padding: 0.25rem 0.625rem 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The panel's last line: what runs here and where its source lives. */
+
+.user-menu-about {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.625rem 0.25rem;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-decoration: none;
+}
+
+.user-menu-about:hover {
+  color: var(--text-primary);
+}
+
+.user-menu-about svg {
+  flex-shrink: 0;
+}
+
+.user-menu-about-version {
+  font-variant-numeric: tabular-nums;
+}
+
+.shell-collapsed .sidebar-brand-row {
+  flex-direction: column;
+  gap: 0.625rem;
+  padding-left: 0;
+}
+
+.shell-collapsed .sidebar-brand {
+  flex: none;
+  justify-content: center;
+}
+
+.shell-collapsed .sidebar-brand-wordmark {
+  display: none;
+}
+
+.shell-collapsed .nav-link {
+  justify-content: center;
+  padding: 0.55rem;
+}
+
+.shell-collapsed .nav-label,
+.shell-collapsed .nav-group-label {
+  display: none;
+}
+
+.content {
+  padding: 2rem 2rem 2.5rem;
+}
+
+/* Page content only; the top bar is a separate banner. Programmatic focus
+   target for the skip link and route changes, not a tab stop. */
+
+.content-main {
+  width: 100%;
+  max-width: 88rem;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.content-main:focus,
+.page-header h1:focus {
+  outline: none;
+}
+
+/* First tab stop; off screen until focused. Above the mobile drawer (200),
+   below modals (zLayers.ts). */
+
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 300;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  color: var(--interactive);
+  font-weight: 600;
+  transform: translateY(calc(-100% - 1.5rem));
+}
+
+/* The shadow only while shown: parked above the viewport, its blur would
+   still reach into the top of the page. */
+
+.skip-link:focus {
+  box-shadow: var(--shadow-overlay);
+  transform: none;
+}
+
+/* Banner above the page: the phone's app bar, and the impersonation notice
+   on any width. Empty on a desktop session. */
+
+.top-nav {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 88rem;
+  margin-inline: auto;
+}
+
+.top-nav:has(.impersonation-banner) {
+  margin-bottom: 1.25rem;
+}
+
+.mobile-bar {
+  display: none;
+}
+
+.impersonation-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  border: 1px solid var(--warning-300);
+  background: var(--warning-100);
+  color: var(--warning-800);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.user-menu {
+  position: relative;
+}
+
+.user-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.user-meta {
+  display: grid;
+  text-align: left;
+  line-height: 1.35;
+}
+
+.user-meta strong {
+  font-size: 0.875rem;
+  color: var(--ink);
+}
+
+.user-menu-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.35rem);
+  z-index: 10;
+  min-width: 220px;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+  padding: 0.375rem;
+  display: grid;
+  gap: 0.125rem;
+}
+
+.user-menu-item {
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  text-align: left;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.625rem;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.user-menu-item:hover {
+  background: var(--surface-sunken);
+}
+
+.user-menu-item-icon {
+  width: 1rem;
+  height: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-body);
+}
+
+/* The workspace column: the banner (top-nav) above the page. */
+
+.content {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+

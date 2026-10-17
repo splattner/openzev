@@ -89,14 +89,29 @@ Draft → Approved → Sent → Paid
 - **Draft** — just generated; can be reviewed, approved, regenerated or deleted.
 - **Approved** — locked; can be emailed or marked as sent. Its amounts can no
   longer change.
-- **Sent** — emailed (or marked as sent); can be resent or marked paid.
-- **Paid** — fully settled; only its PDF can still be regenerated.
-- **Cancelled** — removed from the active workflow; can be deleted or generated
-  again. A cancelled invoice does not count as generated for its period: its
-  period card still asks you to generate a replacement. Cancelling is available
-  through the API only — there is no cancel button in the UI.
+- **Sent** — emailed (or marked as sent); can be resent, receive payments and
+  be marked paid. A sent invoice that has received part of its total shows
+  **Partly paid**.
+- **Paid** — the payments cover the total; only its PDF can still be
+  regenerated.
+- **Cancelled** — removed from the active workflow. A cancelled invoice does
+  not count as generated for its period: its period card still asks you to
+  generate a replacement. Cancelling is available through the API only — there
+  is no cancel button in the UI, and an invoice with payments cannot be
+  cancelled.
 
-Only admins can delete an invoice that is approved, sent or paid.
+Once an invoice has been approved it keeps its number for good: if it is
+cancelled later, generating the period again creates a new invoice next to it
+instead of replacing it, so no invoice number ever goes missing. Only a draft,
+or a cancelled invoice that was never approved, is replaced or can be deleted
+by a manager. Admins can delete other invoices too, except one that has
+received payments.
+
+Approval freezes the issuer and recipient details and discards the draft PDF.
+Use **Generate PDF** to view the approved document. Emailing generates a
+missing PDF automatically. **Mark sent** records manual delivery without
+generating a PDF; you can generate it afterwards. Later address or bank-detail
+changes do not change the approved document.
 
 ## Billing Hub (Invoices · Emails)
 
@@ -209,7 +224,10 @@ Each row in the table represents one **participant** who had active metering-poi
   recipient as billed. **Joined**/**Left** dates explain participation inside the period.
 - The invoice number opens details and retains the period for return navigation.
   Rows without an invoice show **Not created** or **Creating invoice…**;
-  cancelled invoices retain their link and show no billed amount.
+  cancelled invoices retain their link and show no billed amount. When an
+  invoice was cancelled and the period generated again, the row shows the new
+  invoice and **Replaces OZV-00014 (Cancelled)** beneath it, linking to the
+  cancelled one.
 - Problems name missing meters and days, an overlapping locked invoice,
   a failed PDF, a failed email, or an approved invoice whose participant has no
   email address (deliver it yourself, then **Mark as Sent**). A settled invoice
@@ -246,7 +264,9 @@ the rest under **More**:
 **More** groups invoice actions first, then PDF and email actions. **Open PDF**
 appears once the invoice has a stored document.
 
-Admins also see **Delete invoice** for approved, sent and paid invoices.
+Admins also see **Delete invoice** for approved, sent and paid invoices without
+payments. A cancelled invoice that had been approved offers no **Delete
+invoice** to managers: it stays on record with its number.
 
 The filter above the table counts the period's rows: **All**, **Drafts**,
 **Approved**, **Sent** and **Issues** (rows with missing metering data, a
@@ -285,6 +305,9 @@ community stops watching the previous period.
 
 The system calculates energy allocation and applies tariffs, creating a **Draft** invoice.
 
+Concurrent generation requests for the same participant run in sequence.
+The regeneration rules below apply to overlapping billing periods.
+
 ### Regenerating an Existing Invoice
 
 While an invoice is a **Draft**, **More → Regenerate invoice** replaces it with a
@@ -313,6 +336,13 @@ PDF does:
   for their electricity, the VAT is charged on what the ZEV supplies, so it
   does not equal the subtotal times the rate; the invoice PDF below lists the
   producer credit after the VAT.
+
+**Payments** (managers and viewers) — what has been received for the invoice:
+the amount received and still outstanding, and one row per payment with its
+date, amount, note and who recorded it. On a sent invoice, managers see
+**Record payment** and **Mark Paid** here (see
+[Recording payments](#recording-payments)). Participants see the invoice's
+status, not the payment rows.
 
 **Energy totals:**
 
@@ -350,6 +380,11 @@ PDF generation is a separate step from invoice creation.
 **More → Open PDF** opens the document. Generation and regeneration are also
 under **More** for any invoice that exists. **Download all
 PDFs** in the command bar downloads the period's documents together.
+
+If document details keep changing during rendering, generation can stop with
+**PDF missing**. Use **Generate PDF** again once those changes are finished.
+Email delivery retries these conflicts automatically; if retries run out,
+the failure appears in the audit log.
 
 For custom templates that omit the second address line, ask an admin to
 [update the PDF template](14-admin-console.md#invoice-pdf-templates), then regenerate the affected PDFs.
@@ -402,13 +437,116 @@ Use Tab or Shift+Tab to move between email-history controls, then Escape or
 
 Email sending is asynchronous via Celery with automatic retries. For delivery mechanics, retry behavior, and troubleshooting failed emails, see [Email Configuration](10-email-configuration.md).
 
-## Marking Invoices as Paid
+## Recording payments
 
-When a participant has paid:
+When a participant has paid the whole invoice, click **Mark Paid** on the row
+(shown for `Sent` invoices). It records one payment for the outstanding amount,
+dated today, and the status changes to `Paid`. It is a single-click action.
 
-1. Click **Mark Paid** on the row (shown for `Sent` invoices).
+For a partial payment, or to record the date the money actually arrived, open
+the invoice and use the **Payments** card:
 
-The status changes to `Paid`. There is no additional confirmation dialog or payment-detail input — it is a single-click action.
+1. Click **Record payment**.
+2. Enter the amount (it starts at the outstanding amount and can't exceed it),
+   the date it was paid (not in the future) and, optionally, a note such as the
+   bank reference.
+3. Click **Record payment**.
+
+![Record payment dialog](screenshots/08h-record-payment-dialog.png)
+
+A payment short of the total leaves the invoice **Partly paid**: its status
+pill says so, and the payment step in the period table shows it as under way.
+Once the payments cover the total, the invoice becomes `Paid`. **Mark rest as
+paid** records whatever is still outstanding in one go.
+
+![Payments card of a partly paid invoice](screenshots/08f-invoice-payments.png)
+
+An invoice that pays a producer out (a negative total) has no **Record
+payment**: **Mark Paid** records the payout in full.
+
+To correct a payment entered by mistake, remove it with the bin icon on its
+row in the **Payments** card. A paid invoice whose remaining payments no longer
+cover the total goes back to `Sent`. Payments of a cancelled invoice can't be
+removed.
+
+Invoices that were marked paid before payments were recorded have one payment
+for their total, dated when they were marked paid.
+
+## Correcting a paid invoice with a credit note
+
+A paid invoice (or a sent one that has received payments) is not cancelled or
+deleted; it is corrected with a **credit note** (Gutschrift). Open the invoice
+and click **Correct invoice** in the **Credit notes** card, then choose:
+
+- **Reverse the invoice** - credits everything received for the invoice and
+  cancels it. The cancelled invoice stays, with its number. Afterwards generate
+  the period again to issue a replacement. The two invoices link to each other:
+  the replacement says **Replaces …** under its title, the cancelled one
+  **Replaced by …**.
+- **Credit part of it** - credits an amount you enter (at most what was
+  received and not yet credited) and leaves the invoice as it is. Use it for an
+  overcharge.
+
+![Correct invoice dialog](screenshots/08i-correct-invoice-dialog.png)
+
+Enter a **reason**; it is printed on the credit note. Credit notes have their
+own numbers (prefix **CN** by default, changeable in the community settings
+under *Billing & payment*) and a PDF you can open from the card, based on the
+**Credit Note PDF Template** that admins can edit under *Templates*. Participants see their
+credit notes on the invoice and under **My invoices**.
+
+![Credit note on a reversed invoice](screenshots/08g-invoice-credit-note.png)
+
+Once a credit note exists, the invoice's payments can no longer be removed and
+the invoice can no longer be deleted. Invoices with nothing to collect (a
+producer payout) can't be corrected this way. An adjustment credit also shows
+as a negative row in the participant's annual statement.
+
+### Credit on the next invoice
+
+A credit note is not paid out by default: **the next invoice the participant
+gets deducts it.** When an invoice is generated, OpenZEV sets the participant's
+open credit notes against the total, oldest first, **after VAT**. The line
+items, the subtotal, the VAT and the total stay as calculated. The invoice shows
+the credit note ("Credit note CN-00001 applied") and an **Amount due**, which
+is what the QR bill, the email and **Record payment** use:
+
+| | |
+| --- | --- |
+| Total | CHF 108.10 |
+| Credit note CN-00001 applied | CHF -50.00 |
+| **Amount due** | **CHF 58.10** |
+
+If the credit is larger than the invoice, the amount due is CHF 0.00 (the QR
+bill is left off) and the rest carries over to the next invoice. An invoice the
+credit covers in full still has to be moved on: click **Mark Paid**, which
+records no payment.
+
+- **Drafts hold credit.** Credit set against a draft is used up while the draft
+  exists. Regenerating the draft, deleting it or cancelling it gives the credit
+  back, and the replacement invoice uses it again.
+- **Cancelling releases credit.** Cancelling an invoice, or reversing it, frees
+  the credit it used so the next invoice can use it. The cancelled invoice keeps
+  showing what it said.
+- **Reversing an invoice that used credit** credits only the cash the
+  participant paid and releases the credit that was applied, so they get back
+  exactly what they paid and used. An invoice settled **by credit alone** can be
+  reversed too: it is cancelled and its credit released, but no credit note is
+  issued because no cash was paid.
+- **Partial credits are limited to cash.** An invoice settled by credit alone
+  can't be credited in part. Reverse it and generate it again instead.
+
+### Refunding a credit note
+
+When a participant leaves, or simply wants the money, pay out what is left of an
+open credit note: in the **Credit notes** card of the invoice it was issued for,
+click the refund icon on the credit note, enter the date it was paid out and an
+optional note (for example the bank reference), and confirm. OpenZEV books the
+whole **remaining** amount as refunded; the credit note then reads **Refunded**.
+The transfer itself happens outside OpenZEV. Credit set against a draft counts
+as used, so it can be refunded only after that draft is deleted or cancelled. A
+credit note shows its status (**Open**, **Used** or **Refunded**), what remains,
+and which invoices it was applied to.
 
 ## Deleting Invoices
 
@@ -419,8 +557,9 @@ Invoices can be deleted to clean up incorrect or test data.
 
 **Delete visibility rules:**
 
-- **Draft** or **Cancelled** invoices — **More → Delete invoice** is available to managers.
-- **Any status** — admins can always delete.
+- **Draft** invoices, and **Cancelled** invoices that were never approved —
+  **More → Delete invoice** is available to managers.
+- **Any status** — admins can delete, as long as the invoice has no payments or credit notes.
 
 Deletion is permanent; the invoice is removed from the database.
 
@@ -443,9 +582,9 @@ default is the last completed year.
   came from the ZEV, their self-sufficiency rate, and their savings: what their
   ZEV electricity was billed at, what the same kWh would have cost at the
   average grid rate on their invoices, and the difference. These are the same
-  savings figures as on each participant's annual statement. Cancelled
-  invoices do not count, and a participant without invoices for the year shows
-  no savings.
+  savings figures as on each participant's annual statement. Only invoices
+  that have been approved count — not drafts, and not cancelled invoices — and
+  a participant without invoices for the year shows no savings.
 - **Local sales vs. feed-in tariff** — for producers: what selling electricity
   inside the ZEV earned, what the same kWh would have earned as grid feed-in,
   and the difference (the **uplift**). The feed-in figure uses the feed-in
@@ -485,7 +624,9 @@ Below the report, under **Annual documents**:
 statement or select the **Tax Overview** tab. Use **Download PDF** to save the
 document. **Open in new tab** shows the same PDF. Select **Retry** if generation
 fails, or reload the page for fresh documents. The tax overview shows producers'
-net local-energy revenue and feed-in compensation.
+net local-energy revenue and feed-in compensation. The annual statement and the
+tax overview count the same invoices as the annual report: those that have
+been approved and not cancelled, whether or not they are paid yet.
 
 ![Participant annual documents with embedded statement](screenshots/23b-participant-annual-statement.png)
 

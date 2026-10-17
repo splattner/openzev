@@ -720,6 +720,10 @@ Management requests require a participant selection to compute a profile.
 }
 ```
 
+Meter selection unions manager/viewer ZEVs with the caller's current
+participant assignments. The participant branch excludes disabled ZEVs;
+managers/viewers and admins retain quality reads there.
+
 **Gap detection algorithm:**
 
 1. Enumerate all calendar days in `[date_from, date_to]`.
@@ -924,6 +928,7 @@ and missing meters still block the wizard.
 - otherwise, reads → logs of ZEVs the caller holds a manager or viewer grant for, OR `imported_by == user`; deletes (single and bulk) → logs of ZEVs the caller manages, OR logs it imported that belong to no ZEV (#761).
 
 **Deletion semantics:**
+- Single and bulk deletion obey the [disabled-ZEV rules](2026-03-community-and-access.md#45-write-scoping-zevscopedquerysetmixin), preserving all selected logs and readings on refusal.
 - Imports with `rows_overwritten > 0` cannot be deleted. Both endpoints return **400** with `{code: "overwrite_import_protected", error: "Imports that overwrote readings cannot be deleted. No imports were deleted."}` when any selected log is protected. The entire bulk operation is rejected without deleting any log or reading; this is not a rollback API and previous values are not restored.
 - CSV import runs in one transaction, publishing its readings and finalized overwrite count together. The successful log is created inside that transaction, so no half-finished import is ever visible or deletable. An unexpected failure rolls everything back and is then recorded as a separate failed-attempt log outside the transaction, before an `ImportFileError` propagates (400 with an actionable message, never an untraced 500). Deletion freezes the visible selection, locks its logs in primary-key order, checks protection, and deletes only that selection in one transaction.
 - Migration `0005_importlog_rows_overwritten` backfills the count from exact `Overwrote N existing readings.` notes in both legacy `errors` and newer `warnings`; other logs keep zero. The field is exposed by the import-log serializer and represented by `ImportLog.rows_overwritten: number` in TypeScript. Counts include repeated writes within the same file, so those overwrite imports are conservatively protected too.
@@ -1187,6 +1192,13 @@ type MeteringDashboardSummary =
 | `ChartDataEndpointTests` | §5.2: direction aggregates; Swiss day/month boundaries agree with raw data (`test_daily_bucket_uses_the_same_civil_day_as_raw_data`, `test_month_bucket_does_not_cross_the_civil_month_boundary`); hourly buckets stay distinct across both DST transitions |
 | `DashboardCivilDayBucketingTests` | §5.4: a 23:45 Swiss-time reading stays in its civil-day bucket (`+02:00`); 00:00 the next day is excluded |
 | `DataQualityStatusTests` | §5.5: owner sees gaps and severity; participant sees own meters; default range is the 30 days ending yesterday, and a lone `date_from` of today still yields a one-day window; fully assigned readings report no unassigned; holder-less meter flags every reading; assignment-gap readings flagged unassigned; overlapping windows flag only the corrupt meter (others still report) |
+
+### Backend (`metering/test_disabled_zev.py`)
+
+`metering/test_disabled_zev.py` covers `test_disabled_import_log_deletion`
+(6 cases), `test_bulk_delete_with_a_disabled_zev_preserves_the_entire_selection`
+(1), and `test_data_quality_visibility` (8): deletion access, retained data,
+and participant versus grant-based quality visibility.
 
 ### Backend (`metering/test_import_csv.py`, `metering/test_import_csv_characterization.py`, `metering/test_import_limits.py`)
 

@@ -20,7 +20,7 @@ from audit.services import build_diff, record_audit_event
 
 from zev import onboarding as zev_onboarding
 
-from . import email_change, emails, notifications, password_reset
+from . import email_change, emails, magic_links, notifications, password_reset
 from .jwt_utils import impersonator_of
 from .models import User
 from .permissions import IsAdmin
@@ -57,10 +57,8 @@ class EmailChangeRequestView(APIView):
     re-point the account at an attacker's mailbox and keep it (the session alone
     proves nothing about the person holding it).
 
-    Accounts with no usable password — participants, who sign in by emailed
-    link, and OAuth-only accounts — cannot do this themselves: there is nothing
-    to re-authenticate with, and for participants the address is the community
-    owner's to maintain on the participant record. An admin can still edit it.
+    Participant-only addresses remain manager-maintained even after password setup.
+    Passwordless accounts cannot re-authenticate. Both use the administrator flow.
     """
 
     permission_classes = [IsAuthenticated]
@@ -70,9 +68,14 @@ class EmailChangeRequestView(APIView):
         user = request.user
         if impersonator_of(request.auth):
             return Response(NOT_WHILE_IMPERSONATING, status=status.HTTP_403_FORBIDDEN)
-        if not user.has_usable_password():
+        if email_change.is_managed(user):
             return Response(
-                {"detail": "Your email address is managed by your administrator.", "code": "no_password"},
+                {"detail": "Your email address is managed by your administrator.", "code": "managed_email"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not user.has_usable_password() or user.password_from_participant_link:
+            return Response(
+                {"detail": "Email changes require an independently established password.", "code": "no_password"},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -142,15 +145,18 @@ class EmailChangeConfirmView(APIView):
     def post(self, request, *args, **kwargs):
         invalid = Response({"detail": "This link is invalid or has expired."}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            user, new_email = email_change.resolve_token(str(request.data.get("token") or "").strip())
+            token = str(request.data.get("token") or "").strip()
+            user, new_email = email_change.resolve_token(token)
         except email_change.EmailChangeError:
             return invalid
 
         with transaction.atomic():
-            # Re-check under a row lock: two opens of the same link must not both
-            # apply, and the address may have changed since resolve_token read it.
-            locked = User.objects.select_for_update().get(pk=user.pk)
-            if locked.email != user.email or email_change.address_in_use(new_email, excluding=locked):
+            locked = User.objects.locked().filter(pk=user.pk).first()
+            if locked is None:
+                return invalid
+            try:
+                _, new_email = email_change.resolve_token(token, user=locked)
+            except email_change.EmailChangeError:
                 return invalid
             old_email = locked.email
             locked.email = new_email
@@ -245,7 +251,8 @@ class PasswordResetConfirmView(APIView):
         if not isinstance(request.data, dict):
             return Response({"detail": "Expected an object."}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            user = password_reset.resolve_token(str(request.data.get("token") or "").strip())
+            token = str(request.data.get("token") or "").strip()
+            user = password_reset.resolve_token(token)
         except password_reset.PasswordResetError:
             return invalid
 
@@ -261,21 +268,26 @@ class PasswordResetConfirmView(APIView):
         with transaction.atomic():
             # Re-check under a row lock: two opens of the same link must not both
             # apply, and the account may have changed since resolve_token read it.
-            locked = User.objects.select_for_update().get(pk=user.pk)
-            if locked.password != user.password or locked.email != user.email or not password_reset.can_reset(locked):
+            try:
+                locked = User.objects.locked().get(pk=user.pk)
+                password_reset.resolve_token(token, user=locked)
+            except (User.DoesNotExist, password_reset.PasswordResetError):
                 return invalid
             locked.set_password(new_password)
+            locked.password_from_participant_link = False
             locked.must_change_password = False
-            locked.save(update_fields=["password", "must_change_password"])
+            locked.save(update_fields=["password", "password_from_participant_link", "must_change_password"])
             revoke_sessions(locked)
             links_revoked = zev_onboarding.revoke_active_for_user(locked)
-
-        _audit(
-            request, "password.reset", locked,
-            f"Reset the password of {locked.email or locked.username} with an emailed link.",
-            actor=locked, metadata={"onboarding_links_revoked": links_revoked},
-        )
-        notifications.notify(locked, "password_reset", request=request)
+            magic_revoked = magic_links.revoke_for_user(locked)
+            _audit(
+                request, "password.reset", locked,
+                f"Reset the password of {locked.email or locked.username} with an emailed link.",
+                actor=locked, metadata={
+                    "onboarding_links_revoked": links_revoked, "magic_links_revoked": magic_revoked,
+                },
+            )
+            transaction.on_commit(lambda: notifications.notify(locked, "password_reset", request=request))
         return Response({"detail": "Password updated. Sign in with the new password."})
 
 

@@ -18,9 +18,13 @@ import urllib.request
 import urllib.response
 from contextlib import contextmanager
 from datetime import timedelta
+from unittest import skipUnless
 from unittest.mock import patch
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.db import close_old_connections, connection, connections
+from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -66,6 +70,21 @@ def fake_provider_http(*payloads):
         patch("config.net.socket.getaddrinfo", return_value=PUBLIC_DNS),
     ):
         yield
+
+
+def _simultaneously(*operations):
+    barrier = Barrier(len(operations))
+
+    def run(operation):
+        close_old_connections()
+        try:
+            barrier.wait(timeout=10)
+            return operation()
+        finally:
+            connections.close_all()
+
+    with ThreadPoolExecutor(max_workers=len(operations)) as executor:
+        return list(executor.map(run, operations))
 
 
 def make_provider(name="testidp", *, enabled=True, **overrides) -> OAuthProvider:
@@ -167,7 +186,10 @@ class OAuthTestCase(TestCase):
         return self.client.get(f"/api/v1/auth/oauth/callback/{self.provider.name}/", params)
 
     def start_state(self, state="state-token", *, user=None):
-        return OAuthState.objects.create(state=state, provider=self.provider, user=user)
+        return OAuthState.objects.create(
+            state=state, provider=self.provider, user=user,
+            session_version=user.session_version if user else None,
+        )
 
 
 class ProviderListingTests(OAuthTestCase):
@@ -556,6 +578,215 @@ class CallbackExistingAccountTests(OAuthTestCase):
 
 
 class CallbackLinkFlowTests(OAuthTestCase):
+    def _assert_revoked_link_refused(self, *, during_provider_io):
+        from .jwt_utils import make_jwt_for_user
+        from .session_revocation import revoke_sessions
+
+        for participant_origin, existing in ((False, False), (False, True), (True, False), (True, True)):
+            with self.subTest(participant_origin=participant_origin, existing=existing):
+                user = make_user(f"revoked_link_{participant_origin}_{existing}")
+                tokens = make_jwt_for_user(user, participant_link=participant_origin)
+                self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+                self.assertEqual(self.client.post(f"/api/v1/auth/oauth/link/{self.provider.name}/").status_code, 200)
+                state = OAuthState.objects.get(user=user)
+                self.assertEqual(state.session_version, user.session_version)
+                uid = user.username
+                if existing:
+                    SocialAccount.objects.create(
+                        provider=self.provider, uid=uid, user=user, from_participant_link=True,
+                    )
+                if not during_provider_io:
+                    revoke_sessions(user)
+
+                def profile(*args):
+                    if during_provider_io:
+                        revoke_sessions(user)
+                    return {"sub": uid, "email": user.email, "email_verified": True}
+
+                with patch("accounts.views_oauth._exchange_code_for_tokens", return_value={"access_token": "at"}), patch(
+                    "accounts.views_oauth._fetch_user_info", side_effect=profile,
+                ):
+                    response = self.callback(code="c", state=state.state)
+                self.assertEqual(response.url, f"{FRONTEND}/account?oauth_error=session_revoked")
+                self.assertEqual(SocialAccount.objects.filter(user=user).count(), int(existing))
+                if existing:
+                    self.assertTrue(SocialAccount.objects.get(user=user).from_participant_link)
+                self.assertFalse(OAuthState.objects.filter(pk=state.pk).exists())
+                self.assertTrue(AuditEvent.objects.filter(
+                    action_type="oauth.link_refused", target_id=str(user.pk),
+                    metadata_json__reason="session_revoked",
+                ).exists())
+
+    def test_linking_refuses_revocation_before_callback(self):
+        self._assert_revoked_link_refused(during_provider_io=False)
+
+    def test_linking_refuses_revocation_during_provider_io(self):
+        self._assert_revoked_link_refused(during_provider_io=True)
+
+    def test_linking_refuses_legacy_authority_without_a_session_version(self):
+        user = make_user("legacy_linking_authority")
+        state = self.start_state(user=user)
+        state.session_version = None
+        state.save(update_fields=["session_version"])
+        with fake_provider_http({"access_token": "at"}, {"sub": "legacy", "email": user.email, "email_verified": True}):
+            response = self.callback(code="c", state=state.state)
+        self.assertEqual(response.url, f"{FRONTEND}/account?oauth_error=session_revoked")
+        self.assertFalse(SocialAccount.objects.exists())
+
+    def test_deleted_link_owner_is_not_reinterpreted_as_login(self):
+        user = make_user("deleted_before_callback")
+        state = self.start_state(user=user)
+        email = user.email
+        user.delete()
+        with fake_provider_http({"access_token": "at"}, {"sub": "deleted", "email": email, "email_verified": True}):
+            response = self.callback(code="c", state=state.state)
+        self.assertEqual(response.url, f"{FRONTEND}/login?oauth_error=account_inactive")
+        self.assertFalse(User.objects.filter(email=email).exists())
+        self.assertFalse(SocialAccount.objects.exists())
+
+    def test_linking_rechecks_ownership_after_a_competing_insert(self):
+        claimer, owner = make_user("racing_claimer"), make_user("racing_owner")
+        state = self.start_state(user=claimer)
+        original = SocialAccount.objects.get_or_create
+
+        def competing_insert(**kwargs):
+            SocialAccount.objects.create(
+                provider=self.provider, uid="racing-identity", user=owner, from_participant_link=True,
+            )
+            return original(**kwargs)
+
+        with fake_provider_http({"access_token": "at"}, {"sub": "racing-identity", "email": claimer.email}), patch(
+            "accounts.views_oauth.SocialAccount.objects.get_or_create", side_effect=competing_insert,
+        ):
+            response = self.callback(code="c", state=state.state)
+        self.assertEqual(response.url, f"{FRONTEND}/account?oauth_error=already_linked_other")
+        social = SocialAccount.objects.get(uid="racing-identity")
+        self.assertEqual(social.user_id, owner.pk)
+        self.assertTrue(social.from_participant_link)
+        self.assertFalse(AuditEvent.objects.filter(action_type="oauth.link").exists())
+
+    def test_legacy_login_reports_an_identity_removed_while_waiting_for_the_lock(self):
+        user = make_user("removed_legacy_identity")
+        social = SocialAccount.objects.create(
+            provider=self.provider, user=user, uid="removed-identity", from_participant_link=True,
+        )
+        state = self.start_state()
+        lock = User.objects.locked
+
+        def remove_before_lock():
+            SocialAccount.objects.filter(pk=social.pk).delete()
+            return lock()
+
+        with fake_provider_http(
+            {"access_token": "at"}, {"sub": social.uid, "email": user.email, "email_verified": True},
+        ), patch("accounts.views_oauth.User.objects.locked", side_effect=remove_before_lock):
+            response = self.callback(code="c", state=state.state)
+        self.assertEqual(response.url, f"{FRONTEND}/login?oauth_error=identity_removed")
+        self.assertEqual(AuditEvent.objects.get(action_type="oauth.login_failed").metadata_json["reason"], "identity_removed")
+        self.assertFalse(OAuthExchangeCode.objects.exists())
+
+    def test_participant_link_initiation_records_its_origin(self):
+        from .jwt_utils import make_jwt_for_user
+
+        user = make_user("participant_linker", UserRole.USER)
+        tokens = make_jwt_for_user(user, participant_link=True)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = self.client.post(f"/api/v1/auth/oauth/link/{self.provider.name}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(OAuthState.objects.get().from_participant_link)
+
+    def test_participant_linking_rechecks_current_email_after_provider_io(self):
+        user = make_user("oauth_email_race")
+        for existing in (False, True):
+            with self.subTest(existing=existing):
+                user.email = "old@example.com"
+                user.save(update_fields=["email"])
+                state = self.start_state("email-race", user=user)
+                state.from_participant_link = True
+                state.save(update_fields=["from_participant_link"])
+                if existing:
+                    SocialAccount.objects.create(
+                        provider=self.provider, user=user, uid="race-identity", from_participant_link=True,
+                    )
+
+                def profile(*args):
+                    User.objects.filter(pk=user.pk).update(email="current@example.com")
+                    return {"sub": "race-identity", "email": "old@example.com", "email_verified": True}
+
+                with patch("accounts.views_oauth._exchange_code_for_tokens", return_value={"access_token": "at"}), patch(
+                    "accounts.views_oauth._fetch_user_info", side_effect=profile,
+                ):
+                    response = self.callback(code="c", state="email-race")
+                self.assertEqual(response.url, f"{FRONTEND}/account?oauth_error=email_not_verified")
+                self.assertEqual(SocialAccount.objects.filter(user=user).count(), int(existing))
+                if existing:
+                    self.assertTrue(SocialAccount.objects.get(user=user).from_participant_link)
+
+    def test_linking_refuses_account_deleted_during_provider_io(self):
+        user = make_user("oauth_deleted_linker")
+        state = self.start_state("deleted-linker", user=user)
+
+        def profile(*args):
+            user.delete()
+            return {"sub": "deleted-identity", "email": "old@example.com", "email_verified": True}
+
+        with patch("accounts.views_oauth._exchange_code_for_tokens", return_value={"access_token": "at"}), patch(
+            "accounts.views_oauth._fetch_user_info", side_effect=profile,
+        ):
+            response = self.callback(code="c", state=state.state)
+        self.assertEqual(response.url, f"{FRONTEND}/login?oauth_error=account_inactive")
+        self.assertFalse(SocialAccount.objects.filter(uid="deleted-identity").exists())
+
+    def test_api_key_cannot_initiate_oauth_linking(self):
+        from .api_keys import generate_key
+        from .models import ApiKey
+
+        user = make_user("oauth_api_key")
+        raw, prefix, hashed = generate_key()
+        ApiKey.objects.create(user=user, name="OAuth refusal", prefix=prefix, hashed_key=hashed)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Api-Key {raw}")
+        response = self.client.post(f"/api/v1/auth/oauth/link/{self.provider.name}/")
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(OAuthState.objects.exists())
+
+    def test_participant_linking_requires_the_providers_verified_account_email(self):
+        user = make_user("participant_link_owner", UserRole.USER)
+        for email, verified, expected in (
+            ("operator@example.com", True, False),
+            (user.email, False, False),
+            (user.email.upper(), True, True),
+            (f" {user.email.upper()} ", True, True),
+        ):
+            with self.subTest(email=email, verified=verified):
+                state = self.start_state("participant-link", user=user)
+                state.from_participant_link = True
+                state.save(update_fields=["from_participant_link"])
+                with fake_provider_http({"access_token": "at"}, {
+                    "sub": "participant-identity", "email": email, "email_verified": verified,
+                }):
+                    response = self.callback(code="c", state=state.state)
+                self.assertEqual(SocialAccount.objects.filter(user=user).exists(), expected)
+                if expected:
+                    self.assertFalse(SocialAccount.objects.get(user=user).from_participant_link)
+                else:
+                    self.assertEqual(response.url, f"{FRONTEND}/account?oauth_error=email_not_verified")
+
+    def test_unproven_legacy_social_identity_requires_verified_account_email_on_login(self):
+        user = make_user("legacy_participant_social", UserRole.USER)
+        social = SocialAccount.objects.create(
+            provider=self.provider, uid="legacy-identity", user=user, from_participant_link=True,
+        )
+        for email, expected in (("operator@example.com", False), (user.email, True)):
+            with self.subTest(email=email):
+                self.start_state("legacy-login")
+                with fake_provider_http({"access_token": "at"}, {
+                    "sub": social.uid, "email": email, "email_verified": True,
+                }):
+                    self.callback(code="c", state="legacy-login")
+                self.assertEqual(OAuthExchangeCode.objects.filter(user=user).exists(), expected)
+                social.refresh_from_db()
+                self.assertEqual(social.from_participant_link, not expected)
+
     def test_linking_attaches_the_identity_to_the_state_owner(self):
         user = make_user("owner_link", UserRole.USER)
         self.start_state("link", user=user)
@@ -936,3 +1167,131 @@ class ProviderUrlSerializerTests(TestCase):
         changed = OAuthProviderSerializer(provider, data={"token_url": "http://idp.example/other"}, partial=True)
         self.assertFalse(changed.is_valid())
         self.assertIn("token_url", changed.errors)
+
+
+class OAuthCallbackRevocationTests(OAuthTestCase):
+    def test_callback_does_not_issue_a_code_after_revocation_or_deactivation(self):
+        for change in ("version", "inactive"):
+            with self.subTest(change=change):
+                user = make_user(f"callback_{change}")
+                SocialAccount.objects.create(provider=self.provider, user=user, uid=change)
+                self.start_state(change)
+                lock = User.objects.locked
+
+                def change_before_lock():
+                    updates = {"session_version": user.session_version + 1} if change == "version" else {"is_active": False}
+                    User.objects.filter(pk=user.pk).update(**updates)
+                    return lock()
+
+                with fake_provider_http({"access_token": "at"}, {"sub": change, "email": user.email}), patch(
+                    "accounts.views_oauth.User.objects.locked", side_effect=change_before_lock,
+                ):
+                    response = self.callback(code="c", state=change)
+                self.assertEqual(response.url, f"{FRONTEND}/login?oauth_error=account_inactive")
+                self.assertFalse(OAuthExchangeCode.objects.filter(user=user).exists())
+
+
+class OAuthExchangeRevocationTests(TestCase):
+    def setUp(self):
+        self.user = make_user("oauth_exchange_owner")
+        self.code = "one-time-exchange-code"
+        OAuthExchangeCode.objects.create(user=self.user, code=self.code)
+
+    def exchange(self):
+        return APIClient().post("/api/v1/auth/oauth/token-exchange/", {"code": self.code}, format="json")
+
+    def test_session_revocation_discards_pending_exchange_codes(self):
+        from .session_revocation import revoke_sessions
+
+        revoke_sessions(self.user)
+        response = self.exchange()
+        self.assertEqual(response.status_code, 400)
+        self.assertNotIn("openzev_access", response.cookies)
+        self.assertFalse(OAuthExchangeCode.objects.exists())
+
+    def test_inactive_account_cannot_exchange_an_existing_code(self):
+        User.objects.filter(pk=self.user.pk).update(is_active=False)
+        response = self.exchange()
+        self.assertEqual(response.status_code, 400)
+        self.assertNotIn("openzev_access", response.cookies)
+
+    def test_revocation_between_code_lookup_and_user_lock_refuses_exchange(self):
+        from .session_revocation import revoke_sessions
+
+        lock = User.objects.locked
+
+        # A deterministic interleaving at the view's lock boundary.
+        with patch("accounts.views_oauth.User.objects.locked") as acquire:
+            def revoke_once():
+                acquire.side_effect = lock
+                revoke_sessions(self.user)
+                return lock()
+            acquire.side_effect = revoke_once
+            response = self.exchange()
+        self.assertEqual(response.status_code, 400)
+        self.assertNotIn("openzev_access", response.cookies)
+
+
+@skipUnless(connection.vendor == "postgresql", "Requires PostgreSQL row locking")
+class OAuthExchangeConcurrencyTests(TransactionTestCase):
+    def setUp(self):
+        self.user = make_user("concurrent_exchange_owner")
+        self.code = "concurrent-exchange-code"
+        OAuthExchangeCode.objects.create(user=self.user, code=self.code)
+
+    def exchange(self):
+        response = APIClient().post("/api/v1/auth/oauth/token-exchange/", {"code": self.code}, format="json")
+        return response.status_code, response.cookies.get("openzev_access")
+
+    def test_concurrent_redemption_mints_at_most_one_session(self):
+        responses = _simultaneously(self.exchange, self.exchange)
+        self.assertEqual(sorted(status for status, _cookie in responses), [200, 400])
+        self.assertFalse(OAuthExchangeCode.objects.exists())
+
+    def test_exchange_racing_revocation_cannot_leave_a_valid_session(self):
+        from rest_framework_simplejwt.tokens import AccessToken
+        from .session_revocation import revoke_sessions
+        from .session_revocation import is_session_current
+
+        response, _ = _simultaneously(
+            self.exchange, lambda: revoke_sessions(self.user),
+        )
+        status, cookie = response
+        self.user.refresh_from_db()
+        self.assertIn(status, (200, 400))
+        if cookie is not None:
+            self.assertFalse(is_session_current(AccessToken(cookie.value), self.user))
+        self.assertFalse(OAuthExchangeCode.objects.exists())
+
+
+@skipUnless(connection.vendor == "postgresql", "Requires PostgreSQL row locking")
+class OAuthLinkConcurrencyTests(TransactionTestCase):
+    def test_competing_links_only_succeed_for_the_identity_owner(self):
+        provider = make_provider()
+        users = [make_user(f"concurrent_link_{index}") for index in range(2)]
+        states = [OAuthState.objects.create(
+            state=user.username, provider=provider, user=user, session_version=user.session_version,
+        ) for user in users]
+        original = SocialAccount.objects.get_or_create
+        inserts = Barrier(2)
+
+        def competing_insert(**kwargs):
+            inserts.wait(timeout=10)
+            return original(**kwargs)
+
+        def callback(state):
+            response = APIClient().get(f"/api/v1/auth/oauth/callback/{provider.name}/", {
+                "code": "provider-code", "state": state.state,
+            })
+            return state.user_id, response.url
+
+        with patch("accounts.views_oauth._exchange_code_for_tokens", return_value={"access_token": "at"}), patch(
+            "accounts.views_oauth._fetch_user_info", return_value={"sub": "same-identity", "email": "idp@example.com"},
+        ), patch("accounts.views_oauth.SocialAccount.objects.get_or_create", side_effect=competing_insert):
+            results = _simultaneously(*(lambda state=state: callback(state) for state in states))
+        social = SocialAccount.objects.get(provider=provider, uid="same-identity")
+        for user_id, url in results:
+            expected = "oauth_linked=true" if user_id == social.user_id else "oauth_error=already_linked_other"
+            self.assertEqual(url, f"{FRONTEND}/account?{expected}")
+        self.assertEqual(AuditEvent.objects.filter(action_type="oauth.link").count(), 1)
+        self.assertEqual(AuditEvent.objects.filter(action_type="oauth.link_refused").count(), 1)

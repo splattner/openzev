@@ -33,6 +33,9 @@ vi.mock('../src/lib/api/invoices', () => ({
     fetchAnnualStatementPdfTemplate: api.fetch,
     updateAnnualStatementPdfTemplate: api.save,
     resetAnnualStatementPdfTemplate: api.reset,
+    fetchCreditNotePdfTemplate: api.fetch,
+    updateCreditNotePdfTemplate: api.save,
+    resetCreditNotePdfTemplate: api.reset,
     previewPdfTemplateBlob: vi.fn(() => new Promise(() => {})),
 }))
 vi.mock('../src/components/PdfPreview', () => ({ PdfPreview: () => null }))

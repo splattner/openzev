@@ -1,0 +1,213 @@
+/* ── Billing period rows: a table on wide containers, cards on narrow ones ── */
+
+.invoice-rows {
+  container-type: inline-size;
+}
+
+.invoice-rows th {
+  white-space: nowrap;
+}
+
+.invoice-rows th.numeric {
+  text-align: right;
+}
+
+.invoice-rows td {
+  vertical-align: middle;
+}
+
+/* Progress, amount and actions take their content's width; the participant the rest. */
+
+.invoice-row-progress,
+.invoice-row-total,
+.invoice-rows .invoice-actions-cell {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.invoice-rows .invoice-row-actions {
+  flex-wrap: nowrap;
+}
+
+/* The name as billed, flowing as text: an organisation's icon leads it, a
+   household's second name line follows in muted text. */
+
+.invoice-row-name {
+  display: block;
+  color: var(--ink);
+}
+
+.invoice-row-name .muted {
+  margin-inline-start: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.invoice-row-kind {
+  margin-inline-end: 0.3rem;
+  color: var(--ink-soft);
+}
+
+.invoice-row-meta,
+.invoice-row-issues {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.75rem;
+  margin-top: 0.15rem;
+  font-size: 0.85rem;
+}
+
+.invoice-row-meta {
+  color: var(--muted);
+}
+
+.invoice-row-issues {
+  color: var(--danger-700);
+  font-weight: 600;
+}
+
+.invoice-row-meta a,
+.invoice-progress-covered a {
+  color: var(--interactive);
+  font-size: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.invoice-row-meta a:hover,
+.invoice-progress-covered a:hover {
+  color: var(--interactive-hover);
+  text-decoration: underline;
+}
+
+.invoice-progress {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.invoice-progress-step {
+  display: inline-flex;
+}
+
+/* Too narrow for four columns: each row becomes a card — who and how much,
+   then progress beside the actions (below them on phones). */
+
+@container (max-width: 46rem) {
+  .invoice-rows table,
+  .invoice-rows tbody,
+  .invoice-rows td {
+    display: block;
+  }
+
+  /* Out of sight, not out of the accessibility tree. */
+  .invoice-rows thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .invoice-rows tbody tr {
+    display: grid;
+    grid-template:
+      'who total' auto
+      'progress actions' auto / minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.6rem 1rem;
+    height: auto;
+    padding: 0.9rem 0;
+    border-bottom: 1px solid var(--border-default);
+  }
+
+  .invoice-rows tbody tr:first-child {
+    padding-top: 0.2rem;
+  }
+
+  .invoice-rows tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  /* The table's bottom margin takes the sheet's padding, so the last card
+     brings its own: the first card's inset above, mirrored below. */
+  .table-card.invoice-rows > table:last-child tbody tr:last-child {
+    padding-bottom: calc(var(--sheet-pad-block) + 0.2rem);
+  }
+
+  /* No band to meet the sheet's top: the cards start at its inset, their
+     dividers still run edge to edge. */
+  .table-card.invoice-rows > table:first-child {
+    margin-top: 0;
+  }
+
+  .table-card.invoice-rows tbody tr {
+    padding-inline: var(--sheet-pad-inline);
+  }
+
+  .table-card.invoice-rows tbody td,
+  .invoice-rows tbody td,
+  .invoice-rows tbody tr:hover > td {
+    width: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .invoice-row-who {
+    grid-area: who;
+    align-self: start;
+  }
+
+  .invoice-row-total {
+    grid-area: total;
+    align-self: start;
+  }
+
+  .invoice-row-progress {
+    grid-area: progress;
+  }
+
+  .invoice-rows .invoice-actions-cell {
+    grid-area: actions;
+    width: auto;
+  }
+}
+
+@container (max-width: 28rem) {
+  .invoice-rows tbody tr {
+    grid-template:
+      'who total' auto
+      'progress progress' auto
+      'actions actions' auto / minmax(0, 1fr) auto;
+  }
+
+  .page-stack .invoice-rows .invoice-actions-cell {
+    text-align: start;
+    white-space: normal;
+  }
+
+  .invoice-rows .invoice-actions-cell .invoice-row-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
+
+.invoice-row-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.page-stack .invoice-actions-cell {
+  text-align: end;
+}
+
+.invoice-actions-cell .invoice-row-actions {
+  justify-content: flex-end;
+}
+

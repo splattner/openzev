@@ -19,7 +19,7 @@ import { Z_POPOVER } from './zLayers'
  * Colors live in styles/generatedTheme.ts (generated from design/tokens.json),
  * never here. `fontFamily` must stay in the generated theme: Mantine's
  * stylesheet sets `body { font-family }` and would otherwise override
- * index.css.
+ * styles/base.css.
  *
  * Single-line fields share the field-token dimensions with native controls
  * (`design/tokens.json` → `fields`): the `Input` vars below set the box
@@ -66,7 +66,7 @@ const fieldInputVars = (_theme: MantineTheme, props: InputProps, ctx?: InputFact
 export const mantineTheme: MantineThemeOverride = {
   ...generatedTheme,
   defaultRadius: 'md',
-  // Overlays share the app's depth scale (index.css `--shadow-*`).
+  // Overlays share the app's depth scale (styles/base.css `--shadow-*`).
   shadows: { sm: 'var(--shadow-raised)', md: 'var(--shadow-overlay)' },
   components: {
     Popover: { defaultProps: overlay },

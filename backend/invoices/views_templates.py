@@ -27,6 +27,7 @@ from .pdf_render import render_pdf
 from .template_context import (
     build_sample_annual_statement_context,
     build_sample_contract_context,
+    build_sample_credit_note_context,
     build_sample_invoice_context,
 )
 
@@ -35,6 +36,7 @@ from .template_context import (
 SAMPLE_CONTEXTS = {
     "contract": build_sample_contract_context,
     "annual_statement": build_sample_annual_statement_context,
+    "credit_note": build_sample_credit_note_context,
 }
 
 # Preview accepts exactly these template_type values. The PATCH save path
@@ -241,7 +243,7 @@ class PdfTemplatePreviewView(_AdminTemplateView):
     """Render a PDF template with sample data and return an HTML or PDF preview.
 
     POST body: { "content": "<html>...", "template_type": "invoice" | "contract" |
-    "annual_statement", "output": "html" | "pdf" }
+    "annual_statement" | "credit_note", "output": "html" | "pdf" }
 
     ``output`` defaults to ``html`` for backwards compatibility (returns
     ``{ "html": ... }``); ``output: "pdf"`` (also accepted as ``?output=pdf``)

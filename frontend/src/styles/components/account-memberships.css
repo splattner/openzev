@@ -1,0 +1,42 @@
+/* Communities an account belongs to (admin accounts list). Chips are buttons:
+   selecting one opens that community's Participants page. */
+
+.account-memberships {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.account-membership-chip {
+  display: inline-flex;
+  align-items: center;
+  text-align: start;
+  gap: 0.4rem;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--surface-card);
+  color: var(--text-body);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.account-membership-chip:hover {
+  background: var(--brand-pale);
+  border-color: var(--brand-glow);
+}
+
+.account-membership-kind {
+  /* "Verwaltung · Rechnungssteller" stays on one line; the ZEV name wraps. */
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+

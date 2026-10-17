@@ -8,7 +8,7 @@
 - Created: 2026-03-24
 - Target Release: Ongoing baseline
 - Related Issues: n/a (baseline)
-- Related ADRs: 0002, 0006, 0026 (supersedes 0007)
+- Related ADRs: 0002, 0006, 0026 (supersedes 0007), 0038
 - Impacted Areas: backend, frontend, docs
 
 ## 1. Problem and outcome
@@ -129,6 +129,9 @@ end-dated last version, are simply periods the series does not cover.
   the upper bound the new version would swallow its successor's window and be
   rejected by the overlap guard for reasons the caller cannot see.
 - Two versions of one series may not share a `valid_from`.
+
+Custom version, duplicate, and rename writes obey the
+[disabled-ZEV rules](2026-03-community-and-access.md#45-write-scoping-zevscopedquerysetmixin).
 
 OpenZEV rejects overlapping validity windows for two tariffs of the same
 `(zev, name)` — regardless of billing mode.
@@ -466,6 +469,7 @@ produced by the engine:
 | `vat_chf` | `(vat_base_chf ?? subtotal_chf) × vat_rate`, rounded to 0.01 |
 | `embedded_vat_chf` | Non-recoverable VAT folded into the line totals under `vat_mode = inclusive`; null otherwise (§4.8) |
 | `total_chf` | `subtotal_chf + vat_chf` |
+| `credit_applied_chf` | Open credit notes of the participant set against the total after VAT (default 0), see §4.9. The derived model property `amount_due_chf` is `max(total_chf − credit_applied_chf, 0)` for a positive total, else `total_chf` |
 
 **InvoiceItem** (one per tariff per bucket):
 
@@ -488,8 +492,16 @@ The engine runs **inside a single database transaction**.
 
 ### 4.0 Guard rails
 
-1. If a non-draft, non-cancelled invoice exists for the same participant + period → **raise `ValueError`** (do not overwrite).
-2. Delete any existing `draft` or `cancelled` invoice for the same participant + period.
+Generation holds its locks until the surrounding transaction ends, in this order:
+
+1. PostgreSQL: ZEV `FOR KEY SHARE`, which conflicts with restore's exclusive lock but permits other generators ([ADR 0038](../adr/0038-invoice-generation-lock-order.md)).
+2. Participant `FOR UPDATE`, selecting only its primary key to avoid locking the related party.
+3. All overlapping invoice rows `FOR UPDATE`, ordered by primary key, before checking their status or deleting them. Approval uses the same invoice-row lock.
+
+Pricing and numbering may still serialize on shared dynamic-price sources and the ZEV row.
+
+- An `approved`, `sent` or `paid` invoice overlapping the requested inclusive period for the same participant → **raise `ValueError`**.
+- Delete overlapping drafts and never-approved cancellations (`approved_at` null). Keep issued cancellations with their numbers next to the new draft (ADR 0037, `_discard_replaceable_invoices`).
 
 ### 4.1 Collect metering points
 
@@ -1076,6 +1088,18 @@ resolve to zero.
 
 Rationale and alternatives: ADR 0016.
 
+### 4.9 Credit application (#388)
+
+After the invoice row exists (step 8) and only when `total_chf > 0`, `generate_invoice` calls
+`workflow.apply_open_credits(invoice)`. It locks the participant's credits in the ZEV
+(`select_for_update`, oldest `created_at, id` first; the balances are computed afterwards in separate
+queries because PostgreSQL cannot lock rows under an aggregate), and creates one `CreditApplication`
+per credit with money remaining until `total_chf` is covered or the credits run out. The sum goes to
+`credit_applied_chf`. Line items, `subtotal_chf`, `vat_chf` and `total_chf` are untouched, so tariff
+grouping and the allocation reconciliation hold. Regeneration deletes replaceable drafts first
+(`_discard_replaceable_invoices`), whose applications cascade away, so the replacement sees the credit
+as free. Specified in `2026-10-payments-and-credits.md` §4.7.
+
 ---
 
 ## 5. Rounding rules
@@ -1384,6 +1408,8 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 
 - Invoice generation may be triggered asynchronously for heavy periods (via Celery).
 - The engine runs inside `@transaction.atomic`; partial failures roll back cleanly.
+- `Zev.next_invoice_number()` allocates transactionally; a failed invoice returns
+  its number (see the [numbering contract](2026-03-admin-governance-and-settings.md#43-zev-governance-fields)).
 - Re-runs / regeneration must honor locking rules (§4.0).
 
 ---
@@ -1414,12 +1440,14 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 |---|---|---|
 | Allocation regressions in edge timestamps | High | Golden-case regression tests and ADR alignment checks |
 | Historical invoice drift after tariff changes | High | Versioned validity windows and non-mutating historical invoices |
+| Concurrent generation creates overlapping drafts for one participant | High | Participant row lock precedes overlap checks and replacement (§4.0) |
 | Rounding/VAT discrepancies | Medium | Currency rounding tests and explicit VAT selection tests |
 | Zero-production timestamps causing division by zero | Medium | Guard clause: `if zev_production_at_ts > 0` before share computation |
 | Overlapping tariff validity windows | Medium | Tariff matching applies **all** active tariffs (no conflict — they accumulate) |
 | `fixed_price_chf` entered per-participant on a shared fee | Medium | Field label and form hint state "total for the community"; §3.4 and §4.6.3 call out the changed meaning |
 | Shared fee over- or under-recovering after a membership change | Medium | Denominator and charged months both evaluated per month (§4.6.3); reconciliation asserted across a full ZEV run |
 | A dynamic tariff's fetched series has a gap inside a billed period | High — would otherwise bill zero for a real reading | Engine refuses to generate rather than degrade (§4.4.3); readiness flags the gap before generation is attempted (`2026-09-dynamic-tariffs.md` §9.3) |
+| Concurrent generation for one participant and period | High — duplicate invoices with distinct numbers | Serialized: the participant row lock precedes overlap checks and replacement, and overlapping invoice rows are held through the status check and deletion (§4.0) |
 
 ---
 
@@ -1539,6 +1567,12 @@ community energy to a single participant.
 | Duplicate starts a separate series without touching the source; refuses a blank or identical name | §6.1a |
 | Rename renames every version; refuses a name already in use; identical name is a no-op | §6.1a |
 | A version cannot change the series' category/billing mode/energy type | §3.1.1 |
+
+### Backend (`tariffs/test_disabled_zev.py`)
+
+`tariffs/test_disabled_zev.py::test_custom_write_access` (18 cases) covers
+manager/viewer/admin access in both ZEV states and unchanged tariff and band
+values after refusal.
 
 ### Backend (`tariffs/tests.py`) — validity windows
 

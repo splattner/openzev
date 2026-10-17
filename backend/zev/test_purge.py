@@ -14,7 +14,7 @@ from audit.models import AuditActionCategory, AuditEvent
 from audit.services import record_audit_event
 from backups.models import BackupJob
 from exports.models import ExportJob, ExportType
-from invoices.models import ContractIssue, Invoice
+from invoices.models import ContractIssue, Credit, CreditApplication, Invoice
 from invoices.test_helpers import make_invoice
 from metering.models import ImportLog, ImportSource, MeterReading
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory, TariffPeriod
@@ -67,6 +67,14 @@ class _FullyWiredZev(TestCase):
         self.import_log = ImportLog.objects.create(zev=self.zev, source=ImportSource.CSV)
         self.invoice = make_invoice(self.zev, self.participant)
         self.invoice.pdf_file.save("invoice.pdf", ContentFile(b"%PDF-1.4 fake"), save=True)
+        self.credit = Credit.objects.create(
+            zev=self.zev, participant=self.participant, source_invoice=self.invoice,
+            credit_number="CN-00001", kind="adjustment", reason="Overcharged",
+            amount_chf="1.00", vat_mode="not_registered",
+        )
+        self.application = CreditApplication.objects.create(
+            credit=self.credit, invoice=self.invoice, amount_chf="0.50",
+        )
         self.export_job = ExportJob.objects.create(zev=self.zev, export_type=ExportType.ANNUAL_STATEMENTS)
         self.export_job.result_file.save("export.zip", ContentFile(b"PK\x03\x04 fake zip"), save=True)
 
@@ -121,6 +129,8 @@ class PurgeServiceTests(_FullyWiredZev):
         self.assertFalse(TariffPeriod.objects.filter(pk=self.tariff_period.pk).exists())
         self.assertFalse(ImportLog.objects.filter(pk=self.import_log.pk).exists())
         self.assertFalse(Invoice.objects.filter(pk=self.invoice.pk).exists())
+        self.assertFalse(Credit.objects.filter(pk=self.credit.pk).exists())
+        self.assertFalse(CreditApplication.objects.filter(pk=self.application.pk).exists())
         self.assertFalse(ExportJob.objects.filter(pk=self.export_job.pk).exists())
 
         # Media files removed from storage, not just the rows.
@@ -129,6 +139,8 @@ class PurgeServiceTests(_FullyWiredZev):
         self.assertEqual(result.media_files_deleted, 2)
 
         self.assertEqual(result.deleted_counts["invoices"], 1)
+        self.assertEqual(result.deleted_counts["credits"], 1)
+        self.assertEqual(result.deleted_counts["credit_applications"], 1)
         self.assertEqual(result.deleted_counts["export_jobs"], 1)
         self.assertEqual(result.deleted_counts["participants"], 1)
         self.assertEqual(result.deleted_counts["metering_points"], 1)

@@ -1,28 +1,52 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../lib/auth'
-import { changePassword } from '../../lib/api/auth'
+import { changePassword, resetPassword, setInitialPassword } from '../../lib/api/auth'
 import { useToast } from '../../lib/toast'
+import { apiErrorPayload, formatApiError } from '../../lib/api/errors'
 
-/** Change the account password. Clears `must_change_password` on success. */
+const EMPTY_FORM = { oldPassword: '', newPassword: '', confirmPassword: '' }
+
+/** Set, change, or explicitly recover the account password. */
 export function PasswordCard() {
     const { t } = useTranslation()
-    const { refreshUser } = useAuth()
+    const { user, refreshUser } = useAuth()
     const { pushToast } = useToast()
 
-    const [form, setForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' })
+    const [form, setForm] = useState(EMPTY_FORM)
+    const [recoveryDeadline, setRecoveryDeadline] = useState<number | null>(null)
+    const [now, setNow] = useState(() => Date.now())
+    const deadline = user?.password_recovery_expires_at ? Date.parse(user.password_recovery_expires_at) : 0
+    const mode = user?.has_usable_password === false ? 'initial' : deadline && recoveryDeadline === deadline ? 'recovery' : 'change'
+    const recoveryAvailable = deadline > now
+    const submitLabel = { initial: 'account.setPassword', recovery: 'account.recoverPassword', change: 'account.changePassword' }[mode]
+
+    useEffect(() => {
+        if (!deadline) return
+        const timer = setTimeout(() => setNow(Date.now()), Math.max(0, deadline - Date.now()))
+        return () => clearTimeout(timer)
+    }, [deadline])
 
     const mutation = useMutation({
-        mutationFn: () => changePassword(form.oldPassword, form.newPassword),
-        onSuccess: async () => {
-            setForm({ oldPassword: '', newPassword: '', confirmPassword: '' })
-            await refreshUser()
-            pushToast(t('account.passwordChangedSuccess'), 'success')
+        mutationFn: async () => {
+            if (mode === 'initial') await setInitialPassword(form.newPassword)
+            else if (mode === 'recovery') await resetPassword(form.newPassword)
+            else await changePassword(form.oldPassword, form.newPassword)
         },
-        onError: (error: any) => {
-            const message = error.response?.data?.detail || error.response?.data?.old_password?.[0] || t('common.error')
-            pushToast(message, 'error')
+        onSuccess: async () => {
+            setForm(EMPTY_FORM)
+            setRecoveryDeadline(null)
+            pushToast(t('account.passwordChangedSuccess'), 'success')
+            await refreshUser().catch(() => pushToast(t('account.profileRefreshFailed'), 'info'))
+        },
+        onError: async (error) => {
+            const expired = apiErrorPayload(error)?.code === 'password_recovery_required'
+            pushToast(expired ? t('account.passwordRecoveryExpired') : formatApiError(error, t('common.error')), 'error')
+            if (expired) {
+                setRecoveryDeadline(null)
+                await refreshUser().catch(() => pushToast(t('account.profileRefreshFailed'), 'info'))
+            }
         },
     })
 
@@ -34,11 +58,15 @@ export function PasswordCard() {
     const handleSubmit = (event: FormEvent) => {
         event.preventDefault()
 
-        if (!form.oldPassword.trim()) {
+        if (mode === 'recovery' && deadline <= Date.now()) {
+            pushToast(t('account.passwordRecoveryExpired'), 'error')
+            return
+        }
+        if (mode === 'change' && !form.oldPassword) {
             pushToast(t('account.oldPasswordRequired'), 'error')
             return
         }
-        if (!form.newPassword.trim()) {
+        if (!form.newPassword) {
             pushToast(t('account.newPasswordRequired'), 'error')
             return
         }
@@ -54,11 +82,30 @@ export function PasswordCard() {
         mutation.mutate()
     }
 
+    const toggleRecovery = () => {
+        setRecoveryDeadline(mode === 'recovery' ? null : deadline)
+        setForm(EMPTY_FORM)
+    }
+    const submitDisabled = mutation.isPending || (mode === 'recovery' && !recoveryAvailable)
+
     return (
         <div className="card">
-            <h2>{t('account.passwordSection')}</h2>
+            <h2>{t(mode === 'initial' ? 'account.setPassword' : 'account.passwordSection')}</h2>
+            {mode === 'initial' && <p className="muted">{t('account.setPasswordHelp')}</p>}
+            {mode !== 'initial' && (recoveryAvailable || mode === 'recovery') && <>
+                <p className="muted">{t('account.passwordRecoveryHelp')}</p>
+                <button
+                    type="button"
+                    className="button button-secondary"
+                    disabled={mutation.isPending}
+                    onClick={toggleRecovery}
+                >
+                    {t(mode === 'recovery' ? 'account.useCurrentPassword' : 'account.recoverPassword')}
+                </button>
+                {mode === 'recovery' && <p role="status">{t(recoveryAvailable ? 'account.passwordRecoveryActive' : 'account.passwordRecoveryExpired')}</p>}
+            </>}
             <form onSubmit={handleSubmit}>
-                <label>
+                {mode === 'change' && <label>
                     <span>{t('account.oldPassword')}</span>
                     <input
                         type="password"
@@ -67,8 +114,9 @@ export function PasswordCard() {
                         onChange={handleChange}
                         placeholder={t('account.enterCurrentPassword')}
                         required
+                        autoComplete="current-password"
                     />
-                </label>
+                </label>}
 
                 <label>
                     <span>{t('account.newPassword')}</span>
@@ -79,6 +127,7 @@ export function PasswordCard() {
                         onChange={handleChange}
                         placeholder={t('account.enterNewPassword')}
                         required
+                        autoComplete="new-password"
                     />
                     <small className="muted">{t('account.passwordMinLength')}</small>
                 </label>
@@ -92,11 +141,12 @@ export function PasswordCard() {
                         onChange={handleChange}
                         placeholder={t('account.reenterNewPassword')}
                         required
+                        autoComplete="new-password"
                     />
                 </label>
 
-                <button type="submit" className="button button-primary" disabled={mutation.isPending} style={{ width: '100%' }}>
-                    {mutation.isPending ? t('common.saving') : t('account.changePassword')}
+                <button type="submit" className="button button-primary" disabled={submitDisabled} style={{ width: '100%' }}>
+                    {mutation.isPending ? t('common.saving') : t(submitLabel)}
                 </button>
             </form>
             <small className="muted" style={{ marginTop: '1rem', display: 'block' }}>

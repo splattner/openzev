@@ -71,9 +71,9 @@ Each release ships a ready-made `docker-compose.yml` that runs the published
 OpenZEV images — nothing is built on your server. It starts the application
 (`app`: nginx serving the frontend and proxying `/api/` to Django/gunicorn in
 the same container), a Celery worker, one Celery Beat scheduler, PostgreSQL and
-Valkey on one host. Only port `8080` is published; PostgreSQL and Valkey are
-reachable only on the compose network. The images are signed with cosign and
-come with an SBOM.
+Valkey on one host. Only the loopback-bound port `127.0.0.1:8080` is published;
+PostgreSQL and Valkey are reachable only on the compose network. The images are
+signed with cosign and come with an SBOM.
 Keep the shared Valkey cache supplied by Compose: registration reservations and
 throttles must be shared across backend workers; an in-memory cache is local to
 each process.
@@ -102,7 +102,9 @@ cp env.production.example .env
 ```
 
 Fill in every value. The examples below assume the instance is reached at
-`https://zev.example.ch`:
+`https://zev.example.ch`. By default the frontend port is published on loopback
+(`127.0.0.1:8080`) for a TLS proxy on the same host.
+[Step 4](#4-put-https-in-front-of-it) also covers a private container network.
 
 | Setting | Example | Notes |
 |---|---|---|
@@ -166,11 +168,19 @@ its tables; it restarts on its own.
 ### 4. Put HTTPS in front of it
 
 With `DEBUG=False` the login and CSRF cookies are marked `Secure`, so browsers
-only send them over HTTPS. Plain `http://localhost:8080` works for a quick
-check on the server itself, but a public instance needs TLS termination in
-front of port `8080` — for example Caddy, Traefik, or an nginx with a Let's
-Encrypt certificate — forwarding `https://zev.example.ch` to
-`http://127.0.0.1:8080`. Open the app at that `https://` URL.
+only send them over HTTPS — and the production template redirects HTTP to
+HTTPS (`SECURE_SSL_REDIRECT=True`). A public instance therefore needs TLS
+termination. A host-installed proxy reaches `http://127.0.0.1:8080`; a
+containerized proxy reaches `app:8080` on a private container network, with
+the application's host port publication removed. Only trusted proxies may
+reach this nginx endpoint: they must overwrite `X-Forwarded-Proto` with the
+external scheme (`https` for HTTPS requests), or redirects can loop.
+Open the app at the public `https://` URL. Only an explicitly isolated local
+smoke test should set `SECURE_SSL_REDIRECT=False`.
+
+Initially set `SECURE_HSTS_SECONDS=0`. After verifying the public HTTPS origin,
+set it to `31536000`: browsers then require HTTPS for one year after receiving
+the header over a valid HTTPS connection.
 
 **Caddy** obtains and renews the certificate on its own. With Caddy installed
 on the same host, this is the whole `Caddyfile`:
@@ -182,7 +192,8 @@ zev.example.ch {
 ```
 
 If Caddy runs as a container in this compose project instead, put it on the
-same network and point it at the service: `reverse_proxy app:80`.
+same private network, remove the application's `ports` mapping, and point it
+at the service: `reverse_proxy app:8080`.
 
 **Traefik** (v2 or v3, with the Docker provider, an HTTPS entry point and a
 certificate resolver you already run) routes by container labels. Add a
@@ -203,7 +214,7 @@ services:
       - traefik.http.routers.openzev.rule=Host(`zev.example.ch`)
       - traefik.http.routers.openzev.entrypoints=websecure
       - traefik.http.routers.openzev.tls.certresolver=letsencrypt
-      - traefik.http.services.openzev.loadbalancer.server.port=80
+      - traefik.http.services.openzev.loadbalancer.server.port=8080
 
 networks:
   proxy:
@@ -213,13 +224,14 @@ networks:
 Replace `proxy`, `websecure` and `letsencrypt` with the network, entry point
 and resolver names from your Traefik setup, and `zev.example.ch` with your
 domain. On older Compose versions, delete the `ports` line and remove the
-`8080:80` mapping from `docker-compose.yml` by hand.
+`127.0.0.1:8080:8080` mapping from `docker-compose.yml` by hand.
 
 The shipped nginx sanitizes `X-Forwarded-For` and the production stack keeps
-`NUM_PROXIES=1`. If another proxy sits in front of it, audit and rate-limit
-identity is therefore the immediate outer-proxy address; do not increase
-`NUM_PROXIES` unless the entire proxy chain is deliberately sanitized and
-configured to preserve client addresses.
+`NUM_PROXIES=1`. The outer TLS terminator is therefore part of the trust
+boundary: users share its audit address and per-IP throttle bucket. Increasing
+`NUM_PROXIES` cannot recover client addresses that nginx discarded; see the
+[proxy reference](../../charts/openzev/README.md#reverse-proxies-and-num_proxies)
+before changing this topology.
 
 > **`/media/` is never web-served in production** — invoice files are served
 > only through authenticated API endpoints.
@@ -229,6 +241,10 @@ configured to preserve client addresses.
 See [Creating the first admin account](#creating-the-first-admin-account) below.
 
 ### 6. Back up and update
+
+> **Credential-provenance upgrade:** when upgrading across `accounts.0028`/`0029`,
+> use the [maintenance rollout](../credential-provenance-upgrade.md) instead of
+> the ordinary restart commands below. Old and new authentication workers must not overlap.
 
 - Set up backups of the database **and** the `backend_media` volume (invoice
   PDFs) before billing real participants — see [Backups](18-backups.md).
@@ -258,6 +274,29 @@ keep their passwords, sessions and API keys. If the update happens between the
 password and two-factor steps, restart sign-in; the old challenge is no longer
 accepted.
 
+**First upgrade to the hardened images:** the container's HTTP port changes
+from 80 to 8080, host publication becomes loopback-only, and processes run as
+UID/GID 10001. Replace the release Compose file and update custom proxy ports;
+direct LAN access to `http://server:8080` is replaced by the HTTPS proxy above.
+HTTP now redirects by default, and HSTS defaults to one year. Verify HTTPS
+with `SECURE_HSTS_SECONDS=0` before enabling HSTS.
+
+Back up the database and media, then stop every application writer before
+migrating existing media ownership. For the downloaded release stack:
+
+```bash
+docker compose stop app worker beat
+docker compose pull
+docker compose run --rm --no-deps --user root app chown -R 10001:10001 /app/media
+docker compose up -d
+docker compose ps
+```
+
+Confirm that sign-in works over HTTPS and that an upload and invoice PDF
+generation succeed. See [Building from source](#building-from-source) for
+source-stack migration commands; Kubernetes operators should also read the
+[chart upgrade guidance](../../charts/openzev/README.md#production-hardening).
+
 ### Synology NAS (Container Manager)
 
 On a Synology NAS the release file runs as a *Project* in **Container Manager**
@@ -284,18 +323,22 @@ supports Container Manager.
 Things that differ from a plain Linux server:
 
 - **Port.** The stack publishes `8080`. If another package already uses it,
-  change the left-hand number of `"8080:80"` in `docker-compose.yml`, for
-  example `"8088:80"`, and use that port below.
+  change the host port in `"127.0.0.1:8080:8080"` in `docker-compose.yml`, for
+  example `"127.0.0.1:8088:8080"`, and use that port below.
 - **HTTPS.** Let DSM terminate TLS: get a certificate under **Control Panel →
   Security → Certificate**, then add a rule under **Control Panel → Login
   Portal → Advanced → Reverse Proxy** from `https://zev.example.ch` (port 443)
   to `http://localhost:8080`. Set `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`,
   `FRONTEND_URL` and the passkey settings in `.env` to that address as in
-  step 2, and forward the name and ports from your router.
-- **Updating.** Replace `docker-compose.yml` with the new release's file (or
+  step 2, and forward the name and ports from your router. Configure the proxy
+  to send `X-Forwarded-Proto: https` for HTTPS requests, as required by
+  [step 4](#4-put-https-in-front-of-it).
+- **Updating.** Follow the [upgrade warning](#6-back-up-and-update) before restarting.
+  Replace `docker-compose.yml` with the new release's file (or
   set `OPENZEV_VERSION` in `.env`), then over SSH run `sudo docker compose pull`
   followed by `sudo docker compose up -d` in the project folder. Make a backup
-  first.
+  first. On the first upgrade to UID 10001, also follow the
+  [media ownership migration](#6-back-up-and-update).
 - **Backups.** The database and invoice files live in Docker volumes, which
   DSM's own backup tools do not include by default. Set up the backups
   described in [Backups](18-backups.md), and send them to a location outside
@@ -317,10 +360,32 @@ docker compose -f docker-compose.fullstack.yml up -d --build
 `docker-compose.fullstack.yml` is the same single-application-container stack
 as the release file, built locally and reading `backend/.env`. The repository
 also contains `docker-compose.yml`, which builds the frontend (nginx) and the
-backend as two containers — use the service name `backend` instead of `app`
-there. Pass `-f docker-compose.fullstack.yml` to every `docker compose` command
-for the fullstack stack. To update, check out the new tag and run the `up`
-command again.
+backend as two containers. Both use the [HTTPS proxy setup](#4-put-https-in-front-of-it)
+above. Pass `-f docker-compose.fullstack.yml` to every `docker compose` command
+for the fullstack stack. To update, back up the database and media, check out
+the new tag, then rebuild and restart, subject to the
+[upgrade warning](#6-back-up-and-update).
+
+On the first upgrade from root-running images, migrate ownership while writers
+are stopped. For source-built fullstack:
+
+```bash
+docker compose -f docker-compose.fullstack.yml stop app worker beat
+docker compose -f docker-compose.fullstack.yml build
+docker compose -f docker-compose.fullstack.yml run --rm --no-deps --user root app chown -R 10001:10001 /app/media
+docker compose -f docker-compose.fullstack.yml up -d
+```
+
+For the split frontend/backend source stack:
+
+```bash
+docker compose stop backend worker beat
+docker compose build
+docker compose run --rm --no-deps --user root backend chown -R 10001:10001 /app/media
+docker compose up -d
+```
+
+Verify uploads and invoice PDF generation after either migration.
 
 ## Production on Kubernetes (Helm)
 
@@ -346,10 +411,17 @@ chart).
 
 4. [Create the first admin account](#creating-the-first-admin-account).
 
+For an existing installation crossing the credential-provenance boundary, follow
+the [maintenance rollout](../credential-provenance-upgrade.md); a normal rolling
+Helm upgrade is insufficient.
+
 The ingress needs TLS for the same reason as above (`Secure` cookies), and the
 backend runs the same configuration check on start. For every chart value,
 including TLS, existing secrets and `NUM_PROXIES` behind an ingress, see the
 [chart README](../../charts/openzev/README.md).
+
+For an existing media PVC, see the chart's [media upgrade guidance](../../charts/openzev/README.md#media-pvc)
+before switching from root-owned files to UID 10001.
 
 ## Creating the First Admin Account
 
@@ -639,13 +711,11 @@ or download the `.spdx.json` file from the release or workflow run.
 
 ### Reverse proxies and NUM_PROXIES
 
-`NUM_PROXIES` defaults to `0`, so direct requests cannot choose their own
-rate-limit or audit identity through `X-Forwarded-For`. The default and fullstack
-Compose stacks use `1` behind nginx and expose the API through port 8080 only.
-The development stack keeps `0` because its backend is directly accessible;
-requests through Vite may share a rate-limit bucket. For custom proxies or
-Kubernetes, follow the [proxy configuration guidance](../../charts/openzev/README.md#reverse-proxies-and-num_proxies)
-before enabling trusted hops.
+Follow [step 4](#4-put-https-in-front-of-it) for the production Compose
+topologies, or the [proxy reference](../../charts/openzev/README.md#reverse-proxies-and-num_proxies)
+for custom proxies and Kubernetes. Development keeps `NUM_PROXIES=0` because
+its backend is directly accessible; requests through Vite may share a
+rate-limit bucket.
 
 ## What's Next?
 

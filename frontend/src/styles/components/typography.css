@@ -1,0 +1,12 @@
+/* Headings carry no default margin (spacing comes from the stack around them);
+   `.muted` is the secondary text colour. In the components layer, so a layout
+   rule cannot override them. */
+
+h2,
+h3 {
+  margin: 0;
+}
+
+.muted {
+  color: var(--muted);
+}

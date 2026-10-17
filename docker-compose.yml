@@ -11,8 +11,7 @@ services:
       DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
       CELERY_BROKER_URL: redis://valkey:6379/0
       CACHE_URL: redis://valkey:6379/1
-      # One trusted hop: nginx is the only entry path and overwrites
-      # X-Forwarded-For. Never publish this service's port.
+      # Only nginx may reach this backend; it overwrites X-Forwarded-For.
       NUM_PROXIES: 1
     volumes:
       - backend_media:/app/media
@@ -65,8 +64,9 @@ services:
       args:
         VITE_API_BASE_URL: /api/v1
         NGINX_CONF: nginx.compose.conf
+    # Only a trusted local TLS proxy may reach this port.
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:8080"
     depends_on:
       - backend
 

@@ -18,7 +18,7 @@ from accounts.throttling import ApiKeyRateThrottle, ImportThrottle
 from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from .models import MeterReading, ImportLog
 from zev import access
-from zev.scoping import ZevScopedQuerySetMixin
+from zev.scoping import ZevScopedQuerySetMixin, assert_zev_not_disabled
 from .serializers import MeterReadingSerializer, ImportLogSerializer
 from .importers.csv_detect import detect_csv_settings
 from .importers.csv_importer import ImportFileError, import_csv, preview_csv
@@ -459,7 +459,8 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         else:
             metering_points = MeteringPoint.objects.filter(
                 Q(zev_id__in=access.viewable_zev_ids(user))
-                | (Q(assignments__participant__user=user) & access.live_participant_q("assignments__participant__"))
+                | (Q(assignments__participant__user=user, zev__disabled_at__isnull=True)
+                   & access.live_participant_q("assignments__participant__"))
             ).distinct()
 
         zev_id = _validated_uuid(request.query_params.get("zev_id"), "zev_id")
@@ -513,6 +514,8 @@ class ImportLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
                     "error": "Imports that overwrote readings cannot be deleted. No imports were deleted.",
                 })
             zevs = Zev.objects.in_bulk({log.zev_id for log in logs if log.zev_id})
+            for zev in zevs.values():
+                assert_zev_not_disabled(self.request.user, zev)
             by_zev = {}
             for log in logs:
                 counts = by_zev.setdefault(zevs.get(log.zev_id), {"deleted_logs": 0, "deleted_readings": 0, "batch_ids": set()})

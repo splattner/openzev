@@ -1,0 +1,125 @@
+.overview-period-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  min-height: 19rem;
+}
+
+.overview-period-card header {
+  width: 100%;
+  margin-bottom: 1.25rem;
+}
+
+.overview-period-card h3 {
+  margin: 0.3rem 0;
+  font-size: 1.4rem;
+  text-transform: capitalize;
+  overflow-wrap: anywhere;
+}
+
+.overview-period-card .eyebrow,
+.overview-period-range {
+  margin: 0;
+}
+
+.overview-period-range {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-period-work {
+  display: grid;
+  align-content: start;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+  width: 100%;
+  /* Includes two text lines, their gap, and the vertical padding because the
+     global border-box rule counts padding inside min-height. */
+  min-height: 4.7rem;
+  padding: 0.75rem 0 1rem;
+}
+
+.overview-period-lead {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.overview-period-warning {
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.overview-period-card > .button {
+  width: 100%;
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
+}
+
+.overview-step-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.overview-step-link {
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+.overview-step-action {
+  width: fit-content;
+  font-weight: 600;
+}
+
+.overview-period-pending:empty {
+  display: none;
+}
+
+.overview-period-verified {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+}
+
+.overview-detail-label {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.overview-period-verified ul {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.overview-period-verified li {
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.45rem;
+  border: 0;
+  padding: 0.2rem 0;
+}
+
+.overview-step-check {
+  color: var(--success-700);
+  font-weight: 700;
+}
+
+@media (width <= 700px) {
+  .overview-period-card {
+    min-height: 0;
+  }
+}

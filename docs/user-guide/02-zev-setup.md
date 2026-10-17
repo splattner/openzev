@@ -246,6 +246,11 @@ address, after which the new login belongs to that party.
 The QR-Rechnung creditor address is the address of the ZEV's responsible
 person, taken from their participant record.
 
+#### Document numbering
+
+Invoice and participation-contract numbers are assigned automatically. Their
+counters cannot be reset through settings or the standard API.
+
 ### Documents & emails tab
 
 The invoice email template (see [Email Templates](#email-templates) below)
@@ -364,7 +369,7 @@ From the page, **Send me a sign-in link** emails a one-time link to the address 
 - **Subject line** — Email subject sent with invoices
 - **Email body** — Message body sent with invoice PDF attachment
 
-Both fields support variable placeholders such as `{invoice_number}`, `{zev_name}`, `{participant_name}`, `{period_start}`, `{period_end}`, and `{total_chf}`. See [Email Configuration → Email Templates](10-email-configuration.md#email-templates) for the full variable reference.
+Both fields support variable placeholders such as `{invoice_number}`, `{zev_name}`, `{participant_name}`, `{period_start}`, `{period_end}`, `{total_chf}`, and `{amount_due_chf}`. See [Email Configuration → Email Templates](10-email-configuration.md#email-templates) for the full variable reference.
 
 Subject and body can inherit the platform template or use your own text
 independently. Their badges show the saved choice; **Unsaved changes** marks a

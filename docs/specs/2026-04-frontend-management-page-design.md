@@ -225,7 +225,11 @@ render `PageHeader` plus the same body. These bodies have no header-hiding
 
 ### 4.2 CSS contracts
 
-**File:** `frontend/src/index.css`
+**File:** `frontend/src/styles/` (entry `index.css` declares the cascade layers once — `native, vendor, tokens, base, layout, components, pages, responsive, utilities` — and imports every file into its layer; see README there)
+
+**Where CSS goes.** Pick the layer by what the rule is: a later layer beats an earlier one whatever the selector specificity, and within a layer specificity and then import order decide as usual. So a page override needs no `:where()`, doubled class or `:not()` trick — put it in the `pages` layer; a media-query override of a component or page goes in `layout/responsive.css`. A page rule that names a bare class shared with a styled element (a `th` that the table band owns) must be scoped to the element it means (`td.x`), since it now beats the band. Third-party CSS (Mantine, Leaflet) is imported into `vendor` from `index.css`; never import a stylesheet bare from a component, because unlayered CSS beats every layer. Native element defaults that a Mantine class must win over go in `native-controls.css` (layer `native`, below `vendor`).
+
+**Where the file lives.** CSS used by exactly one page or component sits next to it, named after it (`features/tariffs/TariffDetailDrawer.css`, `pages/LoginPage.css`); rules shared by a component and the one page that renders it go in the page's file. `styles/pages/` holds only page-level rules shared by several pages (the sign-in shell, `.form-grid`, the invoice rows of the billing period and the participant list), and `styles/components/` the shared primitives (sheet, table, buttons, badges, dialogs, stat tiles). A co-located file keeps the global class names — no CSS Modules, except `*.module.css` for a new, genuinely local component — and is imported from `styles/index.css` into the `pages` layer, never from the component: routes are lazy, so a component import would load its CSS with the route chunk, and the order inside the layer would then depend on navigation. A component's stylesheet is deleted with it, and the build fails on the leftover `@import` until that goes too, so no orphaned rules stay behind.
 
 The following utility and shared classes define the current management-page
 language and should be reused instead of ad hoc page-local CSS when possible:
@@ -262,7 +266,7 @@ language and should be reused instead of ad hoc page-local CSS when possible:
 | `.email-log*` | Delivery history cards with wrapping text and status rows. |
 | `.balance-chart-grid` | Dashboard consumption/production pair, independent of form layout. Auto-fit columns require 24rem each plus a 2rem gap; panels with less space stack, and the minimum track width is capped at 100% of the panel. |
 
-**Inline styles.** Put static presentation in `index.css`, reusing existing
+**Inline styles.** Put static presentation in `frontend/src/styles/`, reusing existing
 classes where practical. Keep `style` props for runtime values,
 component-provided dimensions, and tokens owned by TypeScript constants
 (`lib/zLayers.ts`, `lib/chartTokens.ts`). Use modifier classes for fixed visual
@@ -279,9 +283,9 @@ field tokens (`design/tokens.json` → `fields`): 2.5rem (40px) height — the
 buttons' height, so fields and buttons on one line align — 1rem value
 type at 1.5 line height (native selects retain platform line-height behavior),
 0.5rem radius, 0.95rem base inline padding, 0.875rem/500 labels in
-`--text-body`, 0.8125rem helpers, and 0.4rem label/control/helper gaps. Native rules live in `index.css`;
-their input-type exclusions use `:where()` to keep specificity below Mantine's
-state and section rules. Native helpers (`label > small.muted`) use the shared
+`--text-body`, 0.8125rem helpers, and 0.4rem label/control/helper gaps. Native rules live in `styles/base.css` and
+`styles/native-controls.css`; the text-field rule in `base.css` skips Mantine's own inputs
+(`[class*='mantine-']`, plus the input-type exclusions in `:where()`) so their state and section rules keep working. Native helpers (`label > small.muted`) use the shared
 helper size and line height.
 
 Mantine defaults live in `frontend/src/lib/mantineTheme.ts`: `Input` box vars
@@ -373,7 +377,7 @@ Frontend interaction rules relevant to async work:
   eligible records, single-page result sets, future billing periods) are
   hidden instead of rendered as dead disabled buttons — a greyed button reads
   to users as a stuck loading state. Disabled buttons use the
-  `cursor: not-allowed` affordance (`index.css` `.button:disabled`), never
+  `cursor: not-allowed` affordance (`styles/components/button.css` `.button:disabled`), never
   `cursor: wait`.
 
 ## 7. Frontend
@@ -596,7 +600,7 @@ These pages define the current management-page reference set.
 | New pages revert to dense equal-weight row buttons | Medium | Reuse `ActionMenu`, compact buttons, and this spec’s action hierarchy |
 | Tabs are overused for simple category groupings | Medium | Default to sections unless categories are truly mutually exclusive working contexts |
 | Locale files encode icons or punctuation | Low | Keep strings semantic only; render visuals in components |
-| Shared styling drifts into page-local one-offs | Medium | Extend `index.css` page-family blocks before inventing new local structures |
+| Shared styling drifts into page-local one-offs | Medium | Extend the `styles/` page-family files before inventing new local structures |
 | Destructive actions ship without confirmation | High | Require `useConfirmDialog` + `ConfirmDialog` for delete/remove/clear workflows |
 
 ## 9. Test plan

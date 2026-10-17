@@ -134,7 +134,8 @@ The two-factor policy fields `mfa_required`, `mfa_grace_period_days` and `mfa_po
 |---|---|---|---|
 | `billing_interval` | CharField(20) | `monthly` | Choices: `monthly`, `quarterly`, `semi_annual`, `annual` (from `BillingInterval` TextChoices) |
 | `invoice_prefix` | CharField(10) | `INV` | Prefix of `next_invoice_number()`. API writes must match `\A[A-Z0-9-]{1,10}\Z`; updates preserve unchanged raw legacy values (including blanks/whitespace), and a blank wizard value means the default. Newly assigned whitespace is refused on updates. Migration `0043` only reports invalid legacy values. |
-| `invoice_counter` | PositiveIntegerField | `1` | Auto-incremented atomically via `F()` expression |
+| `invoice_counter` | PositiveIntegerField | `1` | Next invoice sequence value; read-only via API |
+| `contract_counter` | PositiveIntegerField | `1` | Next participation-contract sequence value; read-only via API |
 | `invoice_language` | CharField(2) | `de` | Choices: `de`, `fr`, `it`, `en` (from `InvoiceLanguage` TextChoices). Used for PDF + contract translation lookups. |
 | `payment_term_days` | PositiveIntegerField | `30` | Days after invoice generation (issue date) until payment is due. Validators: min 1, max 365. The engine uses it to set `Invoice.due_date` at generation. |
 | `bank_iban` | CharField(34) | blank | For QR-Rechnung generation; model and API validation normalize whitespace/case and validate the ISO 13616 MOD-97 checksum |
@@ -162,14 +163,27 @@ DEFAULT_EMAIL_BODY_TEMPLATE = (
 
 **Invoice numbering:**
 - `next_invoice_number()` generates `"{prefix}-{counter:05d}"` (e.g. `INV-00001`).
-- Numbering is **per ZEV**: each community has its own prefix and counter and starts
-  at 1, enforced by the `unique_invoice_number_per_zev` constraint on `Invoice`.
+- Numbering is **per ZEV**: each community has its own prefix and counter (default
+  `1`). `Invoice` enforces `unique_invoice_number_per_zev`.
   Two ZEVs may therefore both hold an `INV-00001`; a number identifies an invoice
   only together with its ZEV.
-- Atomically increments `invoice_counter` using `Zev.objects.filter(pk=self.pk).update(invoice_counter=F("invoice_counter") + 1)`.
-- Calls `self.refresh_from_db()` after increment.
+- Inside `transaction.atomic()`, reads the persisted prefix/counter under a
+  `select_for_update(no_key=True)` ZEV row lock and increments with `F()`.
+  On PostgreSQL this serializes allocators while allowing foreign-key inserts
+  referencing the ZEV (e.g. audit events).
+- Successful calls retain the lock until transaction completion; rolling back
+  to a savepoint releases locks acquired after that savepoint.
+- Rollback restores the counter, allowing reuse. Standalone calls commit their
+  allocation. The calling instance is refreshed after increment.
 
-**Serializer:** `ZevSerializer` — `fields = "__all__"`, read-only: `id`, `created_at`, `updated_at`, `disabled_at`, `disabled_by`, `disabled_reason` (the last three change only through `ZevViewSet.disable`/`enable` — see `2026-03-community-and-access.md` §7.1a). Read-only `issuer` (`{party, display_name}` of today's issuer, or `null`); there is no `owner` (removed in #761, see `2026-03-community-and-access.md` §7.1).
+**Serializer:** `ZevSerializer` — `fields = "__all__"`, read-only: `id`, `created_at`, `updated_at`, `invoice_counter`, `contract_counter`, `disabled_at`, `disabled_by`, `disabled_reason` (the last three change only through `ZevViewSet.disable`/`enable` — see `2026-03-community-and-access.md` §7.1a). Read-only `issuer` (`{party, display_name}` of today's issuer, or `null`); there is no `owner` (removed in #761, see `2026-03-community-and-access.md` §7.1).
+
+POST, PUT, and PATCH ignore both counters; creation uses model defaults.
+Updates save validated fields plus `updated_at`, preserving concurrent allocations
+and omitted settings. Submitting either VAT field saves the validated pair together
+with last-write-wins semantics. Empty or counter-only updates still advance
+`updated_at`. The response reloads persisted settings. Transfer import and
+Django admin can still write counters directly.
 
 ---
 
@@ -294,9 +308,9 @@ keys are `invoice_email`, `participant_onboarding`, `email_verification`, `parti
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
-| `/api/v1/zev/zevs/{id}/` | PATCH | `ZevManagementPermission` (a manager of that ZEV, or an admin) | Partial update of any Zev field including billing, email templates, contract notes |
+| `/api/v1/zev/zevs/{id}/` | PATCH | `ZevManagementPermission` (a manager of that ZEV, or an admin) | Update writable ZEV settings (§4.3) |
 
-Handled by `ZevViewSet` with `ZevSerializer`. All Zev fields (billing_interval, invoice_prefix, invoice_language, payment_term_days, bank_iban, bank_name, vat_mode, vat_number, itemize_tariff_bands, email_subject_template, email_body_template, local_tariff_notes, additional_contract_notes, notes) are writable. `ZevSerializer.validate()` enforces the `vat_mode`/`vat_number` pairing; non-empty IBANs that fail the ISO 13616 MOD-97 checksum are rejected by the shared `BankIbanValidationMixin.validate_bank_iban` (same mixin on `ZevCreateWithOwnerSerializer`, same message as `Zev.clean()`).
+Handled by `ZevViewSet` with `ZevSerializer`. Settings fields (billing_interval, invoice_prefix, invoice_language, payment_term_days, bank_iban, bank_name, vat_mode, vat_number, itemize_tariff_bands, email_subject_template, email_body_template, local_tariff_notes, additional_contract_notes, notes) are writable; document counters are read-only (§4.3). `ZevSerializer.validate()` enforces the `vat_mode`/`vat_number` pairing; non-empty IBANs that fail the ISO 13616 MOD-97 checksum are rejected by the shared `BankIbanValidationMixin.validate_bank_iban` (same mixin on `ZevCreateWithOwnerSerializer`, same message as `Zev.clean()`).
 
 ---
 
@@ -389,7 +403,7 @@ Template: `TEMPLATE_NAME = "invoices/invoice_pdf.html"` — editable by admins v
 - Includes: invoice, `vat_rate_percent` (`invoice.vat_rate × 100`), items grouped by category (`grouped_items`), zev, participant, issuer, recipient, representative, owner_participant (deprecated alias), QR-Rechnung SVG, `inline_qr_payment` flag, invoice-number prefix/suffix split, localized `status_display`, energy comparison chart SVG, hourly profile chart SVG, energy-flow Sankey SVG, energy summary KPIs, savings data, and the translation dict (`tr`)
 
 `generate_pdf(invoice)` renders HTML via `_render_template()`, which prefers a DB `PdfTemplate` override (rendered with `Template(content).render(Context(context))`) and falls back to `render_to_string()` for the on-disk default, then converts to PDF/A-3b via `render_pdf()` (`invoices/pdf_render.py`, shared with contract/annual-statement/financial-summary rendering).
-`save_invoice_pdf(invoice)` generates and attaches as `invoice_{number}.pdf`, writing back only `pdf_file`/`updated_at` via a conditional row update (concurrent workflow changes survive; a concurrently deleted row raises instead of being recreated).
+`save_invoice_pdf(invoice)` attaches `invoice_{number}.pdf`, writing only `pdf_file`, `pdf_status` and `updated_at` when status and party copies still match. Publication conflicts retry once; rejected files are cleaned up without undoing workflow changes or recreating deleted rows ([invoice lifecycle §8.1](2026-03-invoice-lifecycle-and-communication.md#81-pipeline)).
 
 ---
 
@@ -778,6 +792,7 @@ Changing date formats does NOT retroactively modify already-generated PDF files 
 | Template regressions in generated PDFs | Medium | Admin can edit and preview HTML template. Template is a Django template file readable in plain text. |
 | Email template rendering failure | Medium | On `KeyError`/`ValueError`, the invoice-email task falls back to the shipped defaults and logs a warning; other uncaught formatting errors are not guaranteed to degrade gracefully. |
 | VAT overlap allowing double taxation | High | `clean()` checks all existing ranges. `full_clean()` called in `save()`. API wraps validation errors for clear feedback. |
+| Document-counter rewind on settings save | High — number reuse or invoice-generation failures | Read-only API counters and updates restricted to validated settings (§4.3). |
 
 ---
 
@@ -842,6 +857,11 @@ Tests cover dashboard access (`test_invoice_dashboard_is_admin_only`) confirming
   are covered in `test_public_invoice_access.py`; onboarding send behavior and
   all-field context coverage are in `zev/test_onboarding.py`; verification
   context coverage is in `accounts/tests.py`.
+
+### 13.1b ZEV settings counter regressions
+
+`backend/zev/test_zev_counters.py` covers stale settings saves and responses,
+ignored counter input on create/update, timestamps, and concurrent VAT edits.
 
 ### 13.2 Frontend
 

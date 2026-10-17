@@ -136,6 +136,11 @@ export function PublicInvoicePage() {
                             <span className="public-invoice-currency">{data.currency}</span>
                             {formatMoney(data.total_chf)}
                         </div>
+                        {data.status !== 'cancelled' && Number(data.credit_applied_chf) > 0 && Number(data.amount_due_chf) !== Number(data.total_chf) && (
+                            <p className="public-invoice-credit">
+                                {t('pages.publicInvoice.amountDue', { amount: formatMoney(data.amount_due_chf) })}
+                            </p>
+                        )}
                     </div>
                 </header>
 

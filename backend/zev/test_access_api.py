@@ -1,5 +1,6 @@
 """Giving and taking away access to a ZEV, and the account changes around it (#761, spec §7–§8)."""
 
+import uuid
 from datetime import date, timedelta
 from unittest import mock
 
@@ -45,6 +46,27 @@ class AccessApiTestCase(TestCase):
 
 
 class ZevAccessGrantApiTests(AccessApiTestCase):
+    def test_audit_failure_rolls_back_grant_changes(self):
+        client = self.client_for(self.admin)
+        with mock.patch("zev.views_access.record_audit_event", side_effect=RuntimeError("audit failed")):
+            with self.assertRaisesRegex(RuntimeError, "audit failed"):
+                client.patch(self.url(self.viewer_grant.pk), {"role": MANAGER}, format="json")
+        self.viewer_grant.refresh_from_db()
+        self.assertIsNone(self.viewer_grant.valid_to)
+        self.assertFalse(ZevAccessGrant.objects.filter(zev=self.zev, user=self.viewer, role=MANAGER).exists())
+
+    def test_audit_failure_rolls_back_grant_revocation(self):
+        client = self.client_for(self.admin)
+        with mock.patch("zev.views_access.record_audit_event", side_effect=RuntimeError("audit failed")):
+            with self.assertRaisesRegex(RuntimeError, "audit failed"):
+                client.delete(self.url(self.viewer_grant.pk))
+        self.viewer_grant.refresh_from_db()
+        self.assertIsNone(self.viewer_grant.valid_to)
+
+    def test_unknown_grant_precedes_invalid_patch_payload(self):
+        response = self.client_for(self.owner).patch(self.url(uuid.uuid4()), {"role": "invalid"}, format="json")
+        self.assertEqual(response.status_code, 404)
+
     def test_managers_and_viewers_list_the_grants_strangers_get_404(self):
         for user in (self.owner, self.viewer, self.admin):
             with self.subTest(user=user.username):

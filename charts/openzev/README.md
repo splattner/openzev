@@ -20,11 +20,41 @@ configuration.
 - PostgreSQL deployment
 - Valkey (or Redis) deployment
 
+## Production hardening
+
+Production renders reject empty values and known development defaults for
+the secret, database URL, and frontend origin. Django checks the remaining
+production configuration. See [Example values](#example-values).
+
+Transport values render exactly as configured, including in debug and with
+`numProxies: 0`. See [proxy configuration](#reverse-proxies-and-num_proxies)
+before enabling redirects or HSTS. Booleans must be unquoted; HSTS seconds
+must be a non-negative integer. Set chart-managed transport settings through
+`debug` and `backend` values, not `backend.extraEnv`.
+
+Every workload runs as UID 10001 with the RuntimeDefault seccomp profile,
+privilege escalation disabled, dropped capabilities, and bounded CPU/memory
+(the frontend container listens on 8080; its Service remains on port 80).
+
+Partial security-context and resource overrides retain the other defaults;
+`{}` does not clear them. To omit a context or resource map, explicitly set
+that component's `podSecurityContext`, `securityContext`, or `resources` to
+`null`. Size memory limits for representative PDF workloads, including
+interactive invoice regeneration in the backend.
+
+See the [hardening spec](../../docs/specs/2026-09-production-hardening.md) for logging boundaries and upgrade requirements.
+
 ## Install
 
+Local HTTP experiments need debug mode and disabled transport settings:
+
 ```bash
-helm upgrade --install openzev ./charts/openzev -n openzev --create-namespace
+helm upgrade --install openzev ./charts/openzev -n openzev --create-namespace \
+  --set debug=true --set backend.secureSslRedirect=false --set backend.hstsSeconds=0
 ```
+
+A production install must use a values file containing real secrets and the
+public HTTPS origin; the default non-debug values intentionally fail closed.
 
 ## Use as a Helm repo
 
@@ -33,7 +63,7 @@ After enabling GitHub Pages on the `gh-pages` branch, add this repository as a H
 ```bash
 helm repo add openzev https://splattner.github.io/openzev
 helm repo update
-helm install openzev openzev/openzev -n openzev --create-namespace
+helm install openzev openzev/openzev -n openzev --create-namespace -f values-prod.yaml
 ```
 
 ## Database credentials via existing secret
@@ -226,6 +256,11 @@ media:
     existingClaim: openzev-media
 ```
 
+When upgrading root-owned media, `fsGroup: 10001` grants group access on
+storage drivers that support it. If the driver does not apply `fsGroup`, stop
+the backend and worker and use a temporary maintenance pod mounting this
+claim to run `chown -R 10001:10001 /app/media` as root before restarting them.
+
 ## Ingress
 
 Default ingress routes:
@@ -275,7 +310,12 @@ origins are public HTTPS.
 
 ### Reverse proxies and NUM_PROXIES
 
-`backend.numProxies` controls DRF's `NUM_PROXIES` setting for per-IP rate limits. Set it to the number of trusted proxy-added addresses in `X-Forwarded-For`. Set `0` unless the backend is reachable only through proxies that prevent clients from controlling the selected entry. A value that is too low groups clients into one bucket; a value that is too high can let clients evade per-IP limits.
+`backend.numProxies` is the number of proxy-added addresses retained in
+`X-Forwarded-For` for per-IP rate limits and audit identity. A positive value
+also enables Django's `X-Forwarded-Proto` HTTPS detection. Set `0` unless the
+backend is reachable only through a proxy that sanitizes the selected entry
+and scheme. A value that is too low groups clients into one bucket; a value
+that is too high can let clients evade per-IP limits.
 
 ```yaml
 backend:
@@ -286,13 +326,20 @@ Count addresses retained after the last overwriting proxy, not simply the
 number of proxies. The shipped nginx configurations overwrite the header, so
 their backend uses `1` even if another proxy precedes nginx (in that case the
 identity is that upstream proxy). To preserve client identities through more
-hops, the edge must sanitise the header and subsequent trusted proxies must
+hops, the edge must sanitize the header and subsequent trusted proxies must
 append their peer addresses. Restrict backend access to those proxies before
 enabling header trust; the chart does not enforce that network restriction.
 The chart validates `backend.numProxies` (`values.schema.json`): it must be
 an integer `>= 0` — empty, null, negative, and fractional values are rejected
 at install/upgrade time instead of crashing the backend on startup.
 Workers do not serve HTTP and do not need this setting.
+
+The backend connection from an ingress uses HTTP. Before enabling
+`backend.secureSslRedirect`, configure HTTPS at the ingress, make it overwrite
+`X-Forwarded-Proto` with the external scheme, and set `backend.numProxies`
+accordingly. Otherwise HTTPS requests can loop through redirects. Keep
+`backend.hstsSeconds: 0` until the public HTTPS origin works; the default
+`31536000` tells browsers to require HTTPS for one year after a secure response.
 
 ## Email configuration
 
@@ -363,6 +410,10 @@ frontendUrl: https://openzev.example.com
 backend:
   allowedHosts: "openzev.example.com"
   csrfTrustedOrigins: "https://openzev.example.com"
+  # See "Reverse proxies and NUM_PROXIES" above.
+  numProxies: 1
+  secureSslRedirect: true
+  hstsSeconds: 31536000
 
 webauthn:
   rpId: openzev.example.com

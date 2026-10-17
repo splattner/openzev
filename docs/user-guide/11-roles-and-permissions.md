@@ -121,6 +121,9 @@ A manager is **scoped** to the ZEVs it has access to:
 
 ### Participant Capabilities
 
+Participants can set a password or recover a forgotten one in **Account → Security**;
+see [password setup and recovery](03-participant-management.md#a-participant-forgot-their-password).
+
 The participant sidebar shows **Dashboard**, **My invoices**, and **Annual statement**; own consumption charts and trends stay reachable through the direct `/metering/chart` route.
 
 - **Dashboard:** View own energy consumption/production overview
@@ -277,15 +280,30 @@ belongs to:
    person who rents in two communities keeps one login
 4. To detach an account again, choose **Unlink** (the account itself stays as it is)
 
+### Giving a Participant Independent Access
+
 Independent-access accounts are admins, accounts allowed to create a community,
 and current/former manager/viewer grant or issuer/representative role holders.
 They use their normal login; participant links are refused, including after
 accepted access is revoked or admin/self-setup privileges are removed.
 
-An existing linked account without a password, enabled sign-in provider or
-passkey needs an access invitation before you assign a managing role. A party
+An existing linked account without an independently established password, enabled
+sign-in provider or passkey needs an access invitation before you assign a managing
+role. Credentials enrolled through participant links do not count. A party
 without an account can hold a role; invite it to enable sign-in. Giving manager/viewer access
 sends that invitation and ends their earlier participant links, sessions and API keys.
+It also removes passwords, authenticator setup, passkeys and recovery codes enrolled
+through participant links. The participant opens the invitation in their own inbox
+and sets up fresh credentials. Independently established logins survive promotion;
+external providers that verified the account email count even if linked while the
+account was participant-only. Participant-session linking requires that proof;
+an unrelated provider identity cannot establish ownership of the participant account.
+The upgrade signs existing participant-only accounts out once. Their older local
+credentials require an invitation before promotion unless an independent identity
+qualifies; existing independent-access accounts keep their login. Recovery codes
+created through participant links are removed too, even if an independent factor
+survives. Sign in with that factor and regenerate recovery codes before relying on
+them again.
 Managers can start this flow only for participant accounts confined to their
 community; ask an admin for other accounts. Failed delivery leaves the invitation
 pending: use **Resend invitation** on the access row.
@@ -319,7 +337,8 @@ Open **More** on an account row for:
 - **Delete** — only available for accounts that do not belong to a community.
   Unlink the account from its participant first. An account that is a
   community's last manager cannot be deleted either: give someone else manager
-  access first.
+  access first. If the account's relationships change while deletion is waiting,
+  OpenZEV refuses the deletion; review its community access and retry.
 
 ## Data Privacy and Scoping
 
@@ -332,6 +351,12 @@ OpenZEV enforces data boundaries:
 - API access is also scoped—a participant token can only fetch own data
 
 ### ZEV Isolation
+
+Disabled communities remain readable through manager or viewer access;
+participant-only access is suspended. Only admins may modify community data
+or re-enable it, except that managers may revoke invoice access links.
+Bulk import-history deletion is rejected if the selection includes a disabled
+community.
 
 - A manager of ZEV A **cannot** see ZEV B's data unless it has access there too
 - Tariffs, metering points, and invoices are entirely isolated by ZEV
@@ -452,10 +477,10 @@ it takes a few extra steps. Under **My Account → Profile → Email address**:
 The old address is emailed afterwards, so a change you did not make does not go unnoticed. The
 link works once, and stops working if your password or address changes before you use it.
 
-Accounts that have no password — participants, who sign in with emailed links, and accounts that
-only use an external identity provider — cannot do this themselves. For participants the address is
-maintained by the community's managers on the participant record; an administrator can change any
-account's address under **Platform → Accounts → Edit**.
+Participant-only email addresses remain manager-maintained after choosing a password.
+Other accounts without an independently established password also cannot change
+their email themselves. An administrator can change an account's address under
+**Platform → Accounts → Edit**.
 
 ### Signing out other devices
 
@@ -520,26 +545,37 @@ access under **ZEV settings → People & access**.
 **Possible causes:**
 - The onboarding link was never used, has expired, or was revoked
 - User account deactivated
-- Password forgotten — the user can request a reset link with **Forgot your password?** on the sign-in page
+- Password forgotten — accounts with a password can request a reset link with
+  **Forgot your password?** on the sign-in page. Participant-only accounts can
+  also recover through a sign-in link in Account → Security within 15 minutes.
 
 **Fix:**
 1. Check the account under **Platform → Accounts → Users**: is it active, and
    has it ever signed in?
 2. **Participant-only account:** a manager of the community sends or copies the onboarding link
-   again from the **⋯** menu on the participant's row. It signs them in, and they
-   choose a new password.
-3. **Account with a password:** the user chooses **Forgot your password?** on the
-   sign-in page and follows the emailed link (needs working
-   [email delivery](10-email-configuration.md)). Without email, or for an account that
-   only uses an external sign-in provider, someone with server access
-   sets a new password on the command line (the user then signs in with it; the
+   again from the **⋯** menu on the participant's row. Sign in and complete
+   two-factor authentication if enabled, then open **My Account → Security**.
+   Choose **Reset password** within 15 minutes and set a new password without
+   entering the old one. After the deadline, request a fresh sign-in link.
+   An account without a password shows the initial password setup instead.
+   Copying a link alone does not change the password.
+3. **Account with a password:** choose **Forgot your password?** on the sign-in
+   page and follow the emailed link (requires working
+   [email delivery](10-email-configuration.md)). This proves ownership of the
+   account's mailbox and establishes a password for independent access.
+   Without email, or for an account that only uses an external sign-in provider,
+   someone with server access verifies the account owner's identity and sets a
+   new password on the command line (the user then signs in with it; the
    service is `backend` instead of `app` in a two-container source build):
 
    ```bash
-   docker compose exec app python manage.py changepassword <username>
+   docker compose exec app python manage.py recover_password <username>
    ```
 
-   The username is shown in the **Account** column of the accounts list.
+   The username is shown in the **Account** column of the accounts list. This
+   operation establishes an independent password and signs out existing sessions.
+   Django admin's password-change form performs the same recovery. Plain Django
+   `changepassword` changes only the hash and does not establish independent ownership.
 4. **Locked out by two-factor:** see [Locked out?](#locked-out)
 
 ## Next Steps

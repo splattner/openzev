@@ -10,7 +10,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from urllib.parse import urlparse
 from . import email_change, mfa
-from .jwt_utils import add_custom_claims
+from .jwt_utils import PARTICIPANT_LINK_SOURCE, SOURCE_CLAIM, add_custom_claims, is_participant_link_session
 from .models import ApiKey, AppSettings, FeatureFlag, OAuthProvider, SocialAccount, TotpDevice, User, UserRole, VatRate, WebAuthnCredential
 from zev.models import Zev
 
@@ -26,7 +26,10 @@ class UserSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         try:
-            return super().update(instance, validated_data)
+            for field, value in validated_data.items():
+                setattr(instance, field, value)
+            instance.save(update_fields=validated_data)
+            return instance
         except DjangoValidationError as exc:
             raise serializers.ValidationError(
                 exc.message_dict if hasattr(exc, "error_dict") else {"detail": exc.messages}
@@ -262,8 +265,9 @@ class ChangePasswordSerializer(serializers.Serializer):
     def save(self, **kwargs):
         user = self.context["request"].user
         user.set_password(self.validated_data["new_password"])
+        user.password_from_participant_link = is_participant_link_session(self.context["request"].auth)
         user.must_change_password = False
-        user.save()
+        user.save(update_fields=["password", "password_from_participant_link", "must_change_password"])
         return user
 
 
@@ -300,6 +304,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def get_token(cls, user):
         token = super().get_token(user)
         add_custom_claims(token, user)
+        if user.password_from_participant_link:
+            token[SOURCE_CLAIM] = PARTICIPANT_LINK_SOURCE
         return token
 
 

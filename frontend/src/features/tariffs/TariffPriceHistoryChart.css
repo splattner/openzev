@@ -1,0 +1,25 @@
+/* ── Tariff price history chart ──────────────────────────────────────────── */
+
+.tariff-price-history {
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.tariff-price-history-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.35rem;
+}
+
+.tariff-price-history-header h4 {
+  margin: 0;
+}
+
+.tariff-price-history-note {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+}
+

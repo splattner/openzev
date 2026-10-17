@@ -39,7 +39,7 @@ from config.safe_format import render_with_fallback
 from . import access
 from .models import Party, Zev, ZevAccessGrant, ZevAccessRole
 from .services import (
-    build_unique_username, requires_independent_login, has_login_credentials,
+    build_unique_username, requires_independent_login, has_independent_login_credentials,
     is_pending_invitation, issue_invitation,
 )
 
@@ -283,7 +283,7 @@ class ZevAccessListView(_ZevAccessBase):
         field = "party" if party is not None else "email"
         with transaction.atomic():
             if party is not None:
-                party = Party.objects.select_for_update().get(pk=party.pk)
+                party = get_object_or_404(Party.objects.select_for_update(), pk=party.pk)
                 if party.zev_id != zev.pk:
                     return Response({"party": ["The party belongs to another ZEV."]}, status=status.HTTP_400_BAD_REQUEST)
                 accounts = access.party_accounts(party)
@@ -302,7 +302,11 @@ class ZevAccessListView(_ZevAccessBase):
                 account = User.objects.filter(email__iexact=email).order_by("pk").first()
             if account is not None:
                 # Concurrent grants for this account wait here, then see each other's grant.
-                account = User.objects.locked().get(pk=account.pk)
+                account = get_object_or_404(User.objects.locked(), pk=account.pk)
+            access.refresh_write_access(request.user, zev)
+            refusal = self.refuse_write(request, zev, action_type="zev_access.grant")
+            if refusal is not None:
+                return refusal
             if account is not None and account.is_admin:
                 return Response({field: ["Admins already have access to every ZEV."]}, status=status.HTTP_400_BAD_REQUEST)
             if account is not None and ZevAccessGrant.objects.filter(
@@ -325,7 +329,7 @@ class ZevAccessListView(_ZevAccessBase):
                 account.set_unusable_password()
                 account.save(update_fields=["password"])
             else:
-                needs_invitation = not has_login_credentials(account)
+                needs_invitation = not has_independent_login_credentials(account)
                 if needs_invitation and not request.user.is_admin:
                     if (
                         requires_independent_login(account)
@@ -391,43 +395,49 @@ class ZevAccessDetailView(_ZevAccessBase):
         refusal = self.refuse_write(request, zev, action_type="zev_access.change")
         if refusal is not None:
             return refusal
-        grant = self.grant_in(zev, pk)
+        self.grant_in(zev, pk)  # Preserve 404 before payload validation for an unknown grant.
         payload = ZevAccessUpdateSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
         data = payload.validated_data
 
-        role = data.get("role", grant.role)
-        losing_manager = grant.role == ZevAccessRole.MANAGER and (
-            role != ZevAccessRole.MANAGER or data.get("valid_to") is not None
-        )
-        if losing_manager and access.is_last_manager(grant):
-            return Response({"detail": LAST_MANAGER_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
-
-        # A role change opens a new grant from today; the end date must not
-        # precede whichever start applies. Checked before anything is written.
-        starts = timezone.localdate() if role != grant.role else grant.valid_from
-        if data.get("valid_to") is not None and data["valid_to"] < starts:
-            return Response({"valid_to": ["The end date cannot be before the start."]},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        before = {"role": grant.role, "valid_to": grant.valid_to.isoformat() if grant.valid_to else None}
         try:
             with transaction.atomic():
+                access.lock_zevs(zev)
+                grant = self.grant_in(zev, pk)
+                grant.user = get_object_or_404(User.objects.locked(), pk=grant.user_id)
+                access.refresh_write_access(request.user, zev)
+                refusal = self.refuse_write(request, zev, action_type="zev_access.change")
+                if refusal is not None:
+                    return refusal
+                role = data.get("role", grant.role)
+                losing_manager = grant.role == ZevAccessRole.MANAGER and (
+                    role != ZevAccessRole.MANAGER or data.get("valid_to") is not None
+                )
+                if losing_manager and access.is_last_manager(grant):
+                    return Response({"detail": LAST_MANAGER_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
+
+                # A role change opens a new grant from today; validate before writing.
+                starts = timezone.localdate() if role != grant.role else grant.valid_from
+                if data.get("valid_to") is not None and data["valid_to"] < starts:
+                    return Response({"valid_to": ["The end date cannot be before the start."]},
+                                    status=status.HTTP_400_BAD_REQUEST)
+
+                before = {"role": grant.role, "valid_to": grant.valid_to.isoformat() if grant.valid_to else None}
                 if role != grant.role:
                     grant = access.change_role(grant, role, by=request.user)
                     grant = ZevAccessGrant.objects.select_related("user", "granted_by").get(pk=grant.pk)
                 if "valid_to" in data:
                     grant.valid_to = data["valid_to"]
                     grant.save(update_fields=["valid_to", "updated_at"])
+                after = {"role": grant.role, "valid_to": grant.valid_to.isoformat() if grant.valid_to else None}
+                _audit(
+                    request, zev, action_type="zev_access.change", grant=grant,
+                    summary=f"Changed {grant.user.email or grant.user.username}'s access to {zev.name}.",
+                    changes={key: {"before": before[key], "after": after[key]} for key in before if before[key] != after[key]},
+                )
         except DjangoValidationError as exc:
             raise serializers.ValidationError({"detail": exc.messages}) from exc
         access.invalidate(grant.user)
-        after = {"role": grant.role, "valid_to": grant.valid_to.isoformat() if grant.valid_to else None}
-        _audit(
-            request, zev, action_type="zev_access.change", grant=grant,
-            summary=f"Changed {grant.user.email or grant.user.username}'s access to {zev.name}.",
-            changes={key: {"before": before[key], "after": after[key]} for key in before if before[key] != after[key]},
-        )
         return Response(ZevAccessGrantSerializer(grant).data)
 
     def delete(self, request, zev_id, pk):
@@ -435,14 +445,16 @@ class ZevAccessDetailView(_ZevAccessBase):
         refusal = self.refuse_write(request, zev, action_type="zev_access.revoke")
         if refusal is not None:
             return refusal
-        grant = self.grant_in(zev, pk)
-
-        user = grant.user
-        display = user.email or user.username
         with transaction.atomic():
-            user = get_object_or_404(User.objects.locked(), pk=user.pk)
+            access.lock_zevs(zev)
             grant = self.grant_in(zev, pk)
+            user = get_object_or_404(User.objects.locked(), pk=grant.user_id)
             grant.user = user
+            access.refresh_write_access(request.user, zev)
+            refusal = self.refuse_write(request, zev, action_type="zev_access.revoke")
+            if refusal is not None:
+                return refusal
+            display = user.email or user.username
             if grant.role == ZevAccessRole.MANAGER and access.is_last_manager(grant):
                 return Response({"detail": LAST_MANAGER_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
             access.revoke(grant)
@@ -463,13 +475,13 @@ class ZevAccessDetailView(_ZevAccessBase):
                     user.email_verification_tokens.filter(
                         purpose=EmailVerificationToken.Purpose.INVITATION, consumed_at__isnull=True,
                     ).update(consumed_at=timezone.now())
+            _audit(
+                request, zev, action_type="zev_access.revoke", user=user if not removed_account else None,
+                summary=f"Revoked {display}'s access to {zev.name}.",
+                metadata={"email": display, "removed_unaccepted_account": removed_account},
+            )
         if not removed_account:
             access.invalidate(user)
-        _audit(
-            request, zev, action_type="zev_access.revoke", user=user if not removed_account else None,
-            summary=f"Revoked {display}'s access to {zev.name}.",
-            metadata={"email": display, "removed_unaccepted_account": removed_account},
-        )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -486,6 +498,10 @@ class ZevAccessResendInvitationView(_ZevAccessBase):
             user = get_object_or_404(User.objects.locked(), pk=grant.user_id)
             grant = self.grant_in(zev, pk)
             grant.user = user
+            access.refresh_write_access(request.user, zev)
+            refusal = self.refuse_write(request, zev, action_type="zev_access.resend_invitation")
+            if refusal is not None:
+                return refusal
             if user.is_active or (grant.valid_to is not None and grant.valid_to < timezone.localdate()):
                 return Response({"detail": "This grant no longer has a pending invitation."},
                                 status=status.HTTP_400_BAD_REQUEST)

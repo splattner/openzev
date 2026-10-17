@@ -28,13 +28,15 @@ import uuid
 from contextlib import contextmanager
 from datetime import date, timedelta
 
-from django.db import transaction
+from django.core.exceptions import PermissionDenied
+from django.db import connection, transaction
 from django.db.models import Q
+from django.http import Http404
 from django.utils import timezone
 
 from allocation.validity import active_on
 
-from .models import MANAGING_ROLES, Participant, ZevAccessGrant, ZevAccessRole, ZevPartyRole
+from .models import MANAGING_ROLES, Participant, Party, Zev, ZevAccessGrant, ZevAccessRole, ZevPartyRole
 
 _CACHE_ATTR = "_zev_access_cache"
 _generation = 0
@@ -143,23 +145,69 @@ NO_MANAGER_LEFT = "This would leave the ZEV without a manager. Give someone mana
 
 
 class NoManagerLeft(Exception):
-    """A change would leave a ZEV without any manager today."""
+    """A change would leave a ZEV without a manager today."""
+
+
+class AccountRelationshipsChanged(Exception):
+    """Account deletion discovered relationships outside its acquired locks."""
+
+
+def refresh_write_access(user, zev=None) -> None:
+    """Reload actor authority and ZEV state after lock waits."""
+    invalidate(user)
+    try:
+        user.refresh_from_db(fields=["role", "is_superuser", "is_active"])
+    except type(user).DoesNotExist as exc:
+        user.pk = None  # Keep the actor snapshot without a deleted account's audit FK.
+        raise PermissionDenied("This account is no longer active.") from exc
+    if not user.is_active:
+        raise PermissionDenied("This account is no longer active.")
+    if zev is not None:
+        try:
+            zev.refresh_from_db(fields=["disabled_at"])
+        except Zev.DoesNotExist as exc:
+            raise Http404 from exc
+
+
+def lock_zevs(*zevs) -> None:
+    """Serialize manager removals; call inside a transaction, before other row locks."""
+    # Grant creation holds the user lock; allow its FK key-share lock on the ZEV.
+    list(
+        Zev.objects.select_for_update(no_key=connection.features.has_select_for_no_key_update)
+        .filter(pk__in={_zev_id(zev) for zev in zevs}).order_by("pk").values_list("pk", flat=True)
+    )
+
+
+def _account_relationships(account):
+    parties = dict(account.parties.values_list("pk", "zev_id"))
+    zev_ids = (set(parties.values()) | set(account.zev_grants.values_list("zev_id", flat=True))
+               | set(account.participations.values_list("zev_id", flat=True)))
+    return zev_ids, set(parties)
 
 
 @contextmanager
-def keeping_a_manager(*zevs):
-    """Run a change that may take a ZEV's last manager away, and undo it if it does.
+def keeping_a_manager(*zevs, account=None):
+    """Lock affected ZEVs and roll back if one loses its last manager today.
 
-    Each of ``zevs`` that has a manager before the change must still have one
-    after it, or the change's transaction is rolled back and ``NoManagerLeft``
-    raised. Covers what manages without a grant of its own: unlinking or
-    deleting the issuer's participant, deleting an account (its grants and its
-    ``Party.user`` go with it).
+    Already-unmanaged ZEVs need not gain a manager. Account deletion discovers
+    relationships regardless of dates, locks ZEVs, parties and the account,
+    then refuses new relationships rather than locking more ZEVs out of order.
     """
     zev_ids = {_zev_id(zev) for zev in zevs}
     with transaction.atomic():
+        if account is not None:
+            related_zevs, party_ids = _account_relationships(account)
+            zev_ids |= related_zevs
+        lock_zevs(*zev_ids)
+        if account is not None:
+            list(Party.objects.select_for_update().filter(pk__in=party_ids)
+                 .order_by("pk").values_list("pk", flat=True))
+            account = type(account).objects.locked().get(pk=account.pk)
+            current_zevs, current_parties = _account_relationships(account)
+            if not current_zevs <= zev_ids or not current_parties <= party_ids:
+                raise AccountRelationshipsChanged
         managed = [zev_id for zev_id in zev_ids if has_manager(zev_id)]
-        yield
+        yield account
         if any(not has_manager(zev_id) for zev_id in managed):
             raise NoManagerLeft
 

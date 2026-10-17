@@ -1,0 +1,8 @@
+.invoice-progress-covered {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+

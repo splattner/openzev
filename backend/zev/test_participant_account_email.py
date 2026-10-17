@@ -236,6 +236,20 @@ class ZevOwnerSetupExistingAccountTests(TestCase):
         self.assertEqual(response.status_code, 400, response.content)
         self.assertIn("account", response.json()["owner"])
 
+    def test_a_participant_password_cannot_establish_owner_access(self):
+        account = make_user("eo_participant", UserRole.USER)
+        account.password_from_participant_link = True
+        account.save(update_fields=["password_from_participant_link"])
+
+        response = self.post({"account": account.pk})
+
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("account", response.json()["owner"])
+        self.assertFalse(Zev.objects.filter(name="Existing Owner ZEV").exists())
+        account.refresh_from_db()
+        self.assertTrue(account.check_password("pass1234"))
+        self.assertFalse(account.independent_login_required)
+
     def test_an_account_without_a_login_is_refused(self):
         account = make_user("eo_nologin", UserRole.USER)
         account.set_unusable_password()

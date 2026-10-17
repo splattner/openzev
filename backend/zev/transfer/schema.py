@@ -113,6 +113,8 @@ SUBCOUNT_SECTIONS = {
     "parties": SECTION_PARTICIPANTS,
     "party_roles": SECTION_PARTICIPANTS,
     "buildings": SECTION_METERING_POINTS,
+    "credits": SECTION_INVOICES,
+    "credit_applications": SECTION_INVOICES,
     "supplementary_readings": SECTION_SUPPLEMENTARY,
 }
 
@@ -147,6 +149,9 @@ ZEV_FIELDS = (
     "billing_interval",
     "invoice_prefix",
     "invoice_counter",
+    # Optional (#388): an older archive keeps the defaults.
+    "credit_note_prefix",
+    "credit_note_counter",
     "contract_counter",
     "invoice_language",
     "payment_term_days",
@@ -348,13 +353,58 @@ INVOICE_FIELDS = (
     "vat_chf",
     "embedded_vat_chf",
     "total_chf",
+    # Optional (#388): the credit applied; an older archive has none.
+    "credit_applied_chf",
     "sent_at",
+    # Optional (#388): an archive written before it existed infers it on
+    # import from status and ``sent_at``.
+    "approved_at",
     "due_date",
     "notes",
     # The issuer/recipient copy (#761). Optional: an archive written before
     # it existed imports without it, and the copy is built at the next render.
     "issuer",
     "recipient",
+)
+
+# Nested under each invoice as ``payments`` (#388). Optional: an older
+# archive's paid invoice imports with one payment for its total.
+PAYMENT_FIELDS = (
+    "amount_chf",
+    "paid_on",
+    "note",
+    "source",
+)
+
+# Nested under each invoice as ``credits`` (#388), the credit notes issued for
+# it. Optional: an older archive has none. The PDF bytes travel in the
+# ``invoice_pdfs`` section, keyed by ``credit_number``.
+CREDIT_FIELDS = (
+    "credit_number",
+    "kind",
+    "reason",
+    "amount_chf",
+    "vat_mode",
+    "vat_rate",
+    "vat_chf",
+    "embedded_vat_chf",
+    # Optional: an archive from before refunds imports a credit nobody paid out.
+    "refunded_chf",
+    "refunded_on",
+    "refund_note",
+    "issuer",
+    "recipient",
+    "created_at",
+)
+
+# Nested under the invoice that used the credit as ``credit_applications``
+# (#388), next to the ``credit_number`` that names the credit. The credit may
+# sit under another invoice, so these are imported once every credit exists.
+# Optional: an older archive has none.
+CREDIT_APPLICATION_FIELDS = (
+    "amount_chf",
+    "released_at",
+    "created_at",
 )
 
 INVOICE_ITEM_FIELDS = (

@@ -1,0 +1,22 @@
+/* The card of the account pages outside the app: verify email, confirm email
+   change, forgot and reset password. */
+
+.verify-card {
+  width: min(100%, 480px);
+  display: grid;
+  gap: 1rem;
+}
+
+.verify-step-badge {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  background: var(--success-100);
+  color: var(--success-700);
+  border: 1px solid var(--success-200);
+  border-radius: 999px;
+  padding: 0.2rem 0.75rem;
+  width: fit-content;
+}
+

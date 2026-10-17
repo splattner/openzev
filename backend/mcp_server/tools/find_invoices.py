@@ -24,6 +24,10 @@ def _row(item: dict) -> dict:
         "period_end": item.get("period_end"),
         "status": item.get("status"),
         "total_chf": chf(item.get("total_chf")),
+        # What is still to pay: the total less credit applied and payments.
+        "credit_applied_chf": chf(item.get("credit_applied_chf")),
+        "amount_due_chf": chf(item.get("amount_due_chf")),
+        "paid_chf": chf(item.get("paid_chf")),
     }
 
 

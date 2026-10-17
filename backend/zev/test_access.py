@@ -15,7 +15,7 @@ from django.test import TestCase, TransactionTestCase
 from django.test.utils import CaptureQueriesContext
 
 from accounts.models import UserRole
-from invoices.models import Invoice
+from invoices.models import Credit, Invoice
 from testing.helpers import make_user, create_managed_zev
 from zev import access
 from zev.models import Participant, Zev, ZevAccessGrant, ZevAccessRole
@@ -217,6 +217,7 @@ class CreatorGrantTests(GrantTestCase):
         importer = make_user("ga_importer", UserRole.USER)
         # Meter ids are unique across the instance, so the exported ZEV goes
         # first (its invoices protect it from deletion).
+        Credit.objects.filter(zev=source).delete()
         Invoice.objects.filter(zev=source).delete()
         Zev.objects.filter(pk=source.pk).delete()
 

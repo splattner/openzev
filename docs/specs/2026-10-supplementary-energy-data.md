@@ -604,7 +604,7 @@ admin gets `[]` unless linked to a participant), the flagged meters they hold pe
 ### 7.2 Owner: metering-point list
 
 **File:** `frontend/src/features/meteringPoints/MeteringPointsList.tsx`; new
-`SupplementarySourceStatus.tsx` (a button-styled badge, `badge-button` in `index.css`, and the panel).
+`SupplementarySourceStatus.tsx` (a button-styled badge, `badge-button` in `styles/components/badge.css`, and the panel).
 
 Flagged metering points show a status chip from `supplementary_source_status`: on the row when the
 source is in trouble (`error`, `reconnect_required`), otherwise in the row's expanded Measurement card

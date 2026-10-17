@@ -24,7 +24,7 @@ from metering.supplementary.stats import civil_window
 from metering.supplementary.surfaces import participants_gross
 
 from .annual_statement import compute_savings
-from .models import Invoice, InvoiceStatus
+from .models import billed_invoices
 
 
 def _year_readings(zev, year: int):
@@ -76,18 +76,13 @@ def _empty_month() -> dict:
 
 
 def _invoices_by_participant(zev, year: int) -> dict[str, list]:
-    """The year's non-cancelled invoices of ``zev`` grouped by participant id.
+    """The year's billed invoices of ``zev`` grouped by participant id.
 
-    Same invoice selection as the annual statement, so a participant's rows
-    here match their statement.
+    Same invoice selection as the annual statement (``billed_invoices``), so a
+    participant's rows here match their statement.
     """
     invoices = (
-        Invoice.objects.filter(
-            zev=zev,
-            period_start__gte=date(year, 1, 1),
-            period_end__lte=date(year, 12, 31),
-        )
-        .exclude(status=InvoiceStatus.CANCELLED)
+        billed_invoices(zev, date(year, 1, 1), date(year, 12, 31))
         .prefetch_related("items")
         .order_by("period_start")
     )

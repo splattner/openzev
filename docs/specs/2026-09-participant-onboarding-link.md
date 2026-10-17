@@ -74,10 +74,10 @@ without leaving an immortal credential behind.
   override was judged not worth threading through a function used by every
   participant save. An operator who needs a specific username can still
   rename the account afterwards via the existing edit-user action.
-- **Migrating existing participant accounts.** An account issued before this
-  change keeps whatever password it has until it is next touched by
-  `ensure_participant_account` (any participant save, or an onboarding/magic
-  link), at which point it is neutralized. There is no bulk sweep.
+- **Existing participant accounts.** Passwords and pending-change flags survive
+  synchronization and link generation. Origin marking and its one-time session
+  revocation are defined in §4. Only completed link authentication retires pending
+  credentials when `must_change_password=True`; that flag does not establish origin.
 
 ## 3. What this replaces, and why it is a removal rather than a new door
 
@@ -157,16 +157,14 @@ just this — already sets the clear-text precedent.
 
 The single function every account-creating path now goes through
 (`ParticipantSerializer`, the onboarding actions, `accounts.magic_links`).
-Behavioural change: for a **participant-only** account, it always ends with
-`set_unusable_password()` and `must_change_password=False` — on creation, and
-on every touch of an already-linked account that still carries a usable
-password (the upgrade safety net).
+New participant-only accounts are passwordless with `must_change_password=False`.
+Existing accounts preserve their password, origin and pending-change flag through
+participant edits, onboarding copy/send and invoice sign-in-link requests.
 
 **Leaves an account with its own login untouched** when it also happens to be
 linked as a participant (eligibility below). Its password, email and name are unchanged: participant edits
 must not alter its authentication identity. Only an account without its own
-login follows its participant record (`sync_participant_user_fields`) and has
-its password neutralized.
+login follows its participant record (`sync_participant_user_fields`).
 
 ### No link signs in an account with its own login
 
@@ -207,17 +205,75 @@ is a no-op, so rolling back the backfill alone does not clear protection.
 | Independent access subsequently revoked | Refused | Remains true |
 | Unaccepted invitation cancelled, no other protected relationship | Allowed again | Remains false |
 
-**Credential ownership.** Participant-link possession permits password/factor
-setup. Those credentials remain valid after promotion. A usable password, passkey
-or enabled linked social account is a setup check, not proof of enrollment through
-an independent channel. Promotion does not establish fresh account ownership;
-known credential compromise requires password/factor recovery separately.
+**Credential ownership.** Link holders may enroll credentials for participant
+access; these credentials never establish independent access (ADR 0035).
+Origin fields below are non-editable booleans, default false, excluded from API serializers:
 
-`protect_account_login` locks the user and returns it unchanged when permanent
-protection is already set (for example a role change after the invitation was
-accepted but before a password was chosen). Otherwise it requires a login (usable
-password, enabled social login, passkey or pending invitation; else `ValidationError`
-on `credential_field`) and retires sessions, API keys, onboarding links and magic tokens. Pending
+| Credential/state | Origin field | Recorded from |
+|---|---|---|
+| Password | `User.password_from_participant_link` | Password-writing session |
+| TOTP | `TotpDevice.from_participant_link` | Setup OR confirmation session |
+| Passkey | `WebAuthnCredential.from_participant_link` | Registration session |
+| Recovery code | `MfaRecoveryCode.from_participant_link` | First factor's origin, or explicit regeneration session |
+| OAuth linking state | `OAuthState.from_participant_link` | Initiating session |
+| Legacy social identity | `SocialAccount.from_participant_link` | Backfill's missing mailbox proof |
+
+Link-issued access/refresh JWTs carry `src=participant_link`. Password/passkey
+login inherits the credential's origin; MFA challenges carry `participant_link`.
+Refresh and replacement sessions retain it. Access and refresh reject this source
+whenever `requires_independent_login` is true. Normal profile saves cannot restore
+retired password state; trusted recovery is specified in the community spec §5.6b.
+
+Credential origin and recovery authority are separate. Only a completed onboarding
+or invoice-link login grants the fixed 15-minute recovery permission defined in §5.
+Password/passkey login and session renewal preserve `src=participant_link` without
+granting or renewing that permission. Recovery writes a participant-derived password,
+retires sessions and links, and never supplies independent proof for promotion.
+
+`has_independent_login_credentials` accepts an unmarked usable password, unmarked
+passkey, or unmarked social identity on an enabled provider. TOTP and recovery
+codes alone do not qualify. Otherwise access creation uses an inactive-account
+invitation; direct promotion fails until an invitation exists. Verification
+establishes an independent session for fresh enrollment.
+
+OAuth linking records `OAuthState.session_version` (`PositiveIntegerField`, nullable,
+non-editable) from the locked initiating account. Login states leave it null. After
+provider I/O, the callback locks the active account and requires the recorded version
+to match before writing an identity; missing versions and revoked sessions are refused
+with `session_revoked`. It checks ownership of the row returned by `get_or_create`
+before changing trust. Deleted linking accounts cannot become login flows.
+Independent linking trusts the authenticated owner, including a different provider email.
+Participant-origin linking and marked legacy social login require a
+nonempty provider email, `email_verified is True`, and a case-insensitive match to
+the current account email. Proof clears the social marker; failure uses
+`email_not_verified` and audits refusal. A deleted account is refused normally.
+Manager-maintained participant addresses cannot be changed (`403 managed_email`);
+other accounts with participant-derived passwords also fail reauthentication (`403 no_password`).
+Confirmation rechecks password origin, hash, active state and email under the lock.
+
+**Legacy credential origins.** `accounts.0029_mark_legacy_participant_credentials`
+marks local credentials on unprotected accounts linked through
+`Participant.user` or `Participant.party.user`. It increments session versions and
+deletes pending OAuth exchange codes. All legacy account-linking states expire because
+they lack session binding; ordinary OAuth login states remain. Social identities remain
+independent only when stored claims verify the account email (trimmed, case-insensitive).
+Other identities must prove it at login or are removed on promotion. Passwords/factors
+remain usable for participant access. API keys and credentials on protected or unattached
+accounts are unchanged.
+Unknown legacy origins may require an invitation despite an originally independent
+password. Reversing the migration restores neither trust nor sessions.
+Deployment must drain old code before migration; see the
+[maintenance rollout](../credential-provenance-upgrade.md).
+
+`protect_account_login` locks the user. Already-protected accounts are unchanged,
+including between invitation acceptance and password enrollment. Otherwise it requires
+an independent login
+or pending invitation (else `ValidationError` on `credential_field`) before changing
+credentials. It clears a marked password with `set_unusable_password`, resets
+`password_from_participant_link` and `must_change_password`, deletes marked TOTP devices,
+passkeys and recovery codes, then retires sessions, API keys, onboarding links and magic
+tokens. Marked legacy social identities are also deleted; independent local
+credentials and proven social accounts survive. Pending
 invitations can repeat retirement until acceptance. MFA challenges carry the
 session version, so revocation also retires them. API-key creation, initial password
 setup, password changes, signing out other devices, TOTP setup/confirmation/removal,
@@ -281,16 +337,18 @@ response. Missing target parties/accounts produce field validation errors on sav
 `link-account` remains admin-only. The Participants page's "copy onboarding
 link" action calls `onboarding-link`.
 
-`unlink-account` detaches the account and revokes its active token in one transaction.
+`unlink-account` locks and rereads the participant's links before refreshing admin
+authority. Detachment, token revocation and the success audit share one transaction.
 A consume request that resolved the token before unlink must recheck it under lock;
 it cannot recreate an account or issue a session after revocation commits.
 
-`set-initial-password` (`POST /auth/me/set-initial-password/`) and
-`change-password` (`POST /auth/me/change-password/`) revoke the account's
-onboarding links as well (audited as `onboarding_links_revoked` metadata on
-`password.set_initial` / `password.change`): the link's purpose is fulfilled
-once a password exists, so a leaked mail must not stay a live bearer
-credential afterwards.
+Authenticated password writes (`set-initial-password`, `change-password`, `reset-password`)
+retire the account's onboarding and outstanding magic links. Audit metadata records
+`onboarding_links_revoked` and `magic_links_revoked`; the caller keeps fresh cookies
+without recovery permission, and `password_changed` is scheduled after commit.
+The emailed `password-reset/confirm` door also retires both kinds of link, with the
+same audit counts, but signs out every session and schedules `password_reset` after
+commit without issuing cookies. Its signed token is fully revalidated under the user lock.
 
 `zev.onboarding.resolve(prefix, secret)` compares the secret first and returns
 `None` for an expired token exactly as for a revoked one (same 404 on consume —
@@ -298,9 +356,66 @@ see the enumeration comment in `invoices/views_public.py`).
 `get_or_create_for_participant`
 revokes an expired active token and mints a fresh one (new secret, never an
 extension), so "copy onboarding link" / "resend" always hands out a live link.
-Concurrent copy/send requests are serialized by the partial unique constraint
-(one unrevoked link per participant): the loser returns the winner's link
-rather than minting a second live one.
+Concurrent copy/send requests serialize on the participant row; the loser returns
+the winner's link. The partial unique constraint is the backstop.
+
+### Password setup and explicit recovery
+
+Decision and alternatives: [ADR 0036](../adr/0036-explicit-participant-link-password-recovery.md).
+
+Valid onboarding consumption locks party → user → participant, then re-resolves
+the token's secret, expiry, revocation and disabled-ZEV status before synchronizing
+the current account. A request waiting behind password recovery cannot use a
+token read before its revocation. Both onboarding and magic-link consumption
+use `accounts.magic_links.retire_pending_password` to clear the password and flag
+only when `must_change_password=True`, after full authentication, including MFA.
+Issuing a challenge, failing it, or abandoning it leaves both unchanged.
+An unflagged chosen password survives sign-in. Inactive accounts are refused by
+both link doors without changing pending credentials.
+
+After completed eligible link authentication (including any MFA), JWTs carry
+`password_recovery_until`, an absolute Unix deadline from `PASSWORD_RECOVERY_WINDOW`
+(15 minutes). Refresh preserves it; `/auth/me/` exposes it as
+`password_recovery_expires_at: ISO datetime | null`. Sessions without a future
+integer claim skip account-eligibility queries.
+Ordinary password/OAuth/passkey sessions, API keys and impersonation have no recovery permission.
+
+`POST /auth/me/reset-password/` takes `{new_password}`. Under the user lock it
+checks the JWT's account id, current session version, live deadline and independent
+login boundary. Missing/expired/ineligible authority returns 403 with
+`code=password_recovery_required`; stale sessions return 401. Password validation
+failures return 400 without changing credentials or spending permission.
+Success validates and stores the password, clears `must_change_password`, bumps
+the session version, revokes all unrevoked onboarding links and outstanding magic
+tokens across the account's communities, and reissues caller cookies without
+recovery authority. API keys keep their separate semantics. Cookie requests require
+CSRF; API keys are denied; MFA-enrolment policy exempts this self-protective endpoint.
+No browser throttle is added: this authenticated action does not guess a credential,
+and success invalidates its permission through the session-version bump.
+Audit `password.reset` records success/denial, with success counts
+`onboarding_links_revoked` and `magic_links_revoked`; successful recovery schedules
+the existing `password_changed` notification after commit. All three password
+endpoints share `_finish_password_change` for retirement, cookies and notification.
+Session revocation also discards pending OAuth exchange codes; callback issuance and
+exchange serialize with it under the user lock. Profile updates save only supplied
+fields, and ordinary model saves/hash upgrades cannot restore a replaced password
+(community-and-access spec §5.6b).
+These authenticated password audits share their credential-write transaction; a failed insert rolls
+back the password, session version and retired links. No password or bearer secret
+is recorded. Magic-link issuance uses the same user lock, so tokens cannot be inserted
+inside an uncommitted retirement; later authorized issuance remains possible.
+
+Account → Security offers first-time setup without an old password via
+`set-initial-password` when `has_usable_password=False`. Existing passwords use
+the ordinary change form, with an explicit recovery action while link authority
+is live. Expiry disables recovery and asks for fresh link sign-in. Selection is tied
+to the displayed deadline; a changed/removed permission returns to ordinary change
+without clearing entered fields. Successful writes show success even if the subsequent
+profile refresh fails; refresh errors separately ask the user to reload. Signup,
+invitation and passwordless independent-account setup retain their existing gate.
+Participant-only email addresses remain manager-maintained even after password setup
+(`can_change_email=False`); both email-change request and confirmation enforce this.
+Passwords already wiped cannot be restored; the participant chooses a new one.
 
 `ParticipantSerializer` gains a computed `onboarding_status` field —
 `not_sent` / `sent` / `active` / `revoked` / `expired` — read from the participant's most
@@ -381,6 +496,12 @@ acceptable because:
 - an operator who suspects a link has leaked has an explicit, one-click way
   to kill it, discoverable from the same row that shows its status.
 
+A stolen participant link can also establish a durable password during recovery,
+subject to any required MFA. The 15-minute deadline limits the interval after login,
+not a stolen link's own lifetime. Password writes retire old sign-in links and
+sessions, and notify the account address. These limits do not eliminate mailbox or
+link compromise; accounts with independent access remain unreachable through this door.
+
 A disabled ZEV is one more kill switch, not one this spec originally
 anticipated: `onboarding.resolve()` returns `None` for a disabled ZEV's
 token, same as an unknown prefix or a wrong secret, so `onboarding_consume`
@@ -389,12 +510,9 @@ phase 2 — see `2026-03-community-and-access.md` §7.1a).
 
 ## 9. Deferred / open
 
-- **Returning without the link.** Phase 1 does not yet add "set a password"
-  as an offered action after sign-in, nor a "view online" link in the
-  ordinary invoice email — both listed in #712 as the real fix for
-  "onboarding and returning are different problems." The reusable link
-  covers the immediate gap; those are the more complete answer and are left
-  for a follow-up.
+- **Invoice email entry.** A "view online" link in the ordinary invoice email
+  remains deferred. Password setup and explicit link-authorized recovery are
+  offered in Account → Security.
 - **Empty landing state.** A participant onboarded at founding, before any
   invoice exists, lands on `/me/invoices` with nothing in it. Not addressed
   here.
@@ -439,7 +557,7 @@ Frontend: `tests/participant-onboarding.test.ts` for the three API client
 functions; existing suite (`dead-i18n-keys`, `email-template-parity`) guards
 the locale and template-key changes.
 
-`zev/test_login_protection.py` — `LoginProtectionTests` (54 tests):
+`zev/test_login_protection.py` — `LoginProtectionTests` (65 tests):
 
 | Method | Assertion |
 |---|---|
@@ -483,7 +601,18 @@ the locale and template-key changes.
 | `test_participant_edit_rechecks_admin_rule_after_locking` | Manager edit refused with 400 when the account is promoted after validation |
 | `test_concurrent_grant_for_the_same_account_is_refused_after_the_lock` | Grant created while waiting for the user lock gives 400, not a uniqueness error |
 | `test_login_paths_use_supported_row_locks` | Copy, magic consumption, API-key creation, grant creation and revocation work without `no_key` support |
-| `test_a_password_enrolled_through_a_participant_link_remains_usable` | Preserve enrolled password; require fresh sign-in |
+| `test_participant_can_recover_a_forgotten_password_through_a_fresh_link` | New link permits marked replacement without old password; retires other sessions; promotion still requires invitation |
+| `test_credential_origin_alone_does_not_authorize_password_recovery` | Credential/session provenance without a fresh-link deadline cannot replace a password |
+| `test_a_password_enrolled_through_a_participant_link_requires_a_fresh_invitation` | Refuse direct promotion; invite, retire old password, verify email and enroll an independent replacement; refuse email redirection |
+| `test_password_login_refresh_and_changes_cannot_clear_participant_origin` | Preserve source through password login, refresh and password change; refuse promotion |
+| `test_link_enrolled_totp_and_recovery_codes_are_removed_but_an_independent_password_survives` | Retire link-enrolled factors/codes while preserving the independent password |
+| `test_link_enrolled_passkeys_and_their_descendants_are_removed_on_invitation` | Passkey login cannot establish an independent replacement password; invitation removes marked credentials |
+| `test_independent_passkeys_survive_promotion_alongside_link_enrolled_credentials` | Keep the independently enrolled passkey usable; remove marked passkeys |
+| `test_participant_origin_survives_each_mfa_login_door` | All three challenged login doors preserve source |
+| `test_link_regenerated_codes_are_retired_but_independent_totp_survives` | Retire link-issued codes; retain independent TOTP and allow owner regeneration |
+| `test_totp_origin_is_sticky_across_setup_and_confirmation_sessions` | Both mixed-origin ceremony directions stay marked |
+| `test_admin_promotion_does_not_restore_a_retired_password_from_its_loaded_instance` | Preserve verified social login and clear the marked password on a plain admin-promotion save |
+| `test_stale_profile_save_does_not_restore_retired_password` | Retired hash remains unusable; password login fails without issuing cookies |
 | `test_promotion_retires_an_outstanding_mfa_challenge` | Reject challenge with an old session version |
 | `test_direct_grants_and_admin_forms_require_login_setup` | Reject passwordless grant; show user form error |
 | `test_foreign_manager_cannot_rotate_an_already_pending_invitation` | 403; existing invitation remains usable |
@@ -501,7 +630,7 @@ the locale and template-key changes.
 `frontend/tests/participant-write-scope.test.ts` covers localized send/copy
 refusals and ordinary failures for send, copy and revoke.
 
-`LoginProtectionUpgradeTests` (3 tests) migrates real pre-0024 rows forward and
+`LoginProtectionUpgradeTests` (4 tests) migrates real pre-0024 rows forward and
 restores the full migration graph in cleanup:
 
 - `test_upgrade_backfills_independent_accounts_only`: admin, superuser, self-setup,
@@ -513,3 +642,8 @@ restores the full migration graph in cleanup:
 - `test_upgrade_passwordless_admin_can_be_edited_and_stays_protected_after_demotion`:
   a passwordless legacy admin can save its profile and remains protected after
   demotion without session revocation.
+- `test_upgrade_marks_only_legacy_participant_credentials_and_retires_their_sessions`:
+  mark participant-only passwords, factors, codes and unproven social identities;
+  expire legacy linking states while preserving ordinary OAuth login states;
+  preserve passwords until promotion and verified social identities; leave
+  promoted and unattached accounts unchanged.

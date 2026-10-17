@@ -21,7 +21,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection, transaction
 from django.db.models import Prefetch
 
-from invoices.models import Invoice
+from invoices.models import Credit, Invoice
 from metering.models import MeterReading, SupplementaryReading, SupplementarySource
 from tariffs.models import Tariff, TariffPeriod
 from zev.models import Building, MeteringPoint, MeteringPointAssignment, Participant, Party, ZevPartyRole
@@ -32,6 +32,9 @@ from .schema import (
     FORMAT_VERSION,
     INVOICE_FIELDS,
     INVOICE_ITEM_FIELDS,
+    PAYMENT_FIELDS,
+    CREDIT_APPLICATION_FIELDS,
+    CREDIT_FIELDS,
     INVOICE_PDFS_DIR,
     MANIFEST_NAME,
     BUILDING_FIELDS,
@@ -115,6 +118,14 @@ def pdf_member_name(invoice_number):
     safe = "".join(char if char.isalnum() or char in "-_." else "_" for char in invoice_number)
     digest = hashlib.sha1(invoice_number.encode("utf-8")).hexdigest()[:8]
     return f"{INVOICE_PDFS_DIR}/{safe or 'invoice'}-{digest}.pdf"
+
+
+def credit_pdf_member_name(credit_number):
+    """The ``pdf_member_name`` of a credit note: its own prefix so a credit and
+    an invoice sharing a number text cannot share a member."""
+    safe = "".join(char if char.isalnum() or char in "-_." else "_" for char in credit_number)
+    digest = hashlib.sha1(f"credit:{credit_number}".encode("utf-8")).hexdigest()[:8]
+    return f"{INVOICE_PDFS_DIR}/credit-{safe or 'credit'}-{digest}.pdf"
 
 
 def _export_zev(zev):
@@ -219,6 +230,12 @@ def _export_invoices(zev):
                 {"id": str(item.id), **_fields(item, INVOICE_ITEM_FIELDS)}
                 for item in invoice.items.all()
             ],
+            "payments": [_fields(payment, PAYMENT_FIELDS) for payment in invoice.payments.all()],
+            "credits": [_fields(credit, CREDIT_FIELDS) for credit in invoice.credits.all()],
+            "credit_applications": [
+                {"credit_number": application.credit.credit_number, **_fields(application, CREDIT_APPLICATION_FIELDS)}
+                for application in invoice.credit_applications.all()
+            ],
             "dynamic_evidence": [
                 {
                     "dynamic_source": _fields(evidence.source, DYNAMIC_SOURCE_FIELDS),
@@ -233,7 +250,7 @@ def _export_invoices(zev):
         # the data and would dominate the archive size. See the issue's note —
         # a regenerated PDF uses today's template, so this is not the right
         # answer if original documents have to be retained.
-        for invoice in Invoice.objects.filter(zev=zev).prefetch_related("items", "dynamic_evidence__source").order_by("period_start", "invoice_number")
+        for invoice in Invoice.objects.filter(zev=zev).prefetch_related("items", "payments", "credits", "credit_applications__credit", "dynamic_evidence__source").order_by("period_start", "invoice_number")
     ]
 
 
@@ -342,6 +359,13 @@ def _write_invoice_pdfs(archive, zev):
         with invoice.pdf_file.open("rb") as source:
             archive.writestr(pdf_member_name(invoice.invoice_number), source.read())
         written += 1
+    for credit in (
+        Credit.objects.filter(zev=zev).exclude(pdf_file="").exclude(pdf_file__isnull=True)
+        .order_by("credit_number")
+    ):
+        with credit.pdf_file.open("rb") as source:
+            archive.writestr(credit_pdf_member_name(credit.credit_number), source.read())
+        written += 1
     return written
 
 
@@ -423,6 +447,8 @@ def _write_archive(zev, sections, fileobj, *, instance_name=""):
         if SECTION_INVOICES in sections:
             invoices = _export_invoices(zev)
             counts[SECTION_INVOICES] = len(invoices)
+            counts["credits"] = sum(len(invoice["credits"]) for invoice in invoices)
+            counts["credit_applications"] = sum(len(invoice["credit_applications"]) for invoice in invoices)
             archive.writestr(SECTION_FILES[SECTION_INVOICES], _dump(invoices))
 
         if SECTION_INVOICE_PDFS in sections:

@@ -1,0 +1,17 @@
+{{- if not .Values.debug }}
+{{/* Reject empty values and known development defaults outside debug mode. */}}
+{{- if and (not .Values.secretKey.existingSecret.name) (or (empty (trim .Values.secretKey.value)) (eq .Values.secretKey.value "change-me-in-production-use-a-long-random-string")) }}
+{{- fail "secretKey.value is empty or the placeholder; set secretKey.existingSecret.name or secretKey.value" }}
+{{- end }}
+{{- if and (not .Values.database.existingSecret.name) (or (empty (trim .Values.database.url)) (eq .Values.database.url "postgres://openzev:openzev@db:5432/openzev")) }}
+{{- fail "database.url is empty or the local default; set database.existingSecret.name or database.url" }}
+{{- end }}
+{{- if or (empty (trim .Values.frontendUrl)) (eq .Values.frontendUrl "http://localhost:5173") }}
+{{- fail "frontendUrl is empty or localhost; set the deployed HTTPS origin" }}
+{{- end }}
+{{- end }}
+{{- range $key := list "DEBUG" "NUM_PROXIES" "SECURE_SSL_REDIRECT" "SECURE_HSTS_SECONDS" }}
+{{- if hasKey $.Values.backend.extraEnv $key }}
+{{- fail (printf "backend.extraEnv.%s duplicates a chart-managed setting; use debug or backend transport values" $key) }}
+{{- end }}
+{{- end }}

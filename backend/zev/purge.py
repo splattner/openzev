@@ -24,9 +24,10 @@ archive, and the audit trail (including this purge's own event, and
 that must keep existing) is the record that the purge happened, not
 something the purge should erase.
 
-The two exceptions are ``Invoice.zev`` and ``exports.ExportJob.zev``, both
-``PROTECT`` — a bare ``zev.delete()`` raises ``ProtectedError`` while either
-has rows. Both are deleted explicitly first; ``Invoice``'s cascade
+The exceptions are ``Invoice.zev``, ``Credit.zev`` (and ``Credit.source_invoice``)
+and ``exports.ExportJob.zev``, all ``PROTECT`` — a bare ``zev.delete()`` raises
+``ProtectedError`` while any has rows. They are deleted explicitly first, credits
+before invoices, and the applications that use a credit before the credit; ``Invoice``'s cascade
 (``InvoiceItem``, ``InvoiceDynamicSourceEvidence``, ``InvoiceAccessToken``,
 ``EmailLog``, all ``CASCADE`` from ``Invoice``) then follows automatically.
 
@@ -47,7 +48,7 @@ from django.core.files.storage import default_storage
 from django.db import transaction
 
 from exports.models import ExportJob
-from invoices.models import Invoice
+from invoices.models import Credit, CreditApplication, Invoice
 
 from .models import Zev
 
@@ -85,6 +86,11 @@ def purge_zev(zev: Zev) -> PurgeResult:
         Invoice.objects.filter(zev=zev).exclude(pdf_file="").values_list("pdf_file", flat=True)
         if name
     ]
+    credit_pdfs = [
+        name for name in
+        Credit.objects.filter(zev=zev).exclude(pdf_file="").values_list("pdf_file", flat=True)
+        if name
+    ]
     export_files = [
         name for name in
         ExportJob.objects.filter(zev=zev).exclude(result_file="").values_list("result_file", flat=True)
@@ -94,6 +100,8 @@ def purge_zev(zev: Zev) -> PurgeResult:
     counts = {
         "export_jobs": ExportJob.objects.filter(zev=zev).count(),
         "invoices": Invoice.objects.filter(zev=zev).count(),
+        "credit_applications": CreditApplication.objects.filter(credit__zev=zev).count(),
+        "credits": Credit.objects.filter(zev=zev).count(),
         "participants": zev.participants.count(),
         "metering_points": zev.metering_points.count(),
         "tariffs": zev.tariffs.count(),
@@ -103,11 +111,15 @@ def purge_zev(zev: Zev) -> PurgeResult:
         # PROTECT relations first — see the module docstring for why these
         # two are the only rows that need an explicit pre-delete.
         ExportJob.objects.filter(zev=zev).delete()
+        # Applications, then credits: an application's credit and a credit's
+        # source invoice are PROTECT.
+        CreditApplication.objects.filter(credit__zev=zev).delete()
+        Credit.objects.filter(zev=zev).delete()
         Invoice.objects.filter(zev=zev).delete()
         zev.delete()
 
     media_files_deleted = 0
-    for name in (*invoice_pdfs, *export_files):
+    for name in (*invoice_pdfs, *credit_pdfs, *export_files):
         default_storage.delete(name)
         media_files_deleted += 1
 

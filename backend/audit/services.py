@@ -152,7 +152,7 @@ def snapshot_actor(user) -> dict[str, Any]:
 
     display = user.email or user.get_full_name() or user.username
     return {
-        "actor_user": user,
+        "actor_user": user if user.pk is not None else None,
         "actor_role_snapshot": getattr(user, "role", ""),
         "actor_display": display,
     }

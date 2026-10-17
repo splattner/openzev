@@ -692,14 +692,7 @@ class TestBulkGenerationIsolatesPerParticipantFailures:
         assert result.failures == []
 
     def test_failed_participant_gives_its_invoice_number_back(self):
-        """A failure *after* ``next_invoice_number()`` must give its number back.
-
-        The locked-invoice guard raises before the counter is touched, so the
-        other tests here never exercise the counter path. If the shared ``zev``
-        instance is not re-synced after the savepoint rollback, the next
-        participant re-uses the stale ``+1`` and either skips a number or
-        collides with the previous one (a phantom ``UNIQUE constraint failed``).
-        """
+        """A post-allocation failure returns the number despite stale instance state."""
         from django.db import IntegrityError
         from invoices.engine import generate_invoices_for_zev
         from invoices.models import Invoice

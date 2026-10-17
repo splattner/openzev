@@ -1,0 +1,138 @@
+/* ── Buttons ────────────────────────────────────────────────────────────────
+   Primary = flat deep forest; secondary = paper with a hairline; one
+   height scale. */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.95rem;
+  min-height: 2.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--brand-deep);
+  box-shadow: 0 1px 2px rgba(13, 43, 29, 0.3);
+  color: var(--white);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* `:where()` keeps specificity at (0,2,0) so variant hover rules below
+   (e.g. .button-secondary:hover) override this base hover — without it a
+   hovered secondary button got the deep brand background while keeping its
+   dark ink text (unreadable). */
+
+:where(.button):hover:not(:disabled) {
+  background: var(--brand);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.button-secondary {
+  background: var(--surface-card);
+  color: var(--ink);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-sheet);
+}
+
+.button-secondary:hover {
+  background: var(--surface-sunken);
+}
+
+.button-danger,
+.button.danger {
+  background: var(--danger-600);
+  color: var(--white);
+  border: 1px solid var(--danger-700);
+}
+
+.button-danger:hover,
+.button.danger:hover {
+  background: var(--danger-700);
+}
+
+/* Destructive but rare: quiet until hovered; the confirm dialog's button is
+   the solid red one. Row-level (compact) danger buttons follow the same rule. */
+
+.button-secondary.button-destructive,
+.button-danger.button-compact,
+.button.danger.button-compact {
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  color: var(--danger-700);
+  box-shadow: var(--shadow-sheet);
+}
+
+.button-secondary.button-destructive:hover:not(:disabled),
+.button-danger.button-compact:hover:not(:disabled),
+.button.danger.button-compact:hover:not(:disabled) {
+  background: var(--danger-100);
+  border-color: var(--danger-300);
+}
+
+.button-compact {
+  min-height: 2rem;
+  padding: 0.3rem 0.7rem;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+}
+
+/* Icon-only button: a square at the button's own height. Pair with an
+   aria-label and a title. */
+
+.button-icon {
+  width: 2.5rem;
+  padding: 0;
+}
+
+.button-icon.button-compact {
+  width: 2rem;
+}
+
+.danger {
+  background: var(--danger-600);
+}
+
+/* The impersonation banner is a slim strip: its buttons are smaller than the scale. */
+
+.impersonation-banner .button {
+  min-height: 2rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8125rem;
+}
+
+/* Button variants */
+
+.button-outline {
+  background: transparent;
+  border: 1px solid var(--interactive);
+  box-shadow: none;
+  color: var(--interactive);
+}
+
+.button-outline:hover:not(:disabled) {
+  background: var(--brand-pale);
+  color: var(--brand-deep);
+}
+
+.button-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+  color: var(--text-body);
+}
+
+.button-ghost:hover:not(:disabled) {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+

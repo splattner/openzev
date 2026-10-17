@@ -31,6 +31,7 @@ from audit.models import AuditActionCategory
 from audit.services import record_audit_event
 from zev import access
 from zev.models import Zev
+from zev.scoping import assert_zev_not_disabled
 
 from .importers.planner import PlannedCandidate, Selection, apply_import, plan_import
 from .importers.remote import TariffFetchError, fetch_tariff_document
@@ -63,11 +64,7 @@ def _fetch_failed(exc, zev) -> Response:
 
 
 def _resolve_zev(request, zev_id) -> Zev:
-    """The ZEV being imported into, or a 404/403.
-
-    ``HasZevAccess`` only checks the role, so ownership is checked here —
-    otherwise any ZEV owner could write tariffs into any other ZEV.
-    """
+    """Resolve the target ZEV and require management access."""
     zev = Zev.objects.filter(pk=zev_id).first()
     if zev is None:
         raise NotFound("ZEV not found.")
@@ -182,6 +179,7 @@ class VseTariffImportApplyView(APIView):
         payload.is_valid(raise_exception=True)
         data = payload.validated_data
         zev = _resolve_zev(request, data["zev"])
+        assert_zev_not_disabled(request.user, zev)
 
         try:
             url, document, digest = _load(zev, data.get("url", ""))

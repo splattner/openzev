@@ -15,9 +15,10 @@ from datetime import date, timedelta
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
+from accounts.models import User
 from allocation.validity import active_on
 
-from .access import NO_MANAGER_LEFT
+from .access import NO_MANAGER_LEFT, has_manager, lock_zevs, party_accounts
 from .models import MANAGING_ROLES, SINGLE_HOLDER_ROLES, Party, PartyRole, ZevPartyRole
 
 
@@ -62,10 +63,22 @@ def _keeps_a_manager(zev, had_manager: bool) -> None:
     can take the last manager away. Called inside the change's transaction, so
     raising rolls it back.
     """
-    from .access import has_manager
-
     if had_manager and not has_manager(zev):
         raise ValidationError({"party": NO_MANAGER_LEFT})
+
+
+def lock_role_assignment(zev, party, role):
+    """Prepare assignment locks before authorization; call inside a transaction."""
+    if role in MANAGING_ROLES:
+        lock_zevs(zev)
+    rows = list(ZevPartyRole.objects.select_for_update().filter(zev=zev, role=role).order_by("valid_from"))
+    if role in MANAGING_ROLES:
+        try:
+            party.refresh_from_db(from_queryset=Party.objects.select_for_update())
+        except Party.DoesNotExist as exc:
+            raise ValidationError({"party": "This party no longer exists."}) from exc
+        list(User.objects.locked().filter(pk__in=[user.pk for user in party_accounts(party)]).order_by("pk"))
+    return rows
 
 
 @transaction.atomic
@@ -89,11 +102,8 @@ def assign_role(
             raise ValidationError({"building": "Only a landowner role names a building."})
         if building.zev_id != zev.pk:
             raise ValidationError({"building": "The building belongs to another ZEV."})
-    rows = list(ZevPartyRole.objects.select_for_update().filter(zev=zev, role=role).order_by("valid_from"))
-
+    rows = lock_role_assignment(zev, party, role)
     if role in MANAGING_ROLES:
-        from .access import has_manager
-
         had_manager = has_manager(zev)
 
     if role not in SINGLE_HOLDER_ROLES:
@@ -146,6 +156,16 @@ def _end(row: ZevPartyRole, last_day: date) -> ZevPartyRole | None:
     return row
 
 
+def lock_role_end(row):
+    """Lock and reread any role before authorization; call inside a transaction."""
+    if row.role in MANAGING_ROLES:
+        lock_zevs(row.zev_id)
+    try:
+        row.refresh_from_db(from_queryset=ZevPartyRole.objects.select_for_update())
+    except ZevPartyRole.DoesNotExist as exc:
+        raise ValidationError({"party": "This role was removed in the meantime."}) from exc
+
+
 @transaction.atomic
 def end_role(row: ZevPartyRole, last_day: date) -> ZevPartyRole | None:
     """End ``row`` on ``last_day``; a row that would end before it starts is deleted.
@@ -153,9 +173,8 @@ def end_role(row: ZevPartyRole, last_day: date) -> ZevPartyRole | None:
     Ending the issuer or representative role must not leave the ZEV without a
     manager (``ValidationError``)."""
     managing = row.role in MANAGING_ROLES
+    lock_role_end(row)
     if managing:
-        from .access import has_manager
-
         had_manager = has_manager(row.zev_id)
     ended = _end(row, last_day)
     if managing:

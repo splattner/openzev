@@ -1,0 +1,10 @@
+/* ── PDF viewer frame + bar (spec §7.7) ── */
+
+.pdf-frame {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  box-shadow: var(--shadow-sheet);
+  overflow: hidden;
+}
+

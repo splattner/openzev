@@ -58,6 +58,8 @@ spec:
               value: {{ .Values.redis.url | default .Values.valkey.url | quote }}
             - name: CACHE_URL
               value: {{ .Values.redis.cacheUrl | default .Values.valkey.cacheUrl | quote }}
+            - name: DEBUG
+              value: {{ .Values.debug | quote }}
             {{- range $key, $value := .Values.beat.extraEnv }}
             - name: {{ $key }}
               value: {{ $value | quote }}

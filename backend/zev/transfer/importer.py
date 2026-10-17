@@ -29,8 +29,11 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.base import ContentFile
 from django.conf import settings
 from django.db import DataError, IntegrityError, transaction
+from django.utils import timezone
 
-from invoices.models import Invoice, InvoiceItem, InvoiceDynamicSourceEvidence, InvoicePdfStatus
+from invoices.models import (
+    Credit, CreditApplication, Invoice, InvoiceDynamicSourceEvidence, InvoiceItem, InvoicePdfStatus, InvoiceStatus, Payment,
+)
 from tariffs.dynamic.evidence import lock_sources, record_invoice_evidence
 from metering.importers.csv_importer import _parse_datetime_utc, _parse_decimal
 from metering.importers.limits import (
@@ -64,7 +67,7 @@ logger = logging.getLogger(__name__)
 from ..access import grant_manager
 from ..tasks import trigger_building_geocode_if_address_present
 from ..buildings import assign_buildings_from_participants, default_building, ensure_initial_building
-from .export import pdf_member_name
+from .export import credit_pdf_member_name, pdf_member_name
 from .schema import (
     ASSIGNMENT_FIELDS,
     BUILDING_FIELDS,
@@ -72,6 +75,9 @@ from .schema import (
     DYNAMIC_SOURCE_FIELDS,
     INVOICE_FIELDS,
     INVOICE_ITEM_FIELDS,
+    PAYMENT_FIELDS,
+    CREDIT_APPLICATION_FIELDS,
+    CREDIT_FIELDS,
     MANIFEST_NAME,
     METERING_POINT_FIELDS,
     LEGACY_PARTICIPANT_FIELDS,
@@ -713,8 +719,16 @@ def _import_invoices(archive, zev, participants_by_archive_id, collector):
         try:
             with transaction.atomic():
                 invoice = Invoice(zev=zev, participant=participant, **fields)
+                if invoice.approved_at is None and (
+                    invoice.sent_at is not None
+                    or invoice.status in (InvoiceStatus.APPROVED, InvoiceStatus.SENT, InvoiceStatus.PAID)
+                ):
+                    # An archive from before #388: issued, time unknown.
+                    invoice.approved_at = invoice.sent_at or timezone.now()
                 invoice.full_clean(exclude=["zev", "participant", "pdf_file"])
                 invoice.save()
+                _import_payments(invoice, raw, position)
+                _import_credits(invoice, raw, position)
                 items = []
                 for raw_item in raw.get("items") or []:
                     item_fields = _pick(raw_item, INVOICE_ITEM_FIELDS, position, SECTION_INVOICES)
@@ -746,6 +760,78 @@ def _import_invoices(archive, zev, participants_by_archive_id, collector):
         count += 1
         highest = max(highest, _trailing_number(invoice.invoice_number))
     return count, highest
+
+
+def _import_payments(invoice, raw, position):
+    """Create the invoice's payments. An archive from before #388 carries none:
+    its paid invoice gets one payment for the total, like the migration that
+    introduced payments, dated by delivery or else the period end."""
+    if "payments" in raw:
+        entries = [_pick(entry, PAYMENT_FIELDS, position, SECTION_INVOICES) for entry in raw["payments"] or []]
+    elif invoice.status == InvoiceStatus.PAID and invoice.total_chf:
+        paid_on = timezone.localdate(invoice.sent_at) if invoice.sent_at else invoice.period_end
+        entries = [{"amount_chf": invoice.total_chf, "paid_on": paid_on, "source": Payment.Source.BACKFILL}]
+    else:
+        entries = []
+    payments = []
+    for entry in entries:
+        payment = Payment(invoice=invoice, **entry)
+        payment.full_clean(exclude=["invoice"])
+        payments.append(payment)
+    Payment.objects.bulk_create(payments)
+
+
+def _import_credits(invoice, raw, position):
+    """Create the credit notes issued for ``invoice`` (#388). An older archive
+    carries none."""
+    for entry in raw.get("credits") or []:
+        fields = _pick(entry, CREDIT_FIELDS, position, SECTION_INVOICES)
+        created_at = fields.pop("created_at", None)
+        credit = Credit(
+            zev=invoice.zev, participant=invoice.participant, source_invoice=invoice,
+            pdf_status=InvoicePdfStatus.NONE, **fields,
+        )
+        credit.full_clean(exclude=["zev", "participant", "source_invoice", "pdf_file", "created_at"])
+        credit.save()
+        if created_at:
+            Credit.objects.filter(pk=credit.pk).update(created_at=created_at)
+
+
+def _import_credit_applications(archive, zev, collector):
+    """Create the credit applications of every invoice (#388), once all
+    invoices and credit notes exist: an invoice may use a credit issued for
+    another one. Returns how many were created. An older archive carries none."""
+    invoices = {i.invoice_number: i for i in Invoice.objects.filter(zev=zev)}
+    credits = {c.credit_number: c for c in Credit.objects.filter(zev=zev)}
+    count = 0
+    for position, raw in enumerate(_load_json(archive, SECTION_FILES[SECTION_INVOICES]), start=1):
+        entries = raw.get("credit_applications") or []
+        invoice = invoices.get(str(raw.get("invoice_number")))
+        if invoice is None:
+            continue  # failed validation in the invoices pass; already reported
+        for entry in entries:
+            label = f'{invoice.invoice_number} / {entry.get("credit_number")}'
+            credit = credits.get(str(entry.get("credit_number")))
+            if credit is None:
+                collector.add(
+                    SECTION_INVOICES, position, label,
+                    {"credit_number": ["No imported credit note matches this credit application."]},
+                )
+                continue
+            fields = _pick(entry, CREDIT_APPLICATION_FIELDS, position, SECTION_INVOICES)
+            created_at = fields.pop("created_at", None)
+            try:
+                with transaction.atomic():
+                    application = CreditApplication(credit=credit, invoice=invoice, **fields)
+                    application.full_clean(exclude=["credit", "invoice", "created_at"])
+                    application.save()
+                    if created_at:
+                        CreditApplication.objects.filter(pk=application.pk).update(created_at=created_at)
+            except (DjangoValidationError, ValueError, TypeError, IntegrityError) as exc:
+                collector.add(SECTION_INVOICES, position, label, exc)
+                continue
+            count += 1
+    return count
 
 
 def _trailing_number(invoice_number):
@@ -789,6 +875,17 @@ def _import_invoice_pdfs(archive, zev):
         invoice.pdf_file.save(filename, ContentFile(data), save=False)
         Invoice.objects.filter(pk=invoice.pk).update(
             pdf_file=invoice.pdf_file.name, pdf_status=InvoicePdfStatus.READY,
+        )
+        written += 1
+    for credit in Credit.objects.filter(zev=zev).only("id", "credit_number"):
+        member = credit_pdf_member_name(credit.credit_number)
+        if member not in names:
+            continue
+        with archive.open(member) as source:
+            data = source.read()
+        credit.pdf_file.save(f"credit_{credit.credit_number}.pdf", ContentFile(data), save=False)
+        Credit.objects.filter(pk=credit.pk).update(
+            pdf_file=credit.pdf_file.name, pdf_status=InvoicePdfStatus.READY,
         )
         written += 1
     return written
@@ -1161,6 +1258,7 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
     source_name = (manifest.get("source_zev") or {}).get("name") or "Imported ZEV"
     zev_fields["name"] = name_override.strip() or zev_fields.get("name") or source_name
     zev_fields.pop("invoice_counter", None)  # set from the imported invoices below
+    zev_fields.pop("credit_note_counter", None)  # likewise, from the imported credits
 
     # Archives written before vat_mode existed carry only vat_number. Apply the
     # same rule the data migration uses: a number means the source was
@@ -1260,6 +1358,16 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
         if next_counter != zev.invoice_counter:
             zev.invoice_counter = next_counter
             zev.save(update_fields=["invoice_counter"])
+
+        summary["counts"]["credit_applications"] = _import_credit_applications(archive, zev, collector)
+        credit_numbers = list(Credit.objects.filter(zev=zev).values_list("credit_number", flat=True))
+        summary["counts"]["credits"] = len(credit_numbers)
+        next_credit_counter = max(
+            [_trailing_number(number) + 1 for number in credit_numbers] + [zev.credit_note_counter]
+        )
+        if next_credit_counter != zev.credit_note_counter:
+            zev.credit_note_counter = next_credit_counter
+            zev.save(update_fields=["credit_note_counter"])
 
         if SECTION_INVOICE_PDFS in sections:
             summary["counts"][SECTION_INVOICE_PDFS] = _import_invoice_pdfs(archive, zev)

@@ -1,0 +1,57 @@
+/* Single-property utilities; the suffix is the size in rem (`05` = 0.5rem,
+   `15` = 1.5rem). Plain class specificity: a contextual rule that sets the same
+   property (`.page-stack th`) still wins, so use the context's own class there. */
+
+.m-0 {
+  margin: 0;
+}
+
+.mt-0 {
+  margin-top: 0;
+}
+
+.mt-05 {
+  margin-top: 0.5rem;
+}
+
+.mb-1 {
+  margin-bottom: 1rem;
+}
+
+.mb-15 {
+  margin-bottom: 1.5rem;
+}
+
+.mt-1 {
+  margin-top: 1rem;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.template-editor {
+  min-height: 28rem;
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: 0.9rem;
+  background: var(--white);
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+}
+

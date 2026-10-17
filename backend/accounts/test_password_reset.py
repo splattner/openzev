@@ -19,7 +19,8 @@ from audit.models import AuditEvent
 from testing.helpers import authenticate as auth, make_user
 
 from . import password_reset
-from .models import TotpDevice, User, UserRole
+from .models import OAuthExchangeCode, TotpDevice, User, UserRole
+from .session_revocation import revoke_sessions
 from .test_mfa import TEST_KEY, TOKEN_URL, TOTP_CONFIRM_URL, TOTP_DEVICE_URL
 
 REQUEST_URL = "/api/v1/auth/password-reset/"
@@ -113,6 +114,49 @@ class PasswordResetRequestTests(PasswordResetBase):
 
 
 class PasswordResetConfirmTests(PasswordResetBase):
+    def test_mailbox_recovery_establishes_an_independent_password(self):
+        self.user.password_from_participant_link = True
+        self.user.save(update_fields=["password_from_participant_link"])
+        self.request_reset()
+        token = _token_from_mail(mail.outbox[0])
+
+        self.assertEqual(self.confirm(token).status_code, 200)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.password_from_participant_link)
+        login = self.client.post(TOKEN_URL, {"username": self.user.username, "password": NEW_PASSWORD})
+        self.assertEqual(login.status_code, 200)
+        from .jwt_utils import is_participant_link_session
+        from rest_framework_simplejwt.tokens import AccessToken
+
+        self.assertFalse(is_participant_link_session(AccessToken(login.cookies["openzev_access"].value)))
+
+    def test_recovery_discards_pending_oauth_exchange_codes(self):
+        code = OAuthExchangeCode.objects.create(user=self.user, code="before-mailbox-recovery")
+        self.assertEqual(self.confirm(self.issue()).status_code, 200)
+        self.assertFalse(OAuthExchangeCode.objects.filter(pk=code.pk).exists())
+        response = self.client.post("/api/v1/auth/oauth/token-exchange/", {"code": code.code}, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.cookies)
+
+    def test_session_revocation_invalidates_an_outstanding_reset_link(self):
+        token = self.issue()
+        revoke_sessions(self.user)
+        self.assertEqual(self.confirm(token).status_code, 400)
+
+    def test_confirmation_rechecks_revocation_after_token_resolution(self):
+        token = self.issue()
+        resolve = password_reset.resolve_token
+
+        def revoke_after_read(value, **kwargs):
+            user = resolve(value, **kwargs)
+            revoke_sessions(User.objects.get(pk=user.pk))
+            return user
+
+        with mock.patch("accounts.views_security.password_reset.resolve_token", side_effect=revoke_after_read):
+            self.assertEqual(self.confirm(token).status_code, 400)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("pass1234"))
+
     def test_sets_the_password_and_clears_the_forced_change(self):
         response = self.confirm(self.issue())
 
@@ -198,9 +242,9 @@ class PasswordResetConfirmTests(PasswordResetBase):
         self.assertEqual(self.confirm(self.issue()).status_code, 400)
 
     def test_sends_a_security_notice(self):
-        with self.captureOnCommitCallbacks(execute=True), mock.patch(
+        with mock.patch(
             "accounts.tasks.send_security_notification.delay"
-        ) as queued:
+        ) as queued, self.captureOnCommitCallbacks(execute=True):
             self.confirm(self.issue())
 
         self.assertEqual(queued.call_args.args[:2], (self.user.pk, "password_reset"))
@@ -212,6 +256,65 @@ class PasswordResetConfirmTests(PasswordResetBase):
         revoke.assert_called_once()
         event = AuditEvent.objects.get(action_type="password.reset")
         self.assertEqual(event.metadata_json["onboarding_links_revoked"], 2)
+
+    def test_revokes_magic_links_so_an_old_link_cannot_undo_recovery(self):
+        from testing.factories import ParticipantFactory
+        from . import magic_links
+
+        participant = ParticipantFactory(user=self.user, email=self.user.email)
+        account = magic_links.account_for_participant(participant)
+        link = magic_links.issue(account)
+        self.user.refresh_from_db()
+
+        response = self.confirm(self.issue())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.cookies)
+        old_link = APIClient().post("/api/v1/public/magic-link/consume/", {"token": link.token})
+        self.assertEqual(old_link.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(NEW_PASSWORD))
+        event = AuditEvent.objects.get(action_type="password.reset")
+        self.assertEqual(event.metadata_json["magic_links_revoked"], 1)
+
+    def test_audit_failure_rolls_back_password_sessions_and_links(self):
+        from . import magic_links
+
+        link = magic_links.issue(self.user)
+        version = self.user.session_version
+        with mock.patch("accounts.views_security._audit", side_effect=RuntimeError("audit unavailable")), \
+                mock.patch("accounts.views_security.notifications.notify") as notify:
+            with self.assertRaises(RuntimeError):
+                self.confirm(self.issue())
+        self.user.refresh_from_db()
+        link.refresh_from_db()
+        self.assertTrue(self.user.check_password("pass1234"))
+        self.assertTrue(self.user.must_change_password)
+        self.assertEqual(self.user.session_version, version)
+        self.assertIsNone(link.consumed_at)
+        notify.assert_not_called()
+
+    def test_expiry_is_rechecked_after_waiting_for_the_account_lock(self):
+        token = self.issue()
+        locked_users = User.objects.locked()
+        original_get = locked_users.get
+        later = timezone.now() + timedelta(seconds=password_reset.LIFETIME_SECONDS + 5)
+        expired_clock = mock.patch("django.core.signing.time.time", return_value=later.timestamp())
+
+        def waited_for_user(*args, **kwargs):
+            user = original_get(*args, **kwargs)
+            expired_clock.start()
+            return user
+
+        try:
+            with mock.patch("accounts.views_security.User.objects.locked", return_value=locked_users), \
+                    mock.patch.object(locked_users, "get", side_effect=waited_for_user):
+                response = self.confirm(token)
+        finally:
+            expired_clock.stop()
+        self.assertEqual(response.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("pass1234"))
 
 
 @override_settings(MFA_ENCRYPTION_KEYS=[TEST_KEY])

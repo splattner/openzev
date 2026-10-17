@@ -871,7 +871,7 @@ export function ImportsContent() {
                         )}
                     </div>
                 </div>
-                <p className="muted m-0">{t('pages.imports.startDescription')}</p>
+                <p className="muted">{t('pages.imports.startDescription')}</p>
             </section>
             )}
 

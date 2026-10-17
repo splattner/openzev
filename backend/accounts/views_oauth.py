@@ -4,9 +4,6 @@ Split out of ``accounts.views`` because it is both the largest single concern in
 that module and the one with its own threat model — it validates CSRF state,
 talks to third-party HTTP endpoints, auto-provisions local accounts, and builds
 redirects back to the frontend (see the CWE-601 note in ``oauth_callback``).
-
-The permission classes here were already declarative, so this is a move rather
-than a rewrite: no handler logic changed.
 """
 
 import json
@@ -19,6 +16,7 @@ from urllib.parse import urlencode
 
 from django.conf import settings
 from django.core.validators import validate_email
+from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.utils.text import slugify
@@ -32,7 +30,8 @@ from audit.services import build_diff, record_audit_event
 
 from . import mfa
 from .cookies import set_auth_cookies
-from .jwt_utils import make_jwt_for_user, record_login
+from .jwt_utils import is_participant_link_session, make_jwt_for_user, record_login
+from .session_revocation import lock_current_session
 from .throttling import AuthOAuthExchangeThrottle, AuthOAuthInitiateThrottle
 from .models import (
     OAuthExchangeCode,
@@ -326,11 +325,17 @@ def oauth_login_initiate(request, provider_slug: str):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def oauth_link_initiate(request, provider_slug: str):
-    """Return the provider authorization URL for an account-linking flow."""
+    """Return the linking URL after locking and rechecking the requesting session."""
     provider = get_object_or_404(OAuthProvider, name=provider_slug, enabled=True)
     state_token = secrets.token_urlsafe(32)
-    OAuthState.objects.create(state=state_token, provider=provider, user=request.user)
+    user = lock_current_session(request)
+    OAuthState.objects.create(
+        state=state_token, provider=provider, user=user,
+        session_version=user.session_version,
+        from_participant_link=is_participant_link_session(request.auth),
+    )
     redirect_uri = provider.redirect_url
     params = {
         "client_id": provider.client_id,
@@ -343,6 +348,15 @@ def oauth_link_initiate(request, provider_slug: str):
 
 
 # ── callback (browser-facing, redirects back to frontend) ────────────────────
+
+def _provider_proves_account_email(user_info, account_email):
+    email = user_info.get("email")
+    return (
+        isinstance(email, str) and bool(email.strip())
+        and user_info.get("email_verified") is True
+        and email.strip().casefold() == account_email.strip().casefold()
+    )
+
 
 def oauth_callback(request, provider_slug: str):
     """
@@ -381,6 +395,8 @@ def oauth_callback(request, provider_slug: str):
         return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=state_expired")
 
     linking_user = state_obj.user
+    link_session_version = state_obj.session_version
+    participant_link = state_obj.from_participant_link
     provider = state_obj.provider
     state_obj.delete()
 
@@ -402,35 +418,60 @@ def oauth_callback(request, provider_slug: str):
         _record_login_failure(request, provider_slug, "missing_uid")
         return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=missing_uid")
 
-    if linking_user is not None:
-        # ── Link flow: attach to the (already authenticated) user ────────
-        if SocialAccount.objects.filter(provider=provider, uid=provider_uid).exclude(user=linking_user).exists():
-            # The provider account is already linked to a different user
-            _record_auth_event(
-                request,
-                action_type="oauth.link_refused",
-                summary=f"Refused to link an OAuth identity to {linking_user.email or linking_user.username}: already linked to another account.",
-                event_status=AuditEventStatus.DENIED,
-                user=linking_user,
-                metadata={"provider": provider_slug, "reason": "already_linked_other"},
+    if linking_user is not None or link_session_version is not None:
+        with transaction.atomic():
+            linking_user = User.objects.locked().filter(
+                pk=linking_user.pk if linking_user else None, is_active=True,
+            ).first()
+            if linking_user is None:
+                return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=account_inactive")
+            if link_session_version is None or link_session_version != linking_user.session_version:
+                _record_auth_event(
+                    request, action_type="oauth.link_refused", user=linking_user,
+                    summary="Refused OAuth linking: authorizing session revoked.",
+                    event_status=AuditEventStatus.DENIED,
+                    metadata={"provider": provider_slug, "reason": "session_revoked"},
+                )
+                return HttpResponseRedirect(f"{frontend_url}/account?oauth_error=session_revoked")
+            # ── Link flow: attach to the (already authenticated) user ────────
+            if participant_link and not _provider_proves_account_email(user_info, linking_user.email):
+                _record_auth_event(
+                    request, action_type="oauth.link_refused", user=linking_user,
+                    summary="Refused participant-session OAuth linking: account email not verified.",
+                    event_status=AuditEventStatus.DENIED,
+                    metadata={"provider": provider_slug, "reason": "email_not_verified"},
+                )
+                return HttpResponseRedirect(f"{frontend_url}/account?oauth_error=email_not_verified")
+            social, created = SocialAccount.objects.get_or_create(
+                provider=provider,
+                uid=provider_uid,
+                defaults={"user": linking_user, "extra_data": user_info},
             )
-            return HttpResponseRedirect(
-                f"{frontend_url}/account?oauth_error=already_linked_other"
-            )
-        _social, created = SocialAccount.objects.get_or_create(
-            provider=provider,
-            uid=provider_uid,
-            defaults={"user": linking_user, "extra_data": user_info},
-        )
-        if created:
-            _record_auth_event(
-                request,
-                action_type="oauth.link",
-                summary=f"Linked OAuth identity from {provider_slug} to {linking_user.email or linking_user.username}.",
-                user=linking_user,
-                metadata={"provider": provider_slug},
-            )
-        return HttpResponseRedirect(f"{frontend_url}/account?oauth_linked=true")
+            if social.user_id != linking_user.pk:
+                # The provider account is already linked to a different user
+                _record_auth_event(
+                    request,
+                    action_type="oauth.link_refused",
+                    summary=f"Refused to link an OAuth identity to {linking_user.email or linking_user.username}: already linked to another account.",
+                    event_status=AuditEventStatus.DENIED,
+                    user=linking_user,
+                    metadata={"provider": provider_slug, "reason": "already_linked_other"},
+                )
+                return HttpResponseRedirect(
+                    f"{frontend_url}/account?oauth_error=already_linked_other"
+                )
+            if social.from_participant_link:
+                social.from_participant_link = False
+                social.save(update_fields=["from_participant_link"])
+            if created:
+                _record_auth_event(
+                    request,
+                    action_type="oauth.link",
+                    summary=f"Linked OAuth identity from {provider_slug} to {linking_user.email or linking_user.username}.",
+                    user=linking_user,
+                    metadata={"provider": provider_slug},
+                )
+            return HttpResponseRedirect(f"{frontend_url}/account?oauth_linked=true")
 
     # ── Login flow: find or create the local user ─────────────────────────
     try:
@@ -438,6 +479,20 @@ def oauth_callback(request, provider_slug: str):
             provider=provider, uid=provider_uid
         )
         user = social.user
+        if social.from_participant_link:
+            with transaction.atomic():
+                user = User.objects.locked().filter(pk=user.pk, is_active=True).first()
+                if user is None:
+                    return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=account_inactive")
+                social = SocialAccount.objects.select_for_update().filter(pk=social.pk).first()
+                if social is None:
+                    _record_login_failure(request, provider_slug, "identity_removed")
+                    return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=identity_removed")
+                if not _provider_proves_account_email(user_info, user.email):
+                    _record_login_failure(request, provider_slug, "email_not_verified")
+                    return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=email_not_verified")
+                social.from_participant_link = False
+                social.save(update_fields=["from_participant_link"])
     except SocialAccount.DoesNotExist:
         provisioned = False
         if not email:
@@ -546,7 +601,11 @@ def oauth_callback(request, provider_slug: str):
 
     # Issue a short-lived exchange code for the frontend to convert to JWT
     exchange_code = secrets.token_urlsafe(32)
-    OAuthExchangeCode.objects.create(code=exchange_code, user=user)
+    with transaction.atomic():
+        current = User.objects.locked().filter(pk=user.pk, is_active=True).first()
+        if current is None or current.session_version != user.session_version:
+            return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=account_inactive")
+        OAuthExchangeCode.objects.create(code=exchange_code, user=current)
     _record_auth_event(
         request,
         action_type="oauth.login",
@@ -577,23 +636,28 @@ def oauth_token_exchange(request):
     if not re.fullmatch(r'[A-Za-z0-9_\-]{10,64}', code):
         return Response({"detail": "Invalid or expired code."}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        exchange = OAuthExchangeCode.objects.select_related("user").get(code=code)
-    except OAuthExchangeCode.DoesNotExist:
-        return Response({"detail": "Invalid or expired code."}, status=status.HTTP_400_BAD_REQUEST)
+    invalid = Response({"detail": "Invalid or expired code."}, status=status.HTTP_400_BAD_REQUEST)
+    owner = OAuthExchangeCode.objects.filter(code=code).values("user_id").first()
+    if owner is None:
+        return invalid
 
-    if not exchange.is_valid():
+    # Match revocation's user-first lock order; consume and mint in one transaction.
+    with transaction.atomic():
+        user = User.objects.locked().filter(pk=owner["user_id"], is_active=True).first()
+        if user is None:
+            return invalid
+        exchange = OAuthExchangeCode.objects.select_for_update().filter(code=code, user=user).first()
+        if exchange is None:
+            return invalid
+        expired = not exchange.is_valid()
         exchange.delete()
-        return Response({"detail": "Code has expired."}, status=status.HTTP_400_BAD_REQUEST)
-
-    user = exchange.user
-    exchange.delete()
-
-    tokens = make_jwt_for_user(user)
-    response = Response({"detail": "Login successful."})
-    set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
-    record_login(user)
-    return response
+        if expired:
+            return Response({"detail": "Code has expired."}, status=status.HTTP_400_BAD_REQUEST)
+        tokens = make_jwt_for_user(user)
+        response = Response({"detail": "Login successful."})
+        set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
+        record_login(user)
+        return response
 
 
 # ── social accounts (current user) ───────────────────────────────────────────

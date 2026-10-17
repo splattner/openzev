@@ -23,7 +23,8 @@ LABEL org.opencontainers.image.title="$OCI_TITLE" \
     org.opencontainers.image.created="$OCI_CREATED"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    XDG_CACHE_HOME=/tmp/openzev-cache
 
 WORKDIR /app
 
@@ -51,8 +52,12 @@ COPY backend/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
     pip install --no-cache-dir mysqlclient
 
+RUN groupadd --system --gid 10001 openzev \
+    && useradd --system --uid 10001 --gid openzev --home /app openzev
 COPY backend /app
+RUN mkdir -p /app/media && chown 10001:10001 /app/media
+USER 10001:10001
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:8000"]
+CMD ["sh", "-c", "python manage.py migrate && exec gunicorn config.wsgi:application --config /app/gunicorn.conf.py --bind 0.0.0.0:8000"]

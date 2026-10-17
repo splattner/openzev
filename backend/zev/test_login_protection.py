@@ -4,12 +4,14 @@ import uuid
 from datetime import timedelta
 from unittest.mock import patch
 
+import pyotp
+from cryptography.fernet import Fernet
 from django.contrib.admin import site
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.test import RequestFactory, TestCase, TransactionTestCase
+from django.test import RequestFactory, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -17,7 +19,9 @@ from accounts.magic_links import consume, issue
 from accounts import mfa
 from accounts.api_keys import generate_key
 from accounts.authentication import CookieJWTAuthentication
+from accounts.jwt_utils import is_participant_link_session
 from accounts.models import ApiKey, EmailVerificationToken, OAuthProvider, SocialAccount, TotpDevice, User
+from testing.passkeys import SoftAuthenticator, register_passkey, sign_in_with
 from testing.helpers import authenticate, create_managed_zev, make_user
 from zev import access, onboarding
 from zev.models import Participant, Party, PartyRole, ZevAccessGrant
@@ -136,6 +140,81 @@ class LoginProtectionUpgradeTests(TransactionTestCase):
         self.assertTrue(user.independent_login_required)
         self.assertEqual(user.session_version, 0)
         self.assertFalse(user.has_usable_password())
+
+    def test_upgrade_marks_only_legacy_participant_credentials_and_retires_their_sessions(self):
+        Zev = self.apps.get_model("zev", "Zev")
+        OldParticipant = self.apps.get_model("zev", "Participant")
+        OldParty = self.apps.get_model("zev", "Party")
+        Provider = self.apps.get_model("accounts", "OAuthProvider")
+        Social = self.apps.get_model("accounts", "SocialAccount")
+        Factor = self.apps.get_model("accounts", "TotpDevice")
+        Passkey = self.apps.get_model("accounts", "WebAuthnCredential")
+        Recovery = self.apps.get_model("accounts", "MfaRecoveryCode")
+        State = self.apps.get_model("accounts", "OAuthState")
+        Exchange = self.apps.get_model("accounts", "OAuthExchangeCode")
+        zev = Zev.objects.create(name="Legacy", invoice_prefix="L")
+        participant_account = self.old_user.objects.create(username="legacy_tenant", password=make_password("pass1234"))
+        party_account = self.old_user.objects.create(username="legacy_party", password=make_password("pass1234"))
+        promoted = self.old_user.objects.create(username="legacy_manager", role="admin", password=make_password("pass1234"))
+        independent = self.old_user.objects.create(username="legacy_independent", password=make_password("pass1234"))
+        provider = Provider.objects.create(name="legacy-provider", enabled=True)
+        login_state = State.objects.create(provider=provider, state="legacy-login")
+        for user in (participant_account, party_account, promoted):
+            party_only = user == party_account
+            OldParticipant.objects.create(
+                zev=zev, user=None if party_only else user, valid_from=self.today,
+                party=OldParty.objects.create(zev=zev, last_name=user.username, user=user if party_only else None),
+            )
+            Factor.objects.create(user=user, secret_encrypted=b"legacy")
+            Passkey.objects.create(user=user, credential_id=user.username.encode(), public_key=b"legacy")
+            Recovery.objects.create(user=user, code_hash="legacy")
+            Social.objects.create(
+                user=user, provider=provider, uid=user.username,
+                extra_data={"email_verified": True, "email": "other@example.com"},
+            )
+            State.objects.create(user=user, provider=provider, state=user.username)
+            Exchange.objects.create(user=user, code=user.username)
+        participant_account.email = "tenant@example.com"
+        participant_account.save(update_fields=["email"])
+        Social.objects.create(
+            user=participant_account, provider=provider, uid="verified-owner",
+            extra_data={"email_verified": True, "email": f" {participant_account.email.upper()} "},
+        )
+        from rest_framework_simplejwt.tokens import RefreshToken
+
+        old_token = RefreshToken.for_user(participant_account)
+        old_token["sv"] = 0
+        old_challenge = mfa.issue_challenge(participant_account)
+        self.migrate_to_latest()
+        for old_user in (participant_account, party_account, promoted, independent):
+            user = User.objects.get(pk=old_user.pk)
+            marked = old_user in (participant_account, party_account)
+            enrolled = old_user != independent
+            self.assertEqual(user.password_from_participant_link, marked)
+            self.assertEqual(user.session_version, int(marked))
+            self.assertEqual(user.password, old_user.password)
+            for credentials in (user.webauthn_credentials, user.mfa_recovery_codes):
+                self.assertEqual(credentials.count(), int(enrolled))
+                self.assertFalse(credentials.exclude(from_participant_link=marked).exists())
+            self.assertFalse(user.oauthstate_set.exists())
+            devices = TotpDevice.objects.filter(user=user)
+            self.assertEqual(devices.count(), int(enrolled))
+            self.assertFalse(devices.exclude(from_participant_link=marked).exists())
+            socials = user.social_accounts.exclude(uid="verified-owner")
+            self.assertEqual(socials.count(), int(enrolled))
+            self.assertFalse(socials.exclude(from_participant_link=marked).exists())
+            from accounts.models import OAuthExchangeCode
+
+            self.assertEqual(OAuthExchangeCode.objects.filter(user=user).count(), int(enrolled and not marked))
+        self.assertFalse(SocialAccount.objects.get(uid="verified-owner").from_participant_link)
+        from accounts.models import OAuthState
+
+        self.assertTrue(OAuthState.objects.filter(pk=login_state.pk, session_version__isnull=True).exists())
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {old_token.access_token}")
+        self.assertEqual(client.get("/api/v1/auth/me/").status_code, 401)
+        with self.assertRaises(mfa.MfaChallengeError):
+            mfa.resolve_challenge(old_challenge)
 
 
 class LoginProtectionTests(TestCase):
@@ -580,22 +659,278 @@ class LoginProtectionTests(TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertFalse(ApiKey.objects.filter(user=self.account).exists())
 
-    def test_a_password_enrolled_through_a_participant_link_remains_usable(self):
+    def sign_in_through_link(self, recovery_code=None):
         _url, token = get_participant_onboarding_link(self.participant)
         client = APIClient()
-        self.assertEqual(client.post("/api/v1/public/onboarding/consume/", {
+        response = client.post("/api/v1/public/onboarding/consume/", {
             "prefix": token.prefix, "s": token.secret,
+        }, format="json")
+        self.assertEqual(response.status_code, 200)
+        if recovery_code is not None:
+            self.complete_participant_mfa(client, response, recovery_code)
+        self.assertTrue(is_participant_link_session(CookieJWTAuthentication().get_validated_token(
+            client.cookies["openzev_access"].value,
+        )))
+        return client
+
+    def test_participant_can_recover_a_forgotten_password_through_a_fresh_link(self):
+        old_session = self.sign_in_through_link()
+        self.assertEqual(old_session.post("/api/v1/auth/me/set-initial-password/", {
+            "new_password": "ForgottenParticipantPassword42!",
         }, format="json").status_code, 200)
+        recovered = self.sign_in_through_link()
+        self.assertIsNotNone(recovered.get("/api/v1/auth/me/").data["password_recovery_expires_at"])
+        self.assertEqual(recovered.post("/api/v1/auth/me/reset-password/", {
+            "new_password": "RecoveredParticipantPassword42!",
+        }, format="json").status_code, 200)
+        self.assertEqual(old_session.get("/api/v1/auth/me/").status_code, 401)
+        me = recovered.get("/api/v1/auth/me/")
+        self.assertEqual(me.status_code, 200)
+        self.assertIsNone(me.data["password_recovery_expires_at"])
+        self.account.refresh_from_db()
+        self.assertTrue(self.account.password_from_participant_link)
+        with self.assertRaises(ValidationError):
+            ZevAccessGrant.objects.create(zev=self.zev, user=self.account, role="viewer")
+
+    def test_credential_origin_alone_does_not_authorize_password_recovery(self):
+        from accounts.jwt_utils import make_jwt_for_user
+
+        self.account.set_password("ExistingPassword42!")
+        self.account.save(update_fields=["password"])
+        for session_origin, password_origin in ((True, False), (False, True), (True, True)):
+            with self.subTest(session_origin=session_origin, password_origin=password_origin):
+                self.account.password_from_participant_link = password_origin
+                self.account.save(update_fields=["password_from_participant_link"])
+                tokens = make_jwt_for_user(self.account, participant_link=session_origin)
+                client = APIClient()
+                client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+                self.assertIsNone(client.get("/api/v1/auth/me/").data["password_recovery_expires_at"])
+                response = client.post("/api/v1/auth/me/reset-password/", {
+                    "new_password": "UnprovenReplacement42!",
+                }, format="json")
+                self.assertEqual(response.status_code, 403)
+                self.account.refresh_from_db()
+                self.assertTrue(self.account.check_password("ExistingPassword42!"))
+
+    def test_a_password_enrolled_through_a_participant_link_requires_a_fresh_invitation(self):
+        client = self.sign_in_through_link()
         password = "ParticipantOwnedPassword42!"
         self.assertEqual(client.post("/api/v1/auth/me/set-initial-password/", {
             "new_password": password,
         }, format="json").status_code, 200)
-        ZevAccessGrant.objects.create(zev=self.zev, user=self.account, role="viewer")
+        self.account.refresh_from_db()
+        self.assertTrue(self.account.password_from_participant_link)
+        response = client.post("/api/v1/auth/me/email-change/", {
+            "current_password": password, "new_email": "link-holder@example.com",
+        }, format="json")
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["code"], "managed_email")
+        with self.assertRaises(ValidationError):
+            ZevAccessGrant.objects.create(zev=self.zev, user=self.account, role="viewer")
+        self.assertTrue(self.account.check_password(password))
+        self.invite()
+        self.account.refresh_from_db()
+        self.assertFalse(self.account.has_usable_password())
+        self.assertFalse(self.account.is_active)
         self.assertEqual(client.get("/api/v1/auth/me/").status_code, 401)
         response = APIClient().post("/api/v1/auth/token/", {
             "username": self.account.username, "password": password,
         }, format="json")
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 401)
+        invitation = self.account.email_verification_tokens.get(consumed_at__isnull=True)
+        owner = APIClient()
+        self.assertEqual(owner.post("/api/v1/auth/verify-email/", {"token": invitation.token}, format="json").status_code, 200)
+        self.assertEqual(owner.post("/api/v1/auth/me/set-initial-password/", {
+            "new_password": "FreshIndependentPassword42!",
+        }, format="json").status_code, 200)
+        self.account.refresh_from_db()
+        self.assertFalse(self.account.password_from_participant_link)
+        self.assertTrue(self.account.check_password("FreshIndependentPassword42!"))
+
+    def test_password_login_refresh_and_changes_cannot_clear_participant_origin(self):
+        client = self.sign_in_through_link()
+        password = "ParticipantOwnedPassword42!"
+        client.post("/api/v1/auth/me/set-initial-password/", {"new_password": password}, format="json")
+        client = APIClient()
+        self.assertEqual(client.post("/api/v1/auth/token/", {
+            "username": self.account.username, "password": password,
+        }, format="json").status_code, 200)
+        self.assertEqual(client.post("/api/v1/auth/token/refresh/").status_code, 200)
+        self.assertEqual(client.post("/api/v1/auth/me/change-password/", {
+            "old_password": password, "new_password": "ChangedParticipantPassword42!",
+        }, format="json").status_code, 200)
+        self.account.refresh_from_db()
+        self.assertTrue(self.account.password_from_participant_link)
+        self.assertTrue(is_participant_link_session(CookieJWTAuthentication().get_validated_token(
+            client.cookies["openzev_access"].value,
+        )))
+        with self.assertRaises(ValidationError):
+            ZevAccessGrant.objects.create(zev=self.zev, user=self.account, role="manager")
+
+    @override_settings(MFA_ENCRYPTION_KEYS=[Fernet.generate_key().decode()])
+    def test_link_enrolled_totp_and_recovery_codes_are_removed_but_an_independent_password_survives(self):
+        client = self.sign_in_through_link()
+        self.account.set_password("IndependentPassword42!")
+        self.account.save(update_fields=["password"])
+        setup = client.post("/api/v1/auth/me/mfa/totp/")
+        self.assertEqual(setup.status_code, 200)
+        confirmed = client.post("/api/v1/auth/me/mfa/totp/confirm/", {
+            "code": pyotp.TOTP(setup.data["secret"]).now(),
+        }, format="json")
+        self.assertEqual(confirmed.status_code, 200)
+        self.assertTrue(self.account.mfa_recovery_codes.filter(from_participant_link=True).exists())
+        ZevAccessGrant.objects.create(zev=self.zev, user=self.account, role="manager")
+        self.account.refresh_from_db()
+        self.assertTrue(self.account.check_password("IndependentPassword42!"))
+        self.assertFalse(TotpDevice.objects.filter(user=self.account).exists())
+        self.assertFalse(self.account.mfa_recovery_codes.exists())
+
+    @override_settings(WEBAUTHN_RP_ID="localhost", WEBAUTHN_ORIGIN="http://localhost:5173")
+    def test_link_enrolled_passkeys_and_their_descendants_are_removed_on_invitation(self):
+        client = self.sign_in_through_link()
+        authenticator = SoftAuthenticator()
+        registered = register_passkey(client, authenticator)
+        self.assertEqual(registered.status_code, 201)
+        self.assertTrue(self.account.webauthn_credentials.get().from_participant_link)
+        with self.assertRaises(ValidationError):
+            ZevAccessGrant.objects.create(zev=self.zev, user=self.account, role="viewer")
+        client = APIClient()
+        self.assertEqual(sign_in_with(client, authenticator).status_code, 200)
+        self.assertEqual(client.post("/api/v1/auth/me/set-initial-password/", {
+            "new_password": "PasskeyDescendantPassword42!",
+        }, format="json").status_code, 200)
+        self.account.refresh_from_db()
+        self.assertTrue(self.account.password_from_participant_link)
+        self.invite()
+        self.assertFalse(self.account.webauthn_credentials.exists())
+        self.assertFalse(self.account.mfa_recovery_codes.exists())
+
+    @override_settings(WEBAUTHN_RP_ID="localhost", WEBAUTHN_ORIGIN="http://localhost:5173")
+    def test_independent_passkeys_survive_promotion_alongside_link_enrolled_credentials(self):
+        participant_client = self.sign_in_through_link()
+        self.assertEqual(register_passkey(participant_client, SoftAuthenticator()).status_code, 201)
+        independent_client = APIClient()
+        authenticate(independent_client, self.account)
+        independent_key = SoftAuthenticator()
+        self.assertEqual(register_passkey(independent_client, independent_key).status_code, 201)
+        ZevAccessGrant.objects.create(zev=self.zev, user=self.account, role="manager")
+        self.assertEqual(self.account.webauthn_credentials.count(), 1)
+        self.assertFalse(self.account.webauthn_credentials.get().from_participant_link)
+        self.assertEqual(sign_in_with(APIClient(), independent_key).status_code, 200)
+
+    def complete_participant_mfa(self, client, challenge, code):
+        self.assertEqual(challenge.status_code, 200)
+        self.assertTrue(challenge.data["mfa_required"])
+        completed = client.post("/api/v1/auth/token/mfa/", {
+            "mfa_token": challenge.data["mfa_token"], "code": code,
+        }, format="json")
+        self.assertEqual(completed.status_code, 200)
+        self.assertTrue(is_participant_link_session(CookieJWTAuthentication().get_validated_token(
+            client.cookies["openzev_access"].value,
+        )))
+
+    @override_settings(MFA_ENCRYPTION_KEYS=[Fernet.generate_key().decode()])
+    def test_participant_origin_survives_each_mfa_login_door(self):
+        client = self.sign_in_through_link()
+        password = "ParticipantOwnedPassword42!"
+        self.assertEqual(client.post("/api/v1/auth/me/set-initial-password/", {
+            "new_password": password,
+        }, format="json").status_code, 200)
+        setup = client.post("/api/v1/auth/me/mfa/totp/")
+        codes = client.post("/api/v1/auth/me/mfa/totp/confirm/", {
+            "code": pyotp.TOTP(setup.data["secret"]).now(),
+        }, format="json").data["recovery_codes"]
+        magic = issue(self.account)
+        _url, token = get_participant_onboarding_link(self.participant)
+        doors = [
+            ("/api/v1/auth/token/", {"username": self.account.username, "password": password}),
+            ("/api/v1/public/onboarding/consume/", {"prefix": token.prefix, "s": token.secret}),
+            ("/api/v1/public/magic-link/consume/", {"token": magic.token}),
+        ]
+        for code, (url, data) in zip(codes, doors):
+            with self.subTest(url=url):
+                signed_in = APIClient()
+                self.complete_participant_mfa(signed_in, signed_in.post(url, data, format="json"), code)
+
+    @override_settings(MFA_ENCRYPTION_KEYS=[Fernet.generate_key().decode()])
+    def test_link_regenerated_codes_are_retired_but_independent_totp_survives(self):
+        independent = APIClient()
+        authenticate(independent, self.account)
+        setup = independent.post("/api/v1/auth/me/mfa/totp/")
+        secret = setup.data["secret"]
+        confirmed = independent.post("/api/v1/auth/me/mfa/totp/confirm/", {
+            "code": pyotp.TOTP(secret).now(),
+        }, format="json")
+        self.assertEqual(confirmed.status_code, 200)
+        self.assertEqual(self.account.mfa_recovery_codes.filter(from_participant_link=False).count(), 10)
+        participant = self.sign_in_through_link(confirmed.data["recovery_codes"][0])
+        self.assertEqual(participant.post("/api/v1/auth/me/mfa/recovery-codes/").status_code, 200)
+        self.assertEqual(self.account.mfa_recovery_codes.filter(from_participant_link=True).count(), 10)
+        self.account.set_password("IndependentPassword42!")
+        self.account.save(update_fields=["password"])
+        ZevAccessGrant.objects.create(zev=self.zev, user=self.account, role="viewer")
+        self.assertTrue(TotpDevice.objects.get(user=self.account).is_active)
+        self.assertFalse(self.account.mfa_recovery_codes.exists())
+        self.account.refresh_from_db()
+        owner = APIClient()
+        authenticate(owner, self.account)
+        self.assertEqual(owner.post("/api/v1/auth/me/mfa/recovery-codes/").status_code, 200)
+        self.assertEqual(self.account.mfa_recovery_codes.filter(from_participant_link=False).count(), 10)
+
+    @override_settings(MFA_ENCRYPTION_KEYS=[Fernet.generate_key().decode()])
+    def test_totp_origin_is_sticky_across_setup_and_confirmation_sessions(self):
+        participant = self.sign_in_through_link()
+        independent = APIClient()
+        authenticate(independent, self.account)
+        for setup_client, confirm_client in ((participant, independent), (independent, participant)):
+            with self.subTest(participant_starts=setup_client is participant):
+                setup = setup_client.post("/api/v1/auth/me/mfa/totp/")
+                response = confirm_client.post("/api/v1/auth/me/mfa/totp/confirm/", {
+                    "code": pyotp.TOTP(setup.data["secret"]).now(),
+                }, format="json")
+                self.assertEqual(response.status_code, 200)
+                self.assertTrue(TotpDevice.objects.get(user=self.account).from_participant_link)
+                self.assertEqual(self.account.mfa_recovery_codes.filter(from_participant_link=True).count(), 10)
+                TotpDevice.objects.filter(user=self.account).delete()
+                self.account.mfa_recovery_codes.all().delete()
+
+    def test_admin_promotion_does_not_restore_a_retired_password_from_its_loaded_instance(self):
+        client = self.sign_in_through_link()
+        client.post("/api/v1/auth/me/set-initial-password/", {
+            "new_password": "ParticipantOwnedPassword42!",
+        }, format="json")
+        provider = OAuthProvider.objects.create(name="Verified provider", enabled=True)
+        SocialAccount.objects.create(user=self.account, provider=provider, uid="verified-owner")
+        SocialAccount.objects.create(user=self.account, provider=provider, uid="legacy-link-holder", from_participant_link=True)
+        self.account.refresh_from_db()
+        self.account.role = "admin"
+        self.account.save()
+        self.account.refresh_from_db()
+        self.assertTrue(self.account.independent_login_required)
+        self.assertFalse(self.account.has_usable_password())
+        self.assertEqual(self.account.social_accounts.get().uid, "verified-owner")
+
+    def test_stale_profile_save_does_not_restore_retired_password(self):
+        client = self.sign_in_through_link()
+        password = "ParticipantOwnedPassword42!"
+        client.post("/api/v1/auth/me/set-initial-password/", {"new_password": password}, format="json")
+        self.account.refresh_from_db()
+        stale = User.objects.get(pk=self.account.pk)
+        provider = OAuthProvider.objects.create(name="stale-profile-provider", enabled=True)
+        SocialAccount.objects.create(user=self.account, provider=provider, uid="independent-owner")
+        ZevAccessGrant.objects.create(zev=self.zev, user=self.account, role="manager")
+        stale.first_name = "Late profile update"
+        stale.save()
+        signed_in = APIClient()
+        self.account.refresh_from_db()
+        self.assertFalse(self.account.has_usable_password())
+        response = signed_in.post("/api/v1/auth/token/", {
+            "username": self.account.username, "password": password,
+        }, format="json")
+        self.assertEqual(response.status_code, 401)
+        self.assertNotIn("openzev_access", signed_in.cookies)
+        self.assertEqual(signed_in.get("/api/v1/auth/me/").status_code, 401)
+        self.assertEqual(signed_in.post("/api/v1/auth/token/refresh/").status_code, 401)
 
     def test_promotion_retires_an_outstanding_mfa_challenge(self):
         challenge = mfa.issue_challenge(self.account)

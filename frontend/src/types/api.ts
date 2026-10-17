@@ -16,8 +16,10 @@ export interface User {
     must_change_password: boolean
     /** Account-level default community (ZEV id), always present; null = first managed by name. */
     preferred_zev: string | null
-    /** From /auth/me: whether the account can re-authenticate with a password (participants and OAuth-only accounts cannot). */
+    /** From /auth/me: whether this account has a usable password. */
     has_usable_password?: boolean
+    can_change_email?: boolean
+    password_recovery_expires_at?: string | null
     /** Present when this session is an impersonation session. */
     impersonated_by?: User
     /** From /auth/me: every community the account relates to (#761). */
@@ -249,6 +251,7 @@ export interface Zev {
     grid_connection_point?: string
     billing_interval: string
     invoice_prefix?: string
+    credit_note_prefix?: string
     invoice_language?: 'de' | 'fr' | 'it' | 'en'
     payment_term_days?: number
     bank_iban?: string
@@ -279,6 +282,7 @@ export interface ZevInput {
     grid_connection_point?: string
     billing_interval: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
     invoice_prefix?: string
+    credit_note_prefix?: string
     invoice_language?: 'de' | 'fr' | 'it' | 'en'
     payment_term_days?: number
     bank_iban?: string
@@ -1120,6 +1124,10 @@ export interface Invoice {
     vat_base_chf?: string | null
     vat_chf?: string
     total_chf: string
+    /** Credit notes set against this invoice at generation (#388); frozen as issued. */
+    credit_applied_chf?: string
+    /** `max(total - credit applied, 0)` for an invoice that collects money; the total otherwise. */
+    amount_due_chf?: string
     total_local_kwh?: string
     total_grid_kwh?: string
     total_feed_in_kwh?: string
@@ -1129,6 +1137,22 @@ export interface Invoice {
     local_sale_feed_in_chf?: string | null
     status: string
     sent_at?: string | null
+    /** Stamped on approval and never cleared: an issued invoice is never deleted (ADR 0037). */
+    approved_at?: string | null
+    /** Sum of the recorded payments. */
+    paid_chf?: string
+    /** What is still owed; `0.00` for a cancelled invoice. */
+    outstanding_chf?: string
+    /** Detail reads for the ZEV's managers and viewers; null for a participant. */
+    payments?: Payment[] | null
+    /** Credit notes issued for this invoice (#388); the participant sees them too. */
+    credits?: Credit[]
+    /** Credit notes used by this invoice, released ones included (detail only; the participant sees them too). */
+    credit_applications?: InvoiceCreditApplication[]
+    /** Cancelled invoices for the same participant and period this one took the place of, newest first (detail and period overview). */
+    replaces?: InvoiceRef[]
+    /** For a cancelled invoice: the newest invoice issued after it for the same participant and period. */
+    replaced_by?: InvoiceRef | null
     pdf_url?: string | null
     /**
      * Where the document is, as distinct from the invoice's own `status`.
@@ -1147,6 +1171,88 @@ export interface Invoice {
      * The retry endpoint is log-scoped, so the email-delivery tab needs the
      * log id to offer an inline retry off the list payload. */
     last_email_log_id?: string | null
+}
+
+export type CreditKind = 'reversal' | 'adjustment'
+
+/** The part of a credit note set against an invoice, seen from the invoice (#388). */
+/** Another invoice, by id and number only. */
+export interface InvoiceRef {
+    id: string
+    invoice_number: string
+}
+
+export interface InvoiceCreditApplication {
+    id: string
+    credit: string
+    credit_number: string
+    /** The invoice the credit note was issued for; null for a credit without one. */
+    credit_source_invoice: string | null
+    credit_source_invoice_number: string | null
+    amount_chf: string
+    /** Set once the invoice was cancelled and the credit freed again. */
+    released_at: string | null
+}
+
+/** The part of a credit note set against an invoice, seen from the credit. */
+export interface CreditApplication {
+    id: string
+    invoice: string
+    invoice_number: string
+    amount_chf: string
+    released_at: string | null
+}
+
+export type CreditStatus = 'open' | 'used' | 'refunded'
+
+/** A credit note (#388): money owed back for an invoice. */
+export interface Credit {
+    id: string
+    credit_number: string
+    zev: string
+    participant: string
+    participant_name: string
+    kind: CreditKind
+    source_invoice: string | null
+    source_invoice_number: string | null
+    reason: string
+    /** Gross. */
+    amount_chf: string
+    vat_mode: 'not_registered' | 'registered' | 'inclusive'
+    vat_rate: string
+    vat_chf: string
+    embedded_vat_chf: string | null
+    /** Amount less the active applications and what was refunded. */
+    remaining_chf: string
+    refunded_chf: string
+    refunded_on: string | null
+    refund_note: string
+    /** `open` while money remains, then `used` (set against invoices) or `refunded`. */
+    status: CreditStatus
+    applications: CreditApplication[]
+    pdf_url: string | null
+    pdf_status: InvoicePdfStatus
+    created_by_name: string | null
+    created_at: string
+}
+
+/** Answer of `POST invoices/{id}/correct/`. */
+export interface CorrectInvoiceResponse {
+    invoice: Invoice
+    /** `null` when reversing an invoice settled by credit alone: nothing was paid, so nothing is credited. */
+    credit: Credit | null
+}
+
+/** Money received for an invoice (#388). */
+export interface Payment {
+    id: string
+    invoice: string
+    amount_chf: string
+    paid_on: string
+    note: string
+    source: 'manual' | 'mark_paid' | 'backfill'
+    created_by_name: string | null
+    created_at: string
 }
 
 /**
@@ -2046,6 +2152,8 @@ export interface PublicInvoice {
     status: string
     is_paid: boolean
     total_chf: string
+    credit_applied_chf: string
+    amount_due_chf: string
     currency: string
     /** Null when the invoice has no consumption — then no QR was printed either. */
     energy_summary: {

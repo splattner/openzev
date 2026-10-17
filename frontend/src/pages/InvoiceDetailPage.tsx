@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { PageSkeleton } from '../components/PageSkeleton'
@@ -15,13 +15,18 @@ import { useAuth } from '../lib/auth'
 import { scopeNoteKey, shellRoleForZev } from '../lib/communityAccess'
 import { PdfPreview } from '../components/PdfPreview'
 import { InvoiceAccessLinkCard } from '../features/invoices/InvoiceAccessLinkCard'
+import { InvoiceAppliedCreditsCard } from '../features/invoices/InvoiceAppliedCreditsCard'
+import { InvoiceCreditsCard } from '../features/invoices/InvoiceCreditsCard'
+import { amountDueChf, canCorrectInvoice, hasCreditApplied } from '../features/invoices/invoiceCredits'
+import { InvoicePaymentsCard } from '../features/invoices/InvoicePaymentsCard'
+import type { Invoice } from '../types/api'
 
 import { usePdfObjectUrl } from '../lib/usePdfObjectUrl'
 import { PageHeader } from '../components/PageHeader'
 import { Notice } from '../components/Notice'
 import { StatCard } from '../components/StatCard'
 import { InvoiceStatusBadge } from '../components/InvoicePresentation'
-import { formatChfAmount, formatKwh } from '../lib/numbers'
+import { formatChf, formatChfAmount, formatKwh } from '../lib/numbers'
 
 export function InvoiceDetailPage() {
     const { t } = useTranslation()
@@ -29,6 +34,7 @@ export function InvoiceDetailPage() {
     const location = useLocation()
     const { invoiceId } = useParams<{ invoiceId: string }>()
     const { settings } = useAppSettings()
+    const queryClient = useQueryClient()
     // Participants reach this page for their own invoices; revoking is a
     // management control and must not be offered to the person holding the QR.
     // Decided by the invoice's own community, which need not be the selected
@@ -96,6 +102,25 @@ export function InvoiceDetailPage() {
         ? t('common.back')
         : t('pages.invoiceDetail.backToInvoices')
 
+    // A payment changes the status and totals every invoice list shows.
+    const handleInvoiceChanged = (updated: Invoice) => {
+        queryClient.setQueryData(queryKeys.invoices.detail(updated.id), updated)
+        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.lists() })
+        void queryClient.invalidateQueries({ queryKey: ['invoices', 'period-overview'] })
+        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.mine() })
+        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.credits() })
+        for (const key of ['readiness', 'readiness-list', 'attention']) {
+            void queryClient.invalidateQueries({ queryKey: ['invoices', key] })
+        }
+    }
+
+    // A refund leaves the invoice's own payload alone but changes what its credit notes show.
+    const handleCreditChanged = () => {
+        if (invoiceId) void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.detail(invoiceId) })
+        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.credits() })
+        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.mine() })
+    }
+
     const handleGeneratePdf = async () => {
         if (!invoiceId) return
         setGenerating(true)
@@ -121,8 +146,25 @@ export function InvoiceDetailPage() {
                     // The document's own header: status pill, recipient, period.
                     <span className="invoice-detail-meta">
                         <span className="visually-hidden">{t('pages.invoiceDetail.status')}: </span>
-                        <InvoiceStatusBadge status={inv.status} />
+                        <InvoiceStatusBadge status={inv.status} paidChf={inv.paid_chf} />
                         <span>{`${inv.participant_name} · ${formatShortDate(inv.period_start, settings)} → ${formatShortDate(inv.period_end, settings)}`}</span>
+                        {inv.replaced_by ? (
+                            <span>
+                                {t('pages.invoiceDetail.replacedBy')}{' '}
+                                <Link to={`/billing/invoices/${inv.replaced_by.id}`} state={location.state}>{inv.replaced_by.invoice_number}</Link>
+                            </span>
+                        ) : null}
+                        {inv.replaces?.length ? (
+                            <span>
+                                {t('pages.invoiceDetail.replaces')}{' '}
+                                {inv.replaces.map((ref, index) => (
+                                    <span key={ref.id}>
+                                        {index > 0 && ', '}
+                                        <Link to={`/billing/invoices/${ref.id}`} state={location.state}>{ref.invoice_number}</Link>
+                                    </span>
+                                ))}
+                            </span>
+                        ) : null}
                     </span>
                 }
                 actions={
@@ -135,7 +177,13 @@ export function InvoiceDetailPage() {
             {/* The figures of the invoice, as its summary tiles print them. */}
             <div className="invoice-figures">
                 <section className="stat-grid">
-                    <StatCard accent label={t('pages.invoiceDetail.total')} value={formatChfAmount(Number(inv.total_chf))} currency="CHF" />
+                    <StatCard
+                        accent
+                        label={t('pages.invoiceDetail.total')}
+                        value={formatChfAmount(Number(inv.total_chf))}
+                        currency="CHF"
+                        hint={hasCreditApplied(inv) ? t('pages.invoiceDetail.amountDueHint', { amount: formatChf(amountDueChf(inv)) }) : undefined}
+                    />
                     <StatCard label={t('pages.invoiceDetail.subtotal')} value={inv.subtotal_chf != null ? formatChfAmount(Number(inv.subtotal_chf)) : null} currency="CHF" />
                     <StatCard label={t('pages.invoiceDetail.vat')} value={inv.vat_chf != null ? formatChfAmount(Number(inv.vat_chf)) : null} currency="CHF" />
                 </section>
@@ -145,6 +193,23 @@ export function InvoiceDetailPage() {
                     <StatCard label={t('pages.invoiceDetail.feedIn')} value={formatKwh(Number(inv.total_feed_in_kwh ?? 0))} unit="kWh" />
                 </section>
             </div>
+
+            <InvoiceAppliedCreditsCard invoice={inv} />
+
+            {/* `payments` is null for a participant, who sees the totals only. */}
+            {!isParticipant && inv.payments != null && (
+                <InvoicePaymentsCard invoice={inv} canManage={canManageAccessLink} onChanged={handleInvoiceChanged} />
+            )}
+
+            {/* A credit note exists for the participant from the moment it is issued. */}
+            {((inv.credits ?? []).length > 0 || canCorrectInvoice(inv, canManageAccessLink)) && (
+                <InvoiceCreditsCard
+                    invoice={inv}
+                    canManage={canManageAccessLink}
+                    onChanged={handleInvoiceChanged}
+                    onCreditChanged={handleCreditChanged}
+                />
+            )}
 
             {canManageAccessLink && inv.access_link != null && (
                 <InvoiceAccessLinkCard

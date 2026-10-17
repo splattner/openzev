@@ -75,6 +75,21 @@ class AuditEventModelTests(TestCase):
         self.assertIn("audit_admin", event.actor_display)
         self.assertEqual(event.target_display, "Audit ZEV")
 
+    def test_audit_event_preserves_deleted_actor_snapshot(self):
+        self.admin.delete()
+        event = record_audit_event(
+            action_category=AuditActionCategory.AUTH,
+            action_type="user.delete",
+            target_type="accounts.User",
+            summary="Denied deletion by deleted caller.",
+            status=AuditEventStatus.DENIED,
+            user=self.admin,
+        )
+
+        self.assertIsNone(event.actor_user_id)
+        self.assertEqual(event.actor_display, self.admin.email)
+        self.assertEqual(event.actor_role_snapshot, UserRole.ADMIN)
+
     def test_redaction_omits_secret_fields(self):
         redacted = redact_metadata(
             {

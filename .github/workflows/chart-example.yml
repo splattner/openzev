@@ -60,5 +60,5 @@ jobs:
                   assert match, "no yaml example block under '## Example values'"
                   pathlib.Path("/tmp/openzev-example.yaml").write_text(match.group(1), encoding="utf-8")
                   PY
-                  helm lint ./charts/openzev
+                  helm lint ./charts/openzev -f /tmp/openzev-example.yaml
                   helm template openzev ./charts/openzev -f /tmp/openzev-example.yaml > /dev/null

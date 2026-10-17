@@ -85,6 +85,8 @@ spec:
               value: {{ .Values.email.hostUser | quote }}
             - name: DEFAULT_FROM_EMAIL
               value: {{ .Values.email.defaultFromEmail | quote }}
+            - name: DEBUG
+              value: {{ .Values.debug | quote }}
             - name: FRONTEND_URL
               value: {{ .Values.frontendUrl | quote }}
             {{- if .Values.backend.allowedHosts }}

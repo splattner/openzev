@@ -7,7 +7,7 @@
 - Owners: Sebastian Plattner
 - Created: 2026-10-14
 - Target Release: n/a (documents current behaviour)
-- Related Issues: [#1005](https://github.com/splattner/openzev/issues/1005) (email must be unique, fixed), [#1006](https://github.com/splattner/openzev/issues/1006) (forgot-password flow), [PR #1003](https://github.com/splattner/openzev/pull/1003) (participant password recovery, open)
+- Related Issues: [#1005](https://github.com/splattner/openzev/issues/1005) (email must be unique, fixed), [#1006](https://github.com/splattner/openzev/issues/1006) (forgot-password flow), [PR #1003](https://github.com/splattner/openzev/pull/1003) (participant password recovery, merged)
 - Related ADRs: [ADR 0020](../adr/0020-passkeys-replace-the-password.md) (passkeys), [ADR 0021](../adr/0021-mfa-secret-encryption-key.md) (MFA key), [ADR 0022](../adr/0022-session-revocation-by-version-counter.md) (session revocation), [ADR 0027](../adr/0027-per-zev-access-grants.md) (per-ZEV access)
 - Impacted Areas: backend | frontend
 
@@ -24,12 +24,6 @@ remains [`2026-03-community-and-access.md`](2026-03-community-and-access.md) and
 [`2026-09-two-factor-authentication.md`](2026-09-two-factor-authentication.md).
 
 Verified against the code on 2026-10-14. Paths are relative to `backend/`.
-
-> **Pending change.** [PR #1003](https://github.com/splattner/openzev/pull/1003) (open) changes
-> how participant-only accounts keep a password: participant edits and link generation would stop
-> clearing it, and a completed link login would carry a 15-minute `password_recovery_until` claim
-> allowing `POST /auth/me/reset-password/`. This page describes `main` as of 2026-10-14; sections
-> 3 (row 5), 5.1, 5.2 and 5.9 need revisiting when it merges.
 
 ## 2. Vocabulary
 
@@ -85,8 +79,10 @@ Sessions are JWTs in httpOnly cookies (access 60 minutes, refresh 7 days, rotate
 `Bearer` header. `CookieJWTAuthentication` enforces CSRF for cookie-borne unsafe requests.
 
 Credentials an account can end up holding: password, passkeys (many), one TOTP device plus
-recovery codes, linked OAuth identities, API keys. `has_login_credentials(user)`
-(`zev/services.py`) counts a usable password, an enabled OAuth identity or a passkey.
+recovery codes, linked OAuth identities, API keys. `has_independent_login_credentials(user)`
+(`zev/services.py`) counts only independently established passwords, enabled OAuth identities
+or passkeys. The origin and promotion contract is defined in
+[onboarding §4](2026-09-participant-onboarding-link.md#4-data-model).
 
 ## 5. Special cases
 
@@ -98,12 +94,13 @@ recovery codes, linked OAuth identities, API keys. `has_login_credentials(user)`
 - Participant links (magic and onboarding) refuse protected accounts (`LinkRefused`, code
   `own_login_required`); the endpoints answer as for an unknown link and audit the refusal.
 - `ensure_participant_account` leaves a protected account's password, email and name alone.
-  For any other linked account it **clears an existing password** (changed by #1003), clears
-  `must_change_password`, and copies the participant's email and name onto the account.
-- Promoting an account (`protect_account_login`) first requires `has_login_credentials` or a
+  It preserves existing passwords, their origin and pending-change flags on participant
+  edits and link generation. Reusing an existing email holder leaves that account unchanged (section 5.6).
+- Promoting an account (`protect_account_login`) first requires `has_independent_login_credentials` or a
   pending invitation (`validate_account_login`: "Send an access invitation before assigning
-  independent access"). It then bumps `session_version`, revokes active API keys, onboarding
-  links and magic links, and sets the flag unless an invitation is still pending.
+  independent access"). It retires participant-enrolled credentials, bumps `session_version`,
+  revokes active API keys, onboarding links and magic links, and sets the flag unless an
+  invitation is still pending. Independent credentials survive; see onboarding §4.
 - A party holding the issuer or representative role with no account cannot be given a
   participant login (`link_account_for` → `login_setup_required`); it needs an invitation.
 - Only an admin may invite or edit an account that is protected, outside the inviter's ZEV,
@@ -111,10 +108,12 @@ recovery codes, linked OAuth identities, API keys. `has_login_credentials(user)`
 
 ### 5.2 Participant-only accounts
 
-- No password, so `POST /auth/me/email-change/` is refused (`code: no_password`).
+- Participant-only addresses remain manager-maintained (`code: managed_email`); other participant-derived passwords cannot authorize email changes (`code: no_password`).
 - A participant may set a password after signing in through a link
   (`set-initial-password`); that revokes all sessions and the participant's onboarding links,
-  and the account keeps the password afterwards.
+  and the account keeps the password afterwards with participant origin. Completed link
+  authentication grants a separate, explicit 15-minute reset permission; ordinary
+  participant-derived password/passkey sessions do not grant it.
 - `consume` of a magic link also clears `must_change_password` and sets an unusable
   password if the account somehow had a temporary one.
 
@@ -187,8 +186,10 @@ admin, admin MFA reset, and promotion. Reactivating an account does not revive o
 - **Provisioning does not check `zev_self_registration_enabled`.** With any provider enabled,
   anyone whom the IdP verifies can get an account (role `user`, no ZEV access). There is no
   domain or allow-list setting on `OAuthProvider`.
-- The callback only redirects to the configured frontend URL; the exchange code is single
-  use.
+- The callback only redirects to the configured frontend URL. Code issuance locks
+  the user and rechecks account activity/session version. Exchange locks the user
+  before the code and consumes/mints in one transaction. Revocation discards pending
+  codes, and concurrent exchange cannot mint a session that survives it.
 
 ### 5.8 Self-registration
 
@@ -202,13 +203,13 @@ admin, admin MFA reset, and promotion. Reactivating an account does not revive o
 
 - **Forgot password** ([#1006](https://github.com/splattner/openzev/issues/1006)):
   `POST /auth/password-reset/` emails a signed one-hour link to an active account with a usable
-  password, and `POST /auth/password-reset/confirm/` sets the new password, clears
-  `must_change_password`, revokes all sessions and the account's onboarding links, and mints no
+  password, and `POST /auth/password-reset/confirm/` sets an independent password, clears
+  `must_change_password`, revokes all sessions and the account's onboarding and outstanding magic links, and mints no
   session, so a second factor is still asked for at the next sign-in. Same neutral answer for every
   address; per-address cooldown and per-IP throttle. Field-level detail:
   [community and access §5.6d](2026-03-community-and-access.md#56d-password-reset).
   Participant-only accounts without a password, OAuth-only and inactive accounts get no mail
-  and stay on their own recovery (links, provider).
+  and stay on their own recovery (links, provider). Reset links also expire on session revocation.
 - Admins can reset a user's second factor (`DELETE /auth/users/<id>/mfa/`), which bumps the
   user's sessions. Recovery codes (ten, single use) are issued with the first factor.
 

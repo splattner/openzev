@@ -218,6 +218,8 @@ reverse deletes every role row.
 | `representative_on(zev, day)` | `holder_on(zev, "representative", day)` |
 | `assign_role(zev, party, role, valid_from, *, valid_to=None)` | A party of another ZEV → `ValidationError` on `party`; `valid_to < valid_from` → on `valid_to`. Single-holder roles: a row starting after `valid_from` → `ValidationError` ("A later holder exists; end it first."); every row still active on or after `valid_from` is ended `valid_from - 1 day` through `end_role` (deleted when that empties its window); the same party already holding the role open-ended is returned unchanged. Landowner: refuses a second open row for the same party ("The party already holds this role."). Atomic, `select_for_update` on the ZEV's rows of that role; the new row is `full_clean()`ed |
 | `end_role(role_row, last_day)` | Sets `valid_to = last_day`; a row with `last_day < valid_from` is deleted |
+| `lock_role_assignment(zev, party, role)` | Inside the caller's transaction, prepares ZEV/role/party/account locks and returns the role rows; shared by the view and service so authorization follows lock waits |
+| `lock_role_end(role_row)` | Locks and rereads any role; a deleted row raises `ValidationError`. Managing roles acquire the ZEV lock first |
 | `ensure_initial_roles(zev, party, valid_from)` | Issuer + landowner from `valid_from` unless the ZEV already has an issuer row; called by the wizard and self-setup (`zev/services.py`, from PR 4) and `seed_demo` |
 
 ### 4.6 Zev
@@ -335,7 +337,7 @@ Access is derived from the role rows, never stored as `ZevAccessGrant`s.
 | `role_managers(zev, day=None)` | `[(account, role_row)]` managing `zev` through a role on `day` |
 | `has_manager(zev, *, exclude_grant=None, day=None)` | An active manager grant (other than `exclude_grant`) or any `role_managers` |
 | `is_last_manager(grant)` | A manager grant whose ZEV has no other manager — grant or role (`has_manager(..., exclude_grant=grant)`) |
-| `keeping_a_manager(*zevs)` | Context manager: runs the change in a transaction; any of `zevs` that had a manager and has none afterwards rolls it back and raises `NoManagerLeft` |
+| `keeping_a_manager(*zevs, account=None)` | Locks affected ZEVs, then rolls back a change that removes a ZEV's last manager today; account relationship locking: access-grants §7.1 |
 | `role_holdings_by_account(day=None)` | `{account_id: [role rows]}` for the admin accounts list, in a fixed number of queries |
 | `build_memberships(grants, participants, *, roles=())` | Each entry gains `roles` (managing role names held today); a role sets `access` to `manager` |
 
@@ -356,9 +358,12 @@ a row or changing its kind. Editing dates does not repeat credential setup.
 manager access first."` lives in `zev/access.py` (re-exported by `zev/parties.py`).
 
 - `assign_role` and `end_role` of a managing role (`zev/parties.py`) check `has_manager` before
-  and after the change, inside its transaction: a ZEV that had a manager and would have none
+  and after the change under the shared ZEV lock (access-grants §7.1).
+  A ZEV that had a manager and would have none
   today → `ValidationError({"party": [NO_MANAGER_LEFT]})`; the API (`create`, `end`) returns it
-  as a 400. `end_role` is atomic.
+  as a 400. `end_role` rereads the role after taking the lock; a role removed while it waited
+  → `ValidationError({"party": ["This role was removed in the meantime."]})`, also 400.
+  `end_role` is atomic. Non-managing landowner changes do not take the shared manager lock.
 - The changes that take a role manager's account away run inside `keeping_a_manager`:
   - `POST /zev/participants/{id}/unlink-account/` → 400 `{"detail": NO_MANAGER_LEFT}`, the link
     stays;
@@ -556,7 +561,7 @@ their role badges; edit in `PartyFormModal` (`features/zev/PartyFormModal.tsx`: 
 organisation name, title, first/last name — "contact" labels for an organisation —, name
 addition, email, phone, address, notes); delete (with `ConfirmDialog`) only while it holds no
 role. Every change invalidates parties, roles, access, the ZEV list (issuer) and participants.
-Styles `.zev-parties-*` in `index.css` (`.zev-parties-block-first` drops the divider of the
+Styles `.zev-parties-*` in `features/zev/ZevPartiesSection.css` (`.zev-parties-block-first` drops the divider of the
 contacts card's first block), reusing the `.zev-access-*` rows.
 
 ### 8.4 Participants
@@ -690,12 +695,13 @@ through the participant endpoints keep the existing participant audit events.
   and overlapping issuers are rejected); `SchemaParityTests` covers `PARTY_FIELDS` and
   `PARTY_ROLE_FIELDS`; the legacy-format tests rewrite exports with `as_format_version`.
   Backend 3824 passed.
-- **PR 6** (shipped): `zev/test_party_roles.py` `PartyWriteApiTests` (9: a manager adds,
+- **PR 6** (shipped): `zev/test_party_roles.py` `PartyWriteApiTests` (10: a manager adds,
   edits and deletes a contact with audit events; names required by kind; a party in use cannot be
   deleted; edits show on every participation; a manager of another ZEV cannot add a party here;
   a viewer reads but cannot write; a new issuer ends the previous one, with the audit event; a
   later holder is refused with the reason; ending a role, and ending one before it started
-  deletes it); `PartyRoleApiTests` now checks roles only change by assigning and ending (405 on
+  deletes it; a role-derived manager can hand off or end their own role when another manager remains);
+  `PartyRoleApiTests` now checks roles only change by assigning and ending (405 on
   PATCH/DELETE). Frontend `tests/zev-parties-section.test.ts` (4: today's issuer, no
   representative, landowners and contacts; viewer without actions; set a representative from a
   date; end a landowner), `tests/participant-form-mapping.test.ts` (+2: organisation payload and
@@ -727,6 +733,7 @@ through the participant endpoints keep the existing participant audit events.
   `invoices/test_readiness.py` `IssuerSetupTests` (2: no issuer; an issuer without and then with
   an address). Frontend `tests/readiness-cockpit.test.ts` +1 (the issuer-address warning links to
   People & access).
+- **Concurrent manager removals**: access-grants §13.
 - **Creator by role** (`zev/test_without_owner.py`): self-setup makes the caller issuer without
   a grant; a ZEV starting later gets a bridging grant to the day before the start;
   `EndCoveredGrantsMigrationTests` (0039 ends the issuer's grant, another manager's stays).

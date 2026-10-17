@@ -16,7 +16,7 @@ import { useRouteFocus } from '../lib/useRouteFocus'
 import pkg from '../../package.json'
 import { IconSvg, PlugIcon } from './IconSvg'
 
-// Keep in sync with the mobile shell breakpoint in index.css.
+// Keep in sync with the mobile shell breakpoint in styles/layout/responsive.css.
 const MOBILE_MEDIA_QUERY = '(max-width: 768px)'
 
 function SidebarLink({ to, label, icon, active, end, className, scope, collapsed }: {

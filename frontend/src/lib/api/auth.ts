@@ -272,6 +272,10 @@ export async function changePassword(oldPassword: string, newPassword: string): 
   return data
 }
 
+export async function resetPassword(newPassword: string): Promise<void> {
+  await api.post('/auth/me/reset-password/', { new_password: newPassword })
+}
+
 export async function register(payload: RegisterInput): Promise<{ detail: string }> {
   const { data } = await api.post<{ detail: string }>('/auth/register/', payload)
   return data

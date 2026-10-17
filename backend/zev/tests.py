@@ -27,7 +27,7 @@ from zev.management.commands.seed_demo import (
 	quarter_start,
 	years_before,
 )
-from invoices.models import ContractIssue, EmailLog, Invoice, InvoiceStatus
+from invoices.models import ContractIssue, Credit, EmailLog, Invoice, InvoiceStatus
 from metering.models import ImportLog, MeterReading, ReadingDirection, ReadingResolution
 from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
 from tariffs.models import BillingMode, PeriodType, Tariff
@@ -704,10 +704,7 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 				# The role is no longer rewritten (#761): what an account may
 				# do comes from its grants and participant rows.
 				self.assertEqual(account.role, role)
-				# A login of its own (admin, self-registered, manager) must
-				# survive being invited as a participant — only an account
-				# with no login of its own is neutralized.
-				self.assertEqual(account.has_usable_password(), has_own_login)
+				self.assertTrue(account.check_password("pass1234"))
 				if has_own_login:
 					# It signs in with that login; a link would hand it to
 					# whoever holds the link — even when an admin asks.
@@ -1360,15 +1357,31 @@ class SeedDemoSecondCommunitySeedTests(TestCase):
 				status__in=[InvoiceStatus.PAID, InvoiceStatus.CANCELLED],
 			).exists()
 		)
-		# Closed month: everything settled, at most one invoice cancelled.
+		# Closed month: everything settled, at most one invoice cancelled in error
+		# and one reversed by a credit note (whose replacement is a draft).
 		closed_statuses = set(
 			Invoice.objects.filter(zev=self.zev, period_start=closed_start).values_list("status", flat=True)
 		)
-		self.assertTrue(closed_statuses.issubset({InvoiceStatus.PAID, InvoiceStatus.CANCELLED}))
+		self.assertTrue(closed_statuses.issubset({InvoiceStatus.PAID, InvoiceStatus.CANCELLED, InvoiceStatus.DRAFT}))
 		self.assertLessEqual(
 			Invoice.objects.filter(zev=self.zev, period_start=closed_start, status=InvoiceStatus.CANCELLED).count(),
-			1,
+			2,
 		)
+		self.assertEqual(
+			sorted(Credit.objects.filter(zev=self.zev).values_list("kind", flat=True)),
+			["adjustment", "reversal"],
+		)
+		# The credit notes do not stay open: the reversal's replacement draft and
+		# the next month's invoice each use the one their participant holds.
+		reversal = Credit.objects.get(zev=self.zev, kind="reversal")
+		adjustment = Credit.objects.get(zev=self.zev, kind="adjustment")
+		self.assertEqual(
+			reversal.applications.get().invoice.period_start, closed_start,
+		)
+		applied = adjustment.applications.get()
+		self.assertEqual(applied.invoice.period_start, open_start)
+		self.assertEqual(applied.invoice.participant_id, adjustment.participant_id)
+		self.assertEqual(applied.invoice.credit_applied_chf, applied.amount_chf)
 
 	def test_re_seeding_the_second_community_is_idempotent(self):
 		first = self._seed()

@@ -7,14 +7,19 @@ contradicted that: every ZEV ships with the same ``INV`` default, so the second
 one's billing run died on a database constraint.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
+from threading import Event
+from time import monotonic, sleep
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, connections, transaction
 
+from audit.models import AuditEvent
 from invoices.engine import generate_invoices_for_zev
 from invoices.models import Invoice
 from testing.factories import OwnerFactory, ParticipantFactory, ZevFactory
+from zev.models import Zev
 
 pytestmark = pytest.mark.django_db
 
@@ -26,6 +31,112 @@ def _zev_with_participants(owner, count, **kwargs):
     for _ in range(count):
         ParticipantFactory(zev=zev)
     return zev
+
+
+class TestInvoiceNumberAllocation:
+    def test_stale_instances_allocate_distinct_numbers(self):
+        first = ZevFactory()
+        stale = Zev.objects.get(pk=first.pk)
+
+        assert first.next_invoice_number() == "INV-00001"
+        assert stale.next_invoice_number() == "INV-00002"
+        assert stale.invoice_counter == 3
+        first.refresh_from_db()
+        assert first.invoice_counter == 3
+
+    def test_allocation_uses_the_persisted_prefix_and_counter(self):
+        zev = ZevFactory()
+        Zev.objects.filter(pk=zev.pk).update(invoice_prefix="NEW", invoice_counter=42)
+
+        assert zev.next_invoice_number() == "NEW-00042"
+        assert zev.invoice_prefix == "NEW"
+        assert zev.invoice_counter == 43
+
+    def test_rollback_returns_the_number_even_with_a_stale_instance(self):
+        zev = ZevFactory()
+
+        with transaction.atomic():
+            assert zev.next_invoice_number() == "INV-00001"
+            transaction.set_rollback(True)
+
+        assert Zev.objects.get(pk=zev.pk).invoice_counter == 1
+        assert zev.next_invoice_number() == "INV-00001"
+        assert zev.invoice_counter == 2
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("rollback", [False, True], ids=["commit", "rollback"])
+def test_concurrent_invoice_allocations_serialize(rollback):
+    if connection.vendor != "postgresql":
+        pytest.skip("Requires PostgreSQL row locks and pg_blocking_pids")
+
+    zev = ZevFactory()
+    ready, allocate = Event(), Event()
+    contender_pid = []
+
+    def competing_allocation():
+        try:
+            stale = Zev.objects.get(pk=zev.pk)
+            with connection.cursor() as cursor:
+                cursor.execute("SET lock_timeout = '10s'")
+                cursor.execute("SELECT pg_backend_pid()")
+                contender_pid.append(cursor.fetchone()[0])
+            ready.set()
+            assert allocate.wait(10), "Competing allocation was not started"
+            return stale.next_invoice_number()
+        finally:
+            connections.close_all()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        contender = pool.submit(competing_allocation)
+        assert ready.wait(10), "Competing connection was not ready"
+        try:
+            with transaction.atomic():
+                assert zev.next_invoice_number() == "INV-00001"
+                allocate.set()
+                deadline = monotonic() + 5
+                blocked = False
+                while monotonic() < deadline:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT cardinality(pg_blocking_pids(%s))", [contender_pid[0]])
+                        blocked = cursor.fetchone()[0] > 0
+                    if blocked:
+                        break
+                    sleep(0.01)
+                assert blocked, "Competing allocation did not wait for the ZEV row lock"
+                transaction.set_rollback(rollback)
+        finally:
+            allocate.set()
+        assert contender.result(timeout=10) == ("INV-00001" if rollback else "INV-00002")
+
+    zev.refresh_from_db()
+    assert zev.invoice_counter == (2 if rollback else 3)
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("allocator", ["next_invoice_number", "next_contract_number"])
+def test_number_allocation_allows_foreign_key_inserts(allocator):
+    if connection.vendor != "postgresql":
+        pytest.skip("Requires PostgreSQL row locks")
+
+    zev = ZevFactory()
+
+    def insert_audit_event():
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SET lock_timeout = '5s'")
+            return AuditEvent.objects.create(
+                zev_id=zev.pk, action_category="system", action_type="test.number_allocation",
+                target_type="zev", summary="Number allocation lock regression",
+            ).pk
+        finally:
+            connections.close_all()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with transaction.atomic():
+            getattr(zev, allocator)()
+            event_id = pool.submit(insert_audit_event).result(timeout=10)
+            assert AuditEvent.objects.filter(pk=event_id, zev=zev).exists()
 
 
 class TestNumberingIsScopedToTheZev:

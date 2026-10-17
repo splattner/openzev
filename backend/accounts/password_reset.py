@@ -36,23 +36,21 @@ def can_reset(user: User | None) -> bool:
 
 
 def _state_fingerprint(user: User) -> str:
-    """Stands for "the account as it was when the link was issued": its address
-    and password hash. Either changing makes the fingerprint differ. A keyed MAC
-    (as in Django's own reset tokens), so nothing can be recomputed from a leaked
-    token without the server's secret key."""
-    return salted_hmac(SALT, f"{user.pk}\x00{user.email}\x00{user.password}").hexdigest()[:16]
+    """Bind reset tokens to the account's email, password hash and session version."""
+    return salted_hmac(SALT, f"{user.pk}\x00{user.email}\x00{user.password}\x00{user.session_version}").hexdigest()[:16]
 
 
 def issue_token(user: User) -> str:
     return signing.dumps({"u": user.pk, "f": _state_fingerprint(user)}, salt=SALT, compress=True)
 
 
-def resolve_token(token: str) -> User:
+def resolve_token(token: str, *, user: User | None = None) -> User:
     """The account a valid token belongs to.
 
     Raises ``PasswordResetError`` for a bad or expired signature, an account that
     was deactivated or lost its password, and one whose address or password has
     changed since the token was issued.
+    Pass the locked user to revalidate the complete contract after a lock wait.
     """
     try:
         data = signing.loads(token, salt=SALT, max_age=LIFETIME_SECONDS)
@@ -60,7 +58,8 @@ def resolve_token(token: str) -> User:
     except (signing.BadSignature, KeyError, TypeError):
         raise PasswordResetError from None
 
-    user = User.objects.filter(pk=user_id).first()
-    if not can_reset(user) or _state_fingerprint(user) != fingerprint:
+    if user is None:
+        user = User.objects.filter(pk=user_id).first()
+    if not can_reset(user) or user.pk != user_id or _state_fingerprint(user) != fingerprint:
         raise PasswordResetError
     return user

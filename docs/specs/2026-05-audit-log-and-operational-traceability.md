@@ -378,7 +378,7 @@ Required functions:
 | `build_diff(before, after, allowed_fields)` | Build field-level diff object |
 | `infer_zev(obj)` | Resolve ZEV from heterogeneous target objects |
 | `redact_metadata(metadata)` | Apply omission/masking policy |
-| `snapshot_actor(user)` | Freeze actor display + role at event time |
+| `snapshot_actor(user)` | Freeze actor display + role at event time; omit the actor FK when `user.pk` is `None` |
 
 `record_audit_event(...)` must accept either explicit request context or
 explicit metadata for Celery/system workflows.
@@ -393,9 +393,23 @@ Mixin-driven events (`AuditedUpdateMixin`, `AuditedCreateDestroyMixin` in
 one `transaction.atomic()` block, so a failing audit insert rolls back the
 mutation it describes. The update mixin reads its before-snapshot outside
 that block, so the recorded diff is best-effort under concurrent writes.
-Hand-written `record_audit_event` call sites outside
-these mixins (invoice workflow transitions, user CRUD, account link/unlink)
-are follow-up work and are not yet transactional.
+Password setup/change/recovery also write their audit event inside the credential
+transaction; audit failures roll back password/session/link changes and the post-commit
+notification. The `recover_password` management command likewise wraps trusted
+recovery and `auth.password.recovered` auditing in one transaction; an audit failure
+rolls back its password, session and link/code retirement. Initial setup records the actual prior pending-change flag. MFA login
+events distinguish `first_factor` (`password`/`participant_link`) and `second_factor`
+(`totp`/`recovery_code`); the existing `method` key is retained, with
+`participant_link+totp` for link/TOTP logins.
+Grant PATCH/DELETE, party-role changes, account deletion and participant account
+link/unlink keep the mutation and success audit in one transaction. Denied account
+deletion events are recorded after rollback. If authorization refresh discovers
+that the caller was deleted during a lock wait, it clears the stale in-memory
+primary key; the denied event keeps the caller's display and role snapshot with
+`actor_user = null`, and the request returns 403. Grant POST and invitation resend
+record delivery outcomes after committing access/token changes; those audit failures
+cannot roll back the earlier commit. Other manual workflow audit boundaries remain
+follow-up work unless their feature spec defines an atomic transaction.
 
 ### 6.3 Initial workflow coverage matrix
 
@@ -408,7 +422,7 @@ The first implementation slices must instrument these existing modules:
 | `backend/tariffs/views.py` | tariff CRUD, tariff preset import/export |
 | `backend/invoices/views.py` | generate, generate-all, approve, mark-sent, mark-paid, cancel, delete, generate-pdf, send-email, retry-email |
 | `backend/metering/views.py` | import preview/import commit/delete-data and import log–adjacent actions |
-| `backend/invoices/tasks.py` | send-email queued/success/failure/retry outcome |
+| `backend/invoices/tasks.py` | send-email queued/success/failure/retry outcome, including a `FAILED` `invoice.email_task` event when pre-send PDF conflicts exhaust all retries |
 | `backend/mcp_server/views.py` | `mcp.tool.call` (category `system`, source `mcp`) once per MCP `tools/call` — success/failed/denied; see SPEC-2026-mcp-server §8 |
 
 ### 6.4 Async event rules
@@ -713,12 +727,13 @@ the event rows themselves is still not implemented.
 
 ### Backend — `backend/audit/tests.py`
 
-**`AuditEventModelTests`** (9 tests):
+**`AuditEventModelTests`** (10 tests):
 
 | Test | Asserts |
 |---|---|
 | `test_audit_event_orders_by_newest_first` | Default ordering is descending by `created_at` |
 | `test_audit_event_persists_actor_and_target_snapshots` | Snapshot fields remain populated independently of related object display changes |
+| `test_audit_event_preserves_deleted_actor_snapshot` | A deleted actor's display and role persist with no user FK |
 | `test_redaction_omits_secret_fields` | Secrets and masked fields are redacted before persistence |
 | `test_redaction_truncates_large_strings_and_caps_collections` | Oversized values are capped before persistence |
 | `test_record_audit_event_truncates_reason` | Long free-text reasons are truncated |
@@ -798,7 +813,7 @@ middleware propagation; `AuditIpPersistenceTests` (1) checks
 malformed-address persistence as NULL. `ForwardedForThrottleTests` in
 `backend/accounts/test_throttling.py` (3) covers production zero-hop wiring
 and forwarded-header throttle buckets. `ProxyTrustBoundaryTests` in
-`backend/config/test_proxy_trust_boundary.py` (6) checks deployment
+`backend/config/test_proxy_trust_boundary.py` (8) checks deployment
 configuration invariants, including the Helm schema constraint on
 `backend.numProxies`.
 

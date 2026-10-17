@@ -12,6 +12,7 @@ Read that section before adding a field.
 """
 import logging
 
+from django.db import transaction
 from django.core.cache import cache
 from django.http import FileResponse
 from config.http import sanitize_filename
@@ -100,6 +101,10 @@ def _serialize(invoice) -> dict:
         # the point: "have I paid this?" is the reader's second question.
         "is_paid": invoice.status == InvoiceStatus.PAID,
         "total_chf": str(invoice.total_chf),
+        # What is still to pay after any credit note was set against it; the
+        # QR on the paper asks for this amount.
+        "credit_applied_chf": str(invoice.credit_applied_chf),
+        "amount_due_chf": str(invoice.amount_due_chf),
         "currency": "CHF",
         # Verbatim from the insights page rather than recomputed, so the page
         # and the paper cannot disagree. None when the invoice has no
@@ -212,12 +217,12 @@ def magic_link_request(request):
         return accepted
 
     invoice = token.invoice
-    user = magic_links.account_for_participant(invoice.participant)
-    if user is None:
-        return accepted
-
     try:
-        link = magic_links.issue(user)
+        with transaction.atomic():
+            user = magic_links.account_for_participant(invoice.participant)
+            if user is None:
+                return accepted
+            link = magic_links.issue(user)
         send_magic_link_email(invoice.participant, invoice.zev, link)
     except Exception:
         # The requester is told the same thing either way; the operator gets
@@ -247,6 +252,7 @@ def magic_link_request(request):
 @permission_classes([AllowAny])
 @authentication_classes([])
 @throttle_classes([InvoiceLinkThrottle])
+@transaction.atomic
 def magic_link_consume(request):
     """Trade a one-time link for an ordinary participant session."""
     user = magic_links.consume((request.data or {}).get("token", ""))
@@ -277,11 +283,12 @@ def magic_link_consume(request):
         # password. See spec 2026-09-two-factor-authentication.md §5.4 door 5.
         return Response({
             "mfa_required": True,
-            "mfa_token": mfa.issue_challenge(user),
+            "mfa_token": mfa.issue_challenge(user, participant_link=True, password_recovery=True),
             "methods": mfa.challenge_methods(user),
         })
 
-    tokens = make_jwt_for_user(user)
+    magic_links.retire_pending_password(user)
+    tokens = make_jwt_for_user(user, participant_link=True, password_recovery=True)
     response = Response({"detail": "Signed in."})
     set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
     record_login(user)

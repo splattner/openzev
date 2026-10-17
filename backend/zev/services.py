@@ -54,18 +54,20 @@ def build_unique_username(*, first_name: str, last_name: str, email: str | None 
 
 
 def own_participant_for_user(user, zev_id=None):
-    """Self-service membership shared by ``/auth/me`` and report downloads.
+    """Self-service membership for report downloads.
 
     The account's current participant row — in ``zev_id`` when given, else the
-    first by ordering. An ended row is not a membership any more (#761); an
-    unusable ``zev_id`` finds nothing rather than raising.
+    first by ordering. Ended rows and disabled ZEVs give no self-service
+    access; an unusable ``zev_id`` finds nothing rather than raising.
     """
     from django.core.exceptions import ValidationError
 
     from .access import live_participant_q
     from .models import Participant
 
-    rows = Participant.objects.filter(live_participant_q(), user=user).select_related("zev")
+    rows = Participant.objects.filter(
+        live_participant_q(), user=user, zev__disabled_at__isnull=True,
+    ).select_related("zev")
     if zev_id:
         try:
             rows = rows.filter(zev_id=zev_id)
@@ -117,11 +119,8 @@ def ensure_participant_account(participant):
     password, email and name untouched, instead of a second one being created.
     Several participant rows with one address therefore share one account.
 
-    Participant-only accounts get unusable passwords and no password-change
-    requirement: nothing was transmitted, so ``must_change_password`` would
-    strand them on a form asking to change a password they were never given.
-    Existing passwords are cleared here; participants can set their own
-    password after signing in through a link.
+    New participant-only accounts are passwordless. Synchronizing an existing
+    account preserves its password and pending password-change requirement.
     Accounts with their own login keep their password, email and name.
     """
     user = User.objects.locked().get(pk=participant.user_id) if participant.user_id else None
@@ -146,14 +145,7 @@ def ensure_participant_account(participant):
 
     if user is not None:
         sync_participant_user_fields(participant, user)
-        update_fields = ['email', 'first_name', 'last_name']
-        if user.has_usable_password():
-            user.set_unusable_password()
-            update_fields.append('password')
-        if user.must_change_password:
-            user.must_change_password = False
-            update_fields.append('must_change_password')
-        user.save(update_fields=update_fields)
+        user.save(update_fields=['email', 'first_name', 'last_name'])
         return user
 
     username = build_unique_participant_username(
@@ -255,16 +247,17 @@ def link_account_for(participant):
             code="login_setup_required",
         )
     user = ensure_participant_account(participant)
-    if requires_independent_login(user):
+    if not user.is_active or requires_independent_login(user):
         raise LinkRefused()
     return user
 
 
-def has_login_credentials(user):
+def has_independent_login_credentials(user):
+    """Return whether the account has an independent login credential."""
     return (
-        user.has_usable_password()
-        or user.social_accounts.filter(provider__enabled=True).exists()
-        or user.webauthn_credentials.exists()
+        (user.has_usable_password() and not user.password_from_participant_link)
+        or user.social_accounts.filter(provider__enabled=True, from_participant_link=False).exists()
+        or user.webauthn_credentials.filter(from_participant_link=False).exists()
     )
 
 
@@ -275,21 +268,21 @@ def is_pending_invitation(user) -> bool:
 
 
 def validate_account_login(user, *, field="user") -> None:
-    if not has_login_credentials(user) and not is_pending_invitation(user):
+    if not has_independent_login_credentials(user) and not is_pending_invitation(user):
         raise ValidationError({
             field: "Send an access invitation before assigning independent access.",
         })
 
 
 def protect_account_login(user, *, credential_field="user"):
-    """Require a login, then retire sessions, API keys and participant tokens before promotion.
+    """Require ownership, then retire participant credentials before promotion.
 
-    An already protected account was promoted before and passes unchanged, even
-    between accepting its invitation and choosing a password. Call inside a
-    transaction. Bulk writes bypass the model guards that call this, so
+    Already-protected accounts are unchanged, including between invitation
+    acceptance and password enrollment. Call inside a transaction.
+    Bulk writes bypass the model guards that call this, so
     maintenance code must call it before adding access.
     """
-    from accounts.models import ApiKey, MagicLinkToken
+    from accounts.models import ApiKey, MagicLinkToken, TotpDevice
     from accounts.session_revocation import revoke_sessions
     from .onboarding import revoke_active_for_user
 
@@ -297,6 +290,15 @@ def protect_account_login(user, *, credential_field="user"):
     if locked.independent_login_required:
         return locked
     validate_account_login(locked, field=credential_field)
+    if locked.password_from_participant_link:
+        locked.set_unusable_password()
+        locked.password_from_participant_link = False
+        locked.must_change_password = False
+        locked.save(update_fields=["password", "password_from_participant_link", "must_change_password"])
+    locked.webauthn_credentials.filter(from_participant_link=True).delete()
+    locked.social_accounts.filter(from_participant_link=True).delete()
+    locked.mfa_recovery_codes.filter(from_participant_link=True).delete()
+    TotpDevice.objects.filter(user=locked, from_participant_link=True).delete()
     revoke_sessions(locked)
     ApiKey.objects.filter(user=locked, revoked_at__isnull=True).update(revoked_at=timezone.now())
     revoke_active_for_user(locked)
@@ -318,7 +320,7 @@ def existing_owner_problem(user) -> str | None:
         return "An admin account cannot be a ZEV owner. Choose another account."
     if not user.is_active and not is_pending_invitation(user):
         return "This account is deactivated."
-    if not has_login_credentials(user) and not is_pending_invitation(user):
+    if not has_independent_login_credentials(user) and not is_pending_invitation(user):
         return "Send this account an access invitation before making it a ZEV owner."
     return None
 

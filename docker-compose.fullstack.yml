@@ -1,5 +1,5 @@
 # Single-container self-hosting stack. Requires backend/.env — see docs/user-guide/01-getting-started.md ("Building from source").
-# Only 8080 is published; db/valkey talk over the compose network.
+# Publish nginx on loopback for a trusted local TLS proxy.
 services:
   app:
     build:
@@ -13,13 +13,14 @@ services:
       DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
       CELERY_BROKER_URL: redis://valkey:6379/0
       CACHE_URL: redis://valkey:6379/1
-      # One trusted proxy hop: the fullstack nginx overwrites X-Forwarded-For.
+      # Bundled nginx overwrites X-Forwarded-For.
       NUM_PROXIES: 1
     depends_on:
       - db
       - valkey
+    # Only a trusted local TLS proxy may reach this port.
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:8080"
     volumes:
       - backend_media:/app/media
 

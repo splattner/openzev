@@ -14,7 +14,7 @@ from decimal import Decimal
 from accounts.models import AppSettings
 from .pdf_render import render_pdf
 
-from .models import Invoice, InvoiceItem, InvoiceStatus
+from .models import Invoice, InvoiceItem, billed_invoices
 from .pdf import _format_date_value, _render_template
 
 FINANCIAL_SUMMARY_TEMPLATE = "invoices/financial_summary_pdf.html"
@@ -148,13 +148,7 @@ def generate_financial_summary_pdf(zev, participant, year: int) -> bytes:
     year_start = date(year, 1, 1)
     year_end = date(year, 12, 31)
     all_invoices = list(
-        Invoice.objects.filter(
-            zev=zev,
-            participant=participant,
-            status=InvoiceStatus.PAID,
-            period_start__gte=year_start,
-            period_end__lte=year_end,
-        )
+        billed_invoices(zev, year_start, year_end, participant)
         .prefetch_related("items")
         .order_by("period_start")
     )
