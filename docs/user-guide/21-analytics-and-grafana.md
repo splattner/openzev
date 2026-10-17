@@ -1,5 +1,13 @@
 # Analytics Data and Grafana
 
+!!! warning "Beta"
+    The analytics data, analytics tokens and the Grafana example are a **beta feature**. They are
+    new and may still change in later releases: columns, parameters, limits (the maximum range per
+    granularity in particular), how tokens are created, and the example dashboard. If you build
+    dashboards or scripts on top of them, check the release notes when you update OpenZEV and
+    expect to adjust them. Feedback is welcome on the
+    [issue tracker](https://github.com/splattner/openzev/issues/1058).
+
 OpenZEV can hand your metering data to tools that draw charts better than a fixed
 dashboard can — Grafana, a spreadsheet, a script. It does so through one read-only
 endpoint, the **analytics series**, that returns the same numbers your invoices and
