@@ -2669,17 +2669,20 @@ billing-relevant, and destructive actions.</p>
   and viewers see the events of the currently selected community.
   Managers and viewers only see events for communities they can access;
   they cannot see global or other-community events.
-  There is no community selector here (it follows the community chosen above the page title) and no
-  text search; the filters are date range, actor, category, action type,
-  target type, target ID, and status. (The legacy route <code>/audit-logs</code> redirects here.)</li>
+  There is no community selector here (it follows the community chosen above
+  the page title). The filters are date range, actor, category, action type,
+  target type, target ID, status, and text search. (The legacy route <code>/audit-logs</code>
+  redirects here.)</li>
 </ul>
-<p><strong>Platform → Overview → Audit log</strong> supports the full filter set: date range,
-community (ZEV) selector, actor, category, action type, target type, target ID,
-status, and text
-search. Text search is available only to admin users. Events are
-read-only — there is no public write endpoint.
-Action type, target type and target ID apply when you press <strong>Enter</strong> or leave
-the field. Open an event by clicking its summary or focusing it and pressing
+<p><strong>Platform → Overview → Audit log</strong> adds a community (ZEV) selector to the same
+filters. Search matches summary, target and action type, ignoring case. Use up to
+50 characters. All text filters apply with <strong>Enter</strong> or by leaving the field.
+Switching communities in <strong>Community → Settings → Audit log</strong> clears search;
+the platform community filter preserves it. <strong>Clear filters</strong> discards unfinished
+text. Events are read-only.
+If the list is rate-limited, wait for the indicated time before retrying; see
+<a href="../16-api-keys/#rate-limits">rate limits</a>.
+Open an event by clicking its summary or focusing it and pressing
 <strong>Enter</strong> or <strong>Space</strong>.</p>
 <p>The quickest way in is from the account itself: <strong>View activity</strong> on a row
 under <strong>Platform → Accounts → Users</strong> opens the audit log already filtered to
