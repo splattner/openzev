@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- edited with XMLSpy v2007 rel. 3 sp1 (http://www.altova.com) by Kees Sparreboom (Capgemini Nederland) -->
+<!--=========================================================================-->
+<!--====   Codelist DocumentAcceptanceReasonCode  -  Code List Schema Module  =========-->
+<!--=========================================================================-->
+<!--
+  	
+  	Schema agency:			ebIX - extended by VSE
+  	Schema version:			3.0
+  	Schema date:				August 2021
+
+	Code list name:			Document Acceptance Reason code
+	Code list agency:		ebIX
+	Code list version:		1
+  	
+  	Copyright (C) ebIX (2007) & VSE (2021). All Rights Reserved.
+
+	This document and translations of it may be copied and furnished to others, 
+	and derivative works that comment on or otherwise explain it or assist 
+	in its implementation may be prepared, copied, published and distributed, 
+	in whole or in part, without restriction of any kind, provided that the 
+	above copyright notice and this paragraph are included on all such copies 
+	and derivative works. However, this document itself may not be modified in 
+	any way, such as by removing the copyright notice or the references to 
+	ebIX, except as needed for the purpose of developing specifications for ebIX,
+	or as required to translate it into languages other than English.
+
+	This document and the information contained herein is provided on an "AS IS"
+	basis and ebIX DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING 
+	BUT NOT LIMITED TO ANY WARRANTY THAT THE USE OF THE INFORMATION HEREIN WILL 
+	NOT INFRINGE ANY RIGHTS OR ANY IMPLIED WARRANTIES OF MERCHANTABILITY OR 
+	FITNESS FOR A PARTICULAR PURPOSE.
+ -->
+<!-- edited with XMLSPY v2004 rel. 4 U (http://www.xmlspy.com) by kees sparreboom (capgemini) -->
+<xsd:schema xmlns:clmebIX00005="urn:un:unece:uncefact:codelist:draft:ebIX:DocumentAcceptanceReasonCode:3" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ccts="urn:un:unece:uncefact:documentation:standard:CoreComponentsTechnicalSpecification:2" targetNamespace="urn:un:unece:uncefact:codelist:draft:ebIX:DocumentAcceptanceReasonCode:3" elementFormDefault="qualified" attributeFormDefault="unqualified">
+	<!--Root element code list-->
+	<xsd:element name="DocumentAcceptanceReasonCode" type="clmebIX00005:DocumentAcceptanceReasonCodeContentType">
+		<xsd:annotation>
+			<xsd:documentation xml:lang="EN">Root element for DocumentAcceptanceReasonCode code list</xsd:documentation>
+		</xsd:annotation>
+	</xsd:element>
+	<!--=========================================================================-->
+	<!--Content type for code list-->
+	<xsd:simpleType name="DocumentAcceptanceReasonCodeContentType">
+		<xsd:annotation>
+			<xsd:documentation>Content type for DocumentAcceptanceReasonCode code list</xsd:documentation>
+		</xsd:annotation>
+		<xsd:restriction base="xsd:token">
+			<xsd:length value="3"/>
+			<xsd:enumeration value="E09">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Installation not identifiable</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E10">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Metering Point not identifiable</ccts:Name>
+						<ccts:Description>to be agreed and specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E11">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Metering point in basic support, without valid grid access</ccts:Name>
+						<ccts:Description>to be agreed and specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E12">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Unclear delivery relation</ccts:Name>
+						<ccts:Description>to be agreed and specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E13">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Balancing problem</ccts:Name>
+						<ccts:Description>to be agreed and specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E14">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Other reason</ccts:Name>
+						<ccts:Description>to be agreed and specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E15">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>No corrections</ccts:Name>
+						<ccts:Description>to be agreed and specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E16">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Unauthorised Balance Supplier</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E17">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Requested transaction date not within time limits</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E18">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Unauthorised Balance Responsible</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E19">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Metering Point without grid access</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E20">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Already a change of balance supplier in fu-ture existing</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E22">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Metering point blocked for switching</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E29">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Product code unknown or not related to MP</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E36">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>No valid collaboration</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E37">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>No valid grid Access</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E47">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>No ongoing switch for MP</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E49">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Metering grid area not identifiable</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E50">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Invalid period</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E51">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Invalid number of decimals</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E59">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Already existing relation</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E73">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Incorrect measure unit</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E81">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>MeteringPoint is not connected</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E86">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Incorrect value</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E87">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Number of observations doesn't fit observation period/resolution</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E98">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Measurement has a wrong sign</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E0I">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Unauthorised Grid Access Provider</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E0L">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Unauthorised Party Connected to the Grid</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E0M">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Unauthorised Reconciliation Responsible</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="Z58">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Start date cannot be later than the end date</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="ZE1">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Unauthorised ASP</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+		</xsd:restriction>
+	</xsd:simpleType>
+	<!--=========================================================================-->
+</xsd:schema>

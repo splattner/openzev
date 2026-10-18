@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- edited with XMLSpy v2007 sp2 (http://www.altova.com) by Kees Sparreboom (Capgemini Nederland) -->
+<!--=========================================================================-->
+<!--==============   Codelist BusinessTypeCode  -  Code List Schema Module  ============-->
+<!--=========================================================================-->
+<!--
+  	
+  	Schema agency:			ETSO 
+  	Schema version:			0.0
+  	Schema date:				March 09, 2007
+
+	Code list name:			Business type code
+	Code list agency:		ETSO
+	Code list version:		1
+  	
+  	Copyright (C) ETSO (2007). All Rights Reserved.
+
+	This document and translations of it may be copied and furnished to others, 
+	and derivative works that comment on or otherwise explain it or assist 
+	in its implementation may be prepared, copied, published and distributed, 
+	in whole or in part, without restriction of any kind, provided that the 
+	above copyright notice and this paragraph are included on all such copies 
+	and derivative works. However, this document itself may not be modified in 
+	any way, such as by removing the copyright notice or the references to 
+	ETSO, except as needed for the purpose of developing specifications for ETSO,
+	or as required to translate it into languages other than English.
+
+	This document and the information contained herein is provided on an "AS IS"
+	basis and ETSO DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING 
+	BUT NOT LIMITED TO ANY WARRANTY THAT THE USE OF THE INFORMATION HEREIN WILL 
+	NOT INFRINGE ANY RIGHTS OR ANY IMPLIED WARRANTIES OF MERCHANTABILITY OR 
+	FITNESS FOR A PARTICULAR PURPOSE.
+ -->
+<!-- edited with XMLSPY v2004 rel. 4 U (http://www.xmlspy.com) by kees sparreboom (capgemini) -->
+<xsd:schema xmlns:clmETSO000x2="urn:un:unece:uncefact:codelist:draft:ETSO:BusinessTypeCode:1" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ccts="urn:un:unece:uncefact:documentation:standard:CoreComponentsTechnicalSpecification:2" targetNamespace="urn:un:unece:uncefact:codelist:draft:ETSO:BusinessTypeCode:1" elementFormDefault="qualified" attributeFormDefault="unqualified">
+	<!--Root element code list-->
+	<xsd:element name="BusinessTypeCode" type="clmETSO000x2:BusinessTypeCodeContentType">
+		<xsd:annotation>
+			<xsd:documentation xml:lang="EN">Root element for BusinessTypeCode code list</xsd:documentation>
+		</xsd:annotation>
+	</xsd:element>
+	<!--=========================================================================-->
+	<!--Content type for code list-->
+	<xsd:simpleType name="BusinessTypeCodeContentType">
+		<xsd:annotation>
+			<xsd:documentation>Content type for BusinessTypeCode code list</xsd:documentation>
+		</xsd:annotation>
+		<xsd:restriction base="xsd:token">
+			<xsd:length value="3"/>
+			<xsd:enumeration value="A05">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>External Trade Total</ccts:Name>
+						<ccts:Description>to be agreed and specified by ETSO</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="A06">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>External Trade without explicit capacity</ccts:Name>
+						<ccts:Description>to be agreed and specified by ETSO</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="A15">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Losses</ccts:Name>
+						<ccts:Description>to be agreed and specified by ETSO</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="A17">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Settlement deviation</ccts:Name>
+						<ccts:Description>to be agreed and specified by ETSO</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="A25">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>General Capacity Information</ccts:Name>
+						<ccts:Description>to be agreed and specified by ETSO</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="A26">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Available Transfer Capacity (ATC)</ccts:Name>
+						<ccts:Description>to be agreed and specified by ETSO</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="A34">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Allocation</ccts:Name>
+						<ccts:Description>to be agreed and specified by ETSO</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+		</xsd:restriction>
+	</xsd:simpleType>
+	<!--=========================================================================-->
+	<!--This codelist is created by ebIX as a temporary solution for the the actual ETSO codelist-->
+</xsd:schema>

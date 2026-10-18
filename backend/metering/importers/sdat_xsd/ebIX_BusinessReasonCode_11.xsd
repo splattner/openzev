@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--=========================================================================-->
+<!--===========   Codelist BusinessReasonCode  -  Code List Schema Module  ============-->
+<!--=========================================================================-->
+<!--
+  	
+  	Schema agency:			ebIX 
+  	Schema version:			1.1
+  	Schema date:				June, 2008
+
+	Code list name:			Business Reason code
+	Code list agency:		ebIX
+	Code list version:		1
+  	
+  	Copyright (C) ebIX (2007). All Rights Reserved.
+
+	This document and translations of it may be copied and furnished to others, 
+	and derivative works that comment on or otherwise explain it or assist 
+	in its implementation may be prepared, copied, published and distributed, 
+	in whole or in part, without restriction of any kind, provided that the 
+	above copyright notice and this paragraph are included on all such copies 
+	and derivative works. However, this document itself may not be modified in 
+	any way, such as by removing the copyright notice or the references to 
+	ebIX, except as needed for the purpose of developing specifications for ebIX,
+	or as required to translate it into languages other than English.
+
+	This document and the information contained herein is provided on an "AS IS"
+	basis and ebIX DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING 
+	BUT NOT LIMITED TO ANY WARRANTY THAT THE USE OF THE INFORMATION HEREIN WILL 
+	NOT INFRINGE ANY RIGHTS OR ANY IMPLIED WARRANTIES OF MERCHANTABILITY OR 
+	FITNESS FOR A PARTICULAR PURPOSE.
+ -->
+<!-- edited with XMLSPY v2004 rel. 4 U (http://www.xmlspy.com) by kees sparreboom (capgemini) -->
+<xsd:schema xmlns:clmebIX00006="urn:un:unece:uncefact:codelist:draft:ebIX:BusinessReasonCode:11" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ccts="urn:un:unece:uncefact:documentation:standard:CoreComponentsTechnicalSpecification:2" targetNamespace="urn:un:unece:uncefact:codelist:draft:ebIX:BusinessReasonCode:11" elementFormDefault="qualified" attributeFormDefault="unqualified">
+	<!--Root element code list-->
+	<xsd:element name="BusinessReasonCode" type="clmebIX00006:BusinessReasonCodeContentType">
+		<xsd:annotation>
+			<xsd:documentation xml:lang="EN">Root element for BusinessReasonCode code list</xsd:documentation>
+		</xsd:annotation>
+	</xsd:element>
+	<!--=========================================================================-->
+	<!--Content type for code list-->
+	<xsd:simpleType name="BusinessReasonCodeContentType">
+		<xsd:annotation>
+			<xsd:documentation>Content type for BusinessReasonCode code list</xsd:documentation>
+		</xsd:annotation>
+		<xsd:restriction base="xsd:token">
+			<xsd:length value="3"/>
+			<xsd:enumeration value="E03">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Change of Balance Supplier</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E05">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Cancellation</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E06">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Unrequested Change of Balance Supplier</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E20">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>End of Supply</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E44">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Imbalance Settlement</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E88">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Billing Energy</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E89">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Billing Grid Cost</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E92">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Change of Party Connected to the Grid</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E93">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>End of Party Connected to the Grid</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="E0D">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Labelling Energy</ccts:Name>
+						<ccts:Description>The process that adds information about a quality of production to an energy volume</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+		</xsd:restriction>
+	</xsd:simpleType>
+	<!--=========================================================================-->
+</xsd:schema>

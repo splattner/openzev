@@ -1,0 +1,924 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  	
+  	Schema agency:			VSE 
+  	Schema version:			1.6
+  	Schema date:				16.07.2025
+
+  	Copyright (C) VSE (2021). All Rights Reserved.
+
+	This document and translations of it may be copied and furnished to others, 
+	and derivative works that comment on or otherwise explain it or assist 
+	in its implementation may be prepared, copied, published and distributed, 
+	in whole or in part, without restriction of any kind, provided that the 
+	above copyright notice and this paragraph are included on all such copies 
+	and derivative works. However, this document itself may not be modified in 
+	any way, such as by removing the copyright notice or the references to 
+	VSE, except as needed for the purpose of developing specifications 
+	for VSE, or as required to translate it into languages other than English.
+
+	This document and the information contained herein is provided on an "AS IS"
+	basis and ebIX DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING 
+	BUT NOT LIMITED TO ANY WARRANTY THAT THE USE OF THE INFORMATION HEREIN WILL 
+	NOT INFRINGE ANY RIGHTS OR ANY IMPLIED WARRANTIES OF MERCHANTABILITY OR 
+	FITNESS FOR A PARTICULAR PURPOSE.
+ -->
+<xsd:schema xmlns:rsm="http://www.strom.ch" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ccts="urn:un:unece:uncefact:documentation:standard:CoreComponentsTechnicalSpecification:2" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:4" xmlns:qdt="urn:un:unece:uncefact:data:standard:QualifiedDataType:2" xmlns:clmEBO00001="urn:un:unece:uncefact:codelist:draft:ebIX:EBO:InstallationTypeCode:1" xmlns:clmebIX00003="urn:un:unece:uncefact:codelist:draft:ebIX:EnergyQuantityQualityCode:1" xmlns:clmebIX00001="urn:un:unece:uncefact:codelist:draft:ebIX:SchemeIdentificationCode:1" xmlns:clmebIX00002="urn:un:unece:uncefact:codelist:draft:ebIX:EnergyProductIdentificationCode:1" xmlns:clmVSE00002="urn:un:unece:uncefact:codelist:draft:VSE:EnergyProductIdentificationCode:1" xmlns:clmebIX00006="urn:un:unece:uncefact:codelist:draft:ebIX:BusinessReasonCode:11" xmlns:clmETSO000x1="urn:un:unece:uncefact:codelist:draft:ETSO:ProcessTypeCode:1" xmlns:clmebIX00007="urn:un:unece:uncefact:codelist:draft:ebIX:BusinessDomainCode:1" xmlns:clmebIX00008="urn:un:unece:uncefact:codelist:draft:ebIX:BusinessSectorCode:1" xmlns:clmebIX00009="urn:un:unece:uncefact:codelist:draft:ebIX:DocumentFunctionCode:1" xmlns:clmebIX00010="urn:un:unece:uncefact:codelist:draft:ebIX:DocumentTypeCode:2" xmlns:clmebIX00012="urn:un:unece:uncefact:codelist:draft:ebIX:Business:1" xmlns:clmVSE00012="urn:un:unece:uncefact:codelist:draft:VSE:BusinessRoleCode:2" xmlns:clmETSO000x2="urn:un:unece:uncefact:codelist:draft:ETSO:BusinessTypeCode:1" xmlns:clmETSO00006="urn:un:unece:uncefact:codelist:draft:ETSO:BusinessReasonCode:1" xmlns:clmebIX00005="urn:un:unece:uncefact:codelist:draft:ebIX:DocumentAcceptanceReasonCode:3" xmlns:clmebIX00004="urn:un:unece:uncefact:codelist:draft:ebIX:DocumentAcceptanceStatusCode:1" xmlns:clm6Recommendation20="urn:un:unece:uncefact:codelist:standard:6:Recommendation20:5" xmlns:clmVSE00039="urn:un:unece:uncefact:codelist:draft:VSE:MessurementUnitCommonCode:1" xmlns:clm63055="urn:un:unece:uncefact:codelist:standard:6:3055:D06B" xmlns:clmebIX00020="urn:un:unece:uncefact:codelist:draft:ebIX:TemporaryBusinessRoleCode:2" xmlns:clm63035="urn:un:unece:uncefact:codelist:draft:6:3035:D05A" xmlns:clmebIX00021="urn:un:unece:uncefact:codelist:draft:ebIX:MeterReadingOriginCode:1" xmlns:clmebIX00022="urn:un:unece:uncefact:codelist:draft:ebIX:EnergyPriceTypeCode:1" xmlns:clm54217="urn:un:unece:uncefact:codelist:standard:5:4217:2007-03-08" xmlns:clmVSE00001="urn:un:unece:uncefact:codelist:draft:VSE:DocumentTypeCode:2" xmlns:clmVSE00006="urn:un:unece:uncefact:codelist:draft:VSE:BusinessReasonCode:4" xmlns:clmVSE00034="urn:un:unece:uncefact:codelist:draft:VSE:DocumentAcceptanceReasonCode:1" xmlns:clmVSE00036="urn:un:unece:uncefact:codelist:draft:VSE:PhysicalStatusTypeCode:1" xmlns:clmVSE00038="urn:un:unece:uncefact:codelist:draft:VSE:CommunityCode:1" xmlns:clm61001="urn:un:unece:uncefact:codelist:draft:6:1001:D05A" xmlns:clmebIX00103="urn:un:unece:uncefact:codelist:draft:ebIX:MeteringMethodCode:1" xmlns:clmebIX00102="urn:un:unece:uncefact:codelist:draft:ebIX:SettlementMethodCode:1" xmlns:clmebIX00101="urn:un:unece:uncefact:codelist:draft:ebIX:MeteringPointTypeCode:1" xmlns:clmebIX00104="urn:un:unece:uncefact:codelist:draft:ebIX:MeterTimeFrameCode:1" xmlns:idsebIX00012="urn:un:unece:uncefact:identifierlist:draft:ebIX:VersionIdentifier:1" xmlns:ns1="urn:un:unece:uncefact:codelist:draft:ebIX:BusinessRoleCode:1" xmlns:eCH-0010="xmlns/eCH-0010/7" xmlns:eCH-0044="xmlns/eCH-0044/4" xmlns:eCH-0046="xmlns/eCH-0046/5" xmlns:ns2="urn:un:unece:uncefact:codelist:draft:ebIX:TemporaryBusinessRoleCode:1" targetNamespace="http://www.strom.ch" elementFormDefault="qualified" attributeFormDefault="unqualified" version="3">
+	<!--=======================================================================-->
+	<!--==========================   Imports   ====================================-->
+	<!--==================   Unqualified Data Types   ===============================-->
+	<xsd:import namespace="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:4" schemaLocation="UnqualifiedDataType_4p0.xsd"/>
+	<!--==================   Qualified Data Types   =================================-->
+	<xsd:import namespace="urn:un:unece:uncefact:data:standard:QualifiedDataType:2" schemaLocation="QualifiedDataType_2p0.xsd"/>
+	<!--=======================================================================-->
+	<!--===================   Identifier lists   ==========================================-->
+	<xsd:import namespace="urn:un:unece:uncefact:identifierlist:draft:ebIX:VersionIdentifier:1" schemaLocation="ebIX_VersionIdentifier_10.xsd"/>
+	<!--=======================================================================-->
+	<!--===================   Code lists   ==========================================-->
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:standard:6:Recommendation20:5" schemaLocation="UNECE_MeasurementUnitCommonCode_5_ExtVSE.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:standard:6:3055:D06B" schemaLocation="UNECE_AgencyIdentificationCode_D06B.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:6:3035:D05A" schemaLocation="UNECE_BusinessRoleCode_D05A.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:6:1001:D05A" schemaLocation="UNECE_DocumentTypeCode_00.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:standard:5:4217:2007-03-08" schemaLocation="ISO_CurrencyCode_20070308.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:MeteringPointTypeCode:1" schemaLocation="ebIX_MeteringPointTypeCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:DocumentAcceptanceReasonCode:3" schemaLocation="ebIX_DocumentAcceptanceReasonCode_12.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:DocumentAcceptanceStatusCode:1" schemaLocation="ebIX_DocumentAcceptanceStatusCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:BusinessDomainCode:1" schemaLocation="ebIX_BusinessDomainCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:BusinessReasonCode:11" schemaLocation="ebIX_BusinessReasonCode_11.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:BusinessRoleCode:1" schemaLocation="ebIX_BusinessRoleCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:VSE:BusinessRoleCode:2" schemaLocation="VSE_BusinessRoleCode_11.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:TemporaryBusinessRoleCode:2" schemaLocation="ebIX_TemporaryBusinessRoleCode_11.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:BusinessSectorCode:1" schemaLocation="ebIX_BusinessSectorCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:DocumentFunctionCode:1" schemaLocation="ebIX_DocumentFunctionCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:DocumentTypeCode:2" schemaLocation="ebIX_DocumentTypeCode_11.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:EnergyProductIdentificationCode:1" schemaLocation="ebIX_EnergyProductIdentificationCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:VSE:EnergyProductIdentificationCode:1" schemaLocation="VSE_EnergyProductIdentificationCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:EnergyQuantityQualityCode:1" schemaLocation="ebIX_EnergyQuantityQualityCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:MeterReadingOriginCode:1" schemaLocation="ebIX_MeterReadingOriginCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:SchemeIdentificationCode:1" schemaLocation="ebIX_SchemeIdentificationCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:EnergyPriceTypeCode:1" schemaLocation="ebIX_EnergyPriceTypeCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:SettlementMethodCode:1" schemaLocation="ebIX_SettlementMethodCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:MeteringMethodCode:1" schemaLocation="ebIX_MeteringMethodCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ebIX:MeterTimeFrameCode:1" schemaLocation="ebIX_MeterTimeFrameCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ETSO:BusinessTypeCode:1" schemaLocation="ETSO_BusinessTypeCode_00.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ETSO:ProcessTypeCode:1" schemaLocation="ETSO_ProcessTypeCode_00.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:ETSO:BusinessReasonCode:1" schemaLocation="ETSO_BusinessReasonCode_00.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:VSE:DocumentTypeCode:2" schemaLocation="VSE_DocumentTypeCode_11.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:VSE:BusinessReasonCode:4" schemaLocation="VSE_BusinessReasonCode_13.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:VSE:DocumentAcceptanceReasonCode:1" schemaLocation="VSE_DocumentAcceptanceReasonCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:VSE:PhysicalStatusTypeCode:1" schemaLocation="VSE_PhysicalStatusTypeCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:VSE:CommunityCode:1" schemaLocation="VSE_CommunityCode_10.xsd"/>
+	<xsd:import namespace="urn:un:unece:uncefact:codelist:draft:VSE:MessurementUnitCommonCode:1" schemaLocation="VSE_MeasurementUnitCommonCode_10.xsd"/>
+	<!--=======================================================================-->
+	<!--===================   eGov Documents   ==========================================-->
+	<xsd:import namespace="xmlns/eCH-0010/7" schemaLocation="eCH-0010-7-0.xsd"/>
+	<xsd:import namespace="xmlns/eCH-0044/4" schemaLocation="eCH-0044-4-1.xsd"/>
+	<xsd:import namespace="xmlns/eCH-0046/5" schemaLocation="eCH-0046-5-0.xsd"/>
+	<!--========================================================================-->
+	<!--=======   Root element to be included in schema. document version 1.6 ======-->
+	<xsd:element name="ValidatedMeteredData_CoreComponents_16"/>
+	<!--======================================================================-->
+	<!-- ======================================================================= -->
+	<!-- ===== Element Declarations 					 ===== -->
+	<xsd:element name="EnergyMeteringPointLocation" type="rsm:EnergyMeteringPointLocationType"/>
+	<xsd:element name="EnergyAreaLocation" type="rsm:EnergyAreaLocationType"/>
+	<xsd:element name="EnergyPartyID" type="rsm:EnergyPartyIDType"/>
+	<xsd:element name="MPFeature" type="rsm:MPFeatureType"/>
+	<xsd:element name="Direction" type="rsm:DirectionType"/>
+	<xsd:element name="MeteringData" type="rsm:MeteringDataType"/>
+	<xsd:element name="EnergyObservation" type="rsm:EnergyObservationType"/>
+	<xsd:element name="EnergyProduct" type="rsm:EnergyProductType"/>
+	<xsd:element name="DatePeriod" type="rsm:DatePeriodType"/>
+	<xsd:element name="DateTimePeriod" type="rsm:DateTimePeriodType"/>
+	<xsd:element name="SwitchDatePeriod" type="rsm:SwitchDatePeriodType"/>
+	<xsd:element name="EnergyPrice" type="rsm:EnergyPriceType"/>
+	<xsd:element name="EnergyCurrencyExchange" type="rsm:EnergyCurrencyExchangeType"/>
+	<xsd:element name="EnergyParty" type="rsm:EnergyPartyType"/>
+	<xsd:element name="AcceptanceStatus" type="rsm:AcceptanceStatusType"/>
+	<xsd:element name="DocumentReference" type="rsm:DocumentReferenceType"/>
+	<xsd:element name="EnergyStandardBusinessDocumentHeader" type="rsm:EnergyStandardBusinessDocumentHeaderType"/>
+	<xsd:element name="SenderParty" type="rsm:SenderPartyType"/>
+	<xsd:element name="ReceiverParty" type="rsm:ReceiverPartyType"/>
+	<xsd:element name="InstanceDocument" type="rsm:InstanceDocumentType"/>
+	<xsd:element name="BusinessScopeProcess" type="rsm:BusinessScopeProcessType"/>
+	<xsd:element name="BusinessService" type="rsm:BusinessServiceType"/>
+	<xsd:element name="ServiceTransaction" type="rsm:ServiceTransactionType"/>
+	<!-- ======================================================================= -->
+	<!--==========ABIE ===   EnergyMeteringPoint_ Location. Details   =================-->
+	<!--=======================================================================-->
+	<xsd:complexType name="EnergyMeteringPointLocationType">
+		<xsd:choice>
+			<xsd:element name="GS1ID" type="rsm:EnergyGS1MeteringPointIDType" minOccurs="0" maxOccurs="0"/>
+			<xsd:element name="EICID" type="rsm:EnergyEICMeteringPointIDType" minOccurs="0" maxOccurs="0"/>
+			<xsd:element name="VSENationalID" type="rsm:EnergyNationalMeteringPointIDType"/>
+		</xsd:choice>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   EnergyArea_ Location. Details   ==========================-->
+	<!--=======================================================================-->
+	<xsd:complexType name="EnergyAreaLocationType">
+		<xsd:choice>
+			<xsd:element name="GS1ID" type="rsm:EnergyGS1AreaIDType" minOccurs="0" maxOccurs="0"/>
+			<xsd:element name="EICID" type="rsm:EnergyEICAreaIDType"/>
+		</xsd:choice>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   EnergyInstallation_ Location. Details   ==========================-->
+	<!--=======================================================================-->
+	<xsd:complexType name="EnergyPartyIDType">
+		<xsd:choice>
+			<xsd:element name="GS1ID" type="rsm:EnergyGS1PartyIDType" minOccurs="0" maxOccurs="0"/>
+			<xsd:element name="EICID" type="rsm:EnergyEICPartyIDType"/>
+		</xsd:choice>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   AP_ Feature. Details   =============================-->
+	<!--=======================================================================-->
+	<xsd:complexType name="MPFeatureType">
+		<xsd:sequence>
+			<xsd:element name="VoltageLevelCharacteristic" type="udt:CodeType" minOccurs="0"/>
+			<xsd:element name="PhysicalStatusCharacteristic" type="udt:CodeType" minOccurs="0"/>
+			<xsd:element name="LoadProfileCharacteristic" type="udt:CodeType" minOccurs="0"/>
+			<xsd:element name="FlowCharacteristic" type="rsm:MeteringPointTypeCodeType" minOccurs="0"/>
+			<xsd:element name="MeteringMethodCharacteristic" type="rsm:MeteringMethodCodeType" minOccurs="0"/>
+			<xsd:element name="PressureCharacteristic" type="udt:CodeType" minOccurs="0"/>
+			<xsd:element name="SettlementMethodCharacteristic" type="rsm:SettlementMethodCodeType" minOccurs="0"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   Direction. Details   =============================-->
+	<!--=======================================================================-->
+	<xsd:complexType name="DirectionType">
+		<xsd:sequence>
+			<xsd:element name="InArea" type="rsm:EnergyAreaLocationType"/>
+			<xsd:element name="OutArea" type="rsm:EnergyAreaLocationType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   Energy_ MeteringData. Details   ===============-->
+	<!--=======================================================================-->
+	<xsd:complexType name="MeteringDataType">
+		<xsd:sequence>
+			<xsd:element name="DocumentID" type="rsm:DocumentIdentifierType"/>
+			<xsd:element name="RequestedTransaction" type="rsm:AcceptanceStatusType" minOccurs="0" maxOccurs="1"/>
+			<xsd:element name="ReferenceToRequestingDocumentID" type="rsm:DocumentIdentifierType" minOccurs="0" maxOccurs="1"/>
+			<xsd:element name="Version" type="rsm:SimpleTextType" minOccurs="0" maxOccurs="0"/>
+			<xsd:element name="Interval" type="rsm:DateTimePeriodType" minOccurs="0" maxOccurs="1"/>
+			<xsd:element name="BusinessTypeCode" type="rsm:BusinessTypeCodeType" minOccurs="0" maxOccurs="0"/>
+			<xsd:element name="Resolution" type="rsm:ResolutionType" minOccurs="0"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   Energy_ Community. Details   ===============-->
+	<!--=======================================================================-->
+	<xsd:complexType name="CommunityType">
+		<xsd:sequence>
+			<xsd:element name="CommunityID" type="rsm:CommunityIDType"/>
+			<xsd:element name="CommunityType" type="rsm:CommunityCodeType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   Energy_ Observation. Details   ===============-->
+	<!--=======================================================================-->
+	<xsd:complexType name="EnergyObservationType">
+		<xsd:sequence>
+			<xsd:element name="Position" type="rsm:ObservationPositionType"/>
+			<xsd:element name="Volume" type="rsm:EnergyVolumeType"/>
+			<xsd:element name="Condition" minOccurs="0">
+				<xsd:complexType>
+					<xsd:simpleContent>
+						<xsd:restriction base="rsm:QuantityQualityCodeType">
+							<xsd:pattern value="21"/>
+							<xsd:pattern value="56"/>
+						</xsd:restriction>
+					</xsd:simpleContent>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="Origin" type="rsm:MeterReadingOriginCodeType" minOccurs="0" maxOccurs="0"/>
+			<xsd:element name="Price" type="rsm:EnergyPriceType" minOccurs="0" maxOccurs="0"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   ObservationPosition. Type   ==============================-->
+	<!--=======================================================================-->
+	<xsd:complexType name="ObservationPositionType">
+		<xsd:choice>
+			<xsd:element name="Sequence" type="rsm:SequencePositionType"/>
+			<xsd:element name="DateTime" type="rsm:EnergyDateTimeType" minOccurs="0" maxOccurs="0"/>
+			<xsd:element name="Interval" type="rsm:DateTimePeriodType" minOccurs="0" maxOccurs="0"/>
+		</xsd:choice>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   Energy_ Transaction. Details   ===============-->
+	<!--=======================================================================-->
+	<xsd:complexType name="EnergyTransactionType">
+		<xsd:sequence>
+			<xsd:element name="DocumentID" type="rsm:DocumentIdentifierType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   Energy_ Product. Details   ===============-->
+	<!--=======================================================================-->
+	<xsd:complexType name="EnergyProductType">
+		<xsd:sequence>
+			<xsd:element name="ID">
+				<xsd:complexType>
+					<xsd:choice>
+						<xsd:element name="VSENationalCode">
+							<xsd:complexType>
+								<xsd:simpleContent>
+									<xsd:restriction base="rsm:ProductVSEIDType">
+										<xsd:pattern value="2404050010123"/>
+										<xsd:pattern value="2404050010124"/>
+										<xsd:pattern value="8716867000099"/>
+										<xsd:attribute name="schemeAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="260"/>
+									</xsd:restriction>
+								</xsd:simpleContent>
+							</xsd:complexType>
+						</xsd:element>
+						<xsd:element name="ebIXCode">
+							<xsd:complexType>
+								<xsd:simpleContent>
+									<xsd:restriction base="rsm:ProductebIXIDType">
+										<xsd:pattern value="8716867000030"/>
+										<xsd:pattern value="8716867000047"/>
+										<xsd:pattern value="8716867000016"/>
+										<xsd:pattern value="8716867000023"/>
+										<xsd:pattern value="8716867000078"/>
+										<xsd:pattern value="8716867000139"/>
+										<xsd:pattern value="8716867000146"/>
+										<xsd:pattern value="5400001000016"/>
+										<xsd:attribute name="schemeAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="9"/>
+									</xsd:restriction>
+								</xsd:simpleContent>
+							</xsd:complexType>
+						</xsd:element>
+					</xsd:choice>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="MeasureUnit">
+				<xsd:simpleType>
+					<xsd:restriction base="rsm:MeasurementUnitCodeType">
+						<xsd:pattern value="KWH"/>
+						<xsd:pattern value="K3"/>
+						<xsd:pattern value="KVR"/>
+						<xsd:pattern value="KWT"/>
+						<xsd:pattern value="KW1"/>
+						<xsd:pattern value="KW2"/>
+						<xsd:pattern value="KW3"/>
+						<xsd:pattern value="HM1"/>
+						<xsd:pattern value="HM2"/>
+						<xsd:pattern value="TQH"/>
+						<xsd:pattern value="TQD"/>
+						<xsd:pattern value="VPC"/>
+						<xsd:pattern value="MOL"/>
+						<xsd:pattern value="GP"/>
+						<xsd:pattern value="CEL"/>
+						<xsd:pattern value="BAR"/>
+						<xsd:pattern value="KWN"/>
+						<xsd:pattern value="MTQ"/>
+						<xsd:pattern value="NM3"/>
+						<xsd:pattern value="Q40"/>
+						<xsd:pattern value="ZSZ"/>
+						<xsd:pattern value="KV"/>
+						<xsd:pattern value="LL"/>
+					</xsd:restriction>
+				</xsd:simpleType>
+			</xsd:element>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   DateTime_ Period. Details   ===============-->
+	<!--=======================================================================-->
+	<xsd:complexType name="DateTimePeriodType">
+		<xsd:sequence>
+			<xsd:element name="StartDateTime" type="rsm:EnergyDateTimeType"/>
+			<xsd:element name="EndDateTime" type="rsm:EnergyDateTimeType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   Date_ Period. Details   ===============-->
+	<!--=======================================================================-->
+	<xsd:complexType name="DatePeriodType">
+		<xsd:sequence>
+			<xsd:element name="StartDate" type="rsm:EnergyDateType"/>
+			<xsd:element name="EndDate" type="rsm:EnergyDateType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   SwitchDate_ Period. Details   ===============-->
+	<!--=======================================================================-->
+	<xsd:complexType name="SwitchDatePeriodType">
+		<xsd:choice>
+			<xsd:element name="StartDate" type="rsm:EnergyDateType"/>
+			<xsd:element name="EndDate" type="rsm:EnergyDateType"/>
+		</xsd:choice>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   Energy_ Price. Details   ===============-->
+	<!--=======================================================================-->
+	<xsd:complexType name="EnergyPriceType">
+		<xsd:sequence>
+			<xsd:element name="Type" type="clmebIX00022:EnergyPriceTypeCodeContentType" minOccurs="0" maxOccurs="0"/>
+			<xsd:element name="Charge" type="udt:AmountType"/>
+			<xsd:element name="NetPrice" type="udt:IndicatorType" minOccurs="0" maxOccurs="0"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   Energy_ CurrencyExchange. Details   ===============-->
+	<!--=======================================================================-->
+	<xsd:complexType name="EnergyCurrencyExchangeType">
+		<xsd:sequence>
+			<xsd:element name="SourceCurrency" type="clm54217:CurrencyCodeContentType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===   Energy_ Party. Details   ===============-->
+	<!--=======================================================================-->
+	<xsd:complexType name="EnergyPartyType">
+		<xsd:sequence>
+			<xsd:element name="ID" type="rsm:EnergyPartyIDType"/>
+			<xsd:element name="Name" type="rsm:SimpleTextType" minOccurs="0" maxOccurs="0"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========ABIE ===  ConsumerEnergy_ Party. Details   ===============-->
+	<!--=======================================================================-->
+	<xsd:complexType name="ConsumerEnergyPartyType">
+		<xsd:sequence>
+			<xsd:element name="ID" type="rsm:EnergyPartyIDType" minOccurs="0" maxOccurs="0"/>
+			<xsd:element name="Contact" type="eCH-0046:contactType" minOccurs="0" maxOccurs="0"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========ABIE ===   AcceptanceStatus. Details   ==============-->
+	<!--======================================================================-->
+	<xsd:complexType name="AcceptanceStatusType">
+		<xsd:sequence>
+			<xsd:element name="Status" type="clmebIX00004:DocumentAcceptanceStatusCodeContentType"/>
+			<xsd:element name="Reason" type="clmebIX00005:DocumentAcceptanceReasonCodeContentType" minOccurs="0"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========ABIE ===   Document_Reference. Details   ===============-->
+	<!--=======================================================================-->
+	<xsd:complexType name="DocumentReferenceType">
+		<xsd:sequence>
+			<xsd:element name="DictionaryAgencyID" type="clm63055:AgencyIdentificationCodeContentType" minOccurs="0" maxOccurs="0"/>
+			<xsd:element name="VersionID" type="rsm:VersionIdentifierType" minOccurs="0" maxOccurs="0"/>
+			<xsd:element name="DocumentID" type="rsm:DocumentIdentifierType"/>
+			<xsd:element name="DocumentType" type="rsm:DocumentReferenceTypeCodeType"/>
+			<xsd:element name="Creation" type="rsm:EnergyDateTimeType"/>
+			<xsd:element name="Status" type="rsm:DocumentFunctionCodeType" minOccurs="0" maxOccurs="0"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--=================    Qualified data types based on Identifier. Type   =============-->
+	<!--======================================================================-->
+	<!--==========QDT ===   EnergyGS1Area_ Identifier. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="EnergyGS1AreaIDType">
+		<xsd:simpleContent>
+			<xsd:restriction base="udt:IDType">
+				<xsd:attribute name="schemeID" type="xsd:token" use="prohibited"/>
+				<xsd:attribute name="schemeName" type="xsd:string" use="prohibited"/>
+				<xsd:attribute name="schemeAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="9"/>
+				<xsd:attribute name="schemeAgencyName" type="xsd:string" use="prohibited"/>
+				<xsd:attribute name="schemeVersionID" type="xsd:token" use="prohibited"/>
+				<xsd:attribute name="schemeDataURI" type="xsd:anyURI" use="prohibited"/>
+				<xsd:attribute name="schemeURI" type="xsd:anyURI" use="prohibited"/>
+			</xsd:restriction>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===   EnergyEICArea_ Identifier. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="EnergyEICAreaIDType">
+		<xsd:simpleContent>
+			<xsd:restriction base="udt:IDType">
+				<xsd:length value="16"/>
+				<xsd:attribute name="schemeID" type="xsd:token" use="prohibited"/>
+				<xsd:attribute name="schemeName" type="xsd:string" use="prohibited"/>
+				<xsd:attribute name="schemeAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="305"/>
+				<xsd:attribute name="schemeAgencyName" type="xsd:string" use="prohibited"/>
+				<xsd:attribute name="schemeVersionID" type="xsd:token" use="prohibited"/>
+				<xsd:attribute name="schemeDataURI" type="xsd:anyURI" use="prohibited"/>
+				<xsd:attribute name="schemeURI" type="xsd:anyURI" use="prohibited"/>
+			</xsd:restriction>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===    EnergyGS1MeteringPoint_  Identifier. Type   =============-->
+	<!--======================================================================-->
+	<xsd:complexType name="EnergyGS1MeteringPointIDType">
+		<xsd:simpleContent>
+			<xsd:restriction base="udt:IDType">
+				<xsd:length value="18"/>
+				<xsd:attribute name="schemeID" type="xsd:token" use="prohibited"/>
+				<xsd:attribute name="schemeName" type="xsd:string" use="prohibited"/>
+				<xsd:attribute name="schemeAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="9"/>
+				<xsd:attribute name="schemeAgencyName" type="xsd:string" use="prohibited"/>
+				<xsd:attribute name="schemeVersionID" type="xsd:token" use="prohibited"/>
+				<xsd:attribute name="schemeDataURI" type="xsd:anyURI" use="prohibited"/>
+				<xsd:attribute name="schemeURI" type="xsd:anyURI" use="prohibited"/>
+			</xsd:restriction>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===    EnergyEICMeteringPoint_  Identifier. Type   ==============-->
+	<!--======================================================================-->
+	<xsd:complexType name="EnergyEICMeteringPointIDType">
+		<xsd:simpleContent>
+			<xsd:restriction base="udt:IDType">
+				<xsd:length value="16"/>
+				<xsd:attribute name="schemeID" type="xsd:token" use="prohibited"/>
+				<xsd:attribute name="schemeName" type="xsd:string" use="prohibited"/>
+				<xsd:attribute name="schemeAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="305"/>
+				<xsd:attribute name="schemeAgencyName" type="xsd:string" use="prohibited"/>
+				<xsd:attribute name="schemeVersionID" type="xsd:token" use="prohibited"/>
+				<xsd:attribute name="schemeDataURI" type="xsd:anyURI" use="prohibited"/>
+				<xsd:attribute name="schemeURI" type="xsd:anyURI" use="prohibited"/>
+			</xsd:restriction>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===    EnergyNationalMeteringPoint_  Identifier. Type   ==========-->
+	<!--======================================================================-->
+	<xsd:complexType name="EnergyNationalMeteringPointIDType">
+		<xsd:simpleContent>
+			<xsd:restriction base="udt:IDType">
+				<xsd:length value="33"/>
+				<xsd:attribute name="schemeID" type="clmebIX00001:SchemeIdentificationCodeContentType" use="required" fixed="VSE"/>
+				<xsd:attribute name="schemeName" type="xsd:string" use="prohibited"/>
+				<xsd:attribute name="schemeAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="260"/>
+				<xsd:attribute name="schemeAgencyName" type="xsd:string" use="prohibited"/>
+				<xsd:attribute name="schemeVersionID" type="xsd:token" use="prohibited"/>
+				<xsd:attribute name="schemeDataURI" type="xsd:anyURI" use="prohibited"/>
+				<xsd:attribute name="schemeURI" type="xsd:anyURI" use="prohibited"/>
+			</xsd:restriction>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===   GS1Party_ Identifier. Type   ============================-->
+	<!--======================================================================-->
+	<xsd:complexType name="EnergyGS1PartyIDType">
+		<xsd:simpleContent>
+			<xsd:restriction base="udt:IDType">
+				<xsd:attribute name="schemeID" type="xsd:token" use="prohibited"/>
+				<xsd:attribute name="schemeName" type="xsd:string" use="prohibited"/>
+				<xsd:attribute name="schemeAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="9"/>
+				<xsd:attribute name="schemeAgencyName" type="xsd:string" use="prohibited"/>
+				<xsd:attribute name="schemeVersionID" type="xsd:token" use="prohibited"/>
+				<xsd:attribute name="schemeDataURI" type="xsd:anyURI" use="prohibited"/>
+				<xsd:attribute name="schemeURI" type="xsd:anyURI" use="prohibited"/>
+			</xsd:restriction>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===   EICParty_ Identifier. Type   ==============================-->
+	<!--======================================================================-->
+	<xsd:complexType name="EnergyEICPartyIDType">
+		<xsd:simpleContent>
+			<xsd:restriction base="udt:IDType">
+				<xsd:length value="16"/>
+				<xsd:attribute name="schemeID" type="xsd:token" use="prohibited"/>
+				<xsd:attribute name="schemeName" type="xsd:string" use="prohibited"/>
+				<xsd:attribute name="schemeAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="305"/>
+				<xsd:attribute name="schemeAgencyName" type="xsd:string" use="prohibited"/>
+				<xsd:attribute name="schemeVersionID" type="xsd:token" use="prohibited"/>
+				<xsd:attribute name="schemeDataURI" type="xsd:anyURI" use="prohibited"/>
+				<xsd:attribute name="schemeURI" type="xsd:anyURI" use="prohibited"/>
+			</xsd:restriction>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===   QuantityQuality_ Code. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="QuantityQualityCodeType">
+		<xsd:simpleContent>
+			<xsd:extension base="clmebIX00003:EnergyQuantityQualityCodeContentType">
+				<xsd:attribute name="listID" type="clmebIX00001:SchemeIdentificationCodeContentType" use="prohibited"/>
+				<xsd:attribute name="listAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="prohibited"/>
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===   EnergyProduct_ Code. Type   =================-->
+	<!--=======================================================================-->
+	<xsd:complexType name="ProductebIXIDType">
+		<xsd:simpleContent>
+			<xsd:extension base="clmebIX00002:EnergyProductIdentificationCodeContentType">
+				<xsd:attribute name="schemeAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="9"/>
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===   EnergyProduct_ Code. Type   =================-->
+	<!--=======================================================================-->
+	<xsd:complexType name="ProductVSEIDType">
+		<xsd:simpleContent>
+			<xsd:extension base="clmVSE00002:EnergyProductIdentificationCodeContentType">
+				<xsd:attribute name="schemeAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="260"/>
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===   MeasurementUnit_ Code. Type   =================-->
+	<!--=======================================================================-->
+	<xsd:simpleType name="MeasurementUnitCodeType">
+		<xsd:union memberTypes="clm6Recommendation20:MeasurementUnitCommonCodeContentType clmVSE00039:MeasurementUnitCommonCodeContentType"/>
+	</xsd:simpleType>
+	<!--=======================================================================-->
+	<!--==========QDT ===   BusinessReason_ Code. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="BusinessReasonCodeType">
+		<xsd:choice>
+			<xsd:element name="ebIXCode">
+				<xsd:simpleType>
+					<xsd:restriction base="clmebIX00006:BusinessReasonCodeContentType">
+						<xsd:pattern value="E44"/>
+						<xsd:pattern value="E88"/>
+						<xsd:pattern value="E89"/>
+						<xsd:pattern value="E0D"/>
+					</xsd:restriction>
+				</xsd:simpleType>
+			</xsd:element>
+			<xsd:element name="VSENationalCode">
+				<xsd:simpleType>
+					<xsd:restriction base="clmVSE00006:BusinessReasonCodeContentType">
+						<xsd:pattern value="C12"/>
+						<xsd:pattern value="C23"/>
+						<xsd:pattern value="C37"/>
+						<xsd:pattern value="C38"/>
+						<xsd:pattern value="C40"/>
+						<xsd:pattern value="C87"/>
+						<xsd:pattern value="C89"/>
+					</xsd:restriction>
+				</xsd:simpleType>
+			</xsd:element>
+		</xsd:choice>
+		<xsd:attribute name="codeListAgency" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="260"/>
+		<xsd:attribute name="codeListID" type="clmebIX00001:SchemeIdentificationCodeContentType" use="optional" fixed="VSE"/>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========QDT ===   BusinessDocumentAcceptanceReason_ Code. Type   ========-->
+	<!--======================================================================-->
+	<xsd:complexType name="DocumentAcceptanceReasonCodeType">
+		<xsd:simpleContent>
+			<xsd:extension base="clmebIX00005:DocumentAcceptanceReasonCodeContentType"/>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===   BusinessDocumentAcceptanceStatus_ Code. Type   ========-->
+	<!--======================================================================-->
+	<xsd:complexType name="DocumentAcceptanceStatusCodeType">
+		<xsd:simpleContent>
+			<xsd:extension base="clmebIX00004:DocumentAcceptanceStatusCodeContentType"/>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========QDT ===   BusinessDomain_ Code. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="BusinessDomainCodeType">
+		<xsd:simpleContent>
+			<xsd:extension base="clmebIX00007:BusinessDomainCodeContentType">
+				<xsd:attribute name="listAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="260"/>
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========QDT ===   BusinessProcess_ Code. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="BusinessProcessCodeType">
+		<xsd:simpleContent>
+			<xsd:extension base="clmETSO000x1:ProcessTypeCodeContentType">
+				<xsd:attribute name="listAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="305"/>
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========QDT ===   BusinessType_ Code. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="BusinessTypeCodeType">
+		<xsd:simpleContent>
+			<xsd:extension base="clmETSO000x2:BusinessTypeCodeContentType">
+				<xsd:attribute name="listAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="305"/>
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========QDT ===   BusinessSector_ Code. Type   =================-->
+	<!--======================================================================-->
+	<xsd:simpleType name="BusinessSectorCodeType">
+		<xsd:restriction base="clmebIX00008:BusinessSectorCodeContentType"/>
+	</xsd:simpleType>
+	<!--=======================================================================-->
+	<!--==========QDT ===   BusinessRole_ Code. Type   =================-->
+	<!--======================================================================-->
+	<xsd:simpleType name="BusinessRoleCodeType">
+		<xsd:union memberTypes="clm63035:BusinessRoleCodeContentType clmebIX00020:TemporaryBusinessRoleCodeContentType clmVSE00012:BusinessRoleCodeContentType"/>
+	</xsd:simpleType>
+	<!--=======================================================================-->
+	<!--==========QDT ===   CommunityID. Type   =================-->
+	<!--======================================================================-->
+	<xsd:simpleType name="CommunityIDType">
+		<xsd:restriction base="xsd:string">
+			<xsd:pattern value="[0-9]{6}-[0-9A-Z]{6}"/>
+		</xsd:restriction>
+	</xsd:simpleType>
+	<!--=======================================================================-->
+	<!--==========QDT ===   CommunityID. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="CommunityCodeType">
+		<xsd:choice>
+			<xsd:element name="VSENationalCode">
+				<xsd:simpleType>
+					<xsd:restriction base="clmVSE00038:CommunityCodetType">
+						<xsd:pattern value="CT01"/>
+						<xsd:pattern value="CT02"/>
+					</xsd:restriction>
+				</xsd:simpleType>
+			</xsd:element>
+		</xsd:choice>
+		<xsd:attribute name="codeListAgency" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="260"/>
+		<xsd:attribute name="codeListID" type="clmebIX00001:SchemeIdentificationCodeContentType" use="optional" fixed="VSE"/>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========QDT ===   DocumentFunction_ Code. Type   =================-->
+	<!--======================================================================-->
+	<xsd:simpleType name="DocumentFunctionCodeType">
+		<xsd:restriction base="clmebIX00009:DocumentFunctionCodeContentType"/>
+	</xsd:simpleType>
+	<!--=======================================================================-->
+	<!--==========QDT ===   DocumentType_ Code. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="DocumentTypeCodeType">
+		<xsd:choice>
+			<xsd:element name="ebIXCode" type="clmebIX00010:DocumentTypeCodeContentType" fixed="E66"/>
+			<xsd:element name="VSENationalCode" type="clmVSE00001:DocumentTypeCodeContentType" minOccurs="0" maxOccurs="0"/>
+			<xsd:element name="CefactCode" type="clm61001:DocumentTypeCodeContentType" minOccurs="0" maxOccurs="0"/>
+		</xsd:choice>
+		<xsd:attribute name="listAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="260"/>
+		<xsd:attribute name="listID" type="clmebIX00001:SchemeIdentificationCodeContentType" use="prohibited" fixed="VSE"/>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--==========QDT ===   DocumentReferenceType_ Code. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="DocumentReferenceTypeCodeType">
+		<xsd:choice>
+			<xsd:element name="ebIXCode" type="clmebIX00010:DocumentTypeCodeContentType" minOccurs="0"/>
+			<xsd:element name="VSENationalCode" type="clmVSE00001:DocumentTypeCodeContentType" minOccurs="0"/>
+			<xsd:element name="CefactCode" type="clm61001:DocumentTypeCodeContentType" minOccurs="0"/>
+		</xsd:choice>
+		<xsd:attribute name="listAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="optional" fixed="260"/>
+		<xsd:attribute name="listID" type="clmebIX00001:SchemeIdentificationCodeContentType" use="optional" fixed="VSE"/>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===   MeterReadingOrigin_ Code. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="MeterReadingOriginCodeType">
+		<xsd:simpleContent>
+			<xsd:extension base="clmebIX00021:MeterReadingOriginCodeContentType">
+				<xsd:attribute name="listAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="260"/>
+				<xsd:attribute name="listID" use="prohibited">
+					<xsd:simpleType>
+						<xsd:restriction base="clmebIX00001:SchemeIdentificationCodeContentType"/>
+					</xsd:simpleType>
+				</xsd:attribute>
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--=======================================================================-->
+	<!--=================    Qualified data types based on DateTime. Type   =============-->
+	<!--======================================================================-->
+	<!--==========QDT ===   Energy_ Date. Type   =================-->
+	<!--======================================================================-->
+	<xsd:simpleType name="EnergyDateType">
+		<xsd:restriction base="udt:DateType">
+			<xsd:pattern value=".{4}-.{2}-.{2}"/>
+		</xsd:restriction>
+	</xsd:simpleType>
+	<!--======================================================================-->
+	<!--==========QDT ===   Energy_ DateTime. Type   =================-->
+	<!--======================================================================-->
+	<xsd:simpleType name="EnergyDateTimeType">
+		<xsd:restriction base="udt:DateTimeType">
+			<xsd:pattern value=".{4}-.{2}-.{2}T.{2}:.{2}:.{2}Z"/>
+		</xsd:restriction>
+	</xsd:simpleType>
+	<!--======================================================================-->
+	<!--=================    Qualified data types based on Text. Type   =============-->
+	<!--======================================================================-->
+	<!--==========QDT ===   Simple_ Text. Type   =================-->
+	<xsd:complexType name="SimpleTextType">
+		<xsd:simpleContent>
+			<xsd:restriction base="udt:TextType">
+				<xsd:maxLength value="70"/>
+				<xsd:attribute name="languageCode" use="prohibited"/>
+			</xsd:restriction>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--=================    Qualified data types based on Volume. Type   =============-->
+	<!--======================================================================-->
+	<xsd:complexType name="EnergyVolumeType">
+		<xsd:simpleContent>
+			<xsd:restriction base="udt:QuantityType">
+				<xsd:fractionDigits value="3" fixed="true"/>
+				<xsd:attribute name="unitCode" type="clm6Recommendation20:MeasurementUnitCommonCodeContentType" use="prohibited"/>
+			</xsd:restriction>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!-- ===== Qualified Data Type based on generic XSD Type  ========================== -->
+	<!-- =================================================================== -->
+	<!--============   Resolution. Type   ==============================-->
+	<!--======================================================================-->
+	<xsd:complexType name="ResolutionType">
+		<xsd:sequence>
+			<xsd:element name="Resolution" type="xsd:positiveInteger" fixed="15"/>
+			<xsd:element name="Unit" type="clm6Recommendation20:MeasurementUnitCommonCodeContentType" fixed="MIN"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--============   SequencePosition. Type   ==============================-->
+	<xsd:simpleType name="SequencePositionType">
+		<xsd:restriction base="xsd:positiveInteger">
+			<xsd:totalDigits value="5"/>
+		</xsd:restriction>
+	</xsd:simpleType>
+	<!--======================================================================-->
+	<!--==========QDT ===   MeteringPointType_ Code. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="MeteringPointTypeCodeType">
+		<xsd:simpleContent>
+			<xsd:extension base="clmebIX00101:MeteringPointTypeCodeContentType">
+				<xsd:attribute name="listAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="260"/>
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===   MeteringMethod_ Code. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="MeteringMethodCodeType">
+		<xsd:simpleContent>
+			<xsd:extension base="clmebIX00103:MeteringMethodCodeContentType">
+				<xsd:attribute name="listAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="260"/>
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===   SettlementMethod_ Code. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="SettlementMethodCodeType">
+		<xsd:simpleContent>
+			<xsd:extension base="clmebIX00102:SettlementMethodCodeContentType">
+				<xsd:attribute name="listAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="260"/>
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===   MeterTimeFrame_ Code. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="MeterTimeFrameCodeType">
+		<xsd:simpleContent>
+			<xsd:extension base="clmebIX00104:MeterTimeFrameCodeContentType">
+				<xsd:attribute name="listAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="260"/>
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===   Version_ Identifier. Type   =================-->
+	<!--======================================================================-->
+	<xsd:complexType name="VersionIdentifierType">
+		<xsd:simpleContent>
+			<xsd:extension base="idsebIX00012:VersionIdentifierContentType">
+				<xsd:attribute name="listAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="260"/>
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<!--======================================================================-->
+	<!--==========QDT ===   Document_ Identifier. Type   =================-->
+	<!--======================================================================-->
+	<xsd:simpleType name="DocumentIdentifierType">
+		<xsd:restriction base="xsd:string">
+			<xsd:maxLength value="35"/>
+		</xsd:restriction>
+	</xsd:simpleType>
+	<!--======================================================================-->
+	<!--==========QDT ===   Process_ Identifier. Type   =================-->
+	<!--======================================================================-->
+	<xsd:simpleType name="ProcessIdentifierType">
+		<xsd:restriction base="xsd:string">
+			<xsd:maxLength value="35"/>
+		</xsd:restriction>
+	</xsd:simpleType>
+	<!--======================================================================-->
+	<!--==============   Standard Business Document Header   ========================-->
+	<!--======================================================================-->
+	<!--=====================   SBDH ABIE's   ====================================-->
+	<!--======================================================================-->
+	<xsd:complexType name="EnergyStandardBusinessDocumentHeaderType">
+		<xsd:sequence>
+			<xsd:element name="HeaderVersion" type="rsm:SimpleTextType" fixed="1.0"/>
+			<xsd:element name="Sender" type="rsm:SenderPartyType"/>
+			<xsd:element name="Receiver" type="rsm:ReceiverPartyType"/>
+			<xsd:element name="InstanceDocument" type="rsm:InstanceDocumentType"/>
+			<xsd:element name="BusinessScopeProcess" type="rsm:BusinessScopeProcessType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="SenderPartyType">
+		<xsd:sequence>
+			<xsd:element name="ID" type="rsm:EnergyPartyIDType"/>
+			<xsd:element name="Role">
+				<xsd:simpleType>
+					<xsd:restriction base="rsm:BusinessRoleCodeType">
+						<xsd:pattern value="MDR"/>
+						<xsd:pattern value="ASP"/>
+						<xsd:pattern value="DEC"/>
+					</xsd:restriction>
+				</xsd:simpleType>
+			</xsd:element>
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="ReceiverPartyType">
+		<xsd:sequence>
+			<xsd:element name="ID" type="rsm:EnergyPartyIDType"/>
+			<xsd:element name="Role">
+				<xsd:simpleType>
+					<xsd:restriction base="rsm:BusinessRoleCodeType">
+						<xsd:pattern value="CEM"/>
+						<xsd:pattern value="DDQ"/>
+						<xsd:pattern value="DEA"/>
+						<xsd:pattern value="DEC"/>
+						<xsd:pattern value="PQ"/>
+					</xsd:restriction>
+				</xsd:simpleType>
+			</xsd:element>
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="InstanceDocumentType">
+		<xsd:sequence>
+			<xsd:element name="DictionaryAgencyID" type="clm63055:AgencyIdentificationCodeContentType" fixed="260"/>
+			<xsd:element name="VersionID">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">version of the standard ebIX/VSE document schema</xsd:documentation>
+				</xsd:annotation>
+				<xsd:complexType>
+					<xsd:simpleContent>
+						<xsd:restriction base="rsm:VersionIdentifierType">
+							<xsd:pattern value="2007B"/>
+							<xsd:attribute name="listAgencyID" type="clm63055:AgencyIdentificationCodeContentType" use="required" fixed="260"/>
+						</xsd:restriction>
+					</xsd:simpleContent>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="DocumentID" type="rsm:DocumentIdentifierType"/>
+			<xsd:element name="DocumentType" type="rsm:DocumentTypeCodeType"/>
+			<xsd:element name="Creation" type="rsm:EnergyDateTimeType"/>
+			<xsd:element name="Status">
+				<xsd:simpleType>
+					<xsd:restriction base="rsm:DocumentFunctionCodeType">
+						<xsd:pattern value="9"/>
+						<xsd:pattern value="5"/>
+					</xsd:restriction>
+				</xsd:simpleType>
+			</xsd:element>
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="BusinessScopeProcessType">
+		<xsd:sequence>
+			<xsd:element name="BusinessReasonType" type="rsm:BusinessReasonCodeType"/>
+			<xsd:element name="ProcessType" type="rsm:BusinessProcessCodeType" minOccurs="0" maxOccurs="0"/>
+			<xsd:element name="BusinessDomainType" type="rsm:BusinessDomainCodeType" fixed="E02"/>
+			<xsd:element name="BusinessSectorType" type="rsm:BusinessSectorCodeType"/>
+			<xsd:element name="ReportPeriod" type="rsm:DateTimePeriodType">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">Period beyond which no information within the business document shall be specified.</xsd:documentation>
+				</xsd:annotation>
+			</xsd:element>
+			<xsd:element name="BusinessService" type="rsm:BusinessServiceType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="BusinessServiceType">
+		<xsd:sequence>
+			<xsd:element name="BusinessServiceName" type="xsd:string" minOccurs="0" maxOccurs="0"/>
+			<xsd:element name="ServiceTransaction" type="rsm:ServiceTransactionType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="ServiceTransactionType">
+		<xsd:attribute name="typeOfServiceTransaction" type="rsm:TypeOfServiceTransaction" use="prohibited"/>
+		<xsd:attribute name="isNonRepudiationRequired" type="xsd:string" use="prohibited"/>
+		<xsd:attribute name="isAuthenticationRequired" type="xsd:string" use="prohibited"/>
+		<xsd:attribute name="isNonRepudiationOfReceiptRequired" type="xsd:string" use="prohibited"/>
+		<xsd:attribute name="isIntelligibleCheckRequired" type="xsd:boolean" use="required" fixed="true"/>
+		<xsd:attribute name="isApplicationErrorResponseRequested" type="xsd:boolean" use="prohibited"/>
+		<xsd:attribute name="timeToAcknowledgeReceipt" type="xsd:string" use="prohibited"/>
+		<xsd:attribute name="timeToAcknowledgeAcceptance" type="xsd:string" use="prohibited"/>
+		<xsd:attribute name="timeToPerform" type="xsd:string" use="prohibited"/>
+		<xsd:attribute name="recurrence" type="xsd:positiveInteger" use="prohibited"/>
+	</xsd:complexType>
+	<xsd:simpleType name="TypeOfServiceTransaction">
+		<xsd:restriction base="xsd:string"/>
+	</xsd:simpleType>
+</xsd:schema>

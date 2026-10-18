@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--=====================================================================-->
+<!--===========   Codelist BusinessReasonCode  -  Code List Schema Module  ============-->
+<!--=====================================================================-->
+<!--
+  	Schema agency:			VSE
+  	Schema version:			1.3
+  	Schema date:				16.07.2025
+
+	Code list name:				Business Reason code
+	Code list agency:			VSE
+	Code list version:			4
+  	
+  	Copyright (C) VSE (2015). All Rights Reserved.
+
+	This document and translations of it may be copied and furnished to others, 
+	and derivative works that comment on or otherwise explain it or assist 
+	in its implementation may be prepared, copied, published and distributed, 
+	in whole or in part, without restriction of any kind, provided that the 
+	above copyright notice and this paragraph are included on all such copies 
+	and derivative works. However, this document itself may not be modified in 
+	any way, such as by removing the copyright notice or the references to 
+	VSE, except as needed for the purpose of developing specifications for VSE,
+	or as required to translate it into languages other than English.
+
+	This document and the information contained herein is provided on an "AS IS"
+	basis and VSE DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING 
+	BUT NOT LIMITED TO ANY WARRANTY THAT THE USE OF THE INFORMATION HEREIN WILL 
+	NOT INFRINGE ANY RIGHTS OR ANY IMPLIED WARRANTIES OF MERCHANTABILITY OR 
+	FITNESS FOR A PARTICULAR PURPOSE.
+ -->
+<xsd:schema xmlns:clmVSE00006="urn:un:unece:uncefact:codelist:draft:VSE:BusinessReasonCode:4" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ccts="urn:un:unece:uncefact:documentation:standard:CoreComponentsTechnicalSpecification:2" targetNamespace="urn:un:unece:uncefact:codelist:draft:VSE:BusinessReasonCode:4" elementFormDefault="qualified" attributeFormDefault="unqualified">
+	<!--Root element code list-->
+	<xsd:element name="BusinessReasonCode" type="clmVSE00006:BusinessReasonCodeContentType">
+		<xsd:annotation>
+			<xsd:documentation xml:lang="EN">Root element for BusinessReasonCode code list</xsd:documentation>
+		</xsd:annotation>
+	</xsd:element>
+	<!--=========================================================================-->
+	<!--Content type for code list-->
+	<xsd:simpleType name="BusinessReasonCodeContentType">
+		<xsd:annotation>
+			<xsd:documentation>Content type for BusinessReasonCode code list</xsd:documentation>
+		</xsd:annotation>
+		<xsd:restriction base="xsd:token">
+			<xsd:length value="3"/>
+			<xsd:enumeration value="C10">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Check Information</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C11">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="de">
+						<ccts:Name>Kostenzuteilung (Systemdienstleistung)</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C12">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="de">
+						<ccts:Name>Kostenwälzung</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C13">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Order energy</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C16">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Start of ancillary service provider</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C17">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>End of ancillary service provider</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C18">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Change of masterdata party connected to the grid</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C19">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Change of masterdata metering point</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C20">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Query metering point identifier</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C21">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Query switch information</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C22">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Query metering point information</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C23">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Query validated meterd data</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C24">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Query aggregated meterd data</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C25">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="de">
+						<ccts:Name>Ersatzversorgung</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C37">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>metered data Ostral PS</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C38">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Metered Data for information purposes</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C40">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Metered Data for community management</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C87">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Ancillary service for CRF</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="C89">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="de">
+						<ccts:Name>Netznutzungsabrechnung</ccts:Name>
+						<ccts:Description>to be specified by VSE</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+		</xsd:restriction>
+	</xsd:simpleType>
+	<!--=========================================================================-->
+</xsd:schema>

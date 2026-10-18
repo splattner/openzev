@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- edited with XMLSpy v2007 rel. 3 sp1 (http://www.altova.com) by Kees Sparreboom (Capgemini Nederland) -->
+<!-- edited with XMLSPY v2004 rel. 4 U (http://www.xmlspy.com) by kees sparreboom (capgemini) -->
+<!-- ====================================================================== -->
+<!-- =====  63035 - Code List Schema Module                           ===== -->
+<!-- ====================================================================== -->
+<!--
+  	Schema agency:		UN/CEFACT
+        Schema version:   	2.0	
+  	Schema date: 	        17 January 2006
+
+	Code list name:      	Agency Identification Code 
+  	Code list agency: 	UNECE
+        Code list version: 	D05A
+	
+  	Copyright (C) UN/CEFACT (2006). All Rights Reserved.
+
+	This document and translations of it may be copied and furnished to others, 
+	and derivative works that comment on or otherwise explain it or assist 
+	in its implementation may be prepared, copied, published and distributed, 
+	in whole or in part, without restriction of any kind, provided that the 
+	above copyright notice and this paragraph are included on all such copies 
+	and derivative works. However, this document itself may not be modified in 
+	any way, such as by removing the copyright notice or references to 
+	UN/CEFACT, except as needed for the purpose of developing UN/CEFACT 
+	specifications, in which case the procedures for copyrights defined in the 
+	UN/CEFACT Intellectual Property Rights document must be followed, or as 
+	required to translate it into languages other than English.
+
+	The limited permissions granted above are perpetual and will not be revoked 
+	by UN/CEFACT or its successors or assigns.
+
+	This document and the information contained herein is provided on an "AS IS"
+	basis and UN/CEFACT DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING 
+	BUT NOT LIMITED TO ANY WARRANTY THAT THE USE OF THE INFORMATION HEREIN WILL 
+	NOT INFRINGE ANY RIGHTS OR ANY IMPLIED WARRANTIES OF MERCHANTABILITY OR 
+	FITNESS FOR A PARTICULAR PURPOSE.
+-->
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:clm63035="urn:un:unece:uncefact:codelist:draft:6:3035:D05A" xmlns:ccts="urn:un:unece:uncefact:documentation:standard:CoreComponentsTechnicalSpecification:2" targetNamespace="urn:un:unece:uncefact:codelist:draft:6:3035:D05A" elementFormDefault="qualified" attributeFormDefault="unqualified" version="2.0">
+	<!-- ====================================================================== -->
+	<!-- =====  Element Declarations				      ===== -->
+	<!-- ====================================================================== -->
+	<!-- =====  Root Element Declaration				      ===== -->
+	<!-- ====================================================================== -->
+	<xsd:element name="BusinessRoleCode" type="clm63035:BusinessRoleCodeContentType"/>
+	<!-- ====================================================================== -->
+	<!-- =====  Type Definitions					      ===== -->
+	<!-- ====================================================================== -->
+	<!-- =====  Type Definition: Agency Identification Code Content	      ===== -->
+	<!-- ====================================================================== -->
+	<xsd:simpleType name="BusinessRoleCodeContentType">
+		<xsd:restriction base="xsd:token">
+			<xsd:minLength value="1"/>
+			<xsd:maxLength value="3"/>
+			<xsd:enumeration value="EZ">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="EN">
+						<ccts:Name>TSO (Transmission System Operator)</ccts:Name>
+						<ccts:Definition>yet to defined</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="DDK">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="EN">
+						<ccts:Name>Balance Responsible Party</ccts:Name>
+						<ccts:Definition>yet to defined</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="MDR">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="EN">
+						<ccts:Name>Metered Data Responsiblel</ccts:Name>
+						<ccts:Definition>yet to defined</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="DDX">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="EN">
+						<ccts:Name>Imbalance Settlement Responsiblel</ccts:Name>
+						<ccts:Definition>yet to defined</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="DDQ">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="EN">
+						<ccts:Name>Balance Supplier</ccts:Name>
+						<ccts:Definition>yet to defined</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="DDZ">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="EN">
+						<ccts:Name>Metering Point Administrator</ccts:Name>
+						<ccts:Definition>yet to defined</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="DEA">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="EN">
+						<ccts:Name>Metered Data Aggregator, local</ccts:Name>
+						<ccts:Definition>yet to defined</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="DEC">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Party Connected to the Grid</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="MAD">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Meter Administrator</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+		</xsd:restriction>
+	</xsd:simpleType>
+</xsd:schema>

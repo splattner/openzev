@@ -1,0 +1,4804 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- edited with XMLSPY v2004 rel. 4 U (http://www.xmlspy.com) by kees sparreboom (capgemini) -->
+<!-- =========================================================================== -->
+<!-- ===== IANA MIME Media Type - Code List Schema Module                  ===== -->
+<!-- =========================================================================== -->
+<!--
+  	Schema agency:		UN/CEFACT
+	Schema version:		2.0
+	Schema date: 		17 January 2006
+
+	Code list name: 	MIME Media Type
+	Code list agency: 	IANA	
+ 	Code list version:	2006-01-10
+  	  	
+  	The terms and definitions in this schema are taken from the IANA MIME Media Type 
+        list as published by the Internet Assigned Numbers Authority, IANA. This list 
+        can be obtained from the IANA Web site at the following address: 
+        www.iana.org/assignments/media-types.
+ 
+	Schema Copyright (C) UN/CEFACT (2006). All Rights Reserved.
+  
+	This document and translations of it may be copied and furnished to others, 
+	and derivative works that comment on or otherwise explain it or assist 
+	in its implementation may be prepared, copied, published and distributed, 
+	in whole or in part, without restriction of any kind, provided that the 
+	above copyright notice and this paragraph are included on all such copies 
+	and derivative works. However, this document itself may not be modified in 
+	any way, such as by removing the copyright notice or references to 
+	UN/CEFACT, except as needed for the purpose of developing UN/CEFACT 
+	specifications, in which case the procedures for copyrights defined in the 
+	UN/CEFACT Intellectual Property Rights document must be followed, or as 
+	required to translate it into languages other than English.
+
+	The limited permissions granted above are perpetual and will not be revoked 
+	by UN/CEFACT or its successors or assigns.
+
+	This document and the information contained herein is provided on an "AS IS"
+	basis and UN/CEFACT DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING 
+	BUT NOT LIMITED TO ANY WARRANTY THAT THE USE OF THE INFORMATION HEREIN WILL 
+	NOT INFRINGE ANY RIGHTS OR ANY IMPLIED WARRANTIES OF MERCHANTABILITY OR 
+	FITNESS FOR A PARTICULAR PURPOSE.
+-->
+<xsd:schema targetNamespace="urn:un:unece:uncefact:codelist:standard:IANA:MIMEMediaType:2006-01-10" elementFormDefault="qualified" attributeFormDefault="unqualified" version="2.0" xmlns:ccts="urn:un:unece:uncefact:documentation:standard:CoreComponentsTechnicalSpecification:2" xmlns:clmIANAMIMEMediaType="urn:un:unece:uncefact:codelist:standard:IANA:MIMEMediaType:2006-01-10" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<!-- =================================================================== -->
+	<!-- ===== Element Declarations                                    ===== -->
+	<!-- =================================================================== -->
+	<!-- ===== Root Element                                            ===== -->
+	<!-- =================================================================== -->
+	<xsd:element name="MIMEMediaType" type="clmIANAMIMEMediaType:MIMEMediaTypeContentType"/>
+	<!-- =================================================================== -->
+	<!-- ===== Type Definitions                                        ===== -->
+	<!-- =================================================================== -->
+	<!-- ===== Type Definition: MIME Media Type Content Type           ===== -->
+	<!-- =================================================================== -->
+	<xsd:simpleType name="MIMEMediaTypeContentType">
+		<xsd:restriction base="xsd:token">
+			<xsd:enumeration value="application/activemessage">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>activemessage</ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/andrew-inset">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>andrew-inset</ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/applefile">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>applefile</ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/atom+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>atom+xml</ccts:Name>
+						<ccts:Definition>RFC-ietf-atompub-format-11.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/atomicmail">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>atomicmail </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/batch-SMTP">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>batch-SMTP </ccts:Name>
+						<ccts:Definition>RFC2442</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/beep+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>beep+xml </ccts:Name>
+						<ccts:Definition>RFC3080</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/cals-1840">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>cals-1840 </ccts:Name>
+						<ccts:Definition>RFC1895</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/ccxml+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>ccxml+xml </ccts:Name>
+						<ccts:Definition>RFC-froumentin-voice-mediatypes-02.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/cnrp+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>cnrp+xml </ccts:Name>
+						<ccts:Definition>RFCCNRP</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/commonground">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>commonground </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/conference-info+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>conference-info+xml </ccts:Name>
+						<ccts:Definition>RFC-ietf-sipping-conference-package-12.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/cpl+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>cpl+xml </ccts:Name>
+						<ccts:Definition>RFC3880</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/csta+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>csta+xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/CSTAdata+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>CSTAdata+xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/cybercash">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>cybercash </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/dca-rft">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>dca-rft </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/dec-dx">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>dec-dx </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/dialog-info+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>dialog-info+xml </ccts:Name>
+						<ccts:Definition>RFC-ietf-sipping-dialog-package-06.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/dicom">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>dicom </ccts:Name>
+						<ccts:Definition>RFC3240</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/dns">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>dns </ccts:Name>
+						<ccts:Definition>RFC-josefsson-mime-dns-02.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/dvcs">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>dvcs </ccts:Name>
+						<ccts:Definition>RFC3029</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/ecmascript">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>ecmascript </ccts:Name>
+						<ccts:Definition>RFC-hoehrmann-script-types-03.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/EDI-Consent">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>EDI-Consent </ccts:Name>
+						<ccts:Definition>RFC1767</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/EDIFACT">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>EDIFACT </ccts:Name>
+						<ccts:Definition>RFC1767</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/EDI-X12">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>EDI-X12 </ccts:Name>
+						<ccts:Definition>RFC1767</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/epp+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>epp+xml </ccts:Name>
+						<ccts:Definition>RFC3730</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/eshop">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>eshop </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/fits">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>fits </ccts:Name>
+						<ccts:Definition>RFC-allen-fitsmime-00.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/font-tdpfr">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>font-tdpfr </ccts:Name>
+						<ccts:Definition>RFC3073</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/http">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>http </ccts:Name>
+						<ccts:Definition>RFC2616</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/hyperstudio">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>hyperstudio </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/iges">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>iges </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/im-iscomposing+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>im-iscomposing+xml </ccts:Name>
+						<ccts:Definition>RFC-ietf-simple-iscomposing-03.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/index">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>index </ccts:Name>
+						<ccts:Definition>RFC2652</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/index.cmd">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>index.cmd </ccts:Name>
+						<ccts:Definition>RFC2652</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/index.obj">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>index.obj </ccts:Name>
+						<ccts:Definition>RFC2652</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/index.response">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>index.response </ccts:Name>
+						<ccts:Definition>RFC2652</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/index.vnd">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>index.vnd </ccts:Name>
+						<ccts:Definition>RFC2652</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/iotp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>iotp </ccts:Name>
+						<ccts:Definition>RFC2935</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/ipp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>ipp </ccts:Name>
+						<ccts:Definition>RFC2910</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/isup">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>isup </ccts:Name>
+						<ccts:Definition>RFC3204</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/javascript">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>javascript </ccts:Name>
+						<ccts:Definition>RFC-hoehrmann-script-types-03.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/kpml-request+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>kpml-request+xml </ccts:Name>
+						<ccts:Definition>RFC-ietf-sipping-kpml-07.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/kpml-response+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>kpml-response+xml </ccts:Name>
+						<ccts:Definition>RFC-ietf-sipping-kpml-07.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/mac-binhex40">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mac-binhex40 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/macwriteii">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>macwriteii </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/marc">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>marc </ccts:Name>
+						<ccts:Definition>RFC2220</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/mathematica">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mathematica </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/mbox">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mbox </ccts:Name>
+						<ccts:Definition>RFC-hall-mime-app-mbox-04.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/mikey">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mikey </ccts:Name>
+						<ccts:Definition>RFC3830</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/mpeg4-generic">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mpeg4-generic </ccts:Name>
+						<ccts:Definition>RFC3640</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/mpeg4-iod">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mpeg4-iod </ccts:Name>
+						<ccts:Definition>RFC-lim-mpeg4-mime-03.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/mpeg4-iod-xmt">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mpeg4-iod-xmt </ccts:Name>
+						<ccts:Definition>RFC-lim-mpeg4-mime-03.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/mp4">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mp4 </ccts:Name>
+						<ccts:Definition>RFC-lim-mpeg4-mime-03.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/msword">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>msword </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/news-message-id">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>news-message-id </ccts:Name>
+						<ccts:Definition>RFC1036,Spencer</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/news-transmission">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>news-transmission </ccts:Name>
+						<ccts:Definition>RFC1036, Spencer</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/ocsp-request">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>ocsp-request </ccts:Name>
+						<ccts:Definition>RFC2560</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/ocsp-response">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>ocsp-response </ccts:Name>
+						<ccts:Definition>RFC2560</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/octet-stream">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>octet-stream </ccts:Name>
+						<ccts:Definition>RFC2045,RFC2046</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/oda">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>oda </ccts:Name>
+						<ccts:Definition>RFC2045,RFC2046</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/ogg">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>ogg </ccts:Name>
+						<ccts:Definition>RFC3534</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/parityfec">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>parityfec </ccts:Name>
+						<ccts:Definition>RFC3009</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/pdf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>pdf </ccts:Name>
+						<ccts:Definition>RFC3778</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/pgp-encrypted">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>pgp-encrypted </ccts:Name>
+						<ccts:Definition>RFC3156</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/pgp-keys">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>pgp-keys </ccts:Name>
+						<ccts:Definition>RFC3156</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/pgp-signature">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>pgp-signature </ccts:Name>
+						<ccts:Definition>RFC3156</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/pidf+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>pidf+xml </ccts:Name>
+						<ccts:Definition>RFC3863</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/pkcs10">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>pkcs10 </ccts:Name>
+						<ccts:Definition>RFC2311</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/pkcs7-mime">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>pkcs7-mime </ccts:Name>
+						<ccts:Definition>RFC2311</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/pkcs7-signature">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>pkcs7-signature </ccts:Name>
+						<ccts:Definition>RFC2311</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/pkix-cert">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>pkix-cert </ccts:Name>
+						<ccts:Definition>RFC2585</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/pkixcmp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>pkixcmp </ccts:Name>
+						<ccts:Definition>RFC2510</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/pkix-crl">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>pkix-crl </ccts:Name>
+						<ccts:Definition>RFC2585</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/pkix-pkipath">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>pkix-pkipath </ccts:Name>
+						<ccts:Definition>RFC3546</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/pls+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>pls+xml </ccts:Name>
+						<ccts:Definition>RFC-froumentin-voice-mediatypes-02.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/postscript">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>postscript </ccts:Name>
+						<ccts:Definition>RFC2045,RFC2046</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/prs.alvestrand.titrax-sheet">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>prs.alvestrand.titrax-sheet </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/prs.cww">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>prs.cww </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/prs.nprend">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>prs.nprend </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/prs.plucker">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>prs.plucker </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/rdf+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>rdf+xml </ccts:Name>
+						<ccts:Definition>RFC3870</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/qsig">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>qsig </ccts:Name>
+						<ccts:Definition>RFC3204</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/reginfo+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>reginfo+xml </ccts:Name>
+						<ccts:Definition>RFC3680</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/remote-printing">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>remote-printing </ccts:Name>
+						<ccts:Definition>RFC1486,Rose</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/resource-lists+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>resource-lists+xml </ccts:Name>
+						<ccts:Definition>RFC-ietf-simple-xcap-list-usage-05.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/riscos">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>riscos </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/rls-services+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>rls-services+xml </ccts:Name>
+						<ccts:Definition>RFC-ietf-simple-xcap-list-usage-05.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/rtf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>rtf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/samlassertion+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>samlassertion+xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/samlmetadata+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>samlmetadata+xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/sbml+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>sbml+xml </ccts:Name>
+						<ccts:Definition>RFC3823</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/sdp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>sdp </ccts:Name>
+						<ccts:Definition>RFC2327</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/set-payment">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>set-payment </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/set-payment-initiation">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>set-payment-initiation </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/set-registration">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>set-registration </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/set-registration-initiation">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>set-registration-initiation </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/sgml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>sgml </ccts:Name>
+						<ccts:Definition>RFC1874</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/sgml-open-catalog">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>sgml-open-catalog </ccts:Name>
+						<ccts:Definition>Grosso</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/shf+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>shf+xml </ccts:Name>
+						<ccts:Definition>RFC-strombergson-shf-06.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/sieve">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>sieve </ccts:Name>
+						<ccts:Definition>RFC3028</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/simple-filter+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>simple-filter+xml </ccts:Name>
+						<ccts:Definition>RFC-ietf-simple-filter-format-05.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/simple-message-summary">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>simple-message-summary </ccts:Name>
+						<ccts:Definition>RFC3842</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/slate">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>slate </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/soap+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>soap+xml </ccts:Name>
+						<ccts:Definition>RFC3902</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/spirits-event+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>spirits-event+xml </ccts:Name>
+						<ccts:Definition>RFC3910</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/srgs">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>srgs </ccts:Name>
+						<ccts:Definition>RFC-froumentin-voice-mediatypes-02.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/srgs+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>srgs+xml </ccts:Name>
+						<ccts:Definition>RFC-froumentin-voice-mediatypes-02.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/ssml+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>ssml+xml </ccts:Name>
+						<ccts:Definition>RFC-froumentin-voice-mediatypes-02.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/timestamp-query">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>timestamp-query </ccts:Name>
+						<ccts:Definition>RFC3161</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/timestamp-reply">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>timestamp-reply </ccts:Name>
+						<ccts:Definition>RFC3161</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/tve-trigger">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>tve-trigger </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vemmi">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vemmi </ccts:Name>
+						<ccts:Definition>RFC2122</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.3gpp.pic-bw-large">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.3gpp.pic-bw-large </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.3gpp.pic-bw-small">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.3gpp.pic-bw-small </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.3gpp.pic-bw-var">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.3gpp.pic-bw-var </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.3gpp.sms">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.3gpp.sms </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.3M.Post-it-Notes">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.3M.Post-it-Notes </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.accpac.simply.aso">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.accpac.simply.aso </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.accpac.simply.imp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.accpac.simply.imp </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.acucobol">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.acucobol </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.acucorp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.acucorp </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.adobe.xfdf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.adobe.xfdf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.aether.imp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.aether.imp </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.amiga.ami">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.amiga.ami </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.anser-web-certificate-issue-initiation">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.anser-web-certificate-issue-initiation </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.anser-web-funds-transfer-initiation">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.anser-web-funds-transfer-initiation </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.audiograph">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.audiograph </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.blueice.multipass">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.blueice.multipass </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.bmi">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.bmi </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.businessobjects">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.businessobjects </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.canon-cpdl">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.canon-cpdl </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.canon-lips">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.canon-lips </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.cinderella">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.cinderella </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.claymore">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.claymore </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.commerce-battelle">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.commerce-battelle </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.commonspace">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.commonspace </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.cosmocaller">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.cosmocaller </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.contact.cmsg">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.contact.cmsg </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.criticaltools.wbs+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.criticaltools.wbs+xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ctc-posml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ctc-posml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.cups-postscript">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.cups-postscript </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.cups-raster">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.cups-raster </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.cups-raw">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.cups-raw </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.curl">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.curl </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.cybank">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.cybank </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.data-vision.rdz">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.data-vision.rdz </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.dna">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.dna </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.dpgraph">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.dpgraph </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.dreamfactory">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.dreamfactory </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.dxr">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.dxr </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ecdis-update">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ecdis-update </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ecowin.chart">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ecowin.chart </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ecowin.filerequest">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ecowin.filerequest </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ecowin.fileupdate">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ecowin.fileupdate </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ecowin.series">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ecowin.series </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ecowin.seriesrequest">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ecowin.seriesrequest </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ecowin.seriesupdate">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ecowin.seriesupdate </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.enliven">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.enliven </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.epson.esf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.epson.esf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.epson.msf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.epson.msf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.epson.quickanime">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.epson.quickanime </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.epson.salt">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.epson.salt </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.epson.ssf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.epson.ssf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ericsson.quickcall">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ericsson.quickcall </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.eudora.data">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.eudora.data </ccts:Name>
+						<ccts:Definition>Resnick</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.fdf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fdf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ffsns">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ffsns </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.fints">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fints </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.FloGraphIt">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.FloGraphIt </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.framemaker">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.framemaker </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.fsc.weblaunch">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fsc.weblaunch </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.fujitsu.oasys">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fujitsu.oasys </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.fujitsu.oasys2">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fujitsu.oasys2 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.fujitsu.oasys3">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fujitsu.oasys3 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.fujitsu.oasysgp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fujitsu.oasysgp </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.fujitsu.oasysprs">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fujitsu.oasysprs </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.fujixerox.ddd">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fujixerox.ddd </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.fujixerox.docuworks">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fujixerox.docuworks </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.fujixerox.docuworks.binder">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fujixerox.docuworks.binder </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.fut-misnet">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fut-misnet </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.genomatix.tuxedo">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.genomatix.tuxedo </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.grafeq">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.grafeq </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.groove-account">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.groove-account </ccts:Name>
+						<ccts:Definition>Joseph</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.groove-help">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.groove-help </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.groove-identity-message">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.groove-identity-message </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.groove-injector">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.groove-injector </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.groove-tool-message">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.groove-tool-message </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.groove-tool-template">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.groove-tool-template </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.groove-vcard">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.groove-vcard </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.hbci">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.hbci </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.hcl-bireports">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.hcl-bireports </ccts:Name>
+						<ccts:Definition>Serres</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.hhe.lesson-player">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.hhe.lesson-player </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.hp-HPGL">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.hp-HPGL </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.hp-hpid">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.hp-hpid </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.hp-hps">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.hp-hps </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.hp-PCL">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.hp-PCL </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.hp-PCLXL">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.hp-PCLXL </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.httphone">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.httphone </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.hzn-3d-crossword">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.hzn-3d-crossword </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ibm.afplinedata">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ibm.afplinedata </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ibm.electronic-media">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ibm.electronic-media </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ibm.MiniPay">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ibm.MiniPay </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ibm.modcap">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ibm.modcap </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ibm.rights-management">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ibm.rights-management </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ibm.secure-container">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ibm.secure-container </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.informix-visionary">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.informix-visionary </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.intercon.formnet">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.intercon.formnet </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.intertrust.digibox">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.intertrust.digibox </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.intertrust.nncp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.intertrust.nncp </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.intu.qbo">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.intu.qbo </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.intu.qfx">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.intu.qfx </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ipunplugged.rcprofile">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ipunplugged.rcprofile </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.irepository.package+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.irepository.package+xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.is-xpr">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.is-xpr </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.japannet-directory-service">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.japannet-directory-service </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.japannet-jpnstore-wakeup">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.japannet-jpnstore-wakeup </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.japannet-payment-wakeup">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.japannet-payment-wakeup </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.japannet-registration">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.japannet-registration </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.japannet-registration-wakeup">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.japannet-registration-wakeup </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.japannet-setstore-wakeup">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.japannet-setstore-wakeup </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.japannet-verification">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.japannet-verification </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.japannet-verification-wakeup">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.japannet-verification-wakeup </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.jisp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.jisp </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.kde.karbon">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.kde.karbon </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.kde.kchart">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.kde.kchart </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.kde.kformula">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.kde.kformula </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.kde.kivio">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.kde.kivio </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.kde.kontour">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.kde.kontour </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.kde.kpresenter">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.kde.kpresenter </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.kde.kspread">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.kde.kspread </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.kde.kword">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.kde.kword </ccts:Name>
+						<ccts:Definition>Faure</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.kenameaapp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.kenameaapp </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.kidspiration">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.kidspiration </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.Kinar">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.Kinar </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.koan">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.koan </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.liberty-request+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.liberty-request+xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.llamagraphics.life-balance.desktop">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.llamagraphics.life-balance.desktop </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.llamagraphics.life-balance.exchange+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.llamagraphics.life-balance.exchange+xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.lotus-1-2-3">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.lotus-1-2-3 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.lotus-approach">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.lotus-approach </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.lotus-freelance">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.lotus-freelance </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.lotus-notes">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.lotus-notes </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.lotus-organizer">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.lotus-organizer </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.lotus-screencam">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.lotus-screencam </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.lotus-wordpro">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.lotus-wordpro </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.mcd">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.mcd </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.mediastation.cdkey">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.mediastation.cdkey </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.meridian-slingshot">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.meridian-slingshot </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.mfmp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.mfmp </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.micrografx.flo">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.micrografx.flo </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.micrografx.igx">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.micrografx.igx </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.mif">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.mif </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.minisoft-hp3000-save">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.minisoft-hp3000-save </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.mitsubishi.misty-guard.trustweb">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.mitsubishi.misty-guard.trustweb </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.Mobius.DAF">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.Mobius.DAF </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.Mobius.DIS">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.Mobius.DIS </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.Mobius.MBK">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.Mobius.MBK </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.Mobius.MQY">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.Mobius.MQY </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.Mobius.MSL">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.Mobius.MSL </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.Mobius.PLC">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.Mobius.PLC </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.Mobius.TXF">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.Mobius.TXF </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.mophun.application">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.mophun.application </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.mophun.certificate">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.mophun.certificate </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.motorola.flexsuite">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.motorola.flexsuite </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.motorola.flexsuite.adsi">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.motorola.flexsuite.adsi </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.motorola.flexsuite.fis">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.motorola.flexsuite.fis </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.motorola.flexsuite.gotap">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.motorola.flexsuite.gotap </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.motorola.flexsuite.kmr">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.motorola.flexsuite.kmr </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.motorola.flexsuite.ttc">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.motorola.flexsuite.ttc </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.motorola.flexsuite.wem">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.motorola.flexsuite.wem </ccts:Name>
+						<ccts:Definition>Patton</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.mozilla.xul+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.mozilla.xul+xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ms-artgalry">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ms-artgalry </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ms-asf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ms-asf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.mseq">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.mseq </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ms-excel">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ms-excel </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.msign">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.msign </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ms-lrm">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ms-lrm </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ms-powerpoint">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ms-powerpoint </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ms-project">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ms-project </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ms-tnef">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ms-tnef </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ms-works">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ms-works </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ms-wpl">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ms-wpl </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.musician">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.musician </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.music-niff">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.music-niff </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.nervana">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.nervana </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.netfpx">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.netfpx </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.noblenet-directory">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.noblenet-directory </ccts:Name>
+						<ccts:Definition>Solomon</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.noblenet-sealer">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.noblenet-sealer </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.noblenet-web">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.noblenet-web </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.nokia.landmark+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.nokia.landmark+xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.nokia.landmark+wbxml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.nokia.landmark+wbxml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.nokia.landmarkcollection+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.nokia.landmarkcollection+xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.nokia.radio-preset">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.nokia.radio-preset </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.nokia.radio-presets">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.nokia.radio-presets </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.novadigm.EDM">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.novadigm.EDM </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.novadigm.EDX">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.novadigm.EDX </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.novadigm.EXT">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.novadigm.EXT </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.obn">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.obn </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.omads-email+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.omads-email+xml </ccts:Name>
+						<ccts:Definition>OMA Data Synchronization Working Group</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.omads-file+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.omads-file+xml </ccts:Name>
+						<ccts:Definition>OMA Data Synchronization Working Group</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.omads-folder+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.omads-folder+xml </ccts:Name>
+						<ccts:Definition>OMA Data Synchronization Working Group</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.osa.netdeploy">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.osa.netdeploy </ccts:Name>
+						<ccts:Definition>Klos</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.palm">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.palm </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.paos.xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.paos.xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.pg.format">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.pg.format </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.picsel">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.picsel </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.pg.osasli">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.pg.osasli </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.powerbuilder6">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.powerbuilder6 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.powerbuilder6-s">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.powerbuilder6-s </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.powerbuilder7">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.powerbuilder7 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.powerbuilder75">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.powerbuilder75 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.powerbuilder75-s">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.powerbuilder75-s </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.powerbuilder7-s">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.powerbuilder7-s </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.previewsystems.box">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.previewsystems.box </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.publishare-delta-tree">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.publishare-delta-tree </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.pvi.ptid1">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.pvi.ptid1 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.pwg-multiplexed">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.pwg-multiplexed </ccts:Name>
+						<ccts:Definition>RFC3391</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.pwg-xhtml-print+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.pwg-xhtml-print+xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.Quark.QuarkXPress">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.Quark.QuarkXPress </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.rapid">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.rapid </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.RenLearn.rlprint">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.RenLearn.rlprint </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.s3sms">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.s3sms </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.sealed.doc">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealed.doc </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.sealed.eml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealed.eml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.sealed.mht">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealed.mht </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.sealed.net">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealed.net </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.sealed.ppt">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealed.ppt </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.sealed.xls">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealed.xls </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.sealedmedia.softseal.html">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealedmedia.softseal.html </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.sealedmedia.softseal.pdf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealedmedia.softseal.pdf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.seemail">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.seemail </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.shana.informed.formdata">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.shana.informed.formdata </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.shana.informed.formtemplate">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.shana.informed.formtemplate </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.shana.informed.interchange">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.shana.informed.interchange </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.shana.informed.package">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.shana.informed.package </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.smaf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.smaf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.sss-cod">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sss-cod </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.sss-dtf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sss-dtf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.sss-ntf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sss-ntf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.street-stream">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.street-stream </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.sus-calendar">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sus-calendar </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.svd">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.svd </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.swiftview-ics">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.swiftview-ics </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.syncml.ds.notification">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.syncml.ds.notification </ccts:Name>
+						<ccts:Definition>OMA Data Synchronization Working Group</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.syncml.+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.syncml.+xml </ccts:Name>
+						<ccts:Definition>OMA Data Synchronization Working Group</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.triscape.mxs">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.triscape.mxs </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.trueapp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.trueapp </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.truedoc">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.truedoc </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.ufdl">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ufdl </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.uiq.theme">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.uiq.theme </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.uplanet.alert">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.uplanet.alert </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.uplanet.alert-wbxml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.uplanet.alert-wbxml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.uplanet.bearer-choice">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.uplanet.bearer-choice </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.uplanet.bearer-choice-wbxml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.uplanet.bearer-choice-wbxml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.uplanet.cacheop">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.uplanet.cacheop </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.uplanet.cacheop-wbxml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.uplanet.cacheop-wbxml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.uplanet.channel">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.uplanet.channel </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.uplanet.channel-wbxml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.uplanet.channel-wbxml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.uplanet.list">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.uplanet.list </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.uplanet.listcmd">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.uplanet.listcmd </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.uplanet.listcmd-wbxml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.uplanet.listcmd-wbxml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.uplanet.list-wbxml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.uplanet.list-wbxml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.uplanet.signal">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.uplanet.signal </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.vcx">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.vcx </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.vectorworks">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.vectorworks </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.vidsoft.vidconference">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.vidsoft.vidconference </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.visio">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.visio </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.visionary">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.visionary </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.vividence.scriptfile">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.vividence.scriptfile </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.vsf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.vsf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.wap.sic">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wap.sic </ccts:Name>
+						<ccts:Definition>WAP-Forum</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.wap.slc">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wap.slc </ccts:Name>
+						<ccts:Definition>WAP-Forum</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.wap.wbxml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wap.wbxml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.wap.wmlc">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wap.wmlc </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.wap.wmlscriptc">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wap.wmlscriptc </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.webturbo">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.webturbo </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.wordperfect">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wordperfect </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.wqd">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wqd </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.wrq-hp3000-labelled">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wrq-hp3000-labelled </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.wt.stf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wt.stf </ccts:Name>
+						<ccts:Definition>Wohler</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.wv.csp+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wv.csp+xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.wv.csp+wbxml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wv.csp+wbxml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.wv.ssp+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wv.ssp+xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.xara">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.xara </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.xfdl">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.xfdl </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.yamaha.hv-dic">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.yamaha.hv-dic </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.yamaha.hv-script">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.yamaha.hv-script </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.yamaha.hv-voice">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.yamaha.hv-voice </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.yamaha.smaf-audio">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.yamaha.smaf-audio </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.yamaha.smaf-phrase">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.yamaha.smaf-phrase </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/vnd.yellowriver-custom-menu">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.yellowriver-custom-menu </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/voicexml+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>voicexml+xml </ccts:Name>
+						<ccts:Definition>RFC-froumentin-voice-mediatypes-02.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/watcherinfo+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>watcherinfo+xml </ccts:Name>
+						<ccts:Definition>RFC3858</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/whoispp-query">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>whoispp-query </ccts:Name>
+						<ccts:Definition>RFC2957</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/whoispp-response">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>whoispp-response </ccts:Name>
+						<ccts:Definition>RFC2958</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/wita">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>wita </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/wordperfect5.1">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>wordperfect5.1 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/x400-bp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>x400-bp </ccts:Name>
+						<ccts:Definition>RFC1494</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/xcap-att+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>xcap-att+xml </ccts:Name>
+						<ccts:Definition>RFC-ietf-simple-xcap-07.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/xcap-caps+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>xcap-caps+xml </ccts:Name>
+						<ccts:Definition>RFC-ietf-simple-xcap-07.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/xcap-el+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>xcap-el+xml </ccts:Name>
+						<ccts:Definition>RFC-ietf-simple-xcap-07.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/xcap-error+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>xcap-error+xml </ccts:Name>
+						<ccts:Definition>RFC-ietf-simple-xcap-07.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/xhtml-voice+xml (Obsolete)">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>xhtml-voice+xml (Obsolete) </ccts:Name>
+						<ccts:Definition>RFC-mccobb-xplusv-media-type-04.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/xhtml+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>xhtml+xml </ccts:Name>
+						<ccts:Definition>RFC3236</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>xml </ccts:Name>
+						<ccts:Definition>RFC3023</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/xml-dtd">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>xml-dtd </ccts:Name>
+						<ccts:Definition>RFC3023</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/xml-external-parsed-entity">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>xml-external-parsed-entity </ccts:Name>
+						<ccts:Definition>RFC3023</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/xmpp+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>xmpp+xml </ccts:Name>
+						<ccts:Definition>RFC3923</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/xop+xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>xop+xml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="application/zip">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>zip </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/32kadpcm">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>32kadpcm  </ccts:Name>
+						<ccts:Definition>RFC2421,RFC2422</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/3gpp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>3gpp </ccts:Name>
+						<ccts:Definition>RFC3839], [RFC-gellens-mime-bucket.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/3gpp2">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>3gpp2 </ccts:Name>
+						<ccts:Definition>RFC-garudadri-avt-3gpp2-mime-02.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/ac3">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>ac3 </ccts:Name>
+						<ccts:Definition>RFC-ietf-avt-rtp-ac3-07.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/AMR">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>AMR </ccts:Name>
+						<ccts:Definition>RFC3267</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/AMR-WB">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>AMR-WB </ccts:Name>
+						<ccts:Definition>RFC3267</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/basic">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>basic </ccts:Name>
+						<ccts:Definition>RFC2045,RFC2046</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/BV16">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>BV16 </ccts:Name>
+						<ccts:Definition>RFC-ietf-avt-rtp-bv-04.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/BV32">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>BV32 </ccts:Name>
+						<ccts:Definition>RFC-ietf-avt-rtp-bv-04.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/clearmode">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>clearmode </ccts:Name>
+						<ccts:Definition>RFC-draft-ietf-avt-rtp-clearmode-05.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/CN">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>CN </ccts:Name>
+						<ccts:Definition>RFC3389</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/DAT12">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>DAT12 </ccts:Name>
+						<ccts:Definition>RFC3190</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/dsr-es201108">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>dsr-es201108, RFC3557</ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/dsr-es202050">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>dsr-es202050, RFC-ietf-avt-rtp-dsr-codecs-03.txt</ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/dsr-es202211">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>dsr-es202211, RFC-ietf-avt-rtp-dsr-codecs-03.txt</ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/dsr-es202212">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>dsr-es202212, RFC-ietf-avt-rtp-dsr-codecs-03.txt</ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/DVI4">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>DVI4 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/EVRC">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>EVRC </ccts:Name>
+						<ccts:Definition>RFC3558</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/EVRC0">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>EVRC0 </ccts:Name>
+						<ccts:Definition>RFC3558</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/EVRC-QCP">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>EVRC-QCP </ccts:Name>
+						<ccts:Definition>RFC3625</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/G722">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>G722 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/G.722.1">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>G.722.1 </ccts:Name>
+						<ccts:Definition>RFC3047</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/G723">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>G723 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/G726-16">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>G726-16 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/G726-24">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>G726-24 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/G726-32">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>G726-32 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/G726-40">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>G726-40 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/G728">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>G728 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/G729">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>G729 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/G729D">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>G729D </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/G729E">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>G729E </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/GSM">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>GSM </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/GSM-EFR">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>GSM-EFR </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/iLBC">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>iLBC </ccts:Name>
+						<ccts:Definition>RFC3952</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/L8">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>L8 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/L16">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>L16 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/L20">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>L20 </ccts:Name>
+						<ccts:Definition>RFC3190</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/L24">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>L24 </ccts:Name>
+						<ccts:Definition>RFC3190</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/LPC">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>LPC </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/MPA">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>MPA </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/mp4">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mp4 </ccts:Name>
+						<ccts:Definition>RFC-lim-mpeg4-mime-03.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/MP4A-LATM">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>MP4A-LATM </ccts:Name>
+						<ccts:Definition>RFC3016</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/mpa-robust">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mpa-robust </ccts:Name>
+						<ccts:Definition>RFC3119</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/mpeg">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mpeg </ccts:Name>
+						<ccts:Definition>RFC3003</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/mpeg4-generic">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mpeg4-generic </ccts:Name>
+						<ccts:Definition>RFC3640</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/parityfec">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>parityfec </ccts:Name>
+						<ccts:Definition>RFC3009</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/PCMA">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>PCMA </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/PCMU">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>PCMU </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/prs.sid">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>prs.sid </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/QCELP">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>QCELP </ccts:Name>
+						<ccts:Definition>RFC3555][RFC3625</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/RED">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>RED </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/SMV">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>SMV </ccts:Name>
+						<ccts:Definition>RFC3558</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/SMV0">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>SMV0 </ccts:Name>
+						<ccts:Definition>RFC3558</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/SMV-QCP">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>SMV-QCP </ccts:Name>
+						<ccts:Definition>RFC3625</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/telephone-event">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>telephone-event </ccts:Name>
+						<ccts:Definition>RFC2833</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/tone">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>tone </ccts:Name>
+						<ccts:Definition>RFC2833</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/VDVI">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>VDVI </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.3gpp.iufp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.3gpp.iufp </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.audiokoz">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.audiokoz </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.cisco.nse">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.cisco.nse </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.cns.anp1">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.cns.anp1 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.cns.inf1">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.cns.inf1 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.digital-winds">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.digital-winds </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.everad.plj">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.everad.plj </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.lucent.voice">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.lucent.voice </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.nokia.mobile-xmf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.nokia.mobile-xmf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.nortel.vbk">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.nortel.vbk </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.nuera.ecelp4800">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.nuera.ecelp4800 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.nuera.ecelp7470">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.nuera.ecelp7470 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.nuera.ecelp9600">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.nuera.ecelp9600 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.octel.sbc">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.octel.sbc </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.qcelp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.qcelp </ccts:Name>
+						<ccts:Definition>DEPRECATED - Please use audio/qcelp, RFC3625</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.rhetorex.32kadpcm">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.rhetorex.32kadpcm </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.sealedmedia.softseal.mpeg">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealedmedia.softseal.mpeg </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="audio/vnd.vmx.cvsd">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.vmx.cvsd </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/cgm">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>cgm</ccts:Name>
+						<ccts:Definition>Computer Graphics Metafile, Francis</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/fits">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>fits </ccts:Name>
+						<ccts:Definition>RFC4047</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/g3fax">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>g3fax </ccts:Name>
+						<ccts:Definition>RFC1494</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/gif">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>gif </ccts:Name>
+						<ccts:Definition>RFC2045,RFC2046</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/ief">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>ief </ccts:Name>
+						<ccts:Definition>Image Exchange Format, RFC1314</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/jp2">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>jp2 </ccts:Name>
+						<ccts:Definition>RFC3745</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/jpeg">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>jpeg</ccts:Name>
+						<ccts:Definition>RFC2045,RFC2046</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/jpm">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>jpm </ccts:Name>
+						<ccts:Definition>RFC3745</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/jpx">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>jpx </ccts:Name>
+						<ccts:Definition>RFC3745</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/naplps">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>naplps </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/png">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>png </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/prs.btif">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>prs.btif </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/prs.pti">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>prs.pti </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/t38">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>t38 </ccts:Name>
+						<ccts:Definition>RFC3362</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/tiff Tag Image File Format">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>tiff Tag Image File Format </ccts:Name>
+						<ccts:Definition>RFC3302</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/tiff-fx">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>tiff-fx</ccts:Name>
+						<ccts:Definition>Tag Image File Format Fax eXtended, RFC-draft-ietf-fax-tiff-fx-reg-v2-01.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.cns.inf2">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.cns.inf2 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.djvu">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.djvu </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.dwg">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.dwg </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.dxf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.dxf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.fastbidsheet">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fastbidsheet </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.fpx">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fpx </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.fst">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fst </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.fujixerox.edmics-mmr">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fujixerox.edmics-mmr </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.fujixerox.edmics-rlc">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fujixerox.edmics-rlc </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.globalgraphics.pgb">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.globalgraphics.pgb </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.microsoft.icon">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.microsoft.icon </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.mix">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.mix </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.ms-modi">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ms-modi </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.net-fpx">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.net-fpx </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.sealed.png">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealed.png </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.sealedmedia.softseal.gif">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealedmedia.softseal.gif </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.sealedmedia.softseal.jpg">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealedmedia.softseal.jpg </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.svf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.svf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.wap.wbmp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wap.wbmp </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="image/vnd.xiff">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.xiff </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="message/CPIM">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>CPIM  </ccts:Name>
+						<ccts:Definition>RFC3862</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="message/delivery-status">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>delivery-status </ccts:Name>
+						<ccts:Definition>RFC1894</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="message/disposition-notification">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>disposition-notification </ccts:Name>
+						<ccts:Definition>RFC2298</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="message/external-body">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>external-body </ccts:Name>
+						<ccts:Definition>RFC2045,RFC2046</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="message/http">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>http </ccts:Name>
+						<ccts:Definition>RFC2616</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="message/news">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>news </ccts:Name>
+						<ccts:Definition>RFC 1036</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="message/partial">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>partial </ccts:Name>
+						<ccts:Definition>RFC2045,RFC2046</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="message/rfc822">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>rfc822 </ccts:Name>
+						<ccts:Definition>RFC2045,RFC2046</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="message/s-http">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>s-http </ccts:Name>
+						<ccts:Definition>RFC2660</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="message/sip">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>sip </ccts:Name>
+						<ccts:Definition>RFC3261</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="message/sipfrag">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>sipfrag </ccts:Name>
+						<ccts:Definition>RFC3420</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="message/tracking-status">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>tracking-status </ccts:Name>
+						<ccts:Definition>RFC3886</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/iges">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>iges </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/mesh">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mesh </ccts:Name>
+						<ccts:Definition>RFC2077</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/vnd.dwf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.dwf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/vnd.flatland.3dml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.flatland.3dml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/vnd.gdl">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.gdl </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/vnd.gs-gdl">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.gs-gdl </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/vnd.gtw">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.gtw </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/vnd.mts">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.mts </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/vnd.parasolid.transmit.binary">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.parasolid.transmit.binary </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/vnd.parasolid.transmit.text">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.parasolid.transmit.text </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/vnd.vtu">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.vtu </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/vrml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vrml </ccts:Name>
+						<ccts:Definition>RFC2077</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/alternative">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>alternative  </ccts:Name>
+						<ccts:Definition>RFC2045,RFC2046</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/appledouble">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>appledouble </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/byteranges">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>byteranges </ccts:Name>
+						<ccts:Definition>RFC2068</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/digest">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>digest </ccts:Name>
+						<ccts:Definition>RFC2045,RFC2046</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/encrypted">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>encrypted </ccts:Name>
+						<ccts:Definition>RFC1847</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/form-data">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>form-data </ccts:Name>
+						<ccts:Definition>RFC2388</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/header-set">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>header-set </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/mixed">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mixed </ccts:Name>
+						<ccts:Definition>RFC2045,RFC2046</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/parallel">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>parallel </ccts:Name>
+						<ccts:Definition>RFC2045,RFC2046</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/related">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>related </ccts:Name>
+						<ccts:Definition>RFC2387</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/report">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>report </ccts:Name>
+						<ccts:Definition>RFC1892</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/signed">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>signed </ccts:Name>
+						<ccts:Definition>RFC1847</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="model/voice-message">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>voice-message </ccts:Name>
+						<ccts:Definition>RFC2421,RFC2423</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/calendar">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>calendar  </ccts:Name>
+						<ccts:Definition>RFC2445</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/css">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>css </ccts:Name>
+						<ccts:Definition>RFC2318</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/csv">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>csv </ccts:Name>
+						<ccts:Definition>RFC-shafranovich-mime-csv-05.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/directory">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>directory </ccts:Name>
+						<ccts:Definition>RFC2425</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/dns">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>dns </ccts:Name>
+						<ccts:Definition>RFC-josefsson-mime-dns-02.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/ecmascript">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>ecmascript </ccts:Name>
+						<ccts:Definition>obsolete, RFC-hoehrmann-script-types-03.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/enriched">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>enriched </ccts:Name>
+						<ccts:Definition>RFC1896</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/html">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>html </ccts:Name>
+						<ccts:Definition>RFC2854</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/javascript">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>javascript </ccts:Name>
+						<ccts:Definition>obsolete, RFC-hoehrmann-script-types-03.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/parityfec">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>parityfec </ccts:Name>
+						<ccts:Definition>RFC3009</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/plain">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>plain </ccts:Name>
+						<ccts:Definition>RFC2046, RFC3676</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/prs.fallenstein.rst">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>prs.fallenstein.rst</ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/prs.lines.tag">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>prs.lines.tag</ccts:Name>
+						<ccts:Definition>Lines</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/RED">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>RED </ccts:Name>
+						<ccts:Definition>RFC-ietf-avt-text-red-05.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/rfc822-headers">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>rfc822-headers </ccts:Name>
+						<ccts:Definition>RFC1892</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/richtext">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>richtext </ccts:Name>
+						<ccts:Definition>RFC2045,RFC2046</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/rtf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>rtf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/sgml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>sgml </ccts:Name>
+						<ccts:Definition>RFC1874</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/t140">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>t140 </ccts:Name>
+						<ccts:Definition>RFC-ietf-avt-rfc2793bis-09.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/tab-separated-values">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>tab-separated-values </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/troff">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>troff </ccts:Name>
+						<ccts:Definition>RFC-lilly-text-troff-04.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/uri-list">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>uri-list </ccts:Name>
+						<ccts:Definition>RFC2483</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.abc">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.abc </ccts:Name>
+						<ccts:Definition>Allen</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.curl">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.curl </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.DMClientScript">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.DMClientScript </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.esmertec.theme-descriptor">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.esmertec.theme-descriptor </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.fly">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fly </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.fmi.flexstor">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fmi.flexstor </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.in3d.3dml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.in3d.3dml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.in3d.spot">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.in3d.spot </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.IPTC.NewsML">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.IPTC.NewsML </ccts:Name>
+						<ccts:Definition>IPTC</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.IPTC.NITF">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.IPTC.NITF </ccts:Name>
+						<ccts:Definition>IPTC</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.latex-z">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.latex-z </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.motorola.reflex">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.motorola.reflex </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.ms-mediapackage">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.ms-mediapackage </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.net2phone.commcenter.command">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.net2phone.commcenter.command </ccts:Name>
+						<ccts:Definition>Xie</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.sun.j2me.app-descriptor">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sun.j2me.app-descriptor </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.wap.si">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wap.si </ccts:Name>
+						<ccts:Definition>WAP-Forum</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.wap.sl">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wap.sl </ccts:Name>
+						<ccts:Definition>WAP-Forum</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.wap.wml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wap.wml </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/vnd.wap.wmlscript">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.wap.wmlscript </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/xml">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>xml </ccts:Name>
+						<ccts:Definition>RFC3023</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="text/xml-external-parsed-entity">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>xml-external-parsed-entity </ccts:Name>
+						<ccts:Definition>RFC3023</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/3gpp">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>3gpp  </ccts:Name>
+						<ccts:Definition>RFC3839, RFC-gellens-mime-bucket-04.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/3gpp2">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>3gpp2 </ccts:Name>
+						<ccts:Definition>RFC-garudadri-avt-3gpp2-mime-02.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/BMPEG">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>BMPEG </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/BT656">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>BT656 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/CelB">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>CelB </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/DV">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>DV </ccts:Name>
+						<ccts:Definition>RFC3189</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/H261">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>H261 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/H263">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>H263 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/H263-1998">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>H263-1998 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/H263-2000">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>H263-2000 </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/H264">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>H264 </ccts:Name>
+						<ccts:Definition>RFC-ietf-avt-rtp-h264-11.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/JPEG">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>JPEG </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/MJ2">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>MJ2 </ccts:Name>
+						<ccts:Definition>RFC3745</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/MP1S">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>MP1S </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/MP2P">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>MP2P </ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/MP2T">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>MP2T</ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/mp4">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mp4</ccts:Name>
+						<ccts:Definition>RFC-lim-mpeg4-mime-03.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/MP4V-ES">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>MP4V-ES</ccts:Name>
+						<ccts:Definition>RFC3016</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/MPV">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>MPV</ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/mpeg">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mpeg</ccts:Name>
+						<ccts:Definition>RFC2045,RFC2046</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/mpeg4-generic">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>mpeg4-generic</ccts:Name>
+						<ccts:Definition>RFC3640</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/nv">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>nv</ccts:Name>
+						<ccts:Definition>RFC3555</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/parityfec">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>parityfec</ccts:Name>
+						<ccts:Definition>RFC3009</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/pointer">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>pointer </ccts:Name>
+						<ccts:Definition>RFC2862</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/quicktime">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>quicktime </ccts:Name>
+						<ccts:Definition>Lindner</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/raw">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>raw </ccts:Name>
+						<ccts:Definition>RFC-ietf-avt-uncomp-video-06.txt</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/SMPTE292M">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>SMPTE292M </ccts:Name>
+						<ccts:Definition>RFC3497</ccts:Definition>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/vnd.fvt">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.fvt </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/vnd.motorola.video">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.motorola.video </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/vnd.motorola.videop">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.motorola.videop </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/vnd.mpegurl">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.mpegurl </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/vnd.nokia.interleaved-multimedia">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.nokia.interleaved-multimedia </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/vnd.objectvideo">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.objectvideo </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/vnd.sealed.mpeg1">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealed.mpeg1 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/vnd.sealed.mpeg4">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealed.mpeg4 </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/vnd.sealed.swf">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealed.swf </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/vnd.sealedmedia.softseal.mov">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.sealedmedia.softseal.mov </ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="video/vnd.vivo">
+				<xsd:annotation>
+					<xsd:documentation>
+						<ccts:Name>vnd.vivo</ccts:Name>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+		</xsd:restriction>
+	</xsd:simpleType>
+</xsd:schema>

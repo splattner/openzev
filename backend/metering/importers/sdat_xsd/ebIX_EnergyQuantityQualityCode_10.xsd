@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--=========================================================================-->
+<!--=================   Codelist EnergyQuantityQualityCode  -  Code List Schema Module  ================-->
+<!--=========================================================================-->
+<!--
+  	
+  	Schema agency:			ebIX 
+  	Schema version:			1.0
+  	Schema date:				March 09, 2007
+
+	Code list name:			Energy Quantity Quality code
+	Code list agency:		ebIX
+	Code list version:		1
+  	
+  	Copyright (C) ebIX (2007). All Rights Reserved.
+
+	This document and translations of it may be copied and furnished to others, 
+	and derivative works that comment on or otherwise explain it or assist 
+	in its implementation may be prepared, copied, published and distributed, 
+	in whole or in part, without restriction of any kind, provided that the 
+	above copyright notice and this paragraph are included on all such copies 
+	and derivative works. However, this document itself may not be modified in 
+	any way, such as by removing the copyright notice or the references to 
+	ebIX, except as needed for the purpose of developing specifications for ebIX,
+	or as required to translate it into languages other than English.
+
+	This document and the information contained herein is provided on an "AS IS"
+	basis and ebIX DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING 
+	BUT NOT LIMITED TO ANY WARRANTY THAT THE USE OF THE INFORMATION HEREIN WILL 
+	NOT INFRINGE ANY RIGHTS OR ANY IMPLIED WARRANTIES OF MERCHANTABILITY OR 
+	FITNESS FOR A PARTICULAR PURPOSE.
+ -->
+<!-- edited with XMLSPY v2004 rel. 4 U (http://www.xmlspy.com) by kees sparreboom (capgemini) -->
+<xsd:schema xmlns:clmebIX00003="urn:un:unece:uncefact:codelist:draft:ebIX:EnergyQuantityQualityCode:1" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ccts="urn:un:unece:uncefact:documentation:standard:CoreComponentsTechnicalSpecification:2" targetNamespace="urn:un:unece:uncefact:codelist:draft:ebIX:EnergyQuantityQualityCode:1" elementFormDefault="qualified" attributeFormDefault="unqualified">
+	<!--Root element code list-->
+	<xsd:element name="EnergyQuantityQualityCode" type="clmebIX00003:EnergyQuantityQualityCodeContentType">
+		<xsd:annotation>
+			<xsd:documentation xml:lang="EN">Root element for EnergyQuantityQualityCode code list</xsd:documentation>
+		</xsd:annotation>
+	</xsd:element>
+	<!--=========================================================================-->
+	<!--Content type for code list-->
+	<xsd:simpleType name="EnergyQuantityQualityCodeContentType">
+		<xsd:annotation>
+			<xsd:documentation>Content type for EnergyQuantityQualityCode code list</xsd:documentation>
+		</xsd:annotation>
+		<xsd:restriction base="xsd:token">
+			<xsd:maxLength value="3"/>
+			<xsd:minLength value="1"/>
+			<xsd:enumeration value="21">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Temporary</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="22">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Subject to agreed condition</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="23">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Added</ccts:Name>
+						<ccts:Description>to be agreed and specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="36">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Revised</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="46">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Does not exist</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="55">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Extracted</ccts:Name>
+						<ccts:Description>to be agreed and specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="56">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Estimated</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="81">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Definitive</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="85">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Updated</ccts:Name>
+						<ccts:Description>to be agreed and specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="86">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Ratified</ccts:Name>
+						<ccts:Description>to be specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="102">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Settled</ccts:Name>
+						<ccts:Description>to be agreed and specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+			<xsd:enumeration value="121">
+				<xsd:annotation>
+					<xsd:documentation xml:lang="en">
+						<ccts:Name>Complete</ccts:Name>
+						<ccts:Description>to be agreed and specified by ebIX</ccts:Description>
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:enumeration>
+		</xsd:restriction>
+	</xsd:simpleType>
+	<!--=========================================================================-->
+</xsd:schema>
