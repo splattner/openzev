@@ -21,12 +21,13 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection, transaction
 from django.db.models import Prefetch
 
-from invoices.models import Credit, Invoice
+from invoices.models import Charge, Credit, Invoice
 from metering.models import MeterReading, SupplementaryReading, SupplementarySource
 from tariffs.models import Tariff, TariffPeriod
 from zev.models import Building, MeteringPoint, MeteringPointAssignment, Participant, Party, ZevPartyRole
 
 from .schema import (
+    CHARGE_FIELDS,
     ASSIGNMENT_FIELDS,
     DYNAMIC_SOURCE_FIELDS,
     FORMAT_VERSION,
@@ -47,6 +48,7 @@ from .schema import (
     PARTY_ROLES_FILE,
     READING_CSV_COLUMNS,
     READINGS_DIR,
+    SECTION_CHARGES,
     SECTION_FILES,
     SECTION_INVOICE_PDFS,
     SECTION_INVOICES,
@@ -217,6 +219,18 @@ def _export_tariffs(zev):
             ],
         }
         for tariff in tariffs
+    ]
+
+
+def _export_charges(zev):
+    charges = Charge.objects.filter(zev=zev).prefetch_related("participants").order_by("charge_date", "created_at", "id")
+    return [
+        {
+            "id": str(charge.id),
+            **_fields(charge, CHARGE_FIELDS),
+            "participant_ids": sorted(str(participant.id) for participant in charge.participants.all()),
+        }
+        for charge in charges
     ]
 
 
@@ -433,6 +447,11 @@ def _write_archive(zev, sections, fileobj, *, instance_name=""):
             tariffs = _export_tariffs(zev)
             counts[SECTION_TARIFFS] = len(tariffs)
             archive.writestr(SECTION_FILES[SECTION_TARIFFS], _dump(tariffs))
+
+        if SECTION_CHARGES in sections:
+            charges = _export_charges(zev)
+            counts[SECTION_CHARGES] = len(charges)
+            archive.writestr(SECTION_FILES[SECTION_CHARGES], _dump(charges))
 
         if SECTION_READINGS in sections:
             per_meter = _write_readings(archive, zev)

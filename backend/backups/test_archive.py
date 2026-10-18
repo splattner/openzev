@@ -330,7 +330,9 @@ class CoverageTests(SimpleTestCase):
         self.assertLess(labels.index("zev.Building"), labels.index("zev.MeteringPoint"))
 
     def test_no_stale_entries(self):
-        installed = {model._meta.label for model in apps.get_models()}
+        # Auto-created join tables count: a many-to-many is backed up as its
+        # through model (see the charges section).
+        installed = {model._meta.label for model in apps.get_models(include_auto_created=True)}
         self.assertEqual(sorted((backed_up_labels() | set(EXCLUDED_MODELS)) - installed), [])
 
     def test_a_model_is_not_both_backed_up_and_excluded(self):

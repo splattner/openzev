@@ -83,6 +83,9 @@ If you do not use Solar Manager — for instance with Home Assistant, n8n or a
 script — choose **Push / file** when you connect. You get a **push token**
 shown **once**; copy it right away. OpenZEV stores only a hash, so if you lose
 it you issue a new one (**New push token**), which stops the old one at once.
+The token also appears under **Account → Tokens & keys** with when it was issued and last
+used; there you can issue a new one or revoke it. Revoking drops only the token: the source
+and its readings stay, and the device is rejected until you issue a new token.
 
 Send readings with an HTTP `POST`:
 

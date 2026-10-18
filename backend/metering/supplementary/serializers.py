@@ -49,12 +49,13 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
             "id", "metering_point", "metering_point_meter_id", "participant", "participant_name",
             "provider", "label", "external_id", "enabled", "status", "consented_at", "last_sync_at",
             "last_success_at", "last_error", "synced_through", "covers_from", "reconciliation",
-            "has_credential", "push_token_prefix", "created_at", "updated_at",
-            "api_key", "consent",
+            "has_credential", "push_token_prefix", "push_token_created_at", "push_token_last_used_at",
+            "created_at", "updated_at", "api_key", "consent",
         ]
         read_only_fields = [
             "id", "status", "consented_at", "last_sync_at", "last_success_at", "last_error",
-            "synced_through", "covers_from", "reconciliation", "push_token_prefix", "created_at", "updated_at",
+            "synced_through", "covers_from", "reconciliation", "push_token_prefix", "push_token_created_at",
+            "push_token_last_used_at", "created_at", "updated_at",
         ]
         extra_kwargs = {
             # Set from the request; only an admin acting on a participant's behalf names one.

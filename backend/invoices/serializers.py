@@ -2,7 +2,9 @@ from decimal import Decimal
 
 from rest_framework import serializers
 from zev import access
-from .models import Credit, CreditApplication, CreditKind, Invoice, InvoiceItem, InvoiceStatus, EmailLog, Payment
+from zev.models import Participant
+from . import charges as charge_rules
+from .models import Charge, ChargeAllocation, Credit, CreditApplication, CreditKind, Invoice, InvoiceItem, InvoiceStatus, EmailLog, Payment
 from .description_utils import strip_period_suffix
 
 
@@ -380,3 +382,82 @@ class GenerateZevInvoicesSerializer(serializers.Serializer):
     zev_id = serializers.UUIDField()
     period_start = serializers.DateField()
     period_end = serializers.DateField()
+
+
+class ChargeSerializer(serializers.ModelSerializer):
+    """A one-off charge (#924). ``is_locked`` is an issued invoice that carries
+    (or could no longer pick up) the charge; the viewset passes the answer for
+    a whole list in ``context["locked_ids"]``."""
+
+    participants = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Participant.objects.all(), required=False,
+    )
+    is_locked = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Charge
+        fields = [
+            "id", "zev", "description", "amount_chf", "charge_date", "allocation",
+            "split_key", "vat_treatment", "participants", "is_locked", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_is_locked(self, obj) -> bool:
+        locked_ids = self.context.get("locked_ids")
+        if locked_ids is not None:
+            return obj.pk in locked_ids
+        return charge_rules.charge_lock(obj) is not None
+
+    def validate_amount_chf(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("The amount must be greater than zero.")
+        return value
+
+    def validate_description(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("A description is required.")
+        return value
+
+    def resolve(self, attrs) -> dict:
+        """The charge as it would be stored: the payload over the instance."""
+        state = {
+            "zev": None, "charge_date": None,
+            "allocation": ChargeAllocation.ALL_PARTICIPANTS, "participants": [],
+        }
+        if self.instance is not None:
+            state.update(
+                zev=self.instance.zev, charge_date=self.instance.charge_date,
+                allocation=self.instance.allocation, participants=list(self.instance.participants.all()),
+            )
+        state.update({key: attrs[key] for key in state if key in attrs})
+        return state
+
+    def validate(self, attrs):
+        state = self.resolve(attrs)
+        zev = state["zev"]
+        user = self.context["request"].user
+        # Before anything below names an invoice or a participant of this ZEV.
+        if not user.is_admin and not access.can_manage(user, zev):
+            raise serializers.ValidationError(
+                {"zev": ["You do not have access to the ZEV this would belong to."]}
+            )
+        selected = state["participants"]
+        if self.instance is not None and "zev" in attrs and attrs["zev"] != self.instance.zev:
+            raise serializers.ValidationError({"zev": ["A charge cannot move to another ZEV."]})
+        if any(p.zev_id != zev.pk for p in selected):
+            raise serializers.ValidationError({"participants": ["Choose participants of this ZEV."]})
+        selecting = state["allocation"] == ChargeAllocation.SELECTED_PARTICIPANTS
+        if selecting and not selected:
+            raise serializers.ValidationError({"participants": ["Choose at least one participant."]})
+        if not selecting and selected:
+            raise serializers.ValidationError(
+                {"participants": ["Participants can only be chosen for selected participants."]}
+            )
+        locked = charge_rules.locked_invoice_for(zev, state["charge_date"])
+        if locked is not None:
+            raise serializers.ValidationError({"charge_date": [
+                f"Invoice {locked.invoice_number} of this period has already been approved, "
+                "so no charge can be added to it. Choose a date in a later period."
+            ]})
+        return attrs

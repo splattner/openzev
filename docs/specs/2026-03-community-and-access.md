@@ -535,6 +535,10 @@ Helper `accounts.jwt_utils.make_jwt_for_user(user, *, impersonated_by=None, part
 
 `mcp_server.authentication.McpApiKeyAuthentication` (`backend/mcp_server/authentication.py`) subclasses it for the MCP endpoint (`POST /api/v1/mcp/` only — SPEC-2026-mcp-server): it also accepts `Authorization: Bearer ozv_…` (many MCP clients cannot send a custom scheme), skips the `accounts` allow-list and the read-only-by-method check (the endpoint is always `POST`; each MCP tool declares its own `read_only`), and marks the request `audit_source = "mcp"` instead of `"api_key"`. Only an admin or an account with a manager or viewer grant passes there (`HasZevReadAccess`); cookies/JWT are not accepted on that endpoint at all.
 
+`analytics.authentication.AnalyticsTokenAuthentication` (`backend/analytics/authentication.py`) is a second non-user credential, accepted only by `GET /api/v1/analytics/series/` (SPEC-2026-analytics-dataset-api §8): `Authorization: Bearer oza_<prefix>_<secret>`, `request.user` anonymous and `request.auth` the `AnalyticsToken`, scoped to one ZEV or one participant, and re-checked per request against its creator's current access. It passes on any bearer value that is not shaped `oza_…`, so session JWTs still authenticate on that view. Every other endpoint answers `401` for it.
+
+`GET /api/v1/auth/me/credentials/` and `GET /api/v1/auth/credentials/` (admin) list API keys, analytics tokens and energy data push tokens in one shape (SPEC-2026-tokens-and-keys §5). Session-only: they authenticate with `CookieJWTAuthentication` alone and are absent from `ACCOUNTS_API_KEY_ALLOWLIST`.
+
 ### 5.1a Last-login tracking
 
 `User.last_login` (Django's own `AbstractUser` field; no migration) is stamped

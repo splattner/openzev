@@ -1,5 +1,5 @@
 import type { AttentionItem, ReadinessPeriod, ReadinessStep } from '../../types/api'
-import { NEXT_ACTION_STEP_KEY } from './readinessPresentation'
+import { NEXT_ACTION_STEP_KEYS } from './readinessPresentation'
 
 export interface PeriodCardEntry {
     period: ReadinessPeriod['period']
@@ -51,8 +51,8 @@ export function groupPeriodCards(periods: ReadinessPeriod[], alerts: AttentionIt
 
 export function primaryPeriodStep(entry: PeriodCardEntry) {
     if (entry.period.ended === false || !entry.readiness) return undefined
-    const key = NEXT_ACTION_STEP_KEY[entry.readiness.next_action]
-    return entry.readiness.steps.find((step) => step.key === key && isOpenStep(step))
+    const keys = NEXT_ACTION_STEP_KEYS[entry.readiness.next_action] ?? []
+    return entry.readiness.steps.find((step) => keys.includes(step.key) && isOpenStep(step))
 }
 
 /** One detail row per invoice, even if it has both delivery and payment issues. */

@@ -11,7 +11,8 @@ break every archive already sitting on someone's disk.
 """
 
 # Bumped whenever the archive layout changes in a way an older importer cannot
-# read. Version 7 adds the opt-in supplementary_data section (a participant's
+# read. Version 8 adds the charges section (#924): one-off costs passed on to
+# participants. Version 7 adds the opt-in supplementary_data section (a participant's
 # own energy data sources and readings, never their credentials). Version 6 carries the ZEV's buildings (#890): metering points and
 # landowner roles point at one. Version 5 carries the ZEV's parties and their dated roles (#761):
 # participants point at a party instead of carrying its name and address.
@@ -22,8 +23,8 @@ break every archive already sitting on someone's disk.
 # provenance. Version 1 remains readable for static exports and legacy
 # adapter-based dynamic descriptors. An archive naming a version that is not
 # listed here is rejected outright rather than imported half-understood.
-FORMAT_VERSION = 7
-SUPPORTED_FORMAT_VERSIONS = frozenset({1, 2, 3, 4, 5, 6, 7})
+FORMAT_VERSION = 8
+SUPPORTED_FORMAT_VERSIONS = frozenset({1, 2, 3, 4, 5, 6, 7, 8})
 
 MANIFEST_NAME = "manifest.json"
 READINGS_DIR = "readings"
@@ -34,6 +35,7 @@ SECTION_ZEV = "zev"
 SECTION_PARTICIPANTS = "participants"
 SECTION_METERING_POINTS = "metering_points"
 SECTION_TARIFFS = "tariffs"
+SECTION_CHARGES = "charges"
 SECTION_READINGS = "readings"
 SECTION_SUPPLEMENTARY = "supplementary_data"
 SECTION_INVOICES = "invoices"
@@ -49,6 +51,7 @@ SECTIONS = (
     SECTION_PARTICIPANTS,
     SECTION_METERING_POINTS,
     SECTION_TARIFFS,
+    SECTION_CHARGES,
     SECTION_READINGS,
     SECTION_SUPPLEMENTARY,
     SECTION_INVOICES,
@@ -81,6 +84,8 @@ SECTION_DEPENDENCIES = {
     SECTION_PARTICIPANTS: (),
     SECTION_METERING_POINTS: (SECTION_PARTICIPANTS,),
     SECTION_TARIFFS: (),
+    # A charge may name the participants who bear it.
+    SECTION_CHARGES: (SECTION_PARTICIPANTS,),
     SECTION_READINGS: (SECTION_METERING_POINTS,),
     SECTION_SUPPLEMENTARY: (SECTION_METERING_POINTS, SECTION_PARTICIPANTS),
     SECTION_INVOICES: (SECTION_PARTICIPANTS,),
@@ -94,6 +99,7 @@ SECTION_FILES = {
     SECTION_PARTICIPANTS: "participants.json",
     SECTION_METERING_POINTS: "metering_points.json",
     SECTION_TARIFFS: "tariffs.json",
+    SECTION_CHARGES: "charges.json",
     SECTION_INVOICES: "invoices.json",
     SECTION_SUPPLEMENTARY: "supplementary_sources.json",
 }
@@ -278,6 +284,17 @@ ASSIGNMENT_FIELDS = (
     "allocation_mode",
 )
 
+# A one-off charge (#924). The participants who bear it travel as archive
+# participant ids (``participant_ids``), not as a field.
+CHARGE_FIELDS = (
+    "description",
+    "amount_chf",
+    "charge_date",
+    "allocation",
+    "split_key",
+    "vat_treatment",
+)
+
 TARIFF_FIELDS = (
     "name",
     "category",
@@ -350,6 +367,8 @@ INVOICE_FIELDS = (
     "subtotal_chf",
     "vat_rate",
     "vat_base_chf",
+    # Optional (#924): the pass-through charges inside the subtotal.
+    "pass_through_chf",
     "vat_chf",
     "embedded_vat_chf",
     "total_chf",

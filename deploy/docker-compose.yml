@@ -12,7 +12,7 @@
 # `docker compose pull && docker compose up -d`.
 # To build from source instead, use ../docker-compose.fullstack.yml.
 x-openzev: &openzev
-  image: ghcr.io/splattner/openzev-fullstack:${OPENZEV_VERSION:-v1.25.0} # x-release-please-version
+  image: ghcr.io/splattner/openzev-fullstack:${OPENZEV_VERSION:-v1.26.0} # x-release-please-version
   env_file:
     - .env
   environment:

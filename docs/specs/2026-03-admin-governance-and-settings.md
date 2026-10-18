@@ -27,7 +27,7 @@ Global settings (date formats, VAT rates) and ZEV-level configuration (billing i
 
 | Area | Details |
 |---|---|
-| Global AppSettings singleton | Date format choices (short, long, datetime) |
+| Global AppSettings singleton | Date format choices (short, long, datetime), the two-factor policy, the analytics privacy threshold |
 | VAT rate table | Non-overlapping validity windows, `active_for_day()` lookup |
 | Admin dashboard | ZEV, participant, invoice, and email statistics |
 | User account management | Admin-only CRUD with linked-account safety |
@@ -79,9 +79,11 @@ Singleton pattern with `pk=1` enforced by `save()` plus a `singleton_enforcer = 
 
 The two-factor policy fields `mfa_required`, `mfa_grace_period_days` and `mfa_policy_changed_at` live on the same singleton; they are specified in `2026-09-two-factor-authentication.md` §4.4.
 
+`analytics_min_participants_for_aggregate` (`PositiveSmallIntegerField`, null = the platform default, 3 to 100) also lives there: the smallest community whose ZEV-wide analytics totals a participant may see. It is specified in `2026-10-analytics-dataset-api.md` §6a; admin-only, shown with its read-only `analytics_min_participants_default` and `analytics_min_participants_floor`.
+
 **Serializers:**
 - `PublicAppSettingsSerializer` — what a non-admin reads: `date_format_short`, `date_format_long`, `date_time_format`, `updated_at`, all read-only.
-- `AppSettingsSerializer` — the admin read and the write serializer: the date formats plus `mfa_required`, `mfa_grace_period_days`, and `updated_at` (read-only). `validate_mfa_required` delegates to `AppSettings.validate_mfa_required`.
+- `AppSettingsSerializer` — the admin read and the write serializer: the date formats plus `mfa_required`, `mfa_grace_period_days`, `analytics_min_participants_for_aggregate`, the read-only `analytics_min_participants_default` and `analytics_min_participants_floor`, and `updated_at` (read-only). `validate_mfa_required` delegates to `AppSettings.validate_mfa_required`.
 
 ### 4.2 VatRate
 
@@ -514,6 +516,8 @@ link the invoice breakdown to `/admin/invoices` and email statistics to
     - Displays the registered feature flags in a table with toggle switches.
     - A flag whose row has `follows_default` (a flag with a computed default, such as `supplementary_energy_data_enabled`, until an admin chooses) shows its current effective value and a hint that it follows the instance's default; toggling it stores a choice (`follows_default` becomes `false`). Every flag reads as its effective value, so a flag whose `controlled_by_env` is true (a `FEATURE_<NAME>` variable is set) shows the variable's name and a disabled switch. A toggle also invalidates the system health and energy data queries. See [ADR 0033](../adr/0033-energy-data-flag-follows-the-integration-key.md).
     - Toggling uses `updateFeatureFlag` and invalidates `['feature-flags']` after success.
+    - The Accounts hub's second tab is **Tokens & keys** (`/admin/accounts/tokens`; `/admin/accounts/api-keys` and `/admin/api-keys` redirect): API keys, analytics tokens and energy data tokens of every account with owner, type, scope and status, filters for owner, type and status, and revoke through each kind's endpoint (SPEC-2026-tokens-and-keys §7.4).
+    - `analytics_tokens_enabled` (default off) gates creating analytics tokens and authenticating with them ([SPEC-2026-analytics-dataset-api](2026-10-analytics-dataset-api.md) §4.2); its description comes from the backend registry.
 - **OAuth tab:**
     - Uses `fetchOAuthProviderConfigs` with query key `['oauth-provider-configs']`.
     - Displays configured providers in a table with enabled badges and compact Edit/Delete actions.
@@ -866,6 +870,7 @@ ignored counter input on create/update, timestamps, and concurrent VAT edits.
 ### 13.2 Frontend
 
 - AdminSystemSettingsPage: tab selector switches between regional settings, feature flags, OAuth providers, and VAT rates. Regional format selector renders all 4 options per format type, preview updates live, and save mutation calls `updateAppSettings`.
+- `frontend/tests/analytics-privacy-section.test.ts` (11 tests): platform default as placeholder and the floor as `min`, a stored value, save payload, clearing sends `null`, six out-of-range inputs refused client-side without a request, disabled until the admin settings load. The card sits under the Security tab below the two-factor policy.
 - `frontend/tests/mfa-policy-section.test.ts` (4 tests): disabled controls before loading, initial fetch-error recovery (including `false` and `0`), preserved local edits and the Save payload after a failed refresh, and a polite missing-key warning with disabled controls.
 - `frontend/tests/app-settings-provider.test.ts` (3 tests): authenticated fetch-error propagation and recovery, retained policy data with an error after a failed refresh, and in-place Retry through the real provider (busy feedback, repeated failure, then recovery).
 - VatSettingsSection (VAT tab): form validates percentage 0–100, converts to fraction, create/edit/delete flows work. Overlap errors display as toast.

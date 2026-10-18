@@ -8,7 +8,7 @@
 - Created: 2026-10-17
 - Target Release: Phase 1 of the UI patterns rollout
 - Related Issues: n/a
-- Related ADRs: [0039](../adr/0039-overlay-and-disclosure-pattern-rules.md)
+- Related ADRs: [0040](../adr/0040-overlay-and-disclosure-pattern-rules.md)
 - Related specs: [UI patterns and component catalog](2026-10-ui-patterns-and-component-catalog.md) (§6.2 pane contract, §11 rollout), `2026-03-tariffs-and-billing-engine`, `2026-08-ui-redesign-pdf-style` §15.3, `2026-09-dynamic-tariffs`, `2026-09-percentage-tariff-bands`
 - Impacted Areas: frontend, docs
 
@@ -209,7 +209,7 @@ in the reference spec §12.
   and `2026-03-community-and-access` if URL or history behaviour is documented
   there.
 - The matching user-guide chapter and its screenshots, regenerated as a set.
-- ADR 0039 moves to Accepted when the acceptance in §8 passes.
+- ADR 0040 moves to Accepted when the acceptance in §8 passes.
 
 ## 10. Risks
 

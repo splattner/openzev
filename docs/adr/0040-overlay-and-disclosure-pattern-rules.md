@@ -1,4 +1,4 @@
-# ADR 0039: Choose containers by task; one detail pane; validate on tariffs, then roll out
+# ADR 0040: Choose containers by task; one detail pane; validate on tariffs, then roll out
 
 - Status: Proposed
 - Date: 2026-10-15

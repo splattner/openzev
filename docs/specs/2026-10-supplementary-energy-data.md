@@ -146,6 +146,8 @@ one external system.
 | `credential_encrypted` | `BinaryField` | `b""` | Fernet ciphertext under `INTEGRATION_ENCRYPTION_KEYS` of `{"refresh_token": "..."}`. Never serialized. `solar_manager` only |
 | `push_token_prefix` | `CharField(16, unique, null)` | `None` | `push` only. Identifies the token; stored in clear |
 | `push_token_hash` | `CharField(64)` | `""` | `push` only. SHA-256 of the secret part, as `accounts.api_keys.hash_secret` |
+| `push_token_created_at` | `DateTimeField`, null | `None` | when the current token was issued; `null` for tokens issued before it was recorded (SPEC-2026-tokens-and-keys §4.1) |
+| `push_token_last_used_at` | `DateTimeField`, null | `None` | last accepted authentication, rewritten at most every `API_KEY_LAST_USED_RESOLUTION` |
 | `enabled` | `BooleanField` | `True` | A disabled source is never pulled and rejects pushes |
 | `status` | `CharField(20)` | `pending` | `SupplementaryStatus`: `pending`, `ok`, `error`, `reconnect_required`, `disabled` (see below) |
 | `consented_at` | `DateTimeField` | — | Set at creation from the explicit consent in the request |
@@ -283,7 +285,8 @@ All answer `404` while the feature flag is off.
 | `/sources/{id}/purge/` | POST | holder, manager, admin | Body `{date_from?, date_to?}` (civil dates; both absent = everything). Deletes readings only. Audited `supplementary_source.purge` with the count |
 | `/sources/{id}/test/` | POST | holder or admin | `solar_manager`: refresh (a rotated key is stored) + one hour of data; `{"ok": true}` or `400 {"detail"}` with a safe message. A rejected key also sets `reconnect_required`. Never echoes credentials or a raw vendor response. `400` for a push, disconnected or unregistered source |
 | `/sources/{id}/sync/` | POST | holder or admin | Queues a sync now, `202 {"queued": true}`. At most one per source per 5 minutes (`429` with `Retry-After: 300` otherwise). `400` for a push or disconnected source and for one that is `reconnect_required` (enter the key again first) |
-| `/sources/{id}/rotate-push-token/` | POST | holder or admin | `push` only. Issues a new token, returned once; the old one stops working at once |
+| `/sources/{id}/rotate-push-token/` | POST | holder or admin | `push` only. Issues a new token, returned once; the old one stops working at once; sets `push_token_created_at` |
+| `/sources/{id}/revoke-push-token/` | POST | holder or admin | `push` only; `400` when there is no token. Drops only the token (prefix, hash and both timestamps); the source and its readings stay and nothing is accepted until rotate issues a new token. Audited `supplementary_source.revoke_push_token` (SPEC-2026-tokens-and-keys) |
 | `/sources/{id}/reconciliation/` | GET | scoped | The newest 14 comparable days with per-day totals (§6.5), computed on demand |
 | `/sources/{id}/import-csv/` | POST | holder or admin | Multipart `file`; `?dry_run=true` validates only. Columns `timestamp,consumption_kwh,production_kwh,import_kwh,export_kwh`. All-or-nothing: one invalid row rejects the file with per-row errors. Same response as ingest |
 | `/ingest/` | POST | `SupplementaryPushAuthentication` (token `ozs_<prefix>_<secret>` as `Authorization: Bearer`) | Body `{"readings": [{timestamp, consumption_kwh, production_kwh, import_kwh, export_kwh}, ...]}`, at most 2000 per request. Throttled per token (`supplementary_push`) |

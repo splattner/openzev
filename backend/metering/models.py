@@ -150,6 +150,10 @@ class SupplementarySource(models.Model):
     )
     push_token_prefix = models.CharField(max_length=16, unique=True, null=True, blank=True, default=None)
     push_token_hash = models.CharField(max_length=64, blank=True, default="")
+    push_token_created_at = models.DateTimeField(
+        null=True, blank=True, help_text="When the current push token was issued. Empty for tokens issued before this was recorded.",
+    )
+    push_token_last_used_at = models.DateTimeField(null=True, blank=True)
     enabled = models.BooleanField(default=True)
     status = models.CharField(
         max_length=20, choices=SupplementaryStatus.choices, default=SupplementaryStatus.PENDING
@@ -248,13 +252,21 @@ class SupplementarySource(models.Model):
         full_key, prefix, hashed = generate_key(PUSH_TOKEN_NAMESPACE)
         self.push_token_prefix = prefix
         self.push_token_hash = hashed
+        self.push_token_created_at = timezone.now()
+        self.push_token_last_used_at = None
         return full_key
+
+    def revoke_push_token(self) -> None:
+        """Drop only the push token (not saved); the source and its readings stay."""
+        self.push_token_prefix = None
+        self.push_token_hash = ""
+        self.push_token_created_at = None
+        self.push_token_last_used_at = None
 
     def clear_credential(self) -> None:
         """Drop the credential and any push token (not saved)."""
         self.credential_encrypted = b""
-        self.push_token_prefix = None
-        self.push_token_hash = ""
+        self.revoke_push_token()
 
     # ---- state transitions (not saved) ----
 

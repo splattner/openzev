@@ -71,6 +71,9 @@ Energy produced by a participant (e.g., from solar panels) that is fed back to t
 **Feed-In Tariff**
 Price per kWh credited for participant production fed back.
 
+**Charge**
+A one-off cost (postage, a repair) recorded once in the **Charges** section of a billing period and billed to the people who bear it as an *Other charges* line. It survives invoice regeneration. See [One-off Charges](07-tariff-configuration.md#one-off-charges).
+
 **Fixed Fee**
 Flat monthly or yearly charge (not energy-based). Examples: community admin fee, meter maintenance fee. Charged to each participant, per metering point, or divided between participants — see **Shared Fee** and [Tariff Configuration](07-tariff-configuration.md).
 

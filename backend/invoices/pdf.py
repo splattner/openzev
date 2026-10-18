@@ -128,12 +128,14 @@ def _group_items_by_category(items, period_start: date, period_end: date, tr: di
         TariffCategory.GRID_FEES: tr["cat_grid_fees"],
         TariffCategory.LEVIES: tr["cat_levies"],
         TariffCategory.METERING: tr["cat_metering"],
+        TariffCategory.OTHER: tr["cat_other"],
     }
     ordered_categories = [
         TariffCategory.ENERGY,
         TariffCategory.GRID_FEES,
         TariffCategory.LEVIES,
         TariffCategory.METERING,
+        TariffCategory.OTHER,
     ]
     grouped = []
     for category in ordered_categories:
@@ -145,6 +147,8 @@ def _group_items_by_category(items, period_start: date, period_end: date, tr: di
             if item.unit == "month":
                 unit_key = "unit_month_sg" if item.quantity_kwh == 1 else "unit_month_pl"
                 unit_label = tr[unit_key]
+            elif item.unit == "flat":
+                unit_label = tr["unit_flat"]
             else:
                 unit_label = item.unit
             prepared_items.append(
@@ -346,16 +350,18 @@ def _build_template_context(
     if credit_application_rows:
         content_mm += _TABLE_ROW_MM * (len(credit_application_rows) + 1)
 
-    # Producer credits, listed after the VAT (#957); None when there are none
-    # or the invoice has no recorded VAT base.
+    # Producer credits (#957) and pass-through charges (#924) sit outside the
+    # VAT base and are listed after the VAT; None when there are none or the
+    # invoice has no recorded VAT base.
     producer_credit_chf = None
     if invoice.vat_base_chf is not None:
-        producer_credit_chf = (invoice.subtotal_chf - invoice.vat_base_chf) or None
+        producer_credit_chf = (invoice.subtotal_chf - invoice.vat_base_chf - invoice.pass_through_chf) or None
 
     return {
         "invoice": invoice,
         "vat_rate_percent": vat_rate_percent,
         "producer_credit_chf": producer_credit_chf,
+        "pass_through_chf": invoice.pass_through_chf or None,
         "credit_application_rows": credit_application_rows,
         "invoice_number_prefix": invoice_number_prefix,
         "invoice_number_suffix": invoice_number_suffix,

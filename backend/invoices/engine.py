@@ -42,6 +42,7 @@ from tariffs.periods import resolve_band
 from metering.models import MeterReading, ReadingDirection
 from .band_labels import band_description, translations_for as band_translations_for
 from .document_parties import build_issuer, build_recipient
+from .charges import CHARGE_SORT_ORDER, ChargeLine, charge_lines_by_participant, pass_through_total
 from .models import Invoice, InvoiceItem, InvoiceStatus
 from .workflow import apply_open_credits
 
@@ -73,6 +74,9 @@ class InvoiceGenerationContext:
     # The issuer block copied onto every invoice of the batch (#761): the
     # issuer on the period's last day, built once.
     _issuer: dict | None = field(default=None, repr=False)
+    # Every charge dated in the period, as each participant's lines; built on
+    # first use and shared by the whole batch (#924).
+    _charge_lines: "dict[UUID, list[ChargeLine]] | None" = field(default=None, repr=False)
     # Valid only while the current invoice holds the source locks.
     _dynamic_series_cache: "dict[UUID, _DynamicSeries]" = field(default_factory=dict, repr=False)
 
@@ -80,6 +84,12 @@ class InvoiceGenerationContext:
         if self._issuer is None:
             self._issuer = build_issuer(zev, self.scope[2])
         return self._issuer
+
+    def charge_lines(self, zev: Zev, participant_id: UUID) -> list[ChargeLine]:
+        if self._charge_lines is None:
+            _zev_id, period_start, period_end = self.scope
+            self._charge_lines = charge_lines_by_participant(zev, period_start, period_end)
+        return self._charge_lines.get(participant_id, [])
 
     def dynamic_series(self, source_id: UUID) -> "_DynamicSeries":
         series = self._dynamic_series_cache.get(source_id)
@@ -1071,6 +1081,7 @@ def _get_item_type(tariff: Tariff) -> str:
 # Each language maps singular/plural forms for each billing mode.
 DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
     "de": {
+        "charge_shared": "Anteil Gemeinschaftskosten",
         "yearly_fee_sg": "monatliche Rate der Jahresgebühr",
         "yearly_fee_pl": "monatliche Raten der Jahresgebühr",
         "mp_yearly_sg": "monatliche Rate pro Messpunkt",
@@ -1089,6 +1100,7 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "pct_average_prefix": "Ø",
     },
     "fr": {
+        "charge_shared": "quote-part des frais communs",
         "yearly_fee_sg": "mensualité de la redevance annuelle",
         "yearly_fee_pl": "mensualités de la redevance annuelle",
         "mp_yearly_sg": "mensualité par point de mesure",
@@ -1107,6 +1119,7 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "pct_average_prefix": "Ø",
     },
     "it": {
+        "charge_shared": "quota dei costi comuni",
         "yearly_fee_sg": "rata mensile della tariffa annuale",
         "yearly_fee_pl": "rate mensili della tariffa annuale",
         "mp_yearly_sg": "rata mensile per punto di misurazione",
@@ -1125,6 +1138,7 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "pct_average_prefix": "Ø",
     },
     "en": {
+        "charge_shared": "share of community costs",
         "yearly_fee_sg": "monthly installment of annual fee",
         "yearly_fee_pl": "monthly installments of annual fee",
         "mp_yearly_sg": "monthly installment per metering point",
@@ -1911,12 +1925,18 @@ def generate_invoice(
         items_accumulator, gross_rate=gross_rate
     )
 
+    # One-off charges (#924) are billed as they are entered: no inclusive-mode
+    # grossing, and a pass-through charge stays out of the VAT base below.
+    charge_lines = generation_context.charge_lines(zev, participant.pk)
+    subtotal += sum((line.total_chf for line in charge_lines), Decimal("0"))
+
     # VAT is charged on the ZEV's own supplies; producer credits only settle (#957).
     producer_credit_chf = sum(
         (p["total"] for p in item_payloads if p["bucket"] in PRODUCER_CREDIT_BUCKETS),
         Decimal("0"),
     )
-    vat_base_chf = subtotal - producer_credit_chf
+    pass_through_chf = pass_through_total(charge_lines)
+    vat_base_chf = subtotal - producer_credit_chf - pass_through_chf
     vat_rate = _resolve_vat_rate(zev, period_end)
     vat_chf = (vat_base_chf * vat_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     total_chf = subtotal + vat_chf
@@ -1943,6 +1963,7 @@ def generate_invoice(
         subtotal_chf=subtotal,
         vat_rate=vat_rate,
         vat_base_chf=vat_base_chf if zev.vat_mode == VatMode.REGISTERED else None,
+        pass_through_chf=pass_through_chf if zev.vat_mode == VatMode.REGISTERED else Decimal("0"),
         vat_chf=vat_chf,
         embedded_vat_chf=embedded_vat_chf if zev.vat_mode == VatMode.INCLUSIVE else None,
         total_chf=total_chf,
@@ -1974,6 +1995,23 @@ def generate_invoice(
             unit_price_chf=payload["unit_price"],
             total_chf=payload["total"],
             sort_order=_build_sort_order(tariff),
+        ))
+    lang = zev.invoice_language or "de"
+    for line in charge_lines:
+        description = line.charge.description
+        if line.shared:
+            marker = DESCRIPTION_TRANSLATIONS.get(lang, DESCRIPTION_TRANSLATIONS["de"])["charge_shared"]
+            description = f"{description} ({marker})"
+        items.append(InvoiceItem(
+            invoice=invoice,
+            item_type=InvoiceItem.ItemType.FEE,
+            tariff_category=TariffCategory.OTHER,
+            description=description,
+            quantity_kwh=Decimal("1"),
+            unit="flat",
+            unit_price_chf=line.total_chf,
+            total_chf=line.total_chf,
+            sort_order=CHARGE_SORT_ORDER,
         ))
     InvoiceItem.objects.bulk_create(items)
     record_invoice_evidence(invoice, dynamic_tariffs)

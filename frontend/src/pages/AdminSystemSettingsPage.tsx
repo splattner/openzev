@@ -30,6 +30,7 @@ import type { DateTimeFormat, LongDateFormat, OAuthProviderConfig, OAuthProvider
 import { ConfirmDialog, consumeReportedError, useConfirmDialog } from '../components/ConfirmDialog'
 import { FormModal } from '../components/FormModal'
 import { BackupSettingsSection } from '../features/backups/BackupSettingsSection'
+import { AnalyticsPrivacySection } from '../features/settings/AnalyticsPrivacySection'
 import { MfaPolicySection } from '../features/settings/MfaPolicySection'
 import { VatSettingsSection } from '../features/settings/VatSettingsSection'
 import { PageHeader } from '../components/PageHeader'
@@ -343,7 +344,10 @@ export function AdminSystemSettingsPage() {
                 </Tabs.Panel>
 
                 <Tabs.Panel value="security">
-                    <MfaPolicySection />
+                    <div className="page-stack">
+                        <MfaPolicySection />
+                        <AnalyticsPrivacySection />
+                    </div>
                 </Tabs.Panel>
 
                 <Tabs.Panel value="features">

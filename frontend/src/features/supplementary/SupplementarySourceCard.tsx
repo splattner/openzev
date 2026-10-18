@@ -159,6 +159,10 @@ export function SupplementarySourceCard({ point, source, confirm }: Props) {
                     <>
                         <dt className="muted">{t('supplementary.card.token')}</dt>
                         <dd style={{ margin: 0 }}><code>ozs_{source.push_token_prefix}_…</code></dd>
+                        <dt className="muted">{t('supplementary.card.tokenIssued')}</dt>
+                        <dd style={{ margin: 0 }}>{dateTime(source.push_token_created_at)}</dd>
+                        <dt className="muted">{t('supplementary.card.tokenLastUsed')}</dt>
+                        <dd style={{ margin: 0 }}>{dateTime(source.push_token_last_used_at)}</dd>
                     </>
                 )}
                 <dt className="muted">{t('supplementary.card.lastSync')}</dt>

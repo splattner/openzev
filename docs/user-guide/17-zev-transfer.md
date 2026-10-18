@@ -54,6 +54,7 @@ You get a file named `openzev-export-<community>-<date>.zip`.
 | **Participants** | Names, addresses, contact details and validity windows |
 | **Metering points & assignments** | The community's buildings, meters (each in its building) and which participant held each one over which period |
 | **Tariffs** | Every tariff, all its versions, and their price bands |
+| **Charges** | The community's [one-off charges](07-tariff-configuration.md#one-off-charges) and who each is billed to — needs Participants |
 | **Meter readings** | Every reading, as one CSV per meter |
 | **Own energy data** | The energy data sources participants connected for a PV system behind their meter, and their quarter-hour values — opt-in, see below |
 | **Invoices** | Invoices and their line items |

@@ -8,7 +8,7 @@ import { useToast } from '../lib/toast'
 import { queryKeys } from '../lib/api/queryKeys'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { ACCOUNT_TABS, resolveAccountTab, type AccountTab } from '../features/account/accountTabs'
-import { ApiKeysSection } from '../features/account/ApiKeysSection'
+import { TokensSection } from '../features/account/TokensSection'
 import { LinkedAccountsCard } from '../features/account/LinkedAccountsCard'
 import { PasswordCard } from '../features/account/PasswordCard'
 import { ProfileCard } from '../features/account/ProfileCard'
@@ -18,8 +18,8 @@ import { PageHeader } from '../components/PageHeader'
 
 /**
  * The signed-in user's own account, in three tabs: Profile (who you are),
- * Security (how you sign in: password, two-factor, linked providers) and API
- * keys (scripted access). The tab lives in `?tab=` so a link — the enrolment
+ * Security (how you sign in: password, two-factor, linked providers) and
+ * Tokens & keys (API keys, analytics tokens, energy data tokens). The tab lives in `?tab=` so a link — the enrolment
  * gate's, an OAuth return — can land on the right one.
  */
 export function AccountProfilePage() {
@@ -86,7 +86,7 @@ export function AccountProfilePage() {
                 <Tabs.List aria-label={t('account.title')}>
                     <Tabs.Tab value="profile">{t('account.tabs.profile')}</Tabs.Tab>
                     <Tabs.Tab value="security">{t('account.tabs.security')}</Tabs.Tab>
-                    <Tabs.Tab value="api-keys">{t('account.tabs.apiKeys')}</Tabs.Tab>
+                    <Tabs.Tab value="tokens">{t('account.tabs.tokens')}</Tabs.Tab>
                 </Tabs.List>
 
                 <Tabs.Panel value="profile">
@@ -145,15 +145,24 @@ export function AccountProfilePage() {
                     </div>
                 </Tabs.Panel>
 
-                <Tabs.Panel value="api-keys">
+                <Tabs.Panel value="tokens">
                     <div style={{ maxWidth: '1000px' }}>
-                        <ApiKeysSection
-                            onRevoke={({ name, onConfirm }) =>
+                        <TokensSection
+                            onRevoke={({ name, kind, onConfirm }) =>
                                 confirm({
-                                    title: t('account.apiKeys.revokeConfirmTitle'),
-                                    message: t('account.apiKeys.revokeConfirmMessage', { name }),
+                                    title: t('account.tokens.revokeConfirmTitle'),
+                                    message: t(`account.tokens.revokeConfirmMessage.${kind}`, { name }),
                                     confirmText: t('account.apiKeys.revoke'),
                                     isDangerous: true,
+                                    onConfirm,
+                                })
+                            }
+                            onRotate={({ name, onConfirm }) =>
+                                confirm({
+                                    title: t('account.tokens.rotateConfirmTitle'),
+                                    message: t('account.tokens.rotateConfirmMessage', { name }),
+                                    confirmText: t('account.tokens.rotate'),
+                                    isDangerous: false,
                                     onConfirm,
                                 })
                             }

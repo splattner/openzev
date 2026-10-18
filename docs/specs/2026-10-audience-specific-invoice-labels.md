@@ -8,7 +8,7 @@
 - Created: 2026-10-17
 - Target Release: Phase 8 of the UI patterns rollout
 - Related Issues: n/a
-- Related ADRs: [0039](../adr/0039-overlay-and-disclosure-pattern-rules.md) (usefulness over decoration), [0037](../adr/0037-issued-invoices-are-corrected-not-deleted.md)
+- Related ADRs: [0040](../adr/0040-overlay-and-disclosure-pattern-rules.md) (usefulness over decoration), [0037](../adr/0037-issued-invoices-are-corrected-not-deleted.md)
 - Related specs: [UI patterns and component catalog](2026-10-ui-patterns-and-component-catalog.md) §10, `2026-03-invoice-lifecycle-and-communication`, `2026-10-payments-and-credits`
 - Impacted Areas: frontend, backend (PDF templates), docs
 

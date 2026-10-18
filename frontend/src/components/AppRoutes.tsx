@@ -113,10 +113,10 @@ export function AppRoutes() {
               </ProtectedRoute>
             }
           />
-          {(['users', 'api-keys'] as const).map((accountsTab) => (
+          {(['users', 'tokens'] as const).map((accountsTab) => (
             <Route
               key={accountsTab}
-              path={`admin/accounts/${accountsTab === 'api-keys' ? 'api-keys' : 'users'}`}
+              path={`admin/accounts/${accountsTab === 'tokens' ? 'tokens' : 'users'}`}
               element={
                 <ProtectedRoute allowedRoles={['admin']}>
                   <AdminAccountsHubPage tab={accountsTab} />
@@ -124,7 +124,8 @@ export function AppRoutes() {
               }
             />
           ))}
-          <Route path="admin/api-keys" element={<AliasNavigate to="/admin/accounts/api-keys" />} />
+          <Route path="admin/accounts/api-keys" element={<AliasNavigate to="/admin/accounts/tokens" />} />
+          <Route path="admin/api-keys" element={<AliasNavigate to="/admin/accounts/tokens" />} />
           <Route
             path="admin/templates"
             element={

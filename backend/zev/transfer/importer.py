@@ -32,7 +32,7 @@ from django.db import DataError, IntegrityError, transaction
 from django.utils import timezone
 
 from invoices.models import (
-    Credit, CreditApplication, Invoice, InvoiceDynamicSourceEvidence, InvoiceItem, InvoicePdfStatus, InvoiceStatus, Payment,
+    Charge, Credit, CreditApplication, Invoice, InvoiceDynamicSourceEvidence, InvoiceItem, InvoicePdfStatus, InvoiceStatus, Payment,
 )
 from tariffs.dynamic.evidence import lock_sources, record_invoice_evidence
 from metering.importers.csv_importer import _parse_datetime_utc, _parse_decimal
@@ -73,6 +73,7 @@ from .schema import (
     BUILDING_FIELDS,
     BUILDINGS_FILE,
     DYNAMIC_SOURCE_FIELDS,
+    CHARGE_FIELDS,
     INVOICE_FIELDS,
     INVOICE_ITEM_FIELDS,
     PAYMENT_FIELDS,
@@ -87,6 +88,7 @@ from .schema import (
     PARTY_ROLE_FIELDS,
     PARTY_ROLES_FILE,
     READINGS_DIR,
+    SECTION_CHARGES,
     SECTION_FILES,
     SECTION_INVOICE_PDFS,
     SECTION_INVOICES,
@@ -690,6 +692,38 @@ def _import_tariffs(archive, zev, collector, *, format_version):
                         period.save()
         except (DjangoValidationError, ValueError, TypeError) as exc:
             collector.add(SECTION_TARIFFS, position, label, exc)
+            continue
+        count += 1
+    return count
+
+
+def _import_charges(archive, zev, participants_by_archive_id, collector):
+    """Create the ZEV's one-off charges (#924), linking the participants who bear them."""
+    count = 0
+    for position, raw in enumerate(_load_json(archive, SECTION_FILES[SECTION_CHARGES]), start=1):
+        fields = _pick(raw, CHARGE_FIELDS, position, SECTION_CHARGES)
+        label = str(fields.get("description") or f"#{position}")
+        bearers = []
+        for archive_id in raw.get("participant_ids") or []:
+            participant = participants_by_archive_id.get(str(archive_id))
+            if participant is None:
+                collector.warn(f'Charge "{label}" named a participant that was not imported; it was left out.')
+                continue
+            bearers.append(participant)
+        if fields.get("allocation") == "selected_participants" and not bearers:
+            collector.add(
+                SECTION_CHARGES, position, label,
+                {"participant_ids": ["None of the participants named by this charge was imported."]},
+            )
+            continue
+        try:
+            with transaction.atomic():
+                charge = Charge(zev=zev, **fields)
+                charge.full_clean(exclude=["zev"])
+                charge.save()
+                charge.participants.set(bearers)
+        except (DjangoValidationError, ValueError, TypeError, IntegrityError) as exc:
+            collector.add(SECTION_CHARGES, position, label, exc)
             continue
         count += 1
     return count
@@ -1319,6 +1353,11 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
     if SECTION_TARIFFS in sections:
         summary["counts"][SECTION_TARIFFS] = _import_tariffs(
             archive, zev, collector, format_version=manifest.get("format_version"),
+        )
+
+    if SECTION_CHARGES in sections:
+        summary["counts"][SECTION_CHARGES] = _import_charges(
+            archive, zev, participants_by_archive_id, collector,
         )
 
     if SECTION_READINGS in sections:

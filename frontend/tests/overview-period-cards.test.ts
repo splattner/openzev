@@ -67,6 +67,16 @@ describe('Overview period cards', () => {
         expect(primaryPeriodStep(result.current[0])).toBeUndefined()
     })
 
+    it('takes the stale-charges step as the primary one when generation itself is done', () => {
+        const stale = period()
+        stale.steps = [
+            { key: 'generated', status: 'done', count: 3, total: 3 },
+            { key: 'charges', status: 'todo', count: 1, detail_data: { stale_drafts: 1 } },
+        ]
+        stale.next_action = 'generate'
+        expect(primaryPeriodStep(groupPeriodCards([stale], []).open[0])?.key).toBe('charges')
+    })
+
     it('keeps real invoice alerts visible on a running period without exposing readiness actions', () => {
         const current = period()
         current.period.ended = false

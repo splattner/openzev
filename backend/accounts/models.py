@@ -16,6 +16,7 @@ from django.db import connection, models, transaction
 from django.utils import timezone
 
 from allocation.validity import active_during, active_on
+from analytics.policy import AGGREGATE_FLOOR
 from . import mfa_crypto
 
 
@@ -502,6 +503,16 @@ class AppSettings(models.Model):
     # on gives every existing account a full grace period
     # instead of locking out anyone whose account is older than the policy.
     mfa_policy_changed_at = models.DateTimeField(null=True, blank=True, editable=False)
+    # How many participants must have shared a ZEV on every day of a range before a participant
+    # may see ZEV-wide totals in the analytics dataset (SPEC-2026-analytics-dataset-api §6).
+    # ``None``: the platform default (``ANALYTICS_MIN_PARTICIPANTS_FOR_ZEV_AGGREGATE``). Never
+    # below ``analytics.policy.AGGREGATE_FLOOR``, whichever way it is set.
+    analytics_min_participants_for_aggregate = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(AGGREGATE_FLOOR), MaxValueValidator(100)],
+        help_text="Empty: the platform default.",
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     MFA_POLICY_FIELDS = ("mfa_required", "mfa_grace_period_days")
@@ -560,6 +571,7 @@ class FeatureFlag(models.Model):
     PARTICIPANT_GEOCODING_ENABLED = "participant_geocoding_enabled"
     MCP_SERVER_ENABLED = "mcp_server_enabled"
     SUPPLEMENTARY_ENERGY_DATA_ENABLED = "supplementary_energy_data_enabled"
+    ANALYTICS_TOKENS_ENABLED = "analytics_tokens_enabled"
 
     name = models.CharField(max_length=100, unique=True)
     description = models.CharField(max_length=255, blank=True, default="")
@@ -833,6 +845,15 @@ FeatureFlag.register(
         "Allow AI assistants to read OpenZEV data through the MCP endpoint (/api/v1/mcp/) "
         "using a user's API key. Answers are sent to the assistant's LLM provider, "
         "which may be a third party outside Switzerland."
+    ),
+)
+FeatureFlag.register(
+    FeatureFlag.ANALYTICS_TOKENS_ENABLED,
+    default=False,
+    description=(
+        "Let managers and participants create read-only analytics tokens, so tools such as "
+        "Grafana can read their metering data from /api/v1/analytics/series/. The data leaves "
+        "OpenZEV to wherever that tool runs."
     ),
 )
 

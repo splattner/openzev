@@ -180,7 +180,7 @@ export function PublicInvoicePage() {
                                         <tr key={`${group.category}-${index}`}>
                                             <td>{item.description}</td>
                                             <td className="numeric muted">
-                                                {item.quantity} {item.unit}
+                                                {item.unit === 'flat' ? t('pages.publicInvoice.unitFlat') : `${item.quantity} ${item.unit}`}
                                             </td>
                                             <td className="numeric">{formatMoney(item.total_chf)}</td>
                                         </tr>

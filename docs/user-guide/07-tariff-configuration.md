@@ -871,6 +871,87 @@ community's managers and viewers, and admins, can download it; there is nothing 
 participant does not already see broken out on their own participation
 contract or invoice.
 
+## One-off Charges
+
+A tariff describes a price that recurs. A cost that happens **once** — postage
+for the invoice run, a repair, a one-time fee — is not a tariff. Record it as a
+**charge** in the **Charges** section under the period's invoices
+(**Billing → Invoices**, pick the period) and OpenZEV puts it on the right
+invoices as its own line, under **Other charges**.
+
+Because the charge lives apart from the invoice, it **survives regeneration**:
+regenerate a draft as often as you like and the line comes back.
+
+![The Charges section under a period's invoices, with the note that an approved invoice freezes it](screenshots/08j-period-charges.png)
+
+### Adding a charge
+
+Choose **Add charge** and fill in:
+
+| Field | Meaning |
+| --- | --- |
+| **Description** | What appears on the invoice line, e.g. *Postage, March invoice run* |
+| **Total amount (CHF)** | The whole cost, greater than zero |
+| **Date** | Decides who pays (see below); limited to the period you are working in |
+| **Who pays** | *All participants*, or *Selected participants* |
+| **Split** | *Equally* or *By weight* (the participants' [allocation weight](03-participant-management.md#allocation-weight)); only shown when more than one person pays |
+| **VAT** | *Taxable* or *Pass-through* (see below) |
+
+A live **Who pays what** table under the form shows each participant's share
+before you save. It uses the same calculation the invoice does.
+
+### The date decides
+
+A charge is billed on the invoice whose period contains its **date**, and the
+people who pay are the members **on that date**. Somebody who joined after the
+date is not charged; somebody who left before it is not either. Both a single
+invoice and a batch run therefore agree on who pays what.
+
+### Rounding
+
+Each share is rounded to the centime on its own, exactly as for
+[shared fees](#shared-fees). CHF 10.00 divided between three people bills
+CHF 3.33 each, CHF 9.99 in total. The form tells you when rounding leaves part
+of the amount unrecovered (or bills slightly more than the total). A share that
+rounds to zero is left off.
+
+### VAT
+
+| Treatment | Use it for | Effect on a VAT-registered community |
+| --- | --- | --- |
+| **Taxable** (default) | Your own service or cost | Part of the VAT base: VAT is added on top |
+| **Pass-through** | An expense you pay in the participant's name and pass on at cost | No VAT is added |
+
+> **Check with your tax adviser** that a cost really qualifies as a
+> pass-through before you use it. OpenZEV applies the choice you make; it does
+> not judge it.
+
+If the community is not VAT-registered, or folds VAT into its prices, the
+charge is billed as entered.
+
+### Changing and deleting
+
+Edit or delete a charge from the row's actions menu. Draft invoices that
+already carry it keep the old line until you regenerate them — the
+[Overview](09-invoice-management.md#billing-work-by-period-overview) lists
+those drafts under the **Charges** step so you don't forget.
+
+### The period locks with the first approval
+
+As soon as **any** invoice of the period is approved (or sent or paid; a
+cancelled one does not count), the period's charges are **frozen**: you cannot
+add, edit or delete any of them, and the **Add charge** button is replaced by a
+warning. This holds for the whole community, not only the people who pay the
+charge, so the period is always billed from one set of charges. To change
+something afterwards, correct the invoice (see
+[Correcting a paid invoice](09-invoice-management.md#correcting-a-paid-invoice-with-a-credit-note)),
+or record the cost in a later period.
+
+Add every charge **before** you approve the first invoice of the period, then
+regenerate the drafts.
+
+Charges are part of a [ZEV export archive](17-zev-transfer.md) and of backups.
+
 ## Tariff Tips
 
 **Use consistent naming:** Helps operators find right tariff.
@@ -887,4 +968,5 @@ contract or invoice.
 
 - **Check data quality:** [Metering Analysis](06-metering-analysis.md)
 - **Understand allocation:** [How Energy Allocation Works](08-billing-allocation-explained.md)
+- **Bill a one-off cost:** [One-off Charges](#one-off-charges)
 - **Generate invoices:** [Invoice Management](09-invoice-management.md)

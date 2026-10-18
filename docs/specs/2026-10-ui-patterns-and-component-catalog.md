@@ -9,7 +9,7 @@
 - Updated: 2026-10-17
 - Target Release: Ongoing reference; tariff pilot first, then the phases in §11
 - Related Issues: n/a
-- Related ADRs: [0039](../adr/0039-overlay-and-disclosure-pattern-rules.md), [0032](../adr/0032-one-visual-language-for-screen-and-documents.md)
+- Related ADRs: [0040](../adr/0040-overlay-and-disclosure-pattern-rules.md), [0032](../adr/0032-one-visual-language-for-screen-and-documents.md)
 - Related specs: [tariff split view (pilot)](2026-10-tariff-split-view.md), [audience-specific invoice labels](2026-10-audience-specific-invoice-labels.md)
 - Impacted Areas: frontend, docs
 
@@ -42,7 +42,7 @@ the code shows it.
 | Detail views cover the list they belong to | `TariffDetailDrawer` (`clamp(720px, 60vw, 1080px)`) and `AuditEventDrawer` (`min(100vw, 560px)`) are overlays on top of their list. The list stays clickable but no space is reserved for it. |
 | Three drawers, three behaviours | The tariff and audit drawers share copy-pasted non-modal overrides (`trapFocus={false}`, `lockScroll={false}`, a hand-written shadow, a manual Escape handler). `MeteringGapsDrawer` uses Mantine's modal defaults. Headings, widths and header markup differ. |
 | View and edit live in different places | A tariff is viewed in the drawer and edited in `TariffFormModal` / `TariffVersionModal` / `TariffPeriodFormModal`, which open on top of it. |
-| Dialog widths have no scale | `FormModal` is used in 33 files. 20 call sites set `maxWidth` (560, 600, 620, 640 ×6, 720, 760 ×2, 900, 960 ×3, 1000 ×2, 1080px); the rest take the 600px default. |
+| Dialog widths have no scale | `FormModal` is used in 38 files. 24 call sites set `maxWidth` to one of twelve values (480 ×2, 520, 560 ×2, 600, 620, 640 ×7, 720, 760 ×2, 900, 960 ×3, 1000 ×2, 1080px); the rest take the 600px default. |
 | Unsaved input is rarely guarded | Only `ZevSettingsPage` guards it (`useBlocker`, `zevUnsavedGuard`). Tariff and other dialogs close without asking. |
 | Wizards sit in dialogs | `ZevListPage` creation (4 steps plus a done screen, 960px) and `ImportWizardModal` (1080px). |
 | Three disclosure mechanisms | Native `<details>` (`BillingPeriodCard`, `BillingPeriodsPage`), hand-rolled `aria-expanded` buttons (`ZevEmailTemplateFields`, `RawMeteringTable`, `MeteringGapsDrawer`, `MeteringPointRow`, `TariffCategorySections`). |
@@ -72,7 +72,7 @@ planned order.
 - The tariff screen's own behaviour: [tariff split view](2026-10-tariff-split-view.md).
 - Invoice and document labels: [audience-specific invoice labels](2026-10-audience-specific-invoice-labels.md).
 - Backend behaviour, API shapes, billing calculations, permissions, data models.
-- Wrapping every Mantine control, or a custom pattern-checking script (ADR 0039 decision 8).
+- Wrapping every Mantine control, or a custom pattern-checking script (ADR 0040 decision 8).
 
 Illustrative labels below must use translation keys in implementation.
 Count-bearing messages use locale-aware pluralisation.
@@ -177,11 +177,14 @@ Rules that cut across the table:
   multiline and composite controls.
 - **Sizes.** A few named sizes, chosen for content, with a compact one
   preserved. Provisional values, confirmed by screenshots before they become a
-  contract: `sm` 600px (the current default, so default callers do not change),
+  contract: `xs` 480px (one to three fields: record a payment, refund, correct an
+  invoice), `sm` 600px (the current default, so default callers do not change),
   `md` 760px, `lg` 960px, `xl` 1080px (wide read-mostly content such as price
   history or import review). `ConfirmDialog` stays 400px. Responsive bounds
   (90% width, 90dvh) and the no-horizontal-overflow requirement stay. Existing
-  widths map to the nearest size in phase 4; a width change is checked visually.
+  widths map to the nearest size in phase 4 (480/520 → `xs`; 560–640 → `sm`;
+  720/760 → `md`; 900/960 → `lg`; 1000/1080 → `xl`); a width change is checked
+  visually.
 - **Dirty guard (universal).** X, Cancel, Escape, scrim click and in-app
   navigation ask **Discard changes?** when the form has unsaved changes, and
   close immediately when it has none or is read-only. Browser reload or tab
@@ -410,8 +413,8 @@ matching user-guide chapter; regenerate guide screenshots as a set.
 
 | Phase | Work | Exit criterion |
 |---|---|---|
-| 0 | This documentation | Spec and ADR 0039 reviewed |
-| 1 | **Tariff pilot** ([tariff split view](2026-10-tariff-split-view.md)): list treatment, pane with viewing and editing, phone behaviour, the dirty guard | Pilot acceptance passes on a laptop and a phone; widths and breakpoint recorded; ADR 0039 accepted |
+| 0 | This documentation | Spec and ADR 0040 reviewed |
+| 1 | **Tariff pilot** ([tariff split view](2026-10-tariff-split-view.md)): list treatment, pane with viewing and editing, phone behaviour, the dirty guard | Pilot acceptance passes on a laptop and a phone; widths and breakpoint recorded; ADR 0040 accepted |
 | 2 | **Shared pieces:** `FormModal` `size` and universal dirty guard; `Disclosure`; `AppTabs`; the pane's shared parts once a second consumer exists | Components exist with tests; all `FormModal`s guarded |
 | 3 | **Retire overlay drawers:** audit log to the pane; metering gaps to a dialog or inline section (decided with screenshots); remove raw `Drawer` use and add the `no-restricted-imports` rule | No page or feature imports `Drawer` from Mantine |
 | 4 | **Dialog sizes:** map each explicit `maxWidth` to a size with screenshots; remove `maxWidth` from the type | `maxWidth` no longer compiles |
@@ -466,7 +469,7 @@ matching user-guide chapter; regenerate guide screenshots as a set.
 
 ### Acceptance criteria for this documentation change
 
-- [ ] Reference spec, tariff pilot spec, invoice-labels spec and ADR 0039 agree.
+- [ ] Reference spec, tariff pilot spec, invoice-labels spec and ADR 0040 agree.
 - [ ] Proposed behaviour is clearly separated from what is shipped.
 - [ ] The rollout phases have exit criteria.
 - [ ] Every catalogue entry and observation resolves to code.

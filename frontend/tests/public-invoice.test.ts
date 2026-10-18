@@ -66,6 +66,12 @@ describe('groupItemsByCategory', () => {
         ])
     })
 
+    it('puts one-off charges last and does not drop them (#924)', () => {
+        const groups = groupItemsByCategory([item('other', 'Porto'), item('metering', 'Meter'), item('energy', 'Solar')])
+
+        expect(groups.map((g) => g.category)).toEqual(['energy', 'metering', 'other'])
+    })
+
     it('omits categories with no lines rather than rendering empty headings', () => {
         const groups = groupItemsByCategory([item('energy', 'Solar')])
 

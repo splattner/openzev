@@ -26,6 +26,10 @@ class TariffCategory(models.TextChoices):
     GRID_FEES = "grid_fees", "Grid Fees"
     LEVIES = "levies", "Levies"
     METERING = "metering", "Metering Tariff"
+    # Invoice lines only: a ``Charge`` (#924) is billed under this category.
+    # ``Tariff.clean`` refuses it, because the choices are shared with
+    # ``InvoiceItem.tariff_category``.
+    OTHER = "other", "Other"
 
 
 class BillingMode(models.TextChoices):
@@ -191,6 +195,9 @@ class Tariff(models.Model):
 
         if self.billing_mode in {BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY} and not self.energy_type:
             errors["energy_type"] = "Energy-based tariffs require an energy type."
+
+        if self.category == TariffCategory.OTHER:
+            errors["category"] = "Choose energy, grid fees, levies or metering. One-off costs are charges, not tariffs."
 
         # Bands are priced per mode: an energy band carries a price, a
         # percentage band carries a percentage. A band of one mode is

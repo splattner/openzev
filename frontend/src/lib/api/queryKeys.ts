@@ -11,6 +11,10 @@ export const queryKeys = {
     socialAccounts: () => ['auth', 'social-accounts'] as const,
     apiKeys: () => ['auth', 'api-keys'] as const,
     mfa: () => ['auth', 'mfa'] as const,
+    credentials: () => ['auth', 'credentials'] as const,
+    allCredentialsRoot: ['auth', 'all-credentials'] as const,
+    allCredentials: (user?: number | '', kind?: string, status?: string) =>
+      [...queryKeys.auth.allCredentialsRoot, user ?? '', kind ?? '', status ?? ''] as const,
     allApiKeysRoot: ['auth', 'all-api-keys'] as const,
     allApiKeys: (user?: number | '', status?: string) => [...queryKeys.auth.allApiKeysRoot, user ?? '', status ?? ''] as const,
     oauthProviderConfigs: () => ['auth', 'oauth-provider-configs'] as const,
@@ -33,6 +37,12 @@ export const queryKeys = {
     dynamicSources: () => ['tariffs', 'dynamic-sources'] as const,
     dynamicPrices: (sourceId: string, dateFrom: string, dateTo: string) =>
       ['tariffs', 'dynamic-sources', sourceId, 'prices', dateFrom, dateTo] as const,
+  },
+  charges: {
+    lists: () => ['charges', 'list'] as const,
+    list: (zevId?: string, periodStart?: string, periodEnd?: string) =>
+      ['charges', 'list', zevId ?? 'all', periodStart ?? null, periodEnd ?? null] as const,
+    preview: (payload: unknown) => ['charges', 'preview', payload] as const,
   },
   feasibility: {
     enabled: () => ['feasibility', 'enabled'] as const,

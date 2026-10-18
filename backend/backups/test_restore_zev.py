@@ -169,7 +169,10 @@ class ReplaceInPlaceTests(ZevRestoreTestCase):
         with mock.patch.object(restore.connection.ops, "sequence_reset_sql", return_value=[]) as reset:
             restore_from(self.raw, self.alpha_id)
         models = reset.call_args.args[1]
-        self.assertEqual({m._meta.label for m in models}, {"invoices.InvoiceDynamicSourceEvidence"})
+        self.assertEqual(
+            {m._meta.label for m in models},
+            {"invoices.InvoiceDynamicSourceEvidence", "invoices.Charge_participants"},
+        )
 
 
 class LockTests(ZevRestoreTestCase):

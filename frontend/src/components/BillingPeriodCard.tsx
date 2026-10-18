@@ -45,7 +45,10 @@ export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
     )
 
     const pendingSteps = detailSteps.filter(isOpenStep)
-    const completedSteps = detailSteps.filter((step) => !isOpenStep(step))
+    // A community that never uses one-off charges has nothing to verify under them.
+    const completedSteps = detailSteps.filter(
+        (step) => !isOpenStep(step) && !(step.key === 'charges' && step.count === 0),
+    )
 
     return (
         <article className="card overview-period-card">

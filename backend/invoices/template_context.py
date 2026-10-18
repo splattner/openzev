@@ -77,6 +77,7 @@ def build_sample_invoice_context() -> dict:
         ],
         # Zero: the sample has no producer credit to list apart from the VAT.
         "producer_credit_chf": Decimal("0.00"),
+        "pass_through_chf": Decimal("0.00"),
         "grouped_items": [
             {
                 "key": "energy",

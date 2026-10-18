@@ -14,6 +14,7 @@ import {
     pdfWatchRefetchInterval,
     usePdfWatch,
 } from '../features/invoices/pdfWatch'
+import { PeriodCharges } from '../features/charges/PeriodCharges'
 import { PeriodSelector } from '../components/PeriodSelector'
 import {
     billingPeriodName,
@@ -120,6 +121,10 @@ export function InvoicesContent() {
     })
 
     const rows = periodOverviewQuery.data?.rows ?? []
+    // Charges follow the backend rule: any invoice past draft freezes the period's charges.
+    const periodHasIssuedInvoice = rows.some(
+        (row) => row.invoice !== null && row.invoice.status !== 'draft' && row.invoice.status !== 'cancelled',
+    )
     const pendingWorkCount = countPendingInvoiceWork(rows, pdfWatch)
     const isWaitingForPdfs = pdfWatch !== null && pendingWorkCount > 0
 
@@ -269,6 +274,15 @@ export function InvoicesContent() {
                     )}
                 </>
             )}
+
+            {isManagedScope && selectedZevId && period.period_start && period.period_end && periodOverviewQuery.data ? (
+                <PeriodCharges
+                    zevId={selectedZevId}
+                    periodStart={period.period_start}
+                    periodEnd={period.period_end}
+                    periodLocked={periodHasIssuedInvoice}
+                />
+            ) : null}
 
             <InvoiceDeleteModal
                 isOpen={deleteModalInvoiceId !== null}

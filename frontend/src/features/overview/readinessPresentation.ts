@@ -1,16 +1,17 @@
 import type { TFunction } from 'i18next'
 import type { AttentionItem, ReadinessStep } from '../../types/api'
 
-/** Maps a next_action back to the step that owns it (for its open link). */
-export const NEXT_ACTION_STEP_KEY: Record<string, string> = {
-    fix_metering: 'metering',
-    fix_assignments: 'assignments',
-    fix_tariffs: 'tariffs',
-    generate: 'generated',
-    review_generation_conflicts: 'generation_conflicts',
-    approve: 'approved',
-    send: 'sent',
-    track_payments: 'paid',
+/** Maps a next_action back to the steps that can own it, in step order (for their open link). */
+export const NEXT_ACTION_STEP_KEYS: Record<string, string[]> = {
+    fix_metering: ['metering'],
+    fix_assignments: ['assignments'],
+    fix_tariffs: ['tariffs'],
+    // Stale charges are regenerated like a missing invoice, so either step can carry it.
+    generate: ['generated', 'charges'],
+    review_generation_conflicts: ['generation_conflicts'],
+    approve: ['approved'],
+    send: ['sent'],
+    track_payments: ['paid'],
 }
 export function stepDetailText(step: ReadinessStep, t: TFunction): string | null {
     const d = (key: string, vars: Record<string, unknown> = {}) =>
@@ -46,6 +47,14 @@ export function stepDetailText(step: ReadinessStep, t: TFunction): string | null
             return d('conflictsWarn', {
                 count: step.detail_data?.conflict_count ?? step.count,
                 names,
+            })
+        }
+        case 'charges': {
+            if (step.status === 'todo') return d('chargesTodo', { count: step.detail_data?.stale_drafts ?? 0 })
+            if (step.status !== 'warn') return null
+            return d('chargesWarn', {
+                count: (step.detail_data?.unbilled_charges ?? []).length + (step.detail_data?.more_unbilled ?? 0),
+                names: (step.detail_data?.unbilled_charges ?? []).join(', '),
             })
         }
         case 'approved':

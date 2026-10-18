@@ -39,6 +39,7 @@ from .views_security import (
     PasswordResetRequestView,
     RevokeOwnSessionsView,
 )
+from .views_credentials import AdminCredentialsView, MyCredentialsView
 from .views_system import SystemHealthView
 
 urlpatterns = [
@@ -88,6 +89,10 @@ urlpatterns = [
     # revoke everyone else's.
     path("api-keys/", AdminApiKeyListView.as_view(), name="admin-api-key-list"),
     path("api-keys/<uuid:pk>/", AdminApiKeyDetailView.as_view(), name="admin-api-key-detail"),
+    # One list of API keys, analytics tokens and energy data push tokens
+    # (SPEC-2026-tokens-and-keys). Absent from ACCOUNTS_API_KEY_ALLOWLIST.
+    path("me/credentials/", MyCredentialsView.as_view(), name="credential-list"),
+    path("credentials/", AdminCredentialsView.as_view(), name="admin-credential-list"),
     path("me/social-accounts/", social_accounts_list, name="social-accounts-list"),
     path("me/social-accounts/<int:pk>/", social_account_delete, name="social-account-delete"),
     path("app-settings/", app_settings, name="app-settings"),

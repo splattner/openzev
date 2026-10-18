@@ -141,11 +141,11 @@ statements stay live renders; contracts freeze through `ContractIssue`.
 |---|---|---|
 | `invoice` | FK → `Invoice` (`CASCADE`) | Parent invoice |
 | `item_type` | `ItemType` | `local_energy`, `grid_energy`, `feed_in`, `fee`, `credit` |
-| `tariff_category` | `TariffCategory` | `energy`, `grid_fees`, `levies`, `metering` |
+| `tariff_category` | `TariffCategory` | `energy`, `grid_fees`, `levies`, `metering`, `other` (one-off charge lines, #924) |
 | `description` | `CharField(500)` | Human-readable line description |
 | `quantity_kwh` | `Decimal(12,4)` | Quantity (kWh or months) |
 | `unit` | `CharField(20)` | `kWh` or `month` |
-| `unit_price_chf` | `Decimal(8,5)` | Price per unit |
+| `unit_price_chf` | `Decimal(13,5)` | Price per unit (wide enough for a one-off charge's flat line) |
 | `total_chf` | `Decimal(10,2)` | `quantity × unit_price`, rounded |
 | `sort_order` | `PositiveSmallIntegerField` | Display ordering |
 
@@ -534,12 +534,12 @@ required → 400, unknown ZEV → 404, non-owner → 403 via `HasZevAccess`).
 `Readiness` payload: `{period: {start, end, interval} | null, steps: [{key,
 status, count, [total], [failed], [detail], [link], [detail_data]}],
 next_action, [setup], [awaiting_first_period], [caught_up]}`; step keys ∈
-metering | assignments | tariffs | generated | generation_conflicts |
+metering | assignments | tariffs | generated | charges | generation_conflicts |
 approved | sent | paid;
 statuses ∈ ok | warn | todo | done (never `blocked` — data quality is
 soft-gated). `count`/`total` are real: `generated` compares invoices present
 against billable participants; approve/send/paid run over the period's active
-(non-cancelled) invoices. `detail` is an English API fallback never rendered;
+(non-cancelled) invoices. The `charges` step (#924, between `generated` and `approved`, `next_action: generate`) is `todo` while a draft was created before a charge dated in the period was last changed or no longer holds the charge lines that apply to it (a charge deleted, re-dated or taken off the participant), `warn` for a charge nobody bears, and otherwise `ok`/hidden when the period has no charges; `detail_data` carries `stale_drafts`, `unbilled_charges`, `more_unbilled`. `detail` is an English API fallback never rendered;
 the UI localizes from `detail_data`. Both single-period and bulk readiness
 ignore failed email attempts for paid/cancelled invoices, and count the newest
 attempt for every other invoice in the exact period. Cross-period alerts remain
@@ -926,7 +926,8 @@ The invoice PDF template receives:
 | `invoice` | Invoice model instance |
 | `vat_rate_percent` | `invoice.vat_rate × 100` as a `Decimal`; formatted to one decimal place in the VAT label |
 | `producer_credit_chf` | `subtotal_chf − vat_base_chf` (negative) when the invoice has a recorded VAT base that differs from the subtotal; otherwise `None`. When set, the totals block shows the supplies subtotal (`vat_base_chf`, `tr.supplies_subtotal`) in place of the subtotal, and the producer remuneration (`tr.producer_credit`) after the VAT line (itself shown only when `vat_rate > 0`); when `None` it shows the plain subtotal |
-| `grouped_items` | Items grouped by `TariffCategory` (energy → grid_fees → levies → metering), each with category subtotal |
+| `grouped_items` | Items grouped by `TariffCategory` (energy → grid_fees → levies → metering → other), each with category subtotal |
+| `pass_through_chf` | `invoice.pass_through_chf` or `None`; listed after the VAT as `tr.pass_through`, and `producer_credit_chf` excludes it (#924) |
 | `issuer` | The invoice's issuer copy (§3.1a) |
 | `recipient` | The invoice's recipient copy (§3.1a) |
 | `zev` | The ZEV, with `name`, `vat_number`, `bank_iban`, `bank_name` answered from the issuer copy (`FrozenView`); anything else reads the live ZEV |

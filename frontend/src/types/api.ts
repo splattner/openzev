@@ -137,6 +137,12 @@ export interface AppSettings {
     /** Every account must hold a second factor (a passkey or TOTP). Admin-only. */
     mfa_required?: boolean
     mfa_grace_period_days?: number
+    /** Participants needed on every day of a range before a participant sees ZEV-wide analytics totals; `null` follows the platform default. Admin-only. */
+    analytics_min_participants_for_aggregate?: number | null
+    /** What `null` resolves to (the environment's value, never below the floor). Admin-only, read-only. */
+    analytics_min_participants_default?: number
+    /** The lowest value that can be set. Admin-only, read-only. */
+    analytics_min_participants_floor?: number
     updated_at: string
 }
 
@@ -146,6 +152,7 @@ export interface AppSettingsInput {
     date_time_format?: DateTimeFormat
     mfa_required?: boolean
     mfa_grace_period_days?: number
+    analytics_min_participants_for_aggregate?: number | null
 }
 
 /** Admin-only platform health snapshot (nav-regroup phase 3):
@@ -466,6 +473,68 @@ export interface ApiKeyInput {
     expires_at?: string | null
 }
 
+/** The three bearer credentials OpenZEV issues (SPEC-2026-tokens-and-keys). */
+export type CredentialKind = 'api_key' | 'analytics' | 'energy_push'
+
+/** What a credential can do: an API key acts as its owner, the others are narrower. */
+export type CredentialAccess = 'read_write' | 'read_only' | 'read' | 'write_readings'
+
+export interface CredentialScope {
+    zev: string | null
+    zev_name: string | null
+    participant: string | null
+    participant_name: string | null
+    metering_point: string | null
+    meter_id: string | null
+}
+
+/** One row of the Tokens & keys list. Never carries a secret. */
+export interface AccessCredential {
+    kind: CredentialKind
+    id: string
+    name: string
+    /** Namespace and prefix, e.g. `ozv_3f9a1c04b7e2`. */
+    prefix: string
+    access: CredentialAccess
+    scope: CredentialScope
+    created_at: string | null
+    expires_at: string | null
+    last_used_at: string | null
+    status: 'active' | 'expired' | 'revoked'
+    actions: Array<'revoke' | 'rotate'>
+    /** Frontend path where the thing behind the credential is managed (energy data sources). */
+    manage_url: string | null
+}
+
+export interface MyCredentialsResponse {
+    credentials: AccessCredential[]
+    can_create: { api_key: boolean; analytics: boolean }
+}
+
+/** A row as the admin console sees it: plus its owner and, for revoked ones, when. */
+export interface AdminAccessCredential extends AccessCredential {
+    owner: { id: number; username: string; email: string }
+    revoked_at: string | null
+}
+
+export interface AnalyticsTokenInput {
+    name: string
+    zev: string
+    participant?: string | null
+    expires_at?: string | null
+}
+
+/** The one response that carries the secret. It is never retrievable again. */
+export interface AnalyticsTokenWithSecret {
+    id: string
+    name: string
+    zev: string
+    participant: string | null
+    prefix: string
+    expires_at: string | null
+    token: string
+}
+
 export interface OAuthLoginInitiateResponse {
     redirect_url: string
 }
@@ -732,6 +801,8 @@ export interface SupplementarySource {
     reconciliation: SupplementaryReconciliation
     has_credential: boolean
     push_token_prefix: string | null
+    push_token_created_at: string | null
+    push_token_last_used_at: string | null
     created_at: string
     updated_at: string
 }
@@ -1315,10 +1386,13 @@ export interface InvoicePeriodOverview {
     rows: InvoicePeriodParticipantRow[]
 }
 
+/** The groups an invoice's lines fall under: the four tariff categories, plus the one-off charges (#924). */
+export type InvoiceItemCategory = 'energy' | 'grid_fees' | 'levies' | 'metering' | 'other'
+
 export interface InvoiceItem {
     id: string
     item_type: string
-    tariff_category: 'energy' | 'grid_fees' | 'levies' | 'metering'
+    tariff_category: InvoiceItemCategory
     description: string
     quantity_kwh: string
     unit: string
@@ -1348,6 +1422,7 @@ export type ReadinessStepKey =
     | 'tariffs'
     | 'generated'
     | 'generation_conflicts'
+    | 'charges'
     | 'approved'
     | 'sent'
     | 'paid'
@@ -1395,6 +1470,11 @@ export interface ReadinessStepDetailData {
     more_conflicts?: number
     /** paid todo: active invoices not yet paid. */
     unpaid?: number
+    /** charges todo: drafts generated before a charge changed. */
+    stale_drafts?: number
+    /** charges warn: charges nobody can be billed for (first three descriptions). */
+    unbilled_charges?: string[]
+    more_unbilled?: number
 }
 
 /** One participant blocked by locked overlapping invoices. */
@@ -2109,7 +2189,7 @@ export interface VseTariffImportResult {
     errors: Array<{ name: string; error: string }>
 }
 
-export type TransferSectionName = 'zev' | 'participants' | 'metering_points' | 'tariffs' | 'readings' | 'supplementary_data' | 'invoices' | 'invoice_pdfs'
+export type TransferSectionName = 'zev' | 'participants' | 'metering_points' | 'tariffs' | 'charges' | 'readings' | 'supplementary_data' | 'invoices' | 'invoice_pdfs'
 
 export interface ZevArchiveImportResult {
     zev_id: string
@@ -2121,7 +2201,7 @@ export interface ZevArchiveImportResult {
 
 /** One line on a publicly-viewable invoice (see `PublicInvoice`). */
 export interface PublicInvoiceItem {
-    category: 'energy' | 'grid_fees' | 'levies' | 'metering'
+    category: InvoiceItemCategory
     description: string
     quantity: string
     unit: string
@@ -2408,4 +2488,38 @@ export interface RestoreJobInput {
     dry_run: boolean
     force?: boolean
     safety_destination_id?: string
+}
+
+// ---------------------------------------------------------------------------
+// One-off charges (#924)
+// ---------------------------------------------------------------------------
+
+export type ChargeAllocation = 'all_participants' | 'selected_participants'
+export type ChargeSplitKey = 'equal' | 'weight'
+export type ChargeVatTreatment = 'taxable' | 'pass_through'
+
+export interface Charge {
+    id: string
+    zev: string
+    description: string
+    amount_chf: string
+    charge_date: string
+    allocation: ChargeAllocation
+    split_key: ChargeSplitKey
+    vat_treatment: ChargeVatTreatment
+    /** Ids of the participants who bear it; empty unless `allocation` is `selected_participants`. */
+    participants: string[]
+    /** An issued invoice carries (or can no longer pick up) the charge: it cannot be changed or deleted. */
+    is_locked: boolean
+    created_at: string
+    updated_at: string
+}
+
+export type ChargeInput = Omit<Charge, 'id' | 'is_locked' | 'created_at' | 'updated_at'>
+
+export interface ChargePreview {
+    bearers: Array<{ participant: string; name: string; share_chf: string }>
+    total_billed_chf: string
+    /** What the split leaves over after rounding each share to the centime. */
+    unrecovered_chf: string
 }

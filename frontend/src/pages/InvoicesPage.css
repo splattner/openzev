@@ -23,3 +23,19 @@
   font-size: 0.9rem;
 }
 
+
+/* The period's one-off charges sit under its invoices. */
+
+.period-charges {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.period-charges-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}

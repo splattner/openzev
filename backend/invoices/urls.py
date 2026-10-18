@@ -7,6 +7,7 @@ from .contract_pdf import CONTRACT_TEMPLATE_NAME
 from .credit_pdf import CREDIT_NOTE_TEMPLATE
 from .pdf import TEMPLATE_NAME
 from .views import CreditViewSet, InvoiceViewSet
+from .views_charges import ChargeViewSet
 from .views_dashboard import InvoiceDashboardView
 from .views_reports import (
     AnnualReportView,
@@ -25,6 +26,7 @@ from .views_readiness import AttentionView, ReadinessView
 router = DefaultRouter()
 router.register("invoices", InvoiceViewSet, basename="invoice")
 router.register("credits", CreditViewSet, basename="credit")
+router.register("charges", ChargeViewSet, basename="charge")
 
 # These endpoints used to be @action methods on InvoiceViewSet. They are listed
 # explicitly here — ahead of router.urls, so they win over the viewset's
