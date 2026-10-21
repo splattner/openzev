@@ -2515,8 +2515,8 @@ the rest under <strong>More</strong>:</p>
 </tr>
 <tr>
 <td>Sent</td>
-<td><strong>Mark Paid</strong></td>
-<td>Open PDF, Generate/Regenerate PDF, Resend Email</td>
+<td><strong>Mark Paid</strong> / <strong>Mark rest as paid</strong></td>
+<td>Record payment, Open PDF, Generate/Regenerate PDF, Resend Email</td>
 </tr>
 <tr>
 <td>Paid</td>
@@ -2688,16 +2688,19 @@ history</strong>, where a failed latest attempt also has a <strong>Retry</strong
 <h2 id="recording-payments">Recording payments<a class="headerlink" href="#recording-payments" title="Permanent link">&para;</a></h2>
 <p>When a participant has paid the whole invoice, click <strong>Mark Paid</strong> on the row
 (shown for <code>Sent</code> invoices). It records one payment for the outstanding amount,
-dated today, and the status changes to <code>Paid</code>. It is a single-click action.</p>
-<p>For a partial payment, or to record the date the money actually arrived, open
-the invoice and use the <strong>Payments</strong> card:</p>
+dated today, and the status changes to <code>Paid</code>. It is a single-click action.
+Once part of the money has been recorded, the same row action reads <strong>Mark rest
+as paid</strong> and books only what is still open.</p>
+<p>To record an amount or a payment date, choose <strong>Record payment</strong> from the row's
+<strong>More</strong> menu or from the invoice's <strong>Payments</strong> card:</p>
 <ol>
-<li>Click <strong>Record payment</strong>.</li>
 <li>Enter the amount (it starts at the outstanding amount and can't exceed it),
    the date it was paid (not in the future) and, optionally, a note such as the
    bank reference.</li>
 <li>Click <strong>Record payment</strong>.</li>
 </ol>
+<p>In the period table, <strong>Record payment</strong> and <strong>Mark Paid</strong> (or <strong>Mark rest as paid</strong>)
+stay unavailable while either action is saving, even if you close the payment dialog.</p>
 <p><img alt="Record payment dialog" src="../screenshots/08h-record-payment-dialog.png" /></p>
 <p>A payment short of the total leaves the invoice <strong>Partly paid</strong>: its status
 pill says so, and the payment step in the period table shows it as under way.
