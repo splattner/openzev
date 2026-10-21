@@ -1091,6 +1091,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#metering-corrections-on-issued-invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metering corrections on issued invoices
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1962,6 +1973,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#metering-corrections-on-issued-invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metering corrections on issued invoices
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2575,6 +2597,41 @@ they are stored separately and added to the new draft again.</p>
 <blockquote>
 <p><strong>Tip:</strong> You can generate invoices even when metering data is incomplete, but totals may be inaccurate. It is best to resolve missing data first.</p>
 </blockquote>
+<h3 id="metering-corrections-on-issued-invoices">Metering corrections on issued invoices<a class="headerlink" href="#metering-corrections-on-issued-invoices" title="Permanent link">&para;</a></h3>
+<p>A committed metering correction (or an import deletion) never rewrites an
+invoice — amounts, PDFs and delivery records stay as issued. Instead the
+affected invoices stay in the <strong>Issues</strong> filter and carry a <strong>Data review</strong>
+flag. The period rows and invoice detail page identify them; managers and viewers
+also see source evidence (delivery ID or CSV filename, changed intervals) on the
+detail page. The <strong>Overview</strong> readiness
+check gains a <strong>Data corrections</strong> step linking to the period's billing page.</p>
+<table>
+<thead>
+<tr>
+<th>Invoice status</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Draft</strong></td>
+<td><strong>More → Regenerate invoice</strong> bills the corrected values.</td>
+</tr>
+<tr>
+<td><strong>Approved / Sent</strong></td>
+<td>With no payments, cancel through the API and generate a new invoice. A sent invoice with payments needs <strong>Correct invoice → Reverse the invoice</strong> first.</td>
+</tr>
+<tr>
+<td><strong>Paid</strong></td>
+<td>Use <strong>Correct invoice → Reverse the invoice</strong>, then generate a new invoice. Payments and partial credits leave the review flag open.</td>
+</tr>
+</tbody>
+</table>
+<p>Full reversal is available for a positive invoice with uncredited payments
+or applied credit. If neither remains, the flag stays open for review.
+Zero invoices and payouts cannot be reversed.</p>
+<p>Participants see the review flag on their own sent and paid invoices,
+without internal import evidence or management actions.</p>
 <h2 id="reviewing-invoices">Reviewing Invoices<a class="headerlink" href="#reviewing-invoices" title="Permanent link">&para;</a></h2>
 <p>Click the invoice number in the <strong>Participant</strong> column to view the invoice detail page.</p>
 <h3 id="invoice-detail-page">Invoice Detail Page<a class="headerlink" href="#invoice-detail-page" title="Permanent link">&para;</a></h3>
@@ -2913,6 +2970,13 @@ available after billing. The selected community appears above the page title.</p
 <li><strong>Understand billing logic:</strong> <a href="../08-billing-allocation-explained/">Billing &amp; Allocation Explained</a></li>
 <li><strong>Manage tariffs:</strong> <a href="../07-tariff-configuration/">Tariff Configuration</a></li>
 </ul>
+<p>Legacy CSV timestamp repairs also flag invoices for review, including periods
+on either side of a Swiss date boundary. Their evidence identifies a CSV
+timestamp correction rather than an SDAT delivery or an import deletion.</p>
+<p>The Data review notice initially lists the newest 20 corrections. Open the
+invoice detail and choose <strong>Show all</strong> to inspect a longer open history;
+<strong>Show newest 20</strong> collapses it again. Period overview keeps the complete count
+while returning only the newest 20 evidence entries per invoice.</p>
 
 
 

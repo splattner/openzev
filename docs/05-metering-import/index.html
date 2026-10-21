@@ -828,6 +828,56 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="SDAT-CH Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#supported-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported profile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#complete-intervals-and-atomic-rejection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete intervals and atomic rejection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#corrections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Corrections
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#held-non-billable-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Held (non-billable) values
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1049,6 +1099,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Next Steps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#protected-correction-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protected correction paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1803,6 +1870,56 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="SDAT-CH Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#supported-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported profile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#complete-intervals-and-atomic-rejection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete intervals and atomic rejection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#corrections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Corrections
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#held-non-billable-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Held (non-billable) values
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2025,6 +2142,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Next Steps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#protected-correction-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protected correction paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -2210,7 +2344,7 @@ alike. Delimiter may be any single character (for example <code>,</code>, <code>
 <li>Click <strong>Load Preview</strong>. Configuration changes, including toggling overwrite, invalidate the preview — reload before importing. Selecting or removing a file also requires a new preview. With several files, each gets its own preview section; one file with errors blocks the whole import, and a meter missing from any file is listed once.</li>
 <li>Check <strong>Metering point exists</strong> per row; missing IDs are listed with copy/download actions and block <strong>Start Import</strong> until the meters exist.</li>
 <li>Check <strong>Direction</strong>: where each row's readings will land — <em>Consumption (in)</em>, <em>Feed-in (out)</em>, or both when a bidirectional meter's row splits by sign. If a whole file shows the wrong direction, the <strong>Direction column</strong> mapping is wrong.</li>
-<li>Check <strong>Existing data</strong>: the database already holds that reading (standard rows), or the day already holds readings for that meter/direction (daily rows). Enabling overwrite shows an estimate of how many existing readings will be replaced; fully duplicate rows never block the import — they are skipped (reported in the protocol) in skip mode and replaced in overwrite mode.</li>
+<li>Check <strong>Existing data</strong>: the database already holds that reading (standard rows), or the day already holds readings for that meter/direction (daily rows). Enabling overwrite shows an estimate of how many existing readings will be replaced; fully duplicate rows never block the import — they are skipped in skip mode; overwrite mode replaces only changed values. Identical values keep their original source and batch.</li>
 <li>Review <strong>Errors</strong>: parse failures and empty daily rows. Values above 99999999.9999 kWh are rejected: they cannot be stored. Partially duplicate daily rows show no error — the existing slots are skipped and missing ones are imported (gap-fill).</li>
 </ul>
 </li>
@@ -2218,7 +2352,7 @@ alike. Delimiter may be any single character (for example <code>,</code>, <code>
 <p><strong>Review Import Options</strong></p>
 <ul>
 <li><strong>Overwrite existing readings</strong> for the same metering point + timestamp +
-   direction (unchecked by default). When checked, re-importing overwrites any
+   direction (unchecked by default). When checked, re-importing replaces changed
    existing readings that match; when unchecked, existing readings are kept
    and duplicates are skipped per slot. Overwrites are reported as a protocol
    <strong>Note</strong> (<code>Overwrote N existing readings.</code>), not as errors.</li>
@@ -2243,13 +2377,29 @@ alike. Delimiter may be any single character (for example <code>,</code>, <code>
 <strong>Notes</strong> section (e.g. overwrite counts), and a <strong>Skipped row reasons</strong>
 table (row, meter, reason). Overwrites show a success toast; only true
 failures show an error toast. Both errors and overwrite notes auto-open the protocol.</p>
+<p>For SDAT-CH files the protocol shows the structured outcome instead of row
+totals: <strong>Accepted</strong> (billable data written), <strong>Held</strong> (only non-billable
+quarantine values written — still a success), <strong>No changes</strong> (valid replay),
+<strong>Corrections applied</strong> (only overwrites, no new rows), or <strong>Rejected</strong>
+(nothing written). An observation accounting lists new, overwritten, held,
+promoted, duplicate, stale, excluded and rejected observations — promoted
+values are a subset of the created/overwritten rows, not extra energy. Each
+finding carries its stable cause plus the source meter, block/document,
+delivery and position needed to resolve it, and the delivery identity
+(delivery ID, creation, sender/receiver) is shown for traceability.</p>
+<p><img alt="SDAT-CH import protocol with the structured correction outcome" src="../screenshots/09b-import-protocol.png" /></p>
 <p>Duplicate handling: the same metering point + timestamp + direction is stored
 once. Fully existing daily rows show a non-blocking preview notice, so a file
 with existing days and newly appended days can be imported together.
 Re-importing without overwrite skips existing slots and imports missing
 ones; fully duplicate rows are skipped with a <code>Duplicate reading</code> error.</p>
 <h2 id="sdat-ch-format">SDAT-CH Format<a class="headerlink" href="#sdat-ch-format" title="Permanent link">&para;</a></h2>
-<p>OpenZEV supports the Swiss <strong>SDAT-CH</strong> metering data standard (used by utility providers).</p>
+<p>OpenZEV imports <strong>E66 <code>ValidatedMeteredData</code> files for ZEV/vZEV billing</strong>:
+validated active-energy customer/producer deliveries uploaded manually as
+XML (<code>.xml</code>) or gzipped XML (<code>.xml.gz</code>, <code>.gz</code>). That is the supported
+release profile — not all-role SDAT-CH exchange. Automated receipt,
+acknowledgements/error responses, LEG settlement and other market roles
+(supplier, balance-group, grid operator, switching) are deferred.</p>
 <ol>
 <li>Go to <strong>Metering → Import history</strong> and click <strong>New Import</strong></li>
 <li>Choose the <strong>SDAT-CH (ebIX XML)</strong> format</li>
@@ -2261,9 +2411,88 @@ ones; fully duplicate rows are skipped with a <code>Duplicate reading</code> err
    they are imported one after another; if some fail, the others stay
    imported and only the failed files remain selected so you can retry.</li>
 </ol>
-<blockquote>
-<p><strong>Note:</strong> SDAT-CH metadata (meter type, interval) is extracted; timestamp resolution is auto-detected.</p>
-</blockquote>
+<h3 id="supported-profile">Supported profile<a class="headerlink" href="#supported-profile" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Supported</th>
+<th>Excluded / deferred</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Message</td>
+<td>E66 <code>ValidatedMeteredData</code>, schema <code>ValidatedMeteredData_16</code></td>
+<td>E31 aggregates, acknowledgements, error reports, other roots</td>
+</tr>
+<tr>
+<td>Business reason</td>
+<td><code>E88</code> billing, <code>C38</code> information</td>
+<td><code>C40</code> community management, queries, switching, master data</td>
+</tr>
+<tr>
+<td>Product / unit</td>
+<td>Active energy (<code>8716867000030</code>) in kWh</td>
+<td>Reactive energy, LEG products, other units</td>
+</tr>
+<tr>
+<td>Direction</td>
+<td>Customer/producer consumption (<code>IN</code>) and production (<code>OUT</code>)</td>
+<td>Grid-interconnection (exchange) points</td>
+</tr>
+<tr>
+<td>Resolution</td>
+<td>15-minute intervals</td>
+<td>Hourly and other resolutions</td>
+</tr>
+<tr>
+<td>Quality</td>
+<td>Measured and estimated (<code>56</code>) values bill; temporary (<code>21</code>) values are held</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Transport</td>
+<td>Manual file upload (XML, gzip)</td>
+<td>Automated exchange, ACK/error messages</td>
+</tr>
+</tbody>
+</table>
+<p>Unsupported message types, reasons, products and units reject the file;
+reactive-energy, LEG and exchange blocks are reported skips. Automated exchange,
+acknowledgements and other market roles remain outside this manual receiver.</p>
+<p>Real DSO production file variants and the full 50 MB exchange volume have not
+been exercised in production yet.</p>
+<h3 id="complete-intervals-and-atomic-rejection">Complete intervals and atomic rejection<a class="headerlink" href="#complete-intervals-and-atomic-rejection" title="Permanent link">&para;</a></h3>
+<p>Each billing block must carry <strong>every position of its declared interval</strong>
+and fit within the delivery's ReportPeriod. Its IN/OUT direction must match
+the configured meter type; bidirectional points accept both. An invalid file (unknown or ambiguous meter,
+incompatible unit, out-of-range or missing position, conflicting values,
+unknown product) rejects the <strong>whole file</strong>: no observations are written,
+existing data is unchanged, and the protocol names the cause with the
+affected meter, block and position. Reactive-energy, LEG and exchange blocks
+are intentional skips, reported as notes rather than failures. Separate files
+in a multi-file upload keep independent outcomes.</p>
+<h3 id="corrections">Corrections<a class="headerlink" href="#corrections" title="Permanent link">&para;</a></h3>
+<p>A replacement delivery (<code>Status 5</code>) with a newer <code>Creation</code> overwrites the
+billable values it names; an identical repeat is idempotent and changes
+nothing, while a different value at equal <code>Creation</code> rejects the file and
+reports both document identities. Overlaps with CSV/manual readings reject
+the file and preserve the existing data. Corrections that touch already
+invoiced periods flag those invoices for review instead of changing them —
+see <a href="../09-invoice-management/#metering-corrections-on-issued-invoices">Invoice Management</a>.</p>
+<p>SDAT-CH uploads open the result protocol even for held-only files and
+unchanged replays. Its counters distinguish billable writes, held values and
+intentional skips. A multi-file upload opens one protocol; the other files
+remain available in history.</p>
+<h3 id="held-non-billable-values">Held (non-billable) values<a class="headerlink" href="#held-non-billable-values" title="Permanent link">&para;</a></h3>
+<p>Estimated/information-only and temporary values that are not billable are
+<strong>held in quarantine</strong>, visible in the protocol but excluded from billing,
+charts and invoices. A file that only holds values is still a successful
+import (<code>held</code>, not a failure). When a later validated delivery covers a
+held slot, the held value is promoted into billing and counted as such.</p>
+<p>XML and gzip uploads are limited to 50 MB, with a 100 MB limit after
+decompression.</p>
 <h2 id="timestamp-handling">Timestamp Handling<a class="headerlink" href="#timestamp-handling" title="Permanent link">&para;</a></h2>
 <p>OpenZEV stores every reading as an exact moment in time and does all
 calendar work — days, billing periods, tariff hours, charts — in <strong>Swiss
@@ -2336,7 +2565,7 @@ CH12346-load,2026-01-15 01:00:00,0.630
 <li>Import</li>
 </ol>
 <h3 id="scenario-2-utility-sdat-ch-export">Scenario 2: Utility SDAT-CH Export<a class="headerlink" href="#scenario-2-utility-sdat-ch-export" title="Permanent link">&para;</a></h3>
-<p>Utility provides file: <code>20260315_metering.sdat</code></p>
+<p>Utility provides file: <code>20260315_metering.xml</code> (or <code>.xml.gz</code>)</p>
 <ol>
 <li>Click <strong>New Import</strong> and choose <strong>SDAT-CH (ebIX XML)</strong> (select the target ZEV first)</li>
 <li>OpenZEV auto-parses metadata</li>
@@ -2354,7 +2583,7 @@ CH12346-load,2026-01-15 01:00:00,0.630
 <h3 id="duplicate-reading-for-metering_point--timestamp--direction">"Duplicate reading for metering_point + timestamp + direction"<a class="headerlink" href="#duplicate-reading-for-metering_point--timestamp--direction" title="Permanent link">&para;</a></h3>
 <p>The reading already exists. Without overwrite, fully duplicate rows are
 skipped; partially duplicate daily rows gap-fill the missing slots. With
-<strong>Overwrite existing readings</strong> checked, matching readings are updated and the
+<strong>Overwrite existing readings</strong> checked, matching readings with different values are updated and the
 protocol notes <code>Overwrote N existing readings.</code></p>
 <p><strong>Two files for the same meter, one consumption and one feed-in?</strong> Grid
 operators often deliver a profile export as one file per OBIS code — grid
@@ -2401,16 +2630,21 @@ the imports were created, the same days the history shows.</p>
 </blockquote>
 <h2 id="deleting-imports">Deleting imports<a class="headerlink" href="#deleting-imports" title="Permanent link">&para;</a></h2>
 <p>Single and bulk deletion remove eligible import logs plus all readings still
-linked to their batches, then refresh metering data. <strong>Imports that overwrote
-readings cannot be deleted</strong>, because their previous values cannot be restored.
+linked to their batches, including held SDAT-CH values, then refresh metering
+data. <strong>Imports that replaced billable or held values cannot be deleted</strong>,
+because their previous values cannot be restored.
 The delete action is disabled for these imports; their protocol explains why.
 If a bulk selection includes a protected import, the entire deletion is rejected
 and nothing is removed. The bulk dialog lists the blocking protected imports
 (filename and creation time) and disables confirmation while any is included.
 To correct an overwrite import, upload corrected values
-with overwrite enabled. Period bulk-delete matches imports created from
+with overwrite enabled; for SDAT-CH, request a newer correction delivery from
+your provider. Managers cannot delete imports from a disabled community.
+Period bulk-delete matches imports created from
 00:00 Swiss time on the first day up to midnight after the last day — the
-visible-count preview counts exactly the same imports.</p>
+visible-count preview counts exactly the same imports. Deleting billable
+readings flags the affected invoices for review instead of changing them —
+see <a href="../09-invoice-management/#metering-corrections-on-issued-invoices">Invoice Management</a>.</p>
 <h2 id="data-quality-checks">Data Quality Checks<a class="headerlink" href="#data-quality-checks" title="Permanent link">&para;</a></h2>
 <p>After import, review <strong>Metering → Data Quality</strong> (<code>/metering/quality</code>) to see:</p>
 <ul>
@@ -2516,6 +2750,40 @@ python<span class="w"> </span>manage.py<span class="w"> </span>generate_metering
 <li><strong>Set up tariffs:</strong> <a href="../07-tariff-configuration/">Tariff Configuration</a></li>
 <li><strong>Generate invoices:</strong> <a href="../09-invoice-management/">Invoice Management</a></li>
 </ul>
+<h3 id="protected-correction-paths">Protected correction paths<a class="headerlink" href="#protected-correction-paths" title="Permanent link">&para;</a></h3>
+<p>Individual readings and importer provenance are read-only through the API and
+Django admin. Correct quantities through an explicit CSV overwrite or a newer
+SDAT replacement delivery. A newer original delivery cannot replace existing
+values; the protocol reports those skipped originals separately from replays.
+The protocol shows localized findings and relevant identifiers; expand
+<strong>Technical details</strong> for the raw diagnostic.</p>
+<p>Cancellation deliveries remain unsupported. For an exceptional removal, an
+admin can delete a point's readings for a date range using <strong>Delete data</strong>;
+this is a deletion, not an undo of a replacement, and affected invoices still
+require review. Request corrected source data before reimporting.</p>
+<p>The supported E66 profile requires an explicit 15-minute resolution and complete
+interval positions. Other schema-valid E66 volumes without a resolution, hourly
+series and tariff-band observations are not supported. Held observations remain
+non-billable staging evidence: inspect the uploaded source or community archive;
+a validated delivery can promote them. There is no manual release action.</p>
+<p>Direct reading API create/update/delete operations return <code>405</code>; corrections use
+imports or the protected deletion workflow. PostgreSQL is required for production
+metering correction and identity concurrency guarantees.</p>
+<p>CSV overwrite skips identical values and preserves their source evidence and
+import ownership. Changing an SDAT value deliberately makes it a CSV correction:
+it clears the SDAT provenance and later SDAT deliveries cannot replace that slot.
+The confirmation explains this before import. CSV meter lookup uses primary IDs;
+secondary SDAT aliases are not CSV identifiers.</p>
+<p>The completion message distinguishes new readings, corrections, held values and
+unchanged files. Batch messages count these separately. Reading changes and
+deletions refresh invoice-review and billing-readiness state. <strong>Delete data</strong>
+removes billable and held observations in the chosen range and reports both counts.</p>
+<p>Production deployments require PostgreSQL. SQLite is supported for development
+and tests; MariaDB does not support these billing/identity lock workflows.
+Historical assignment edits remain a separate management operation: the reading
+correction flags described here track imports, protected deletion and timestamp
+repair, not every change to assignment windows. Review affected billing periods
+when changing historical assignments.</p>
 
 
 
