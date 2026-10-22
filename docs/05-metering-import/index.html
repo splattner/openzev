@@ -2481,6 +2481,10 @@ reports both document identities. Overlaps with CSV/manual readings reject
 the file and preserve the existing data. Corrections that touch already
 invoiced periods flag those invoices for review instead of changing them —
 see <a href="../09-invoice-management/#metering-corrections-on-issued-invoices">Invoice Management</a>.</p>
+<p>Cancellation deliveries (<code>Status 1</code>) are rejected with a cancellation error in
+the import protocol, without changing readings or invoices or blocking billing.
+For corrected readings, request a replacement delivery (<code>Status 5</code>) from your
+grid operator.</p>
 <p>SDAT-CH uploads open the result protocol even for held-only files and
 unchanged replays. Its counters distinguish billable writes, held values and
 intentional skips. A multi-file upload opens one protocol; the other files
