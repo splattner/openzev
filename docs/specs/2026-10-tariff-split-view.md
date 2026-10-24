@@ -1,7 +1,7 @@
 # Feature Spec: Tariff split view (pilot for the detail pane)
 
 - Spec ID: SPEC-2026-10-tariff-split-view
-- Status: Draft
+- Status: Implemented, pending review (pilot acceptance and ADR 0040 are not yet signed off)
 - Scope: Major
 - Type: Change
 - Owners: Core maintainers
@@ -14,12 +14,12 @@
 
 ---
 
-This is a proposal; it does not describe the shipped tariff screen. The overview
-hierarchy and tariff list described here **replace** the shipped Valid /
+This describes the tariff screen as implemented for phase 1 of the UI patterns
+rollout. The overview hierarchy and the in-flow pane **replaced** the Valid /
 Upcoming / All tabs and the overlay detail drawer (SPEC-2026-08 §15.3); the
-maintainers accept changing shipped design where it makes the screen more
-consistent, clear and less cluttered. The baseline specs and the user guide are
-updated with the implementation (§9). No backend behaviour changes.
+baseline specs and the user guide were updated with the implementation (§9).
+No backend behaviour changes. §1 records the observations the change started
+from (commit `ecb0c962`); §11 records what the pilot decided.
 
 The detail-pane contract (reserved layout, viewing and editing modes, narrow
 behaviour, dirty guard, semantics) lives in the reference spec §6.2; this spec
@@ -220,3 +220,34 @@ in the reference spec §12.
 | Grey history reads as disabled | Readable text, explicit context, accessible corrections; disablement explained separately |
 | Creating a many-band or dynamic tariff does not fit a pane | Go/no-go in §6; page for that task only |
 | A late save lands in the wrong scope | `useWriteScope`; clear on scope change |
+
+## 11. Implementation record
+
+Values and decisions the pilot produced (reference spec §13, open question 3).
+
+| Item | Outcome |
+|---|---|
+| Pane breakpoint | The list and the pane sit side by side when the **tariff content area is at least 62rem (992px) wide** (`SPLIT_MIN_REM` in `TariffsPage.tsx`, measured on the area itself by `useMinWidth`, not the viewport). Below it the pane takes the whole area. Checked with the shell's sidebar open at viewports 1440 (content 1152px: list about 640px, pane 28–34rem), 1280 (content 992px: two panes, list in card mode at about 424px), 1200 (one pane) and 400. |
+| Pane width | `minmax(28rem, 34rem)` beside a flexible list. |
+| Dialog sizes | Not confirmed here: the pilot removed three tariff dialogs (create/edit, version, band) rather than sizing them. The provisional `FormModal` sizes stay provisional until phase 4. |
+| Table treatment | `.table-card.invoice-rows.tariff-list`: the shared sheet, header band and container behaviour. A tariff row has several bands, which the invoice row's areas do not fit, so the card reflow stays the tariff's own (below 56rem), and the shared hiding of the header is overridden so the category band stays on cards. |
+| Pane navigation | Opening from the list pushes one entry marked `state.tariffPane`; X takes it back with `navigate(-1)`. A direct link has no such entry, so X removes the parameters in place. Switching tariff or version replaces the entry and keeps the marker. A link to a tariff that no longer exists clears the parameters. A renamed tariff is found by the version in the URL, which the page then rewrites to the new name. |
+| Escape | In the pane, Escape cancels an open form (guarded) and otherwise closes the pane. An event already handled by a menu or picker (`defaultPrevented`) is left alone. X always closes the pane. |
+| Dirty guard | `useDraftGuard`: pane actions (`run`), the router blocker for Back/Forward and links, `beforeunload` for reload. A save in flight counts as unsaved and the prompt says it may still complete. Scope, permission and account changes clear the selection and every draft without asking. Phase 2 moves the pane-independent part into `FormModal`. |
+| Saving | Each form is a `<form>` seeded once on mount; a refetch behind it does not overwrite the draft. While saving the fields are in a disabled `fieldset` (`display: contents`), the form is `aria-busy` and the button says "Saving…". A failure stays in the form as a `Notice` (the toast is no longer used for it); validation problems show next to the field in the user's language. A completion applies only to its scope **and** editing session (`session` counter in `useTariffCrud` / `useTariffVersions`); the result is selected only after the series refetch has landed (`invalidateTariffQueries` now resolves when it has). |
+| After a save | Create and duplicate select the new tariff (a history step when no tariff was open), schedule price change and rename keep the pane on the saved version, an edit stays on its version; focus moves to the pane title. Cancel returns focus to the control that opened the form (`data-action-key`). |
+| Go/no-go for creation | **Go, with one case not exercised.** A simple fixed fee was created, renamed and deleted in the pane on the dev stack; the dynamic source form opened and was dirty-guarded as an inline section of the tariff form (`DynamicSourceForm`, the body of the former dialog, shared with the admin page), outside the tariff `<form>` so forms do not nest; a many-band tariff is created as one tariff and its bands added through the band form in the pane, which was opened but not run with many bands. No task moved to a page. |
+| Duplicate | The spec did not name it; it follows rule A and is a pane form like rename and schedule price change. |
+| Pane content | Version history is grouped Current, Scheduled changes, Past versions (a disclosure, open when a past version is shown). The price history chart and the dynamic source's fetched prices sit in lazily mounted disclosures (`TariffDisclosure`, replaced by the shared `Disclosure` in phase 2). Counts and validity pills are gone from the pane. |
+| Pane layout | After review the pane has two levels. Header actions are tariff-level and visible: Schedule price change, Rename, Duplicate. A version block (`.tariff-version-card`) shows the shown version once: validity window, status badge (Current / Upcoming / Ended, replacing the "Viewing an …" banner), its own labelled **Edit**, the price of a tariff without bands, and the notes. The former Valid and Pricing cards are gone. The version history is a picker, hidden when the series has one version, and each row has an `ActionMenu` (`⋮`, icon only) with Edit and Delete; a band row has icon-only edit and delete buttons. `ActionMenu` takes an optional `actionKey` (`data-action-key` on its trigger) so a cancelled form returns focus to it. |
+| Dynamic source | `DynamicSourceSummary` shows the label, status badges, the admin link (admins only) and the last successful fetch up front; URL, protocol/type/product, stored coverage and platform-wide usage are in a "Source details" disclosure. A failed fetch's error stays visible. |
+| Header | The page actions (import, overview PDF, New tariff) moved from a toolbar card into the page header, since the toolbar only held the tabs besides them. |
+
+Browser checks of the acceptance table (laptop and phone widths, navigation,
+dirty guard, create/rename/delete round trip) were run by hand against the dev
+stack; the keyboard, inertness and restoration behaviour is covered by
+`tariff-draft-guard.test.ts`, `tariff-detail-pane.test.ts`,
+`tariff-overview-list.test.ts`, `tariff-write-scope.test.ts` and the Playwright
+specs `tariff-presentation.spec.ts` and `hub-workflow-links.spec.ts`. Not yet
+verified: a screen-reader pass, forced-colours mode and long translated labels
+beyond the existing German and French narrow-band checks.

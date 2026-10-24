@@ -1,5 +1,5 @@
 import { useMutation, type QueryClient } from '@tanstack/react-query'
-import { useLayoutEffect, useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   createTariff,
   createTariffPeriod,
@@ -33,12 +33,21 @@ type TariffCrudParams = {
   pushToast: (message: string, tone?: 'success' | 'error') => void
   confirm: (options: ConfirmOptions) => void
   t: (key: string, options?: Record<string, unknown>) => string
+  /** A tariff was created or changed and its form closed: select what was saved. */
+  onTariffSaved?: (saved: Tariff, kind: 'created' | 'updated') => void
+  /** A band was saved and its form closed. */
+  onPeriodSaved?: () => void
 }
 
-export function resolvePeriodModalTariffId(bandableTariffs: Tariff[], tariffId?: string): string | undefined {
+export function resolvePeriodTariffId(bandableTariffs: Tariff[], tariffId?: string): string | undefined {
   return tariffId ?? bandableTariffs[0]?.id
 }
 
+/**
+ * Tariff and band writes: the form state the detail pane shows while one is
+ * open, and the requests behind them. Saving closes the form only for the
+ * community, account and editing session that asked.
+ */
 export function useTariffCrud({
   selectedZevId,
   canWrite = true,
@@ -50,21 +59,35 @@ export function useTariffCrud({
   pushToast,
   confirm,
   t,
+  onTariffSaved,
+  onPeriodSaved,
 }: TariffCrudParams) {
   const { user } = useAuth()
   const { scope, isCurrent, assertWritable } = useWriteScope({ selectedZevId, canWrite, accountId: user?.id }, t('common.error'))
   const [editingTariffId, setEditingTariffId] = useState<string | null>(null)
   const [editingPeriodId, setEditingPeriodId] = useState<string | null>(null)
-  const [periodModalTariffId, setPeriodModalTariffId] = useState<string | undefined>(undefined)
-  const [showTariffModal, setShowTariffModal] = useState(false)
-  const [showPeriodModal, setShowPeriodModal] = useState(false)
+  const [periodTariffId, setPeriodTariffId] = useState<string | undefined>(undefined)
+  const [tariffFormOpen, setTariffFormOpen] = useState(false)
+  const [periodFormOpen, setPeriodFormOpen] = useState(false)
+  // A failure that belongs to the open form: shown in it, not only as a toast.
+  const [saveError, setSaveError] = useState<string | null>(null)
+  // Which editing session a request belongs to. A save that completes after
+  // its form was closed, or after another one opened, must not close, select
+  // or overwrite anything in the newer session.
+  const session = useRef(0)
+
+  function startSession() {
+    session.current += 1
+    setSaveError(null)
+  }
 
   useLayoutEffect(() => {
-    setShowTariffModal(false)
-    setShowPeriodModal(false)
+    startSession()
+    setTariffFormOpen(false)
+    setPeriodFormOpen(false)
     setEditingTariffId(null)
     setEditingPeriodId(null)
-    setPeriodModalTariffId(undefined)
+    setPeriodTariffId(undefined)
   }, [scope])
 
   const editingTariff = useMemo(
@@ -78,25 +101,31 @@ export function useTariffCrud({
   )
 
   const tariffMutation = useMutation({
-    mutationFn: ({ id, payload, scope: submittingScope }: { id?: string; payload: TariffInput; scope: typeof scope }) => {
+    mutationFn: ({ id, payload, scope: submittingScope }: { id?: string; payload: TariffInput; scope: typeof scope; session: number }) => {
       assertWritable(submittingScope)
       if (id) {
         return updateTariff(id, payload)
       }
       return createTariff(payload)
     },
-    onSuccess: (_, variables) => {
-      invalidateTariffQueries(queryClient, variables.scope.selectedZevId)
+    onSuccess: async (saved, variables) => {
+      // Selecting what was saved needs the series to contain it.
+      await invalidateTariffQueries(queryClient, variables.scope.selectedZevId)
       if (!isCurrent(variables.scope)) return
-      setEditingTariffId(null)
-      setShowTariffModal(false)
       pushToast(
         variables.id ? t('pages.tariffs.messages.updated') : t('pages.tariffs.messages.created'),
         'success',
       )
+      if (variables.session !== session.current) return
+      startSession()
+      setEditingTariffId(null)
+      setTariffFormOpen(false)
+      onTariffSaved?.(saved, variables.id ? 'updated' : 'created')
     },
     onError: (error, variables) => {
-      if (isCurrent(variables.scope)) pushToast(formatApiError(error, t('pages.tariffs.messages.saveFailed')), 'error')
+      if (isCurrent(variables.scope) && variables.session === session.current) {
+        setSaveError(formatApiError(error, t('pages.tariffs.messages.saveFailed')))
+      }
     },
   })
 
@@ -106,7 +135,7 @@ export function useTariffCrud({
       return deleteTariff(id)
     },
     onSuccess: (_, variables) => {
-      invalidateTariffQueries(queryClient, variables.scope.selectedZevId)
+      void invalidateTariffQueries(queryClient, variables.scope.selectedZevId)
       if (!isCurrent(variables.scope)) return
       pushToast(t('pages.tariffs.messages.deleted'), 'success')
     },
@@ -116,26 +145,31 @@ export function useTariffCrud({
   })
 
   const periodMutation = useMutation({
-    mutationFn: ({ id, payload, scope: submittingScope }: { id?: string; payload: TariffPeriodInput; scope: typeof scope }) => {
+    mutationFn: ({ id, payload, scope: submittingScope }: { id?: string; payload: TariffPeriodInput; scope: typeof scope; session: number }) => {
       assertWritable(submittingScope)
       if (id) {
         return updateTariffPeriod(id, payload)
       }
       return createTariffPeriod(payload)
     },
-    onSuccess: (_, variables) => {
-      invalidateTariffQueries(queryClient, variables.scope.selectedZevId)
+    onSuccess: async (_, variables) => {
+      await invalidateTariffQueries(queryClient, variables.scope.selectedZevId)
       if (!isCurrent(variables.scope)) return
-      setEditingPeriodId(null)
-      setPeriodModalTariffId(undefined)
-      setShowPeriodModal(false)
       pushToast(
         variables.id ? t('pages.tariffs.messages.periodUpdated') : t('pages.tariffs.messages.periodCreated'),
         'success',
       )
+      if (variables.session !== session.current) return
+      startSession()
+      setEditingPeriodId(null)
+      setPeriodTariffId(undefined)
+      setPeriodFormOpen(false)
+      onPeriodSaved?.()
     },
     onError: (error, variables) => {
-      if (isCurrent(variables.scope)) pushToast(formatApiError(error, t('pages.tariffs.messages.periodSaveFailed')), 'error')
+      if (isCurrent(variables.scope) && variables.session === session.current) {
+        setSaveError(formatApiError(error, t('pages.tariffs.messages.periodSaveFailed')))
+      }
     },
   })
 
@@ -145,7 +179,7 @@ export function useTariffCrud({
       return deleteTariffPeriod(id)
     },
     onSuccess: (_, variables) => {
-      invalidateTariffQueries(queryClient, variables.scope.selectedZevId)
+      void invalidateTariffQueries(queryClient, variables.scope.selectedZevId)
       if (!isCurrent(variables.scope)) return
       pushToast(t('pages.tariffs.messages.periodDeleted'), 'success')
     },
@@ -160,7 +194,8 @@ export function useTariffCrud({
       pushToast(t('pages.tariffs.messages.selectZevBeforeSave'), 'error')
       return
     }
-    tariffMutation.mutate({ id: editingTariffId || undefined, payload: { ...payload, zev: selectedZevId }, scope })
+    setSaveError(null)
+    tariffMutation.mutate({ id: editingTariffId || undefined, payload: { ...payload, zev: selectedZevId }, scope, session: session.current })
   }
 
   function submitPeriod(payload: TariffPeriodInput) {
@@ -169,50 +204,57 @@ export function useTariffCrud({
       pushToast(t('pages.tariffs.messages.periodSaveFailed'), 'error')
       return
     }
-    periodMutation.mutate({ id: editingPeriodId || undefined, payload, scope })
+    setSaveError(null)
+    periodMutation.mutate({ id: editingPeriodId || undefined, payload, scope, session: session.current })
   }
 
   function startTariffEdit(tariff: Tariff) {
+    startSession()
     setEditingTariffId(tariff.id)
-    setShowTariffModal(true)
+    setTariffFormOpen(true)
   }
 
   function startPeriodEdit(period: TariffPeriod) {
+    startSession()
     setEditingPeriodId(period.id)
-    setPeriodModalTariffId(period.tariff)
-    setShowPeriodModal(true)
+    setPeriodTariffId(period.tariff)
+    setPeriodFormOpen(true)
   }
 
-  function openCreateTariffModal() {
+  function openCreateTariff() {
     if (!selectedZevId) {
       pushToast(t('pages.tariffs.messages.selectZevBeforeCreate'), 'error')
       return
     }
+    startSession()
     setEditingTariffId(null)
-    setShowTariffModal(true)
+    setTariffFormOpen(true)
   }
 
-  function closeTariffModal() {
-    setShowTariffModal(false)
+  function closeTariffForm() {
+    startSession()
+    setTariffFormOpen(false)
     setEditingTariffId(null)
   }
 
-  function openCreatePeriodModal(tariffId?: string) {
-    const defaultTariffId = resolvePeriodModalTariffId(bandableTariffs, tariffId)
+  function openCreatePeriod(tariffId?: string) {
+    const defaultTariffId = resolvePeriodTariffId(bandableTariffs, tariffId)
 
     if (!defaultTariffId) {
       pushToast(t('pages.tariffs.messages.createEnergyTariffFirst'), 'error')
       return
     }
+    startSession()
     setEditingPeriodId(null)
-    setPeriodModalTariffId(defaultTariffId)
-    setShowPeriodModal(true)
+    setPeriodTariffId(defaultTariffId)
+    setPeriodFormOpen(true)
   }
 
-  function closePeriodModal() {
-    setShowPeriodModal(false)
+  function closePeriodForm() {
+    startSession()
+    setPeriodFormOpen(false)
     setEditingPeriodId(null)
-    setPeriodModalTariffId(undefined)
+    setPeriodTariffId(undefined)
   }
 
   function confirmDeleteTariff(tariff: Tariff) {
@@ -240,13 +282,14 @@ export function useTariffCrud({
   }
 
   return {
-    showTariffModal,
-    showPeriodModal,
+    tariffFormOpen,
+    periodFormOpen,
     editingTariffId,
     editingPeriodId,
-    periodModalTariffId,
+    periodTariffId,
     editingTariff,
     editingPeriod,
+    saveError,
     tariffPending: tariffMutation.isPending,
     periodPending: periodMutation.isPending,
     deleteTariffPending: deleteTariffMutation.isPending,
@@ -255,10 +298,10 @@ export function useTariffCrud({
     submitPeriod,
     startTariffEdit,
     startPeriodEdit,
-    openCreateTariffModal,
-    closeTariffModal,
-    openCreatePeriodModal,
-    closePeriodModal,
+    openCreateTariff,
+    closeTariffForm,
+    openCreatePeriod,
+    closePeriodForm,
     confirmDeleteTariff,
     confirmDeletePeriod,
   }

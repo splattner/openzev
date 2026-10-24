@@ -24,13 +24,15 @@ let zevId: string
 let canWrite: boolean
 let confirmation: { onConfirm: () => void }
 const toast = vi.fn()
+const tariffSaved = vi.fn()
+const versionSaved = vi.fn()
 const tariff = { id: 'tariff-A', zev: 'A' } as Tariff
 const series = { zev: 'A' } as TariffSeries
 const source = { id: tariff.id } as TariffVersion
 function Harness() {
     const shared = { selectedZevId: zevId, canWrite, queryClient: client, pushToast: toast, t: (key: string) => key }
-    const currentCrud = useTariffCrud({ ...shared, tariffs: [tariff], periods: [], bandableTariffs: [tariff], tariffNameById: new Map(), confirm: options => { confirmation = options } })
-    const currentVersions = useTariffVersions(shared)
+    const currentCrud = useTariffCrud({ ...shared, tariffs: [tariff], periods: [], bandableTariffs: [tariff], tariffNameById: new Map(), confirm: options => { confirmation = options }, onTariffSaved: tariffSaved })
+    const currentVersions = useTariffVersions({ ...shared, onSaved: versionSaved })
     useLayoutEffect(() => { crud = currentCrud; versions = currentVersions }, [currentCrud, currentVersions])
     return null
 }
@@ -52,8 +54,8 @@ afterEach(() => { act(() => root.unmount()); client.clear(); container.remove() 
 
 it.each(['community', 'permission', 'account'])('resets write dialogs and refuses a captured delete after a %s change', async change => {
     act(() => {
-        crud.openCreateTariffModal()
-        crud.openCreatePeriodModal()
+        crud.openCreateTariff()
+        crud.openCreatePeriod()
         versions.openRename(series, source)
         crud.confirmDeleteTariff(tariff)
     })
@@ -62,8 +64,8 @@ it.each(['community', 'permission', 'account'])('resets write dialogs and refuse
     if (change === 'permission') canWrite = false
     if (change === 'account') api.userId = 2
     await render()
-    expect(crud.showTariffModal).toBe(false)
-    expect(crud.showPeriodModal).toBe(false)
+    expect(crud.tariffFormOpen).toBe(false)
+    expect(crud.periodFormOpen).toBe(false)
     expect(versions.dialog).toBeNull()
     act(() => captured())
     expect(api.remove).not.toHaveBeenCalled()
@@ -77,7 +79,7 @@ it.each(['save', 'rename'])('ignores delayed %s UI completion while invalidating
     const invalidate = vi.spyOn(client, 'invalidateQueries')
     act(() => {
         if (operation === 'save') {
-            crud.openCreateTariffModal()
+            crud.openCreateTariff()
             crud.submitTariff({ name: 'A' } as TariffInput)
         } else {
             versions.openRename(series, source)
@@ -87,10 +89,10 @@ it.each(['save', 'rename'])('ignores delayed %s UI completion while invalidating
     await waitForCondition(() => api.save.mock.calls.length + api.rename.mock.calls.length > 0, 'submitted write')
     zevId = 'B'
     await render()
-    act(() => { crud.openCreateTariffModal(); versions.openRename({ ...series, zev: 'B' }, source) })
+    act(() => { crud.openCreateTariff(); versions.openRename({ ...series, zev: 'B' }, source) })
     await act(async () => resolve(tariff))
     await waitForCondition(() => invalidate.mock.calls.length > 0, 'cache invalidation')
-    expect(crud.showTariffModal).toBe(true)
+    expect(crud.tariffFormOpen).toBe(true)
     expect(versions.dialog).not.toBeNull()
     expect(toast).not.toHaveBeenCalled()
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.tariffs.series('A') })
@@ -138,4 +140,59 @@ it('rejects a tariff write queued before its submitting scope changes', async ()
     await act(async () => undefined)
     expect(api.save).not.toHaveBeenCalled()
     expect(toast).not.toHaveBeenCalled()
+})
+
+it('closes the form and selects what was saved once the series has been refetched', async () => {
+    api.save.mockResolvedValue(tariff)
+    act(() => {
+        crud.openCreateTariff()
+        crud.submitTariff({ name: 'A' } as TariffInput)
+    })
+    await waitForCondition(() => tariffSaved.mock.calls.length > 0, 'saved tariff selected')
+    expect(tariffSaved).toHaveBeenCalledWith(tariff, 'created')
+    expect(crud.tariffFormOpen).toBe(false)
+    expect(toast).toHaveBeenCalledWith('pages.tariffs.messages.created', 'success')
+})
+
+it('keeps a failed save in the form as a notice, not only a toast', async () => {
+    api.save.mockRejectedValue(new Error('boom'))
+    act(() => {
+        crud.openCreateTariff()
+        crud.submitTariff({ name: 'A' } as TariffInput)
+    })
+    await waitForCondition(() => crud.saveError !== null, 'save error')
+    expect(crud.saveError).toBe('pages.tariffs.messages.saveFailed')
+    expect(crud.tariffFormOpen).toBe(true)
+    expect(toast).not.toHaveBeenCalled()
+    act(() => crud.closeTariffForm())
+    expect(crud.saveError).toBeNull()
+})
+
+it.each(['save', 'rename'])('a %s finishing after its form was closed neither reopens nor selects anything', async operation => {
+    let resolve!: (value: Tariff) => void
+    const pending = new Promise<Tariff>(done => { resolve = done })
+    api.save.mockReturnValue(pending)
+    api.rename.mockReturnValue(pending)
+    act(() => {
+        if (operation === 'save') {
+            crud.startTariffEdit(tariff)
+            crud.submitTariff({ name: 'A' } as TariffInput)
+        } else {
+            versions.openRename(series, source)
+            versions.submitRename(tariff.id, 'renamed A')
+        }
+    })
+    await waitForCondition(() => api.save.mock.calls.length + api.rename.mock.calls.length > 0, 'submitted write')
+    // The user walks away from the form, then starts another one.
+    act(() => {
+        crud.closeTariffForm()
+        versions.closeDialog()
+        versions.openDuplicate(series, source)
+    })
+    await act(async () => resolve(tariff))
+    await act(async () => undefined)
+    expect(tariffSaved).not.toHaveBeenCalled()
+    expect(versionSaved).not.toHaveBeenCalled()
+    expect(crud.tariffFormOpen).toBe(false)
+    expect(versions.dialog?.kind).toBe('duplicate')
 })

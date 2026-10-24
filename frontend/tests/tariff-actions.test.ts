@@ -2,11 +2,11 @@ import { act, createElement, type ReactElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MantineProvider } from '@mantine/core'
-import { TariffToolbar } from '../src/features/tariffs/TariffToolbar'
+import { TariffActions } from '../src/features/tariffs/TariffActions'
 import { waitForCondition } from './helpers/waitForCondition'
 
-// The Valid · Upcoming · All tabs filter the list; the overview PDF's scope is chosen at
-// the download (SPEC-2026-08-ui-redesign-pdf-style §15.3, SPEC-2026-09-tariff-overview-pdf §11).
+// The list is grouped (Current, Upcoming, History) rather than filtered; the overview PDF's
+// scope is chosen at the download (SPEC-2026-10-tariff-split-view §4, SPEC-2026-09-tariff-overview-pdf §11).
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
 
@@ -25,32 +25,24 @@ async function render(element: ReactElement) {
     return container
 }
 
-const props = {
-    validCount: 6, upcomingCount: 0, totalCount: 6, validityFilter: 'valid' as const,
-    onValidityFilterChange: vi.fn(), onOpenCreateTariffModal: vi.fn(), onDownloadOverview: vi.fn(),
-}
+const props = { onOpenCreateTariff: vi.fn(), onDownloadOverview: vi.fn() }
 
-describe('TariffToolbar', () => {
-    it('leaves the validity tabs out when All would list the same series', async () => {
-        const container = await render(createElement(TariffToolbar, props))
+describe('TariffActions', () => {
+    it('offers no validity filter: the overview groups the list instead', async () => {
+        const container = await render(createElement(TariffActions, props))
         expect(container.querySelector('.filter-tabs')).toBeNull()
     })
 
-    it('shows the validity tabs when All lists more series', async () => {
-        const container = await render(createElement(TariffToolbar, { ...props, totalCount: 7 }))
-        expect(container.querySelector('.filter-tabs')).not.toBeNull()
-    })
-
-    it('shows Upcoming whenever a version is still to start, even at the valid count', async () => {
-        // Next year's prices often arrive as a new version of every series at once.
-        const container = await render(createElement(TariffToolbar, { ...props, upcomingCount: 6 }))
-        const tabs = [...container.querySelectorAll('.filter-tab')].map((tab) => tab.textContent)
-        expect(tabs).toEqual(['pages.tariffs.filters.validOnly 6', 'pages.tariffs.filters.upcoming 6'])
+    it('offers the one primary action to a writer and none to a viewer', async () => {
+        const writer = await render(createElement(TariffActions, props))
+        expect(writer.querySelector('.button-primary')?.textContent).toContain('pages.tariffs.newTariff')
+        const viewer = await render(createElement(TariffActions, { ...props, readOnly: true }))
+        expect(viewer.querySelector('.button-primary')).toBeNull()
     })
 
     it('offers the PDF scope as a menu', async () => {
         const onDownloadOverview = vi.fn()
-        const container = await render(createElement(TariffToolbar, { ...props, onDownloadOverview }))
+        const container = await render(createElement(TariffActions, { ...props, onDownloadOverview }))
         const button = [...container.querySelectorAll('button')]
             .find((candidate) => candidate.textContent?.includes('pages.tariffs.overviewPdf.action'))
         expect(button?.getAttribute('aria-haspopup')).toBe('menu')

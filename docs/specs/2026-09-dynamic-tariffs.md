@@ -675,10 +675,10 @@ price points; source identity fields are read-only after creation.
 Managers/admins discover and create sources from the energy-tariff form.
 Viewers read linked tariffs/history; existing-source maintenance is admin-only.
 
-`DynamicSourceSummary` in the tariff detail drawer shows the linked source's
-label, endpoint, protocol, component/product, fetch status, disabled state,
-last success, user-safe fetch error, stored range/point count and global
-linked-tariff/ZEV totals. A positive point count shows stored coverage and a gap
+`DynamicSourceSummary` in the tariff detail pane shows the linked source's
+label, fetch status, disabled state, last success and user-safe fetch error
+up front, and the endpoint, protocol, component/product, stored range/point
+count and global linked-tariff/ZEV totals in a “Source details” disclosure. A positive point count shows stored coverage and a gap
 hint; zero points show “No stored prices yet.” Last success is shown only when
 its timestamp is present. The history panel is scoped to the shown tariff's validity.
 Only admins see the maintenance link to `/admin/dynamic-sources?source=<id>`.
@@ -701,7 +701,7 @@ positive coverage and maintenance-link permissions.
 
 `frontend/src/features/tariffs/`:
 
-- **`TariffFormModal`** — an energy tariff (`billing_mode = 'energy'`) gets a
+- **`TariffForm`** — an energy tariff (`billing_mode = 'energy'`) gets a
   "Dynamic price source" picker alongside its bands. Picking a source sets
   `energy_type` to match it (`dynamicSources.impliedEnergyType`, mirroring
   `ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE`) for a brand-new tariff; editing an
@@ -709,7 +709,7 @@ positive coverage and maintenance-link permissions.
   the picker to sources that would still validate
   (`dynamicSources.dynamicSourceOptions`), so nothing offered could fail on
   save.
-  A new tariff can open `DynamicSourceFormModal` directly from this picker;
+  A new tariff can create a source from this picker: `DynamicSourceForm` opens as an inline section of the pane's form (the form is the dialog's body without its shell, shared with `DynamicSourceFormModal` on the admin page);
   after the probed source is created or reused it is selected automatically and
   its implied energy type is applied. Selecting a source whose `tariff_type`
   is an aggregate (`integrated` and v2's `dso`/`dso_complete`/
@@ -729,7 +729,7 @@ positive coverage and maintenance-link permissions.
   successful save also toasts any `warnings` the create response carries
   (units the endpoint publishes but this source cannot bill), rather than
   leaving them visible only in the audit trail.
-- **`TariffCategorySections`** / **`TariffDetailDrawer`** — the price and
+- **`TariffCategorySections`** / **`TariffDetailPane`** — the price and
   the "Dynamic" label are branched on the *shown version's* `dynamic_source`,
   not the series: because `dynamic_source` is deliberately not a
   series-coherence field (§3.1.2 of the billing-engine spec), one series can
@@ -740,13 +740,13 @@ positive coverage and maintenance-link permissions.
   price (`rateLines`); the dates are the summary's `reference_from` /
   `reference_to`, the window the average covers, which ends today and is not
   the version's validity shown in the Valid column;
-  the drawer shows the source label with it (`priceSummary`). When the source's `last_fetch_status` is `failed`, a
+  the pane shows the source label with it (`priceSummary`). When the source's `last_fetch_status` is `failed`, a
   danger "Price fetch failed" badge (`pages.tariffs.dynamicFetchFailed`)
   appears beside the name in both, with the fetch error as its tooltip.
   Its representative number and percentage-of-grid display use the API's
   bounded summary; partial and unavailable data are labelled instead of shown
   as complete or zero.
-  `TariffVersionModal` also hides both the band editor and the fixed-price editor
+  `TariffVersionForm` also hides both the band editor and the fixed-price editor
   for a dynamic energy version; the dynamic source is the complete price input.
 - **`VseTariffImportModal`** — a dynamic candidate's price cell shows a
   "Dynamic" badge, URL and explicit product input instead of a period list; the result view shows "Dynamic" in place of a billing-mode label for

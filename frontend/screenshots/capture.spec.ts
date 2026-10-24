@@ -313,31 +313,34 @@ test.describe('User Guide Screenshots', () => {
   })
 
   // 07b — A tariff's version history and price chart, both in its detail
-  // drawer (opened from the list row, but rendered as a page-level sibling).
+  // pane (opened beside the list; the chart sits in a disclosure).
   test('07b-tariff-versions', async ({ page }) => {
     await navigateTo(page, '/tariffs')
-    const row = page.getByRole('button', { name: 'Grid Energy HT/NT', expanded: false })
+    const row = page.getByRole('button', { name: 'Grid Energy HT/NT', expanded: false }).first()
     await row.waitFor({ timeout: 10_000 })
     await row.click()
-    const drawer = page.locator('.tariff-drawer')
+    const pane = page.locator('.tariff-pane')
     // Waiting on the chart rather than the history: it renders only for a series
     // with more than one version, so it also asserts the seed still has them.
-    await drawer.locator('.tariff-price-history').waitFor({ timeout: 10_000 })
+    await pane.locator('.tariff-disclosure > summary').last().click()
+    await pane.locator('.tariff-price-history').waitFor({ timeout: 10_000 })
     await page.waitForTimeout(1000)  // let Recharts finish laying out
     await screenshotFull(page, '07b-tariff-versions')
   })
 
-  // 07d — A dynamic tariff's detail drawer, showing its source and locally
-  // seeded price history (stats, chart and point table render inline).
+  // 07d — A dynamic tariff's detail pane: its source with the details
+  // disclosure opened. The fetched prices sit in a second disclosure whose
+  // point table would make the capture several screens tall, so it stays shut.
   test('07d-tariff-dynamic-source', async ({ page }) => {
     await requireDemoDynamicSource(page)
     await navigateTo(page, '/tariffs')
-    const row = page.getByRole('button', { name: DEMO_DYNAMIC_TARIFF, expanded: false })
+    const row = page.getByRole('button', { name: DEMO_DYNAMIC_TARIFF, expanded: false }).first()
     await row.waitFor({ timeout: 10_000 })
     await row.click()
-    const drawer = page.locator('.tariff-drawer')
-    await expect(drawer.locator('.recharts-surface'), `Dynamic price chart missing — ${SEED_HINT}`).toBeVisible()
-    await expect(drawer.locator('tbody tr').first()).toBeVisible()
+    const pane = page.locator('.tariff-pane')
+    const details = pane.locator('.tariff-period-section .tariff-disclosure > summary').first()
+    await details.click()
+    await expect(pane.locator('.tariff-period-section .tariff-disclosure[open]'), `Dynamic source details missing — ${SEED_HINT}`).toBeVisible()
     await screenshotFull(page, '07d-tariff-dynamic-source')
   })
 

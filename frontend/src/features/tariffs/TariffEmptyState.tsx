@@ -2,12 +2,12 @@ import { faPlus } from '@fortawesome/free-solid-svg-icons'
 import { EmptyState } from '../../components/EmptyState'
 
 type TariffEmptyStateProps = {
-  onOpenCreateTariffModal: () => void
+  onOpenCreateTariff: () => void
   /** A viewer reads only (#761): no create action. */
   readOnly?: boolean
 }
 
-export function TariffEmptyState({ onOpenCreateTariffModal, readOnly = false }: TariffEmptyStateProps) {
+export function TariffEmptyState({ onOpenCreateTariff, readOnly = false }: TariffEmptyStateProps) {
   return (
     <EmptyState
       titleKey="pages.tariffs.noTariffs"
@@ -15,7 +15,7 @@ export function TariffEmptyState({ onOpenCreateTariffModal, readOnly = false }: 
       actions={readOnly ? [] : [
         {
           labelKey: 'pages.tariffs.newTariff',
-          onClick: onOpenCreateTariffModal,
+          onClick: onOpenCreateTariff,
           variant: 'primary',
           icon: faPlus,
         },

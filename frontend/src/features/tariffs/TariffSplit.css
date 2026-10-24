@@ -1,0 +1,23 @@
+/* ── Tariff list and pane ────────────────────────────────────────────────
+   Two columns when both fit; otherwise the pane takes the whole area and
+   the list steps aside (hidden, so out of the tab order too). The page
+   decides which layout applies (data-layout) from its measured width. */
+
+.tariff-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.tariff-split[data-layout='wide'][data-pane='open'] {
+  grid-template-columns: minmax(0, 1fr) minmax(28rem, 34rem);
+}
+
+.tariff-split-list {
+  min-width: 0;
+}
+
+.tariff-split-list[hidden] {
+  display: none;
+}

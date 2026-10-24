@@ -3,16 +3,17 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useQuery } from '@tanstack/react-query'
 import { Controller, useForm, useWatch } from 'react-hook-form'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FormModal } from '../../components/FormModal'
 import { FormModalFooter } from '../../components/FormModalFooter'
 import { CivilDateInput } from '../../components/CivilDateInput'
 import { fetchDynamicTariffSources } from '../../lib/api/tariffs'
 import { queryKeys } from '../../lib/api/queryKeys'
 import type { Tariff, TariffBillingMode, TariffInput, TariffPeriod } from '../../types/api'
 import { dynamicSourceOptions, impliedEnergyType } from './dynamicSources'
-import { DynamicSourceFormModal } from './DynamicSourceFormModal'
+import { DynamicSourceForm } from './DynamicSourceFormModal'
+import { Notice } from '../../components/Notice'
+import { useFocusFirstField } from './useFocusFirstField'
 import {
   defaultTariffFormValues,
   mapTariffFormValuesToInput,
@@ -33,34 +34,46 @@ const FIXED_PRICE_LABELS: Partial<Record<TariffBillingMode, string>> = {
 
 const SHARED_FEE_MODES: TariffBillingMode[] = ['shared_monthly_fee', 'shared_yearly_fee']
 
-type TariffFormModalProps = {
-  isOpen: boolean
-  title: string
-  onClose: () => void
-  onSubmit: (payload: TariffInput) => void
+type TariffFormProps = {
   // Every caller actually passes a `TariffVersion` (the flattened `Tariff[]`
   // lists upstream just don't say so) — `periods` is read to decide whether
   // switching this version to a dynamic source is currently possible.
   initialTariff?: Tariff & { periods?: TariffPeriod[] }
   selectedZevId: string
   isPending?: boolean
+  /** A failure that belongs to no field: shown in the form, not only as a toast. */
+  error?: string | null
+  onSubmit: (payload: TariffInput) => void
+  onCancel: () => void
+  /** Whether anything was changed, for the pane's unsaved-input guard. */
+  onDirtyChange: (dirty: boolean) => void
 }
 
-export function TariffFormModal({
-  isOpen,
-  title,
-  onClose,
-  onSubmit,
+/**
+ * Create a tariff, or edit one version of it, in the detail pane. Creating a
+ * dynamic source happens in a section of this form, not a dialog over it.
+ */
+export function TariffForm({
   initialTariff,
   selectedZevId,
   isPending = false,
-}: TariffFormModalProps) {
+  error = null,
+  onSubmit,
+  onCancel,
+  onDirtyChange,
+}: TariffFormProps) {
   const { t } = useTranslation()
-  const [showSourceModal, setShowSourceModal] = useState(false)
+  const formId = useId()
+  const [showSourceSection, setShowSourceSection] = useState(false)
+  const [sourceDirty, setSourceDirty] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  useFocusFirstField(formRef)
 
   const form = useForm<TariffFormValues>({
     resolver: zodResolver(tariffFormSchema),
-    defaultValues: defaultTariffFormValues,
+    // Seeded once, when the form opens: a refetch of the list behind it must
+    // not overwrite what is being typed.
+    defaultValues: initialTariff ? mapTariffToFormValues(initialTariff) : defaultTariffFormValues,
   })
 
   const billingMode = useWatch({
@@ -97,7 +110,6 @@ export function TariffFormModal({
   const sourcesQuery = useQuery({
     queryKey: queryKeys.tariffs.dynamicSources(),
     queryFn: fetchDynamicTariffSources,
-    enabled: isOpen,
     staleTime: 5 * 60 * 1000,
   })
   const sourcesData = sourcesQuery.data
@@ -107,9 +119,21 @@ export function TariffFormModal({
     return source?.aggregated_tariff_types ?? []
   }, [sourcesData, dynamicSourceId])
 
-  useEffect(() => {
-    form.reset(initialTariff ? mapTariffToFormValues(initialTariff) : defaultTariffFormValues)
-  }, [initialTariff, form, isOpen])
+  const isDirty = form.formState.isDirty || (showSourceSection && sourceDirty)
+  useEffect(() => { onDirtyChange(isDirty) }, [isDirty, onDirtyChange])
+
+  // A field's problem is told by the field. The schema's own messages are
+  // English and generic; the form says it in the user's language.
+  const errors = form.formState.errors
+  const fieldError = (field: keyof TariffFormValues) => {
+    if (!errors[field]) return null
+    const value = form.getValues(field)
+    return (
+      <small className="field-error" role="alert">
+        {t(typeof value === 'string' && value.trim() ? 'pages.tariffs.form.errorNumber' : 'pages.tariffs.form.errorRequired')}
+      </small>
+    )
+  }
 
   // Picking a source is what decides the energy type for a brand-new tariff
   // (there is nothing else to derive it from); an existing version's energy
@@ -129,8 +153,10 @@ export function TariffFormModal({
   }
 
   return (
-    <FormModal isOpen={isOpen} title={title} onClose={onClose}>
-      <form onSubmit={form.handleSubmit(submit)} className="form-grid">
+    <div className="tariff-pane-form">
+      {error && <Notice tone="error">{error}</Notice>}
+      <form ref={formRef} id={formId} onSubmit={form.handleSubmit(submit)} className="form-grid" aria-busy={isPending || undefined}>
+       <fieldset className="tariff-pane-fieldset" disabled={isPending}>
         {/* Editing an existing tariff means editing one *version* of it. The name
             groups versions, and category/billing mode/energy type must match
             across them, so the four identity fields are shown as values rather
@@ -167,6 +193,7 @@ export function TariffFormModal({
             <label>
               <span>{t('pages.tariffs.form.name')}</span>
               <input {...form.register('name')} required />
+              {fieldError('name')}
             </label>
             <label>
               <span>{t('pages.tariffs.form.category')}</span>
@@ -235,6 +262,7 @@ export function TariffFormModal({
                   {...form.register('minimum_price_chf_per_kwh')}
                 />
                 <small className="muted">{t('pages.tariffs.form.minimumPriceHint')}</small>
+                {fieldError('minimum_price_chf_per_kwh')}
               </label>
             )}
             {selectedSourceAggregatedTypes.length > 0 && (
@@ -251,7 +279,7 @@ export function TariffFormModal({
                 <button
                   className="button button-secondary button-compact"
                   type="button"
-                  onClick={() => setShowSourceModal(true)}
+                  onClick={() => setShowSourceSection(true)}
                 >
                   <FontAwesomeIcon icon={faPlus} fixedWidth />
                   {t('pages.tariffs.form.createDynamicSource')}
@@ -269,12 +297,14 @@ export function TariffFormModal({
               <span>{t('pages.tariffs.form.initialPercentage')}</span>
               <input type="number" step="0.01" min="0" {...form.register('initial_percentage')} required />
               <small className="muted">{t('pages.tariffs.form.initialPercentageHint')}</small>
+              {fieldError('initial_percentage')}
             </label>
           )
         ) : billingMode !== 'energy' ? (
           <label>
             <span>{t(FIXED_PRICE_LABELS[billingMode] ?? 'pages.tariffs.form.monthlyFee')}</span>
             <input type="number" step="0.01" {...form.register('fixed_price_chf')} required />
+            {fieldError('fixed_price_chf')}
             {isSharedFee && (
               <small className="muted">
                 {t(splitKey === 'weight' ? 'pages.tariffs.form.sharedFeeHintWeight' : 'pages.tariffs.form.sharedFeeHint')}
@@ -324,33 +354,30 @@ export function TariffFormModal({
           <input {...form.register('notes')} />
         </label>
 
-        {Object.keys(form.formState.errors).length > 0 && (
-          <div className="error-banner" style={{ gridColumn: '1 / -1' }}>
-            {form.formState.errors.name?.message
-              || form.formState.errors.energy_type?.message
-              || form.formState.errors.initial_percentage?.message
-              || form.formState.errors.fixed_price_chf?.message
-              || t('common.error')}
-          </div>
-        )}
-
-        <FormModalFooter
-          onCancel={onClose}
-          isPending={isPending}
-          submitLabel={initialTariff ? t('pages.tariffs.saveTariff') : t('pages.tariffs.createTariff')}
-          submitIcon={<FontAwesomeIcon icon={faCheck} fixedWidth />}
-          cancelIcon={<FontAwesomeIcon icon={faXmark} fixedWidth />}
-        />
+       </fieldset>
       </form>
-      <DynamicSourceFormModal
-        isOpen={showSourceModal}
-        onClose={() => setShowSourceModal(false)}
-        onSaved={(source) => {
-          form.setValue('dynamic_source', source.id, { shouldValidate: true })
-          const energyType = impliedEnergyType(source)
-          if (energyType) form.setValue('energy_type', energyType, { shouldValidate: true })
-        }}
+      {showSourceSection && (
+        <section className="tariff-pane-section" aria-labelledby={`${formId}-source`}>
+          <h3 id={`${formId}-source`}>{t('pages.dynamicSources.createTitle')}</h3>
+          <DynamicSourceForm
+            onClose={() => setShowSourceSection(false)}
+            onDirtyChange={setSourceDirty}
+            onSaved={(source) => {
+              form.setValue('dynamic_source', source.id, { shouldValidate: true, shouldDirty: true })
+              const energyType = impliedEnergyType(source)
+              if (energyType) form.setValue('energy_type', energyType, { shouldValidate: true })
+            }}
+          />
+        </section>
+      )}
+      <FormModalFooter
+        formId={formId}
+        onCancel={onCancel}
+        isPending={isPending}
+        submitLabel={isPending ? t('common.saving') : initialTariff ? t('pages.tariffs.saveTariff') : t('pages.tariffs.createTariff')}
+        submitIcon={<FontAwesomeIcon icon={faCheck} fixedWidth />}
+        cancelIcon={<FontAwesomeIcon icon={faXmark} fixedWidth />}
       />
-    </FormModal>
+    </div>
   )
 }

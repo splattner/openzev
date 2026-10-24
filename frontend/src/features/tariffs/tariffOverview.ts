@@ -5,7 +5,8 @@
  * to the API's `scope` parameter — and the download filename — is testable
  * without mounting the page or hitting the network.
  */
-import type { TariffValidityFilter } from './TariffToolbar'
+/** The overview PDF's scope, chosen at the download. */
+export type TariffValidityFilter = 'valid' | 'all'
 
 export function tariffOverviewParams(
     zevId: string,

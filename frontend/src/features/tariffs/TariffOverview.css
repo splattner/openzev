@@ -1,0 +1,41 @@
+/* Current, Upcoming, and a folded History: one sheet per group. */
+
+.tariff-overview {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.tariff-overview-title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+/* The same +/− disclosure as the billing periods' history. */
+
+.tariff-overview-history > summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  list-style: none;
+}
+
+.tariff-overview-history > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tariff-overview-history > summary::after {
+  content: '+';
+}
+
+.tariff-overview-history[open] > summary::after {
+  content: '−';
+}
+
+.tariff-overview-history > summary .tariff-overview-title {
+  margin: 0;
+  color: inherit;
+}

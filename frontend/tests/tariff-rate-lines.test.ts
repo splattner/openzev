@@ -272,9 +272,10 @@ describe('tariff list narrow markup', () => {
                 QueryClientProvider,
                 { client },
                 createElement(TariffCategorySections, {
-                    tariffSections: [{ category: 'energy', series: [series] }],
+                    rows: [{ series, version }],
+                    kind: 'current',
                     settings,
-                    openSeriesKey: null,
+                    selected: null,
                     onOpenDetail,
                 }),
             ))

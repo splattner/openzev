@@ -15,9 +15,10 @@
 
 ---
 
-This document defines target guidance; it does not describe the shipped UI.
-Until a rollout phase (§11) lands, the baseline specs and the user guide stay
-authoritative for the screens that phase covers. Documentation only: no UI,
+This document defines target guidance. Phase 1 (the tariff pilot) is
+implemented (see [tariff split view](2026-10-tariff-split-view.md) §11 for the
+values it recorded); until a later rollout phase (§11) lands, the baseline specs
+and the user guide stay authoritative for the screens that phase covers. Documentation only: no UI,
 route, component or lint change is claimed as shipped.
 
 ## 1. Problem and outcome

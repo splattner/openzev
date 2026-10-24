@@ -5,40 +5,43 @@ import { formatShortDate } from '../../lib/appSettings'
 import { todayBusinessIso } from '../../lib/dates'
 import type { AppSettings, Tariff, TariffSeries } from '../../types/api'
 import { seriesKeyOf, useTariffDisplay } from './useTariffDisplay'
-import { listedVersion, validityState } from './validity'
+import type { TariffOverviewRow } from './validity'
 import { emphasizedDate } from './datePresentation'
 
 const DATE_SLOT = '\u0000'
 
-type TariffSeriesSection = {
-    category: Tariff['category']
-    series: TariffSeries[]
-}
+const categoryOrder: Tariff['category'][] = ['energy', 'grid_fees', 'levies', 'metering']
+
+/** What a group of rows is about; it decides how a row words its validity. */
+export type TariffRowsKind = 'current' | 'upcoming' | 'history'
 
 type TariffCategorySectionsProps = {
-    tariffSections: TariffSeriesSection[]
+    rows: TariffOverviewRow[]
+    kind: TariffRowsKind
     settings: AppSettings
-    /** The series currently shown in the detail drawer, so its row can be highlighted. */
-    openSeriesKey: string | null
-    /** The Upcoming view: each row shows its series' next version. */
-    upcoming?: boolean
+    /** The series and version shown in the detail pane, so its row can be highlighted. */
+    selected: { seriesKey: string, versionId: string } | null
     /** Open the exact version displayed by the row. */
     onOpenDetail: (series: TariffSeries, versionId: string) => void
 }
 
 /**
- * One row per tariff series; details and write actions live in the drawer.
+ * One row per tariff series and group, in the category order; details and
+ * write actions live in the detail pane.
  */
 export function TariffCategorySections({
-    tariffSections,
+    rows,
+    kind,
     settings,
-    openSeriesKey,
-    upcoming = false,
+    selected,
     onOpenDetail,
 }: TariffCategorySectionsProps) {
     const { t } = useTranslation()
     const today = todayBusinessIso()
     const { sourceById, validityBadge, rateLines, pricingTooltipFor } = useTariffDisplay(settings, today)
+    const tariffSections = categoryOrder
+        .map((category) => ({ category, rows: rows.filter((row) => row.series.category === category) }))
+        .filter((section) => section.rows.length > 0)
 
     // `ab 01.01.2027`, the year (and, within this year, the month) bold. The
     // sentence is cut at its date, so each language keeps its own word order.
@@ -49,7 +52,7 @@ export function TariffCategorySections({
     }
 
     return (
-        <section className="card tariff-list">
+        <div className="table-card invoice-rows tariff-list">
             {tariffSections.map((section) => (
                 <table key={section.category} className="tariff-table">
                     <thead>
@@ -60,7 +63,7 @@ export function TariffCategorySections({
                             <th scope="col" className="tariff-table-applies">{t('pages.tariffs.rateCard.applies')}</th>
                             <th scope="col" className="numeric">{t('pages.tariffs.rateCard.price')}</th>
                             <th scope="col" className="tariff-table-unit">{t('pages.tariffs.rateCard.unit')}</th>
-                            <th scope="col" id={`tariff-bands-${section.category}`} className="tariff-table-bands">
+                            <th scope="col" id={`tariff-bands-${kind}-${section.category}`} className="tariff-table-bands">
                                 <span className="visually-hidden">
                                     {t('pages.tariffs.rateCard.applies')} · {t('pages.tariffs.rateCard.price')} · {t('pages.tariffs.rateCard.unit')}
                                 </span>
@@ -72,10 +75,8 @@ export function TariffCategorySections({
                         </tr>
                     </thead>
                     <tbody>
-                        {section.series.map((series) => {
+                        {section.rows.map(({ series, version: shown }) => {
                             const seriesKey = seriesKeyOf(series)
-                            const shown = listedVersion(series.versions, today, upcoming)
-                            const state = validityState(shown, today)
 
                             const dynamicSource = shown.dynamic_source ? sourceById.get(shown.dynamic_source) : undefined
                             const fetchFailed = dynamicSource?.last_fetch_status === 'failed'
@@ -83,15 +84,16 @@ export function TariffCategorySections({
                             const pricingExplanation = pricingTooltipFor(series, shown, dynamicSource)
                             const badge = validityBadge(shown)
                             const notes = shown.notes?.trim()
-                            const isOpen = seriesKey === openSeriesKey
+                            const isOpen = seriesKey === selected?.seriesKey && shown.id === selected.versionId
                             function openRow() {
                                 onOpenDetail(series, shown.id)
                             }
 
                             return (
                                 <tr
-                                    key={seriesKey}
-                                    className={[isOpen && 'is-selected', state === 'expired' && 'is-ended'].filter(Boolean).join(' ') || undefined}
+                                    key={`${seriesKey}:${shown.id}`}
+                                    data-row-key={`${seriesKey}:${shown.id}`}
+                                    className={[isOpen && 'is-selected', kind === 'history' && 'is-ended'].filter(Boolean).join(' ') || undefined}
                                     onClick={openRow}
                                 >
                                     <td className="tariff-table-tariff">
@@ -139,7 +141,7 @@ export function TariffCategorySections({
                                     <td className="tariff-table-lines tariff-table-unit">
                                         {lines.map((line, index) => <div key={index} title={line.unit}>{line.unit}</div>)}
                                     </td>
-                                    <td className="tariff-table-bands" headers={`tariff-bands-${section.category}`}>
+                                    <td className="tariff-table-bands" headers={`tariff-bands-${kind}-${section.category}`}>
                                         {lines.map((line, index) => (
                                             <div key={index} className="tariff-table-band" title={pricingExplanation ?? line.applies}>
                                                 <span className="tariff-table-band-applies">{line.applies}</span>
@@ -152,9 +154,11 @@ export function TariffCategorySections({
                                         ))}
                                     </td>
                                     <td className="tariff-table-valid">
-                                        {state === 'scheduled'
+                                        {kind === 'upcoming'
                                             ? upcomingStart(shown.valid_from)
-                                            : <span title={badge.tooltip}>{badge.label}</span>}
+                                            : kind === 'history'
+                                                ? <span>{formatShortDate(shown.valid_from, settings)} – {formatShortDate(shown.valid_to ?? shown.valid_from, settings)}</span>
+                                                : <span title={badge.tooltip}>{badge.label}</span>}
                                     </td>
                                     <td className="tariff-table-open">
                                         <FontAwesomeIcon icon={faChevronRight} fixedWidth />
@@ -165,6 +169,6 @@ export function TariffCategorySections({
                     </tbody>
                 </table>
             ))}
-        </section>
+        </div>
     )
 }

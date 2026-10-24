@@ -216,11 +216,6 @@
     font-size: 1.5rem;
   }
 
-  .tariff-detail-card-wide {
-    grid-column: auto;
-  }
-
-  .tariff-period-actions,
   .metering-assignment-actions {
     justify-content: flex-start;
   }

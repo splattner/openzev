@@ -518,7 +518,7 @@ and from where. (Answers open question 1 of #507.)
 
 **File:** `frontend/src/pages/TariffsPage.tsx`
 
-`TariffToolbar` gains an optional `onOpenImportModal`; the button renders only
+`TariffActions` (the page header's actions) takes an optional `onOpenImportModal`; the button renders only
 when a single ZEV is selected, since an import needs one target. The modal
 receives `selectedZev.tariff_source_url` as its initial URL.
 

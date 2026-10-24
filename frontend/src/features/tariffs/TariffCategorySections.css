@@ -1,4 +1,4 @@
-/* One row per series; details and write actions live in the drawer. */
+/* One row per series; details and write actions live in the detail pane. */
 
 .tariff-list {
   container-type: inline-size;
@@ -154,6 +154,22 @@ td.tariff-table-valid {
     display: block;
   }
 
+  /* The shared row table hides its header on cards; here the category
+     names the group, so its cell stays. */
+  .invoice-rows.tariff-list .tariff-table thead {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
+
+  /* The band opens the sheet, as on the wide table. */
+  .table-card.invoice-rows.tariff-list > table:first-child {
+    margin-top: calc(-1 * var(--sheet-pad-block));
+  }
+
   /* Out of sight, not out of the accessibility tree. */
   .tariff-table thead th:not(:first-child) {
     position: absolute;
@@ -193,10 +209,13 @@ td.tariff-table-valid {
     box-shadow: none;
   }
 
+  /* The row is the card, so the row carries the ground; the cells are grid
+     areas and would tint only their own text. */
   .tariff-list .tariff-table tbody tr:hover > td {
-    background: var(--surface);
+    background: transparent;
   }
 
+  .tariff-list .tariff-table tbody tr:hover,
   .tariff-list .tariff-table tbody tr.is-selected,
   .tariff-list .tariff-table tbody tr:has(:focus-visible) {
     background: var(--surface);

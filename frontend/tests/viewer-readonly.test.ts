@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { MantineProvider } from '@mantine/core'
 import { ParticipantToolbar } from '../src/features/participants/ParticipantToolbar'
-import { TariffToolbar } from '../src/features/tariffs/TariffToolbar'
+import { TariffActions } from '../src/features/tariffs/TariffActions'
 import { TariffEmptyState } from '../src/features/tariffs/TariffEmptyState'
 import { ImportHistoryTable } from '../src/features/imports/ImportHistoryTable'
 
@@ -39,20 +39,16 @@ describe('viewer read-only controls', () => {
     })
 
     it('tariffs: no "New tariff" or import, but the overview PDF stays', async () => {
-        const props = {
-            validCount: 1, totalCount: 1, hasOutOfForceVersions: false,
-            validityFilter: 'all' as const, onValidityFilterChange: vi.fn(), onOpenCreateTariffModal: vi.fn(),
-            onDownloadOverview: vi.fn(),
-        }
-        const viewer = await render(createElement(TariffToolbar, { ...props, readOnly: true }))
+        const props = { onOpenCreateTariff: vi.fn(), onDownloadOverview: vi.fn() }
+        const viewer = await render(createElement(TariffActions, { ...props, readOnly: true }))
         expect(has(viewer, 'pages.tariffs.newTariff')).toBe(false)
         expect(has(viewer, 'pages.tariffs.import.action')).toBe(false)
         expect(has(viewer, 'pages.tariffs.overviewPdf.action')).toBe(true)
-        expect(has(await render(createElement(TariffToolbar, props)), 'pages.tariffs.newTariff')).toBe(true)
+        expect(has(await render(createElement(TariffActions, props)), 'pages.tariffs.newTariff')).toBe(true)
     })
 
     it('tariffs empty state: no create action', async () => {
-        expect(has(await render(createElement(TariffEmptyState, { onOpenCreateTariffModal: vi.fn(), readOnly: true })), 'pages.tariffs.newTariff')).toBe(false)
+        expect(has(await render(createElement(TariffEmptyState, { onOpenCreateTariff: vi.fn(), readOnly: true })), 'pages.tariffs.newTariff')).toBe(false)
     })
 
     it('imports: an empty history offers no new import', async () => {

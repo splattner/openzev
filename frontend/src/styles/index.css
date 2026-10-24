@@ -69,7 +69,9 @@
 @import '../pages/MeteringPointsPage.css' layer(pages);
 @import '../features/meteringPoints/MeteringPointTypeLegend.css' layer(pages);
 @import '../features/tariffs/TariffCategorySections.css' layer(pages);
-@import '../features/tariffs/TariffDetailDrawer.css' layer(pages);
+@import '../features/tariffs/TariffOverview.css' layer(pages);
+@import '../features/tariffs/TariffDetailPane.css' layer(pages);
+@import '../features/tariffs/TariffSplit.css' layer(pages);
 @import './pages/invoice-rows.css' layer(pages);
 @import '../features/invoices/InvoicePeriodRowsTable.css' layer(pages);
 @import '../components/ProgressIcon.css' layer(pages);
@@ -85,8 +87,8 @@
 @import '../features/meteringPoints/MeteringGapsDrawer.css' layer(pages);
 @import '../features/audit/AuditEventDrawer.css' layer(pages);
 @import '../features/audit/ChangesDiff.css' layer(pages);
-@import '../features/tariffs/TariffVersionModal.css' layer(pages);
-@import '../features/tariffs/TariffFormModal.css' layer(pages);
+@import '../features/tariffs/TariffVersionForm.css' layer(pages);
+@import '../features/tariffs/TariffForm.css' layer(pages);
 @import '../features/tariffs/TariffPriceHistoryChart.css' layer(pages);
 @import '../pages/PublicInvoicePage.css' layer(pages);
 @import './pages/public-card.css' layer(pages);

@@ -19,12 +19,13 @@ Each tariff has:
 
 ![Tariffs page](screenshots/07-tariffs.png)
 
-The tabs above the list count the tariffs: **Valid** (the default) shows the
-tariffs with a version in force today; **Upcoming** shows the tariffs with a
-version that starts later, each with that version's prices (for example next
-year's grid tariff, once imported); **All** adds the ones with none in force
-(only superseded or future versions). The tabs show only when there are such
-tariffs.
+The list is grouped by what applies when: **Current** shows each tariff's
+version in force today; **Upcoming** shows tariffs with a version that starts
+later, each with that version's prices (for example next year's grid tariff,
+once imported); **History** is folded away and shows the versions that have
+ended. A tariff appears in every group it has a version for, and **History**
+opens by itself when you follow a link to a past version. The headings carry no
+counts.
 
 Each category is a rate card, set like the tariff overview PDF, with one row
 per tariff:
@@ -46,9 +47,12 @@ the other bands' remaining hours. Uncovered hours use the first band in the
 matching season (or the tariff's first band if no season matches).
 
 A red badge next to the name means warnings: a gap between
-versions or a failed price fetch. A tariff whose last version has ended sits on
-a grey row. Click a row to open the tariff's detail panel, where **Edit** and
-the other actions are; from **Upcoming** it opens on the upcoming version.
+versions or a failed price fetch. Rows in **History** are grey but readable.
+Click a row to open the tariff's detail pane beside the list, where **Edit**
+and the other actions are; from **Upcoming** it opens on the upcoming version.
+On a narrow screen (a phone, or a small window) the pane takes the whole area
+and the list is hidden until you close it with **X** or the browser's **Back**
+button.
 
 The list waits for the selected community to load. If loading fails, use **Retry**;
 a failed community refresh keeps the loaded scope and your open draft available.
@@ -57,7 +61,14 @@ a failed community refresh keeps the loaded scope and your open draft available.
 
 **Managers** create tariffs in **Tariffs**.
 
-Switching community or losing write access closes open tariff, version and import dialogs, including delete confirmations. Save your draft before switching.
+Switching community or losing write access closes the open tariff pane, its form and any import dialog or delete confirmation. Save your draft before switching.
+
+The forms for creating and changing tariffs open in the detail pane, in the
+place you were just looking at the tariff, and the list stays beside them.
+If you leave with unsaved input — **X**, **Cancel**, **Escape**, the browser's
+**Back** button, picking another tariff or version, or reloading the page —
+OpenZEV asks whether to discard it; choosing **Keep editing** leaves your input
+and the selection as they were.
 
 1. Click **New Tariff**
 2. Enter details:
@@ -80,7 +91,7 @@ Switching community or losing write access closes open tariff, version and impor
    [Percentage of Energy Tariff](#percentage-of-energy-tariff)), or — for a
    per-kWh tariff — a [dynamic price source](#dynamic-tariffs) if it has one
 
-5. Click **Save Tariff**
+5. Click **Create Tariff**; the new tariff opens in the pane
 
 6. For a per-kWh or percentage tariff with fixed bands, add its prices as
    [Tariff Periods](#tariff-periods) — a tariff without a band prices nothing
@@ -217,12 +228,14 @@ moment, negative prices included.
 
 Managers can choose an existing shared source or create a new source from
 the energy-tariff form. Viewers can inspect linked sources and price history.
-Click a dynamic tariff to see its source label, endpoint,
-protocol, product, fetch status, last successful fetch and stored coverage.
-Usage counts cover the whole platform. A stored date range can
-still contain gaps; check the price history for the period you need.
+Click a dynamic tariff to see its source name, fetch status and last
+successful fetch. **Source details** unfolds the endpoint, protocol, product,
+stored coverage and usage. Usage counts cover the whole platform. A stored date
+range can still contain gaps; check the price history for the period you need.
 Administrators can follow **Manage source in platform admin** to its operational
 row; managers create and reuse sources in the tariff form.
+
+![A dynamic tariff's detail pane with its source details](screenshots/07d-tariff-dynamic-source.png)
 
 ### Reading a dynamic tariff's price
 
@@ -567,7 +580,7 @@ across the participants. It appears on invoices as a credit line.
 **Tariff periods** hold a per-kWh tariff's prices. There are no default
 periods: a new per-kWh tariff has none until you add one. A [percentage
 tariff](#percentage-of-energy-tariff) uses the same periods and the same
-**Add Period** dialog, entering a **percentage** instead of a **CHF/kWh**
+**Add Period** form, entering a **percentage** instead of a **CHF/kWh**
 price — everything below about period types, time windows, weekdays and
 months applies to it unchanged. Each period has a type:
 
@@ -579,7 +592,7 @@ months applies to it unchanged. Each period has a type:
 
 To add one:
 
-1. Click the tariff to open its detail panel
+1. Click the tariff to open its detail pane
 2. Click **Add Period** in the Tariff Periods section
 3. Enter:
    - **Period type** (see above) and, for a time band, a **Band name**
@@ -632,13 +645,14 @@ Local Energy                                    ← one tariff, three versions
 
 ### Adding a New Version
 
-1. Click the tariff to open its detail panel, then click **New version**
+1. Click the tariff to open its detail pane, then click **Schedule price change**
 2. Enter the date the new prices take effect (defaults to today)
-3. Adjust the prices (pre-filled from the current version)
-4. Click **Create**
+3. Adjust the prices (pre-filled from the current version); the form says what
+   will apply from that date
+4. Click **Schedule price change**
 
 OpenZEV **closes the previous version automatically** on the day before, so the
-timeline stays continuous. You never set an end date by hand — the dialog names
+timeline stays continuous. You never set an end date by hand — the form names
 the closing date it will use as you pick the start date.
 
 > **Why this matters:** if a day falls between two versions, OpenZEV has no price
@@ -654,30 +668,37 @@ both sides.
 
 The Tariffs page shows **one entry per tariff**, using the version selected by
 the current list view rather than listing every version separately. Click it
-to open a panel on the right with
-everything else:
-version history, the price chart, price bands, and notes.
+to open the detail pane beside the list with
+everything else.
 
-**Version history** lists every version with its window and price. Click one
-to make the *panel* show that version — its price bands switch to the ones in
-force then, and a **Viewing an older version** (or, for one that has not
-started yet, **Viewing an upcoming version**) badge appears so you can't
-mistake it for the current rate. Switching versions in the detail panel does
-not change the version shown by the selected list view. Click the active version
-to go back.
+At the top of the pane, **Schedule price change**, **Rename** and **Duplicate**
+act on the whole tariff. Under them, the version being shown has its validity
+window, a **Current**, **Upcoming** or **Ended** label so you can't mistake an
+old or future version for the current rate, and its own **Edit** button. Below
+come the notes, the dynamic source if there is one, the price bands (each with
+edit and delete buttons) and the version history.
 
-Each row has its own edit and delete buttons, because correcting a superseded
-version's end date is a normal follow-up to adding a new one.
+**Version history** lists the versions with their window and price: the current
+one first, then **Scheduled changes**, then **Past versions** (folded away
+unless you are looking at one). A tariff with only one version has no history
+section. Click a row to make the *pane* show that version — its price bands
+switch to the ones in force then. Switching versions in the detail pane does not
+change the version shown in the list. Click the current version to go back.
 
-The panel stays open across a page reload or a shared link — the URL records
-which tariff and version you're looking at.
+Each row has a **⋮** menu with **Edit** and **Delete** for that version, because
+correcting a superseded version's end date is a normal follow-up to adding a
+new one.
+
+The pane stays open across a page reload or a shared link — the URL records
+which tariff and version you're looking at. **X**, **Escape** and the browser's
+**Back** button all return to the list.
 
 ![Tariff version history and price chart](screenshots/07b-tariff-versions.png)
 
 ### Price History
 
-Once a tariff has **more than one version**, its detail panel also charts how
-its price moved over time.
+Once a tariff has **more than one version**, its detail pane also charts how
+its price moved over time; open **Price history** to see the chart.
 
 - The line is **stepped**, not sloped — a price holds for its whole window and
   then jumps. A sloped line would suggest it drifted between two Januaries.
@@ -695,14 +716,14 @@ its price moved over time.
 
 Renaming is done for the **whole tariff**, not per version — the name is what
 holds the versions together, so renaming just one would split it into two
-unrelated tariffs. **Rename** sits at the top of the detail panel, and tells
+unrelated tariffs. **Rename** sits at the top of the detail pane, and tells
 you how many versions it will affect.
 
 ### Duplicating
 
-Use **Duplicate** (also at the top of the detail panel) to create a *different*
+Use **Duplicate** (also at the top of the detail pane) to create a *different*
 tariff starting from an existing one's numbers. It asks for a new name and leaves
-the original untouched. (Use **New version** instead when the prices of the
+the original untouched. (Use **Schedule price change** instead when the prices of the
 *same* tariff have changed.)
 
 ### Which Version Gets Billed
@@ -758,7 +779,7 @@ means two prices claim the same day:
   Local Energy   2026-04-01 → (open)
 ```
 
-Use **New version** and you never hit this: OpenZEV closes the old window for
+Use **Schedule price change** and you never hit this: OpenZEV closes the old window for
 you. You only see this error when editing validity dates by hand. If two tariffs
 really are meant to apply together, give them different names — which you would
 want anyway, since the name is what appears on the invoice line.
@@ -781,7 +802,7 @@ the pricing. See [ZEV Export and Import](17-zev-transfer.md).
 
 Edit **future** tariffs freely:
 
-1. Click the tariff to open its detail panel
+1. Click the tariff to open its detail pane
 2. Click **Edit**
 3. Change prices, periods, validity dates
 4. Click **Save**
@@ -794,7 +815,7 @@ than inputs: they are shared by every version, so changing them on one alone
 would break the series. Use **Rename** for the name; for a different category,
 billing mode or energy type, create a separate tariff.
 
-> **Prices changed from a certain date?** Use **New version** instead of editing.
+> **Prices changed from a certain date?** Use **Schedule price change** instead of editing.
 > Editing rewrites what the *current* version has always charged; a new version
 > records the change, keeps the old prices on the record, and lets invoices
 > spanning the switch bill each part correctly. See
@@ -804,14 +825,14 @@ billing mode or energy type, create a separate tariff.
 
 Set **Valid To** to exclude from future invoices:
 
-1. Click the tariff to open its detail panel
+1. Click the tariff to open its detail pane
 2. Click **Edit**
 3. Set **Valid To** to today or last usage date
 4. Click **Save**
 
 > **Important:** Never delete a tariff—always set Valid To instead. This preserves invoice audit trail.
 
-This applies to the delete button on a **version** row too. Deleting a version
+This applies to **Delete** in a **version** row's menu too. Deleting a version
 removes the prices that applied in its window, which leaves a gap: energy in
 those days is then billed at nothing. Reserve it for a version created by
 mistake — one you have not billed against.

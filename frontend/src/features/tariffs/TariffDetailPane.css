@@ -1,0 +1,365 @@
+.tariff-source-summary {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.tariff-period-actions {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.tariff-period-line {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+
+/* The version being looked at: its window, standing and price once, with the
+   one action that changes it. The history below only picks which one. */
+
+.tariff-version-card {
+  display: grid;
+  gap: 0.375rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.tariff-version-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  flex-wrap: wrap;
+}
+
+.tariff-version-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.tariff-version-card-window {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.tariff-version-card-price,
+.tariff-version-card-notes {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.tariff-version-card-notes {
+  color: var(--text-muted);
+}
+
+.tariff-detail-label {
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.tariff-period-section {
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--border-default);
+}
+
+.tariff-period-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.tariff-period-section-header h4 {
+  margin: 0;
+}
+
+.tariff-period-list {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.tariff-period-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.tariff-period-main {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 0.3rem;
+}
+
+.tariff-period-meta,
+.tariff-period-empty {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+/* ── Tariff detail pane ──────────────────────────────────────────────────
+   In flow beside the list: it takes its own column, no scrim, no scroll
+   lock. On a wide page it stays in view while the list scrolls, and
+   scrolls on its own when taller than the screen. */
+
+.tariff-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sheet);
+}
+
+.tariff-split[data-layout='wide'] .tariff-pane {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+
+.tariff-pane-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-default);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--surface-card);
+}
+
+.tariff-pane-heading {
+  display: grid;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.tariff-pane-heading h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.tariff-pane-heading h2:focus {
+  outline: none;
+}
+
+.tariff-pane-meta {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.tariff-pane-heading > .badge {
+  justify-self: start;
+}
+
+.tariff-pane-body {
+  padding: 1.25rem 1.25rem 1.75rem;
+}
+
+.tariff-pane-actions {
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border-default);
+}
+
+/* ── Tariff versions ─────────────────────────────────────────────────────── */
+
+.tariff-version-section {
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-default);
+}
+
+.tariff-version-section h3,
+.tariff-period-section-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.tariff-version-group {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.tariff-version-group h4 {
+  margin: 0;
+}
+
+.tariff-version-list {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A past version: grey, still readable and still editable. */
+
+.tariff-version-row.is-ended .tariff-version-window,
+.tariff-version-row.is-ended strong {
+  color: color-mix(in srgb, var(--text-body) 50%, var(--text-muted));
+}
+
+/* Secondary pane content on demand. */
+
+.tariff-disclosure > summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.25rem 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  list-style: none;
+}
+
+.tariff-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tariff-disclosure > summary::after {
+  content: '+';
+}
+
+.tariff-disclosure[open] > summary::after {
+  content: '−';
+}
+
+.tariff-disclosure[open] > summary {
+  margin-bottom: 0.5rem;
+}
+
+.tariff-version-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid var(--border-default);
+  border-radius: 0.7rem;
+  padding: 0.15rem 0.5rem 0.15rem 0.15rem;
+  background: var(--surface-card);
+}
+
+.tariff-version-row.is-shown {
+  border-color: var(--brand-accent);
+  background: var(--brand-pale);
+}
+
+/* The whole row is the selector, so the click target matches the affordance. */
+
+.tariff-version-select {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: none;
+  border: 0;
+  padding: 0.5rem;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0.5rem;
+}
+
+.tariff-version-select:hover {
+  background: var(--surface);
+}
+
+.tariff-version-window {
+  color: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.tariff-gap-warning {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  margin-top: 0.8rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--danger-300);
+  border-radius: 0.7rem;
+  background: var(--danger-100);
+  color: var(--danger-700);
+}
+
+.tariff-gap-warning p {
+  margin: 0.15rem 0 0;
+}
+
+.tariff-gap-warning .muted {
+  color: var(--warning-800);
+}
+
+
+.tariff-disclosure .tariff-price-history {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* ── Editing in the pane ─────────────────────────────────────────────────── */
+
+.tariff-pane-form {
+  display: grid;
+  gap: 1rem;
+}
+
+/* A disabled fieldset is how a saving form stops taking input; it must not
+   become a box of its own in the form's grid. */
+
+.tariff-pane-fieldset {
+  display: contents;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.tariff-pane-section {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem 0 0;
+  border-top: 1px solid var(--border-default);
+}
+
+.tariff-pane-section h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+/* Save and Cancel stay in reach while the form scrolls. */
+
+.tariff-pane-form > .dialog-actions {
+  position: sticky;
+  bottom: 0;
+  margin: 0;
+  padding: 0.75rem 0;
+  background: var(--surface-card);
+  border-top: 1px solid var(--border-default);
+}

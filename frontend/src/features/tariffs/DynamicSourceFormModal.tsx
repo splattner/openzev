@@ -29,6 +29,15 @@ const BFE_RMP_URLS: Record<'quarterly' | 'monthly', string> = {
 
 const BFE_RMP_TECHNOLOGIES: BfeRmpTechnology[] = ['pv', 'wasserkraft', 'windenergie', 'biomasse']
 
+type FormProps = {
+  /** Cancel: leave without saving. */
+  onClose: () => void
+  onSaved?: (source: DynamicTariffSource) => void
+  source?: DynamicTariffSource | null
+  /** Whether anything was typed, for the caller's unsaved-input guard. */
+  onDirtyChange?: (dirty: boolean) => void
+}
+
 type Props = {
   isOpen: boolean
   onClose: () => void
@@ -40,7 +49,12 @@ function componentKey(component: DynamicSourceDiscovery['components'][number]): 
   return `${component.tariff_type}\u0000${component.tariff_name}`
 }
 
-export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Props) {
+/**
+ * The source form without a shell: in a dialog on the admin page, an inline
+ * section beside the tariff form (a pane has no second dialog). Mount it
+ * fresh each time it opens.
+ */
+export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: FormProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { pushToast } = useToast()
@@ -70,7 +84,12 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
       source?.url === BFE_RMP_URLS.monthly ? 'monthly' : 'quarterly',
     )
     setBfeTechnology((source?.tariff_name as BfeRmpTechnology) || 'pv')
-  }, [source, isOpen])
+  }, [source])
+
+  const dirty = label !== (source?.label ?? '')
+    || url !== (source?.url ?? '')
+    || enabled !== (source?.enabled ?? true)
+  useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
 
   const discoverMutation = useMutation({
     mutationFn: () => discoverDynamicTariffSource(
@@ -147,11 +166,6 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
   const pending = discoverMutation.isPending || saveMutation.isPending
 
   return (
-    <FormModal
-      isOpen={isOpen}
-      title={t(source ? 'pages.dynamicSources.editTitle' : 'pages.dynamicSources.createTitle')}
-      onClose={onClose}
-    >
       <form className="form-grid" onSubmit={submit}>
         {!source && sourceKind === 'vse' && (
           <div className="muted" style={{ gridColumn: '1 / -1' }}>
@@ -311,6 +325,18 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
           </button>
         </div>
       </form>
+  )
+}
+
+export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Props) {
+  const { t } = useTranslation()
+  return (
+    <FormModal
+      isOpen={isOpen}
+      title={t(source ? 'pages.dynamicSources.editTitle' : 'pages.dynamicSources.createTitle')}
+      onClose={onClose}
+    >
+      {isOpen && <DynamicSourceForm onClose={onClose} onSaved={onSaved} source={source} />}
     </FormModal>
   )
 }

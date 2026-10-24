@@ -50,7 +50,7 @@ props) are unlayered and win; they only set what the component was asked to set.
 ## Where a rule lives
 
 CSS used by exactly one page or component sits **next to it**, named after it:
-`features/tariffs/TariffDetailDrawer.css`, `pages/LoginPage.css`,
+`features/tariffs/TariffDetailPane.css`, `pages/LoginPage.css`,
 `components/PeriodSelector.css`. A rule shared by a component and the one page that
 renders it goes in the page's file. Only what several pages share stays here:
 shared primitives (sheet, table, buttons, badges, dialogs, stat tiles) in `components/`,

@@ -866,7 +866,7 @@ downloads and exports stay:
 |---|---|---|
 | `ParticipantsPage` → `ParticipantToolbar`, `ParticipantCardsSection` (`readOnly`) | New participant, the name as edit link, the fix controls on missing details, the whole row menu (edit, onboarding links, link/unlink account, delete), the empty state's create action | Contract PDF — through `downloadIssuedParticipantContractPdf` (GET of the latest issued version, 404 before the first) instead of the issuing POST |
 | `MeteringPointsPage` → `MeteringPointsToolbar`, `MeteringPointsList`, `MeteringPointsEmptyState` (`readOnly`; `canManageMeteringPoints` keeps its meaning of "management view") | New metering point, assign, point and assignment edit/delete menus | assignment history, summary stats, chart links |
-| `TariffsPage` → `TariffToolbar`, `TariffEmptyState`, `TariffDetailDrawer` (`readOnly`; the list rows carry no write actions) | New tariff, VSE import, Edit, new version / rename / duplicate, version edit/delete, add/edit/delete band | tariff overview PDF, version history |
+| `TariffsPage` → `TariffActions`, `TariffEmptyState`, `TariffDetailPane` (`readOnly`; the list rows carry no write actions) | New tariff, VSE import, Edit, new version / rename / duplicate, version edit/delete, add/edit/delete band | tariff overview PDF, version history |
 | `InvoicesPage` | the row's primary action, every row menu item except navigation (`review-conflict`), the batch recommended action and batch menu | Download all PDFs |
 | `InvoiceDetailPage` (decided by the invoice's own ZEV, `shellRoleForZev`) | Generate PDF, revoke access link | the PDF, back link |
 | `BillingEmailsPage` | Retry (row and history modal) | delivery history |

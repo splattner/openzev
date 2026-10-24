@@ -19,9 +19,11 @@ interface ActionMenuProps {
     iconOnly?: boolean
     /** Row-level size by default; `false` for a page toolbar, beside full-size buttons. */
     compact?: boolean
+    /** Lets the caller find the trigger again, to return focus once a form it opened closes. */
+    actionKey?: string
 }
 
-export function ActionMenu({ label, items, icon, iconOnly = false, compact = true }: ActionMenuProps) {
+export function ActionMenu({ label, items, icon, iconOnly = false, compact = true, actionKey }: ActionMenuProps) {
     const availableItems = useMemo(() => items.filter((item) => !item.disabled), [items])
     const renderedItems = useMemo(() => {
         return items.map((item, index) => {
@@ -49,6 +51,7 @@ export function ActionMenu({ label, items, icon, iconOnly = false, compact = tru
                     className={`button button-secondary${compact ? ' button-compact' : ''}`}
                     disabled={availableItems.length === 0}
                     aria-haspopup="menu"
+                    data-action-key={actionKey}
                     onKeyDown={closePopupOnEscape}
                     aria-label={iconOnly ? label : undefined}
                     title={iconOnly ? label : undefined}

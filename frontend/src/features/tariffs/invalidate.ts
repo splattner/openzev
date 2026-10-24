@@ -17,9 +17,14 @@ import { queryKeys } from '../../lib/api/queryKeys'
  * not per-ZEV — ADR 0018), so the source picker's list is refetched too; an
  * ordinary tariff edit never touches that list, but invalidating it anyway
  * costs one cheap refetch against a query nothing else is actively changing.
+ *
+ * Resolves once the refetch has landed, so a caller that selects what it just
+ * saved can wait for the series to contain it.
  */
-export function invalidateTariffQueries(queryClient: QueryClient, selectedZevId?: string): void {
+export function invalidateTariffQueries(queryClient: QueryClient, selectedZevId?: string): Promise<void> {
     const zevId = selectedZevId || undefined
-    void queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.series(zevId) })
-    void queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.dynamicSources() })
+    return Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.series(zevId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.dynamicSources() }),
+    ]).then(() => undefined)
 }

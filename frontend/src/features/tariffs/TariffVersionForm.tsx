@@ -1,9 +1,11 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faTriangleExclamation, faXmark } from '@fortawesome/free-solid-svg-icons'
 import dayjs from 'dayjs'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FormModal } from '../../components/FormModal'
+import { FormModalFooter } from '../../components/FormModalFooter'
+import { Notice } from '../../components/Notice'
+import { useFocusFirstField } from './useFocusFirstField'
 import { CivilDateInput } from '../../components/CivilDateInput'
 import { formatShortDate } from '../../lib/appSettings'
 import type { AppSettings, TariffPeriodType, TariffVersion, TariffVersionInput } from '../../types/api'
@@ -20,11 +22,16 @@ type PeriodDraft = {
   months: string
 }
 
-type TariffVersionModalProps = {
-  dialog: VersionDialog
+type TariffVersionFormProps = {
+  /** The task and the version it starts from. */
+  dialog: NonNullable<VersionDialog>
   settings: AppSettings
   isPending: boolean
-  onClose: () => void
+  /** A failure that belongs to no field: shown in the form, not only as a toast. */
+  error?: string | null
+  onCancel: () => void
+  /** Whether anything was changed, for the pane's unsaved-input guard. */
+  onDirtyChange: (dirty: boolean) => void
   onSubmitNewVersion: (id: string, payload: TariffVersionInput) => void
   onSubmitDuplicate: (id: string, payload: TariffVersionInput & { name: string }) => void
   onSubmitRename: (id: string, name: string) => void
@@ -53,36 +60,51 @@ function closesPreviousOn(source: TariffVersion, validFrom: string): string | nu
   return dayjs(validFrom).subtract(1, 'day').format('YYYY-MM-DD')
 }
 
-export function TariffVersionModal({
+function seedFor(dialog: NonNullable<VersionDialog>) {
+  const { source, series, kind } = dialog
+  return {
+    validFrom: kind === 'rename' ? '' : dayjs().format('YYYY-MM-DD'),
+    name: kind === 'duplicate' ? '' : series.name,
+    fixedPrice: source.fixed_price_chf ? String(source.fixed_price_chf) : '',
+    minimumPrice: source.minimum_price_chf_per_kwh ? String(source.minimum_price_chf_per_kwh) : '',
+    periods: draftsFrom(source),
+  }
+}
+
+/**
+ * Schedule a price change, duplicate a tariff or rename it, in the detail
+ * pane. Prices start from the source version, because a new version almost
+ * always exists to change them and retyping HT/NT bands from scratch would be
+ * busywork. Mount it fresh for each task.
+ */
+export function TariffVersionForm({
   dialog,
   settings,
   isPending,
-  onClose,
+  error = null,
+  onCancel,
+  onDirtyChange,
   onSubmitNewVersion,
   onSubmitDuplicate,
   onSubmitRename,
-}: TariffVersionModalProps) {
+}: TariffVersionFormProps) {
   const { t } = useTranslation()
-  const [validFrom, setValidFrom] = useState('')
-  const [name, setName] = useState('')
-  const [fixedPrice, setFixedPrice] = useState('')
-  const [minimumPrice, setMinimumPrice] = useState('')
-  const [periods, setPeriods] = useState<PeriodDraft[]>([])
+  const formId = useId()
+  const formRef = useRef<HTMLFormElement>(null)
+  useFocusFirstField(formRef)
+  const seed = useMemo(() => seedFor(dialog), [dialog])
+  const [validFrom, setValidFrom] = useState(seed.validFrom)
+  const [name, setName] = useState(seed.name)
+  const [fixedPrice, setFixedPrice] = useState(seed.fixedPrice)
+  const [minimumPrice, setMinimumPrice] = useState(seed.minimumPrice)
+  const [periods, setPeriods] = useState<PeriodDraft[]>(seed.periods)
 
-  // Re-seed whenever the dialog target changes: prices start from the source
-  // version, because a new version almost always exists to change them and
-  // retyping HT/NT bands from scratch would be busywork.
-  useEffect(() => {
-    if (!dialog) return
-    const { source, series } = dialog
-    setValidFrom(dialog.kind === 'rename' ? '' : dayjs().format('YYYY-MM-DD'))
-    setName(dialog.kind === 'duplicate' ? '' : series.name)
-    setFixedPrice(source.fixed_price_chf ? String(source.fixed_price_chf) : '')
-    setMinimumPrice(source.minimum_price_chf_per_kwh ? String(source.minimum_price_chf_per_kwh) : '')
-    setPeriods(draftsFrom(source))
-  }, [dialog])
-
-  if (!dialog) return null
+  const isDirty = validFrom !== seed.validFrom
+    || name !== seed.name
+    || fixedPrice !== seed.fixedPrice
+    || minimumPrice !== seed.minimumPrice
+    || JSON.stringify(periods) !== JSON.stringify(seed.periods)
+  useEffect(() => { onDirtyChange(isDirty) }, [isDirty, onDirtyChange])
 
   const { kind, series, source } = dialog
   const isDynamic = Boolean(source.dynamic_source)
@@ -92,12 +114,6 @@ export function TariffVersionModal({
   const usesPeriods = (series.billing_mode === 'energy' && !isDynamic) || isPercentage
   const usesFixedPrice = !usesPeriods && !isDynamic
   const usesMinimumPrice = isDynamic && series.energy_type === 'feed_in'
-
-  const title = kind === 'new-version'
-    ? t('pages.tariffs.versions.newVersionTitle', { name: series.name })
-    : kind === 'duplicate'
-      ? t('pages.tariffs.versions.duplicateTitle', { name: series.name })
-      : t('pages.tariffs.versions.renameTitle', { name: series.name })
 
   function buildPayload(): TariffVersionInput {
     const payload: TariffVersionInput = { valid_from: validFrom }
@@ -131,15 +147,30 @@ export function TariffVersionModal({
     onSubmitNewVersion(source.id, buildPayload())
   }
 
+  // What will apply from the chosen date, said before it is saved.
+  const resultingPrices = usesPeriods
+    ? `${periods.map((period) => (isPercentage ? period.percentage : period.price_chf_per_kwh) || '—').join(' / ')} ${
+      isPercentage ? '%' : t('pages.tariffs.chfPerKwh')}`
+    : `CHF ${fixedPrice || '—'}`
   const closingDate = kind === 'new-version' ? closesPreviousOn(source, validFrom) : null
   const submitDisabled = isPending
     || (kind === 'rename' && (!name.trim() || name.trim() === series.name))
     || (kind === 'duplicate' && (!name.trim() || !validFrom))
     || (kind === 'new-version' && !validFrom)
 
+  const submitLabel = isPending
+    ? t('common.saving')
+    : kind === 'new-version'
+      ? t('pages.tariffs.versions.schedule')
+      : kind === 'duplicate'
+        ? t('pages.tariffs.versions.duplicate')
+        : t('common.save')
+
   return (
-    <FormModal isOpen title={title} onClose={onClose} maxWidth="620px">
-      <form onSubmit={submit} className="form-grid">
+    <div className="tariff-pane-form">
+      {error && <Notice tone="error">{error}</Notice>}
+      <form ref={formRef} id={formId} onSubmit={submit} className="form-grid" aria-busy={isPending || undefined}>
+       <fieldset className="tariff-pane-fieldset" disabled={isPending}>
         {kind === 'rename' && (
           <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>
             {t('pages.tariffs.versions.renameHint', { count: series.version_count })}
@@ -149,7 +180,7 @@ export function TariffVersionModal({
         {(kind === 'rename' || kind === 'duplicate') && (
           <label style={{ gridColumn: '1 / -1' }}>
             <span>{t('pages.tariffs.form.name')}</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} required autoFocus />
+            <input value={name} onChange={(event) => setName(event.target.value)} required />
           </label>
         )}
 
@@ -176,6 +207,15 @@ export function TariffVersionModal({
               : t('pages.tariffs.versions.pickLaterDate', {
                 date: formatShortDate(source.valid_from, settings),
               })}
+          </p>
+        )}
+
+        {kind === 'new-version' && validFrom && !isDynamic && (
+          <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>
+            {t('pages.tariffs.versions.resultingPrices', {
+              date: formatShortDate(validFrom, settings),
+              prices: resultingPrices,
+            })}
           </p>
         )}
 
@@ -263,17 +303,16 @@ export function TariffVersionModal({
           </div>
         )}
 
-        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-          <button className="button button-secondary" type="button" onClick={onClose}>
-            <FontAwesomeIcon icon={faXmark} fixedWidth />
-            {t('common.cancel')}
-          </button>
-          <button className="button button-primary" type="submit" disabled={submitDisabled}>
-            <FontAwesomeIcon icon={faCheck} fixedWidth />
-            {kind === 'rename' ? t('common.save') : t('common.create')}
-          </button>
-        </div>
+       </fieldset>
       </form>
-    </FormModal>
+      <FormModalFooter
+        formId={formId}
+        onCancel={onCancel}
+        isPending={submitDisabled}
+        submitLabel={submitLabel}
+        submitIcon={<FontAwesomeIcon icon={faCheck} fixedWidth />}
+        cancelIcon={<FontAwesomeIcon icon={faXmark} fixedWidth />}
+      />
+    </div>
   )
 }

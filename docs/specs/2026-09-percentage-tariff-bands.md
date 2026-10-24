@@ -228,20 +228,20 @@ returns one dict per band of the tariff, in `Meta.ordering`:
 - `TariffPeriodInput`: `price_chf_per_kwh?: string | null`, `percentage?: string | null`.
 - `Tariff.percentage` and `TariffVersionInput.percentage` removed. `TariffInput.percentage` is replaced by `initial_percentage?: string | null`.
 
-**Tariff form (`TariffFormModal.tsx`, `useTariffForms.ts`)**: in percentage mode
+**Tariff form (`TariffForm.tsx`, `useTariffForms.ts`)**: in percentage mode
 the percentage input is shown **only when creating**, labelled "Initial
 percentage" with a hint that more bands can be added afterwards. It maps to
 `initial_percentage`. When editing, the field is hidden and the bands are
-managed in the drawer. The zod schema requires it on create in percentage mode,
+managed in the detail pane. The zod schema requires it on create in percentage mode,
 as today.
 
-**Band modal (`TariffPeriodFormModal.tsx` + its form helpers)**: takes the
+**Band form (`TariffPeriodForm.tsx` + its form helpers)**, shown in the detail pane for the version it shows: takes the
 tariff's billing mode. Percentage mode shows a `%` input (`step=0.01`, `min=0`)
 instead of CHF/kWh and maps it to `percentage` (with `price_chf_per_kwh: null`).
 Energy mode does the reverse. Everything else (period type, label, window,
 weekday/month chips) is shared.
 
-**Drawer (`TariffDetailDrawer.tsx`)**: the band section is shown when
+**Pane (`TariffDetailPane.tsx`)**: the band section is shown when
 `billing_mode === 'energy' && !isDynamic` **or** `billing_mode === 'percentage_of_energy'`.
 A percentage band row shows `"{pct} %"`, plus `"≈ CHF {pct × base}/kWh"` when
 `percentage_base_summary.price_chf_per_kwh` is known. The existing single
@@ -260,7 +260,7 @@ per band, using the same band keys and the same seasonal segmentation as
 energy tariffs. Each value is `base × band.percentage / 100`, and the note is
 `"{pct}% × {base}"`.
 
-**Version modal (`TariffVersionModal.tsx`)**: percentage tariffs use the same
+**Version form (`TariffVersionForm.tsx`)**: percentage tariffs use the same
 per-band rows as energy tariffs (`usesPeriods` true for both), editing
 `percentage` instead of `price_chf_per_kwh`. The single percentage input and
 `payload.percentage` are removed.

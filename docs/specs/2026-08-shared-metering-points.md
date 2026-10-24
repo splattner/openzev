@@ -580,7 +580,7 @@ edit.
 
 ### 8.3 Tariffs: split-key selector
 
-**File:** `frontend/src/features/tariffs/TariffFormModal.tsx` (form state in
+**File:** `frontend/src/features/tariffs/TariffForm.tsx` (form state in
 `useTariffForms.ts`).
 
 - New select `split_key` (`equal` / `weight`), **shown only when

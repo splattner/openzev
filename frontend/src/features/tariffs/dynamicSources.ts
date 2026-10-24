@@ -30,7 +30,7 @@ export function impliedEnergyType(source: DynamicTariffSource): 'grid' | 'feed_i
  * A brand-new tariff has not fixed its energy type yet, so every source is a
  * legitimate choice — picking one is what sets the type. An existing version
  * has already locked its energy type (identity fields don't change in place,
- * see TariffFormModal), so only sources that would still pass
+ * see TariffForm), so only sources that would still pass
  * `Tariff.clean()` are worth showing: offering one that would just fail on
  * save is worse than not offering it.
  */

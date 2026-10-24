@@ -1,8 +1,10 @@
 import { createElement } from 'react'
+import { act } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DynamicSourceSummary } from '../src/features/tariffs/DynamicSourceSummary'
+import { renderWithProviders } from './helpers/render'
 import type { AppSettings, DynamicTariffSource } from '../src/types/api'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
@@ -21,9 +23,27 @@ function render(overrides: Partial<DynamicTariffSource> = {}, canOperate = true)
         createElement(DynamicSourceSummary, { source: { ...source, ...overrides }, settings: {} as AppSettings, canOperate })))
 }
 
+const cleanups: (() => void)[] = []
+afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
+
+// The source's address and coverage sit in a disclosure, mounted when opened.
+async function renderDetails(overrides: Partial<DynamicTariffSource> = {}) {
+    const { container } = await renderWithProviders(
+        createElement(DynamicSourceSummary, { source: { ...source, ...overrides }, settings: {} as AppSettings, canOperate: true }), cleanups)
+    await act(async () => { container.querySelector('summary')!.click() })
+    return container.innerHTML
+}
+
 describe('DynamicSourceSummary', () => {
-    it('shows no stored coverage without warning about gaps in an empty source', () => {
-        const html = render()
+    it('keeps the address and coverage behind the source details until they are opened', () => {
+        const html = render({ point_count: 12, covers_from: '2026-09-01', covers_to: '2026-10-01' })
+        expect(html).toContain('pages.dynamicSources.sourceDetails')
+        expect(html).not.toContain('prices.example.test')
+        expect(html).not.toContain('pages.dynamicSources.history.coverage')
+    })
+
+    it('shows no stored coverage without warning about gaps in an empty source', async () => {
+        const html = await renderDetails()
         expect(html).toContain('pages.dynamicSources.noCoverage')
         expect(html).not.toContain('pages.dynamicSources.coverageHint')
         expect(html).not.toContain('pages.dynamicSources.history.coverage')
@@ -34,8 +54,8 @@ describe('DynamicSourceSummary', () => {
         expect(render({ last_success_at: '2026-10-01T12:00:00Z' })).toContain('pages.dynamicSources.lastSuccess')
     })
 
-    it('shows stored coverage and the gap hint when points exist', () => {
-        const html = render({ point_count: 12, covers_from: '2026-09-01', covers_to: '2026-10-01' })
+    it('shows stored coverage and the gap hint when points exist', async () => {
+        const html = await renderDetails({ point_count: 12, covers_from: '2026-09-01', covers_to: '2026-10-01' })
         expect(html).toContain('pages.dynamicSources.history.coverage')
         expect(html).toContain('pages.dynamicSources.coverageHint')
         expect(html).not.toContain('pages.dynamicSources.noCoverage')

@@ -3,8 +3,8 @@
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 0.7rem 1.1rem;
   padding: 0.85rem 1rem;
-  border: 1px solid rgba(148, 163, 184, 0.24);
+  border: 1px solid var(--border-default);
   border-radius: 0.7rem;
-  background: rgba(241, 245, 249, 0.7);
+  background: var(--surface);
 }
 
