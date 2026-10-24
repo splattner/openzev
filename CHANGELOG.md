@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.27.0](https://github.com/splattner/openzev/compare/v1.26.0...v1.27.0) (2026-10-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **metering:** Metering points with billable, held or supplementary history can no longer be deleted or change community/type. Remove or reconcile the protected history before changing their configuration.
+
+### Features
+
+* **audit:** enable scoped search and repair audit redaction ([#1079](https://github.com/splattner/openzev/issues/1079)) ([1e5ea9a](https://github.com/splattner/openzev/commit/1e5ea9abb1fbfc9e2b4b6ab7f88c3181473c0836))
+* **invoices:** record payments from the period row menu ([#1084](https://github.com/splattner/openzev/issues/1084)) ([f9000e9](https://github.com/splattner/openzev/commit/f9000e9e130dba71382916f44bdba89927b6ce94))
+* **metering:** add SDAT-CH import and invoice correction review ([#1083](https://github.com/splattner/openzev/issues/1083)) ([1ee04a8](https://github.com/splattner/openzev/commit/1ee04a81c1fedc9d01845a816bac3f63e43e9f06))
+
+
+### Bug Fixes
+
+* **auth:** bind OAuth login state to the initiating browser ([#1095](https://github.com/splattner/openzev/issues/1095)) ([a7b25af](https://github.com/splattner/openzev/commit/a7b25afd3a1f5b1d286c14166a64c7d0b3b699bb))
+* **auth:** stop impersonation from minting durable credentials ([#1094](https://github.com/splattner/openzev/issues/1094)) ([14ceb67](https://github.com/splattner/openzev/commit/14ceb67872c200bbd00499fe8882e67f4501d656))
+* **billing:** space scope notices inside tab panels ([#1087](https://github.com/splattner/openzev/issues/1087)) ([aaa83d4](https://github.com/splattner/openzev/commit/aaa83d4f773a0e7cca0534250680aa3fa1e5834d))
+* **sdat:** bound reading persistence batches ([#1093](https://github.com/splattner/openzev/issues/1093)) ([b75e527](https://github.com/splattner/openzev/commit/b75e527ccfab695470b8a601048e2cf0a79a0895))
+* **ui:** give dynamic source tables the shared white surface ([#1085](https://github.com/splattner/openzev/issues/1085)) ([42c29c0](https://github.com/splattner/openzev/commit/42c29c024326305d30be16b874eef8a7795b484f))
+
+
+### Performance Improvements
+
+* reduce metering and invoice page-load times ([#1097](https://github.com/splattner/openzev/issues/1097)) ([68c9494](https://github.com/splattner/openzev/commit/68c94942a56e8367ee88ffb90e3e7f64291a2430))
+
 ## [1.26.0](https://github.com/splattner/openzev/compare/v1.25.0...v1.26.0) (2026-10-17)
 
 
