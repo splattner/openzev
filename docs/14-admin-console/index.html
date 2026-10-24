@@ -2620,7 +2620,11 @@ See <a href="#feature-flags">Feature Flags</a> below.</p>
   provider, and leave the field blank when editing to keep the existing secret.</li>
 <li><strong>Authorization / Token / Userinfo URLs</strong> — Provider endpoint URLs</li>
 <li><strong>Redirect URL</strong> — The callback URL registered with the provider (e.g.
-  <code>https://app.example.com/api/v1/auth/oauth/callback/github/</code>)</li>
+  <code>https://app.example.com/api/v1/auth/oauth/callback/github/</code>). The URL path
+  must use <code>/api/v1/auth/oauth/callback/&lt;slug&gt;/</code>: the browser binding cookie is
+  scoped to <code>/api/v1/auth/oauth/callback/</code>, so a path-rewriting reverse proxy
+  that alters this prefix prevents the cookie from being sent and causes sign-in
+  to fail with <code>invalid_state</code>.</li>
 <li><strong>Scope</strong> — Space-separated OIDC scopes (default <code>openid email profile</code>)</li>
 <li><strong>Enabled</strong> — Toggle to activate or deactivate the provider</li>
 </ul>
