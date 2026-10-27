@@ -85,7 +85,9 @@ export function TariffPeriodForm({
   // The version's bands as they would be if this one were saved now.
   const timeFrom = useWatch({ control: form.control, name: 'time_from' })
   const timeTo = useWatch({ control: form.control, name: 'time_to' })
-  const draft = { id: initialPeriod?.id, period_type: periodType, label: '', time_from: timeFrom || null, time_to: timeTo || null, weekdays, months }
+  const price = useWatch({ control: form.control, name: 'price_chf_per_kwh' })
+  const percentage = useWatch({ control: form.control, name: 'percentage' })
+  const draft = { id: initialPeriod?.id, period_type: periodType, label: '', price_chf_per_kwh: price || null, percentage: percentage || null, time_from: timeFrom || null, time_to: timeTo || null, weekdays, months }
   const siblings = periods.filter((period) => period.tariff === owner?.id && period.id !== initialPeriod?.id)
   const versionBands = [...siblings, draft]
   // A timed band without its hours yet says nothing about coverage.
