@@ -2448,7 +2448,7 @@ acknowledgements/error responses, LEG settlement and other market roles
 </tr>
 <tr>
 <td>Quality</td>
-<td>Measured and estimated (<code>56</code>) values bill; temporary (<code>21</code>) values are held</td>
+<td>Unflagged and estimated (<code>56</code>) values bill; temporary (<code>21</code>) values are held</td>
 <td>—</td>
 </tr>
 <tr>
@@ -2490,11 +2490,28 @@ unchanged replays. Its counters distinguish billable writes, held values and
 intentional skips. A multi-file upload opens one protocol; the other files
 remain available in history.</p>
 <h3 id="held-non-billable-values">Held (non-billable) values<a class="headerlink" href="#held-non-billable-values" title="Permanent link">&para;</a></h3>
-<p>Estimated/information-only and temporary values that are not billable are
-<strong>held in quarantine</strong>, visible in the protocol but excluded from billing,
-charts and invoices. A file that only holds values is still a successful
-import (<code>held</code>, not a failure). When a later validated delivery covers a
-held slot, the held value is promoted into billing and counted as such.</p>
+<p>Values from information-only deliveries (<code>C38</code>) and temporary values (condition <code>21</code>) are
+<strong>held in quarantine</strong> and excluded from billing, charts and invoices. A file
+that only holds values is still a successful import (<code>held</code>, not a failure).
+A validated delivery can write billable data for a held slot when it is new
+enough, removing the eligible held predecessor. A newer held observation can
+remain.</p>
+<p>You can read the held values themselves:</p>
+<ul>
+<li><strong>In the import protocol.</strong> <strong>Remaining held observations</strong> lists current
+  rows associated with that import. Its counters describe the original import;
+  later deliveries may replace or promote held rows, so fewer rows—or none—may
+  remain. The accepted counterpart shown is also current, not an import-time
+  snapshot.</li>
+<li><strong>On the raw readings table.</strong> Open <strong>Metering → Chart</strong>, pick the meter and
+  period, and use <strong>Held observations</strong> below the raw readings table — see
+  <a href="../06-metering-analysis/#reading-quality">Reading Quality and Held Observations</a>.</li>
+</ul>
+<p>Held values never appear in accepted consumption, feed-in or billing totals,
+and a held value does not replace an accepted reading for the same interval.
+Held values cannot be managed from the UI: correcting one requires a
+validated replacement delivery from your grid operator. The list is read-only
+and available to admins, managers and viewers; participants do not see it.</p>
 <p>XML and gzip uploads are limited to 50 MB, with a 100 MB limit after
 decompression.</p>
 <h2 id="timestamp-handling">Timestamp Handling<a class="headerlink" href="#timestamp-handling" title="Permanent link">&para;</a></h2>

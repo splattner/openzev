@@ -859,6 +859,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#reading-quality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading Quality
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#held-observations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Held Observations
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1712,6 +1734,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#reading-quality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading Quality
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#held-observations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Held Observations
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1980,6 +2024,89 @@ if any. Readings are grouped by their Swiss calendar day, the same day used
 for billing periods and tariffs. The day on which clocks go forward has 92
 quarter-hours and the day they go back has 100; in the grid, that day's two
 02:00 hours add up in one cell.</p>
+<h3 id="reading-quality">Reading Quality<a class="headerlink" href="#reading-quality" title="Permanent link">&para;</a></h3>
+<p>Each quarter-hour cell exposes its stored quality in interval detail.
+Estimated intervals are marked individually, including within mixed-quality hours:</p>
+<table>
+<thead>
+<tr>
+<th>Marker</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>(no ≈ marker)</em></td>
+<td>No estimated-value marker; inspect interval detail for the stored quality</td>
+</tr>
+<tr>
+<td><strong>≈</strong></td>
+<td>The reading is an estimated replacement value (SDAT-CH condition <code>56</code>); it still counts toward billing</td>
+</tr>
+<tr>
+<td><strong>·2</strong></td>
+<td>The cell holds more than one reading for that Swiss hour — on the day the clocks go back, the repeated 02:00 hour — and shows their sum</td>
+</tr>
+</tbody>
+</table>
+<p>Click a cell to open its <strong>interval detail</strong>. It lists every constituent
+reading with its Swiss timestamp and UTC offset, value, translated quality
+(<strong>Unflagged</strong>, <strong>Estimated</strong>, <strong>Temporary</strong>, or <strong>Condition <code>&lt;code&gt;</code></strong> for an unrecognised
+code) and the stored code itself. Nothing on this table changes what billing
+uses: it shows the stored quality, it does not reinterpret it.</p>
+<h3 id="held-observations">Held Observations<a class="headerlink" href="#held-observations" title="Permanent link">&para;</a></h3>
+<p>Some SDAT-CH values are not billable — temporary (<code>21</code>) or information-only
+observations. They are <strong>held</strong> rather than stored as readings. Below the raw
+data table, <strong>Held observations</strong> opens a lazily loaded, paginated list for the
+selected meter and period:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Interval start</strong></td>
+<td>The meter and Swiss timestamp with UTC offset, so repeated autumn intervals stay distinct</td>
+</tr>
+<tr>
+<td><strong>Direction</strong></td>
+<td>Consumption (IN) or production / feed-in (OUT)</td>
+</tr>
+<tr>
+<td><strong>Held (kWh)</strong></td>
+<td>The value that was held back</td>
+</tr>
+<tr>
+<td><strong>Quality</strong></td>
+<td>The stored condition and its meaning</td>
+</tr>
+<tr>
+<td><strong>Current accepted reading</strong></td>
+<td>The current accepted value for the same interval, or <strong>No accepted reading</strong>. An accepted <code>0.0000</code> is shown as zero, not as missing</td>
+</tr>
+<tr>
+<td><strong>Delivery purpose</strong></td>
+<td>Billing energy (<code>E88</code>) or information-only delivery (<code>C38</code>); quality is shown separately</td>
+</tr>
+<tr>
+<td><strong>Source</strong></td>
+<td>Delivery and document identities, where available, and when the delivery was created</td>
+</tr>
+<tr>
+<td><strong>Recorded</strong></td>
+<td>When OpenZEV created the held record; retained when a later delivery updates it</td>
+</tr>
+</tbody>
+</table>
+<p>Held values never count toward the accepted consumption, feed-in or billing
+totals, and a held value does not replace an accepted reading for the same
+interval: when both exist, both are shown. Later deliveries may replace or
+promote held rows. The import protocol shows only those remaining from its
+batch, alongside historical counters — see
+<a href="../05-metering-import/#held-non-billable-values">Held (non-billable) values</a>.</p>
 <h2 id="data-quality-view">Data Quality View<a class="headerlink" href="#data-quality-view" title="Permanent link">&para;</a></h2>
 <p>Use the <strong>Data Quality</strong> tab to assess completeness and health of metering
 data. Unlike the Chart tab, selecting a metering point here is optional —
