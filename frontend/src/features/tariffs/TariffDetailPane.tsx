@@ -20,6 +20,7 @@ import { MONTH_KEYS, formatSeason } from './recurrence'
 import { useTariffDisplay } from './useTariffDisplay'
 import { listedVersion, validityState } from './validity'
 import { TariffPriceHistoryChart } from './TariffPriceHistoryChart'
+import { TariffBandCoverage } from './TariffBandCoverage'
 import { DynamicPriceHistoryPanel } from './DynamicPriceHistoryModal'
 import { DynamicSourceSummary } from './DynamicSourceSummary'
 import { TariffDisclosure } from './TariffDisclosure'
@@ -409,6 +410,7 @@ export function TariffDetailPane({
                                 ))}
                             </div>
                         )}
+                        <TariffBandCoverage bands={shown.periods} validity={shown} />
                     </section>
                 )}
 

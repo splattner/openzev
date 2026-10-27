@@ -1,5 +1,5 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faChevronRight, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
+import { faChevronRight, faClock, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../lib/appSettings'
 import { todayBusinessIso } from '../../lib/dates'
@@ -7,6 +7,8 @@ import type { AppSettings, Tariff, TariffSeries } from '../../types/api'
 import { seriesKeyOf, useTariffDisplay } from './useTariffDisplay'
 import type { TariffOverviewRow } from './validity'
 import { emphasizedDate } from './datePresentation'
+import { nextChange } from './rateLines'
+import { bandCoverage } from './bandCoverage'
 
 const DATE_SLOT = '\u0000'
 
@@ -75,7 +77,7 @@ export function TariffCategorySections({
                         </tr>
                     </thead>
                     <tbody>
-                        {section.rows.map(({ series, version: shown }) => {
+                        {section.rows.map(({ series, version: shown, upcomingVersion }) => {
                             const seriesKey = seriesKeyOf(series)
 
                             const dynamicSource = shown.dynamic_source ? sourceById.get(shown.dynamic_source) : undefined
@@ -84,7 +86,14 @@ export function TariffCategorySections({
                             const pricingExplanation = pricingTooltipFor(series, shown, dynamicSource)
                             const badge = validityBadge(shown)
                             const notes = shown.notes?.trim()
-                            const isOpen = seriesKey === selected?.seriesKey && shown.id === selected.versionId
+                            const isOpen = seriesKey === selected?.seriesKey
+                                && (shown.id === selected.versionId || upcomingVersion?.id === selected.versionId)
+                            // Only a row about now or later: an ended version's holes are history.
+                            const hasUncoveredHours = kind !== 'history' && !shown.dynamic_source
+                                && (series.billing_mode === 'energy' || series.billing_mode === 'percentage_of_energy')
+                                && shown.periods.length > 0 && bandCoverage(shown.periods, shown).uncovered
+                            const change = upcomingVersion ? nextChange(lines, rateLines(series, upcomingVersion)) : null
+                            const changeDate = upcomingVersion ? formatShortDate(upcomingVersion.valid_from, settings) : ''
                             function openRow() {
                                 onOpenDetail(series, shown.id)
                             }
@@ -113,6 +122,12 @@ export function TariffCategorySections({
                                                 <span className="badge badge-danger" title={t('pages.tariffs.versions.gapTooltip')}>
                                                     <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />{' '}
                                                     {t('pages.tariffs.versions.gapBadge', { count: series.gaps.length })}
+                                                </span>
+                                            )}
+                                            {hasUncoveredHours && (
+                                                <span className="badge badge-danger" title={t('pages.tariffs.coverage.badgeTooltip')}>
+                                                    <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />{' '}
+                                                    {t('pages.tariffs.coverage.badge')}
                                                 </span>
                                             )}
                                             {fetchFailed && (
@@ -159,6 +174,21 @@ export function TariffCategorySections({
                                             : kind === 'history'
                                                 ? <span>{formatShortDate(shown.valid_from, settings)} – {formatShortDate(shown.valid_to ?? shown.valid_from, settings)}</span>
                                                 : <span title={badge.tooltip}>{badge.label}</span>}
+                                        {upcomingVersion && change && (
+                                            <button
+                                                type="button"
+                                                className="tariff-next-change"
+                                                onClick={(event) => {
+                                                    event.stopPropagation()
+                                                    onOpenDetail(series, upcomingVersion.id)
+                                                }}
+                                            >
+                                                <FontAwesomeIcon icon={faClock} fixedWidth aria-hidden="true" />
+                                                {change.kind === 'prices'
+                                                    ? t('pages.tariffs.overview.nextPrices', { date: changeDate, prices: change.prices, unit: change.unit })
+                                                    : t(change.kind === 'schedule' ? 'pages.tariffs.overview.nextSchedule' : 'pages.tariffs.overview.nextVersion', { date: changeDate })}
+                                            </button>
+                                        )}
                                     </td>
                                     <td className="tariff-table-open">
                                         <FontAwesomeIcon icon={faChevronRight} fixedWidth />

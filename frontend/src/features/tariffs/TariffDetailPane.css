@@ -186,6 +186,38 @@
   border-bottom: 1px solid var(--border-default);
 }
 
+/* ── Band coverage ───────────────────────────────────────────────────────── */
+
+.tariff-band-coverage {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.tariff-band-coverage p {
+  margin: 0;
+}
+
+.tariff-band-coverage > div > p + p {
+  margin-top: 0.25rem;
+}
+
+.tariff-band-coverage.is-warning {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--danger-300);
+  border-radius: var(--radius-sm);
+  background: var(--danger-100);
+  color: var(--danger-700);
+}
+
+.tariff-band-coverage.is-covered {
+  align-items: center;
+  color: var(--success-700);
+}
+
 /* ── Tariff versions ─────────────────────────────────────────────────────── */
 
 .tariff-version-section {

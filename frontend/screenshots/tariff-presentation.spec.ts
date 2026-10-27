@@ -27,23 +27,26 @@ async function tariffs(page: Page, series: TariffSeries[]) {
   await page.route('**/api/v1/tariffs/tariffs/series/**', route => route.fulfill({ json: series }))
 }
 
-test('Upcoming opens the displayed version through the URL and keyboard', async ({ page }) => {
+test('the next version is read from the current row and opens through the URL and keyboard', async ({ page }) => {
   await tariffs(page, [grid])
   await page.goto('/tariffs')
-  const upcoming = page.getByRole('region', { name: 'Upcoming' })
-  await expect(page.getByRole('region', { name: 'Current' }).locator('td.numeric')).toContainText('0.295')
-  await expect(upcoming.locator('td.numeric')).toContainText('0.315')
-  await expect(upcoming.locator('td.tariff-table-valid')).toContainText('01.01.2027')
+  const row = page.getByRole('region', { name: 'Current' })
+  await expect(row.locator('td.numeric')).toContainText('0.295')
+  // One row for the tariff: the next version is a line in it, not a second group.
+  await expect(page.getByRole('region', { name: 'Upcoming' })).toHaveCount(0)
+  const next = row.locator('.tariff-next-change')
+  await expect(next).toHaveText('From 01.01.2027: 0.315 per kWh')
   for (const key of ['Enter', 'Space']) {
-    await upcoming.getByRole('button', { name: 'Grid', exact: true }).focus()
+    await next.focus()
     await page.keyboard.press(key)
     await expect(page).toHaveURL(/version=next/)
     await expect(page.locator('.tariff-version-row.is-shown')).toContainText('0.315')
     await expect(page.locator('.tariff-version-card .badge')).toHaveText('Upcoming')
+    await expect(row.locator('tr.is-selected')).toHaveCount(1)
     await page.locator('.tariff-version-select').filter({ hasText: '01.01.2028' }).click()
     await expect(page).toHaveURL(/version=later/)
-    // The list highlights the row for the version shown, not another of the series.
-    await expect(upcoming.locator('tr.is-selected')).toHaveCount(0)
+    // The list highlights the row only for the versions it shows, not for any other of the series.
+    await expect(row.locator('tr.is-selected')).toHaveCount(0)
     await page.locator('.tariff-pane header').getByRole('button', { name: 'Close', exact: true }).click()
     await expect(page.locator('.tariff-pane')).toBeHidden()
   }

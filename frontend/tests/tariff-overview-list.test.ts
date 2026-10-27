@@ -35,19 +35,35 @@ async function list(selected: { seriesKey: string, versionId: string } | null = 
 
 describe('TariffOverview', () => {
     it('groups by what is in force, what is coming and, folded, what has ended', async () => {
-        const container = await list()
+        const upcomingOnly = { ...series, name: 'Soon', versions: [next] } as unknown as TariffSeries
+        const pastOnly = { ...series, name: 'Old', versions: [past] } as unknown as TariffSeries
+        const groups = tariffOverview([series, upcomingOnly, pastOnly], TODAY)
+        const { container } = await renderWithProviders(createElement(TariffOverview, { groups, settings, selected: null, onOpenDetail: vi.fn() }), cleanups)
         expect([...container.querySelectorAll('h2')].map((h) => h.textContent)).toEqual([
             'pages.tariffs.overview.current', 'pages.tariffs.overview.upcoming', 'pages.tariffs.overview.history',
         ])
         expect(container.querySelector<HTMLDetailsElement>('details.tariff-overview-history')!.open).toBe(false)
     })
 
-    it('shows each group the version it is about, in plain text rather than a pill', async () => {
+    it('gives a tariff one row, and says in it what the next version changes', async () => {
         const container = await list()
         const rows = [...container.querySelectorAll('tbody tr')].map((row) => row.getAttribute('data-row-key'))
-        expect(rows).toEqual(['z:Grid:current', 'z:Grid:next', 'z:Grid:past'])
+        expect(rows).toEqual(['z:Grid:current'])
         expect(container.querySelector('.tariff-table-valid .badge')).toBeNull()
-        expect(container.querySelector('tr.is-ended')?.getAttribute('data-row-key')).toBe('z:Grid:past')
+        const change = container.querySelector<HTMLButtonElement>('.tariff-next-change')!
+        expect(change.textContent).toBe('pages.tariffs.overview.nextPrices')
+    })
+
+    it('opens the next version from the row, and highlights the row for it', async () => {
+        const onOpenDetail = vi.fn()
+        const groups = tariffOverview([series], TODAY)
+        const { container } = await renderWithProviders(createElement(TariffOverview, {
+            groups, settings, selected: { seriesKey: 'z:Grid', versionId: 'next' }, onOpenDetail,
+        }), cleanups)
+        expect(container.querySelector('tr.is-selected')?.getAttribute('data-row-key')).toBe('z:Grid:current')
+        await act(async () => { container.querySelector<HTMLButtonElement>('.tariff-next-change')!.click() })
+        expect(onOpenDetail).toHaveBeenCalledWith(series, 'next')
+        expect(onOpenDetail).toHaveBeenCalledTimes(1)
     })
 
     it('has no totals', async () => {
@@ -56,8 +72,8 @@ describe('TariffOverview', () => {
         expect(container.textContent).not.toMatch(/\b3\b/)
     })
 
-    it('unfolds History when the selected version is a past one', async () => {
-        const container = await list({ seriesKey: 'z:Grid', versionId: 'past' })
+    it('unfolds History when the selected version is a past one of a tariff that has ended', async () => {
+        const container = await list({ seriesKey: 'z:Grid', versionId: 'past' }, true)
         expect(container.querySelector<HTMLDetailsElement>('details.tariff-overview-history')!.open).toBe(true)
     })
 
@@ -65,6 +81,7 @@ describe('TariffOverview', () => {
         const container = await list(null, true)
         expect(container.querySelector('p.muted')?.textContent).toBe('pages.tariffs.overview.nothingCurrent')
         expect(container.querySelectorAll('details.tariff-overview-history tbody tr')).toHaveLength(1)
+        expect(container.querySelector('.tariff-next-change')).toBeNull()
     })
 })
 

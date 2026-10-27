@@ -85,3 +85,26 @@ export function buildRateLines(
         unit: t(yearly ? 'pages.tariffs.rateCard.perYear' : 'pages.tariffs.rateCard.perMonth'),
     }]
 }
+
+/** How the next version of a tariff differs from the one in force, as a row says it. */
+export type NextChange =
+    | { kind: 'prices', prices: string, unit: string }
+    | { kind: 'schedule' }
+    | { kind: 'version' }
+
+const hasPrice = (line: RateLine) => Boolean(line.price) && line.price !== '—'
+
+/**
+ * Same bands (the same hours, in the same order) at new prices: the new
+ * prices, to read against the current ones. Different bands: say that the
+ * schedule changes rather than line up two lists that do not match. A next
+ * version with no prices to show (a dynamic one, or no bands yet) is just a
+ * date.
+ */
+export function nextChange(current: RateLine[], planned: RateLine[]): NextChange {
+    if (!planned.some(hasPrice)) return { kind: 'version' }
+    const comparable = current.length === planned.length
+        && current.every((line, index) => line.applies === planned[index].applies && line.unit === planned[index].unit)
+    if (!comparable) return { kind: 'schedule' }
+    return { kind: 'prices', prices: planned.map((line) => line.price || '—').join(' / '), unit: planned[0].unit }
+}

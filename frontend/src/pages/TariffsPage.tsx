@@ -428,6 +428,7 @@ export function TariffsPage() {
                         initialPeriod={editingPeriod}
                         defaultTariffId={periodTariffId}
                         tariffs={bandableTariffs}
+                        periods={periods}
                         isPending={periodPending}
                         error={crudSaveError}
                         onSubmit={submitPeriod}

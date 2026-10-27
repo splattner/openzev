@@ -19,13 +19,16 @@ Each tariff has:
 
 ![Tariffs page](screenshots/07-tariffs.png)
 
-The list is grouped by what applies when: **Current** shows each tariff's
-version in force today; **Upcoming** shows tariffs with a version that starts
-later, each with that version's prices (for example next year's grid tariff,
-once imported); **History** is folded away and shows the versions that have
-ended. A tariff appears in every group it has a version for, and **History**
-opens by itself when you follow a link to a past version. The headings carry no
-counts.
+The list is grouped by what applies when, with one row per tariff:
+**Current** shows each tariff's version in force today; **Upcoming** shows
+tariffs that have nothing in force yet but a version that starts later (for
+example next year's grid tariff, once imported); **History** is folded away and
+shows tariffs that have ended altogether. When a tariff in force has a later
+version, its row says so under the validity — *From 01.01.2027: 0.315 per kWh*
+when the same bands get new prices, *Prices and schedule change from
+01.01.2027* when the bands themselves change — and clicking that line opens the
+later version. **History** opens by itself when you follow a link to the past
+version of a tariff that has ended. The headings carry no counts.
 
 Each category is a rate card, set like the tariff overview PDF, with one row
 per tariff:
@@ -44,10 +47,18 @@ per tariff:
 An unnamed band shows its time window once. A non-flat band without a complete
 time window says **time window not configured**; it does not automatically cover
 the other bands' remaining hours. Uncovered hours use the first band in the
-matching season (or the tariff's first band if no season matches).
+matching season (or the tariff's first band if no season matches). The detail
+pane and the band form say which hours are affected and what they are billed
+at — for example *No band covers 00:00–07:00, 21:00–24:00; 07:00–21:00 · Sat–Sun.
+Those hours are billed as High (HT) 07:00–21:00 at 0.295 CHF/kWh* — and warn
+when more than one band matches the same hour (the first match applies). While
+you fill in a band, the form shows whether the version's bands together cover
+every hour of the year. A version of a few weeks is only checked against the
+days it can contain.
 
 A red badge next to the name means warnings: a gap between
-versions or a failed price fetch. Rows in **History** are grey but readable.
+versions, a failed price fetch, or **Hours without a band** — some hours of the
+year have no band of their own and are billed at the fallback band (see below). Rows in **History** are grey but readable.
 Click a row to open the tariff's detail pane beside the list, where **Edit**
 and the other actions are; from **Upcoming** it opens on the upcoming version.
 On a narrow screen (a phone, or a small window) the pane takes the whole area

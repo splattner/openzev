@@ -27,7 +27,7 @@
 }
 
 .tariff-table .tariff-table-valid {
-  width: 10.5rem;
+  width: 13rem;
 }
 
 .tariff-table th.numeric {
@@ -129,6 +129,28 @@ td.tariff-table-valid {
 .tariff-table-valid strong {
   font-weight: 650;
   color: var(--text-body);
+}
+
+/* What the next version changes, under the validity: a link to that version. */
+
+.tariff-next-change {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  margin-top: 0.25rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--brand-mid);
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+}
+
+.tariff-next-change:hover {
+  text-decoration: underline;
 }
 
 .tariff-table .tariff-table-open {

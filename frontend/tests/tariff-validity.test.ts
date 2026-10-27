@@ -61,22 +61,31 @@ describe('the overview groups', () => {
     const series = (name: string, ...versions: Tariff[]) => ({ name, versions }) as unknown as TariffSeries
     const ids = (rows: { series: TariffSeries, version: { id: string } }[]) => rows.map((row) => `${row.series.name}:${row.version.id}`)
 
-    it('lists a series under each group it has a version for, with that group\'s version', () => {
+    it('gives a series one row, in force with the version that follows it', () => {
         const groups = tariffOverview([series('Energy', next, current, ended)], TODAY)
         expect(ids(groups.current)).toEqual(['Energy:current'])
-        expect(ids(groups.upcoming)).toEqual(['Energy:next'])
-        expect(ids(groups.history)).toEqual(['Energy:ended'])
+        expect(groups.current[0].upcomingVersion?.id).toBe('next')
+        expect(groups.upcoming).toEqual([])
+        expect(groups.history).toEqual([])
     })
 
-    it('shows the nearest upcoming version and the most recently ended one', () => {
+    it('follows with the nearest upcoming version, not a later one', () => {
         const later = version('later', '2028-01-01', null)
         const older = version('older', '2024-01-01', '2024-12-31')
         const groups = tariffOverview([series('Energy', later, next, current, ended, older)], TODAY)
-        expect(ids(groups.upcoming)).toEqual(['Energy:next'])
-        expect(ids(groups.history)).toEqual(['Energy:ended'])
+        expect(groups.current[0].upcomingVersion?.id).toBe('next')
     })
 
-    it('keeps a series with only past versions reachable, in History alone', () => {
+    it('lists a series that has nothing in force yet under Upcoming, with the nearest version', () => {
+        const later = version('later', '2028-01-01', null)
+        const groups = tariffOverview([series('Energy', later, next, ended)], TODAY)
+        expect(groups.current).toEqual([])
+        expect(ids(groups.upcoming)).toEqual(['Energy:next'])
+        expect(groups.upcoming[0].upcomingVersion).toBeUndefined()
+        expect(groups.history).toEqual([])
+    })
+
+    it('keeps a series with only past versions reachable, in History alone, with the most recently ended', () => {
         const groups = tariffOverview([series('Old', ended)], TODAY)
         expect(groups.current).toEqual([])
         expect(groups.upcoming).toEqual([])

@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { Notice } from '../../components/Notice'
 import { useFocusFirstField } from './useFocusFirstField'
 import { RecurrenceChips } from './RecurrenceChips'
+import { TariffBandCoverage } from './TariffBandCoverage'
 import { MONTH_KEYS, WEEKDAY_KEYS } from './recurrence'
 import { FormModalFooter } from '../../components/FormModalFooter'
 import type { Tariff, TariffPeriod, TariffPeriodInput } from '../../types/api'
@@ -28,6 +29,8 @@ type TariffPeriodFormProps = {
   defaultTariffId?: string
   /** Energy and percentage-of-energy tariffs: the only two modes that take bands. */
   tariffs: Tariff[]
+  /** Every band of every version: the owner's other bands are what this one is checked against. */
+  periods: TariffPeriod[]
   isPending?: boolean
   /** A failure that belongs to no field: shown in the form, not only as a toast. */
   error?: string | null
@@ -41,6 +44,7 @@ export function TariffPeriodForm({
   initialPeriod,
   defaultTariffId,
   tariffs,
+  periods,
   isPending = false,
   error = null,
 }: TariffPeriodFormProps) {
@@ -77,6 +81,15 @@ export function TariffPeriodForm({
   function submit(values: TariffPeriodFormValues) {
     onSubmit(mapTariffPeriodFormValuesToInput(values))
   }
+
+  // The version's bands as they would be if this one were saved now.
+  const timeFrom = useWatch({ control: form.control, name: 'time_from' })
+  const timeTo = useWatch({ control: form.control, name: 'time_to' })
+  const draft = { id: initialPeriod?.id, period_type: periodType, label: '', time_from: timeFrom || null, time_to: timeTo || null, weekdays, months }
+  const siblings = periods.filter((period) => period.tariff === owner?.id && period.id !== initialPeriod?.id)
+  const versionBands = [...siblings, draft]
+  // A timed band without its hours yet says nothing about coverage.
+  const draftComplete = periodType === 'flat' || Boolean(timeFrom && timeTo)
 
   const errors = form.formState.errors
   const fieldError = (field: 'price_chf_per_kwh' | 'percentage') => errors[field]
@@ -148,7 +161,7 @@ export function TariffPeriodForm({
           }))}
           columns={6}
         />
-
+        {draftComplete && <TariffBandCoverage bands={versionBands} validity={owner} showCovered />}
        </fieldset>
       </form>
       <FormModalFooter
