@@ -1,7 +1,7 @@
 # Feature Spec: Tariff split view (pilot for the detail pane)
 
 - Spec ID: SPEC-2026-10-tariff-split-view
-- Status: Implemented, pending review (pilot acceptance and ADR 0040 are not yet signed off)
+- Status: Implemented; ADR 0040 accepted 2026-10-28 (a screen-reader pass and forced-colours check are still open, §11)
 - Scope: Major
 - Type: Change
 - Owners: Core maintainers
@@ -209,7 +209,7 @@ in the reference spec §12.
   and `2026-03-community-and-access` if URL or history behaviour is documented
   there.
 - The matching user-guide chapter and its screenshots, regenerated as a set.
-- ADR 0040 moves to Accepted when the acceptance in §8 passes.
+- ADR 0040 moved to Accepted on 2026-10-28, with the checks listed as not yet verified in §11 still open.
 
 ## 10. Risks
 
@@ -252,9 +252,22 @@ Values and decisions the pilot produced (reference spec §13, open question 3).
 
 Browser checks of the acceptance table (laptop and phone widths, navigation,
 dirty guard, create/rename/delete round trip) were run by hand against the dev
-stack; the keyboard, inertness and restoration behaviour is covered by
-`tariff-draft-guard.test.ts`, `tariff-detail-pane.test.ts`,
-`tariff-overview-list.test.ts`, `tariff-write-scope.test.ts`, `tariff-price-delta.test.ts`, `tariff-band-coverage.test.ts` and the Playwright
-specs `tariff-presentation.spec.ts` and `hub-workflow-links.spec.ts`. Not yet
-verified: a screen-reader pass, forced-colours mode and long translated labels
-beyond the existing German and French narrow-band checks.
+stack. The draft guard, pane, overview, write scope, price change and band
+coverage logic are covered by `tariff-draft-guard.test.ts`,
+`tariff-detail-pane.test.ts`, `tariff-overview-list.test.ts`,
+`tariff-write-scope.test.ts`, `tariff-price-delta.test.ts` and
+`tariff-band-coverage.test.ts` (jsdom). The Playwright specs
+`tariff-presentation.spec.ts` and `hub-workflow-links.spec.ts` run in a real
+browser; `tariff-presentation.spec.ts` asserts, against mocked data:
+
+- at 400px the list is `hidden` while the pane is open, no Tab stop lands in it,
+  it is not in the accessibility tree, and X brings it back and clears the URL;
+- the pane is not modal: nothing is `inert`, `<body>` is not scroll-locked,
+  there is no `aria-modal`, and Tab leaves the pane;
+- Escape on an untouched form and Cancel return to viewing with focus back on
+  the control that opened the form; on a dirty form Escape asks, Keep editing
+  keeps the draft, Discard returns to viewing, and a further Escape closes the
+  pane.
+
+Not yet verified: a screen-reader pass, forced-colours mode and long translated
+labels beyond the existing German and French narrow-band checks.

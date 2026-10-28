@@ -1260,14 +1260,33 @@ one.
 
 ---
 
-### Frontend write dialogs
+### Frontend tariff screen and write forms
 
-Tariff create/edit, price-band, version/duplicate/rename and import dialogs reset
-when account, selected community or effective write capability changes. Pending
-delete confirmations are cancelled and recheck current scope before dispatch.
-CRUD and version completions invalidate the submitting community's series; an
-obsolete completion does not close replacement dialogs or show a toast. The
-validity filter and badges use the business date calculated on each render.
+The tariff screen is an overview beside an in-flow detail pane
+(SPEC-2026-10-tariff-split-view; it replaced the Valid / Upcoming / All tabs and
+the overlay detail drawer). The overview lists a series once, under **Current**
+(a version is in force), **Upcoming** (only scheduled versions) or a collapsed
+**History**, with a link to the next version's price change. A tariff opens
+beside the list when the content area is at least 62rem wide, otherwise the pane
+replaces the list (the list is `hidden`, so it leaves the tab order and the
+accessibility tree). Tariff create, edit, rename, duplicate, schedule price
+change, price-band create/edit and the dynamic source form are forms inside the
+pane; there are no edit dialogs. Delete asks through the shared confirmation.
+
+Selection lives in the URL (`tariff`, `version`): opening from the list adds one
+history step, switching tariff or version replaces it, X, Back, Forward and a
+reload agree. Unsaved input is guarded for X, Cancel, Escape, Back/Forward,
+links, selecting another tariff or version and reload (`useDraftGuard`).
+
+The forms and pane reset when account, selected community or effective write
+capability changes: the selection, the open form and its draft are dropped
+without asking, and pending delete confirmations are cancelled and recheck
+current scope before dispatch. CRUD and version completions invalidate the
+submitting community's series; a completion applies only to its scope **and**
+its editing session, so an obsolete one neither selects a tariff, closes or
+replaces a newer form, nor shows a message. Overview grouping and status labels
+use the business date calculated on each render.
+
 Tariff and price-band submissions both require a selected community as well as
 effective write capability, including for admins.
 

@@ -1,8 +1,8 @@
 # ADR 0040: Choose containers by task; one detail pane; validate on tariffs, then roll out
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-15
-- Updated: 2026-10-17
+- Updated: 2026-10-28
 - Related specs: `2026-10-ui-patterns-and-component-catalog` (reference), `2026-10-tariff-split-view` (pilot), `2026-04-frontend-management-page-design` (reference), `2026-08-ui-redesign-pdf-style` (baseline)
 - Related ADRs: 0032 (one visual language), 0014 (print-parity design system)
 
@@ -110,7 +110,9 @@ Trade-offs:
 ## Notes
 
 The reference spec is `2026-10-ui-patterns-and-component-catalog`; the tariff
-pilot and the audience-specific invoice labels have their own specs. This ADR
-stays Proposed until the pilot is accepted. Revised after review by
+pilot and the audience-specific invoice labels have their own specs. The tariff
+pilot shipped (#1081) and this ADR was accepted on 2026-10-28; the pane
+breakpoint it produced is recorded in the pilot spec §11, the dialog sizes stay
+provisional until phase 4. Revised after review by
 @spalinger, whose proposal introduced the in-flow pane, the pilot-first order
 and the usefulness rules for labels.

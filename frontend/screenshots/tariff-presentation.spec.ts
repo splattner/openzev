@@ -155,3 +155,82 @@ test('shared sticky headers and the light raw-metering grid survive fractional z
     .toBe(await sharedHeader.evaluate(element => getComputedStyle(element).backgroundColor))
   await page.screenshot({ path: testInfo.outputPath('billing-header-zoom-1.25.png'), fullPage: true })
 })
+
+test('at 400px the list leaves the tab order and the accessibility tree while the pane is open, and X brings it back', async ({ page }) => {
+  await tariffs(page, [grid])
+  await page.setViewportSize({ width: 400, height: 850 })
+  await page.goto('/tariffs?tariff=42%3AGrid')
+  const pane = page.locator('.tariff-pane')
+  await expect(pane).toBeVisible()
+  await expect(page.locator('.tariff-split')).toHaveAttribute('data-layout', 'narrow')
+  const list = page.locator('.tariff-split-list')
+  await expect(list).toBeHidden()
+  await expect(list).toHaveAttribute('hidden', '')
+  // Hidden content is neither focusable nor exposed: no tariff row button is reachable by Tab.
+  const session = await page.context().newCDPSession(page)
+  const { nodes } = await session.send('Accessibility.getFullAXTree')
+  await session.detach()
+  expect(nodes.filter(node => !node.ignored && node.role?.value === 'columnheader')).toHaveLength(0)
+  const reached = new Set<string>()
+  for (let i = 0; i < 40; i++) {
+    await page.keyboard.press('Tab')
+    reached.add(await page.evaluate(() => document.activeElement?.closest('.tariff-split-list') ? 'list' : 'other'))
+  }
+  expect(reached.has('list')).toBe(false)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await pane.getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(pane).toBeHidden()
+  await expect(list).toBeVisible()
+  await expect(page).not.toHaveURL(/tariff=/)
+})
+
+test('the pane is not modal: no inert, no scroll lock, no focus trap, and Escape and Cancel put focus back', async ({ page }) => {
+  await tariffs(page, [grid])
+  await page.goto('/tariffs?tariff=42%3AGrid')
+  const pane = page.locator('.tariff-pane')
+  await expect(pane).toBeVisible()
+  await expect(page.locator('.tariff-split')).toHaveAttribute('data-layout', 'wide')
+  expect(await page.locator('[inert]').count()).toBe(0)
+  expect(await pane.getAttribute('aria-modal')).toBeNull()
+  expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).not.toBe('hidden')
+  // Tab leaves the pane in both directions instead of cycling inside it.
+  const leftPane = new Set<boolean>()
+  for (let i = 0; i < 60; i++) {
+    await page.keyboard.press('Tab')
+    leftPane.add(await page.evaluate(() => !document.activeElement?.closest('.tariff-pane')))
+  }
+  expect(leftPane.has(true)).toBe(true)
+
+  const rename = pane.getByRole('button', { name: 'Rename', exact: true })
+  await rename.focus()
+  await page.keyboard.press('Enter')
+  const field = pane.getByRole('textbox').first()
+  // An untouched form: Escape returns to viewing (the pane stays) and focus goes back to Rename.
+  await page.keyboard.press('Escape')
+  await expect(pane.getByRole('textbox')).toHaveCount(0)
+  await expect(pane).toBeVisible()
+  await expect(rename).toBeFocused()
+  // Cancel does the same.
+  await rename.click()
+  await pane.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(pane.getByRole('textbox')).toHaveCount(0)
+  await expect(rename).toBeFocused()
+  // A dirty form is guarded: Escape asks, keeping the draft; discarding returns to viewing; a second Escape closes the pane.
+  await rename.click()
+  await field.fill('Grid renamed')
+  // The form reports its draft to the guard one render after the input; a person is never quicker than that.
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+  await page.keyboard.press('Escape')
+  const guard = page.getByRole('alertdialog').or(page.getByRole('dialog')).filter({ hasText: 'Discard changes?' })
+  await expect(guard).toBeVisible()
+  await guard.getByRole('button', { name: 'Keep editing' }).click()
+  await expect(field).toHaveValue('Grid renamed')
+  await expect(pane).toBeVisible()
+  await field.press('Escape')
+  await guard.getByRole('button', { name: 'Discard' }).click()
+  await expect(pane.getByRole('textbox')).toHaveCount(0)
+  await expect(rename).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(pane).toBeHidden()
+  await expect(page).not.toHaveURL(/tariff=/)
+})
