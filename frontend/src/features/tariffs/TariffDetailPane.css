@@ -15,15 +15,30 @@
   flex-wrap: wrap;
 }
 
-/* The version being looked at: its window, standing and price once, with the
-   one action that changes it. The history below only picks which one. */
+/* A version in force or scheduled, in full: window and standing, price or
+   bands, and the actions that change it. Past versions are picked from the
+   history and shown the same way. */
 
 .tariff-version-card {
   display: grid;
-  gap: 0.375rem;
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  gap: 0.75rem;
+  padding: 0.75rem 1rem 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+}
+
+/* Which one the list pointed at, when the pane shows more than one. */
+.tariff-version-card.is-shown {
+  border-color: var(--brand-accent);
+}
+
+/* A price against the one before it; the words are for screen readers. */
+.tariff-change {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .tariff-version-card-head {
@@ -43,8 +58,51 @@
 }
 
 .tariff-version-card-window {
-  color: var(--ink);
+  color: var(--text-muted);
+  font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
+}
+
+.tariff-version-card-body {
+  display: grid;
+  gap: 0.75rem;
+}
+
+/* A scheduled version folded to a line: the whole title is the toggle. */
+
+.tariff-version-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  min-width: 0;
+  margin: -0.25rem -0.375rem;
+  padding: 0.25rem 0.375rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tariff-version-toggle:hover {
+  background: var(--surface);
+}
+
+.tariff-version-card-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tariff-add-band {
+  justify-self: start;
 }
 
 .tariff-version-card-price,
@@ -86,6 +144,7 @@
 
 .tariff-period-section-header h4 {
   margin: 0;
+  font-size: 0.875rem;
 }
 
 .tariff-period-list {
@@ -219,28 +278,6 @@
 }
 
 /* ── Tariff versions ─────────────────────────────────────────────────────── */
-
-.tariff-version-section {
-  display: grid;
-  gap: 0.75rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border-default);
-}
-
-.tariff-version-section h3,
-.tariff-period-section-header h3 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.tariff-version-group {
-  display: grid;
-  gap: 0.4rem;
-}
-
-.tariff-version-group h4 {
-  margin: 0;
-}
 
 .tariff-version-list {
   display: grid;
@@ -394,4 +431,11 @@
   padding: 0.75rem 0;
   background: var(--surface-card);
   border-top: 1px solid var(--border-default);
+}
+
+/* Deleting what a form edits: out of the way, below the fields. */
+
+.tariff-pane-delete {
+  display: flex;
+  justify-content: flex-start;
 }

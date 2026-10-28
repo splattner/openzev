@@ -192,8 +192,6 @@ export function TariffsPage() {
         saveError: crudSaveError,
         tariffPending,
         periodPending,
-        deleteTariffPending,
-        deletePeriodPending,
         submitTariff,
         submitPeriod,
         startTariffEdit,
@@ -412,6 +410,7 @@ export function TariffsPage() {
                         selectedZevId={selectedZevId || ''}
                         isPending={tariffPending}
                         error={crudSaveError}
+                        onDelete={editingTariff ? () => confirmDeleteTariff(editingTariff) : undefined}
                         onSubmit={submitTariff}
                         onCancel={cancelEditing}
                         onDirtyChange={setFormDirty}
@@ -431,6 +430,7 @@ export function TariffsPage() {
                         periods={periods}
                         isPending={periodPending}
                         error={crudSaveError}
+                        onDelete={editingPeriod ? () => confirmDeletePeriod(editingPeriod) : undefined}
                         onSubmit={submitPeriod}
                         onCancel={cancelEditing}
                         onDirtyChange={setFormDirty}
@@ -496,14 +496,10 @@ export function TariffsPage() {
                         settings={settings}
                         shownVersionId={shownVersionId}
                         onShowVersion={(versionId) => showVersion(openSeries, versionId)}
-                        deleteTariffDisabled={deleteTariffPending || dialogLoading}
-                        deletePeriodDisabled={deletePeriodPending || dialogLoading}
                         onClose={escapePane}
                         onEditTariff={(version, actionKey) => beginEditing(actionKey, () => startTariffEdit(version))}
-                        onDeleteTariff={confirmDeleteTariff}
                         onOpenCreatePeriod={(versionId) => beginEditing('add-period', () => openCreatePeriod(versionId))}
                         onEditPeriod={(period, actionKey) => beginEditing(actionKey, () => startPeriodEdit(period))}
-                        onDeletePeriod={confirmDeletePeriod}
                         onNewVersion={(series, source) => beginEditing('new-version', () => versions.openNewVersion(series, source))}
                         onDuplicate={(series, source) => beginEditing('duplicate', () => versions.openDuplicate(series, source))}
                         onRenameSeries={(series, source) => beginEditing('rename', () => versions.openRename(series, source))}

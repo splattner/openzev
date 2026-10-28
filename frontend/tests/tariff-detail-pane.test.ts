@@ -27,8 +27,8 @@ afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
 
 const noop = () => undefined
 const handlers = {
-    onShowVersion: noop, deleteTariffDisabled: false, deletePeriodDisabled: false, onClose: noop, onEditTariff: noop,
-    onDeleteTariff: noop, onOpenCreatePeriod: noop, onEditPeriod: noop, onDeletePeriod: noop, onNewVersion: noop,
+    onShowVersion: noop, onClose: noop, onEditTariff: noop,
+    onOpenCreatePeriod: noop, onEditPeriod: noop, onNewVersion: noop,
     onDuplicate: noop, onRenameSeries: noop,
 }
 async function pane(props: Record<string, unknown> = {}): Promise<HTMLElement> {
@@ -47,21 +47,63 @@ describe('TariffDetailPane', () => {
         expect(container.querySelector('h2')?.getAttribute('tabindex')).toBe('-1')
     })
 
-    it('shows the current version first, then what is scheduled, then the folded past', async () => {
+    it('shows the current and the scheduled version in full, and folds the past into the history', async () => {
         const container = await pane()
-        const labels = [...container.querySelectorAll('.tariff-version-group > h4, .tariff-version-group > .tariff-disclosure > summary')]
-            .map((node) => node.textContent)
-        expect(labels).toEqual(['pages.tariffs.versions.groupCurrent', 'pages.tariffs.versions.groupUpcoming', 'pages.tariffs.versions.groupPast'])
-        const folded = container.querySelector<HTMLDetailsElement>('.tariff-version-group .tariff-disclosure')!
-        expect(folded.open).toBe(false)
-        expect(container.querySelectorAll('.tariff-version-row')).toHaveLength(2)
+        const cards = [...container.querySelectorAll('.tariff-version-card')]
+        expect(cards.slice(0, 2).map((card) => card.querySelector('.badge')?.textContent)).toEqual([
+            'pages.tariffs.overview.current', 'pages.tariffs.overview.upcoming',
+        ])
+        const history = container.querySelector<HTMLDetailsElement>('.tariff-disclosure')!
+        expect(history.querySelector('summary')?.textContent).toBe('pages.tariffs.versions.history (1)')
+        expect(history.open).toBe(false)
+        expect(cards).toHaveLength(2)
     })
 
-    it('opens the past versions when one of them is shown, and says it is not the current one', async () => {
+    it('opens the history when a past version is shown, and says it is not the current one', async () => {
         const container = await pane({ shownVersionId: 'past' })
         expect(container.querySelector<HTMLDetailsElement>('.tariff-disclosure')!.open).toBe(true)
         expect(container.querySelector('.tariff-version-row.is-shown.is-ended')).not.toBeNull()
-        expect(container.querySelector('.tariff-version-card .badge')?.textContent).toBe('pages.tariffs.versions.statusEnded')
+        expect(container.querySelector('.tariff-disclosure .tariff-version-card .badge')?.textContent).toBe('pages.tariffs.versions.statusEnded')
+    })
+
+    it('says what the scheduled version changes against the one before it', async () => {
+        const dearer = { ...next, fixed_price_chf: '12.00' } as TariffVersion
+        const container = await pane({ series: { ...series, versions: [dearer, current, past] } })
+        const cards = container.querySelectorAll('.tariff-version-card')
+        expect(cards[0].querySelector('.tariff-change')).toBeNull()
+        // Folded, the scheduled version says it in a line; opened, with the amount.
+        expect(cards[1].querySelector('.tariff-change')?.textContent).toBe('(+20 %)')
+        const toggle = cards[1].querySelector<HTMLButtonElement>('.tariff-version-toggle')!
+        await act(async () => { toggle.click() })
+        expect(cards[1].querySelector('.tariff-change')?.textContent).toContain('+2.00 (+20 %)')
+    })
+
+    it('folds the scheduled version to a line and opens it on request, or when it is the one shown', async () => {
+        const container = await pane()
+        const [now, later] = [...container.querySelectorAll('.tariff-version-card')]
+        expect(now.querySelector('.tariff-version-toggle')).toBeNull()
+        const toggle = later.querySelector<HTMLButtonElement>('.tariff-version-toggle')!
+        expect(toggle.getAttribute('aria-expanded')).toBe('false')
+        expect(later.querySelector('.tariff-version-card-body')).toBeNull()
+        await act(async () => { toggle.click() })
+        expect(toggle.getAttribute('aria-expanded')).toBe('true')
+        expect(later.querySelector(`#${toggle.getAttribute('aria-controls')}`)).not.toBeNull()
+        const shown = await pane({ shownVersionId: 'next' })
+        expect(shown.querySelectorAll('.tariff-version-toggle')[0].getAttribute('aria-expanded')).toBe('true')
+    })
+
+    it('puts no delete button on the cards: deleting is done from the edit form', async () => {
+        const container = await pane()
+        expect(container.querySelector('.button-danger')).toBeNull()
+    })
+
+    it('shows a version\u2019s notes only where the overview row does not already say them', async () => {
+        const noted = (id: string, base: TariffVersion, notes: string) => ({ ...base, id, notes }) as TariffVersion
+        const container = await pane({ shownVersionId: 'next', series: { ...series, versions: [
+            noted('next', next, 'Price rise'), noted('current', current, 'Standard'), past,
+        ] } })
+        const notes = [...container.querySelectorAll('.tariff-version-card-notes')].map((node) => node.textContent)
+        expect(notes).toEqual(['Price rise'])
     })
 
     it('carries no status pill or version count in its heading', async () => {
@@ -83,8 +125,9 @@ describe('TariffDetailPane', () => {
     })
 
     it('offers a viewer the same facts and warnings with no write controls', async () => {
-        const container = await pane({ readOnly: true })
+        const container = await pane({ readOnly: true, shownVersionId: 'past' })
         expect(container.querySelector('.tariff-pane-actions')).toBeNull()
+        expect(container.querySelector('.tariff-version-card .button')).toBeNull()
         expect(container.querySelector('.tariff-version-row .button')).toBeNull()
         expect(container.querySelector('.tariff-version-select')).not.toBeNull()
     })
@@ -94,6 +137,6 @@ describe('TariffDetailPane', () => {
         expect(container.querySelector('h2')?.textContent).toBe('Grid')
         expect(container.querySelector('.tariff-pane-meta')?.textContent).toBe('editing label')
         expect(container.querySelector('.the-form')).not.toBeNull()
-        expect(container.querySelector('.tariff-version-section')).toBeNull()
+        expect(container.querySelector('.tariff-version-card')).toBeNull()
     })
 })

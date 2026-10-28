@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCheck, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faCheck, faPlus, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useQuery } from '@tanstack/react-query'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
@@ -43,6 +43,8 @@ type TariffFormProps = {
   isPending?: boolean
   /** A failure that belongs to no field: shown in the form, not only as a toast. */
   error?: string | null
+  /** Delete the version being edited (asks first); absent while creating a tariff. */
+  onDelete?: () => void
   onSubmit: (payload: TariffInput) => void
   onCancel: () => void
   /** Whether anything was changed, for the pane's unsaved-input guard. */
@@ -58,6 +60,7 @@ export function TariffForm({
   selectedZevId,
   isPending = false,
   error = null,
+  onDelete,
   onSubmit,
   onCancel,
   onDirtyChange,
@@ -369,6 +372,14 @@ export function TariffForm({
             }}
           />
         </section>
+      )}
+      {onDelete && (
+        <div className="tariff-pane-delete">
+          <button type="button" className="button button-danger button-compact" onClick={onDelete} disabled={isPending}>
+            <FontAwesomeIcon icon={faTrash} fixedWidth />
+            {t('pages.tariffs.versions.deleteVersion')}
+          </button>
+        </div>
       )}
       <FormModalFooter
         formId={formId}

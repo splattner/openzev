@@ -138,6 +138,8 @@ export function useTariffCrud({
       void invalidateTariffQueries(queryClient, variables.scope.selectedZevId)
       if (!isCurrent(variables.scope)) return
       pushToast(t('pages.tariffs.messages.deleted'), 'success')
+      // Deleted from its own form: nothing left to edit.
+      if (variables.id === editingTariffId) closeTariffForm()
     },
     onError: (error, variables) => {
       if (isCurrent(variables.scope)) pushToast(formatApiError(error, t('pages.tariffs.messages.deleteFailed')), 'error')
@@ -182,6 +184,7 @@ export function useTariffCrud({
       void invalidateTariffQueries(queryClient, variables.scope.selectedZevId)
       if (!isCurrent(variables.scope)) return
       pushToast(t('pages.tariffs.messages.periodDeleted'), 'success')
+      if (variables.id === editingPeriodId) closePeriodForm()
     },
     onError: (error, variables) => {
       if (isCurrent(variables.scope)) pushToast(formatApiError(error, t('pages.tariffs.messages.periodDeleteFailed')), 'error')

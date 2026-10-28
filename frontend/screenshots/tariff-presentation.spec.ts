@@ -35,18 +35,17 @@ test('the next version is read from the current row and opens through the URL an
   // One row for the tariff: the next version is a line in it, not a second group.
   await expect(page.getByRole('region', { name: 'Upcoming' })).toHaveCount(0)
   const next = row.locator('.tariff-next-change')
-  await expect(next).toHaveText('From 01.01.2027: 0.315 per kWh')
+  await expect(next).toHaveText('From 01.01.2027: 0.315 per kWh (+6.8 %)')
   for (const key of ['Enter', 'Space']) {
     await next.focus()
     await page.keyboard.press(key)
     await expect(page).toHaveURL(/version=next/)
-    await expect(page.locator('.tariff-version-row.is-shown')).toContainText('0.315')
-    await expect(page.locator('.tariff-version-card .badge')).toHaveText('Upcoming')
+    await expect(page.locator('.tariff-version-card.is-shown')).toContainText('0.315')
+    await expect(page.locator('.tariff-version-card.is-shown .badge').first()).toHaveText('Upcoming')
     await expect(row.locator('tr.is-selected')).toHaveCount(1)
-    await page.locator('.tariff-version-select').filter({ hasText: '01.01.2028' }).click()
-    await expect(page).toHaveURL(/version=later/)
-    // The list highlights the row only for the versions it shows, not for any other of the series.
-    await expect(row.locator('tr.is-selected')).toHaveCount(0)
+    // Every version in force or scheduled is in the pane, each with the change against the one before it.
+    await expect(page.locator('.tariff-version-card')).toHaveCount(3)
+    await expect(page.locator('.tariff-version-card').nth(1).locator('.tariff-change')).toContainText('+0.02')
     await page.locator('.tariff-pane header').getByRole('button', { name: 'Close', exact: true }).click()
     await expect(page.locator('.tariff-pane')).toBeHidden()
   }
@@ -55,12 +54,12 @@ test('the next version is read from the current row and opens through the URL an
 test('active clicks and a bare link use the current version despite a stale active ID', async ({ page }) => {
   await tariffs(page, [{ ...grid, active_version_id: 'later' }])
   await page.goto('/tariffs?tariff=42%3AGrid')
-  await expect(page.locator('.tariff-version-row.is-shown')).toContainText('0.295')
+  await expect(page.locator('.tariff-version-card.is-shown')).toContainText('0.295')
   await expect(page.locator('.tariff-pane .info-banner')).toHaveCount(0)
   await page.locator('.tariff-pane header').getByRole('button', { name: 'Close', exact: true }).click()
   await page.getByRole('region', { name: 'Current' }).locator('.tariff-select').click()
   await expect(page).toHaveURL(/version=current/)
-  await expect(page.locator('.tariff-version-row.is-shown')).toContainText('0.295')
+  await expect(page.locator('.tariff-version-card.is-shown')).toContainText('0.295')
 })
 
 for (const language of ['en', 'de', 'fr']) {

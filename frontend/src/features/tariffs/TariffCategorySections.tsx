@@ -8,7 +8,9 @@ import { seriesKeyOf, useTariffDisplay } from './useTariffDisplay'
 import type { TariffOverviewRow } from './validity'
 import { emphasizedDate } from './datePresentation'
 import { nextChange } from './rateLines'
+import { deltaSummary } from './priceDelta'
 import { bandCoverage } from './bandCoverage'
+import { TariffTypeIcon } from './TariffTypeIcon'
 
 const DATE_SLOT = '\u0000'
 
@@ -93,6 +95,9 @@ export function TariffCategorySections({
                                 && (series.billing_mode === 'energy' || series.billing_mode === 'percentage_of_energy')
                                 && shown.periods.length > 0 && bandCoverage(shown.periods, shown).uncovered
                             const change = upcomingVersion ? nextChange(lines, rateLines(series, upcomingVersion)) : null
+                            const changeSummary = upcomingVersion && change?.kind === 'prices'
+                                ? deltaSummary(series, shown, upcomingVersion, (diff) => t('pages.tariffs.change.points', { diff }))
+                                : null
                             const changeDate = upcomingVersion ? formatShortDate(upcomingVersion.valid_from, settings) : ''
                             function openRow() {
                                 onOpenDetail(series, shown.id)
@@ -107,6 +112,7 @@ export function TariffCategorySections({
                                 >
                                     <td className="tariff-table-tariff">
                                         <div className="tariff-table-name">
+                                            <TariffTypeIcon type={series.energy_type} />
                                             <button
                                                 type="button"
                                                 className="tariff-select"
@@ -140,11 +146,6 @@ export function TariffCategorySections({
                                                 </span>
                                             )}
                                         </div>
-                                        {series.energy_type && (
-                                            <div className="tariff-table-meta">
-                                                {t(`pages.tariffs.energyTypes.${series.energy_type}` as Parameters<typeof t>[0])}
-                                            </div>
-                                        )}
                                         {notes && <div className="tariff-table-notes" title={notes}>{notes}</div>}
                                     </td>
                                     <td className="tariff-table-lines tariff-table-applies">
@@ -185,7 +186,7 @@ export function TariffCategorySections({
                                             >
                                                 <FontAwesomeIcon icon={faClock} fixedWidth aria-hidden="true" />
                                                 {change.kind === 'prices'
-                                                    ? t('pages.tariffs.overview.nextPrices', { date: changeDate, prices: change.prices, unit: change.unit })
+                                                    ? t(changeSummary ? 'pages.tariffs.overview.nextPricesChange' : 'pages.tariffs.overview.nextPrices', { date: changeDate, prices: change.prices, unit: change.unit, change: changeSummary })
                                                     : t(change.kind === 'schedule' ? 'pages.tariffs.overview.nextSchedule' : 'pages.tariffs.overview.nextVersion', { date: changeDate })}
                                             </button>
                                         )}

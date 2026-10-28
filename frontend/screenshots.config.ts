@@ -55,6 +55,12 @@ export default defineConfig({
       name: 'capture-data',
       dependencies: ['setup'],
       testMatch: /capture\.setup\.ts/,
+      teardown: 'capture-cleanup',
+      use: { storageState: AUTH_STATE_PATH },
+    },
+    {
+      name: 'capture-cleanup',
+      testMatch: /capture\.teardown\.ts/,
       use: { storageState: AUTH_STATE_PATH },
     },
     {

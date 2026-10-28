@@ -22,6 +22,10 @@ const __dirname = path.dirname(__filename)
  */
 export const AUTH_STATE_PATH = path.join(__dirname, '.auth', 'admin.json')
 
+/** The price change capture.setup.ts schedules for the tariff captures, and the note capture.teardown.ts removes it by. */
+export const SCHEDULED_CHANGE_FILE = path.join(__dirname, '.auth', 'scheduled-change.json')
+export const SCHEDULED_TARIFF = 'Grid Energy HT/NT'
+
 /**
  * Pin Sonnenhof so screenshots consistently show the same community: both
  * demo ZEVs carry data, and a capture that drifted onto the second community

@@ -24,8 +24,9 @@ The list is grouped by what applies when, with one row per tariff:
 tariffs that have nothing in force yet but a version that starts later (for
 example next year's grid tariff, once imported); **History** is folded away and
 shows tariffs that have ended altogether. When a tariff in force has a later
-version, its row says so under the validity — *From 01.01.2027: 0.315 per kWh*
-when the same bands get new prices, *Prices and schedule change from
+version, its row says so under the validity — *From 01.01.2027: 0.315 per kWh
+(+6.8 %)* when the same bands get new prices (the change in brackets, one
+figure per band, in the order of the prices), *Prices and schedule change from
 01.01.2027* when the bands themselves change — and clicking that line opens the
 later version. **History** opens by itself when you follow a link to the past
 version of a tariff that has ended. The headings carry no counts.
@@ -33,7 +34,9 @@ version of a tariff that has ended. The headings carry no counts.
 Each category is a rate card, set like the tariff overview PDF, with one row
 per tariff:
 
-- **Tariff** — the name, its energy type and the first line of its note
+- **Tariff** — the name, with a small icon for its energy type (a plug for
+  grid, a solar panel for local, an arrow for feed-in; hover it for the name),
+  and the first line of its note
 - **Applies** — when each band applies (for example *High (HT) Mon–Fri,
   07:00–21:00*, one line per band), the percentage and the grid price used as
   its base (with “incomplete base average” when dynamic coverage is partial),
@@ -604,7 +607,7 @@ months applies to it unchanged. Each period has a type:
 To add one:
 
 1. Click the tariff to open its detail pane
-2. Click **Add Period** in the Tariff Periods section
+2. Click **Add Period** under the version's bands
 3. Enter:
    - **Period type** (see above) and, for a time band, a **Band name**
    - **Time from** / **Time to** — HH:MM (24-hour format), in Swiss time
@@ -683,22 +686,35 @@ to open the detail pane beside the list with
 everything else.
 
 At the top of the pane, **Schedule price change**, **Rename** and **Duplicate**
-act on the whole tariff. Under them, the version being shown has its validity
-window, a **Current**, **Upcoming** or **Ended** label so you can't mistake an
-old or future version for the current rate, and its own **Edit** button. Below
-come the notes, the dynamic source if there is one, the price bands (each with
-edit and delete buttons) and the version history.
+act on the whole tariff. Under them, each version in force or scheduled has its
+own card, the one in force first:
 
-**Version history** lists the versions with their window and price: the current
-one first, then **Scheduled changes**, then **Past versions** (folded away
-unless you are looking at one). A tariff with only one version has no history
-section. Click a row to make the *pane* show that version — its price bands
-switch to the ones in force then. Switching versions in the detail pane does not
-change the version shown in the list. Click the current version to go back.
+- The card opens with its status — **Current** or **Upcoming** — and its
+  validity window, so you can't mistake a future version for the current rate,
+  and has its own **Edit** button. Below come the dynamic source if there is
+  one, or the price bands with a pencil on each and **Add Period** under them.
+  The notes appear on a card only when they differ from the ones the list row
+  already shows.
+- A **scheduled** version starts as a single line — its prices, what they change
+  against the version before (for example *−1.7 % / −2.2 %*) and a red
+  **Hours without a band** badge if it has uncovered hours. Click it to open the
+  card and edit its bands. It is open from the start when you came to it from
+  the list's *From 01.01.2027: …* line.
+- Next to each band price, a scheduled card shows how that price moves against
+  the version it replaces (*−0.005 (−1.7 %)*); a fixed fee shows its amount.
 
-Each row has a **⋮** menu with **Edit** and **Delete** for that version, because
-correcting a superseded version's end date is a normal follow-up to adding a
-new one.
+![A tariff's current version and the scheduled change](screenshots/07e-tariff-scheduled-change.png)
+
+**History** is folded away under the cards, with the number of ended versions.
+Open it for the price chart and the list of past versions with their window and
+price; click one to show its card — marked **Ended** — underneath. A tariff
+without ended versions has no history. Switching versions in the pane does not
+change the version shown in the list.
+
+**Delete** is not on the cards: open **Edit** on a version (or a band's
+pencil) and use the **Delete** button below the fields. It asks for
+confirmation, and the form closes afterwards. Correcting a superseded version's
+end date is a normal follow-up to adding a new one, so **Edit** is on every card.
 
 The pane stays open across a page reload or a shared link — the URL records
 which tariff and version you're looking at. **X**, **Escape** and the browser's
@@ -709,7 +725,7 @@ which tariff and version you're looking at. **X**, **Escape** and the browser's
 ### Price History
 
 Once a tariff has **more than one version**, its detail pane also charts how
-its price moved over time; open **Price history** to see the chart.
+its price moved over time; open **History** to see the chart.
 
 - The line is **stepped**, not sloped — a price holds for its whole window and
   then jumps. A sloped line would suggest it drifted between two Januaries.
@@ -814,7 +830,7 @@ the pricing. See [ZEV Export and Import](17-zev-transfer.md).
 Edit **future** tariffs freely:
 
 1. Click the tariff to open its detail pane
-2. Click **Edit**
+2. Click **Edit** on the version's card
 3. Change prices, periods, validity dates
 4. Click **Save**
 
@@ -837,13 +853,13 @@ billing mode or energy type, create a separate tariff.
 Set **Valid To** to exclude from future invoices:
 
 1. Click the tariff to open its detail pane
-2. Click **Edit**
+2. Click **Edit** on the version's card
 3. Set **Valid To** to today or last usage date
 4. Click **Save**
 
 > **Important:** Never delete a tariff—always set Valid To instead. This preserves invoice audit trail.
 
-This applies to **Delete** in a **version** row's menu too. Deleting a version
+This applies to **Delete** in a version's edit form too. Deleting a version
 removes the prices that applied in its window, which leaves a gap: energy in
 those days is then billed at nothing. Reserve it for a version created by
 mistake — one you have not billed against.

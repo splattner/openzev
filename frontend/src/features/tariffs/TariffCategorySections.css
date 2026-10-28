@@ -60,8 +60,13 @@
   background: color-mix(in srgb, var(--status-neutral) 60%, var(--surface-card));
 }
 
-.tariff-table tbody tr.is-ended :is(.tariff-select, td, .tariff-table-meta, .tariff-table-notes) {
+.tariff-table tbody tr.is-ended :is(.tariff-select, td, .tariff-type-icon, .tariff-table-notes) {
   color: color-mix(in srgb, var(--text-body) 50%, var(--text-muted));
+}
+
+.tariff-type-icon {
+  flex: none;
+  color: var(--text-muted);
 }
 
 .tariff-table-name {
@@ -82,7 +87,6 @@
   cursor: pointer;
 }
 
-.tariff-table-meta,
 .tariff-table-notes {
   margin-top: 0.125rem;
   font-size: 0.8125rem;
