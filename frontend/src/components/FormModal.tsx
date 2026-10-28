@@ -17,8 +17,6 @@ interface FormModalProps {
     onClose: () => void
     /** One to three fields: xs. The default sm suits most forms; md/lg for wide forms; xl for wide read-mostly content. */
     size?: FormModalSize
-    /** @deprecated Use `size`; removed once the last caller has moved (UI patterns phase 4). */
-    maxWidth?: string
     /**
      * Overrides the unsaved-input check, which reads the form controls. Pass
      * false for a step with nothing to lose (a finished wizard) and true when
@@ -53,7 +51,7 @@ export function FormModal({ isOpen, ...props }: FormModalProps) {
     return isOpen ? <OpenFormModal {...props} /> : null
 }
 
-function OpenFormModal({ title, children, onClose, size = 'sm', maxWidth, dirty, returnFocusRef }: Omit<FormModalProps, 'isOpen'>) {
+function OpenFormModal({ title, children, onClose, size = 'sm', dirty, returnFocusRef }: Omit<FormModalProps, 'isOpen'>) {
     const { t } = useTranslation()
     const titleId = useId()
     const hasDataRouter = useContext(UNSAFE_DataRouterContext) !== null
@@ -84,7 +82,6 @@ function OpenFormModal({ title, children, onClose, size = 'sm', maxWidth, dirty,
                         aria-labelledby={titleId}
                         tabIndex={-1}
                         className={`form-modal form-modal-${size}`}
-                        style={maxWidth ? { maxWidth } : undefined}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="form-modal-header">

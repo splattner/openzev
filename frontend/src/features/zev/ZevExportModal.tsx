@@ -63,7 +63,7 @@ export function ZevExportModal({ isOpen, zevId, zevName, onClose }: ZevExportMod
   })
 
   return (
-    <FormModal isOpen={isOpen} title={t('zevTransfer.exportTitle')} onClose={onClose} maxWidth="560px">
+    <FormModal isOpen={isOpen} title={t('zevTransfer.exportTitle')} onClose={onClose}>
       <div style={{ display: 'grid', gap: '1.25rem' }}>
         <p className="muted m-0">
           {t('zevTransfer.exportDescription', { name: zevName })}

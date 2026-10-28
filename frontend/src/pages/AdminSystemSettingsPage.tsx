@@ -493,7 +493,6 @@ export function AdminSystemSettingsPage() {
                 isOpen={showOAuthForm}
                 title={oauthEditTarget ? t('adminOAuth.editTitle') : t('adminOAuth.createTitle')}
                 onClose={closeOAuthForm}
-                maxWidth="640px"
             >
                 <form onSubmit={submitOAuthForm} className="page-stack">
                     <label>

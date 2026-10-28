@@ -229,7 +229,6 @@ export function BackupDestinationsSection({ status }: { status: BackupStatus | u
                 isOpen={modalOpen}
                 title={editing ? t('pages.backups.form.editTitle') : t('pages.backups.form.createTitle')}
                 onClose={closeModal}
-                maxWidth="640px"
             >
                 <form onSubmit={submit} className="page-stack">
                     <label>

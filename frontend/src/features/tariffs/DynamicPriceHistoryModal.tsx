@@ -328,7 +328,7 @@ export function DynamicPriceHistoryModal({ source, onClose, tariff }: ModalProps
       isOpen={Boolean(source)}
       title={t('pages.dynamicSources.history.title', { label: source?.label ?? '' })}
       onClose={onClose}
-      maxWidth="1000px"
+      size="xl"
     >
       {source && <DynamicPriceHistoryPanel source={source} tariff={tariff} />}
     </FormModal>

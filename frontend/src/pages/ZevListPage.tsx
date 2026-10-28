@@ -467,7 +467,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                 }}
             />
 
-            <FormModal isOpen={showCreateModal} title={wizardStep === 5 ? t('pages.zevs.wizard.titleDone') : t('pages.zevs.wizard.titleStep', { step: wizardStep })} onClose={closeCreateModal} maxWidth="960px" dirty={wizardStep === 5 ? false : undefined}>
+            <FormModal isOpen={showCreateModal} title={wizardStep === 5 ? t('pages.zevs.wizard.titleDone') : t('pages.zevs.wizard.titleStep', { step: wizardStep })} onClose={closeCreateModal} size="lg" dirty={wizardStep === 5 ? false : undefined}>
                 <form onSubmit={submitCreate} className="form-grid">
                     {wizardStep === 1 && (
                         <>
@@ -836,7 +836,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                 </form>
             </FormModal>
 
-            <FormModal isOpen={showEditModal} title={t('pages.zevs.editModalTitle')} onClose={closeEditModal} maxWidth="960px">
+            <FormModal isOpen={showEditModal} title={t('pages.zevs.editModalTitle')} onClose={closeEditModal} size="lg">
                 <form onSubmit={submitEdit} className="page-stack">
                     <section className="card page-stack">
                         <ZevGeneralSettingsFields

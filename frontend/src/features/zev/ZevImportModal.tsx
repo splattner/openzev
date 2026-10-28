@@ -129,7 +129,7 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
 
   if (imported) {
     return (
-      <FormModal isOpen={isOpen} title={t('zevTransfer.importTitle')} onClose={close} maxWidth="640px" dirty={false}>
+      <FormModal isOpen={isOpen} title={t('zevTransfer.importTitle')} onClose={close} dirty={false}>
         <div className="page-stack">
           <p>{t('zevTransfer.importSuccess', { name: imported.zev_name })}</p>
           {imported.warnings.map((warning) => (
@@ -142,7 +142,7 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
   }
 
   return (
-    <FormModal isOpen={isOpen} title={t('zevTransfer.importTitle')} onClose={close} maxWidth="640px">
+    <FormModal isOpen={isOpen} title={t('zevTransfer.importTitle')} onClose={close}>
       <div style={{ display: 'grid', gap: '1.25rem' }}>
         <p className="muted m-0">
           {t('zevTransfer.importDescription')}

@@ -70,7 +70,7 @@ export function PartyFormModal({ isOpen, party, isPending, onClose, onSubmit }: 
             isOpen={isOpen}
             title={t(party ? 'pages.zevSettings.parties.editContact' : 'pages.zevSettings.parties.newContact')}
             onClose={onClose}
-            maxWidth="760px"
+            size="md"
         >
             <form className="form-grid" onSubmit={submit}>
                 <label>

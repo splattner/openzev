@@ -148,13 +148,6 @@ describe('FormModal size', () => {
             expect(dialog().classList.contains(`form-modal-${size}`)).toBe(true)
         }
     })
-
-    it('lets a legacy maxWidth win until the last caller has moved', () => {
-        render({ maxWidth: '520px' })
-        expect((container.querySelector('[role=dialog]') as HTMLElement).style.maxWidth).toBe('520px')
-        render({})
-        expect((container.querySelector('[role=dialog]') as HTMLElement).style.maxWidth).toBe('')
-    })
 })
 
 describe('FormModal dirty guard', () => {

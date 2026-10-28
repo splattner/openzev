@@ -248,7 +248,7 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
     )
 
     return (
-        <FormModal isOpen={true} title={t('pages.imports.wizard.title')} onClose={props.onClose} maxWidth="1080px">
+        <FormModal isOpen={true} title={t('pages.imports.wizard.title')} onClose={props.onClose} size="xl">
             <div className="page-stack" style={{ gap: '0.75rem' }}>
                 <div className="muted" style={{ fontSize: '0.9rem' }}>
                     {t('pages.imports.wizard.step', { step })}

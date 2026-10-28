@@ -46,7 +46,6 @@ export function ChargeFormModal({ isOpen, ...rest }: ChargeFormModalProps) {
             isOpen={isOpen}
             title={rest.charge ? t('pages.charges.editTitle') : t('pages.charges.createTitle')}
             onClose={rest.onClose}
-            maxWidth="640px"
         >
             {/* Mounted per opening, so each one starts from the charge being edited (or a blank one). */}
             {isOpen ? <ChargeForm {...rest} /> : null}

@@ -24,7 +24,7 @@ export function BackupJobDetailsModal({ job, onClose }: { job: BackupJob | null;
     const missing = countMissingMedia(manifest)
 
     return (
-        <FormModal isOpen title={t('pages.backups.details.title')} onClose={onClose} maxWidth="720px">
+        <FormModal isOpen title={t('pages.backups.details.title')} onClose={onClose} size="md">
             <div className="page-stack">
                 <dl className="page-stack m-0">
                     <Row label={t('pages.backups.details.archive')}>{job.archive_name || '—'}</Row>

@@ -166,7 +166,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
             isOpen={isOpen}
             title={t('pages.tariffs.import.title')}
             onClose={handleClose}
-            maxWidth="1000px"
+            size="xl"
         >
             {step === 'url' && (
                 <form onSubmit={submitUrl} className="page-stack">

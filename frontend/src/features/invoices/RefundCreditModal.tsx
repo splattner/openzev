@@ -24,7 +24,7 @@ type RefundCreditModalProps = {
 export function RefundCreditModal({ isOpen, ...rest }: RefundCreditModalProps) {
     const { t } = useTranslation()
     return (
-        <FormModal isOpen={isOpen} title={t('pages.invoiceDetail.credits.refundTitle')} onClose={rest.onClose} maxWidth="480px">
+        <FormModal isOpen={isOpen} title={t('pages.invoiceDetail.credits.refundTitle')} onClose={rest.onClose} size="xs">
             {/* Mounted per opening, so each one starts from today and the current remainder. */}
             {isOpen ? <RefundCreditForm {...rest} /> : null}
         </FormModal>

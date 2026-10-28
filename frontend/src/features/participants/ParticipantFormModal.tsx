@@ -102,7 +102,7 @@ export function ParticipantFormModal({
   ]
 
   return (
-    <FormModal isOpen={isOpen} title={title} onClose={onClose} maxWidth="960px">
+    <FormModal isOpen={isOpen} title={title} onClose={onClose} size="lg">
       <form onSubmit={form.handleSubmit(submit)} className="form-grid">
         {isCreate && (partiesQuery.data ?? []).length > 0 && (
           <label className="grid-span-full">

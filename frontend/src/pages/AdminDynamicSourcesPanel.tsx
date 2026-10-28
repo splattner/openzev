@@ -361,7 +361,7 @@ export function AdminDynamicSourcesPanel() {
         isOpen={Boolean(activitySource)}
         title={t('pages.dynamicSources.activity.title', { label: activitySource?.label ?? '' })}
         onClose={() => setActivitySource(null)}
-        maxWidth="900px"
+        size="lg"
       >
         <p>
           <Link to={`/admin/audit?target_type=tariffs.DynamicTariffSource&target_id=${encodeURIComponent(activitySource?.id ?? '')}`}>

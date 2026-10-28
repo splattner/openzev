@@ -26,7 +26,7 @@ type CorrectInvoiceModalProps = {
 export function CorrectInvoiceModal({ isOpen, ...rest }: CorrectInvoiceModalProps) {
     const { t } = useTranslation()
     return (
-        <FormModal isOpen={isOpen} title={t('pages.invoiceDetail.credits.correctTitle')} onClose={rest.onClose} maxWidth="520px">
+        <FormModal isOpen={isOpen} title={t('pages.invoiceDetail.credits.correctTitle')} onClose={rest.onClose} size="xs">
             {/* Mounted per opening, so each one starts from the current creditable amount. */}
             {isOpen ? <CorrectInvoiceForm {...rest} /> : null}
         </FormModal>

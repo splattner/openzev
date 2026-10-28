@@ -526,7 +526,7 @@ receives `selectedZev.tariff_source_url` as its initial URL.
 
 **File:** `frontend/src/features/tariffs/VseTariffImportModal.tsx`
 
-Three steps in one `FormModal` (`maxWidth="1000px"`):
+Three steps in one `FormModal` (`size="xl"`):
 
 1. **URL** — prefilled from the ZEV, with a line explaining Art. 7b.
 2. **Preview** — operator name and source URL; a banner listing any entries the

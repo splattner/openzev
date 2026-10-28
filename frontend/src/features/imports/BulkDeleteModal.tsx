@@ -41,7 +41,7 @@ export function BulkDeleteModal(props: BulkDeleteModalProps) {
     const blocked = protectedCount > 0
 
     return (
-        <FormModal isOpen={open} title={t('pages.imports.delete.bulkModalTitle')} onClose={props.onClose} maxWidth="640px">
+        <FormModal isOpen={open} title={t('pages.imports.delete.bulkModalTitle')} onClose={props.onClose}>
             <div className="page-stack" style={{ gap: '1rem' }}>
                 <p className="muted">{t('pages.imports.delete.overwriteProtected')}</p>
                 {!armed ? (

@@ -274,9 +274,7 @@ consumers and a concrete maintenance payoff. Keep intermediate builds valid.
 
 ### 7.1 `FormModal` `size`
 
-A `size` prop replaces `maxWidth` (values in §6.1; shipped in phase 2 with `maxWidth` kept as a deprecated override until phase 4 maps the last caller). Migrate all affected callers
-in one change, or keep both props valid until the last caller moves; remove
-`maxWidth` from the type at the end so the old API is a compile error.
+A `size` prop replaces `maxWidth` (values in §6.1). Phase 2 shipped it with `maxWidth` kept as a deprecated override; phase 4 mapped the last caller and removed `maxWidth` from the type, so the old API is a compile error.
 
 ### 7.2 Detail pane
 

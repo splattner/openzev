@@ -501,7 +501,7 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                 </table>
             </div>
 
-            <FormModal isOpen={showCreateUserModal} title={t('pages.accounts.createModal.title')} onClose={() => setShowCreateUserModal(false)} maxWidth="600px">
+            <FormModal isOpen={showCreateUserModal} title={t('pages.accounts.createModal.title')} onClose={() => setShowCreateUserModal(false)}>
                 <form onSubmit={submitCreateUser} className="form-grid">
                     <label>
                         <span>{t('pages.accounts.editModal.username')}</span>
@@ -546,7 +546,7 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                 </form>
             </FormModal>
 
-            <FormModal isOpen={showEditUserModal} title={t('pages.accounts.editModal.title')} onClose={() => setShowEditUserModal(false)} maxWidth="760px">
+            <FormModal isOpen={showEditUserModal} title={t('pages.accounts.editModal.title')} onClose={() => setShowEditUserModal(false)} size="md">
                 <form onSubmit={submitEditUser} className="form-grid">
                     <label>
                         <span>{t('pages.accounts.editModal.username')}</span>

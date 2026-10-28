@@ -92,7 +92,6 @@ export function BuildingFormModal({ isOpen, zevId, building, isPending, onClose,
             isOpen={isOpen}
             title={t(building ? 'pages.meteringPoints.buildings.edit' : 'pages.meteringPoints.buildings.add')}
             onClose={onClose}
-            maxWidth="640px"
         >
             <form className="form-grid" onSubmit={submit}>
                 {!building && withAddress.length > 0 && (
