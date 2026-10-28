@@ -342,6 +342,27 @@ test.describe('User Guide Screenshots', () => {
     await screenshotFull(page, '07e-tariff-scheduled-change')
   })
 
+  // 07f — The create form with its Bands section: an HT/NT tariff with both bands
+  // entered before saving. Nothing is saved.
+  test('07f-tariff-create-bands', async ({ page }) => {
+    await navigateTo(page, '/tariffs')
+    await page.getByRole('button', { name: 'Neuer Tarif' }).first().click()
+    const pane = page.locator('.tariff-pane')
+    await pane.getByLabel('Name', { exact: true }).fill('Netzstrom HT/NT')
+    const bands = pane.locator('.tariff-draft-bands')
+    for (const [type, price, from, to] of [['high', '0.2850', '06:00', '22:00'], ['low', '0.1950', '22:00', '06:00']]) {
+      await bands.getByRole('button', { name: 'Band hinzufügen' }).click()
+      const editor = bands.locator('.tariff-draft-band-editor')
+      await editor.locator('select').first().selectOption(type)
+      await editor.locator('input[type="number"]').fill(price)
+      await editor.locator('input[type="time"]').first().fill(from)
+      await editor.locator('input[type="time"]').nth(1).fill(to)
+      await editor.getByRole('button', { name: 'Band übernehmen' }).click()
+    }
+    await expect(bands.locator('.tariff-period-row')).toHaveCount(2)
+    await screenshotFull(page, '07f-tariff-create-bands')
+  })
+
   // 07d — A dynamic tariff's detail pane: its source with the details
   // disclosure opened. The fetched prices sit in a second disclosure whose
   // point table would make the capture several screens tall, so it stays shut.

@@ -114,6 +114,8 @@ and the selection as they were.
    warns about hours without a band while you build the list (see
    [Tariff Periods](#tariff-periods))
 
+   ![The create form with an HT and an NT band entered before saving](screenshots/07f-tariff-create-bands.png)
+
 6. Click **Create Tariff**; the tariff and all its bands are created together,
    or — if the server rejects a band — not at all. The rejected band is marked
    in the list with the reason; fix it and save again. The new tariff opens in
