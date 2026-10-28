@@ -24,6 +24,7 @@ import {
     destinationToForm,
     type DestinationFormState,
 } from './backupHelpers'
+import { FormModalCancelButton } from '../../components/FormModalFooter'
 
 export function BackupDestinationsSection({ status }: { status: BackupStatus | undefined }) {
     const { t } = useTranslation()
@@ -390,15 +391,7 @@ export function BackupDestinationsSection({ status }: { status: BackupStatus | u
                     {formError && <div className="error-banner">{formError}</div>}
 
                     <div className="actions-row actions-row-end actions-row-wrap">
-                        <button
-                            type="button"
-                            className="button button-secondary"
-                            onClick={closeModal}
-                            disabled={saveMutation.isPending}
-                        >
-                            <FontAwesomeIcon icon={faXmark} fixedWidth />
-                            {t('common.cancel')}
-                        </button>
+                        <FormModalCancelButton onCancel={closeModal} disabled={saveMutation.isPending} icon={<FontAwesomeIcon icon={faXmark} fixedWidth />} />
                         <button type="submit" className="button button-primary" disabled={saveMutation.isPending}>
                             <FontAwesomeIcon icon={faCheck} fixedWidth />
                             {saveMutation.isPending ? t('common.saving') : editing ? t('common.save') : t('common.create')}

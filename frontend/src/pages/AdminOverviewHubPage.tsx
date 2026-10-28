@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Tabs } from '@mantine/core'
+import { AppTabs } from '../components/AppTabs'
 import { usePageNavigation } from '../lib/usePageNavigation'
 import { AdminDashboardPage } from './AdminDashboardPage'
 import { ZevListPage } from './ZevListPage'
@@ -35,42 +35,41 @@ export function AdminOverviewHubPage({ tab = 'overview' }: { tab?: AdminOverview
                 description={t(`pages.adminOverview.descriptions.${tab}`)}
             />
 
-            <Tabs
-                classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
+            <AppTabs
                 value={tab}
                 keepMounted={false}
                 onChange={handleTabChange}
             >
-                <Tabs.List aria-label={t('nav.adminOverview')}>
-                    <Tabs.Tab value="overview">{t('pages.adminOverview.tabs.overview')}</Tabs.Tab>
-                    <Tabs.Tab value="zevs">{t('nav.zevs')}</Tabs.Tab>
-                    <Tabs.Tab value="invoices">{t('nav.adminInvoices')}</Tabs.Tab>
-                    <Tabs.Tab value="dynamic-sources">{t('pages.dynamicSources.tab')}</Tabs.Tab>
-                    <Tabs.Tab value="audit">{t('nav.adminAuditLogs')}</Tabs.Tab>
-                    <Tabs.Tab value="health">{t('pages.adminOverview.tabs.health')}</Tabs.Tab>
-                </Tabs.List>
+                <AppTabs.List aria-label={t('nav.adminOverview')}>
+                    <AppTabs.Tab value="overview">{t('pages.adminOverview.tabs.overview')}</AppTabs.Tab>
+                    <AppTabs.Tab value="zevs">{t('nav.zevs')}</AppTabs.Tab>
+                    <AppTabs.Tab value="invoices">{t('nav.adminInvoices')}</AppTabs.Tab>
+                    <AppTabs.Tab value="dynamic-sources">{t('pages.dynamicSources.tab')}</AppTabs.Tab>
+                    <AppTabs.Tab value="audit">{t('nav.adminAuditLogs')}</AppTabs.Tab>
+                    <AppTabs.Tab value="health">{t('pages.adminOverview.tabs.health')}</AppTabs.Tab>
+                </AppTabs.List>
 
-                <Tabs.Panel value="overview">
+                <AppTabs.Panel value="overview">
                     <AdminDashboardPage embedded />
-                </Tabs.Panel>
-                <Tabs.Panel value="zevs">
+                </AppTabs.Panel>
+                <AppTabs.Panel value="zevs">
                     <ZevListPage embedded />
-                </Tabs.Panel>
-                <Tabs.Panel value="invoices">
+                </AppTabs.Panel>
+                <AppTabs.Panel value="invoices">
                     <AdminInvoicesContent />
-                </Tabs.Panel>
-                <Tabs.Panel value="dynamic-sources">
+                </AppTabs.Panel>
+                <AppTabs.Panel value="dynamic-sources">
                     <AdminDynamicSourcesPanel />
-                </Tabs.Panel>
-                <Tabs.Panel value="audit">
+                </AppTabs.Panel>
+                <AppTabs.Panel value="audit">
                     {/* Platform-wide audit log — the scope is locked to 'admin'
                         inside the component and never merges with ZEV logs. */}
                     <AuditLogsPage scope="admin" embedded />
-                </Tabs.Panel>
-                <Tabs.Panel value="health">
+                </AppTabs.Panel>
+                <AppTabs.Panel value="health">
                     <AdminSystemHealthPanel />
-                </Tabs.Panel>
-            </Tabs>
+                </AppTabs.Panel>
+            </AppTabs>
         </div>
     )
 }

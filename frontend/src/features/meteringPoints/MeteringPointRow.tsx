@@ -348,13 +348,13 @@ export function MeteringPointRow({
           )}
           <button
             type="button"
-            className="button button-ghost button-compact metering-point-expand"
+            className="button button-ghost button-compact metering-point-expand disclosure-toggle"
             aria-expanded={expanded}
             aria-controls={expanded ? detailId : undefined}
             aria-label={t(expanded ? 'pages.meteringPoints.detail.hide' : 'pages.meteringPoints.detail.show', { meterId: point.meter_id })}
             onClick={onToggle}
           >
-            <FontAwesomeIcon icon={faChevronDown} fixedWidth />
+            <FontAwesomeIcon icon={faChevronDown} className="disclosure-toggle-icon" fixedWidth />
           </button>
         </td>
       </tr>

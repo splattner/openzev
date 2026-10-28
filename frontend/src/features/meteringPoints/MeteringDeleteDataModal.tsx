@@ -4,6 +4,7 @@ import { FormModal } from '../../components/FormModal'
 import { quickRangeToDates } from '../../lib/dateRangePresets'
 import { toDayJsDateFormat } from '../../lib/appSettings'
 import type { AppSettings } from '../../types/api'
+import { FormModalCancelButton } from '../../components/FormModalFooter'
 
 type MeteringDeleteDataModalProps = {
   isOpen: boolean
@@ -146,9 +147,7 @@ export function MeteringDeleteDataModal({
         )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem' }}>
-          <button className="button button-secondary" type="button" onClick={onClose}>
-            {t('common.cancel')}
-          </button>
+          <FormModalCancelButton onCancel={onClose} />
           <button className="button button-danger" type="button" onClick={onConfirm} disabled={isPending}>
             {t('pages.meteringPoints.deleteData.confirm')}
           </button>

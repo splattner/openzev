@@ -43,6 +43,7 @@ import { GridOperatorField } from '../features/zev/GridOperatorField'
 import { GridOperatorSuggestion } from '../features/zev/GridOperatorSuggestion'
 import { PageHeader } from '../components/PageHeader'
 import { Notice } from '../components/Notice'
+import { FormModalCancelButton } from '../components/FormModalFooter'
 
 const defaultCreateForm = (): ZevWizardInput => ({
     name: '',
@@ -465,7 +466,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                 }}
             />
 
-            <FormModal isOpen={showCreateModal} title={wizardStep === 5 ? t('pages.zevs.wizard.titleDone') : t('pages.zevs.wizard.titleStep', { step: wizardStep })} onClose={closeCreateModal} maxWidth="960px">
+            <FormModal isOpen={showCreateModal} title={wizardStep === 5 ? t('pages.zevs.wizard.titleDone') : t('pages.zevs.wizard.titleStep', { step: wizardStep })} onClose={closeCreateModal} maxWidth="960px" dirty={wizardStep === 5 ? false : undefined}>
                 <form onSubmit={submitCreate} className="form-grid">
                     {wizardStep === 1 && (
                         <>
@@ -804,10 +805,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
 
                     <div className="actions-row actions-row-end actions-row-gap-lg grid-span-full mt-1">
                         {wizardStep < 5 && (
-                            <button className="button button-secondary" type="button" onClick={closeCreateModal}>
-                                <FontAwesomeIcon icon={faXmark} fixedWidth />
-                                {t('common.cancel')}
-                            </button>
+                            <FormModalCancelButton onCancel={closeCreateModal} icon={<FontAwesomeIcon icon={faXmark} fixedWidth />} />
                         )}
                         {wizardStep > 1 && wizardStep < 5 && (
                             <button className="button button-secondary" type="button" onClick={goToPreviousStep}>
@@ -863,10 +861,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                     {editError && <div className="error-banner">{editError}</div>}
 
                     <div className="actions-row actions-row-end actions-row-gap-lg">
-                        <button className="button button-secondary" type="button" onClick={closeEditModal}>
-                            <FontAwesomeIcon icon={faXmark} fixedWidth />
-                            {t('common.cancel')}
-                        </button>
+                        <FormModalCancelButton onCancel={closeEditModal} icon={<FontAwesomeIcon icon={faXmark} fixedWidth />} />
                         <button className="button button-primary" type="submit" disabled={updateMutation.isPending}>
                             <FontAwesomeIcon icon={faCheck} fixedWidth />
                             {t('pages.zevs.saveZev')}

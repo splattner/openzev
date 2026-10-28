@@ -648,7 +648,10 @@ into a **Total consumption** node. Disabled communities contribute no consumptio
 
 Use Tab or Shift+Tab to move between dialog controls. Escape closes an open
 dropdown or calendar first; otherwise Escape or **Close** dismisses the dialog. Background controls are unavailable until the top dialog
-closes. Before submitting a confirmation, choose **Cancel** to
+closes. If a form holds changes you have not saved, **Close**, **Cancel**,
+**Escape**, a click outside the dialog and the browser's **Back** button ask
+whether to discard them; **Keep editing** returns to the form with your input
+intact, and reloading the page shows the browser's own warning. Before submitting a confirmation, choose **Cancel** to
 leave without starting the action. While it is processing, **Close** dismisses
 the dialog and the action continues; failures are still reported. If an action
 fails, reopen its confirmation to retry.

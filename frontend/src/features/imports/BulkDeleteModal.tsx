@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { CivilDateInput } from '../../components/CivilDateInput'
 import { FormModal } from '../../components/FormModal'
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
+import { FormModalCancelButton } from '../../components/FormModalFooter'
 
 export type BulkDeleteMode = 'period' | 'all'
 
@@ -100,10 +101,7 @@ export function BulkDeleteModal(props: BulkDeleteModalProps) {
                         )}
 
                         <div className="actions-row actions-row-end">
-                            <button className="button button-secondary" type="button" onClick={props.onClose}>
-                                <FontAwesomeIcon icon={faXmark} fixedWidth />
-                                {t('common.cancel')}
-                            </button>
+                            <FormModalCancelButton onCancel={props.onClose} icon={<FontAwesomeIcon icon={faXmark} fixedWidth />} />
                             <button className="button button-danger" type="button" onClick={props.onReview} disabled={pending || blocked}>
                                 <FontAwesomeIcon icon={faTrash} fixedWidth />
                                 {t('pages.imports.delete.reviewAction')}

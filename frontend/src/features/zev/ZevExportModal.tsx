@@ -11,6 +11,7 @@ import { downloadBlob } from '../../lib/downloadBlob'
 import { useToast } from '../../lib/toast'
 import { TransferSectionPicker } from './TransferSectionPicker'
 import { DEFAULT_SECTIONS, type TransferSectionName } from './transferSections'
+import { FormModalCancelButton } from '../../components/FormModalFooter'
 
 type ZevExportModalProps = {
   isOpen: boolean
@@ -82,10 +83,7 @@ export function ZevExportModal({ isOpen, zevId, zevName, onClose }: ZevExportMod
         )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-          <button className="button button-secondary" type="button" onClick={onClose}>
-            <FontAwesomeIcon icon={faXmark} fixedWidth />
-            {t('common.cancel')}
-          </button>
+          <FormModalCancelButton onCancel={onClose} icon={<FontAwesomeIcon icon={faXmark} fixedWidth />} />
           <button
             className="button button-primary"
             type="button"

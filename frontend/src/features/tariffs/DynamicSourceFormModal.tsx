@@ -16,6 +16,7 @@ import type {
   DynamicSourceDiscovery,
   DynamicTariffSource,
 } from '../../types/api'
+import { FormModalCancelButton } from '../../components/FormModalFooter'
 
 type VersionChoice = 'auto' | DynamicApiVersion
 
@@ -309,9 +310,7 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
               {t('pages.dynamicSources.discovery.back')}
             </button>
           )}
-          <button className="button button-secondary" type="button" onClick={onClose} disabled={pending}>
-            {t('common.cancel')}
-          </button>
+          <FormModalCancelButton onCancel={onClose} disabled={pending} />
           <button
             className="button button-primary"
             type="submit"

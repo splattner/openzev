@@ -2,7 +2,6 @@ import { useId, useState, type KeyboardEvent, type ReactNode, type Ref } from 'r
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
     faChevronDown,
-    faChevronRight,
     faClone,
     faPen,
     faPlus,
@@ -24,7 +23,7 @@ import { TariffPriceHistoryChart } from './TariffPriceHistoryChart'
 import { TariffBandCoverage } from './TariffBandCoverage'
 import { DynamicPriceHistoryPanel } from './DynamicPriceHistoryModal'
 import { DynamicSourceSummary } from './DynamicSourceSummary'
-import { TariffDisclosure } from './TariffDisclosure'
+import { Disclosure } from '../../components/Disclosure'
 import { useAuth } from '../../lib/auth'
 
 type TariffPaneFrameProps = {
@@ -241,12 +240,12 @@ export function TariffDetailPane({
                     {collapsible ? (
                         <button
                             type="button"
-                            className="tariff-version-toggle"
+                            className="tariff-version-toggle disclosure-toggle"
                             aria-expanded={open}
                             aria-controls={bodyId}
                             onClick={() => setUnfolded((current) => ({ ...current, [version.id]: !open }))}
                         >
-                            <FontAwesomeIcon icon={open ? faChevronDown : faChevronRight} fixedWidth aria-hidden="true" />
+                            <FontAwesomeIcon icon={faChevronDown} className="disclosure-toggle-icon" fixedWidth aria-hidden="true" />
                             {status}
                             <span className="tariff-version-card-window">{dateWindow(version)}</span>
                         </button>
@@ -295,9 +294,9 @@ export function TariffDetailPane({
                             <h4>{t('pages.tariffs.pane.dynamicSource')}</h4>
                         </div>
                         <DynamicSourceSummary source={source} settings={settings} canOperate={user?.role === 'admin'} />
-                        <TariffDisclosure summary={t('pages.dynamicSources.history.sectionTitle')}>
+                        <Disclosure lazy summary={t('pages.dynamicSources.history.sectionTitle')}>
                             <DynamicPriceHistoryPanel source={source} tariff={version} />
-                        </TariffDisclosure>
+                        </Disclosure>
                     </section>
                 )}
 
@@ -456,7 +455,8 @@ export function TariffDetailPane({
                 {inForceAndNext.map(versionCard)}
 
                 {pastVersions.length > 0 && (
-                    <TariffDisclosure
+                    <Disclosure
+                        lazy
                         key={`${series.name}-${shownState === 'expired'}`}
                         summary={`${t('pages.tariffs.versions.history')} (${pastVersions.length})`}
                         defaultOpen={shownState === 'expired' || inForceAndNext.length === 0}
@@ -473,7 +473,7 @@ export function TariffDetailPane({
                             <ul className="tariff-version-list">{pastVersions.map(versionRow)}</ul>
                             {shownState === 'expired' && versionCard(shown)}
                         </div>
-                    </TariffDisclosure>
+                    </Disclosure>
                 )}
             </div>
         </TariffPaneFrame>

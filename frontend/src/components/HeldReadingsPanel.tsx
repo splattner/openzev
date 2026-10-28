@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { faChevronDown } from '@fortawesome/free-solid-svg-icons'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { fetchHeldMeteringReadings } from '../lib/api/metering'
@@ -52,10 +54,11 @@ export function HeldReadingsPanel({
                 {!importBatch && (
                     <button
                         type="button"
-                        className="button button-secondary button-compact"
+                        className="button button-ghost button-compact disclosure-toggle"
                         aria-expanded={open}
                         onClick={() => setOpen((value) => !value)}
                     >
+                        <FontAwesomeIcon icon={faChevronDown} className="disclosure-toggle-icon" fixedWidth aria-hidden="true" />
                         {open
                             ? t('pages.meteringData.rawTable.heldHide')
                             : t('pages.meteringData.rawTable.heldShow')}

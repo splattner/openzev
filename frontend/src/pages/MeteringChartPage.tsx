@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Tabs } from '@mantine/core'
+import { AppTabs } from '../components/AppTabs'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { DataTable, type ColumnDef } from '../components/DataTable'
 import { EmptyState } from '../components/EmptyState'
@@ -547,17 +547,16 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
             />
 
             <ScopeGuard skeleton="table">
-            <Tabs
-                classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
+            <AppTabs
                 value={tab}
                 keepMounted={false}
                 onChange={handleTabChange}
             >
-                <Tabs.List aria-label={t('pages.meteringData.title')}>
-                    <Tabs.Tab value="chart">{t('nav.meteringCharts')}</Tabs.Tab>
-                    {isManagedScope && <Tabs.Tab value="quality">{t('nav.meteringDataQuality')}</Tabs.Tab>}
-                    {isManagedScope && <Tabs.Tab value="imports">{t('nav.meteringImportsTab')}</Tabs.Tab>}
-                </Tabs.List>
+                <AppTabs.List aria-label={t('pages.meteringData.title')}>
+                    <AppTabs.Tab value="chart">{t('nav.meteringCharts')}</AppTabs.Tab>
+                    {isManagedScope && <AppTabs.Tab value="quality">{t('nav.meteringDataQuality')}</AppTabs.Tab>}
+                    {isManagedScope && <AppTabs.Tab value="imports">{t('nav.meteringImportsTab')}</AppTabs.Tab>}
+                </AppTabs.List>
 
                 {tab !== 'imports' && <div className="filter-bar">
                     {mpQuery.isError && (
@@ -648,7 +647,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                     )}
                 </div>}
 
-                <Tabs.Panel value="chart">
+                <AppTabs.Panel value="chart">
                     <div className="page-stack">
                         {isResolvingMpSelection || awaitingMeterList ? (
                             <PageSkeleton variant="card" />
@@ -793,9 +792,9 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                             </>
                         )}
                     </div>
-                </Tabs.Panel>
+                </AppTabs.Panel>
 
-                <Tabs.Panel value="quality">
+                <AppTabs.Panel value="quality">
                     <MeteringGapsDrawer
                         point={gapsPoint}
                         period={period}
@@ -865,15 +864,15 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                         </>
                         )}
                     </div>
-                </Tabs.Panel>
+                </AppTabs.Panel>
 
                 {/* Import history owns its wizard, queries and guards. */}
                 {isManagedScope && (
-                    <Tabs.Panel value="imports">
+                    <AppTabs.Panel value="imports">
                         <ImportsContent />
-                    </Tabs.Panel>
+                    </AppTabs.Panel>
                 )}
-            </Tabs>
+            </AppTabs>
             </ScopeGuard>
         </div>
     )

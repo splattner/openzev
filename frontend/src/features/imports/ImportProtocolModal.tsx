@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DataTable, type ColumnDef } from '../../components/DataTable'
+import { Disclosure } from '../../components/Disclosure'
 import { FormModal } from '../../components/FormModal'
 import { HeldReadingsPanel } from '../../components/HeldReadingsPanel'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
@@ -69,10 +70,9 @@ function SdatIssueRow({ issue }: { issue: SdatIssue }) {
                     ))}
                 </dl>
             )}
-            <details className="muted" style={{ marginTop: '0.4rem', fontSize: '0.85rem' }}>
-                <summary>{t('pages.imports.protocol.technicalDetails')}</summary>
+            <Disclosure className="muted disclosure-sm mt-05" summary={t('pages.imports.protocol.technicalDetails')}>
                 <p style={{ margin: '0.4rem 0 0' }}>{issue.message}</p>
-            </details>
+            </Disclosure>
         </div>
     )
 }

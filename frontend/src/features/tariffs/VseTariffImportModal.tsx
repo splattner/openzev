@@ -26,6 +26,7 @@ import type {
     VseTariffImportPreview,
     VseTariffImportResult,
 } from '../../types/api'
+import { FormModalCancelButton } from '../../components/FormModalFooter'
 
 type VseTariffImportModalProps = {
     isOpen: boolean
@@ -182,9 +183,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                         <small className="muted">{t('pages.tariffs.import.urlHint')}</small>
                     </label>
                     <div className="actions-row actions-row-end">
-                        <button className="button button-secondary" type="button" onClick={handleClose}>
-                            {t('common.cancel')}
-                        </button>
+                        <FormModalCancelButton onCancel={handleClose} />
                         <button className="button button-primary" type="submit" disabled={previewMutation.isPending}>
                             <FontAwesomeIcon icon={faDownload} fixedWidth />
                             {previewMutation.isPending

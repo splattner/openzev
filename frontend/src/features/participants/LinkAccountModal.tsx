@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
 import type { AdminUser } from '../../types/api'
+import { FormModalCancelButton } from '../../components/FormModalFooter'
 
 type LinkAccountModalProps = {
     participantName: string
@@ -50,10 +51,7 @@ export function LinkAccountModal({ participantName, accounts, error, pending, on
                 {(validation ?? error) && <div className="error-banner">{validation ?? error}</div>}
 
                 <div className="actions-row actions-row-end actions-row-wrap">
-                    <button className="button button-secondary" type="button" onClick={onClose}>
-                        <FontAwesomeIcon icon={faXmark} fixedWidth />
-                        {t('common.cancel')}
-                    </button>
+                    <FormModalCancelButton onCancel={onClose} icon={<FontAwesomeIcon icon={faXmark} fixedWidth />} />
                     <button className="button button-primary" type="submit" disabled={pending}>
                         <FontAwesomeIcon icon={faLink} fixedWidth />
                         {t('pages.accounts.linkModal.linkButton')}

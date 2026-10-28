@@ -2,7 +2,7 @@ import { act, createElement, useLayoutEffect, useReducer, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { useDraftGuard } from '../src/features/tariffs/useDraftGuard'
+import { useDraftGuard } from '../src/components/useDraftGuard'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
 

@@ -1,5 +1,5 @@
 import { useManagedZev } from '../lib/managedZev'
-import { Tabs } from '@mantine/core'
+import { AppTabs } from '../components/AppTabs'
 import { useTranslation } from 'react-i18next'
 import { usePageNavigation } from '../lib/usePageNavigation'
 import { InvoicesContent } from './InvoicesPage'
@@ -37,24 +37,23 @@ export function BillingHubPage({ tab }: { tab: BillingTab }) {
                 description={t('pages.billingHub.description')}
             />
 
-            <Tabs
-                classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab', panel: 'app-tabs-panel' }}
+            <AppTabs
                 value={tab}
                 keepMounted={false}
                 onChange={handleTabChange}
             >
-                <Tabs.List aria-label={t('nav.billing')}>
-                    <Tabs.Tab value="invoices">{t('pages.billingHub.tabs.invoices')}</Tabs.Tab>
-                    <Tabs.Tab value="emails">{t('pages.billingHub.tabs.emails')}</Tabs.Tab>
-                </Tabs.List>
+                <AppTabs.List aria-label={t('nav.billing')}>
+                    <AppTabs.Tab value="invoices">{t('pages.billingHub.tabs.invoices')}</AppTabs.Tab>
+                    <AppTabs.Tab value="emails">{t('pages.billingHub.tabs.emails')}</AppTabs.Tab>
+                </AppTabs.List>
 
-                <Tabs.Panel value="invoices">
+                <AppTabs.Panel value="invoices">
                     <InvoicesContent />
-                </Tabs.Panel>
-                <Tabs.Panel value="emails">
+                </AppTabs.Panel>
+                <AppTabs.Panel value="emails">
                     <BillingEmailsPage />
-                </Tabs.Panel>
-            </Tabs>
+                </AppTabs.Panel>
+            </AppTabs>
         </div>
     )
 }

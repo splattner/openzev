@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Tabs } from '@mantine/core'
+import { AppTabs } from '../../components/AppTabs'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faDownload } from '@fortawesome/free-solid-svg-icons'
 import { PdfPreview } from '../../components/PdfPreview'
@@ -106,7 +106,7 @@ function AnnualDocumentPanel({
   )
 
   return (
-    <Tabs.Panel value={descriptor.kind} aria-busy={loading}>
+    <AppTabs.Panel value={descriptor.kind} aria-busy={loading}>
       <div className="page-stack">
         <p className="muted" style={{ margin: 0 }}>{t(descriptor.descriptionKey)}</p>
         {/* Keep focus here when Retry replaces the error with the viewer. */}
@@ -159,7 +159,7 @@ function AnnualDocumentPanel({
           )}
         </div>
       </div>
-    </Tabs.Panel>
+    </AppTabs.Panel>
   )
 }
 
@@ -181,8 +181,7 @@ export function ParticipantYearDocuments({ userId, zevId, year, years, onYearCha
       </div>
 
       <section id="yearly-documents-preview" aria-label={t('pages.reports.participantDescription')}>
-        <Tabs
-          classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
+        <AppTabs
           value={active}
           onChange={(value) => {
             if (value === 'annual-statement' || value === 'tax-overview') setActive(value)
@@ -190,13 +189,13 @@ export function ParticipantYearDocuments({ userId, zevId, year, years, onYearCha
           keepMounted={false}
           activateTabWithKeyboard={false}
         >
-          <Tabs.List aria-label={t('pages.reports.documentTabs')}>
+          <AppTabs.List aria-label={t('pages.reports.documentTabs')}>
             {DESCRIPTORS.map((descriptor) => (
-              <Tabs.Tab key={descriptor.kind} value={descriptor.kind}>
+              <AppTabs.Tab key={descriptor.kind} value={descriptor.kind}>
                 {t(descriptor.titleKey)}
-              </Tabs.Tab>
+              </AppTabs.Tab>
             ))}
-          </Tabs.List>
+          </AppTabs.List>
           {DESCRIPTORS.map((descriptor) => (
             <AnnualDocumentPanel
               key={`${descriptor.kind}-${userId}-${zevId ?? ''}-${year}`}
@@ -206,7 +205,7 @@ export function ParticipantYearDocuments({ userId, zevId, year, years, onYearCha
               active={active === descriptor.kind}
             />
           ))}
-        </Tabs>
+        </AppTabs>
       </section>
     </div>
   )

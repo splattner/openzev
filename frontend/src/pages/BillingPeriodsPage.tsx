@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
+import { Disclosure } from '../components/Disclosure'
 import { BillingPeriodCard } from '../components/BillingPeriodCard'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { groupPeriodCards, periodKey } from '../features/overview/periodCards'
@@ -71,8 +72,7 @@ export function BillingPeriodsPage({ attentionQuery }: { attentionQuery?: Attent
                 </div>
             ))}
             {completed.length > 0 && alertsKnown && (
-                <details className="overview-period-details overview-period-history">
-                    <summary>{t('pages.billingPeriods.completedSummary', { count: completed.length })}</summary>
+                <Disclosure className="overview-period-details overview-period-history" summary={t('pages.billingPeriods.completedSummary', { count: completed.length })}>
                     <ul>{[...completed].reverse().map(({ period }) => (
                         <li key={periodKey(period)}>
                             <span className="overview-history-range">{format(period.start)} – {format(period.end)}</span>
@@ -81,7 +81,7 @@ export function BillingPeriodsPage({ attentionQuery }: { attentionQuery?: Attent
                             </Link>
                         </li>
                     ))}</ul>
-                </details>
+                </Disclosure>
             )}
         </section>
     )

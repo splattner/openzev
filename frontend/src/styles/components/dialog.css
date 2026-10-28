@@ -36,6 +36,29 @@
   padding: 0 1.75rem 1.75rem;
 }
 
+/* Named widths (SPEC-2026-10-ui-patterns §6.1); the 90% width above is the
+   narrow-screen bound. */
+
+.form-modal-xs {
+  max-width: 480px;
+}
+
+.form-modal-sm {
+  max-width: 600px;
+}
+
+.form-modal-md {
+  max-width: 760px;
+}
+
+.form-modal-lg {
+  max-width: 960px;
+}
+
+.form-modal-xl {
+  max-width: 1080px;
+}
+
 .form-modal-header {
   position: sticky;
   top: 0;

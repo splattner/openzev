@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Disclosure } from '../../components/Disclosure'
 import type { AppSettings, TariffSeries } from '../../types/api'
 import { TariffCategorySections } from './TariffCategorySections'
 import { seriesKeyOf } from './useTariffDisplay'
@@ -49,16 +50,14 @@ export function TariffOverview({ groups, settings, selected, onOpenDetail }: Tar
             )}
 
             {groups.history.length > 0 && (
-                <details
+                <Disclosure
                     className="tariff-overview-history"
                     open={historyOpen}
-                    onToggle={(event) => setHistoryOpen(event.currentTarget.open)}
+                    onOpenChange={setHistoryOpen}
+                    summary={<h2 className="tariff-overview-title">{t('pages.tariffs.overview.history')}</h2>}
                 >
-                    <summary>
-                        <h2 className="tariff-overview-title">{t('pages.tariffs.overview.history')}</h2>
-                    </summary>
                     <TariffCategorySections rows={groups.history} kind="history" settings={settings} selected={selected} onOpenDetail={onOpenDetail} />
-                </details>
+                </Disclosure>
             )}
         </div>
     )

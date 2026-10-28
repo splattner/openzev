@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 're
 import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faBan, faDownload, faPlay, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
-import { Tabs } from '@mantine/core'
+import { AppTabs } from '../components/AppTabs'
 import { useBlocker, useParams } from 'react-router-dom'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { PageSkeleton } from '../components/PageSkeleton'
@@ -372,22 +372,21 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                 </div>
             )}
 
-            <Tabs
-                classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
+            <AppTabs
                 value={tab}
                 keepMounted={false}
                 onChange={handleTabChange}
             >
-                <Tabs.List aria-label={t('pages.zevSettings.title')}>
-                    <Tabs.Tab value="general">{t('pages.zevSettings.tabs.general')}</Tabs.Tab>
-                    <Tabs.Tab value="people">{t('pages.zevSettings.tabs.people')}</Tabs.Tab>
-                    <Tabs.Tab value="billing">{t('pages.zevSettings.tabs.billingPayment')}</Tabs.Tab>
-                    <Tabs.Tab value="documents">{t('pages.zevSettings.tabs.documentsEmails')}</Tabs.Tab>
-                    <Tabs.Tab value="audit">{t('pages.zevSettings.tabs.auditLog')}</Tabs.Tab>
-                    <Tabs.Tab value="export">{t('pages.zevSettings.tabs.exportTransfer')}</Tabs.Tab>
-                </Tabs.List>
+                <AppTabs.List aria-label={t('pages.zevSettings.title')}>
+                    <AppTabs.Tab value="general">{t('pages.zevSettings.tabs.general')}</AppTabs.Tab>
+                    <AppTabs.Tab value="people">{t('pages.zevSettings.tabs.people')}</AppTabs.Tab>
+                    <AppTabs.Tab value="billing">{t('pages.zevSettings.tabs.billingPayment')}</AppTabs.Tab>
+                    <AppTabs.Tab value="documents">{t('pages.zevSettings.tabs.documentsEmails')}</AppTabs.Tab>
+                    <AppTabs.Tab value="audit">{t('pages.zevSettings.tabs.auditLog')}</AppTabs.Tab>
+                    <AppTabs.Tab value="export">{t('pages.zevSettings.tabs.exportTransfer')}</AppTabs.Tab>
+                </AppTabs.List>
 
-                <Tabs.Panel value="general">
+                <AppTabs.Panel value="general">
                     <section className="card page-stack">
                         <form id="zev-settings-form" className="page-stack" noValidate onSubmit={submit}>
                             <ZevGeneralSettingsFields
@@ -400,9 +399,9 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                             />
                         </form>
                     </section>
-                </Tabs.Panel>
+                </AppTabs.Panel>
 
-                <Tabs.Panel value="billing">
+                <AppTabs.Panel value="billing">
                     <section className="card page-stack">
                         <form id="zev-settings-form" className="page-stack" noValidate onSubmit={submit}>
                             <ZevGeneralSettingsFields
@@ -415,9 +414,9 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                             />
                         </form>
                     </section>
-                </Tabs.Panel>
+                </AppTabs.Panel>
 
-                <Tabs.Panel value="documents">
+                <AppTabs.Panel value="documents">
                     <section className="card page-stack">
                         <form id="zev-settings-form" className="inline-form page-stack" noValidate onSubmit={submit}>
                             <ZevEmailTemplateFields
@@ -447,21 +446,21 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                             />
                         </form>
                     </section>
-                </Tabs.Panel>
+                </AppTabs.Panel>
 
-                <Tabs.Panel value="people">
+                <AppTabs.Panel value="people">
                     <ZevPeopleSection zevId={selectedZevId} canManage={canWriteSelectedCommunity} />
-                </Tabs.Panel>
+                </AppTabs.Panel>
 
 
-                <Tabs.Panel value="audit">
+                <AppTabs.Panel value="audit">
                     {/* Owner-scoped audit log as a tab of its ZEV (spec §5): the
                         component locks scope to 'owner' — the platform log never
                         merges here. */}
                     <AuditLogsPage scope="owner" embedded />
-                </Tabs.Panel>
+                </AppTabs.Panel>
 
-                <Tabs.Panel value="export">
+                <AppTabs.Panel value="export">
                     <section className="card page-stack">
                         <div>
                             <h3 style={{ marginTop: 0 }}>{t('zevTransfer.exportTitle')}</h3>
@@ -508,8 +507,8 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                             </div>
                         </section>
                     )}
-                </Tabs.Panel>
-            </Tabs>
+                </AppTabs.Panel>
+            </AppTabs>
 
             {showSaveBar && (
                 <div className="zev-settings-save-bar" role="region" aria-label={t('pages.zevSettings.saveBarLabel')}>

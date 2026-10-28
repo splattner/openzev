@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Tabs } from '@mantine/core'
+import { AppTabs } from '../components/AppTabs'
 import { usePageNavigation } from '../lib/usePageNavigation'
 import { AdminAccountsPage } from './AdminAccountsPage'
 import { AdminCredentialsPage } from './AdminCredentialsPage'
@@ -32,24 +32,23 @@ export function AdminAccountsHubPage({ tab = 'users' }: { tab?: AdminAccountsTab
                 description={t('pages.adminAccounts.description')}
             />
 
-            <Tabs
-                classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
+            <AppTabs
                 value={tab}
                 keepMounted={false}
                 onChange={handleTabChange}
             >
-                <Tabs.List aria-label={t('pages.adminAccounts.title')}>
-                    <Tabs.Tab value="users">{t('pages.adminAccounts.tabs.users')}</Tabs.Tab>
-                    <Tabs.Tab value="tokens">{t('pages.adminAccounts.tabs.tokens')}</Tabs.Tab>
-                </Tabs.List>
+                <AppTabs.List aria-label={t('pages.adminAccounts.title')}>
+                    <AppTabs.Tab value="users">{t('pages.adminAccounts.tabs.users')}</AppTabs.Tab>
+                    <AppTabs.Tab value="tokens">{t('pages.adminAccounts.tabs.tokens')}</AppTabs.Tab>
+                </AppTabs.List>
 
-                <Tabs.Panel value="users">
+                <AppTabs.Panel value="users">
                     <AdminAccountsPage embedded />
-                </Tabs.Panel>
-                <Tabs.Panel value="tokens">
+                </AppTabs.Panel>
+                <AppTabs.Panel value="tokens">
                     <AdminCredentialsPage embedded />
-                </Tabs.Panel>
-            </Tabs>
+                </AppTabs.Panel>
+            </AppTabs>
         </div>
     )
 }

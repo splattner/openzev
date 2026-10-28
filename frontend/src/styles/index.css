@@ -58,6 +58,7 @@
 @import './components/field-reference.css' layer(components);
 @import './components/verify-card.css' layer(components);
 @import './components/app-tabs.css' layer(components);
+@import './components/disclosure.css' layer(components);
 
 @import '../components/RawMeteringTable.css' layer(pages);
 @import '../components/HeldReadingsPanel.css' layer(pages);

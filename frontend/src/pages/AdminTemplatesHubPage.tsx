@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Tabs } from '@mantine/core'
+import { AppTabs } from '../components/AppTabs'
 import { usePageNavigation } from '../lib/usePageNavigation'
 import { AdminPdfTemplatesPage, type PdfTemplateTab } from './AdminPdfTemplatesPage'
 import { AdminEmailTemplatesPage } from './AdminEmailTemplatesPage'
@@ -39,8 +39,7 @@ export function AdminTemplatesHubPage({ tab = 'pdf' }: { tab?: AdminTemplatesTab
         <div className="page-stack">
             <PageHeader eyebrow={t('nav.platformScope')} title={t('pages.adminTemplates.title')} />
 
-            <Tabs
-                classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
+            <AppTabs
                 value={selected}
                 keepMounted={false}
                 onChange={handleTabChange}
@@ -50,39 +49,39 @@ export function AdminTemplatesHubPage({ tab = 'pdf' }: { tab?: AdminTemplatesTab
                         <span className="template-tab-group" id="template-tabs-group-pdf">
                             {t('pages.adminTemplates.tabs.pdf')}
                         </span>
-                        <Tabs.List aria-labelledby="template-tabs-group-pdf">
+                        <AppTabs.List aria-labelledby="template-tabs-group-pdf">
                             {pdfTemplates.map((key) => (
-                                <Tabs.Tab key={key} value={key}>
+                                <AppTabs.Tab key={key} value={key}>
                                     {t(`pages.adminTemplates.items.${key}`)}
-                                </Tabs.Tab>
+                                </AppTabs.Tab>
                             ))}
-                        </Tabs.List>
+                        </AppTabs.List>
                     </div>
                     <div className="template-tabs-row">
                         <span className="template-tab-group" id="template-tabs-group-email">
                             {t('pages.adminTemplates.tabs.email')}
                         </span>
-                        <Tabs.List aria-labelledby="template-tabs-group-email">
+                        <AppTabs.List aria-labelledby="template-tabs-group-email">
                             {emailTemplates.map((key) => (
-                                <Tabs.Tab key={key} value={key}>
+                                <AppTabs.Tab key={key} value={key}>
                                     {t(`pages.adminTemplates.items.${key}`)}
-                                </Tabs.Tab>
+                                </AppTabs.Tab>
                             ))}
-                        </Tabs.List>
+                        </AppTabs.List>
                     </div>
                 </div>
 
                 {pdfTemplates.map((key) => (
-                    <Tabs.Panel key={key} value={key}>
+                    <AppTabs.Panel key={key} value={key}>
                         <AdminPdfTemplatesPage embedded template={key} />
-                    </Tabs.Panel>
+                    </AppTabs.Panel>
                 ))}
                 {emailTemplates.map((key) => (
-                    <Tabs.Panel key={key} value={key}>
+                    <AppTabs.Panel key={key} value={key}>
                         <AdminEmailTemplatesPage embedded template={key} />
-                    </Tabs.Panel>
+                    </AppTabs.Panel>
                 ))}
-            </Tabs>
+            </AppTabs>
         </div>
     )
 }

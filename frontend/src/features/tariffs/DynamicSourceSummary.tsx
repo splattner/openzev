@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { formatDateTime } from '../../lib/appSettings'
 import type { AppSettings, DynamicTariffSource } from '../../types/api'
-import { TariffDisclosure } from './TariffDisclosure'
+import { Disclosure } from '../../components/Disclosure'
 
 /**
  * Shared-source facts beside the linked tariff: which source and whether it is
@@ -31,7 +31,7 @@ export function DynamicSourceSummary({ source, settings, canOperate }: {
                 <p className="muted" style={{ margin: 0 }}>{t('pages.dynamicSources.lastSuccess', { time: formatDateTime(source.last_success_at, settings) })}</p>
             )}
             {source.last_fetch_status === 'failed' && source.last_fetch_error && <p className="text-error" style={{ margin: 0 }}>{source.last_fetch_error}</p>}
-            <TariffDisclosure summary={t('pages.dynamicSources.sourceDetails')}>
+            <Disclosure lazy summary={t('pages.dynamicSources.sourceDetails')}>
                 <div className="tariff-source-summary">
                     <p className="muted" style={{ margin: 0, overflowWrap: 'anywhere' }}>{source.url}</p>
                     <p className="muted" style={{ margin: 0 }}>
@@ -51,7 +51,7 @@ export function DynamicSourceSummary({ source, settings, canOperate }: {
                         {t('pages.dynamicSources.globalReuseSummary', { tariffs: source.linked_tariff_count, zevs: source.linked_zev_count })}
                     </p>
                 </div>
-            </TariffDisclosure>
+            </Disclosure>
         </div>
     )
 }

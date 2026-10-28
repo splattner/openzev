@@ -34,6 +34,7 @@ import type { AdminUser, CreateUserInput, UserInput, UserRole } from '../types/a
 import { PageHeader } from '../components/PageHeader'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { Notice } from '../components/Notice'
+import { FormModalCancelButton } from '../components/FormModalFooter'
 
 const defaultEditUserForm: UserInput = {
     username: '',
@@ -536,10 +537,7 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                     {createUserError && <div className="error-banner" style={{ gridColumn: '1 / -1' }}>{createUserError}</div>}
 
                     <div className="actions-row actions-row-end actions-row-wrap" style={{ gridColumn: '1 / -1' }}>
-                        <button className="button button-secondary" type="button" onClick={() => setShowCreateUserModal(false)}>
-                            <FontAwesomeIcon icon={faXmark} fixedWidth />
-                            {t('common.cancel')}
-                        </button>
+                        <FormModalCancelButton onCancel={() => setShowCreateUserModal(false)} icon={<FontAwesomeIcon icon={faXmark} fixedWidth />} />
                         <button className="button button-primary" type="submit" disabled={createUserMutation.isPending}>
                             <FontAwesomeIcon icon={faCirclePlus} fixedWidth />
                             {t('pages.accounts.createModal.submit')}
@@ -585,10 +583,7 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                     {editUserError && <div className="error-banner" style={{ gridColumn: '1 / -1' }}>{editUserError}</div>}
 
                     <div className="actions-row actions-row-end actions-row-wrap" style={{ gridColumn: '1 / -1' }}>
-                        <button className="button button-secondary" type="button" onClick={() => setShowEditUserModal(false)}>
-                            <FontAwesomeIcon icon={faXmark} fixedWidth />
-                            {t('common.cancel')}
-                        </button>
+                        <FormModalCancelButton onCancel={() => setShowEditUserModal(false)} icon={<FontAwesomeIcon icon={faXmark} fixedWidth />} />
                         <button className="button button-primary" type="submit" disabled={updateUserMutation.isPending}>
                             <FontAwesomeIcon icon={faCheck} fixedWidth />
                             {t('pages.accounts.editModal.saveButton')}

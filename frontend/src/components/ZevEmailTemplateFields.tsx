@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { faChevronDown } from '@fortawesome/free-solid-svg-icons'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { fetchEmailTemplate } from '../lib/api/invoices'
@@ -160,10 +162,11 @@ export function ZevEmailTemplateFields({
                     <div className="zev-email-fields-toggle">
                         <button
                             type="button"
-                            className="button button-secondary button-compact"
+                            className="button button-ghost button-compact disclosure-toggle"
                             aria-expanded={fieldsOpen}
                             onClick={() => setFieldsOpen((open) => !open)}
                         >
+                            <FontAwesomeIcon icon={faChevronDown} className="disclosure-toggle-icon" fixedWidth aria-hidden="true" />
                             {t('pages.zevSettings.emailInsertField')}
                         </button>
                         {fieldsOpen && (

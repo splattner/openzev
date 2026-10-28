@@ -39,28 +39,6 @@
   overflow-wrap: anywhere;
 }
 
-.overview-period-details summary {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 1rem;
-  cursor: pointer;
-  color: var(--text-muted);
-  list-style: none;
-}
-
-.overview-period-details summary::-webkit-details-marker {
-  display: none;
-}
-
-.overview-period-details summary::after {
-  content: '+';
-}
-
-.overview-period-details[open] summary::after {
-  content: '−';
-}
-
 .overview-period-details ul {
   list-style: none;
   padding: 0;
@@ -93,10 +71,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.overview-period-details summary:focus-visible {
-  outline: 2px solid var(--interactive);
-  outline-offset: 4px;
-}
 
 .overview-community-notices h3,
 .overview-caught-up h3 {

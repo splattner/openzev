@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
+import { Disclosure } from './Disclosure'
 import { groupInvoiceAlerts, isOpenStep, primaryPeriodStep, type PeriodCardEntry } from '../features/overview/periodCards'
 import { attentionText, stepDetailText } from '../features/overview/readinessPresentation'
 
@@ -76,8 +77,7 @@ export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
                 {actionLabel}
             </Link>
             {(detailSteps.length > 0 || alerts.length > 0 || (primary?.key === 'paid' && overdue > 0)) && (
-                <details className="overview-period-details">
-                    <summary>{t('pages.overview.cards.details')}</summary>
+                <Disclosure className="overview-period-details" summary={t('pages.overview.cards.details')}>
                     <ul className="overview-period-pending">
                         {primary?.key === 'paid' && overdue > 0 && detail && <li>{detail}</li>}
                         {pendingSteps.map((step) => (
@@ -118,7 +118,7 @@ export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
                             </ul>
                         </div>
                     )}
-                </details>
+                </Disclosure>
             )}
         </article>
     )

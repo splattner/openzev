@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePageNavigation } from '../lib/usePageNavigation'
-import { Tabs } from '@mantine/core'
+import { AppTabs } from '../components/AppTabs'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
@@ -76,8 +76,7 @@ export function AccountProfilePage() {
                 </div>
             )}
 
-            <Tabs
-                classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
+            <AppTabs
                 value={activeTab}
                 onChange={(value) => setActiveTab(ACCOUNT_TABS.includes(value as AccountTab) ? (value as AccountTab) : 'profile')}
                 // Panels stay mounted (hidden) on purpose: recovery codes and a freshly
@@ -85,19 +84,19 @@ export function AccountProfilePage() {
                 // be lost the moment the user clicked another tab.
                 keepMounted
             >
-                <Tabs.List aria-label={t('account.title')}>
-                    <Tabs.Tab value="profile">{t('account.tabs.profile')}</Tabs.Tab>
-                    <Tabs.Tab value="security">{t('account.tabs.security')}</Tabs.Tab>
-                    <Tabs.Tab value="tokens">{t('account.tabs.tokens')}</Tabs.Tab>
-                </Tabs.List>
+                <AppTabs.List aria-label={t('account.title')}>
+                    <AppTabs.Tab value="profile">{t('account.tabs.profile')}</AppTabs.Tab>
+                    <AppTabs.Tab value="security">{t('account.tabs.security')}</AppTabs.Tab>
+                    <AppTabs.Tab value="tokens">{t('account.tabs.tokens')}</AppTabs.Tab>
+                </AppTabs.List>
 
-                <Tabs.Panel value="profile">
+                <AppTabs.Panel value="profile">
                     <div style={{ maxWidth: '520px' }}>
                         <ProfileCard />
                     </div>
-                </Tabs.Panel>
+                </AppTabs.Panel>
 
-                <Tabs.Panel value="security">
+                <AppTabs.Panel value="security">
                     <fieldset className="form-grid" disabled={isImpersonating} aria-label={t('account.tabs.security')} style={{ gap: '2rem', maxWidth: '1000px', alignItems: 'start' }}>
                         <div style={{ display: 'grid', gap: '2rem' }}>
                             <PasswordCard />
@@ -145,9 +144,9 @@ export function AccountProfilePage() {
                             }
                         />
                     </fieldset>
-                </Tabs.Panel>
+                </AppTabs.Panel>
 
-                <Tabs.Panel value="tokens">
+                <AppTabs.Panel value="tokens">
                     <div style={{ maxWidth: '1000px' }}>
                         <TokensSection
                             onRevoke={({ name, kind, onConfirm }) =>
@@ -170,8 +169,8 @@ export function AccountProfilePage() {
                             }
                         />
                     </div>
-                </Tabs.Panel>
-            </Tabs>
+                </AppTabs.Panel>
+            </AppTabs>
 
             {dialog && (
                 <ConfirmDialog

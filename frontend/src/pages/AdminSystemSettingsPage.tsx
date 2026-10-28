@@ -1,6 +1,7 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Skeleton, Switch, Tabs } from '@mantine/core'
+import { Skeleton, Switch } from '@mantine/core'
+import { AppTabs } from '../components/AppTabs'
 import { useReducedMotion } from '@mantine/hooks'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faPen, faPlus, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
@@ -34,6 +35,7 @@ import { AnalyticsPrivacySection } from '../features/settings/AnalyticsPrivacySe
 import { MfaPolicySection } from '../features/settings/MfaPolicySection'
 import { VatSettingsSection } from '../features/settings/VatSettingsSection'
 import { PageHeader } from '../components/PageHeader'
+import { FormModalCancelButton } from '../components/FormModalFooter'
 
 type SystemSettingsTab = 'regional' | 'features' | 'oauth' | 'security' | 'vat' | 'backup'
 
@@ -244,22 +246,21 @@ export function AdminSystemSettingsPage() {
                 description={t('adminSystemSettings.description')}
             />
 
-            <Tabs
-                classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
+            <AppTabs
                 value={activeTab}
                 onChange={(value) => setActiveTab(getValidTab(value ?? 'regional'))}
                 keepMounted={false}
             >
-                <Tabs.List aria-label={t('adminSystemSettings.title')}>
-                    <Tabs.Tab value="regional">{t('adminSystemSettings.tabs.regional.label')}</Tabs.Tab>
-                    <Tabs.Tab value="features">{t('adminSystemSettings.tabs.features.label')}</Tabs.Tab>
-                    <Tabs.Tab value="oauth">{t('adminSystemSettings.tabs.oauth.label')}</Tabs.Tab>
-                    <Tabs.Tab value="security">{t('adminSystemSettings.tabs.security.label')}</Tabs.Tab>
-                    <Tabs.Tab value="vat">{t('adminSystemSettings.tabs.vat.label')}</Tabs.Tab>
-                    <Tabs.Tab value="backup">{t('adminSystemSettings.tabs.backup.label')}</Tabs.Tab>
-                </Tabs.List>
+                <AppTabs.List aria-label={t('adminSystemSettings.title')}>
+                    <AppTabs.Tab value="regional">{t('adminSystemSettings.tabs.regional.label')}</AppTabs.Tab>
+                    <AppTabs.Tab value="features">{t('adminSystemSettings.tabs.features.label')}</AppTabs.Tab>
+                    <AppTabs.Tab value="oauth">{t('adminSystemSettings.tabs.oauth.label')}</AppTabs.Tab>
+                    <AppTabs.Tab value="security">{t('adminSystemSettings.tabs.security.label')}</AppTabs.Tab>
+                    <AppTabs.Tab value="vat">{t('adminSystemSettings.tabs.vat.label')}</AppTabs.Tab>
+                    <AppTabs.Tab value="backup">{t('adminSystemSettings.tabs.backup.label')}</AppTabs.Tab>
+                </AppTabs.List>
 
-                <Tabs.Panel value="regional">
+                <AppTabs.Panel value="regional">
                 <section className="card">
                     <div style={{ marginBottom: '1rem' }}>
                         <h3 style={{ marginTop: 0, marginBottom: '0.35rem' }}>{t('adminSystemSettings.regional.title')}</h3>
@@ -341,16 +342,16 @@ export function AdminSystemSettingsPage() {
                         </form>
                     )}
                 </section>
-                </Tabs.Panel>
+                </AppTabs.Panel>
 
-                <Tabs.Panel value="security">
+                <AppTabs.Panel value="security">
                     <div className="page-stack">
                         <MfaPolicySection />
                         <AnalyticsPrivacySection />
                     </div>
-                </Tabs.Panel>
+                </AppTabs.Panel>
 
-                <Tabs.Panel value="features">
+                <AppTabs.Panel value="features">
                 <section className="card">
                     <div style={{ marginBottom: '1rem' }}>
                         <h3 style={{ marginTop: 0, marginBottom: '0.35rem' }}>{t('features.title')}</h3>
@@ -400,9 +401,9 @@ export function AdminSystemSettingsPage() {
                         </table>
                     )}
                 </section>
-                </Tabs.Panel>
+                </AppTabs.Panel>
 
-                <Tabs.Panel value="oauth">
+                <AppTabs.Panel value="oauth">
                 <div className="table-card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '1rem' }}>
                         <div>
@@ -481,12 +482,12 @@ export function AdminSystemSettingsPage() {
                         </table>
                     )}
                 </div>
-                </Tabs.Panel>
+                </AppTabs.Panel>
 
-                <Tabs.Panel value="vat"><VatSettingsSection /></Tabs.Panel>
+                <AppTabs.Panel value="vat"><VatSettingsSection /></AppTabs.Panel>
 
-                <Tabs.Panel value="backup"><BackupSettingsSection /></Tabs.Panel>
-            </Tabs>
+                <AppTabs.Panel value="backup"><BackupSettingsSection /></AppTabs.Panel>
+            </AppTabs>
 
             <FormModal
                 isOpen={showOAuthForm}
@@ -615,10 +616,7 @@ export function AdminSystemSettingsPage() {
                     {oauthFormError && <div className="error-banner">{oauthFormError}</div>}
 
                     <div className="actions-row actions-row-end actions-row-wrap">
-                        <button type="button" className="button button-secondary" onClick={closeOAuthForm} disabled={oauthMutationPending}>
-                            <FontAwesomeIcon icon={faXmark} fixedWidth />
-                            {t('common.cancel')}
-                        </button>
+                        <FormModalCancelButton onCancel={closeOAuthForm} disabled={oauthMutationPending} icon={<FontAwesomeIcon icon={faXmark} fixedWidth />} />
                         <button type="submit" className="button button-primary" disabled={oauthMutationPending}>
                             <FontAwesomeIcon icon={faCheck} fixedWidth />
                             {oauthMutationPending ? t('common.saving') : oauthEditTarget ? t('common.save') : t('common.create')}

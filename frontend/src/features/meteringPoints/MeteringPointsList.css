@@ -301,14 +301,6 @@
   background: var(--brand-pale);
 }
 
-.metering-point-expand svg {
-  transition: transform 0.15s ease;
-}
-
-.metering-point-card.is-expanded .metering-point-expand svg {
-  transform: rotate(180deg);
-}
-
 .metering-detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 28rem);

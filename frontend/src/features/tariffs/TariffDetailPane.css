@@ -294,35 +294,6 @@
   color: color-mix(in srgb, var(--text-body) 50%, var(--text-muted));
 }
 
-/* Secondary pane content on demand. */
-
-.tariff-disclosure > summary {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.25rem 0;
-  cursor: pointer;
-  color: var(--text-muted);
-  list-style: none;
-}
-
-.tariff-disclosure > summary::-webkit-details-marker {
-  display: none;
-}
-
-.tariff-disclosure > summary::after {
-  content: '+';
-}
-
-.tariff-disclosure[open] > summary::after {
-  content: '−';
-}
-
-.tariff-disclosure[open] > summary {
-  margin-bottom: 0.5rem;
-}
-
 .tariff-version-row {
   display: flex;
   align-items: center;
@@ -386,7 +357,7 @@
 }
 
 
-.tariff-disclosure .tariff-price-history {
+.disclosure .tariff-price-history {
   margin-top: 0;
   padding-top: 0;
   border-top: 0;

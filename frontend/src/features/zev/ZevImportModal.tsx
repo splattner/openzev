@@ -18,6 +18,7 @@ import { useToast } from '../../lib/toast'
 import type { ZevArchiveImportResult } from '../../types/api'
 import { TransferSectionPicker } from './TransferSectionPicker'
 import { DEFAULT_SECTIONS, type TransferSectionName } from './transferSections'
+import { FormModalCancelButton } from '../../components/FormModalFooter'
 
 type ZevImportModalProps = {
   isOpen: boolean
@@ -128,7 +129,7 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
 
   if (imported) {
     return (
-      <FormModal isOpen={isOpen} title={t('zevTransfer.importTitle')} onClose={close} maxWidth="640px">
+      <FormModal isOpen={isOpen} title={t('zevTransfer.importTitle')} onClose={close} maxWidth="640px" dirty={false}>
         <div className="page-stack">
           <p>{t('zevTransfer.importSuccess', { name: imported.zev_name })}</p>
           {imported.warnings.map((warning) => (
@@ -241,10 +242,7 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
         )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-          <button className="button button-secondary" type="button" onClick={close}>
-            <FontAwesomeIcon icon={faXmark} fixedWidth />
-            {t('common.cancel')}
-          </button>
+          <FormModalCancelButton onCancel={close} icon={<FontAwesomeIcon icon={faXmark} fixedWidth />} />
           <button
             className="button button-primary"
             type="button"

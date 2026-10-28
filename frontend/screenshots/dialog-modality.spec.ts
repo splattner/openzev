@@ -65,7 +65,11 @@ test('popup portals inside a dialog retain selection, calendar and keyboard inte
   expect(await page.evaluate(() => !!document.activeElement?.closest('[inert]'))).toBe(false)
   await day.click()
   await expect(dialog.getByRole('button', { name: 'Fixture date' })).toContainText('October 15, 2026')
+  // The picked option and date are unsaved input: Escape asks before closing.
   await page.keyboard.press('Escape')
+  const discard = page.getByRole('dialog', { name: 'Discard changes?', exact: true })
+  await expect(discard).toBeVisible()
+  await discard.getByRole('button', { name: 'Discard', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   expect(errors).toEqual([])
 })

@@ -1,0 +1,62 @@
+/* ── Disclosure and its toggles (SPEC-2026-10-ui-patterns §6.3) ──────────── */
+
+/* Section disclosure: native details/summary with a +/− marker. Hosts add
+   their own layout through a modifier class, not by restyling the summary. */
+.disclosure > summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.25rem 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  list-style: none;
+}
+
+.disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosure > summary::after {
+  content: '+';
+}
+
+.disclosure[open] > summary::after {
+  content: '−';
+}
+
+.disclosure[open] > summary {
+  margin-bottom: 0.5rem;
+}
+
+.disclosure > summary:focus-visible {
+  outline: 2px solid var(--interactive);
+  outline-offset: 4px;
+}
+
+.disclosure-sm {
+  font-size: 0.85rem;
+}
+
+/* Show-more and row-expansion buttons: a `button button-ghost button-compact`
+   (or the host's own row style) that says what it reveals, with a chevron that
+   turns over while aria-expanded is true. */
+.disclosure-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.disclosure-toggle-icon {
+  transition: transform 0.15s ease;
+}
+
+.disclosure-toggle[aria-expanded='true'] .disclosure-toggle-icon {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .disclosure-toggle-icon {
+    transition: none;
+  }
+}

@@ -265,6 +265,8 @@ test('metering refresh failure preserves an open draft and retry recovers', asyn
   state.failed = false
   // The modal deliberately makes background controls inert.
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  // The meter ID is unsaved input: leaving asks first.
+  await page.getByRole('dialog', { name: 'Discard changes?', exact: true }).getByRole('button', { name: 'Discard', exact: true }).click()
   await warning.getByRole('button', { name: 'Retry', exact: true }).click()
   await expect(warning).toHaveCount(0)
   await expectTitle(page)
