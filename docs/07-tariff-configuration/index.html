@@ -2672,10 +2672,13 @@ per tariff:</p>
   until when (<em>until …</em>), from when it will (<em>starts 01.01.2027</em>, with the year
   in bold, and the month too when it starts this year), or when it ended</li>
 </ul>
-<p>An unnamed band shows its time window once. A non-flat band without a complete
-time window says <strong>time window not configured</strong>; it does not automatically cover
-the other bands' remaining hours. Uncovered hours use the first band in the
-matching season (or the tariff's first band if no season matches). The detail
+<p>An unnamed band shows its time window once. A high, low or time band with
+<strong>no time window</strong> (both times left empty) is the band for <strong>all other hours</strong>:
+it prices every hour the other bands of its months and weekdays do not cover,
+so "HT Mon–Fri 07:00–21:00, NT the rest" needs only the HT window. Only one
+band per season and weekday can do this. Hours that no band covers, and no
+such band catches, use the first band in the matching season (or the tariff's
+first band if no season matches). The detail
 pane and the band form say which hours are affected and what they are billed
 at — for example <em>No band covers 00:00–07:00, 21:00–24:00; 07:00–21:00 · Sat–Sun.
 Those hours are billed as High (HT) 07:00–21:00 at 0.295 CHF/kWh</em> — and warn
@@ -3128,10 +3131,11 @@ a per-kWh tariff's.</p>
 ├─ Band "Evening": 16:00–00:00, 90%
 </code></pre></div></p>
 <blockquote>
-<p><strong>Cover the whole day.</strong> Every band needs its own time window, and the
-windows should together cover all 24 hours. A band without a window
-("the rest of the day") never matches: an hour no band covers is billed at
-the tariff's first band instead, which is usually not what you meant.</p>
+<p><strong>Cover the whole day.</strong> The bands should together cover all 24 hours. Give
+every band a time window, or leave both times empty on one band to make it
+the band for <strong>all other hours</strong> ("the rest of the day"). Without such a
+band, an hour no band covers is billed at the tariff's first band instead,
+which is usually not what you meant.</p>
 </blockquote>
 <p>This is useful when you want to set local energy prices as a fraction of the grid energy rate, so that price changes to the grid tariff are automatically reflected.</p>
 <h3 id="fixed-fee-tariff">Fixed Fee Tariff<a class="headerlink" href="#fixed-fee-tariff" title="Permanent link">&para;</a></h3>
