@@ -1,0 +1,36 @@
+.issue-text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: start;
+  text-decoration: none;
+}
+
+.issue-text--error {
+  color: var(--danger-700);
+}
+
+.issue-text--warning {
+  color: var(--warning-800);
+}
+
+.issue-text svg {
+  flex: none;
+  font-size: 0.75em;
+}
+
+:is(a, button).issue-text {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+:is(a, button).issue-text:is(:hover, :focus-visible) {
+  text-decoration: underline;
+}

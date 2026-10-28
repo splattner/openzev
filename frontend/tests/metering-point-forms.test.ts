@@ -10,7 +10,6 @@ import {
   getNextAssignmentGuidance,
   isAssignmentCurrent,
   isMeteringPointHolderLess,
-  meteringPointHealthBadgeClass,
   meteringPointNeedsAttention,
   readMeteringPointTypeFilter,
   readMeteringPointView,
@@ -194,13 +193,6 @@ describe('metering point form helpers', () => {
     }
     expect(meteringPointNeedsAttention({ is_active: true }, 'green', true)).toBe(true)
     expect(meteringPointNeedsAttention({ is_active: true }, 'green', false)).toBe(false)
-  })
-
-  it('maps health to badge classes', () => {
-    expect(meteringPointHealthBadgeClass('green')).toBe('badge badge-success')
-    expect(meteringPointHealthBadgeClass('yellow')).toBe('badge badge-warning')
-    expect(meteringPointHealthBadgeClass('red')).toBe('badge badge-danger')
-    expect(meteringPointHealthBadgeClass('no_data')).toBe('badge badge-neutral')
   })
 
   describe('reading filters from the URL (#625)', () => {

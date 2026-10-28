@@ -20,11 +20,6 @@ export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
         (step) => step.status === 'warn' && step !== primary,
     )
     const tone = overdue ? 'danger' : failed || warnings.length || primary?.status === 'warn' ? 'warning' : 'info'
-    const status = overdue ? t('pages.dashboard.openInvoices.overdue')
-        : failed ? t('pages.overview.cards.deliveryFailed')
-            : primary?.status === 'warn' || warnings.length ? t('pages.billingPeriods.status.attention')
-                : readiness?.next_action === 'approve' ? t('pages.overview.cards.readyForReview')
-                    : t('pages.billingPeriods.status.inProgress')
     const invoicesUrl = `/billing/invoices?period_start=${period.start}&period_end=${period.end}`
     const destination = primary?.link || alerts[0]?.link || invoicesUrl
     const actionLabel = primary?.link && readiness
@@ -58,16 +53,15 @@ export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
                 <h3>{sameMonth ? startMonth : `${startMonth} – ${endMonth}`}</h3>
                 <p className="overview-period-range muted">{format(period.start)} – {format(period.end)}</p>
             </header>
-            <span className={`badge badge-${tone}`}>{status}</span>
             <div className="overview-period-work">
-                {detail && !(primary?.key === 'paid' && overdue) ? <p className="overview-period-lead">{detail}</p> : null}
+                {detail && !(primary?.key === 'paid' && overdue) ? <p className={`overview-period-lead${primary?.status === 'warn' ? ' overview-period-issue' : ''}`}>{detail}</p> : null}
                 {!detail && primary && readiness ? (
                     <p className="overview-period-lead">{t(`pages.dashboard.cockpit.nextActionLabels.${readiness.next_action}`)}</p>
                 ) : null}
-                {overdue > 0 && <p className="overview-period-lead">{t('pages.overview.cards.overdue', { count: overdue })}</p>}
-                {failed > 0 && <p className="overview-period-lead">{t('pages.overview.cards.failed', { count: failed })}</p>}
+                {overdue > 0 && <p className="overview-period-lead overview-period-issue">{t('pages.overview.cards.overdue', { count: overdue })}</p>}
+                {failed > 0 && <p className="overview-period-lead overview-period-issue">{t('pages.overview.cards.failed', { count: failed })}</p>}
                 {warnings.map((step) => (
-                    <p key={step.key} className="overview-period-warning">
+                    <p key={step.key} className="overview-period-warning overview-period-issue">
                         {step.link ? <Link to={step.link}>{stepDetailText(step, t) || t(`pages.dashboard.cockpit.stepLabels.${step.key}`)}</Link>
                             : stepDetailText(step, t) || t(`pages.dashboard.cockpit.stepLabels.${step.key}`)}
                     </p>
@@ -88,11 +82,8 @@ export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
                                             {t(`pages.dashboard.cockpit.stepLabels.${step.key}`)}
                                         </Link>
                                     ) : <strong>{t(`pages.dashboard.cockpit.stepLabels.${step.key}`)}</strong>}
-                                    <span className={`badge badge-${step.status === 'warn' ? 'warning' : 'info'}`}>
-                                        {t(`pages.dashboard.cockpit.statusLabels.${step.status}`)}
-                                    </span>
                                 </div>
-                                <span className="muted">{stepDetailText({ ...step, failed: 0 }, t) || t(`pages.dashboard.cockpit.statusLabels.${step.status}`)}</span>
+                                <span className={step.status === 'warn' ? 'overview-period-issue' : 'muted'}>{stepDetailText({ ...step, failed: 0 }, t) || t(`pages.dashboard.cockpit.statusLabels.${step.status}`)}</span>
                                 {step.link && (
                                     <Link className="overview-step-action" to={step.link}>{t('pages.dashboard.cockpit.openStep')}</Link>
                                 )}

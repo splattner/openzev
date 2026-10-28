@@ -40,7 +40,7 @@ Three "nothing to do right now" states look similar but behave differently:
   as warnings above the waiting message.
 - **Caught up** — no ended period needs you right now (nothing waiting at
   draft/approved, every eligible participant invoiced); Overview shows a quiet
-  **Up to date** message and keeps completed periods collapsed below it.
+  **No billing work needs attention** message and keeps completed periods collapsed below it.
 
 An unfinished setup never hides behind a green status: with active
 participants but no current meter assignment Overview says nothing is
@@ -140,7 +140,7 @@ The yearly whole-ZEV annual-statement ZIP is on **Reports** (see
 The former `/billing/statements` address redirects there.
 
 The per-period work cards live on **Overview**. The running period is separated
-as **Collecting data** and never exposes readiness actions. Ended periods with
+as **Current billing period**, with a note that it is still open, and never exposes readiness actions. Ended periods with
 open work remain visible as cards; fully completed ended periods are collapsed.
 The primary action follows the backend-selected next step. **Open invoices**
 deep-links into Billing with that exact period preselected

@@ -324,7 +324,7 @@ test.describe('User Guide Screenshots', () => {
     await pane.locator('.tariff-version-toggle').click()
     // Waiting on the chart rather than the history: it renders only for a series
     // with more than one version, so it also asserts the seed still has them.
-    await pane.locator('.tariff-disclosure > summary').last().click()
+    await pane.locator('.disclosure > summary').last().click()
     await pane.locator('.tariff-price-history').waitFor({ timeout: 10_000 })
     await page.waitForTimeout(1000)  // let Recharts finish laying out
     await screenshotFull(page, '07b-tariff-versions')
@@ -373,9 +373,9 @@ test.describe('User Guide Screenshots', () => {
     await row.waitFor({ timeout: 10_000 })
     await row.click()
     const pane = page.locator('.tariff-pane')
-    const details = pane.locator('.tariff-period-section .tariff-disclosure > summary').first()
+    const details = pane.locator('.tariff-period-section .disclosure > summary').first()
     await details.click()
-    await expect(pane.locator('.tariff-period-section .tariff-disclosure[open]'), `Dynamic source details missing — ${SEED_HINT}`).toBeVisible()
+    await expect(pane.locator('.tariff-period-section .disclosure[open]'), `Dynamic source details missing — ${SEED_HINT}`).toBeVisible()
     await screenshotFull(page, '07d-tariff-dynamic-source')
   })
 

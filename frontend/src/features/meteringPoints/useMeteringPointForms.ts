@@ -193,13 +193,6 @@ export function isMeteringPointHolderLess(
   return !assignments.some((assignment) => isAssignmentCurrent(assignment, todayIso))
 }
 
-export function meteringPointHealthBadgeClass(health: MeteringPointHealth): string {
-  if (health === 'green') return 'badge badge-success'
-  if (health === 'yellow') return 'badge badge-warning'
-  if (health === 'red') return 'badge badge-danger'
-  return 'badge badge-neutral'
-}
-
 /** Active points with incomplete data or readings without a current holder need review. */
 export function meteringPointNeedsAttention(
   point: Pick<MeteringPoint, 'is_active'>,

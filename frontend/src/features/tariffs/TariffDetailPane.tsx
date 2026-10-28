@@ -24,6 +24,7 @@ import { TariffBandCoverage } from './TariffBandCoverage'
 import { DynamicPriceHistoryPanel } from './DynamicPriceHistoryModal'
 import { DynamicSourceSummary } from './DynamicSourceSummary'
 import { Disclosure } from '../../components/Disclosure'
+import { IssueText } from '../../components/IssueText'
 import { useAuth } from '../../lib/auth'
 
 type TariffPaneFrameProps = {
@@ -272,10 +273,9 @@ export function TariffDetailPane({
                         <span>{priceSummary(series, version)}</span>
                         {comparison && <span className="tariff-change">({comparison})</span>}
                         {uncovered && (
-                            <span className="badge badge-danger" title={t('pages.tariffs.coverage.badgeTooltip')}>
-                                <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />{' '}
+                            <IssueText title={t('pages.tariffs.coverage.badgeTooltip')}>
                                 {t('pages.tariffs.coverage.badge')}
-                            </span>
+                            </IssueText>
                         )}
                     </p>
                 )}
@@ -385,13 +385,9 @@ export function TariffDetailPane({
     }
 
     const failedFetch = dynamicSource?.last_fetch_status === 'failed' && (
-        <span
-            className="badge badge-danger"
-            title={t('pages.tariffs.dynamicFetchFailedTooltip', { error: dynamicSource.last_fetch_error })}
-        >
-            <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />{' '}
+        <IssueText title={t('pages.tariffs.dynamicFetchFailedTooltip', { error: dynamicSource.last_fetch_error })}>
             {t('pages.tariffs.dynamicFetchFailed')}
-        </span>
+        </IssueText>
     )
 
     if (editor) {
@@ -458,7 +454,7 @@ export function TariffDetailPane({
                     <Disclosure
                         lazy
                         key={`${series.name}-${shownState === 'expired'}`}
-                        summary={`${t('pages.tariffs.versions.history')} (${pastVersions.length})`}
+                        summary={t('pages.tariffs.versions.history')}
                         defaultOpen={shownState === 'expired' || inForceAndNext.length === 0}
                     >
                         <div className="page-stack">

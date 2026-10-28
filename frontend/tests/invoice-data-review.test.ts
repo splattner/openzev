@@ -65,7 +65,6 @@ describe('InvoiceDataReviewNotice', () => {
 
     it('tells managers to regenerate a tainted draft', () => {
         const text = render(invoice({ status: 'draft', needs_data_review: true, open_data_impact_count: 2 }), 'row', true)
-        expect(text).toContain('pages.invoices.dataReview.badge')
         expect(text).toContain('pages.invoices.dataReview.draftAction')
     })
 

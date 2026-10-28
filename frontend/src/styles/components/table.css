@@ -275,12 +275,6 @@
   font-size: 0.8125rem;
 }
 
-.invoice-cell-stack {
-  display: grid;
-  gap: 0.3rem;
-  align-content: start;
-}
-
 /* Invoice total, credit notes applied, amount due (#388): the sum line closes the table. */
 .credit-statement tfoot td {
   font-weight: 600;

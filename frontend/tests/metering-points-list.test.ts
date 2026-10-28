@@ -324,17 +324,17 @@ describe('MeteringPointsList', () => {
         const view = render({ points: [point('m1', { is_active: active, reading_count: health === 'no_data' ? 0 : 10 })], groups: null,
             healthByMeteringPoint: new Map([['m1', health]]), holderLessByMeteringPoint: new Map([['m1', holderLess]]),
         })
-        expect(!!view.querySelector('.metering-quality-issue, .metering-holder-issue')).toBe(expected)
+        expect(!!view.querySelector('.issue-text')).toBe(expected)
         expect(view.querySelector('.metering-point-id-main .dot')).toBeNull()
         if (expected) {
             if (health !== 'green' && health !== 'unknown') {
-                const issue = view.querySelector<HTMLAnchorElement>('.metering-point-last .metering-quality-issue')!
+                const issue = view.querySelector<HTMLAnchorElement>('.metering-point-last .issue-text')!
                 expect(issue.textContent).toContain(`pages.meteringPoints.health.${health === 'no_data' ? 'noReadings' : health}`)
                 expect(issue.getAttribute('href')).toBe('/metering-data?metering_point=m1&tab=quality')
                 expect(issue.getAttribute('aria-label')).toContain('m1')
-                expect(issue.classList.contains(health === 'red' ? 'badge-danger' : 'badge-warning')).toBe(true)
+                expect(issue.classList.contains(health === 'red' ? 'issue-text--error' : 'issue-text--warning')).toBe(true)
             }
-            if (holderLess) expect(view.querySelector('.metering-point-holder .metering-holder-issue')!.textContent).toContain('pages.meteringPoints.holderLessBadge')
+            if (holderLess) expect(view.querySelector('.metering-point-holder .issue-text')!.textContent).toContain('pages.meteringPoints.holderLessBadge')
         }
     })
 

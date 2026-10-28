@@ -28,7 +28,7 @@ with no readings, confirmed data gaps, or readings without a current assignment.
 Unavailable quality or assignment information is not counted as a confirmed problem;
 loading and retry notices explain when results may be incomplete. This view covers
 active inventory, not billing readiness. Connected-source warnings remain visible
-on rows and are handled separately. Data issues appear as named badges in
+on rows and are handled separately. Data issues appear as named red or amber text in
 **Last reading**; click one to open its data-quality view. A missing current
 assignment is marked in **Assignment**. These mark the same points counted
 under **Needs attention**, while point IDs remain plain text.

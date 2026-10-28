@@ -92,6 +92,18 @@
   display: inline-flex;
 }
 
+/* Only the card layout has room for the words behind the icons. */
+
+.invoice-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+}
+
+.invoice-progress-next {
+  display: none;
+}
+
 /* Too narrow for four columns: each row becomes a card — who and how much,
    then progress beside the actions (below them on phones). */
 
@@ -169,6 +181,17 @@
 
   .invoice-row-progress {
     grid-area: progress;
+  }
+
+  .invoice-progress-wrap {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .invoice-progress-next {
+    display: inline;
+    color: var(--muted);
+    font-size: 0.85rem;
   }
 
   .invoice-rows .invoice-actions-cell {

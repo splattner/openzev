@@ -277,8 +277,6 @@ export function AdminDynamicSourcesPanel() {
   const sources = sourcesQuery.data ?? []
   const visibleSources = sourceId ? sources.filter((source) => source.id === sourceId) : sources
   const failed = sources.filter((source) => source.last_fetch_status === 'failed').length
-  const reused = sources.filter((source) => source.linked_zev_count > 1).length
-  const points = sources.reduce((sum, source) => sum + source.point_count, 0)
 
   const activityColumns = useMemo<ColumnDef<AuditEvent, unknown>[]>(() => [
     { accessorKey: 'created_at', header: t('pages.dynamicSources.activity.time'), cell: ({ row }) => formatDateTime(row.original.created_at, settings) },
@@ -324,12 +322,11 @@ export function AdminDynamicSourcesPanel() {
             {t('pages.dynamicSources.refreshError')}
           </Notice>
         )}
-        <div className="stat-grid">
-          <StatCard label={t('pages.dynamicSources.stats.sources')} value={sources.length} />
-          <StatCard label={t('pages.dynamicSources.stats.points')} value={points} />
-          <StatCard label={t('pages.dynamicSources.stats.reused')} value={reused} />
-          <StatCard label={t('pages.dynamicSources.stats.failed')} value={failed} tone={failed ? 'danger' : 'success'} />
-        </div>
+        {failed > 0 && (
+          <div className="stat-grid">
+            <StatCard label={t('pages.dynamicSources.stats.failed')} value={failed} tone="danger" />
+          </div>
+        )}
 
         {sources.length === 0 && !sourceId ? (
           <EmptyState

@@ -390,6 +390,26 @@ user sees the same text without a click affordance. Routine state does not earn
 colour, colour never carries meaning alone, and neutral tags stay valid. This is
 usage guidance; badge shape and palette do not change.
 
+**Shipped (phase 6).** `components/IssueText` is the shared form of the
+reference treatment: coloured text with a warning icon, a link (`to`), a button
+(`onClick`) or plain text when the user may not act. The sweep applied §10.1 to
+the Overview period cards (no status pills; overdue, failed and warning steps
+read as red text; the running period and the caught-up card carry no badge; the
+completed-periods disclosure carries no count), the metering-point list ("No
+current assignment" opens the assignment dialog for writers; data-quality
+issues link to the quality view; a healthy point is not green), the tariff list
+and pane (gaps, uncovered hours, failed price fetch; no version count on the
+history disclosure), invoices (no green "PDF ready", a failed or missing PDF as
+text, only a failed or running email send marked, the data-review badge
+repeating the notice removed), the ZEV list IBAN warning, the MFA compliance
+mark, the period selector's "not a billing period", and the decorative stat
+tiles on VAT rates and dynamic sources (only failed sources remain, only when
+there are any). Billing rows in the card layout name the next step in words
+beside the icons. Kept as state, because the state is the information: job and
+delivery statuses (backups, restore, imports, audit log), current/upcoming/
+ended versions and assignments, and counts that describe a filtered population
+(list filter tabs).
+
 ### 10.2 Feedback and wording
 
 | Situation | Component / behaviour |

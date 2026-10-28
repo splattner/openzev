@@ -65,7 +65,6 @@ export function BuildingHeader({
             {address && <span>{address}</span>}
             {building.egid !== null && <span>{t('pages.meteringPoints.buildings.egidBadge', { egid: building.egid })}</span>}
             {landowners.length > 0 && <span>{t('pages.meteringPoints.buildings.landowners', { names: landowners.join(', ') })}</span>}
-            <span>{t('pages.meteringPoints.buildings.meteringPoints', { count: building.metering_point_count })}</span>
           </span>
         </div>
       </div>

@@ -44,6 +44,7 @@ import { GridOperatorSuggestion } from '../features/zev/GridOperatorSuggestion'
 import { PageHeader } from '../components/PageHeader'
 import { Notice } from '../components/Notice'
 import { FormModalCancelButton } from '../components/FormModalFooter'
+import { IssueText } from '../components/IssueText'
 
 const defaultCreateForm = (): ZevWizardInput => ({
     name: '',
@@ -934,9 +935,9 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                             {zev.zev_type.toUpperCase()}
                                         </span>
                                         {!isValidIban(zev.bank_iban ?? '') && (
-                                            <span className="badge badge-warning" title={t('pages.zevs.ibanWarningHint')}>
+                                            <IssueText tone="warning" title={t('pages.zevs.ibanWarningHint')}>
                                                 {t('pages.zevs.ibanWarning')}
-                                            </span>
+                                            </IssueText>
                                         )}
                                         {zev.disabled_at && (
                                             <span

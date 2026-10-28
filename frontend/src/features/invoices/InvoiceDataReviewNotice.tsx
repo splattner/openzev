@@ -63,7 +63,6 @@ export function InvoiceDataReviewNotice({
     return (
         <div className="warning-banner" style={{ margin: 0, overflowWrap: 'anywhere' }}>
             <div className="actions-row actions-row-wrap">
-                <span className="badge badge-warning">{t('pages.invoices.dataReview.badge')}</span>
                 <span>{t(messageKey, { count })}</span>
             </div>
             {variant === 'detail' && (invoice.data_impacts ?? []).length > 0 && (

@@ -18,6 +18,7 @@ import {
     INVOICE_PROGRESS_STEPS,
     invoiceRowProgress,
     type InvoiceProgressStep,
+    type InvoiceRowStep,
     type InvoiceRowWork,
     type InvoiceStepReason,
     type InvoiceStepState,
@@ -66,22 +67,30 @@ export function InvoiceRowProgress({ row, period, work }: InvoiceRowProgressProp
         )
     }
 
+    // Say what the step means for this row: "Invoice created",
+    // "Not approved yet" — or what is under way or wrong.
+    const labelOf = ({ step, state, reason }: InvoiceRowStep) => reason
+        ? invoiceStepReasonText(t, reason, row)
+        : t(`pages.invoices.progress.${state === 'done' ? 'done' : 'open'}.${step}`)
+    // A card has room for words, not for a legend to decode five icons. A
+    // problem already reads as red text under the name; this is the next step.
+    const next = steps.find(({ state }) => state === 'open' || state === 'active')
+
     return (
-        <ol className="invoice-progress" aria-label={t('pages.invoices.progress.label')}>
-            {steps.map(({ step, state, reason }) => {
-                // Say what the step means for this row: "Invoice created",
-                // "Not approved yet" — or what is under way or wrong.
-                const label = reason
-                    ? invoiceStepReasonText(t, reason, row)
-                    : t(`pages.invoices.progress.${state === 'done' ? 'done' : 'open'}.${step}`)
-                return (
-                    <li key={step} className="invoice-progress-step" title={label} data-step={step} data-state={state}>
-                        <StepIcon step={step} state={state} reason={reason} />
-                        <span className="visually-hidden">{label}</span>
-                    </li>
-                )
-            })}
-        </ol>
+        <div className="invoice-progress-wrap">
+            <ol className="invoice-progress" aria-label={t('pages.invoices.progress.label')}>
+                {steps.map((entry) => {
+                    const label = labelOf(entry)
+                    return (
+                        <li key={entry.step} className="invoice-progress-step" title={label} data-step={entry.step} data-state={entry.state}>
+                            <StepIcon step={entry.step} state={entry.state} reason={entry.reason} />
+                            <span className="visually-hidden">{label}</span>
+                        </li>
+                    )
+                })}
+            </ol>
+            {next && <span className="invoice-progress-next" aria-hidden="true">{labelOf(next)}</span>}
+        </div>
     )
 }
 

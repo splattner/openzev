@@ -11,7 +11,6 @@ import {
   faRightLeft,
   faSolarPanel,
   faTrash,
-  faTriangleExclamation,
   faUserPlus,
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons'
@@ -19,6 +18,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
 import { BehindMeterBadge } from '../../components/BehindMeterBadge'
+import { IssueText } from '../../components/IssueText'
 import { formatDateTime, formatShortDate } from '../../lib/appSettings'
 import { formatBusinessIsoDate } from '../../lib/dates'
 import { formatNumber } from '../../lib/numbers'
@@ -29,7 +29,6 @@ import {
   assignmentStateBadgeClass,
   assignmentStateSortOrder,
   getAssignmentState,
-  meteringPointHealthBadgeClass,
   meteringPointNeedsAttention,
   type MeteringPointHealth,
 } from './useMeteringPointForms'
@@ -124,7 +123,7 @@ export function MeteringPointRow({
   const typeLabel = t(`pages.meteringPoints.meterTypes.${point.meter_type}`)
   const location = point.location_description?.trim() ?? ''
   const lastReadingDate = point.last_reading_at ? formatShortDate(formatBusinessIsoDate(new Date(point.last_reading_at)), settings) : null
-  // A source in trouble is worth a badge on the row; a healthy or pending one sits in the details.
+  // A source in trouble is worth a mark on the row; a healthy or pending one sits in the details.
   const sourceTone = statusTone(point.supplementary_source_status)
   const sourceNeedsAttention = sourceTone === 'warning' || sourceTone === 'danger'
   const needsAttention = meteringPointNeedsAttention(point, health, holderLess)
@@ -308,10 +307,12 @@ export function MeteringPointRow({
         {isManagedScope && (
           <td role="cell" className="metering-point-holder">
             {needsAttention && holderLess && (
-              <span className="badge badge-danger metering-holder-issue" title={t('pages.meteringPoints.holderLessHint')}>
-                <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />
+              <IssueText
+                title={t('pages.meteringPoints.holderLessHint')}
+                onClick={canWrite && assignmentsAvailable ? () => onOpenCreateAssignModal(point.id) : undefined}
+              >
                 {t('pages.meteringPoints.holderLessBadge')}
-              </span>
+              </IssueText>
             )}
             {renderHolder()}
           </td>
@@ -319,14 +320,14 @@ export function MeteringPointRow({
         <td role="cell" className="metering-point-last muted">
           {!(showDataIssue && health === 'no_data') && <span>{lastReadingDate ?? t('pages.meteringPoints.never')}</span>}
           {showDataIssue && (
-            <Link
-              className={`badge ${health === 'red' ? 'badge-danger' : 'badge-warning'} metering-quality-issue`}
+            <IssueText
+              tone={health === 'red' ? 'error' : 'warning'}
               to={`/metering-data?metering_point=${point.id}&tab=quality`}
               aria-label={t('pages.meteringPoints.health.issueFor', { meterId: point.meter_id, status: dataIssueLabel })}
               title={t('pages.meteringPoints.health.linkHint')}
             >
               {dataIssueLabel}
-            </Link>
+            </IssueText>
           )}
         </td>
         <td id={actionsId} role="cell" className="metering-point-actions">
@@ -449,14 +450,22 @@ export function MeteringPointRow({
                 <div>
                   <dt>{t('pages.meteringPoints.detail.dataQuality')}</dt>
                   <dd>
-                    <Link
-                      className={meteringPointHealthBadgeClass(health)}
-                      style={{ textDecoration: 'none' }}
-                      to={`/metering-data?metering_point=${point.id}&tab=quality`}
-                      title={t('pages.meteringPoints.health.linkHint')}
-                    >
-                      {t(`pages.meteringPoints.health.${health}`)}
-                    </Link>
+                    {health === 'yellow' || health === 'red' ? (
+                      <IssueText
+                        tone={health === 'red' ? 'error' : 'warning'}
+                        to={`/metering-data?metering_point=${point.id}&tab=quality`}
+                        title={t('pages.meteringPoints.health.linkHint')}
+                      >
+                        {t(`pages.meteringPoints.health.${health}`)}
+                      </IssueText>
+                    ) : (
+                      <Link
+                        to={`/metering-data?metering_point=${point.id}&tab=quality`}
+                        title={t('pages.meteringPoints.health.linkHint')}
+                      >
+                        {t(`pages.meteringPoints.health.${health}`)}
+                      </Link>
+                    )}
                   </dd>
                 </div>
               </dl>

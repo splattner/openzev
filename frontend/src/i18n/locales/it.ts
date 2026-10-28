@@ -1503,7 +1503,6 @@ export const it = {
             markedSent: 'Fattura segnata come inviata.',
             markPaid: 'Segna come pagato',
             markRestPaid: 'Segna il resto come pagato',
-            pdfReady: 'Pronto',
             pdfMissing: 'PDF mancante',
             pdfGenerating: 'In creazione…',
             pdfFailed: 'Non riuscito',
@@ -2237,7 +2236,7 @@ export const it = {
             confirmLabel: 'Digita esattamente “{{label}}” per confermare',
             columns: { source: 'Fonte', status: 'Stato', lastFetch: 'Ultimo recupero', points: 'Punti', reuse: 'Utilizzo sulla piattaforma' },
             status: { pending: 'Non ancora recuperata', ok: 'Operativa', failed: 'Non riuscita', disabled: 'Disattivata' },
-            stats: { sources: 'Fonti', points: 'Punti memorizzati', reused: 'Fonti condivise', failed: 'Fonti non riuscite' },
+            stats: { failed: 'Fonti non riuscite' },
             actions: { fetch: 'Recupera', manage: 'Gestisci' },
             versions: { auto: 'Rileva automaticamente', v1_0_5: 'v1.0.5', v2_0_0: 'v2.0.0', bfe_rmp: 'Prezzo di mercato di riferimento UFE' },
             types: {
@@ -2380,8 +2379,6 @@ export const it = {
                 egidHint: 'Identificatore federale dell\'edificio, facoltativo.',
                 egidInvalid: 'L\'EGID è un numero intero di al massimo 9 cifre.',
                 egidBadge: 'EGID {{egid}}',
-                meteringPoints_one: '{{count}} punto di misura',
-                meteringPoints_other: '{{count}} punti di misura',
                 landowners: 'Proprietari: {{names}}',
                 copyFromParticipant: 'Copia l\'indirizzo da un partecipante',
                 copyFromParticipantPlaceholder: 'Scegli una persona o un\'organizzazione',
@@ -3209,15 +3206,12 @@ export const it = {
             title: 'Panoramica',
             cards: {
                 workTitle: 'Attività per periodo · Prima i meno recenti',
-                deliveryFailed: 'Invio non riuscito',
-                readyForReview: 'Pronto per la verifica',
                 reviewInvoices: 'Verifica fatture',
                 viewPayments: 'Visualizza pagamenti',
                 reviewDelivery: 'Verifica invio',
                 verified: 'Verificato e completato',
                 details: 'Dettagli del periodo',
                 communityNotices: 'Avvisi della comunità',
-                upToDate: 'Tutto aggiornato',
                 noWork: 'Nessuna attività di fatturazione in sospeso',
                 overdue_one: '{{count}} fattura scaduta',
                 overdue_other: '{{count}} fatture scadute',
@@ -3369,9 +3363,6 @@ export const it = {
                     participantExpiring: '{{name}} termina il {{validTo}} — verifica le assegnazioni dei contatori',
                 },
             },
-            openInvoices: {
-                overdue: 'Scaduta',
-            },
             noInvoices: 'Nessuna fattura disponibile.',
             invoiceCol: {
                 invoice: 'Fattura',
@@ -3481,12 +3472,10 @@ export const it = {
             },
         },
         billingPeriods: {
-            status: { collecting: 'Raccolta dati', attention: 'Richiede attenzione', inProgress: 'In corso' },
             failed: 'Impossibile caricare i periodi di fatturazione.',
             currentTitle: 'Periodo di fatturazione corrente',
             collectingDescription: 'Questo periodo è ancora aperto. La preparazione diventa operativa dopo la sua conclusione.',
-            completedSummary_one: '{{count}} periodo completato',
-            completedSummary_other: '{{count}} periodi completati',
+            completedSummary: 'Periodi completati',
             openInvoices: 'Apri fatture',
         },
         billingEmails: {
@@ -4183,9 +4172,7 @@ export const it = {
             cancelEdit: 'Annulla modifica',
         },
         stats: {
-            total: 'Aliquote configurate',
             active: 'Attiva oggi',
-            scheduled: 'Modifiche pianificate',
             none: 'Nessuna',
         },
         table: {

@@ -11,6 +11,7 @@ import { soleCommunityName, personalInvoiceFilter } from '../lib/membership'
 import { PageHeader } from '../components/PageHeader'
 import { Notice } from '../components/Notice'
 import { CREDIT_STATUS_BADGE } from '../features/invoices/invoiceCredits'
+import { IssueText } from '../components/IssueText'
 
 /**
  * Participant's own invoices (`/me/invoices`, nav-regroup phase 2): a
@@ -86,9 +87,9 @@ export function MyInvoicesPage() {
                                             <InvoiceStatusBadge status={invoice.status} paidChf={invoice.paid_chf} />
                                             {invoice.needs_data_review && (
                                                 <div style={{ marginTop: '0.25rem' }}>
-                                                    <span className="badge badge-warning" title={t('pages.invoices.dataReview.issuedNotice', { count: invoice.open_data_impact_count ?? 0 })}>
+                                                    <IssueText tone="warning" title={t('pages.invoices.dataReview.issuedNotice', { count: invoice.open_data_impact_count ?? 0 })}>
                                                         {t('pages.invoices.dataReview.badge')}
-                                                    </span>
+                                                    </IssueText>
                                                 </div>
                                             )}
                                         </td>
@@ -103,7 +104,6 @@ export function MyInvoicesPage() {
                                                 </InvoiceLink>
                                                 <InvoicePdfCell
                                                     invoice={invoice}
-                                                    showReadyStatus={false}
                                                     keepExistingDuringPending
                                                     buttonClassName="button button-secondary"
                                                     ariaLabel={t('pages.myInvoices.openPdf', { number: invoice.invoice_number })}

@@ -9,6 +9,7 @@ import { formatChf, formatChfAmount } from '../lib/numbers'
 import type { Invoice } from '../types/api'
 import { amountDueChf, hasCreditApplied } from '../features/invoices/invoiceCredits'
 import { invoiceStatusBadgeClass, isPartlyPaid } from '../features/invoices/invoiceStatus'
+import { IssueText } from './IssueText'
 
 export function InvoiceLink({ invoice, from, period, children, className }: {
     invoice: Pick<Invoice, 'id' | 'invoice_number'>
@@ -65,10 +66,9 @@ export function InvoiceTotal({ invoice, currency = true }: {
 }
 
 /** Presentation only: callers decide whether PDF access is allowed and pass local pending state. */
-export function InvoicePdfCell({ invoice, pending = false, showReadyStatus = true, keepExistingDuringPending = false, buttonClassName = 'table-inline-link', ariaLabel }: {
+export function InvoicePdfCell({ invoice, pending = false, keepExistingDuringPending = false, buttonClassName = 'table-inline-link', ariaLabel }: {
     invoice: Invoice | null
     pending?: boolean
-    showReadyStatus?: boolean
     keepExistingDuringPending?: boolean
     buttonClassName?: string
     ariaLabel?: string
@@ -86,20 +86,15 @@ export function InvoicePdfCell({ invoice, pending = false, showReadyStatus = tru
     }
     if (invoice.pdf_status === 'failed' && !invoice.pdf_url) {
         return (
-            <span className="badge badge-danger" title={t('pages.invoices.pdfFailedHint')}>
-                {t('pages.invoices.pdfFailed')}
-            </span>
+            <IssueText title={t('pages.invoices.pdfFailedHint')}>{t('pages.invoices.pdfFailed')}</IssueText>
         )
     }
-    if (!invoice.pdf_url) return <span className="badge badge-neutral">{t('pages.invoices.pdfMissing')}</span>
+    if (!invoice.pdf_url) return <span className="muted">{t('pages.invoices.pdfMissing')}</span>
     return (
-        <div className="invoice-cell-stack">
-            <button type="button" onClick={() => void openInvoicePdf(invoice.id)} className={buttonClassName} aria-label={ariaLabel}>
-                <FontAwesomeIcon icon={faFilePdf} fixedWidth aria-hidden="true" />
-                {t('common.openPdf')}
-            </button>
-            {showReadyStatus && <span className="badge badge-success">{t('pages.invoices.pdfReady')}</span>}
-        </div>
+        <button type="button" onClick={() => void openInvoicePdf(invoice.id)} className={buttonClassName} aria-label={ariaLabel}>
+            <FontAwesomeIcon icon={faFilePdf} fixedWidth aria-hidden="true" />
+            {t('common.openPdf')}
+        </button>
     )
 }
 

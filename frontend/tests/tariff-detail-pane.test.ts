@@ -54,7 +54,7 @@ describe('TariffDetailPane', () => {
             'pages.tariffs.overview.current', 'pages.tariffs.overview.upcoming',
         ])
         const history = container.querySelector<HTMLDetailsElement>('.disclosure')!
-        expect(history.querySelector('summary')?.textContent).toBe('pages.tariffs.versions.history (1)')
+        expect(history.querySelector('summary')?.textContent).toBe('pages.tariffs.versions.history')
         expect(history.open).toBe(false)
         expect(cards).toHaveLength(2)
     })

@@ -63,7 +63,6 @@ export function ParticipantInvoicesCard({ invoices, isError, isRetrying, onRetry
                                             </InvoiceLink>
                                             <InvoicePdfCell
                                                 invoice={invoice}
-                                                showReadyStatus={false}
                                                 keepExistingDuringPending
                                                 buttonClassName="button button-secondary"
                                                 ariaLabel={t('pages.dashboard.openInvoicePdf', { number: invoice.invoice_number })}

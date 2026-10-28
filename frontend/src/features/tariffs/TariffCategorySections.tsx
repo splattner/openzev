@@ -1,6 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faChevronRight, faClock, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
+import { faChevronRight, faClock } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
+import { IssueText } from '../../components/IssueText'
 import { formatShortDate } from '../../lib/appSettings'
 import { todayBusinessIso } from '../../lib/dates'
 import type { AppSettings, Tariff, TariffSeries } from '../../types/api'
@@ -125,25 +126,19 @@ export function TariffCategorySections({
                                                 {series.name}
                                             </button>
                                             {series.gaps.length > 0 && (
-                                                <span className="badge badge-danger" title={t('pages.tariffs.versions.gapTooltip')}>
-                                                    <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />{' '}
+                                                <IssueText title={t('pages.tariffs.versions.gapTooltip')}>
                                                     {t('pages.tariffs.versions.gapBadge', { count: series.gaps.length })}
-                                                </span>
+                                                </IssueText>
                                             )}
                                             {hasUncoveredHours && (
-                                                <span className="badge badge-danger" title={t('pages.tariffs.coverage.badgeTooltip')}>
-                                                    <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />{' '}
+                                                <IssueText title={t('pages.tariffs.coverage.badgeTooltip')}>
                                                     {t('pages.tariffs.coverage.badge')}
-                                                </span>
+                                                </IssueText>
                                             )}
                                             {fetchFailed && (
-                                                <span
-                                                    className="badge badge-danger"
-                                                    title={t('pages.tariffs.dynamicFetchFailedTooltip', { error: dynamicSource.last_fetch_error })}
-                                                >
-                                                    <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />{' '}
+                                                <IssueText title={t('pages.tariffs.dynamicFetchFailedTooltip', { error: dynamicSource.last_fetch_error })}>
                                                     {t('pages.tariffs.dynamicFetchFailed')}
-                                                </span>
+                                                </IssueText>
                                             )}
                                         </div>
                                         {notes && <div className="tariff-table-notes" title={notes}>{notes}</div>}

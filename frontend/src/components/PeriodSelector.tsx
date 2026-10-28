@@ -7,7 +7,6 @@ import {
     faChevronDown,
     faChevronLeft,
     faChevronRight,
-    faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons'
 import { Popover } from '@mantine/core'
 import { DatePicker } from '@mantine/dates'
@@ -24,6 +23,7 @@ import {
     shiftBillingPeriod,
 } from '../lib/billingPeriod'
 import { quickRangeToDates, type QuickRangePreset } from '../lib/dateRangePresets'
+import { IssueText } from './IssueText'
 
 type PeriodRange = { from: string; to: string }
 
@@ -150,10 +150,7 @@ export function PeriodSelector({
             ) : compact ? (
                 // Whole periods are all this selector offers: anything else
                 // came from a link and is not one of the community's periods.
-                <span className="badge badge-warning">
-                    <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth aria-hidden="true" />
-                    {t('common.periodSelector.notBillingPeriod')}
-                </span>
+                <IssueText tone="warning">{t('common.periodSelector.notBillingPeriod')}</IssueText>
             ) : (
                 <span className="badge badge-info">{t('common.periodSelector.custom')}</span>
             )}

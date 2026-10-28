@@ -87,7 +87,7 @@ describe('compact period selector', () => {
         const { container } = mount('2026-09-03', '2026-09-30')
         expect(trigger(container).textContent).toContain('2026-09-03 → 2026-09-30')
         // Whole periods are all a compact selector offers: anything else is flagged.
-        expect(trigger(container).querySelector('.badge-warning')?.textContent).toContain('common.periodSelector.notBillingPeriod')
+        expect(trigger(container).querySelector('.issue-text--warning')?.textContent).toContain('common.periodSelector.notBillingPeriod')
         expect(trigger(container).textContent).not.toContain('common.periodSelector.custom')
         expect(trigger(container).title).toBe('')
     })

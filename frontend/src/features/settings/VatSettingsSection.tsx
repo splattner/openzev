@@ -51,11 +51,6 @@ export function VatSettingsSection() {
         [today, vatRates],
     )
 
-    const futureVatRatesCount = useMemo(
-        () => vatRates.filter((rate) => rate.valid_from > today).length,
-        [today, vatRates],
-    )
-
     const saveMutation = useMutation({
         mutationFn: ({ id, payload }: { id?: number; payload: VatRateInput }) => {
             if (id) return updateVatRate(id, payload)
@@ -104,13 +99,11 @@ export function VatSettingsSection() {
     return (
         <div className="page-stack">
             <section className="stat-grid">
-                <StatCard label={t('adminVatSettings.stats.total')} value={vatRates.length} />
                 <StatCard
                     label={t('adminVatSettings.stats.active')}
                     value={activeVatRate ? (Number(activeVatRate.rate) * 100).toFixed(2) : t('adminVatSettings.stats.none')}
                     unit={activeVatRate ? '%' : undefined}
                 />
-                <StatCard label={t('adminVatSettings.stats.scheduled')} value={futureVatRatesCount} />
             </section>
 
             <section className="card page-stack">

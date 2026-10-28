@@ -57,7 +57,6 @@ export function BillingPeriodsPage({ attentionQuery }: { attentionQuery?: Attent
                 </section>
             ) : loaded && completed.length > 0 && community.length === 0 ? (
                 <div className="card overview-caught-up">
-                    <span className="badge badge-success">{t('pages.overview.cards.upToDate')}</span>
                     <h3>{t('pages.overview.cards.noWork')}</h3>
                 </div>
             ) : null}
@@ -68,11 +67,10 @@ export function BillingPeriodsPage({ attentionQuery }: { attentionQuery?: Attent
                         <strong className="billing-current-period-range">{format(period.start)} – {format(period.end)}</strong>
                         <p className="muted">{t('pages.billingPeriods.collectingDescription')}</p>
                     </div>
-                    <span className="badge badge-info">{t('pages.billingPeriods.status.collecting')}</span>
                 </div>
             ))}
             {completed.length > 0 && alertsKnown && (
-                <Disclosure className="overview-period-details overview-period-history" summary={t('pages.billingPeriods.completedSummary', { count: completed.length })}>
+                <Disclosure className="overview-period-details overview-period-history" summary={t('pages.billingPeriods.completedSummary')}>
                     <ul>{[...completed].reverse().map(({ period }) => (
                         <li key={periodKey(period)}>
                             <span className="overview-history-range">{format(period.start)} – {format(period.end)}</span>

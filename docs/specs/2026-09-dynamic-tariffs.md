@@ -741,7 +741,7 @@ positive coverage and maintenance-link permissions.
   `reference_to`, the window the average covers, which ends today and is not
   the version's validity shown in the Valid column;
   the pane shows the source label with it (`priceSummary`). When the source's `last_fetch_status` is `failed`, a
-  danger "Price fetch failed" badge (`pages.tariffs.dynamicFetchFailed`)
+  red "Price fetch failed" issue text (`pages.tariffs.dynamicFetchFailed`, `IssueText`)
   appears beside the name in both, with the fetch error as its tooltip.
   Its representative number and percentage-of-grid display use the API's
   bounded summary; partial and unavailable data are labelled instead of shown

@@ -49,8 +49,8 @@ describe('shared invoice presentation', () => {
         ['pending', null, 'pages.invoices.pdfGenerating'],
         ['failed', null, 'pages.invoices.pdfFailed'],
         ['none', null, 'pages.invoices.pdfMissing'],
-        ['ready', '/stored.pdf', 'pages.invoices.pdfReady'],
-        ['failed', '/stored.pdf', 'pages.invoices.pdfReady'],
+        ['ready', '/stored.pdf', 'common.openPdf'],
+        ['failed', '/stored.pdf', 'common.openPdf'],
     ] as const)('preserves PDF state %s with stored file %s', async (status, url, label) => {
         const { container } = await mount(createElement(InvoicePdfCell, { invoice: { ...invoice, pdf_status: status, pdf_url: url } }))
         expect(container.textContent).toContain(label)

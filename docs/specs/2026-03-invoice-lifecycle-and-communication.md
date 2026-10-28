@@ -1285,8 +1285,8 @@ when readiness is unavailable, and history/caught-up claims are suppressed
 while attention is loading or failed.
 
 Each open period renders a `BillingPeriodCard`: localized month or month range,
-year, exact formatted date range, semantic status, localized next-step detail,
-visible overdue/delivery-failure counts, a text-only workflow link, and collapsed
+year, exact formatted date range, localized next-step detail, visible
+overdue/delivery-failure counts (as issue text, ui-patterns §10.1), a text-only workflow link, and collapsed
 period details. The backend `next_action` selects its matching warn/todo step;
 its link is used unchanged. Without that link, the card opens an alert's link
 or the exact-date invoice overview. Approval is labelled **Review invoices**
@@ -1294,20 +1294,22 @@ because approval still happens in Billing. Other readiness warnings remain
 visible with their resolution links. Delivery-failure counts use the maximum
 of readiness and attention counts, not their sum. Expanded details retain
 other steps and group alerts by invoice ID, so one invoice with two issues has
-one detail row. Pending detail steps appear first with explicit status badges;
+one detail row. Pending detail steps appear first, a step that needs attention in red issue text rather than a status badge;
 both their titles and explicit open actions link to the relevant workflow, even
 when multiple steps share a destination. OK/done steps share a compact vertical checklist under
 **Checked and complete**, without repeated status or detail sentences. No backend English `detail` or `label` is rendered.
 
 Running periods (`ended: false`) never expose readiness actions or warnings.
-They appear below open cards as **Collecting data**; a real invoice alert can
+They appear below open cards as a **Current billing period** card that says in words that the period is still open, with no status badge; a real invoice alert can
 instead place that period in the work grid, without exposing its readiness
 steps. Omitted `ended` remains compatible with older responses (treated as
 ended). Completed periods are collapsed into newest-first rows with exact
 dates and an explicit **Open invoices** button placed directly after the period;
 rows do not repeat the completed status. With completed periods, no open work, no community notices and both
-queries successful, an **Up to date** message is shown. First-run and waiting
+queries successful, a **No billing work needs attention** message is shown, again without a badge. First-run and waiting
 states remain owned by the setup component.
+
+Completed periods sit under a **Completed periods** disclosure without a count.
 
 The complete primary-work area reserves two text lines so card actions align
 whether it contains one wrapping message or two short messages. The card grid uses three columns, two at viewport widths ≤1150px, and one at
@@ -1582,7 +1584,8 @@ visibility, restored access, and strict selection with a second membership.
   up to 28rem, progress and actions stack. The amount column header names CHF;
   cards show the currency next to the amount.
 - Role-aware home routing, invoices-first Billing tabs, compatibility redirects,
-  cockpit compaction and running-period **Collecting data** behavior remain.
+  cockpit compaction and the running-period card (no readiness actions) remain.
+- Billing rows keep the five progress icons; in the card layout (≤46rem) the next open or running step is also shown as visible text beside them (`InvoiceRowProgress`, `.invoice-progress-next`), since a card has room for words and no legend to decode. Problems already read as red text under the name, so they are not repeated. The PDF cell shows only a failed PDF (issue text) or a missing one (muted text), never a green "ready" mark, and the email-delivery column marks only a failed send (issue text) or a running one (info badge).
 - Template field definitions come from the backend catalogs. `frontend/src/lib/emailTemplateFields.ts` owns only `EMAIL_TEMPLATE_KEYS`/`EmailTemplateKey`, the four-key frontend route contract. `frontend/src/components/FieldReference.tsx` is shared by `ZevEmailTemplateFields`, `AdminEmailTemplatesPage`, and `AdminPdfTemplatesPage`; it renders API-provided groups (without the backend-only `sample_path`), examples, search, usage badges, and click-to-insert behavior. Insertion calculates state changes and restores the caret after controlled React updates rather than writing `element.value` directly. `frontend/tests/templates-hub.test.ts` covers the seven-tab hub and cross-category routing; `field-reference.test.ts`, `email-template-parity.test.ts`, and `dead-i18n-keys.test.ts` pin token helpers, syntax-aware counting, key/tab parity, backend description-key translations, and catalog-key reachability.
 - Annual-statement export card (admin/owner): prepare → poll → download with partial, failed and expired states. Polling stops on ZEV/year switch, and a create response that resolves after the user switched ZEV/year is discarded (the old selection's job is never shown under the new one); a failed job shows the backend's safe `error_message` when there is one; a single transient poll error is tolerated (only consecutive errors or a long wall-clock backstop end the poll); a failed download surfaces an error instead of crashing; an in-flight or completed export is restored after a reload (`AnnualStatementsExportCard`)
 - PDF tests: `use-pdf-object-url.test.ts` covers replacement, abort, failure, and cleanup; `participant-documents.test.ts` covers tabs, year and user changes, retries, and blob reuse. `pdf-preview.test.ts`, `api-reports.test.ts`, and `invoice-pdf-preview.test.ts` cover the shared viewer and API calls. Manager and export flows remain in `reports-page.test.ts` and `annual-statements-export.test.ts`.

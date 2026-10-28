@@ -15,6 +15,7 @@ import { useManagedZev } from '../lib/managedZev'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
 import type { EmailLog, Invoice } from '../types/api'
+import { IssueText } from '../components/IssueText'
 
 /** Cross-period email delivery state and its canonical delivery history. */
 
@@ -23,15 +24,18 @@ type RetryRequest = { invoice: Invoice; emailLogId: string }
 
 const FILTERABLE: EmailFilter[] = ['all', 'failed', 'pending', 'sent']
 
-function hasEmailStatus(invoice: Invoice): boolean {
-    return invoice.status === 'approved' || invoice.status === 'sent' || invoice.status === 'paid'
+/** A failed delivery is a problem and a running one is work; a delivered email needs no mark. */
+function EmailStatus({ status }: { status: string | null | undefined }) {
+    const { t } = useTranslation()
+    if (!status) return <span className="muted">{t('pages.billingEmails.noEmailYet')}</span>
+    const label = t(`pages.invoices.emailLogs.status.${status}`)
+    if (status === 'failed') return <IssueText>{label}</IssueText>
+    if (status === 'pending') return <span className="badge badge-info">{label}</span>
+    return <span>{label}</span>
 }
 
-function badgeFor(status: string | null | undefined): string {
-    if (status === 'failed') return 'badge badge-danger'
-    if (status === 'sent') return 'badge badge-success'
-    if (status === 'pending') return 'badge badge-info'
-    return 'badge badge-neutral'
+function hasEmailStatus(invoice: Invoice): boolean {
+    return invoice.status === 'approved' || invoice.status === 'sent' || invoice.status === 'paid'
 }
 
 export function BillingEmailsPage() {
@@ -176,11 +180,7 @@ function BillingEmailsContent() {
                                     </td>
                                     <td>{invoice.participant_name}</td>
                                     <td>
-                                        <span className={badgeFor(invoice.last_email_status)}>
-                                            {invoice.last_email_status
-                                                ? t(`pages.invoices.emailLogs.status.${invoice.last_email_status}`)
-                                                : t('pages.billingEmails.noEmailYet')}
-                                        </span>
+                                        <EmailStatus status={invoice.last_email_status} />
                                     </td>
                                     <td>
                                         <div className="actions-row actions-row-wrap">

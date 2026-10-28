@@ -431,7 +431,7 @@ The admin console is organized into four hubs with routed sections; legacy URLs 
 |---|---|---|
 | `/admin` | `AdminOverviewHubPage` | Overview hub (default tab `overview`) |
 | `/admin/overview` | `AdminOverviewHubPage tab="overview"` | KPIs dashboard (embedded `AdminDashboardPage`, see §9.3) |
-| `/admin/zevs` | `AdminOverviewHubPage tab="zevs"` | ZEV list (embedded `ZevListPage`; “Missing or invalid IBAN” badge when `bank_iban` is missing or invalid — IBAN status only, not overall setup or period readiness) |
+| `/admin/zevs` | `AdminOverviewHubPage tab="zevs"` | ZEV list (embedded `ZevListPage`; “Missing or invalid IBAN” issue text (`IssueText`, no capsule) when `bank_iban` is missing or invalid — IBAN status only, not overall setup or period readiness) |
 | `/admin/invoices` | `AdminOverviewHubPage tab="invoices"` | All invoices (embedded `AdminInvoicesContent`) |
 | `/admin/dynamic-sources` | `AdminOverviewHubPage tab="dynamic-sources"` | Global dynamic price-source health and operations (`AdminDynamicSourcesPanel`; see the dynamic-tariff spec §10) |
 | `/admin/audit` | `AdminOverviewHubPage tab="audit"` | Platform audit log (embedded `AuditLogsPage scope="admin"`) |

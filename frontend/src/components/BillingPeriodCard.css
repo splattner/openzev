@@ -47,6 +47,14 @@
   line-height: 1.35;
 }
 
+.overview-period-issue {
+  color: var(--danger-700);
+}
+
+.overview-period-issue a {
+  color: inherit;
+}
+
 .overview-period-warning {
   font-size: 0.8rem;
   margin: 0;

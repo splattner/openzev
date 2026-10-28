@@ -1512,7 +1512,6 @@ export const en = {
             markedSent: 'Invoice marked as sent.',
             markPaid: 'Mark Paid',
             markRestPaid: 'Mark rest as paid',
-            pdfReady: 'Ready',
             pdfMissing: 'PDF missing',
             pdfGenerating: 'Generating\u2026',
             pdfFailed: 'Failed',
@@ -2248,7 +2247,7 @@ export const en = {
             confirmLabel: 'Type “{{label}}” exactly to confirm',
             columns: { source: 'Source', status: 'Status', lastFetch: 'Last fetch', points: 'Points', reuse: 'Platform usage' },
             status: { pending: 'Not fetched', ok: 'Healthy', failed: 'Failed', disabled: 'Disabled' },
-            stats: { sources: 'Sources', points: 'Stored points', reused: 'Shared sources', failed: 'Failed sources' },
+            stats: { failed: 'Failed sources' },
             actions: { fetch: 'Fetch', manage: 'Manage' },
             versions: { auto: 'Detect automatically', v1_0_5: 'v1.0.5', v2_0_0: 'v2.0.0', bfe_rmp: 'BFE reference market price' },
             types: {
@@ -2391,8 +2390,6 @@ export const en = {
                 egidHint: 'Federal building ID, optional.',
                 egidInvalid: 'The EGID is a whole number of up to 9 digits.',
                 egidBadge: 'EGID {{egid}}',
-                meteringPoints_one: '{{count}} metering point',
-                meteringPoints_other: '{{count}} metering points',
                 landowners: 'Landowners: {{names}}',
                 copyFromParticipant: 'Copy address from participant',
                 copyFromParticipantPlaceholder: 'Choose a person or organisation',
@@ -3220,15 +3217,12 @@ export const en = {
             title: 'Overview',
             cards: {
                 workTitle: 'Work by period · Oldest first',
-                deliveryFailed: 'Delivery failed',
-                readyForReview: 'Ready for review',
                 reviewInvoices: 'Review invoices',
                 viewPayments: 'View payments',
                 reviewDelivery: 'Review delivery',
                 verified: 'Checked and complete',
                 details: 'Period details',
                 communityNotices: 'Community notices',
-                upToDate: 'Up to date',
                 noWork: 'No billing work needs attention',
                 overdue_one: '{{count}} overdue invoice',
                 overdue_other: '{{count}} overdue invoices',
@@ -3380,9 +3374,6 @@ export const en = {
                     participantExpiring: '{{name}} ends {{validTo}} — check meter assignments',
                 },
             },
-            openInvoices: {
-                overdue: 'Overdue',
-            },
             noInvoices: 'No invoices available.',
             invoiceCol: {
                 invoice: 'Invoice',
@@ -3492,12 +3483,10 @@ export const en = {
             },
         },
         billingPeriods: {
-            status: { collecting: 'Collecting data', attention: 'Needs attention', inProgress: 'In progress' },
             failed: 'Failed to load billing periods.',
             currentTitle: 'Current billing period',
             collectingDescription: 'This period is still open. Readiness becomes actionable after it ends.',
-            completedSummary_one: '{{count}} completed period',
-            completedSummary_other: '{{count}} completed periods',
+            completedSummary: 'Completed periods',
             openInvoices: 'Open invoices',
         },
         billingEmails: {
@@ -4194,9 +4183,7 @@ export const en = {
             cancelEdit: 'Cancel edit',
         },
         stats: {
-            total: 'Configured rates',
             active: 'Active today',
-            scheduled: 'Scheduled changes',
             none: 'None',
         },
         table: {

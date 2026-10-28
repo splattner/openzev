@@ -82,7 +82,7 @@ async function mount(component: typeof BillingEmailsPage | typeof InvoicesPage |
 }
 
 describe('Billing hub interactions', () => {
-    it('distinguishes period status from the next action and links to the blocking workflow', async () => {
+    it('says what is wrong as text and links to the blocking workflow, without a status pill', async () => {
         const destination = '/metering/quality?period_start=2025-02-01&period_end=2025-02-28'
         api.readiness.mockResolvedValue([{
             period: { start: '2025-02-01', end: '2025-02-28' }, next_action: 'fix_metering',
@@ -90,7 +90,7 @@ describe('Billing hub interactions', () => {
         }])
         const { container } = await mount(BillingPeriodsPage, '/billing/periods')
         expect(api.readiness).toHaveBeenCalledWith('z1')
-        expect(container.querySelector('.overview-period-card')?.textContent).toContain('pages.billingPeriods.status.attention')
+        expect(container.querySelector('.overview-period-card .badge')).toBeNull()
         expect(container.querySelector('a')?.getAttribute('href')).toBe(destination)
         expect(container.querySelector('a')?.textContent).toBe('pages.dashboard.cockpit.nextActionLabels.fix_metering')
     })
@@ -232,7 +232,7 @@ describe('Billing hub interactions', () => {
         expect(container.textContent).toContain('pages.dashboard.cockpit.stepDetails.conflictsWarn')
     })
 
-    it('shows the running period as collecting data, never as needing attention', async () => {
+    it('describes the running period in words, never as needing attention', async () => {
         api.readiness.mockResolvedValue([{
             period: { start: '2026-09-01', end: '2026-09-30', interval: 'monthly', source: 'calendar', ended: false },
             next_action: 'fix_metering',
@@ -240,8 +240,8 @@ describe('Billing hub interactions', () => {
         }])
         const { container } = await mount(BillingPeriodsPage, '/billing/periods')
         const current = container.querySelector('.billing-current-period')
-        expect(current?.textContent).toContain('pages.billingPeriods.status.collecting')
-        expect(current?.textContent).not.toContain('pages.billingPeriods.status.attention')
+        expect(current?.textContent).toContain('pages.billingPeriods.collectingDescription')
+        expect(current?.querySelector('.badge')).toBeNull()
         expect(container.querySelector('tbody')).toBeNull()
     })
 })

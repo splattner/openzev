@@ -175,7 +175,7 @@ describe('invoices page filters', () => {
     it('shows a linked range that is no billing period, but creates no invoice for it', async () => {
         const { container } = await render('/billing/invoices?period_start=2026-02-03&period_end=2026-02-20')
         expect(container.textContent).toContain('pages.invoices.unalignedPeriod.notice')
-        expect(container.querySelector('.period-selector .badge-warning')?.textContent).toContain('common.periodSelector.notBillingPeriod')
+        expect(container.querySelector('.period-selector .issue-text--warning')?.textContent).toContain('common.periodSelector.notBillingPeriod')
         // Nothing generates here: not the batch, not the row.
         expect(batchButton(container)?.textContent).toContain('pages.invoices.batch.approveAllCount')
         expect(container.textContent).not.toContain('pages.invoices.batch.generateAllCount')
