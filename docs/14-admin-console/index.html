@@ -2687,7 +2687,12 @@ text. Events are read-only.
 If the list is rate-limited, wait for the indicated time before retrying; see
 <a href="../16-api-keys/#rate-limits">rate limits</a>.
 Open an event by clicking its summary or focusing it and pressing
-<strong>Enter</strong> or <strong>Space</strong>.</p>
+<strong>Enter</strong> or <strong>Space</strong>. Its details (time, status, category, action, actor,
+target, request and event IDs, reason, the field changes and metadata) appear in
+a panel beside the log. On a wide window the log stays visible next to the panel,
+showing only the columns that identify a row, and clicking another row swaps the
+details in place, so you can step through events. On a narrower window the panel
+replaces the log until you close it with <strong>×</strong> or <strong>Esc</strong>.</p>
 <p>The quickest way in is from the account itself: <strong>View activity</strong> on a row
 under <strong>Platform → Accounts → Users</strong> opens the audit log already filtered to
 what that account has done.</p>
