@@ -93,8 +93,8 @@ export function TariffPeriodForm({
   const draft = { id: initialPeriod?.id, period_type: periodType, label: '', price_chf_per_kwh: price || null, percentage: percentage || null, time_from: timeFrom || null, time_to: timeTo || null, weekdays, months }
   const siblings = periods.filter((period) => period.tariff === owner?.id && period.id !== initialPeriod?.id)
   const versionBands = [...siblings, draft]
-  // A timed band without its hours yet says nothing about coverage.
-  const draftComplete = periodType === 'flat' || Boolean(timeFrom && timeTo)
+  // Both times, or neither (a band for all other hours): one time alone says nothing about coverage.
+  const draftComplete = periodType === 'flat' || Boolean(timeFrom) === Boolean(timeTo)
 
   const errors = form.formState.errors
   const fieldError = (field: 'price_chf_per_kwh' | 'percentage') => errors[field]
@@ -143,6 +143,8 @@ export function TariffPeriodForm({
         <label>
           <span>{t('pages.tariffs.form.timeTo')}</span>
           <input type="time" {...form.register('time_to')} />
+          {periodType !== 'flat' && <small className="muted">{t('pages.tariffs.form.timeWindowHint')}</small>}
+          {(errors.time_from || errors.time_to) && <small className="field-error" role="alert">{t('pages.tariffs.form.errorTimeWindow')}</small>}
         </label>
         <RecurrenceChips
           label={t('pages.tariffs.form.weekdays')}

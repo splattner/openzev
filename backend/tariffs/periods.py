@@ -119,6 +119,17 @@ def in_window(t, start, end) -> bool:
     return t >= start or t < end
 
 
+def has_window(period) -> bool:
+    """Whether the band names both ends of an hour window."""
+    return bool(period.time_from and period.time_to)
+
+
+def is_catch_all(period) -> bool:
+    """A non-flat band without a window: it prices every hour its months and
+    weekdays leave to the windowed bands ("all other hours")."""
+    return period.period_type != _FLAT_PERIOD_TYPE and not has_window(period)
+
+
 def resolve_band(periods, ts: datetime):
     """The band among ``periods`` that prices a tariff at ``ts``, or ``None``.
 
@@ -131,6 +142,11 @@ def resolve_band(periods, ts: datetime):
     Months, weekdays and hours describe the Swiss wall clock, so an aware
     ``ts`` (what the ORM returns, in UTC) is read in the business timezone
     first (ADR 0026). A naive ``ts`` is taken as a wall clock already.
+
+    Resolution order within the season: a flat band; else the first windowed
+    band matching weekday and hour; else the season's catch-all band (a
+    non-flat band without a window) whose weekdays include the day; else, for
+    tariffs without one, the season's first band.
     """
     ts = wall_clock(ts)
     periods = list(periods)
@@ -149,12 +165,17 @@ def resolve_band(periods, ts: datetime):
     for period in in_season:
         if period.period_type == _FLAT_PERIOD_TYPE:
             return period
-        if period.time_from and period.time_to:
+        if has_window(period):
             if weekday in weekdays_of(period) and in_window(t_time, period.time_from, period.time_to):
                 return period
 
-    # Nothing matched the hour: the day's first band in this season, else the
-    # tariff's first band overall.
+    # No window matched: the band without one prices the remaining hours.
+    for period in in_season:
+        if is_catch_all(period) and weekday in weekdays_of(period):
+            return period
+
+    # Nothing matched the hour and there is no catch-all: the season's first
+    # band, else the tariff's first band overall.
     return (in_season or periods)[0]
 
 

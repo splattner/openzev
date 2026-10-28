@@ -5,7 +5,7 @@ from .dynamic.adapters import DynamicApiVersion
 from .dynamic.models import DynamicTariffSource
 from .dynamic.services import tariff_has_dynamic_billing_evidence
 from .models import BillingMode, EnergyType, PeriodType, Tariff, TariffPeriod
-from .periods import months_of
+from .periods import has_window, is_catch_all, months_of, weekdays_of
 
 
 class TariffPeriodSerializer(serializers.ModelSerializer):
@@ -43,6 +43,53 @@ class TariffPeriodSerializer(serializers.ModelSerializer):
                     )
                 })
 
+    def _reject_ambiguous_catch_all(self, tariff, attrs):
+        """A band takes both times or neither, and only one may take neither.
+
+        A band without a window prices every hour the windowed bands of its
+        months leave open (``periods.resolve_band``), so two of them on the
+        same month and weekday would be ambiguous.
+        """
+        def current(name, default=None):
+            return attrs.get(name, getattr(self.instance, name, default))
+
+        candidate = TariffPeriod(
+            period_type=current("period_type", PeriodType.FLAT),
+            months=current("months", ""),
+            weekdays=current("weekdays", ""),
+            time_from=current("time_from"),
+            time_to=current("time_to"),
+        )
+        if candidate.period_type == PeriodType.FLAT:
+            return
+        if (candidate.time_from is None) != (candidate.time_to is None):
+            missing = "time_to" if candidate.time_to is None else "time_from"
+            raise serializers.ValidationError({
+                missing: (
+                    "A band takes both a start and an end time, or neither: "
+                    "without times it prices all other hours."
+                )
+            })
+        if has_window(candidate) or not is_catch_all(candidate):
+            return
+
+        siblings = tariff.periods.all()
+        if self.instance is not None:
+            siblings = siblings.exclude(pk=self.instance.pk)
+        for sibling in siblings:
+            if not is_catch_all(sibling):
+                continue
+            shared = months_of(candidate) & months_of(sibling)
+            if shared and weekdays_of(candidate) & weekdays_of(sibling):
+                raise serializers.ValidationError({
+                    "time_from": (
+                        "Only one band without a time window can apply in months "
+                        f"{','.join(str(month) for month in sorted(shared))}: it prices all "
+                        "hours the other bands leave open. Give one of them a time "
+                        "window or different months."
+                    )
+                })
+
     def validate(self, attrs):
         tariff = attrs.get("tariff") or getattr(self.instance, "tariff", None)
         if tariff is not None and getattr(tariff, "dynamic_source_id", None):
@@ -51,6 +98,7 @@ class TariffPeriodSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Tariff periods are only supported for energy-based tariffs.")
         if tariff:
             self._reject_flat_beside_timed_bands(tariff, attrs)
+            self._reject_ambiguous_catch_all(tariff, attrs)
             # The §4.1 per-mode rules (a price band needs a price and no
             # percentage, a percentage band the reverse) live on
             # TariffPeriod.clean(); running it here turns them into field

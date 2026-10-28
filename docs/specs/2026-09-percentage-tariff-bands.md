@@ -56,7 +56,7 @@ tariffs bill exactly as before.
 ### Out of scope
 
 - The Art. 16 EnV price ceiling and how it interacts with a higher evening percentage (#690).
-- New overlap or gap validation between timed bands. Percentage bands follow the energy-band rules exactly, including the "first band of the season" fallback for unpriced hours (§5.1). A stricter coverage check would apply to both tariff kinds and belongs in its own change.
+- New overlap or gap validation between timed bands. Percentage bands follow the energy-band rules exactly, including the catch-all band (a non-flat band without a time window prices all other hours, #1109) and the "first band of the season" fallback for unpriced hours when there is none (§5.1). A stricter coverage check would apply to both tariff kinds and belongs in its own change.
 - Aligning grid bands and percentage bands in time for the *representative* (document/display) price. The representative grid base stays a single value (`display_grid_base_summary`), and each percentage band is multiplied by it.
 - VSE/AES import (it never creates percentage tariffs).
 - Changing already issued invoices. `InvoiceItem` stores values, not references.

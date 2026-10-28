@@ -10,6 +10,27 @@ const low = (extra: Partial<CoverageBand> = {}): CoverageBand => ({ period_type:
 const HOUR = 3600
 
 describe('bandCoverage', () => {
+    it('lets a band without a window price every hour the windowed bands leave open', () => {
+        const coverage = bandCoverage([high({ weekdays: '0,1,2,3,4' }), low({ time_from: null, time_to: null })])
+        expect(coverage.uncovered).toBe(false)
+        expect(coverage.gaps).toEqual([])
+        expect(coverage.fallbacks).toEqual([])
+        expect(coverage.overlaps).toBe(false)
+    })
+
+    it('leaves the other days as gaps when the catch-all is restricted to some weekdays', () => {
+        const coverage = bandCoverage([high({ weekdays: '0,1,2,3,4' }), low({ time_from: null, time_to: null, weekdays: '5,6' })])
+        expect(coverage.gaps).toHaveLength(2)
+        expect(coverage.gaps.map(({ start, end }) => [start / HOUR, end / HOUR])).toEqual([[0, 7], [21, 24]])
+        expect(coverage.gaps.every((gap) => gap.weekdays.join() === '0,1,2,3,4')).toBe(true)
+    })
+
+    it('reports two catch-alls on the same month and day as an overlap', () => {
+        const rest = (extra: Partial<CoverageBand> = {}) => low({ time_from: null, time_to: null, ...extra })
+        expect(bandCoverage([high(), rest(), rest({ period_type: 'band' })]).overlaps).toBe(true)
+        expect(bandCoverage([high(), rest({ months: '1,2' }), rest({ period_type: 'band', months: '3' })]).overlaps).toBe(false)
+    })
+
     it('finds nothing wrong with a flat band, or with high and low that complete the day', () => {
         expect(bandCoverage([flat()]).uncovered).toBe(false)
         const both = bandCoverage([high(), low()])
@@ -57,10 +78,11 @@ describe('bandCoverage', () => {
         expect(bandCoverage([high(), high({ id: 'b', time_from: '12:00:00', time_to: '14:00:00' }), low()]).overlaps).toBe(true)
     })
 
-    it('treats a timed band without both ends as matching nothing', () => {
+    it('treats a band with only one end like the engine does: as a band without a window', () => {
+        // high loses its window and prices what low (21:00-07:00) leaves open.
         const coverage = bandCoverage([high({ time_to: null }), low()])
-        expect(coverage.uncovered).toBe(true)
-        expect(coverage.gaps[0]).toMatchObject({ start: 7 * HOUR, end: 21 * HOUR })
+        expect(coverage.uncovered).toBe(false)
+        expect(coverage.overlaps).toBe(false)
     })
 
     it('only checks the weekdays and months a short version can meet', () => {

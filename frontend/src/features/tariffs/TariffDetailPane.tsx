@@ -340,7 +340,7 @@ export function TariffDetailPane({
                                                 <div className="muted tariff-period-meta">
                                                     {period.period_type === 'flat'
                                                         ? `${t('pages.tariffs.allDay')} · ${t('pages.tariffs.allWeekdays')}`
-                                                        : `${period.time_from || '--'} - ${period.time_to || '--'} · ${period.weekdays || t('pages.tariffs.allWeekdays')}`}
+                                                        : `${period.time_from && period.time_to ? `${period.time_from} - ${period.time_to}` : t('pages.tariffs.rateCard.allOtherHours')} · ${period.weekdays || t('pages.tariffs.allWeekdays')}`}
                                                     {/* Without the season a winter price reads as the
                                                         whole year's price. */}
                                                     {formatSeason(period.months, monthNames) && ` · ${formatSeason(period.months, monthNames)}`}

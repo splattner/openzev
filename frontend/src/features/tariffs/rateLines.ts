@@ -12,8 +12,9 @@ export type RateLineTranslate = (key: string, opts?: Record<string, unknown>) =>
 export const kwhPrice = new Intl.NumberFormat('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 5, useGrouping: false })
 
 /** When a band applies, as the tariff overview PDF names it:
- * `High (HT) Mon–Fri, 07:00–21:00`. Missing non-flat windows are
- * unconfigured, not complementary coverage. */
+ * `High (HT) Mon–Fri, 07:00–21:00`. A non-flat band without a window prices
+ * every hour the others leave open, so it reads `Low (NT) all other hours`;
+ * an unnamed time band is called "all other hours" outright. */
 export function formatBandApplies(
     period: TariffVersion['periods'][number],
     t: RateLineTranslate,
@@ -21,12 +22,17 @@ export function formatBandApplies(
     monthNames: string[],
 ): string {
     const window = bandWindow(period)
-    const name = bandName(period, t(`pages.tariffs.periodTypes.${period.period_type}`, { defaultValue: period.period_type }))
+    const catchAll = period.period_type !== 'flat' && !window
+    const allOtherHours = t('pages.tariffs.rateCard.allOtherHours')
+    const unnamedCatchAll = catchAll && period.period_type === 'band' && !period.label
+    const name = unnamedCatchAll
+        ? allOtherHours
+        : bandName(period, t(`pages.tariffs.periodTypes.${period.period_type}`, { defaultValue: period.period_type }))
     const when = [
         formatWeekdays(period.weekdays, dayNames),
         name === window ? null : window,
         formatSeason(period.months, monthNames),
-        period.period_type !== 'flat' && !window && t('pages.tariffs.rateCard.noTimeWindow'),
+        catchAll && !unnamedCatchAll && allOtherHours,
     ].filter(Boolean).join(', ')
     if (period.period_type === 'flat' && !when) return t('pages.tariffs.rateCard.allHours')
     return `${name} ${when}`.trim()

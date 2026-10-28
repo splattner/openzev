@@ -191,7 +191,7 @@ Only what this spec's own algorithm needs to know:
 | `label` | `CharField(60)` | Name for a `band`; blank falls back to its window. Unused by the other types |
 | `price_chf_per_kwh` | `Decimal(8,5)` (nullable) | Price in CHF per kWh. Required on a band of an `energy` tariff, and must be null on a `percentage_of_energy` tariff |
 | `percentage` | `Decimal(5,2)` (nullable) | Percentage of the grid base price, for a band of a `percentage_of_energy` tariff (see SPEC-2026-percentage-tariff-bands). Required there, and must be null on an `energy` tariff |
-| `time_from` | `TimeField` (nullable) | Start of the window (required for every type but `flat`) |
+| `time_from` | `TimeField` (nullable) | Start of the window. Both times or neither on a non-flat band; neither makes it the catch-all "all other hours" band (matching rule 4) |
 | `time_to` | `TimeField` (nullable) | End of the window (exclusive). An end not after `time_from` wraps past midnight (see matching rule 3) |
 | `weekdays` | `CharField(20)` | Comma-separated weekday numbers `0`–`6` (Mon–Sun); blank = all days |
 | `months` | `CharField(40)` | Comma-separated month numbers `1`–`12`; blank = all months |
@@ -228,8 +228,9 @@ on the spring day there is no 02:xx reading.
    mask matches every month, so every period predating seasonal support
    qualifies unchanged.
 2. Among those, if a `flat` period exists → use its price; ignore time/weekday.
-3. For every other period: extract the timestamp's **time** and **weekday**.
-   Match periods where the time is in the window (`tariffs.periods.in_window`)
+3. For every other period that **has a window** (both `time_from` and
+   `time_to`; `tariffs.periods.has_window`): extract the timestamp's **time** and
+   **weekday**. Match periods where the time is in the window (`tariffs.periods.in_window`)
    and weekday ∈ allowed weekdays. A window with `time_from < time_to` matches
    `time_from ≤ time < time_to`. Otherwise it **wraps past midnight** and
    matches `time ≥ time_from or time < time_to`: `22:00–06:00` is the night,
@@ -237,13 +238,35 @@ on the spring day there is no 02:xx reading.
    and equal ends cover the whole day. The weekday is always the timestamp's
    own, so a weekday-only `22:00–06:00` band covers Friday 22:00–24:00 and
    Friday 00:00–06:00, not Saturday morning. Before #837 such windows matched
-   nothing and silently fell through to step 4.
+   nothing and silently fell through to the fallback.
    The number of such periods is irrelevant — a band is matched by its window,
    never by its name, so three or five resolve exactly as two do.
-4. **Fallback:** when no period matches the hour, the day's **first band in this
-   season** — `periods[0]` under the ordering above, which is the earliest
+4. **Catch-all band ("all other hours", #1109):** when no windowed period
+   matches, the season's **catch-all** prices the hour — a non-flat period
+   (`high`, `low` or `band`) without a complete window
+   (`tariffs.periods.is_catch_all`: `time_from` or `time_to` is null) whose
+   `weekdays` (blank = all) include the timestamp's weekday. "HT Mon–Fri
+   07:00–21:00, NT the rest" is therefore an HT band with a window and an NT
+   band with none.
+5. **Fallback:** when there is no catch-all either, the day's **first band in
+   this season** — `periods[0]` under the ordering above, which is the earliest
    window. Preferring an in-season band matters once seasons exist: billing a
-   January night at the summer rate would be the worse guess.
+   January night at the summer rate would be the worse guess. A tariff without
+   a catch-all band prices exactly as before step 4 existed.
+
+Validation (`TariffPeriodSerializer._reject_ambiguous_catch_all`): a non-flat
+band takes **both times or neither** (a single time is a field error on the
+missing one; flat bands are left as they were), and **at most one catch-all may
+apply per month and weekday** — a second one sharing at least one month and one
+weekday with a sibling catch-all of the same tariff is rejected on `time_from`,
+naming the shared months. `_reject_flat_beside_timed_bands` is unchanged and
+counts a catch-all as timed. No model constraint is added; bands written by the
+VSE import and the transfer archive are not re-validated. Contracts, the tariff
+overview and band-itemised invoices name such a band "all other hours"
+(`band_labels.band_window` / `band_recurrence`, key `tariff_other_hours` in
+`CONTRACT_TRANSLATIONS`); an unlabelled `band` catch-all is named that way once.
+`resolve_band` is shared with percentage bands and `average_percentage`, which
+therefore get the catch-all too.
 
 The month check comes **first, before the flat short-circuit**. A winter-only
 flat band that short-circuited on `period_type` would bill its winter price in
@@ -302,7 +325,8 @@ Consumers:
   label is cleared when the type is switched away from `band`, so one left
   behind cannot surface on a contract under a name nothing set.
 
-Remaining gap: nothing enforces that a tariff's bands cover the whole day. The
+Remaining gap: nothing enforces that a tariff's bands cover the whole day (a
+catch-all band covers it without enforcement). The
 fallback above is deterministic and stated rather than accidental, and the
 importer warns when a document leaves hours unpriced — but a hand-entered
 tariff can still have a hole. Enforcing coverage would make a half-entered
@@ -353,6 +377,24 @@ Consequences elsewhere:
 
 More than two distinct prices within one season are stored as unnamed bands —
 see §3.2c.
+
+**Tests (catch-all band, #1109).** `backend/tariffs/test_catch_all_band.py` (29):
+`is_catch_all`/`has_window`; HT Mon–Fri 07–21 plus a window-less NT pricing
+nights, weekends and weekday daytime, in either band order; `band` and `high`
+catch-alls; one catch-all per season; a catch-all of another season not
+applying; a weekday-restricted catch-all leaving other days on the first-band
+fallback; a tariff without a catch-all keeping that fallback; a flat band still
+short-circuiting; a half-open window counting as no window; percentage bands;
+the seed-demo "Grid Energy HT/NT" tariff billing NT outside HT hours unchanged;
+`average_percentage`; serializer validation (one time rejected on the missing
+field, two catch-alls sharing month and weekday rejected, disjoint seasons or
+weekdays accepted, the catch-all editable, clearing a window into a second
+catch-all rejected); and the "all other hours" label/recurrence in de and en,
+all languages carrying `tariff_other_hours`, and an unlabelled `band` named once.
+Frontend: `frontend/tests/tariff-band-coverage.test.ts` (16) covers catch-all
+coverage, weekday-restricted catch-alls and catch-all overlaps;
+`frontend/tests/tariff-rate-lines.test.ts` covers "all other hours" in the
+rate lines.
 
 **Tests (§3.2c).** `backend/tariffs/test_multi_band_periods.py` (13): a
 three-band tariff pricing each window and its boundaries; bands read back in

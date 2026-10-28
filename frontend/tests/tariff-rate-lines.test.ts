@@ -21,7 +21,7 @@ function mockT(key: string, opts?: Record<string, unknown>): string {
     if (key === 'pages.tariffs.rateCard.perMeteringPoint') return 'per metering point'
     if (key === 'pages.tariffs.rateCard.shared') return 'shared by the participants'
     if (key === 'pages.tariffs.rateCard.allHours') return 'All hours'
-    if (key === 'pages.tariffs.rateCard.noTimeWindow') return 'time window not configured'
+    if (key === 'pages.tariffs.rateCard.allOtherHours') return 'all other hours'
     if (key === 'pages.tariffs.rateCard.dynamicAverage') return `Dynamic, average ${String(opts?.from)} – ${String(opts?.to)}`
     if (key === 'pages.tariffs.rateCard.dynamicPartial') return `Dynamic, incomplete average ${String(opts?.from)} – ${String(opts?.to)}`
     if (key === 'pages.tariffs.rateCard.incompleteBaseAverage') return 'incomplete base average'
@@ -79,24 +79,26 @@ function period(id: string, overrides: Record<string, unknown> = {}) {
 const formatDate = (isoDate: string) => isoDate.split('-').reverse().join('.')
 
 describe('buildRateLines', () => {
-    it.each(['energy', 'percentage_of_energy'] as const)('identifies untimed non-flat bands without claiming complementary coverage (%s)', (billing_mode) => {
+    it.each(['energy', 'percentage_of_energy'] as const)('names a non-flat band without a window as all other hours (%s)', (billing_mode) => {
         const series = energySeries({ billing_mode })
         const high = period('ht', { period_type: 'high', price_chf_per_kwh: '0.295', percentage: '80', time_from: '07:00', time_to: '21:00', weekdays: '0,1,2,3,4' })
         const low = period('nt', { period_type: 'low', price_chf_per_kwh: '0.225', percentage: '60' })
         for (const periods of [[high, low], [low]]) {
             const lines = buildRateLines(series, energyVersion(periods), t, DAY_NAMES, MONTH_NAMES, formatDate)
-            expect(lines.at(-1)?.applies.split(' · ')[0]).toBe('Low (NT) time window not configured')
+            expect(lines.at(-1)?.applies.split(' · ')[0]).toBe('Low (NT) all other hours')
         }
     })
 
-    it.each([
-        { time_from: null, time_to: null },
-        { time_from: '07:00', time_to: null },
-        { time_from: null, time_to: '21:00' },
-    ])('keeps weekday and season restrictions while identifying an incomplete window: %j', (window) => {
-        const version = energyVersion([period('p1', { period_type: 'band', label: 'Winter', weekdays: '0,1,2,3,4', months: '10,11,12,1,2,3', ...window })])
+    it('keeps weekday and season restrictions on a named band for all other hours', () => {
+        const version = energyVersion([period('p1', { period_type: 'band', label: 'Winter', weekdays: '0,1,2,3,4', months: '10,11,12,1,2,3' })])
         expect(buildRateLines(energySeries(), version, t, DAY_NAMES, MONTH_NAMES, formatDate)[0].applies)
-            .toBe('Winter Mon–Fri, Oct–Mar, time window not configured')
+            .toBe('Winter Mon–Fri, Oct–Mar, all other hours')
+    })
+
+    it('does not print all other hours twice for an unnamed time band', () => {
+        const version = energyVersion([period('p1', { period_type: 'band', weekdays: '5,6' })])
+        expect(buildRateLines(energySeries(), version, t, DAY_NAMES, MONTH_NAMES, formatDate)[0].applies)
+            .toBe('all other hours Sat–Sun')
     })
 
     it('shows an unnamed imported band window once, with its weekdays and season', () => {

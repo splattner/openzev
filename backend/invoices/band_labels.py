@@ -11,7 +11,7 @@ does not have to reach into that module itself.
 """
 
 from tariffs.models import PeriodType
-from tariffs.periods import ALL_WEEKDAYS, hhmm, month_ranges, months_of, weekdays_of
+from tariffs.periods import ALL_WEEKDAYS, has_window, hhmm, is_catch_all, month_ranges, months_of, weekdays_of
 
 from .contract_translations import CONTRACT_TRANSLATIONS
 
@@ -22,9 +22,11 @@ def translations_for(lang: str) -> dict:
 
 
 def band_window(period, tr: dict) -> str:
-    """``07:00-21:00``, or the generic band name when the band has no window."""
-    if period.time_from and period.time_to:
+    """``07:00-21:00``, or "all other hours" for a band without a window."""
+    if has_window(period):
         return f"{hhmm(period.time_from)}–{hhmm(period.time_to)}"
+    if is_catch_all(period):
+        return tr["tariff_other_hours"]
     return tr["tariff_band"]
 
 
@@ -84,7 +86,14 @@ def band_recurrence(period, tr: dict) -> str:
         ]
         days = ", ".join(parts)
 
-    hours = f"{hhmm(period.time_from)}–{hhmm(period.time_to)}" if period.time_from and period.time_to else ""
+    if has_window(period):
+        hours = f"{hhmm(period.time_from)}–{hhmm(period.time_to)}"
+    elif is_catch_all(period) and (period.period_type != PeriodType.BAND or period.label):
+        # An unlabelled band is already named "all other hours"; saying it
+        # again in the recurrence column would print it twice.
+        hours = tr["tariff_other_hours"]
+    else:
+        hours = ""
 
     if days and hours:
         return tr["tariff_recurrence_join"].format(days=days, hours=hours)

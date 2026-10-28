@@ -82,6 +82,7 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_nt": "NT (Niedertarif)",
         "tariff_flat": "Einheitstarif",
         "tariff_band": "Zeitband",
+        "tariff_other_hours": "alle übrigen Zeiten",
         # Order is significant: index 0 is January. Used to name a
         # seasonal band's month range on the tariff table.
         "tariff_months_short": ["Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sept.", "Okt.", "Nov.", "Dez."],
@@ -454,6 +455,7 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_nt": "NT (tarif creux)",
         "tariff_flat": "Tarif unique",
         "tariff_band": "Plage horaire",
+        "tariff_other_hours": "toutes les autres heures",
         # Order is significant: index 0 is January. Used to name a
         # seasonal band's month range on the tariff table.
         "tariff_months_short": ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."],
@@ -822,6 +824,7 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_nt": "NT (tariffa ridotta)",
         "tariff_flat": "Tariffa unica",
         "tariff_band": "Fascia oraria",
+        "tariff_other_hours": "tutte le altre ore",
         # Order is significant: index 0 is January. Used to name a
         # seasonal band's month range on the tariff table.
         "tariff_months_short": ["genn.", "febbr.", "mar.", "apr.", "magg.", "giugno", "luglio", "ag.", "sett.", "ott.", "nov.", "dic."],
@@ -1189,6 +1192,7 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_nt": "NT (off-peak)",
         "tariff_flat": "Flat rate",
         "tariff_band": "Time band",
+        "tariff_other_hours": "all other hours",
         # Order is significant: index 0 is January. Used to name a
         # seasonal band's month range on the tariff table.
         "tariff_months_short": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],

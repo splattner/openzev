@@ -47,10 +47,13 @@ per tariff:
   until when (*until …*), from when it will (*starts 01.01.2027*, with the year
   in bold, and the month too when it starts this year), or when it ended
 
-An unnamed band shows its time window once. A non-flat band without a complete
-time window says **time window not configured**; it does not automatically cover
-the other bands' remaining hours. Uncovered hours use the first band in the
-matching season (or the tariff's first band if no season matches). The detail
+An unnamed band shows its time window once. A high, low or time band with
+**no time window** (both times left empty) is the band for **all other hours**:
+it prices every hour the other bands of its months and weekdays do not cover,
+so "HT Mon–Fri 07:00–21:00, NT the rest" needs only the HT window. Only one
+band per season and weekday can do this. Hours that no band covers, and no
+such band catches, use the first band in the matching season (or the tariff's
+first band if no season matches). The detail
 pane and the band form say which hours are affected and what they are billed
 at — for example *No band covers 00:00–07:00, 21:00–24:00; 07:00–21:00 · Sat–Sun.
 Those hours are billed as High (HT) 07:00–21:00 at 0.295 CHF/kWh* — and warn
@@ -502,10 +505,11 @@ Percentage Tariff "Local Solar Surcharge"
 ├─ Band "Evening": 16:00–00:00, 90%
 ```
 
-> **Cover the whole day.** Every band needs its own time window, and the
-> windows should together cover all 24 hours. A band without a window
-> ("the rest of the day") never matches: an hour no band covers is billed at
-> the tariff's first band instead, which is usually not what you meant.
+> **Cover the whole day.** The bands should together cover all 24 hours. Give
+> every band a time window, or leave both times empty on one band to make it
+> the band for **all other hours** ("the rest of the day"). Without such a
+> band, an hour no band covers is billed at the tariff's first band instead,
+> which is usually not what you meant.
 
 This is useful when you want to set local energy prices as a fraction of the grid energy rate, so that price changes to the grid tariff are automatically reflected.
 

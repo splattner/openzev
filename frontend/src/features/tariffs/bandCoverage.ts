@@ -6,12 +6,14 @@ import { parseMonths } from './recurrence'
  * engine's fallback.
  *
  * Mirrors `tariffs.periods.resolve_band`: months are checked first (a blank
- * mask is every month), a flat band prices its months outright, a timed band
+ * mask is every month), a flat band prices its months outright, a windowed band
  * needs both ends and its weekday, and its window is `[start, end)` — wrapping
  * past midnight when the end is not after the start, and a whole day when the
- * two are equal. Anything nothing matches is priced by the first band of the
- * season, in the model's order (type, start, id): that is the fallback the
- * warning names.
+ * two are equal. A non-flat band without a window is the catch-all of its
+ * months and weekdays: it prices every hour no windowed band matches, so it
+ * closes the gaps and is not an overlap with the windowed bands. Anything
+ * still unmatched is priced by the first band of the season, in the model's
+ * order (type, start, id): that is the fallback the warning names.
  */
 export type CoverageBand = {
     id?: string
@@ -92,11 +94,15 @@ export function bandCoverage<T extends CoverageBand>(
             const open: number[] = []
             for (let day = 0; day < 7; day++) {
                 if (reachable && !reachable.has((month - 1) * 7 + day)) continue
+                const catchAlls = inSeason.filter(({ band, start, end, days }) => band.period_type !== 'flat' && (start === null || end === null)
+                    && (days.length === 0 || days.includes(day))).length
+                // Two catch-alls on one month and day is what the backend rejects.
+                if (catchAlls > 1) result.overlaps = true
                 const matching = inSeason.filter(({ band, start, end, days }) => band.period_type === 'flat' || (
                     start !== null && end !== null && (days.length === 0 || days.includes(day))
                     && (start < end ? time >= start && time < end : time >= start || time < end)
                 )).length
-                if (matching === 0) open.push(day)
+                if (matching === 0 && catchAlls === 0) open.push(day)
                 if (matching > 1) result.overlaps = true
             }
             if (open.length === 0) continue

@@ -162,6 +162,15 @@ export const tariffPeriodFormSchema = z
         message: 'Price is required.',
       })
     }
+    // A band takes both times or neither (neither = all other hours); the
+    // backend rejects a single time too.
+    if (values.period_type !== 'flat' && Boolean(values.time_from) !== Boolean(values.time_to)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [values.time_from ? 'time_to' : 'time_from'],
+        message: 'Enter both times, or neither.',
+      })
+    }
   })
 
 export const defaultTariffFormValues: TariffFormValues = {
