@@ -77,7 +77,7 @@ async function openDraft(mode: 'create' | 'edit' | 'assignment' | 'delete') {
         const button = mode === 'create'
             ? container.querySelector<HTMLButtonElement>('.metering-toolbar .toolbar-actions .button-primary')!
             : mode === 'assignment'
-                ? container.querySelector<HTMLButtonElement>('.metering-point-holder .button-primary')!
+                ? container.querySelector<HTMLButtonElement>('.metering-point-holder .button-outline')!
                 : container.querySelector<HTMLButtonElement>('.metering-point-actions [aria-haspopup="menu"]')!
         button.click()
     })
@@ -450,7 +450,7 @@ describe('metering status availability', () => {
             await waitForCondition(() => !state.actions!.meteringPointHolderLessById.has('mp42'), 'unknown assignment status')
             expect(state.actions!.needsAttentionCount).toBe(0)
             expect(state.actions!.unassignedCount).toBe(0)
-            expect(container.querySelector('.metering-point-holder .button-primary')).toBeNull()
+            expect(container.querySelector('.metering-point-holder .button-outline')).toBeNull()
             expect(container.textContent).toContain(failure ? 'pages.meteringPoints.assignmentsLoadFailed' : 'pages.meteringPoints.assignmentsLoading')
             act(() => state.actions!.setView('unassigned'))
             expect(state.actions!.meteringPoints).toEqual([])

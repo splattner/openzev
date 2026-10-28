@@ -129,7 +129,7 @@ export function ConfirmDialog({
                         {isLoading ? t('common.close') : (cancelText || t('common.cancel'))}
                     </button>
                     <button
-                        className={`button ${isDangerous ? 'danger' : ''}`}
+                        className={`button ${isDangerous ? 'button-danger' : 'button-primary'}`}
                         onClick={onConfirm}
                         disabled={isLoading || confirmDisabled}
                         type="button"

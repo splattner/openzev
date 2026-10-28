@@ -367,6 +367,23 @@ SPEC-2026-04 §7.3 stays the reference: primary, secondary, overflow, destructiv
 - Visible labels on primary mobile actions. Disabled controls say why, near the
   control; a tooltip may supplement but is never the only route.
 
+**Shipped (phase 7).** The invoice access-link revoke button and the
+confirm dialog's dangerous confirm use `button button-danger`; the metering-point
+"assign" row action is `button button-outline button-compact`; the 17 bare
+`className="button"` actions (sign-in and onboarding forms, template save, the
+back links) carry `button-primary`; the data-review "show all" toggle gained the
+missing `button` base class (`button button-secondary button-compact`), and the
+PDF template preview toggle names both states (`button-primary` active,
+`button-secondary` otherwise). The `.button.danger` and `.danger` rules are gone
+from `button.css` and `row-actions.css`, and `tests/retired-css-classes.test.ts`
+fails on a reintroduced `button danger`, `button-primary button-outline` or bare
+`button`. Static `style={{}}` presentation that an existing class covers moved to
+the class: `m-0`, `mt-0`, `mt-05`, `mt-1`, `mb-1`, `mb-15` (utilities),
+`grid-span-full`, and `actions-row` / `actions-row-wrap` for the flex-centred
+rows. What remains inline is either dynamic (a computed width, colour or
+position) or has no class yet (`display: block`, `textAlign`, the table cell
+padding, one-off font sizes); those stay until a class earns its place.
+
 ## 10. Feedback, labels and states
 
 ### 10.1 Usefulness before decoration

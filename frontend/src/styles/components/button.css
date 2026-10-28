@@ -48,15 +48,13 @@
   background: var(--surface-sunken);
 }
 
-.button-danger,
-.button.danger {
+.button-danger {
   background: var(--danger-600);
   color: var(--white);
   border: 1px solid var(--danger-700);
 }
 
-.button-danger:hover,
-.button.danger:hover {
+.button-danger:hover {
   background: var(--danger-700);
 }
 
@@ -64,8 +62,7 @@
    the solid red one. Row-level (compact) danger buttons follow the same rule. */
 
 .button-secondary.button-destructive,
-.button-danger.button-compact,
-.button.danger.button-compact {
+.button-danger.button-compact {
   background: var(--surface-card);
   border: 1px solid var(--border-strong);
   color: var(--danger-700);
@@ -73,8 +70,7 @@
 }
 
 .button-secondary.button-destructive:hover:not(:disabled),
-.button-danger.button-compact:hover:not(:disabled),
-.button.danger.button-compact:hover:not(:disabled) {
+.button-danger.button-compact:hover:not(:disabled) {
   background: var(--danger-100);
   border-color: var(--danger-300);
 }
@@ -96,10 +92,6 @@
 
 .button-icon.button-compact {
   width: 2rem;
-}
-
-.danger {
-  background: var(--danger-600);
 }
 
 /* The impersonation banner is a slim strip: its buttons are smaller than the scale. */

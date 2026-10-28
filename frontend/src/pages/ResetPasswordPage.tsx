@@ -61,7 +61,7 @@ export function ResetPasswordPage() {
                 <div className="card verify-card">
                     <h2>{t('auth.reset.successTitle')}</h2>
                     <p className="muted">{t('auth.reset.successMessage')}</p>
-                    <Link to="/login" className="button" style={{ textAlign: 'center' }}>
+                    <Link to="/login" className="button button-primary" style={{ textAlign: 'center' }}>
                         {t('auth.reset.toLogin')}
                     </Link>
                 </div>
@@ -102,7 +102,7 @@ export function ResetPasswordPage() {
 
                 {error ? <div className="error-banner">{error}</div> : null}
 
-                <button className="button" type="submit" disabled={loading}>
+                <button className="button button-primary" type="submit" disabled={loading}>
                     {loading ? t('common.loading') : t('auth.reset.submit')}
                 </button>
                 <Link to="/forgot-password" className="button button-ghost" style={{ textAlign: 'center' }}>

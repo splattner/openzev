@@ -262,12 +262,12 @@ export function AdminSystemSettingsPage() {
 
                 <AppTabs.Panel value="regional">
                 <section className="card">
-                    <div style={{ marginBottom: '1rem' }}>
+                    <div className="mb-1">
                         <h3 style={{ marginTop: 0, marginBottom: '0.35rem' }}>{t('adminSystemSettings.regional.title')}</h3>
-                        <p className="muted" style={{ margin: 0 }}>{t('adminSystemSettings.regional.description')}</p>
+                        <p className="muted m-0">{t('adminSystemSettings.regional.description')}</p>
                     </div>
                     {appSettingsLoading ? (
-                        <p className="muted" style={{ margin: 0 }}>{t('adminSystemSettings.regional.loading')}</p>
+                        <p className="muted m-0">{t('adminSystemSettings.regional.loading')}</p>
                     ) : (
                         <form onSubmit={submitRegionalSettings} className="page-stack">
                             <label>
@@ -316,7 +316,7 @@ export function AdminSystemSettingsPage() {
                             </label>
 
                             <div className="card" style={{ background: 'var(--surface)' }}>
-                                <h3 style={{ marginTop: 0 }}>{t('adminSystemSettings.regional.previewTitle')}</h3>
+                                <h3 className="mt-0">{t('adminSystemSettings.regional.previewTitle')}</h3>
                                 <p style={{ marginBottom: '0.35rem' }}>
                                     <strong>{t('adminSystemSettings.regional.previewShort')}</strong> {formatDateByPattern(previewDate, regionalForm.date_format_short)}
                                 </p>
@@ -353,9 +353,9 @@ export function AdminSystemSettingsPage() {
 
                 <AppTabs.Panel value="features">
                 <section className="card">
-                    <div style={{ marginBottom: '1rem' }}>
+                    <div className="mb-1">
                         <h3 style={{ marginTop: 0, marginBottom: '0.35rem' }}>{t('features.title')}</h3>
-                        <p className="muted" style={{ margin: 0 }}>{t('features.description')}</p>
+                        <p className="muted m-0">{t('features.description')}</p>
                     </div>
 
                     {featureFlagsQuery.isLoading && <p className="muted">{t('features.loading')}</p>}
@@ -408,7 +408,7 @@ export function AdminSystemSettingsPage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '1rem' }}>
                         <div>
                             <h3 style={{ marginTop: 0, marginBottom: '0.35rem' }}>{t('adminOAuth.providersTitle')}</h3>
-                            <p className="muted" style={{ margin: 0 }}>{t('adminOAuth.description')}</p>
+                            <p className="muted m-0">{t('adminOAuth.description')}</p>
                         </div>
                         <button type="button" className="button button-primary" onClick={openCreateOAuthForm}>
                             <FontAwesomeIcon icon={faPlus} fixedWidth />

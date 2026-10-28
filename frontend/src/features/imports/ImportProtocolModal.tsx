@@ -138,7 +138,7 @@ export function ImportProtocolModal({ log, onClose }: { log: ImportLog | null; o
                                     {t(`pages.imports.protocol.outcome.${outcome}`)}
                                 </span>
                             </div>
-                            <p className="muted" style={{ margin: 0 }}>
+                            <p className="muted m-0">
                                 {t(`pages.imports.protocol.outcome.${outcome}Description`)}
                             </p>
 
@@ -178,19 +178,19 @@ export function ImportProtocolModal({ log, onClose }: { log: ImportLog | null; o
                                         {delivery.creation && (
                                             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                                                 <dt style={{ fontWeight: 600 }}>{t('pages.imports.protocol.delivery.creation')}:</dt>
-                                                <dd style={{ margin: 0 }}>{formatDateTime(delivery.creation, settings)}</dd>
+                                                <dd className="m-0">{formatDateTime(delivery.creation, settings)}</dd>
                                             </div>
                                         )}
                                         {(delivery.status || delivery.reason) && (
                                             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                                                 <dt style={{ fontWeight: 600 }}>{t('pages.imports.protocol.delivery.profile')}:</dt>
-                                                <dd style={{ margin: 0 }}>{[delivery.status, delivery.reason].filter(Boolean).join(' · ')}</dd>
+                                                <dd className="m-0">{[delivery.status, delivery.reason].filter(Boolean).join(' · ')}</dd>
                                             </div>
                                         )}
                                         {(delivery.sender_id || delivery.receiver_id) && (
                                             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                                                 <dt style={{ fontWeight: 600 }}>{t('pages.imports.protocol.delivery.parties')}:</dt>
-                                                <dd style={{ margin: 0 }}>
+                                                <dd className="m-0">
                                                     {[delivery.sender_id, delivery.receiver_id].filter(Boolean).join(' → ')}
                                                 </dd>
                                             </div>

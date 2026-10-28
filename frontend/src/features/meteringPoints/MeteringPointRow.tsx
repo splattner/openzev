@@ -268,7 +268,7 @@ export function MeteringPointRow({
     if (canWrite && point.is_active) {
       return (
         <button
-          className="button button-primary button-outline button-compact"
+          className="button button-outline button-compact"
           type="button"
           onClick={() => onOpenCreateAssignModal(point.id)}
         >

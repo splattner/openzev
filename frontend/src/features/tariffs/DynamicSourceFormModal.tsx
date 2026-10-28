@@ -169,13 +169,13 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
   return (
       <form className="form-grid" onSubmit={submit}>
         {!source && sourceKind === 'vse' && (
-          <div className="muted" style={{ gridColumn: '1 / -1' }}>
+          <div className="muted grid-span-full">
             {t('pages.dynamicSources.discovery.step', { current: step, total: 2 })}
           </div>
         )}
 
         {!source && (
-          <label style={{ gridColumn: '1 / -1' }}>
+          <label className="grid-span-full">
             <span>{t('pages.dynamicSources.form.kind')}</span>
             <select value={sourceKind} onChange={(event) => setSourceKind(event.target.value as SourceKind)}>
               <option value="vse">{t('pages.dynamicSources.form.kindVse')}</option>
@@ -184,14 +184,14 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
           </label>
         )}
 
-        <label style={{ gridColumn: '1 / -1' }}>
+        <label className="grid-span-full">
           <span>{t('pages.dynamicSources.form.label')}</span>
           <input value={label} onChange={(event) => setLabel(event.target.value)} required />
         </label>
 
         {!source && sourceKind === 'bfe_rmp' ? (
           <>
-            <label style={{ gridColumn: '1 / -1' }}>
+            <label className="grid-span-full">
               <span>{t('pages.dynamicSources.form.bfeSeries')}</span>
               <select value={bfeSeries} onChange={(event) => setBfeSeries(event.target.value as 'quarterly' | 'monthly')}>
                 <option value="quarterly">{t('pages.dynamicSources.form.bfeSeriesQuarterly')}</option>
@@ -199,7 +199,7 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
               </select>
               <small className="muted">{t('pages.dynamicSources.form.bfeSeriesHint')}</small>
             </label>
-            <label style={{ gridColumn: '1 / -1' }}>
+            <label className="grid-span-full">
               <span>{t('pages.dynamicSources.form.bfeTechnology')}</span>
               <select value={bfeTechnology} onChange={(event) => setBfeTechnology(event.target.value as BfeRmpTechnology)}>
                 {BFE_RMP_TECHNOLOGIES.map((technology) => (
@@ -212,7 +212,7 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
           </>
         ) : source ? (
           <>
-            <div className="info-banner" style={{ gridColumn: '1 / -1' }}>
+            <div className="info-banner grid-span-full">
               <strong>{source.url}</strong>
               <div>
                 {t(`pages.dynamicSources.versions.${source.api_version}` as Parameters<typeof t>[0])}
@@ -222,7 +222,7 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
               </div>
               <small>{t('pages.dynamicSources.form.identityReplacement')}</small>
             </div>
-            <label className="checkbox-label" style={{ gridColumn: '1 / -1' }}>
+            <label className="checkbox-label grid-span-full">
               <input
                 type="checkbox"
                 checked={enabled}
@@ -230,18 +230,18 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
               />
               <span>{t('pages.dynamicSources.form.enabled')}</span>
             </label>
-            <small className="muted" style={{ gridColumn: '1 / -1' }}>
+            <small className="muted grid-span-full">
               {t('pages.dynamicSources.form.enabledHint')}
             </small>
           </>
         ) : step === 1 ? (
           <>
-            <label style={{ gridColumn: '1 / -1' }}>
+            <label className="grid-span-full">
               <span>{t('pages.dynamicSources.form.url')}</span>
               <input type="url" value={url} onChange={(event) => setUrl(event.target.value)} required />
               <small className="muted">{t('pages.dynamicSources.form.urlHint')}</small>
             </label>
-            <label style={{ gridColumn: '1 / -1' }}>
+            <label className="grid-span-full">
               <span>{t('pages.dynamicSources.form.apiVersion')}</span>
               <select value={versionChoice} onChange={(event) => setVersionChoice(event.target.value as VersionChoice)}>
                 <option value="auto">{t('pages.dynamicSources.versions.auto')}</option>
@@ -253,7 +253,7 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
           </>
         ) : (
           <>
-            <div className="info-banner" style={{ gridColumn: '1 / -1' }}>
+            <div className="info-banner grid-span-full">
               {t(
                 discovery!.components_discovered
                   ? 'pages.dynamicSources.discovery.detected'
@@ -261,7 +261,7 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
                 { version: t(`pages.dynamicSources.versions.${discovery!.api_version}` as Parameters<typeof t>[0]) },
               )}
             </div>
-            <label style={{ gridColumn: '1 / -1' }}>
+            <label className="grid-span-full">
               <span>{t('pages.dynamicSources.form.tariffType')}</span>
               <select
                 value={selection}
@@ -281,7 +281,7 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
               </select>
             </label>
             {(discovery!.api_version === 'v1_0_5' || !selected?.tariff_name) && (
-              <label style={{ gridColumn: '1 / -1' }}>
+              <label className="grid-span-full">
                 <span>{t('pages.dynamicSources.form.tariffName')}</span>
                 <input value={tariffName} onChange={(event) => setTariffName(event.target.value)} required={discovery!.api_version === 'v2_0_0'} />
                 <small className="muted">{t(discovery!.api_version === 'v2_0_0'
@@ -290,7 +290,7 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
               </label>
             )}
             {aggregatedTypes.length > 0 && (
-              <div className="warning-banner" style={{ gridColumn: '1 / -1' }}>
+              <div className="warning-banner grid-span-full">
                 {t('pages.dynamicSources.form.doubleCountingWarning', {
                   components: aggregatedTypes
                     .map((type) => t(`pages.dynamicSources.types.${type}` as Parameters<typeof t>[0]))
@@ -298,7 +298,7 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
                 })}
               </div>
             )}
-            <div className="info-banner" style={{ gridColumn: '1 / -1' }}>
+            <div className="info-banner grid-span-full">
               {t('pages.dynamicSources.form.probeNotice')}
             </div>
           </>

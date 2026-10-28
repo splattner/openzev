@@ -42,7 +42,7 @@ export function ParticipantOnboardingNotice({ notice, onDismiss }: ParticipantOn
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div>
           <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>{t('pages.participants.onboardingLinkTitle')}</h3>
-          <p className="muted" style={{ marginTop: 0 }}>{notice.message}</p>
+          <p className="muted mt-0">{notice.message}</p>
           <p style={{ marginBottom: '0.35rem' }}><strong>{notice.participantName}</strong></p>
           <p style={{ margin: '0.2rem 0', wordBreak: 'break-all' }}>{notice.onboardingUrl}</p>
           {notice.onboardingExpiresAt && (

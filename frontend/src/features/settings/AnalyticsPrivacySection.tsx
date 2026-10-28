@@ -46,9 +46,9 @@ export function AnalyticsPrivacySection() {
 
     return (
         <section className="card">
-            <div style={{ marginBottom: '1rem' }}>
+            <div className="mb-1">
                 <h3 style={{ marginTop: 0, marginBottom: '0.35rem' }}>{t('adminSystemSettings.analyticsPrivacy.title')}</h3>
-                <p className="muted" style={{ margin: 0 }}>{t('adminSystemSettings.analyticsPrivacy.description')}</p>
+                <p className="muted m-0">{t('adminSystemSettings.analyticsPrivacy.description')}</p>
             </div>
 
             <form onSubmit={handleSubmit}>

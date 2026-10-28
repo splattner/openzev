@@ -223,7 +223,7 @@ export function LoginPage() {
 
                         {error ? <div className="error-banner">{error}</div> : null}
 
-                        <button className="button" type="submit" disabled={loading}>
+                        <button className="button button-primary" type="submit" disabled={loading}>
                             {loading ? t('common.loading') : t('auth.submit')}
                         </button>
 
@@ -294,7 +294,7 @@ export function LoginPage() {
 
                         {error ? <div className="error-banner">{error}</div> : null}
 
-                        <button className="button" type="submit" disabled={loading}>
+                        <button className="button button-primary" type="submit" disabled={loading}>
                             {loading ? t('common.loading') : t('auth.submit')}
                         </button>
 
@@ -382,7 +382,7 @@ export function LoginPage() {
                                     >
                                         {t('common.cancel')}
                                     </button>
-                                    <button className="button" type="submit" disabled={regLoading}>
+                                    <button className="button button-primary" type="submit" disabled={regLoading}>
                                         {regLoading ? t('common.loading') : t('auth.register.submitModal')}
                                     </button>
                                 </div>
@@ -391,7 +391,7 @@ export function LoginPage() {
 
                         {regSuccess && (
                             <div className="modal-actions">
-                                <button className="button" type="button" onClick={() => setShowModal(false)}>
+                                <button className="button button-primary" type="button" onClick={() => setShowModal(false)}>
                                     {t('common.close')}
                                 </button>
                             </div>

@@ -46,7 +46,7 @@ export function PrefillFromZevCard({ onPrefillLoaded }: Props) {
 
     return (
         <section className="card">
-            <h3 style={{ marginTop: 0 }}>{t('pages.feasibility.prefill.title')}</h3>
+            <h3 className="mt-0">{t('pages.feasibility.prefill.title')}</h3>
             <p className="muted" style={{ fontSize: '0.85rem', marginTop: 0 }}>{t('pages.feasibility.prefill.description')}</p>
             <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <select

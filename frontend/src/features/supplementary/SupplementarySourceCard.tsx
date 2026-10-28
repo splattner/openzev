@@ -131,7 +131,7 @@ export function SupplementarySourceCard({ point, source, confirm }: Props) {
                         {source.label ? ` · ${source.label}` : ''}
                     </small>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div className="actions-row actions-row-wrap">
                     <MeteringDataLink meteringPointId={point.metering_point} />
                     <SourceStatusBadge status={source.status} />
                 </div>
@@ -145,32 +145,32 @@ export function SupplementarySourceCard({ point, source, confirm }: Props) {
             )}
             {source.status === 'error' && source.last_error && (
                 <div className="warning-banner" role="status">
-                    <p style={{ margin: 0 }}>{source.last_error}</p>
+                    <p className="m-0">{source.last_error}</p>
                 </div>
             )}
-            {disconnected && <p className="muted" style={{ margin: 0 }}>{t('supplementary.disconnectedNote')}</p>}
+            {disconnected && <p className="muted m-0">{t('supplementary.disconnectedNote')}</p>}
 
             <dl style={{ display: 'grid', gridTemplateColumns: 'minmax(7rem, max-content) minmax(0, 1fr)', overflowWrap: 'anywhere', gap: '0.4rem 1rem', margin: 0 }}>
                 {isSolar && (
                     <>
                         <dt className="muted">{t('supplementary.card.smId')}</dt>
-                        <dd style={{ margin: 0 }}><code>{source.external_id}</code></dd>
+                        <dd className="m-0"><code>{source.external_id}</code></dd>
                     </>
                 )}
                 {!isSolar && source.push_token_prefix && (
                     <>
                         <dt className="muted">{t('supplementary.card.token')}</dt>
-                        <dd style={{ margin: 0 }}><code>ozs_{source.push_token_prefix}_…</code></dd>
+                        <dd className="m-0"><code>ozs_{source.push_token_prefix}_…</code></dd>
                         <dt className="muted">{t('supplementary.card.tokenIssued')}</dt>
-                        <dd style={{ margin: 0 }}>{dateTime(source.push_token_created_at)}</dd>
+                        <dd className="m-0">{dateTime(source.push_token_created_at)}</dd>
                         <dt className="muted">{t('supplementary.card.tokenLastUsed')}</dt>
-                        <dd style={{ margin: 0 }}>{dateTime(source.push_token_last_used_at)}</dd>
+                        <dd className="m-0">{dateTime(source.push_token_last_used_at)}</dd>
                     </>
                 )}
                 <dt className="muted">{t('supplementary.card.lastSync')}</dt>
-                <dd style={{ margin: 0 }}>{dateTime(source.last_success_at)}</dd>
+                <dd className="m-0">{dateTime(source.last_success_at)}</dd>
                 <dt className="muted">{t('supplementary.card.covered')}</dt>
-                <dd style={{ margin: 0 }}>
+                <dd className="m-0">
                     {source.covers_from && source.synced_through
                         ? t('supplementary.card.coveredRange', {
                               from: formatDateTime(source.covers_from, settings),
@@ -179,7 +179,7 @@ export function SupplementarySourceCard({ point, source, confirm }: Props) {
                         : t('supplementary.card.noData')}
                 </dd>
                 <dt className="muted">{t('supplementary.card.reconciliation')}</dt>
-                <dd style={{ margin: 0 }}><ReconciliationSummary reconciliation={source.reconciliation} /></dd>
+                <dd className="m-0"><ReconciliationSummary reconciliation={source.reconciliation} /></dd>
             </dl>
 
             {token && <PushTokenPanel token={token} onDismiss={() => setToken(null)} />}

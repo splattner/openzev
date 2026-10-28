@@ -28,18 +28,18 @@ export function DynamicSourceSummary({ source, settings, canOperate }: {
                 )}
             </div>
             {source.last_success_at && (
-                <p className="muted" style={{ margin: 0 }}>{t('pages.dynamicSources.lastSuccess', { time: formatDateTime(source.last_success_at, settings) })}</p>
+                <p className="muted m-0">{t('pages.dynamicSources.lastSuccess', { time: formatDateTime(source.last_success_at, settings) })}</p>
             )}
-            {source.last_fetch_status === 'failed' && source.last_fetch_error && <p className="text-error" style={{ margin: 0 }}>{source.last_fetch_error}</p>}
+            {source.last_fetch_status === 'failed' && source.last_fetch_error && <p className="text-error m-0">{source.last_fetch_error}</p>}
             <Disclosure lazy summary={t('pages.dynamicSources.sourceDetails')}>
                 <div className="tariff-source-summary">
                     <p className="muted" style={{ margin: 0, overflowWrap: 'anywhere' }}>{source.url}</p>
-                    <p className="muted" style={{ margin: 0 }}>
+                    <p className="muted m-0">
                         {t(`pages.dynamicSources.versions.${source.api_version}`)}
                         {' · '}{t(`pages.dynamicSources.types.${source.tariff_type}`)}
                         {source.tariff_name ? ` · ${source.tariff_name}` : ''}
                     </p>
-                    <p className="muted" style={{ margin: 0 }}>
+                    <p className="muted m-0">
                         {source.point_count > 0 ? t('pages.dynamicSources.history.coverage', {
                             from: formatDateTime(source.covers_from, settings),
                             to: formatDateTime(source.covers_to, settings),
@@ -47,7 +47,7 @@ export function DynamicSourceSummary({ source, settings, canOperate }: {
                         }) : t('pages.dynamicSources.noCoverage')}
                         {source.point_count > 0 && <>{' · '}{t('pages.dynamicSources.coverageHint')}</>}
                     </p>
-                    <p className="muted" style={{ margin: 0 }}>
+                    <p className="muted m-0">
                         {t('pages.dynamicSources.globalReuseSummary', { tariffs: source.linked_tariff_count, zevs: source.linked_zev_count })}
                     </p>
                 </div>

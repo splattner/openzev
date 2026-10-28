@@ -348,7 +348,7 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                         <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth style={{ marginRight: '0.4rem' }} />
                         {t('pages.zevSettings.lifecycle.bannerTitle')}
                     </strong>
-                    <p style={{ margin: 0 }}>
+                    <p className="m-0">
                         {t('pages.zevSettings.lifecycle.bannerBody', {
                             date: selectedZev?.disabled_at ? formatShortDate(selectedZev.disabled_at, settings) : '',
                         })}
@@ -463,8 +463,8 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                 <AppTabs.Panel value="export">
                     <section className="card page-stack">
                         <div>
-                            <h3 style={{ marginTop: 0 }}>{t('zevTransfer.exportTitle')}</h3>
-                            <p className="muted" style={{ margin: 0 }}>
+                            <h3 className="mt-0">{t('zevTransfer.exportTitle')}</h3>
+                            <p className="muted m-0">
                                 {t('zevTransfer.exportSectionDescription', { name: selectedZev.name })}
                             </p>
                         </div>
@@ -483,8 +483,8 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                     {!isDisabled && canWriteSelectedCommunity && (
                         <section className="card page-stack">
                             <div>
-                                <h3 style={{ marginTop: 0 }}>{t('pages.zevSettings.lifecycle.disableSectionTitle')}</h3>
-                                <p className="muted" style={{ margin: 0 }}>
+                                <h3 className="mt-0">{t('pages.zevSettings.lifecycle.disableSectionTitle')}</h3>
+                                <p className="muted m-0">
                                     {t('pages.zevSettings.lifecycle.disableSectionDescription')}
                                 </p>
                             </div>

@@ -147,8 +147,8 @@ describe('MeteringPointsList', () => {
         const rows = Array.from(view.querySelectorAll('.metering-point-card'))
         const holder = (index: number) => rows[index].querySelector('.metering-point-holder')!
         expect(holder(0).textContent).toContain('Anna Consumer')
-        expect(holder(0).querySelector('.button-primary')).toBeNull()
-        expect(holder(1).querySelector('.button-primary')).not.toBeNull()
+        expect(holder(0).querySelector('.button-outline')).toBeNull()
+        expect(holder(1).querySelector('.button-outline')).not.toBeNull()
         expect(holder(2).textContent).toContain('Anna Consumer')
         expect(holder(2).textContent).toContain('+1')
     })
@@ -278,7 +278,7 @@ describe('MeteringPointsList', () => {
 
     it('offers a viewer neither an Assign button, a menu nor assignment controls', () => {
         const view = render({ points, readOnly: true })
-        expect(view.querySelector('.metering-point-holder .button-primary')).toBeNull()
+        expect(view.querySelector('.metering-point-holder .button-outline')).toBeNull()
         expect(view.querySelector('.metering-point-actions [aria-haspopup="menu"]')).toBeNull()
         act(() => view.querySelector<HTMLButtonElement>('.metering-point-expand')!.click())
         expect(view.querySelector('.metering-point-detail')).not.toBeNull()
@@ -393,7 +393,7 @@ describe('MeteringPointsList', () => {
 
     it('keeps assignment creation hidden until assignment history is available', () => {
         const view = render({ points, assignmentsAvailable: false })
-        expect(view.querySelector('.metering-point-holder .button-primary')).toBeNull()
+        expect(view.querySelector('.metering-point-holder .button-outline')).toBeNull()
         expect(view.querySelector('.metering-holder-name button')).toBeNull()
         expect(view.textContent).toContain('pages.meteringPoints.assignmentsUnavailable')
         act(() => view.querySelector<HTMLButtonElement>('.metering-point-expand')!.click())

@@ -108,7 +108,7 @@ function AnnualDocumentPanel({
   return (
     <AppTabs.Panel value={descriptor.kind} aria-busy={loading}>
       <div className="page-stack">
-        <p className="muted" style={{ margin: 0 }}>{t(descriptor.descriptionKey)}</p>
+        <p className="muted m-0">{t(descriptor.descriptionKey)}</p>
         {/* Keep focus here when Retry replaces the error with the viewer. */}
         <div
           ref={statusRef}
@@ -131,7 +131,7 @@ function AnnualDocumentPanel({
               </div>
               {loading ? (
                 <>
-                  <p className="muted" role="status" aria-live="polite" style={{ margin: 0 }}>
+                  <p className="muted m-0" role="status" aria-live="polite">
                     {t('pages.reports.preparingDocument', { document: documentLabel, year })}
                   </p>
                   <div className="yearly-document-skeleton">
@@ -140,7 +140,7 @@ function AnnualDocumentPanel({
                 </>
               ) : error ? (
                 <div className="card error-banner page-stack" role="alert">
-                  <p style={{ margin: 0 }}>{t(descriptor.errorKey)}</p>
+                  <p className="m-0">{t(descriptor.errorKey)}</p>
                   <div className="actions-row">
                     <button
                       className="button button-secondary button-compact"

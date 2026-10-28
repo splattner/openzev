@@ -225,7 +225,7 @@ export function DynamicPriceHistoryPanel({ source, tariff }: PanelProps) {
       </div>
 
       {tariff && (
-        <p className="muted" style={{ margin: 0 }}>
+        <p className="muted m-0">
           {t('pages.dynamicSources.history.validityScope', {
             from: formatShortDate(tariff.valid_from, settings),
             to: tariff.valid_to ? formatShortDate(tariff.valid_to, settings) : t('pages.tariffs.openEnded'),

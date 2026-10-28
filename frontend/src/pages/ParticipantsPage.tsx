@@ -440,7 +440,7 @@ export function ParticipantsPage() {
 
             {geocodingEnabledQuery.data === true && isManagedScope && (
                 <section className="card">
-                    <h3 style={{ marginTop: 0 }}>{t('pages.participants.map.title')}</h3>
+                    <h3 className="mt-0">{t('pages.participants.map.title')}</h3>
                     <BuildingsMap buildings={buildingsQuery.data ?? []} />
                 </section>
             )}

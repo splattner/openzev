@@ -53,7 +53,7 @@ export function BackupScheduleSection({ status }: { status: BackupStatus | undef
     if (!saved || !form) {
         return (
             <section className="card page-stack">
-                <h3 style={{ margin: 0 }}>{t('pages.backups.schedule.title')}</h3>
+                <h3 className="m-0">{t('pages.backups.schedule.title')}</h3>
                 <div className="muted">{t('common.loading')}</div>
             </section>
         )
@@ -66,7 +66,7 @@ export function BackupScheduleSection({ status }: { status: BackupStatus | undef
     return (
         <section className="card page-stack">
             <div>
-                <h3 style={{ margin: 0 }}>{t('pages.backups.schedule.title')}</h3>
+                <h3 className="m-0">{t('pages.backups.schedule.title')}</h3>
                 <p className="muted" style={{ margin: '0.25rem 0 0' }}>{t('pages.backups.schedule.description')}</p>
             </div>
 
@@ -128,7 +128,7 @@ export function BackupScheduleSection({ status }: { status: BackupStatus | undef
                     </label>
                 </div>
 
-                <p className="muted" style={{ margin: 0 }}>
+                <p className="muted m-0">
                     {t('pages.backups.schedule.hint')}
                     {saved.last_run_at && <> {t('pages.backups.schedule.lastRun', { date: formatDateTime(saved.last_run_at, settings) })}</>}
                 </p>

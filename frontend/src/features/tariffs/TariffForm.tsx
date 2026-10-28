@@ -188,7 +188,7 @@ export function TariffForm({
             would quietly blank the name on save. The values still reach the
             payload from the form state seeded by reset(). */}
         {isVersion ? (
-          <div className="tariff-identity-summary" style={{ gridColumn: '1 / -1' }}>
+          <div className="tariff-identity-summary grid-span-full">
             <div>
               <span className="tariff-detail-label">{t('pages.tariffs.form.name')}</span>
               <strong>{initialTariff?.name}</strong>
@@ -207,7 +207,7 @@ export function TariffForm({
                 <span>{t(`pages.tariffs.energyTypes.${initialTariff.energy_type}` as Parameters<typeof t>[0])}</span>
               </div>
             )}
-            <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>
+            <p className="muted grid-span-full m-0">
               {t('pages.tariffs.form.identityLockedHint')}
             </p>
           </div>
@@ -273,7 +273,7 @@ export function TariffForm({
                     : t('pages.tariffs.form.dynamicSourceHint')}
               </small>
             </label>
-            <p className="muted" style={{ margin: 0 }}>{t('pages.tariffs.form.sharedSourceHint')}</p>
+            <p className="muted m-0">{t('pages.tariffs.form.sharedSourceHint')}</p>
             {energyType === 'feed_in' && dynamicSourceId && (
               <label>
                 <span>{t('pages.tariffs.form.minimumPrice')}</span>

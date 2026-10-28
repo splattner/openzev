@@ -464,7 +464,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
             cell: (ctx) => {
                 const mp = ctx.row.original
                 return (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div className="actions-row">
                         <div style={{ width: '80px', height: '20px', background: 'var(--line-subtle)', borderRadius: '4px', overflow: 'hidden' }}>
                             <div
                                 style={{

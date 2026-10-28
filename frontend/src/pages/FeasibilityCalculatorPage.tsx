@@ -283,18 +283,18 @@ function FeasibilityCalculator() {
                             </section>
 
                             <section className="card page-stack">
-                                <h3 style={{ marginTop: 0 }}>{t('pages.feasibility.results.splitTitle')}</h3>
+                                <h3 className="mt-0">{t('pages.feasibility.results.splitTitle')}</h3>
                                 <div className="feasibility-split">
                                     <div>
                                         <p className="eyebrow">{t('pages.feasibility.results.consumers')}</p>
-                                        <p style={{ margin: 0 }}>{t('pages.feasibility.results.baselineCost')}: {formatChf(Number(result.baseline_consumer_cost_chf))}</p>
-                                        <p style={{ margin: 0 }}>{t('pages.feasibility.results.vzevCost')}: {formatChf(Number(result.vzev_consumer_cost_chf))}</p>
+                                        <p className="m-0">{t('pages.feasibility.results.baselineCost')}: {formatChf(Number(result.baseline_consumer_cost_chf))}</p>
+                                        <p className="m-0">{t('pages.feasibility.results.vzevCost')}: {formatChf(Number(result.vzev_consumer_cost_chf))}</p>
                                         <p style={{ margin: '0.3rem 0 0', fontWeight: 600 }}>{t('pages.feasibility.results.savings')}: {formatChf(Number(result.consumer_savings_chf))}</p>
                                     </div>
                                     <div>
                                         <p className="eyebrow">{t('pages.feasibility.results.producer')}</p>
-                                        <p style={{ margin: 0 }}>{t('pages.feasibility.results.baselineRevenue')}: {formatChf(Number(result.baseline_producer_revenue_chf))}</p>
-                                        <p style={{ margin: 0 }}>{t('pages.feasibility.results.vzevRevenue')}: {formatChf(Number(result.vzev_producer_revenue_chf))}</p>
+                                        <p className="m-0">{t('pages.feasibility.results.baselineRevenue')}: {formatChf(Number(result.baseline_producer_revenue_chf))}</p>
+                                        <p className="m-0">{t('pages.feasibility.results.vzevRevenue')}: {formatChf(Number(result.vzev_producer_revenue_chf))}</p>
                                         <p style={{ margin: '0.3rem 0 0', fontWeight: 600 }}>{t('pages.feasibility.results.gain')}: {formatChf(Number(result.producer_gain_chf))}</p>
                                     </div>
                                 </div>
@@ -302,14 +302,14 @@ function FeasibilityCalculator() {
 
                             {result.participants.length > 0 && (
                                 <section className="card page-stack">
-                                    <h3 style={{ marginTop: 0 }}>{t('pages.feasibility.results.participantsTitle')}</h3>
+                                    <h3 className="mt-0">{t('pages.feasibility.results.participantsTitle')}</h3>
                                     <ParticipantResultsTable participants={result.participants} />
                                 </section>
                             )}
 
                             {result.participants.length > 0 && (
                                 <section className="card">
-                                    <h3 style={{ marginTop: 0 }}>{t('pages.feasibility.results.topologyTitle')}</h3>
+                                    <h3 className="mt-0">{t('pages.feasibility.results.topologyTitle')}</h3>
                                     <EnergyFlowChart
                                         totals={{
                                             produced_kwh: result.participants.reduce((sum, p) => sum + Number(p.annual_production_kwh), 0),

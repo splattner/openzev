@@ -31,9 +31,9 @@ export function RecoveryCodesNotice({ codes, onDismiss }: Props) {
     }
 
     return (
-        <div className="warning-banner" role="alert" style={{ marginBottom: '1.5rem' }}>
+        <div className="warning-banner mb-15" role="alert">
             <strong>{t('account.mfa.recoveryCodesShownOnceTitle')}</strong>
-            <p style={{ marginTop: '0.5rem' }}>{t('account.mfa.recoveryCodesShownOnceBody')}</p>
+            <p className="mt-05">{t('account.mfa.recoveryCodesShownOnceBody')}</p>
             <code
                 style={{
                     display: 'block',

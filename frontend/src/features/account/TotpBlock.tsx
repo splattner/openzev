@@ -60,7 +60,7 @@ export function TotpBlock({ device, onRecoveryCodes, onRemove }: Props) {
     })
 
     return (
-        <div style={{ marginBottom: '1.5rem' }}>
+        <div className="mb-15">
             <strong>{t('account.mfa.authenticatorTitle')}</strong>
             <p className="muted">{t('account.mfa.description')}</p>
 

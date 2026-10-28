@@ -172,13 +172,13 @@ export function TariffVersionForm({
       <form ref={formRef} id={formId} onSubmit={submit} className="form-grid" aria-busy={isPending || undefined}>
        <fieldset className="tariff-pane-fieldset" disabled={isPending}>
         {kind === 'rename' && (
-          <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>
+          <p className="muted grid-span-full m-0">
             {t('pages.tariffs.versions.renameHint', { count: series.version_count })}
           </p>
         )}
 
         {(kind === 'rename' || kind === 'duplicate') && (
-          <label style={{ gridColumn: '1 / -1' }}>
+          <label className="grid-span-full">
             <span>{t('pages.tariffs.form.name')}</span>
             <input value={name} onChange={(event) => setName(event.target.value)} required />
           </label>
@@ -199,7 +199,7 @@ export function TariffVersionForm({
         )}
 
         {kind === 'new-version' && (
-          <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>
+          <p className="muted grid-span-full m-0">
             {closingDate
               ? t('pages.tariffs.versions.closesPrevious', {
                 date: formatShortDate(closingDate, settings),
@@ -211,7 +211,7 @@ export function TariffVersionForm({
         )}
 
         {kind === 'new-version' && validFrom && !isDynamic && (
-          <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>
+          <p className="muted grid-span-full m-0">
             {t('pages.tariffs.versions.resultingPrices', {
               date: formatShortDate(validFrom, settings),
               prices: resultingPrices,
@@ -248,10 +248,10 @@ export function TariffVersionForm({
         )}
 
         {kind !== 'rename' && usesPeriods && (
-          <div style={{ gridColumn: '1 / -1' }}>
+          <div className="grid-span-full">
             <strong>{t('pages.tariffs.versions.prices')}</strong>
             {periods.length === 0 ? (
-              <p className="muted" style={{ marginTop: '0.5rem' }}>
+              <p className="muted mt-05">
                 <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />{' '}
                 {t('pages.tariffs.versions.noPricesToCopy')}
               </p>

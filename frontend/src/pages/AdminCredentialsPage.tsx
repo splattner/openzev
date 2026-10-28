@@ -193,7 +193,7 @@ export function AdminCredentialsPage({ embedded = false }: { embedded?: boolean 
                                             {credential.status !== 'revoked' && (
                                                 <button
                                                     type="button"
-                                                    className="button button-compact button-danger"
+                                                    className="button button-danger button-compact"
                                                     disabled={revokeMutation.isPending}
                                                     aria-label={t('account.tokens.revokeNamed', { name: credential.name })}
                                                     onClick={() => handleRevoke(credential)}

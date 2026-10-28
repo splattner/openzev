@@ -24,7 +24,7 @@ export function ParticipantRowsEditor({ form }: Props) {
                     }}
                 >
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.5rem', alignItems: 'end' }}>
-                        <label style={{ margin: 0 }}>
+                        <label className="m-0">
                             <span className="muted" style={{ fontSize: '0.72rem' }}>{t('pages.feasibility.form.participantName')}</span>
                             <input
                                 placeholder={t('pages.feasibility.form.participantNamePlaceholder')}
@@ -42,11 +42,11 @@ export function ParticipantRowsEditor({ form }: Props) {
                         </button>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                        <label style={{ margin: 0 }}>
+                        <label className="m-0">
                             <span className="muted" style={{ fontSize: '0.72rem' }}>{t('pages.feasibility.form.participantProduction')}</span>
                             <input type="number" step="any" min="0" {...form.register(`participants.${index}.annual_production_kwh` as const)} />
                         </label>
-                        <label style={{ margin: 0 }}>
+                        <label className="m-0">
                             <span className="muted" style={{ fontSize: '0.72rem' }}>{t('pages.feasibility.form.participantConsumption')}</span>
                             <input type="number" step="any" min="0" {...form.register(`participants.${index}.annual_consumption_kwh` as const)} />
                         </label>

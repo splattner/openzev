@@ -37,12 +37,12 @@ export function MeteringAssignmentFormModal({
     <FormModal isOpen={isOpen} title={title} onClose={onClose}>
       <form onSubmit={onSubmit} className="form-grid">
         {hasOpenEndedWarning && (
-          <div className="warning-banner" role="alert" style={{ gridColumn: '1 / -1' }}>
+          <div className="warning-banner grid-span-full" role="alert">
             {t('pages.meteringPoints.assignForm.openEndedWarning')}
           </div>
         )}
 
-        <label style={{ gridColumn: '1 / -1' }}>
+        <label className="grid-span-full">
           <span>{t('pages.meteringPoints.assignForm.participant')}</span>
           <select
             value={form.participant}
@@ -80,7 +80,7 @@ export function MeteringAssignmentFormModal({
           {t('pages.meteringPoints.assignForm.validToHint')}
         </p>
 
-        <label style={{ gridColumn: '1 / -1' }}>
+        <label className="grid-span-full">
           <span>{t('pages.meteringPoints.assignForm.allocationMode')}</span>
           <select
             value={form.allocation_mode}

@@ -197,7 +197,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
             {step === 'preview' && preview && (
                 <div className="page-stack">
                     <div>
-                        <p style={{ margin: 0 }}>
+                        <p className="m-0">
                             <strong>{t('pages.tariffs.import.documentFrom', { name: preview.dso_name })}</strong>
                         </p>
                         <p className="muted" style={{ margin: 0, wordBreak: 'break-all' }}>{preview.source_url}</p>
@@ -205,7 +205,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
 
                     {preview.errors.length > 0 && (
                         <div className="card error-banner">
-                            <p style={{ marginTop: 0 }}>
+                            <p className="mt-0">
                                 <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />{' '}
                                 {t('pages.tariffs.import.documentErrors', { count: preview.errors.length })}
                             </p>
@@ -255,13 +255,13 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                         </button>
                     </div>
 
-                    <p className="muted" style={{ margin: 0 }}>
+                    <p className="muted m-0">
                         {t('pages.tariffs.import.billingModeHint')}
                     </p>
 
                     {grouped.map((group) => (
                         <section key={group.category} className="card">
-                            <h3 style={{ marginTop: 0 }}>{t(`pages.tariffs.categories.${group.category}`)}</h3>
+                            <h3 className="mt-0">{t(`pages.tariffs.categories.${group.category}`)}</h3>
                             <div className="data-table table-scroll">
                                 <table>
                                     <thead>
@@ -295,7 +295,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                         </section>
                     ))}
 
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <label className="actions-row">
                         <input
                             type="checkbox"
                             checked={rememberUrl}
@@ -371,11 +371,11 @@ function ResultList({ title, empty, children }: { title: string; empty?: string;
     const hasItems = Array.isArray(children) ? children.length > 0 : Boolean(children)
     return (
         <section>
-            <h3 style={{ marginTop: 0 }}>{title}</h3>
+            <h3 className="mt-0">{title}</h3>
             {hasItems ? (
                 <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>{children}</ul>
             ) : (
-                <p className="muted" style={{ margin: 0 }}>{empty}</p>
+                <p className="muted m-0">{empty}</p>
             )}
         </section>
     )

@@ -72,7 +72,7 @@ export function AccountProfilePage() {
             {user?.must_change_password && (
                 <div className="warning-banner" role="alert" style={{ display: 'grid', gap: '0.35rem', maxWidth: '1000px' }}>
                     <strong>{t('account.passwordChangeRequired')}</strong>
-                    <p style={{ margin: 0 }}>{t('account.passwordChangeRequiredDescription')}</p>
+                    <p className="m-0">{t('account.passwordChangeRequiredDescription')}</p>
                 </div>
             )}
 

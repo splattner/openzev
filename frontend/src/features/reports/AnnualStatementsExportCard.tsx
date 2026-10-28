@@ -160,25 +160,25 @@ export function AnnualStatementsExportCard({
 
     return (
         <section className="card">
-            <h3 style={{ marginTop: 0 }}>{t('pages.reports.annualStatement.title')}</h3>
-            <p className="muted" style={{ marginBottom: '1rem' }}>
+            <h3 className="mt-0">{t('pages.reports.annualStatement.title')}</h3>
+            <p className="muted mb-1">
                 {t('pages.reports.annualStatement.ownerDescription')}
             </p>
 
             {actionFailed || (job && job.status === 'failed') ? (
-                <p className="error-text" role="alert" style={{ marginTop: '0.5rem' }}>
+                <p className="error-text mt-05" role="alert">
                     {job && job.status === 'failed' && job.error_message
                         ? job.error_message
                         : t('pages.reports.annualStatement.error')}
                 </p>
             ) : null}
             {job && job.status === 'completed' && job.expired ? (
-                <p className="muted" role="status" style={{ marginTop: '0.5rem' }}>
+                <p className="muted mt-05" role="status">
                     {t('pages.reports.annualStatement.expired')}
                 </p>
             ) : null}
             {job && job.status === 'completed' && !job.expired && (job.omitted_count ?? 0) > 0 ? (
-                <p className="error-text" role="alert" style={{ marginTop: '0.5rem' }}>
+                <p className="error-text mt-05" role="alert">
                     {t('pages.reports.annualStatement.partialWarning', {
                         omitted: job.omitted_count,
                         total: (job.generated_count ?? 0) + (job.omitted_count ?? 0),
@@ -197,7 +197,7 @@ export function AnnualStatementsExportCard({
                             <FontAwesomeIcon icon={faDownload} fixedWidth />
                             {t('pages.reports.annualStatement.downloadAll')}
                         </button>
-                        <button type="button" className="button" disabled={starting} onClick={prepare}>
+                        <button type="button" className="button button-primary" disabled={starting} onClick={prepare}>
                             {t('pages.reports.annualStatement.prepareAgain')}
                         </button>
                     </>

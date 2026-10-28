@@ -119,23 +119,23 @@ function SourcePanel({ point, canManage, isOwnMeter, confirm, onClose }: Props &
             {source && (
                 <div style={{ display: 'grid', gap: '1rem' }}>
                     {isOwnMeter ? (
-                        <p className="muted" style={{ margin: 0 }}>
+                        <p className="muted m-0">
                             <Link to="/me/metering-points">{t('supplementary.owner.manageOwn')}</Link>
                         </p>
                     ) : (
-                        <p className="muted" style={{ margin: 0 }}>{t('supplementary.owner.readOnlyNote', { name: source.participant_name })}</p>
+                        <p className="muted m-0">{t('supplementary.owner.readOnlyNote', { name: source.participant_name })}</p>
                     )}
                     <dl style={{ display: 'grid', gridTemplateColumns: 'minmax(7rem, max-content) minmax(0, 1fr)', overflowWrap: 'anywhere', gap: '0.4rem 1rem', margin: 0 }}>
                         <dt className="muted">{t('supplementary.owner.provider')}</dt>
-                        <dd style={{ margin: 0 }}>{t(`supplementary.provider.${source.provider}`)}</dd>
+                        <dd className="m-0">{t(`supplementary.provider.${source.provider}`)}</dd>
                         <dt className="muted">{t('supplementary.owner.status')}</dt>
-                        <dd style={{ margin: 0 }}><SourceStatusBadge status={source.status} /></dd>
+                        <dd className="m-0"><SourceStatusBadge status={source.status} /></dd>
                         <dt className="muted">{t('supplementary.card.lastSync')}</dt>
-                        <dd style={{ margin: 0 }}>
+                        <dd className="m-0">
                             {source.last_success_at ? formatDateTime(source.last_success_at, settings) : t('supplementary.never')}
                         </dd>
                         <dt className="muted">{t('supplementary.card.covered')}</dt>
-                        <dd style={{ margin: 0 }}>
+                        <dd className="m-0">
                             {source.covers_from && source.synced_through
                                 ? t('supplementary.card.coveredRange', {
                                       from: formatDateTime(source.covers_from, settings),
@@ -144,7 +144,7 @@ function SourcePanel({ point, canManage, isOwnMeter, confirm, onClose }: Props &
                                 : t('supplementary.card.noData')}
                         </dd>
                         <dt className="muted">{t('supplementary.card.reconciliation')}</dt>
-                        <dd style={{ margin: 0 }}><ReconciliationSummary reconciliation={source.reconciliation} /></dd>
+                        <dd className="m-0"><ReconciliationSummary reconciliation={source.reconciliation} /></dd>
                     </dl>
                     {source.last_error && <div className="warning-banner" role="status">{source.last_error}</div>}
 

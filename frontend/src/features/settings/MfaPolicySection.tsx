@@ -64,9 +64,9 @@ export function MfaPolicySection() {
 
     return (
         <section className="card">
-            <div style={{ marginBottom: '1rem' }}>
+            <div className="mb-1">
                 <h3 style={{ marginTop: 0, marginBottom: '0.35rem' }}>{t('adminSystemSettings.mfaPolicy.title')}</h3>
-                <p className="muted" style={{ margin: 0 }}>{t('adminSystemSettings.mfaPolicy.description')}</p>
+                <p className="muted m-0">{t('adminSystemSettings.mfaPolicy.description')}</p>
             </div>
 
             {keyMissing && <Notice tone="warning">{t('adminSystemSettings.mfaPolicy.keyMissing')}</Notice>}
@@ -83,7 +83,7 @@ export function MfaPolicySection() {
             <form onSubmit={handleSubmit}>
                 <fieldset className="form-grid" disabled={disabled}>
                     <div>
-                        <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <label className="actions-row">
                             <input
                                 type="checkbox"
                                 checked={required}

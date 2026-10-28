@@ -159,7 +159,7 @@ function EmailTemplateEditor({ templateKey }: { templateKey: EmailTemplateKey })
                         </label>
                         <div className="actions-row actions-row-wrap">
                             <button
-                                className="button"
+                                className="button button-primary"
                                 type="button"
                                 disabled={busy}
                                 onClick={() => void save()}

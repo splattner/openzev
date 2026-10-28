@@ -46,7 +46,7 @@ export function BulkDeleteModal(props: BulkDeleteModalProps) {
                 <p className="muted">{t('pages.imports.delete.overwriteProtected')}</p>
                 {!armed ? (
                     <>
-                        <p className="muted" style={{ margin: 0 }}>
+                        <p className="muted m-0">
                             {zevName
                                 ? t('pages.imports.delete.bulkDescription', { zevName })
                                 : t('pages.imports.delete.bulkDescriptionAll')}
@@ -78,7 +78,7 @@ export function BulkDeleteModal(props: BulkDeleteModalProps) {
                             </>
                         )}
 
-                        <p className="muted" style={{ margin: 0 }}>
+                        <p className="muted m-0">
                             {t('pages.imports.delete.visibleImpact', { count: visibleCount })}
                         </p>
 
@@ -93,7 +93,7 @@ export function BulkDeleteModal(props: BulkDeleteModalProps) {
                                     ))}
                                 </ul>
                                 {protectedCount > protectedExamples.length && (
-                                    <p className="muted" style={{ margin: 0 }}>
+                                    <p className="muted m-0">
                                         {t('pages.imports.delete.blockedMore', { count: protectedCount - protectedExamples.length })}
                                     </p>
                                 )}
@@ -110,7 +110,7 @@ export function BulkDeleteModal(props: BulkDeleteModalProps) {
                     </>
                 ) : (
                     <>
-                        <p style={{ margin: 0 }}>
+                        <p className="m-0">
                             {mode === 'period'
                                 ? zevName
                                     ? t('pages.imports.delete.bulkPeriodMessage', { from: formattedDateFrom, to: formattedDateTo, zevName })
@@ -119,12 +119,12 @@ export function BulkDeleteModal(props: BulkDeleteModalProps) {
                                     ? t('pages.imports.delete.bulkAllMessage', { zevName })
                                     : t('pages.imports.delete.bulkAllMessageAll')}
                         </p>
-                        <p className="muted" style={{ margin: 0 }}>
+                        <p className="muted m-0">
                             {t('pages.imports.delete.visibleImpact', { count: visibleCount })}{' '}
                             {t('pages.imports.delete.readingImpactUnknown')}
                         </p>
                         {blocked && (
-                            <p className="muted" style={{ margin: 0 }}>
+                            <p className="muted m-0">
                                 {t('pages.imports.delete.blockedNotice', { count: protectedCount })}
                             </p>
                         )}

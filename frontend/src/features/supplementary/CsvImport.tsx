@@ -79,7 +79,7 @@ export function CsvImport({ sourceId }: { sourceId: string }) {
                 </button>
             </div>
             {result && (
-                <p role="status" className="muted" style={{ margin: 0 }}>
+                <p role="status" className="muted m-0">
                     {t(result.dryRun ? 'supplementary.csv.checked' : 'supplementary.csv.result', {
                         accepted: result.data.accepted,
                         updated: result.data.updated,
@@ -89,7 +89,7 @@ export function CsvImport({ sourceId }: { sourceId: string }) {
             )}
             {error && (
                 <div className="error-banner" role="alert">
-                    <p style={{ margin: 0 }}>{error.message}</p>
+                    <p className="m-0">{error.message}</p>
                     {error.rejected.length > 0 && (
                         <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem' }}>
                             {error.rejected.slice(0, MAX_ERRORS_SHOWN).map((row) => (

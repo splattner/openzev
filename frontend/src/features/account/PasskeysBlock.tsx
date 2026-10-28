@@ -81,7 +81,7 @@ export function PasskeysBlock({ passkeys, onRecoveryCodes, onRemove }: Props) {
     }
 
     return (
-        <div style={{ marginBottom: '1.5rem' }}>
+        <div className="mb-15">
             <strong>{t('account.passkeys.title')}</strong>
             <p className="muted">{t('account.passkeys.description')}</p>
 

@@ -394,7 +394,7 @@ function TemplateEditor({
                             contract defaults; the annual-statement template
                             is standalone, so the hint only applies there. */}
                         {templateType !== 'annual_statement' && !showPreview && (
-                            <p className="muted" style={{ marginTop: '0.5rem' }}>
+                            <p className="muted mt-05">
                                 {t('admin.templateIncludeHint')}
                             </p>
                         )}
@@ -402,7 +402,7 @@ function TemplateEditor({
                             <div className="page-stack">
                                 <div className="actions-row">
                                     <button
-                                        className={`button button-compact ${debugSource ? 'button-secondary' : ''}`}
+                                        className={`button button-compact ${debugSource ? 'button-secondary' : 'button-primary'}`}
                                         type="button"
                                         aria-pressed={!debugSource}
                                         onClick={() => setDebugSource(false)}
@@ -410,7 +410,7 @@ function TemplateEditor({
                                         {t('pdf.previewTitle')}
                                     </button>
                                     <button
-                                        className={`button button-compact ${debugSource ? '' : 'button-secondary'}`}
+                                        className={`button button-compact ${debugSource ? 'button-primary' : 'button-secondary'}`}
                                         type="button"
                                         aria-pressed={debugSource}
                                         onClick={() => setDebugSource(true)}
@@ -452,7 +452,7 @@ function TemplateEditor({
                         {previewError && <p className="error-banner">{previewError}</p>}
                         <div className="actions-row actions-row-wrap">
                             <button
-                                className="button"
+                                className="button button-primary"
                                 type="button"
                                 disabled={busy}
                                 onClick={() => void save()}

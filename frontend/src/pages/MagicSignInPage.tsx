@@ -113,7 +113,7 @@ export function MagicSignInPage() {
                         />
                     </label>
                     {mfaError && <div className="error-banner">{mfaError}</div>}
-                    <button className="button" type="submit" disabled={mfaLoading}>
+                    <button className="button button-primary" type="submit" disabled={mfaLoading}>
                         {mfaLoading ? t('common.loading') : t('auth.submit')}
                     </button>
                 </form>

@@ -40,7 +40,7 @@ export function AnnualReportSection({ zevId, year }: AnnualReportSectionProps) {
     if (reportQuery.isError) {
         return (
             <section className="card">
-                <p className="error-text" role="alert" style={{ margin: 0 }}>{t('pages.reports.annualReport.error')}</p>
+                <p className="error-text m-0" role="alert">{t('pages.reports.annualReport.error')}</p>
             </section>
         )
     }
@@ -49,8 +49,8 @@ export function AnnualReportSection({ zevId, year }: AnnualReportSectionProps) {
     if (!report.has_data) {
         return (
             <section className="card">
-                <h3 style={{ marginTop: 0 }}>{t('pages.reports.annualReport.title', { year })}</h3>
-                <p className="muted" style={{ margin: 0 }}>{t('pages.reports.annualReport.noData', { year })}</p>
+                <h3 className="mt-0">{t('pages.reports.annualReport.title', { year })}</h3>
+                <p className="muted m-0">{t('pages.reports.annualReport.noData', { year })}</p>
             </section>
         )
     }
@@ -128,7 +128,7 @@ function AnnualTrendCard({ report }: { report: AnnualReport }) {
     const previous = String(report.year - 1)
     return (
         <section className="card">
-            <h3 style={{ marginTop: 0 }}>{t('pages.reports.annualReport.trend.title')}</h3>
+            <h3 className="mt-0">{t('pages.reports.annualReport.trend.title')}</h3>
             <p className="muted">{t('pages.reports.annualReport.trend.description')}</p>
             <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={data} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
@@ -186,7 +186,7 @@ function ParticipantSavingsCard({ report }: { report: AnnualReport }) {
     const { t } = useTranslation()
     return (
         <section className="card">
-            <h3 style={{ marginTop: 0 }}>{t('pages.reports.annualReport.participants.title')}</h3>
+            <h3 className="mt-0">{t('pages.reports.annualReport.participants.title')}</h3>
             <p className="muted">{t('pages.reports.annualReport.participants.description')}</p>
             {report.participants.length === 0 ? (
                 <p className="muted">{t('pages.reports.annualReport.participants.empty')}</p>
@@ -258,7 +258,7 @@ function ProducerUpliftCard({ report }: { report: AnnualReport }) {
     if (producers.length === 0) return null
     return (
         <section className="card">
-            <h3 style={{ marginTop: 0 }}>{t('pages.reports.annualReport.uplift.title')}</h3>
+            <h3 className="mt-0">{t('pages.reports.annualReport.uplift.title')}</h3>
             <p className="muted">{t('pages.reports.annualReport.uplift.description')}</p>
             <div className="table-scroll">
                 <table className="participant-table participant-table--static">

@@ -30,7 +30,7 @@ function ProbeCard({ status, title, children }: ProbeProps) {
     const { t } = useTranslation()
     return (
         <div className="card system-health-probe">
-            <h3 style={{ marginTop: 0 }}>
+            <h3 className="mt-0">
                 <HealthDot status={status} /> {title}
             </h3>
             <p className="muted">
@@ -63,7 +63,7 @@ export function AdminSystemHealthPanel() {
         <div className="page-stack">
             <div className="grid grid-3">
                 <ProbeCard status={health.database.status} title={t('pages.adminOverview.health.database.title')}>
-                    <p className="muted" style={{ margin: 0 }}>
+                    <p className="muted m-0">
                         {health.database.engine}
                         {health.database.size_bytes != null && (
                             <> · {formatBytes(health.database.size_bytes)}</>
@@ -71,7 +71,7 @@ export function AdminSystemHealthPanel() {
                     </p>
                 </ProbeCard>
                 <ProbeCard status={health.celery.status} title={t('pages.adminOverview.health.celery.title')}>
-                    <p className="muted" style={{ margin: 0 }}>
+                    <p className="muted m-0">
                         {health.celery.workers_responding == null
                             ? t('pages.adminOverview.health.celery.noWorkers')
                             : t('pages.adminOverview.health.celery.workers', { count: health.celery.workers_responding })}
@@ -82,14 +82,14 @@ export function AdminSystemHealthPanel() {
                     {health.celery.detail && <p className="muted text-error">{health.celery.detail}</p>}
                 </ProbeCard>
                 <ProbeCard status={health.mfa.status} title={t('pages.adminOverview.health.mfa.title')}>
-                    <p className="muted" style={{ margin: 0 }}>
+                    <p className="muted m-0">
                         {t(health.mfa.encryption_key_configured
                             ? 'pages.adminOverview.health.mfa.configured'
                             : 'pages.adminOverview.health.mfa.notConfigured')}
                     </p>
                 </ProbeCard>
                 <ProbeCard status={health.backups.status} title={t('pages.adminOverview.health.backups.title')}>
-                    <p className="muted" style={{ margin: 0 }}>
+                    <p className="muted m-0">
                         {health.backups.status === 'unknown'
                             ? t('pages.adminOverview.health.backups.notSetUp')
                             : health.backups.last_successful_at
@@ -108,12 +108,12 @@ export function AdminSystemHealthPanel() {
                                 : t('pages.adminOverview.health.backups.unencrypted')}
                         </p>
                     )}
-                    <p className="muted" style={{ margin: 0 }}>
+                    <p className="muted m-0">
                         <Link to="/admin/system-settings?tab=backup">{t('pages.adminOverview.health.backups.manage')}</Link>
                     </p>
                 </ProbeCard>
                 <ProbeCard status={health.supplementary.status} title={t('pages.adminOverview.health.supplementary.title')}>
-                    <p className="muted" style={{ margin: 0 }}>
+                    <p className="muted m-0">
                         {health.supplementary.feature_enabled === false
                             ? t('pages.adminOverview.health.supplementary.off')
                             : health.supplementary.feature_enabled
@@ -131,18 +131,18 @@ export function AdminSystemHealthPanel() {
                         </p>
                     )}
                     {health.supplementary.oldest_last_success_at && (
-                        <p className="muted" style={{ margin: 0 }}>
+                        <p className="muted m-0">
                             {t('pages.adminOverview.health.supplementary.oldest', {
                                 time: formatDateTime(health.supplementary.oldest_last_success_at),
                             })}
                         </p>
                     )}
-                    <p className="muted" style={{ margin: 0 }}>
+                    <p className="muted m-0">
                         <Link to="/admin/system-settings?tab=features">{t('pages.adminOverview.health.supplementary.manage')}</Link>
                     </p>
                 </ProbeCard>
                 <ProbeCard status={health.email.status} title={t('pages.adminOverview.health.email.title')}>
-                    <p className="muted" style={{ margin: 0 }}>
+                    <p className="muted m-0">
                         {t(`pages.adminOverview.health.email.mode.${health.email.mode}`)}
                     </p>
                 </ProbeCard>

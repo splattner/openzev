@@ -10,7 +10,7 @@ export function NotFoundPage() {
             <div className="card not-found-card">
                 <h2>{t('pages.notFound.title')}</h2>
                 <p className="muted">{t('pages.notFound.description')}</p>
-                <Link className="button" to="/">{t('common.back')}</Link>
+                <Link className="button button-primary" to="/">{t('common.back')}</Link>
             </div>
         </div>
     )

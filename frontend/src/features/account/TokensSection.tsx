@@ -117,7 +117,7 @@ export function TokensSection({ onRevoke, onRotate }: Props) {
     return (
         <div className="card">
             <h2>{t('account.tokens.section')}</h2>
-            <p className="muted" style={{ marginBottom: '1.5rem' }}>{t('account.tokens.description')}</p>
+            <p className="muted mb-15">{t('account.tokens.description')}</p>
 
             {fresh?.kind === 'api_key' && (
                 <SecretReveal
@@ -177,7 +177,7 @@ export function TokensSection({ onRevoke, onRotate }: Props) {
             )}
 
             {creating === null && (
-                <div className="actions-row actions-row-wrap" style={{ marginBottom: '1.5rem' }}>
+                <div className="actions-row actions-row-wrap mb-15">
                     {(query.data?.can_create.api_key || isImpersonating) && (
                         <button
                             type="button"
@@ -350,6 +350,7 @@ function CreateApiKeyForm({ onCancel, onCreated }: { onCancel: () => void; onCre
 
     return (
         <form
+            className="mb-15"
             onSubmit={(event) => {
                 event.preventDefault()
                 if (!name.trim()) {
@@ -358,7 +359,6 @@ function CreateApiKeyForm({ onCancel, onCreated }: { onCancel: () => void; onCre
                 }
                 create.mutate()
             }}
-            style={{ marginBottom: '1.5rem' }}
         >
             <h3>{t('account.tokens.newApiKey')}</h3>
             <p className="muted">{t('account.apiKeys.description')}</p>
@@ -372,7 +372,7 @@ function CreateApiKeyForm({ onCancel, onCreated }: { onCancel: () => void; onCre
                 />
             </label>
             <ExpirySelect value={expiryDays} onChange={setExpiryDays} />
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <label className="actions-row">
                 <input type="checkbox" checked={readOnly} onChange={(event) => setReadOnly(event.target.checked)} />
                 <span>{t('account.apiKeys.readOnlyLabel')}</span>
             </label>
@@ -433,6 +433,7 @@ function CreateAnalyticsTokenForm({
 
     return (
         <form
+            className="mb-15"
             onSubmit={(event) => {
                 event.preventDefault()
                 if (!name.trim()) {
@@ -441,7 +442,6 @@ function CreateAnalyticsTokenForm({
                 }
                 create.mutate()
             }}
-            style={{ marginBottom: '1.5rem' }}
         >
             <h3>{t('account.tokens.newAnalytics')}</h3>
             <p className="muted">{t('account.tokens.analytics.description')}</p>

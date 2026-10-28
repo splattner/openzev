@@ -32,11 +32,11 @@ export function AccountCreatedNotice({ notice, onDismiss }: { notice: AccountCre
                     <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>{t('pages.accounts.createModal.createdTitle')}</h3>
                     {notice.password ? (
                         <>
-                            <p className="muted" style={{ marginTop: 0 }}>{t('pages.accounts.createModal.createdMessage', { username: notice.username })}</p>
+                            <p className="muted mt-0">{t('pages.accounts.createModal.createdMessage', { username: notice.username })}</p>
                             <p style={{ margin: '0.2rem 0', fontFamily: 'monospace', wordBreak: 'break-all' }}>{notice.password}</p>
                         </>
                     ) : (
-                        <p className="muted" style={{ marginTop: 0 }}>{t('pages.accounts.createModal.createdMessageOwnPassword', { username: notice.username })}</p>
+                        <p className="muted mt-0">{t('pages.accounts.createModal.createdMessageOwnPassword', { username: notice.username })}</p>
                     )}
                 </div>
                 <div className="actions-row actions-row-wrap actions-row-end">

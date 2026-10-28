@@ -105,7 +105,7 @@ export function ParticipantFormModal({
     <FormModal isOpen={isOpen} title={title} onClose={onClose} maxWidth="960px">
       <form onSubmit={form.handleSubmit(submit)} className="form-grid">
         {isCreate && (partiesQuery.data ?? []).length > 0 && (
-          <label style={{ gridColumn: '1 / -1' }}>
+          <label className="grid-span-full">
             <span>{t('pages.participants.form.sameParty')}</span>
             <select value={partyId} onChange={(event) => (event.target.value ? pickParty(event.target.value) : form.setValue('party', ''))}>
               <option value="">{t('pages.participants.form.newParty')}</option>
@@ -117,7 +117,7 @@ export function ParticipantFormModal({
           </label>
         )}
         {shared && (
-          <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>
+          <p className="muted grid-span-full m-0">
             {t('pages.participants.form.samePartyKept', {
               name: (partiesQuery.data ?? []).find((party) => party.id === partyId)?.display_name ?? '',
             })}
@@ -156,7 +156,7 @@ export function ParticipantFormModal({
           <span>{t(kind === 'organisation' ? 'pages.participants.form.contactLastName' : 'pages.participants.form.lastName')}</span>
           <input {...form.register('last_name')} required={kind === 'person'} />
         </label>
-        <label style={{ gridColumn: '1 / -1' }}>
+        <label className="grid-span-full">
           <span>{t('pages.participants.form.nameAddition')}</span>
           <input {...form.register('name_addition')} />
           <small className="muted">{t('pages.participants.form.nameAdditionHint')}</small>
@@ -170,7 +170,7 @@ export function ParticipantFormModal({
           <input {...form.register('phone')} />
         </label>
         {isCreate && addressBuildings.length === 1 && (
-          <div style={{ gridColumn: '1 / -1' }}>
+          <div className="grid-span-full">
             <button
               type="button"
               className="button button-secondary button-compact"
@@ -181,7 +181,7 @@ export function ParticipantFormModal({
           </div>
         )}
         {isCreate && addressBuildings.length > 1 && (
-          <label style={{ gridColumn: '1 / -1' }}>
+          <label className="grid-span-full">
             <span>{t('pages.participants.form.copyFromBuilding')}</span>
             <select
               value=""
@@ -197,11 +197,11 @@ export function ParticipantFormModal({
             </select>
           </label>
         )}
-        <label style={{ gridColumn: '1 / -1' }}>
+        <label className="grid-span-full">
           <span>{t('pages.participants.form.addressLine1')}</span>
           <input {...form.register('address_line1')} />
         </label>
-        <label style={{ gridColumn: '1 / -1' }}>
+        <label className="grid-span-full">
           <span>{t('pages.participants.form.addressLine2')}</span>
           <input {...form.register('address_line2')} />
         </label>
@@ -249,13 +249,13 @@ export function ParticipantFormModal({
         <p className="muted" style={{ gridColumn: '1 / -1', margin: 0, fontSize: '0.82rem' }}>
           {t('pages.participants.form.allocationWeightHint')}
         </p>
-        <label style={{ gridColumn: '1 / -1' }}>
+        <label className="grid-span-full">
           <span>{t('pages.participants.form.notes')}</span>
           <textarea {...form.register('notes')} rows={3} />
         </label>
 
         {Object.keys(form.formState.errors).length > 0 && (
-          <div className="error-banner" style={{ gridColumn: '1 / -1' }}>
+          <div className="error-banner grid-span-full">
             {form.formState.errors.organisation_name?.message
               || form.formState.errors.first_name?.message
               || form.formState.errors.last_name?.message

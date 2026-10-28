@@ -129,13 +129,13 @@ export function AuditEventDrawer({ eventId, onClose, statusBadgeClass }: AuditEv
                             {event.reason && (
                                 <div>
                                     <strong>{t('pages.auditLogs.detail.reason')}</strong>
-                                    <p style={{ marginTop: '0.5rem' }}>{event.reason}</p>
+                                    <p className="mt-05">{event.reason}</p>
                                 </div>
                             )}
 
                             <div>
                                 <strong>{t('pages.auditLogs.detail.changes')}</strong>
-                                <div style={{ marginTop: '0.5rem' }}>
+                                <div className="mt-05">
                                     <ChangesDiff changes={event.changes_json} />
                                 </div>
                             </div>

@@ -400,7 +400,7 @@ export function AdminDynamicSourcesPanel() {
           onCancel={handleCancel}
           onConfirm={handleConfirm}
         >
-          <label style={{ gridColumn: '1 / -1' }}>
+          <label className="grid-span-full">
             <span>{t('pages.dynamicSources.confirmLabel', { label: destructive.source.label })}</span>
             <input value={confirmation} onChange={(event) => { confirmationRef.current = event.target.value; setConfirmation(event.target.value) }} required />
           </label>

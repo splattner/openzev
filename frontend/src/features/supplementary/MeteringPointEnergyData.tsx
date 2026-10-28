@@ -51,7 +51,7 @@ export function MeteringPointEnergyData({ point, source, sourcesUnavailable, onR
                     <small className="muted">{point.zev_name}</small>
                 </div>
                 {sourcesUnavailable === 'loading' ? (
-                    <p className="muted" style={{ margin: 0 }}>{t('common.loading')}</p>
+                    <p className="muted m-0">{t('common.loading')}</p>
                 ) : (
                     <div className="error-banner" role="alert">
                         {t('supplementary.section.loadError')}
@@ -74,7 +74,7 @@ export function MeteringPointEnergyData({ point, source, sourcesUnavailable, onR
                     <h3 style={{ margin: 0, overflowWrap: 'anywhere' }}>{point.meter_id}</h3>
                     <small className="muted">{point.zev_name}</small>
                 </div>
-                <p className="muted" style={{ margin: 0 }}>{t('supplementary.section.notConnected')}</p>
+                <p className="muted m-0">{t('supplementary.section.notConnected')}</p>
                 <div className="actions-row actions-row-wrap">
                     <button type="button" className="button button-primary" disabled={isImpersonating} title={isImpersonating ? t('account.impersonationRestrictions') : undefined} onClick={() => setConnecting(true)}>
                         {t('supplementary.section.connect')}

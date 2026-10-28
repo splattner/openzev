@@ -105,7 +105,7 @@ export function MeteringPointFormModal({
           {fieldErrors.meter_type && <span className="field-error" role="alert">{fieldErrors.meter_type}</span>}
         </label>
 
-        <div style={{ gridColumn: '1 / -1' }}>
+        <div className="grid-span-full">
           <Switch
             checked={form.is_active}
             onChange={(event) => {
@@ -118,7 +118,7 @@ export function MeteringPointFormModal({
         </div>
 
         {(form.meter_type === 'bidirectional' || form.meter_type === 'production') && (
-          <div style={{ gridColumn: '1 / -1' }}>
+          <div className="grid-span-full">
             <Switch
               checked={form.has_behind_meter_generation ?? false}
               onChange={(event) => {
@@ -132,7 +132,7 @@ export function MeteringPointFormModal({
         )}
 
         {buildings.length > 1 && (
-          <label style={{ gridColumn: '1 / -1' }}>
+          <label className="grid-span-full">
             <span>{t('pages.meteringPoints.form.building')}</span>
             <select
               value={form.building ?? ''}
@@ -150,7 +150,7 @@ export function MeteringPointFormModal({
           </label>
         )}
 
-        <label style={{ gridColumn: '1 / -1' }}>
+        <label className="grid-span-full">
           <span>{t('pages.meteringPoints.form.location')}</span>
           <input
             value={form.location_description ?? ''}

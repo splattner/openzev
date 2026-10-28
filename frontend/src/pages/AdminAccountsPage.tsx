@@ -531,12 +531,12 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                         </select>
                     </label>
 
-                    <div className="muted" style={{ gridColumn: '1 / -1' }}>
+                    <div className="muted grid-span-full">
                         {t('pages.accounts.createModal.passwordHint')}
                     </div>
-                    {createUserError && <div className="error-banner" style={{ gridColumn: '1 / -1' }}>{createUserError}</div>}
+                    {createUserError && <div className="error-banner grid-span-full">{createUserError}</div>}
 
-                    <div className="actions-row actions-row-end actions-row-wrap" style={{ gridColumn: '1 / -1' }}>
+                    <div className="actions-row actions-row-end actions-row-wrap grid-span-full">
                         <FormModalCancelButton onCancel={() => setShowCreateUserModal(false)} icon={<FontAwesomeIcon icon={faXmark} fixedWidth />} />
                         <button className="button button-primary" type="submit" disabled={createUserMutation.isPending}>
                             <FontAwesomeIcon icon={faCirclePlus} fixedWidth />
@@ -577,12 +577,12 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                         </select>
                     </label>
 
-                    <div className="muted" style={{ gridColumn: '1 / -1' }}>
+                    <div className="muted grid-span-full">
                         {editingSelf ? t('pages.accounts.editModal.selfRoleNotice') : t('pages.accounts.editModal.roleHint')}
                     </div>
-                    {editUserError && <div className="error-banner" style={{ gridColumn: '1 / -1' }}>{editUserError}</div>}
+                    {editUserError && <div className="error-banner grid-span-full">{editUserError}</div>}
 
-                    <div className="actions-row actions-row-end actions-row-wrap" style={{ gridColumn: '1 / -1' }}>
+                    <div className="actions-row actions-row-end actions-row-wrap grid-span-full">
                         <FormModalCancelButton onCancel={() => setShowEditUserModal(false)} icon={<FontAwesomeIcon icon={faXmark} fixedWidth />} />
                         <button className="button button-primary" type="submit" disabled={updateUserMutation.isPending}>
                             <FontAwesomeIcon icon={faCheck} fixedWidth />

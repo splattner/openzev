@@ -84,7 +84,7 @@ export function InvoiceDataReviewNotice({
                 </ul>
             )}
             {variant === 'detail' && impacts.length > 20 && (
-                <button type="button" className="button-secondary" onClick={() => setShowAll(!showAll)}>
+                <button type="button" className="button button-secondary button-compact" onClick={() => setShowAll(!showAll)}>
                     {t(showAll ? 'pages.invoices.dataReview.showLess' : 'pages.invoices.dataReview.showAll', { count: impacts.length })}
                 </button>
             )}

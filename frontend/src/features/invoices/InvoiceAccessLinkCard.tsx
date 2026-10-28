@@ -30,10 +30,10 @@ export function InvoiceAccessLinkCard({
 
     return (
         <section className="card">
-            <h3 style={{ marginTop: 0 }}>{t('pages.invoiceDetail.accessLink.title')}</h3>
+            <h3 className="mt-0">{t('pages.invoiceDetail.accessLink.title')}</h3>
             <p className="muted">{t('pages.invoiceDetail.accessLink.description')}</p>
 
-            <div className="inline-form grid grid-2" style={{ marginBottom: '1rem' }}>
+            <div className="inline-form grid grid-2 mb-1">
                 <div>
                     <strong>{t('pages.invoiceDetail.accessLink.created')}</strong>
                     <div>{formatShortDate(link.created_at, settings)}</div>
@@ -50,7 +50,7 @@ export function InvoiceAccessLinkCard({
 
             <button
                 type="button"
-                className="button danger"
+                className="button button-danger"
                 disabled={revokeMutation.isPending}
                 onClick={() =>
                     confirm({

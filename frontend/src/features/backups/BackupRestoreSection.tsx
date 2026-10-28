@@ -140,7 +140,7 @@ export function BackupRestoreSection({ status }: { status?: BackupStatus } = {})
     return (
         <section className="card page-stack">
             <div>
-                <h3 style={{ margin: 0 }}>{t('pages.backups.restore.title')}</h3>
+                <h3 className="m-0">{t('pages.backups.restore.title')}</h3>
                 <p className="muted" style={{ margin: '0.25rem 0 0' }}>
                     {t('pages.backups.restore.description', {
                         command: 'python manage.py openzev_restore --mode instance',
@@ -219,7 +219,7 @@ export function BackupRestoreSection({ status }: { status?: BackupStatus } = {})
 
             {plan && job && job.status !== 'queued' && job.status !== 'running' && (
                 <div className="page-stack">
-                    <h4 style={{ margin: 0 }}>
+                    <h4 className="m-0">
                         {job.dry_run ? t('pages.backups.restore.previewTitle', { name: plan.zev.name }) : t('pages.backups.restore.restoredTitle', { name: plan.zev.name })}
                     </h4>
                     {!job.dry_run && job.status === 'completed' && (
@@ -310,7 +310,7 @@ function RestoreHistory({ jobs, loading }: { jobs: RestoreJob[]; loading: boolea
 
     return (
         <div className="page-stack">
-            <h4 style={{ margin: 0 }}>{t('pages.backups.restore.history')}</h4>
+            <h4 className="m-0">{t('pages.backups.restore.history')}</h4>
             <div className="table-card">
                 <table className="data-table">
                     <thead>

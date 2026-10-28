@@ -100,7 +100,7 @@ function MyMeteringPointsView() {
 
             {isEmpty && (
                 <div className="card">
-                    <h3 style={{ marginTop: 0 }}>{t('pages.myMeteringPoints.empty.title')}</h3>
+                    <h3 className="mt-0">{t('pages.myMeteringPoints.empty.title')}</h3>
                     <p className="muted" style={{ marginBottom: 0 }}>
                         {t(isParticipantScope ? 'pages.myMeteringPoints.empty.participant' : 'pages.myMeteringPoints.empty.manager')}
                     </p>
@@ -108,7 +108,7 @@ function MyMeteringPointsView() {
             )}
 
             {energyData.featureOn && eligible.length > 0 && (
-                <p className="muted" style={{ margin: 0 }}>{t('supplementary.section.description')}</p>
+                <p className="muted m-0">{t('supplementary.section.description')}</p>
             )}
 
             {eligible.map((point) => (
@@ -153,7 +153,7 @@ function PlainMeteringPoint({ point, showEnergyDataNote }: { point: MeteringPoin
                 {point.has_behind_meter_generation && <BehindMeterBadge />}
             </div>
             {showEnergyDataNote && point.has_behind_meter_generation && (
-                <p className="muted" style={{ margin: 0 }}>{t('pages.myMeteringPoints.notHolder')}</p>
+                <p className="muted m-0">{t('pages.myMeteringPoints.notHolder')}</p>
             )}
             <div className="actions-row actions-row-wrap">
                 <MeteringDataLink meteringPointId={point.id} />

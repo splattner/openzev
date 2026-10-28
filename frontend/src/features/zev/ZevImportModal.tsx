@@ -144,7 +144,7 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
   return (
     <FormModal isOpen={isOpen} title={t('zevTransfer.importTitle')} onClose={close} maxWidth="640px">
       <div style={{ display: 'grid', gap: '1.25rem' }}>
-        <p className="muted" style={{ margin: 0 }}>
+        <p className="muted m-0">
           {t('zevTransfer.importDescription')}
         </p>
 
@@ -172,11 +172,11 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
               }}
             >
               <dt className="muted">{t('zevTransfer.sourceZev')}</dt>
-              <dd style={{ margin: 0 }}>{manifest.source_zev?.name || '—'}</dd>
+              <dd className="m-0">{manifest.source_zev?.name || '—'}</dd>
               <dt className="muted">{t('zevTransfer.exportedAt')}</dt>
-              <dd style={{ margin: 0 }}>{formatDateTime(manifest.exported_at, settings)}</dd>
+              <dd className="m-0">{formatDateTime(manifest.exported_at, settings)}</dd>
               <dt className="muted">{t('zevTransfer.formatVersion')}</dt>
-              <dd style={{ margin: 0 }}>{manifest.format_version}</dd>
+              <dd className="m-0">{manifest.format_version}</dd>
             </dl>
 
             <label>

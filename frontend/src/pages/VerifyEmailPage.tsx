@@ -197,7 +197,7 @@ export function VerifyEmailPage() {
 
                     {pwError ? <div className="error-banner">{pwError}</div> : null}
 
-                    <button className="button" type="submit" disabled={pwLoading}>
+                    <button className="button button-primary" type="submit" disabled={pwLoading}>
                         {pwLoading ? t('common.loading') : t('auth.verify.passwordSubmit')}
                     </button>
                 </form>
@@ -358,7 +358,7 @@ export function VerifyEmailPage() {
 
                     {zevError ? <div className="error-banner">{zevError}</div> : null}
 
-                    <button className="button" type="submit" disabled={zevLoading}>
+                    <button className="button button-primary" type="submit" disabled={zevLoading}>
                         {zevLoading ? t('common.loading') : t('auth.verify.zevSubmit')}
                     </button>
                 </form>

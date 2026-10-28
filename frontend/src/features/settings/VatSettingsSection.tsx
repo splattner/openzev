@@ -107,7 +107,7 @@ export function VatSettingsSection() {
             </section>
 
             <section className="card page-stack">
-                <h3 style={{ marginTop: 0 }}>{editingId ? t('adminVatSettings.editTitle') : t('adminVatSettings.createTitle')}</h3>
+                <h3 className="mt-0">{editingId ? t('adminVatSettings.editTitle') : t('adminVatSettings.createTitle')}</h3>
                 <form
                     className="page-stack"
                     onSubmit={(event) => {
@@ -166,7 +166,7 @@ export function VatSettingsSection() {
             </section>
 
             <section className="page-stack">
-                <h3 style={{ marginTop: 0 }}>{t('adminVatSettings.listTitle')}</h3>
+                <h3 className="mt-0">{t('adminVatSettings.listTitle')}</h3>
                 {vatRatesQuery.isLoading ? (
                     <div className="muted">{t('adminVatSettings.loading')}</div>
                 ) : vatRates.length === 0 ? (

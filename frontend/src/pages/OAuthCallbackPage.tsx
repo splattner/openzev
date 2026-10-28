@@ -62,7 +62,7 @@ export function OAuthCallbackPage() {
                         <h1>{t('auth.oauth.errors.title')}</h1>
                         <div className="error-banner">{error}</div>
                         <button
-                            className="button"
+                            className="button button-primary"
                             type="button"
                             onClick={() => navigate('/login', { replace: true })}
                         >

@@ -140,7 +140,7 @@ export function BackupJobsSection({ status }: { status: BackupStatus | undefined
     return (
         <section className="card page-stack">
             <div>
-                <h3 style={{ margin: 0 }}>{t('pages.backups.jobs.title')}</h3>
+                <h3 className="m-0">{t('pages.backups.jobs.title')}</h3>
                 <p className="muted" style={{ margin: '0.25rem 0 0' }}>
                     {t('pages.backups.jobs.description', { command: 'python manage.py openzev_backup' })}
                 </p>

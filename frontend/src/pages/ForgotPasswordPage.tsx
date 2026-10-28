@@ -54,7 +54,7 @@ export function ForgotPasswordPage() {
                             />
                         </label>
                         {error ? <div className="error-banner">{error}</div> : null}
-                        <button className="button" type="submit" disabled={loading}>
+                        <button className="button button-primary" type="submit" disabled={loading}>
                             {loading ? t('common.loading') : t('auth.forgot.submit')}
                         </button>
                     </>

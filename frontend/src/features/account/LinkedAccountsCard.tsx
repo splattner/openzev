@@ -46,7 +46,7 @@ export function LinkedAccountsCard({ onUnlink }: Props) {
     return (
         <div className="card">
             <h2>{t('account.linkedAccountsSection')}</h2>
-            <p className="muted" style={{ marginBottom: '1.5rem' }}>{t('account.linkedAccountsDescription')}</p>
+            <p className="muted mb-15">{t('account.linkedAccountsDescription')}</p>
 
             {oauthProvidersQuery.isLoading && (
                 <div style={{ display: 'grid', gap: '0.5rem' }}>

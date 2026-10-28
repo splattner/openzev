@@ -33,7 +33,7 @@ export function LinkAccountModal({ participantName, accounts, error, pending, on
     return (
         <FormModal isOpen title={t('pages.accounts.linkModal.title')} onClose={onClose} maxWidth="560px">
             <form onSubmit={submit} style={{ display: 'grid', gap: '1rem' }}>
-                <p style={{ margin: 0 }}>
+                <p className="m-0">
                     {t('pages.accounts.linkModal.participant')} <strong>{participantName}</strong>
                 </p>
                 <label>

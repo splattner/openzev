@@ -254,7 +254,7 @@ export function InvoiceDetailPage() {
                         </p>
                         {/* PDF generation takes a manager of the invoice's ZEV (#761). */}
                         {canManageAccessLink ? (
-                            <button className="button" type="button" disabled={generating || pdfLoading} onClick={handleGeneratePdf}>
+                            <button className="button button-primary" type="button" disabled={generating || pdfLoading} onClick={handleGeneratePdf}>
                                 {generating ? t('common.loading') : t('pages.invoiceDetail.generatePdf')}
                             </button>
                         ) : null}

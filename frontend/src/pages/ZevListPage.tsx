@@ -454,7 +454,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                         </button>
                     </>
                 ) : (
-                    <p className="muted" style={{ margin: 0 }}>{t('pages.zevs.adminOnly')}</p>
+                    <p className="muted m-0">{t('pages.zevs.adminOnly')}</p>
                 )}
             </div>
 
@@ -548,11 +548,11 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                 <p className="muted" style={{ margin: '0.35rem 0 0' }}>{t('pages.zevs.wizard.step2Description')}</p>
                             </div>
                             <div className="grid-span-full" role="radiogroup" aria-label={t('pages.zevs.wizard.ownerModeLabel')} style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
-                                <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                <label className="actions-row">
                                     <input type="radio" name="owner_mode" checked={ownerMode === 'new'} onChange={() => setOwnerMode('new')} />
                                     <span>{t('pages.zevs.wizard.ownerModeNew')}</span>
                                 </label>
-                                <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                <label className="actions-row">
                                     <input type="radio" name="owner_mode" checked={ownerMode === 'existing'} onChange={() => setOwnerMode('existing')} />
                                     <span>{t('pages.zevs.wizard.ownerModeExisting')}</span>
                                 </label>
@@ -740,7 +740,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
 
                     {wizardStep === 4 && (
                         <div className="card grid-span-full">
-                            <h3 style={{ marginTop: 0 }}>{t('pages.zevs.wizard.review')}</h3>
+                            <h3 className="mt-0">{t('pages.zevs.wizard.review')}</h3>
                             <p><strong>{t('pages.zevs.wizard.reviewZev')}</strong> {createForm.name} ({t(`pages.zevs.zevTypes.${createForm.zev_type}` as Parameters<typeof t>[0])}) · {t('pages.zevs.wizard.reviewStarting', { date: formatShortDate(createForm.start_date, settings) })}</p>
                             <p><strong>{t('pages.zevs.wizard.reviewOwner')}</strong> {ownerName} ({ownerEmail})</p>
                             <p><strong>{t('pages.zevs.wizard.reviewPaymentRecipient')}</strong> {ownerName}{reviewRecipientAddress ? ` · ${reviewRecipientAddress}` : ''}</p>
@@ -760,7 +760,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
 
                     {wizardStep === 5 && createdCredentials && (
                         <div className="grid-span-full page-stack">
-                            <p style={{ margin: 0 }}>
+                            <p className="m-0">
                                 {t(createdCredentials.temporary_password === null ? 'pages.zevs.wizard.createdIntroExisting' : 'pages.zevs.wizard.createdIntro', { name: createdZevName })}
                             </p>
 
@@ -888,7 +888,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                     onCancel={handlePurgeCancel}
                     onConfirm={handlePurgeConfirm}
                 >
-                    <label style={{ gridColumn: '1 / -1' }}>
+                    <label className="grid-span-full">
                         <span>{t('pages.zevs.purgeConfirmLabel', { name: purgeTarget.name })}</span>
                         <input
                             value={purgeConfirmation}
@@ -929,7 +929,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                         {data.map((zev) => (
                             <tr key={zev.id}>
                                 <td>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <div className="actions-row">
                                         <span>{zev.name}</span>
                                         <span className="badge badge-tag">
                                             {zev.zev_type.toUpperCase()}

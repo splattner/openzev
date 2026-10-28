@@ -89,7 +89,7 @@ export function SetupGuidance({
     if (readiness.awaiting_first_period || !readiness.setup) {
         return (
             <section className="card">
-                <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.cockpit.title')}</h3>
+                <h3 className="mt-0">{t('pages.dashboard.cockpit.title')}</h3>
                 <p className="muted">{t('pages.dashboard.cockpit.awaitingFirstPeriod')}</p>
                 <SetupWarnings setup={readiness.setup} />
             </section>
@@ -98,7 +98,7 @@ export function SetupGuidance({
 
     return (
         <section className="card">
-            <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.cockpit.firstRunTitle')}</h3>
+            <h3 className="mt-0">{t('pages.dashboard.cockpit.firstRunTitle')}</h3>
             <p className="muted">{t('pages.dashboard.cockpit.firstRunDescription')}</p>
             <SetupChecklist setup={readiness.setup} />
         </section>

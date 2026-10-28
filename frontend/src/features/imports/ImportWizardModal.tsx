@@ -111,7 +111,7 @@ function DetectionNotice({ detection, onRedetect }: { detection: DetectionState;
     const { t } = useTranslation()
     if (detection.status === 'idle') return null
     if (detection.status === 'loading') {
-        return <p className="muted" style={{ margin: 0 }}>{t('pages.imports.detection.loading', { filename: detection.fileName })}</p>
+        return <p className="muted m-0">{t('pages.imports.detection.loading', { filename: detection.fileName })}</p>
     }
     const redetect = (
         <button type="button" className="button button-secondary button-compact" onClick={onRedetect}>
@@ -241,7 +241,7 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
 
     const showPreview = previews.length > 0 && !previewOutdated
     const targetZev = (
-        <p style={{ margin: 0 }}>
+        <p className="m-0">
             <span className="muted">{t('pages.imports.wizard.targetZev')}: </span>
             <strong>{selectedZevName ?? t('pages.imports.wizard.noZevSelected')}</strong>
         </p>
@@ -386,7 +386,7 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                             <span className="muted" style={{ fontSize: '0.82rem' }}>{t('pages.imports.wizard.timestampTimezoneHint')}</span>
                                         </label>
                                     </div>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <label className="actions-row">
                                         <input
                                             type="checkbox"
                                             checked={hasHeader}
@@ -524,7 +524,7 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                                     )}
                                                 </div>
                                             )}
-                                            <div className="actions-row actions-row-wrap" style={{ marginTop: '0.5rem' }}>
+                                            <div className="actions-row actions-row-wrap mt-05">
                                                 <button type="button" className="button button-secondary" onClick={props.onCopyMissingIds}>
                                                     {t('pages.imports.preview.copyMissingIds')}
                                                 </button>
@@ -545,10 +545,10 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                             </>
                         ) : (
                             <>
-                                <p className="muted" style={{ margin: 0 }}>
+                                <p className="muted m-0">
                                     {t('pages.imports.sdatchScope')}
                                 </p>
-                                <p className="muted" style={{ margin: 0 }}>
+                                <p className="muted m-0">
                                     {t('pages.imports.sdatchNoPreview')}
                                 </p>
                                 {targetZev}

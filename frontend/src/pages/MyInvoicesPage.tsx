@@ -56,7 +56,7 @@ export function MyInvoicesPage() {
                 <Notice tone="error" onRetry={() => void invoicesQuery.refetch()} isRetrying={invoicesQuery.isFetching}>{t('pages.myInvoices.failed')}</Notice>
             ) : invoices.length === 0 ? (
                 <div className="card">
-                    <h3 style={{ marginTop: 0 }}>{t('pages.myInvoices.empty.title')}</h3>
+                    <h3 className="mt-0">{t('pages.myInvoices.empty.title')}</h3>
                     <p className="muted">{t('pages.myInvoices.empty.description')}</p>
                 </div>
             ) : (

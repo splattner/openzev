@@ -35,7 +35,7 @@ export function SecretReveal({ secret, onDismiss, title, body, labels, children,
     return (
         <div className="warning-banner" role="alert" style={{ display: 'grid', gap: '0.75rem' }}>
             <strong>{title ?? t('secretReveal.title')}</strong>
-            <p style={{ margin: 0 }}>{body ?? t('secretReveal.body')}</p>
+            <p className="m-0">{body ?? t('secretReveal.body')}</p>
             <code
                 data-testid={testId}
                 style={{

@@ -23,8 +23,8 @@ export function YearDownloadCard({
 
     return (
         <section className="card">
-            <h3 style={{ marginTop: 0 }}>{t(titleKey)}</h3>
-            <p className="muted" style={{ marginBottom: '1rem' }}>{t(descriptionKey)}</p>
+            <h3 className="mt-0">{t(titleKey)}</h3>
+            <p className="muted mb-1">{t(descriptionKey)}</p>
             <div className="actions-row">
                 <button
                     type="button"
@@ -37,7 +37,7 @@ export function YearDownloadCard({
                 </button>
             </div>
             {error && (
-                <p className="error-text" role="alert" style={{ marginTop: '0.5rem' }}>
+                <p className="error-text mt-05" role="alert">
                     {error}
                 </p>
             )}

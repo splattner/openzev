@@ -433,7 +433,7 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
                         {/* Only rendered when the result spans more than one page:
                             DRF returns next = previous = null exactly when count <= page size. */}
                         {(eventsQuery.data?.next || eventsQuery.data?.previous) && (
-                            <div className="actions-row actions-row-wrap actions-row-end" style={{ marginTop: '1rem' }}>
+                            <div className="actions-row actions-row-wrap actions-row-end mt-1">
                                 <span className="muted">{t('pages.auditLogs.pagination.pageLabel', { page: filters.page, total: eventsQuery.data?.count ?? 0 })}</span>
                                 <button
                                     type="button"

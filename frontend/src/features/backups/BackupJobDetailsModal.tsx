@@ -8,7 +8,7 @@ import { countMissingMedia, fileGone, readManifest, totalRecords, verificationSt
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(7rem, 11rem) 1fr', gap: '0.75rem' }}>
-            <dt className="muted" style={{ margin: 0 }}>{label}</dt>
+            <dt className="muted m-0">{label}</dt>
             <dd style={{ margin: 0, wordBreak: 'break-all' }}>{children}</dd>
         </div>
     )
@@ -26,7 +26,7 @@ export function BackupJobDetailsModal({ job, onClose }: { job: BackupJob | null;
     return (
         <FormModal isOpen title={t('pages.backups.details.title')} onClose={onClose} maxWidth="720px">
             <div className="page-stack">
-                <dl className="page-stack" style={{ margin: 0 }}>
+                <dl className="page-stack m-0">
                     <Row label={t('pages.backups.details.archive')}>{job.archive_name || '—'}</Row>
                     <Row label={t('pages.backups.details.location')}>{job.archive_location || '—'}</Row>
                     <Row label={t('pages.backups.details.size')}>

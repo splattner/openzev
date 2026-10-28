@@ -14,27 +14,27 @@
 /* In a row, the main action is a forest outline: one solid button per page
    (the page's own primary action), not one per record. */
 
-:is(td, .actions-cell-content) > .button:not(.button-secondary, .button-ghost, .button-danger, .danger, .button-outline) {
+:is(td, .actions-cell-content) > .button:not(.button-secondary, .button-ghost, .button-danger, .button-outline) {
   background: transparent;
   border-color: var(--interactive);
   box-shadow: none;
   color: var(--interactive);
 }
 
-:is(td, .actions-cell-content) > .button:not(.button-secondary, .button-ghost, .button-danger, .danger, .button-outline):hover:not(:disabled) {
+:is(td, .actions-cell-content) > .button:not(.button-secondary, .button-ghost, .button-danger, .button-outline):hover:not(:disabled) {
   background: var(--brand-pale);
   color: var(--brand-deep);
 }
 
 /* A destructive row action is quiet, as in the compact rule below. */
 
-:is(td, .actions-cell-content) > :is(.button-danger, .button.danger) {
+:is(td, .actions-cell-content) > .button-danger {
   background: var(--surface-card);
   border: 1px solid var(--border-strong);
   color: var(--danger-700);
 }
 
-:is(td, .actions-cell-content) > :is(.button-danger, .button.danger):hover:not(:disabled) {
+:is(td, .actions-cell-content) > .button-danger:hover:not(:disabled) {
   background: var(--danger-100);
   border-color: var(--danger-300);
 }

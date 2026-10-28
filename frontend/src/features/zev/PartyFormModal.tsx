@@ -103,7 +103,7 @@ export function PartyFormModal({ isOpen, party, isPending, onClose, onSubmit }: 
                     <span>{t(organisation ? 'pages.participants.form.contactLastName' : 'pages.participants.form.lastName')}</span>
                     <input value={values.last_name} onChange={(event) => set('last_name', event.target.value)} required={!organisation} />
                 </label>
-                <label style={{ gridColumn: '1 / -1' }}>
+                <label className="grid-span-full">
                     <span>{t('pages.participants.form.nameAddition')}</span>
                     <input value={values.name_addition} onChange={(event) => set('name_addition', event.target.value)} />
                 </label>
@@ -115,11 +115,11 @@ export function PartyFormModal({ isOpen, party, isPending, onClose, onSubmit }: 
                     <span>{t('pages.participants.form.phone')}</span>
                     <input value={values.phone} onChange={(event) => set('phone', event.target.value)} />
                 </label>
-                <label style={{ gridColumn: '1 / -1' }}>
+                <label className="grid-span-full">
                     <span>{t('pages.participants.form.addressLine1')}</span>
                     <input value={values.address_line1} onChange={(event) => set('address_line1', event.target.value)} />
                 </label>
-                <label style={{ gridColumn: '1 / -1' }}>
+                <label className="grid-span-full">
                     <span>{t('pages.participants.form.addressLine2')}</span>
                     <input value={values.address_line2} onChange={(event) => set('address_line2', event.target.value)} />
                 </label>
@@ -131,14 +131,14 @@ export function PartyFormModal({ isOpen, party, isPending, onClose, onSubmit }: 
                     <span>{t('pages.participants.form.city')}</span>
                     <input value={values.city} onChange={(event) => set('city', event.target.value)} />
                 </label>
-                <label style={{ gridColumn: '1 / -1' }}>
+                <label className="grid-span-full">
                     <span>{t('pages.participants.form.notes')}</span>
                     <textarea rows={3} value={values.notes} onChange={(event) => set('notes', event.target.value)} />
                 </label>
                 {party && party.participations.length > 0 && (
-                    <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>{t('pages.participants.form.sharedPartyHint')}</p>
+                    <p className="muted grid-span-full m-0">{t('pages.participants.form.sharedPartyHint')}</p>
                 )}
-                {error && <div className="error-banner" style={{ gridColumn: '1 / -1' }}>{error}</div>}
+                {error && <div className="error-banner grid-span-full">{error}</div>}
                 <FormModalFooter onCancel={onClose} isPending={isPending} submitLabel={t(party ? 'common.save' : 'common.create')} />
             </form>
         </FormModal>

@@ -71,3 +71,20 @@ describe('retired CSS classes', () => {
         expect(offenders).toEqual([])
     })
 })
+
+describe('button class forms', () => {
+    // SPEC-2026-10 §9: `button` plus one variant on every action. These two
+    // forms had a rule or an accidental look, but are not variants.
+    const STRAY_FORMS = [
+        { form: 'button danger', pattern: /className=(?:"|\{[`'"])[^"`'}]*\bbutton danger\b/ },
+        { form: 'button-primary with button-outline', pattern: /className=(?:"|\{[`'"])[^"`'}]*\bbutton-primary button-outline\b/ },
+        { form: 'bare button', pattern: /className="button"/ },
+    ]
+
+    it.each(STRAY_FORMS)('has no $form', ({ pattern }) => {
+        const offenders = sourceFiles(SRC)
+            .filter((file) => pattern.test(readFileSync(file, 'utf8')))
+            .map((file) => file.slice(SRC.length + 1))
+        expect(offenders).toEqual([])
+    })
+})

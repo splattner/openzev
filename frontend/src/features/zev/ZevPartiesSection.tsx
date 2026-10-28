@@ -220,8 +220,8 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
         <>
         <section className="card page-stack">
             <div>
-                <h3 style={{ marginTop: 0 }}>{t('pages.zevSettings.parties.title')}</h3>
-                <p className="muted" style={{ margin: 0 }}>{t('pages.zevSettings.parties.description')}</p>
+                <h3 className="mt-0">{t('pages.zevSettings.parties.title')}</h3>
+                <p className="muted m-0">{t('pages.zevSettings.parties.description')}</p>
             </div>
 
             {(partiesQuery.isLoading || rolesQuery.isLoading) && <p className="muted">{t('common.loading')}</p>}
@@ -264,7 +264,7 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
                 <div className="zev-parties-block zev-parties-block-first">
                     <div className="zev-parties-block-header">
                         <div>
-                            <h3 style={{ margin: 0 }}>{t('pages.zevSettings.parties.contacts')}</h3>
+                            <h3 className="m-0">{t('pages.zevSettings.parties.contacts')}</h3>
                             <p className="muted">{t('pages.zevSettings.parties.contactsHint')}</p>
                         </div>
                         {canManage && (

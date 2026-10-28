@@ -96,7 +96,7 @@ export function BuildingFormModal({ isOpen, zevId, building, isPending, onClose,
         >
             <form className="form-grid" onSubmit={submit}>
                 {!building && withAddress.length > 0 && (
-                    <label style={{ gridColumn: '1 / -1' }}>
+                    <label className="grid-span-full">
                         <span>{t('pages.meteringPoints.buildings.copyFromParticipant')}</span>
                         <select
                             value=""
@@ -114,17 +114,17 @@ export function BuildingFormModal({ isOpen, zevId, building, isPending, onClose,
                         </select>
                     </label>
                 )}
-                <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>{t('pages.meteringPoints.buildings.hint')}</p>
-                <label style={{ gridColumn: '1 / -1' }}>
+                <p className="muted grid-span-full m-0">{t('pages.meteringPoints.buildings.hint')}</p>
+                <label className="grid-span-full">
                     <span>{t('pages.meteringPoints.buildings.name')}</span>
                     <input value={values.name} onChange={(event) => set('name', event.target.value)} maxLength={200} required />
                     <small className="muted">{t('pages.meteringPoints.buildings.nameHint')}</small>
                 </label>
-                <label style={{ gridColumn: '1 / -1' }}>
+                <label className="grid-span-full">
                     <span>{t('pages.participants.form.addressLine1')}</span>
                     <input value={values.address_line1} onChange={(event) => set('address_line1', event.target.value)} />
                 </label>
-                <label style={{ gridColumn: '1 / -1' }}>
+                <label className="grid-span-full">
                     <span>{t('pages.participants.form.addressLine2')}</span>
                     <input value={values.address_line2} onChange={(event) => set('address_line2', event.target.value)} />
                 </label>
@@ -148,11 +148,11 @@ export function BuildingFormModal({ isOpen, zevId, building, isPending, onClose,
                     />
                     <small className="muted">{t('pages.meteringPoints.buildings.egidHint')}</small>
                 </label>
-                <label style={{ gridColumn: '1 / -1' }}>
+                <label className="grid-span-full">
                     <span>{t('pages.participants.form.notes')}</span>
                     <textarea rows={3} value={values.notes} onChange={(event) => set('notes', event.target.value)} />
                 </label>
-                {error && <div className="error-banner" style={{ gridColumn: '1 / -1' }}>{error}</div>}
+                {error && <div className="error-banner grid-span-full">{error}</div>}
                 <FormModalFooter onCancel={onClose} isPending={isPending} submitLabel={t(building ? 'common.save' : 'common.create')} />
             </form>
         </FormModal>

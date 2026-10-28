@@ -138,7 +138,7 @@ export function BackupDestinationsSection({ status }: { status: BackupStatus | u
         <section className="card page-stack">
             <div className="actions-row actions-row-wrap" style={{ justifyContent: 'space-between' }}>
                 <div style={{ flex: '1 1 22rem', minWidth: 0 }}>
-                    <h3 style={{ margin: 0 }}>{t('pages.backups.destinations.title')}</h3>
+                    <h3 className="m-0">{t('pages.backups.destinations.title')}</h3>
                     <p className="muted" style={{ margin: '0.25rem 0 0' }}>{t('pages.backups.destinations.description')}</p>
                 </div>
                 <button type="button" className="button button-primary" onClick={openCreate}>

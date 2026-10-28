@@ -38,7 +38,7 @@ export function BackupSettingsSection() {
                     </Notice>
                 )}
                 <section className="card page-stack">
-                    <p className="muted" style={{ margin: 0 }}>{t('pages.backups.intro')}</p>
+                    <p className="muted m-0">{t('pages.backups.intro')}</p>
 
                     {status?.encryption_key_problem ? (
                         <div className="error-banner">
@@ -74,7 +74,7 @@ export function BackupSettingsSection() {
                         </div>
                     )}
 
-                    <p className="muted" style={{ margin: 0 }}>
+                    <p className="muted m-0">
                         {t('pages.backups.restoreNotice', {
                             restoreCommand: 'python manage.py openzev_restore --mode instance --from <archive>',
                             command: 'python manage.py openzev_backup_verify',

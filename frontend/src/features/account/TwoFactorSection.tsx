@@ -57,7 +57,7 @@ export function TwoFactorSection({ onRemoveTotp, onRemovePasskey }: Props) {
             <h2>{t('account.mfa.section')}</h2>
 
             {status.required && !protectedAccount && (
-                <div className="warning-banner" role="status" style={{ marginBottom: '1rem' }}>
+                <div className="warning-banner mb-1" role="status">
                     {status.grace_until
                         ? t('account.mfa.requiredUntil', { date: formatDateTime(status.grace_until, settings) })
                         : t('account.mfa.required')}
