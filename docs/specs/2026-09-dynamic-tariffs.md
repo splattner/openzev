@@ -681,6 +681,17 @@ up front, and the endpoint, protocol, component/product, stored range/point
 count and global linked-tariff/ZEV totals in a “Source details” disclosure. A positive point count shows stored coverage and a gap
 hint; zero points show “No stored prices yet.” Last success is shown only when
 its timestamp is present. The history panel is scoped to the shown tariff's validity.
+When the stored series has no price for time that has already passed, the summary
+also shows a warning notice (`missing` prop, fed by `useElapsedPriceGaps` through
+`DynamicSourceSection`): the merged missing date ranges in the business timezone
+(“No prices for 03.10.2026 – 05.10.2026”), a line saying invoice generation stops
+for a period that needs a missing price (§9), and an “Exact missing intervals”
+disclosure with the timestamps. `dynamicPriceGaps.ts` holds the pure helpers:
+`elapsedPriceGaps` cuts each gap off at now (a gap wholly in the future is dropped,
+since prices may not be published yet), `missingPriceDates` merges adjacent or
+overlapping gaps into inclusive date ranges. The notice reads the window the chart
+opens on (last 30 days within the tariff's validity; the same query key, so one
+request), from the existing `gaps` of the price-history response — no API change.
 Only admins see the maintenance link to `/admin/dynamic-sources?source=<id>`.
 
 `AdminDynamicSourcesPanel` presents source operations and global KPIs,
@@ -756,10 +767,15 @@ positive coverage and maintenance-link permissions.
 - **`types/api.ts`** — `DynamicTariffSource`, `DynamicTariffType`,
   `Tariff.dynamic_source` / `TariffInput.dynamic_source`,
   `VseTariffCandidate.dynamic_url`, `VseTariffImportResult.created[].dynamic`.
-- **`DynamicPriceHistoryModal`** — linked from the expanded dynamic tariff and
-  from the platform admin table. It exposes a seven-day default/31-day maximum
-  date window, summary statistics, a step chart, explicit coverage gaps, and a
-  paginated interval table.
+- **`DynamicPriceHistoryModal`** — opened from the platform admin table; the same
+  `DynamicPriceHistoryPanel` is shown inline in the tariff detail pane
+  (`compact`). It exposes a seven-day default/31-day maximum date window (opened
+  for a tariff: the last 30 days within its validity), summary statistics, a step
+  chart, explicit coverage gaps, and a paginated interval table. In the pane the
+  chart is visible without opening anything, with elapsed gaps shaded
+  (`ReferenceArea`) and an `aria-label` giving the window, the price range and the
+  missing dates; the statistics and the interval table sit in a lazy disclosure
+  “Fetched interval prices”, and the gap list is left to the source summary.
 - **`AdminDynamicSourcesPanel`** — routed as `/admin/dynamic-sources` in the
   Admin Overview hub. It displays global source/point/reuse/failure KPIs and a
   `DataTable` with current fetch state, last error/time and reuse counts. Its

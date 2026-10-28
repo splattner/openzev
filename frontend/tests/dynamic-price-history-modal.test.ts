@@ -96,13 +96,13 @@ describe('defaultHistoryDateRange', () => {
     })
   })
 
-  it('leaves the default range untouched when it already sits inside an active, open-ended tariff', () => {
+  it('looks back a month inside an active, open-ended tariff, so an earlier hole shows', () => {
     const tariff: TariffValidityContext = {
       valid_from: '2026-01-01', valid_to: null, minimum_price_chf_per_kwh: null,
     }
 
     expect(defaultHistoryDateRange(VSE_SOURCE, TODAY, tariff)).toEqual({
-      dateFrom: '2026-09-08',
+      dateFrom: '2026-08-16',
       dateTo: '2026-09-14',
     })
   })

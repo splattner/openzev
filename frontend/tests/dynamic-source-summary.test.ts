@@ -8,7 +8,7 @@ import { renderWithProviders } from './helpers/render'
 import type { AppSettings, DynamicTariffSource } from '../src/types/api'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
-vi.mock('../src/lib/appSettings', () => ({ formatDateTime: (value: string) => value }))
+vi.mock('../src/lib/appSettings', () => ({ formatDateTime: (value: string) => value, formatShortDate: (value: string) => value }))
 
 const source: DynamicTariffSource = {
     id: 'source-1', label: 'Shared source', url: 'https://prices.example.test',
@@ -18,9 +18,11 @@ const source: DynamicTariffSource = {
     supports_backfill: true, empty_on_not_found: false, aggregated_tariff_types: [], created_at: '', updated_at: '',
 }
 
-function render(overrides: Partial<DynamicTariffSource> = {}, canOperate = true) {
+const missing = [{ from: '2026-10-02T22:00:00Z', to: '2026-10-05T22:00:00Z' }]
+
+function render(overrides: Partial<DynamicTariffSource> = {}, canOperate = true, gaps: typeof missing = []) {
     return renderToStaticMarkup(createElement(MemoryRouter, null,
-        createElement(DynamicSourceSummary, { source: { ...source, ...overrides }, settings: {} as AppSettings, canOperate })))
+        createElement(DynamicSourceSummary, { source: { ...source, ...overrides }, settings: {} as AppSettings, canOperate, missing: gaps })))
 }
 
 const cleanups: (() => void)[] = []
@@ -64,5 +66,24 @@ describe('DynamicSourceSummary', () => {
     it('limits the maintenance link to users with operation permission', () => {
         expect(render()).toContain('/admin/dynamic-sources?source=source-1')
         expect(render({}, false)).not.toContain('pages.dynamicSources.manageSource')
+    })
+
+    it('says nothing about prices when none are missing', () => {
+        expect(render()).not.toContain('pages.dynamicSources.history.missingTitle')
+    })
+
+    it('names the missing dates up front and keeps the exact intervals on demand', () => {
+        const html = render({}, true, missing)
+        expect(html).toContain('pages.dynamicSources.history.missingTitle')
+        expect(html).toContain('pages.dynamicSources.history.missingDates')
+        expect(html).toContain('pages.dynamicSources.history.missingEffect')
+        expect(html).toContain('pages.dynamicSources.history.exactIntervals')
+        expect(html).not.toContain('2026-10-02T22:00:00Z')
+    })
+
+    it('keeps the failed-fetch error visible next to the missing-price notice', () => {
+        const html = render({ last_fetch_status: 'failed', last_fetch_error: 'upstream 503' }, true, missing)
+        expect(html).toContain('upstream 503')
+        expect(html).toContain('pages.dynamicSources.history.missingTitle')
     })
 })

@@ -1,18 +1,24 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { formatDateTime } from '../../lib/appSettings'
-import type { AppSettings, DynamicTariffSource } from '../../types/api'
+import type { AppSettings, DynamicPriceHistory, DynamicTariffSource } from '../../types/api'
 import { Disclosure } from '../../components/Disclosure'
+import { Notice } from '../../components/Notice'
+import { missingPriceDates, missingRangeLabel } from './dynamicPriceGaps'
 
 /**
  * Shared-source facts beside the linked tariff: which source and whether it is
  * delivering, up front; where it is fetched from and what it covers, on
  * demand. Maintenance stays in the platform hub, which only an admin can open.
+ *
+ * `missing` are the stretches of already-elapsed time the stored series has no
+ * price for (see `useElapsedPriceGaps`); they are said up front, as dates.
  */
-export function DynamicSourceSummary({ source, settings, canOperate }: {
+export function DynamicSourceSummary({ source, settings, canOperate, missing = [] }: {
     source: DynamicTariffSource
     settings: AppSettings
     canOperate: boolean
+    missing?: DynamicPriceHistory['gaps']
 }) {
     const { t } = useTranslation()
     return (
@@ -31,6 +37,22 @@ export function DynamicSourceSummary({ source, settings, canOperate }: {
                 <p className="muted m-0">{t('pages.dynamicSources.lastSuccess', { time: formatDateTime(source.last_success_at, settings) })}</p>
             )}
             {source.last_fetch_status === 'failed' && source.last_fetch_error && <p className="text-error m-0">{source.last_fetch_error}</p>}
+            {missing.length > 0 && (
+                <Notice tone="warning">
+                    <strong>{t('pages.dynamicSources.history.missingTitle')}</strong>
+                    {missingPriceDates(missing).map((dates) => (
+                        <p key={dates.from} className="m-0">{missingRangeLabel(dates, settings, t)}</p>
+                    ))}
+                    <p className="muted m-0">{t('pages.dynamicSources.history.missingEffect')}</p>
+                    <Disclosure lazy summary={t('pages.dynamicSources.history.exactIntervals')}>
+                        <ul className="m-0">
+                            {missing.map((gap) => (
+                                <li key={gap.from}>{formatDateTime(gap.from, settings)} – {formatDateTime(gap.to, settings)}</li>
+                            ))}
+                        </ul>
+                    </Disclosure>
+                </Notice>
+            )}
             <Disclosure lazy summary={t('pages.dynamicSources.sourceDetails')}>
                 <div className="tariff-source-summary">
                     <p className="muted" style={{ margin: 0, overflowWrap: 'anywhere' }}>{source.url}</p>

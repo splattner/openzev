@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { CivilDateInput } from '../../components/CivilDateInput'
 import { DataTable, type ColumnDef } from '../../components/DataTable'
+import { Disclosure } from '../../components/Disclosure'
 import { FormModal } from '../../components/FormModal'
 import { StatCard } from '../../components/StatCard'
 import { fetchDynamicPriceHistory } from '../../lib/api/tariffs'
 import { formatDateTime, formatShortDate, useAppSettings } from '../../lib/appSettings'
-import { AXIS_COLOR, CHART_GRIDLINE, CONS_COLORS } from '../../lib/chartTokens'
+import { AXIS_COLOR, CHART_GRIDLINE, CONS_COLORS, NEGATIVE_COLOR } from '../../lib/chartTokens'
 import { CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
-import { formatIsoDate, todayBusinessIso } from '../../lib/dates'
+import { formatBusinessIsoDate, formatIsoDate, todayBusinessIso } from '../../lib/dates'
 import { queryKeys } from '../../lib/api/queryKeys'
 import type { DynamicPriceHistory, DynamicPricePoint, DynamicTariffSource, Tariff } from '../../types/api'
+import { dynamicChartData, elapsedPriceGaps, missingPriceDates, missingRangeLabel, windowBounds } from './dynamicPriceGaps'
 
 /** What the history view needs from the tariff it was opened for, if any. */
 export type TariffValidityContext = Pick<Tariff, 'valid_from' | 'valid_to' | 'minimum_price_chf_per_kwh'>
@@ -63,7 +65,9 @@ function clampToValidity(
  * The date range a freshly opened history view should start on.
  *
  * A quarter-hourly VSE source defaults to the last week, which is a
- * reasonable recent slice. A BFE reference-price source publishes one point
+ * reasonable recent slice. Opened for a tariff it defaults to the last 30
+ * days instead (within the 31-day request cap): a week is too short to
+ * surface a hole that opened earlier in the month. A BFE reference-price source publishes one point
  * per quarter (or month), so the same default almost always lands on an
  * unpublished period and looks like nothing was ever fetched — default to
  * the source's own covered range instead. Either way, opened for a specific
@@ -82,7 +86,7 @@ export function defaultHistoryDateRange(
       dateFrom: formatIsoDate(new Date(source.covers_from)),
       dateTo: daysBefore(formatIsoDate(new Date(source.covers_to)), 1),
     }
-    : { dateFrom: daysBefore(today, 6), dateTo: today }
+    : { dateFrom: daysBefore(today, tariff ? 29 : 6), dateTo: today }
   return tariff ? clampToValidity(base, tariff, today) : base
 }
 
@@ -134,6 +138,12 @@ type PanelProps = {
   source: DynamicTariffSource
   /** The tariff this history was opened for, if any — see `TariffValidityContext`. */
   tariff?: TariffValidityContext | null
+  /**
+   * Inline in the tariff pane: the chart is the content, and the statistics and
+   * the long interval table wait behind a disclosure. The pane's source summary
+   * already says which dates are missing, so the gap list is not repeated.
+   */
+  compact?: boolean
 }
 
 /**
@@ -145,12 +155,12 @@ type PanelProps = {
  * a table row rather than an already-open detail view, still wants it as a
  * modal.
  */
-export function DynamicPriceHistoryPanel({ source, tariff }: PanelProps) {
+export function DynamicPriceHistoryPanel({ source, tariff, compact = false }: PanelProps) {
   const { t } = useTranslation()
   const { settings } = useAppSettings()
   const today = todayBusinessIso()
-  const [dateFrom, setDateFrom] = useState(daysBefore(today, 6))
-  const [dateTo, setDateTo] = useState(today)
+  const [dateFrom, setDateFrom] = useState(() => defaultHistoryDateRange(source, today, tariff).dateFrom)
+  const [dateTo, setDateTo] = useState(() => defaultHistoryDateRange(source, today, tariff).dateTo)
 
   useEffect(() => {
     const range = defaultHistoryDateRange(source, today, tariff)
@@ -170,10 +180,17 @@ export function DynamicPriceHistoryPanel({ source, tariff }: PanelProps) {
     [historyQuery.data, tariff?.minimum_price_chf_per_kwh],
   )
 
-  const chartData = useMemo(() => points.map((point) => ({
-    timestamp: new Date(point.valid_from).getTime(),
-    price: Number(point.price_chf_per_kwh),
-  })), [points])
+  // Only elapsed holes are shaded: a stretch that is not published yet is not
+  // a defect, and shading it would read like one.
+  const gaps = useMemo(
+    () => elapsedPriceGaps(historyQuery.data?.gaps ?? [], historyQuery.dataUpdatedAt),
+    [historyQuery.data, historyQuery.dataUpdatedAt],
+  )
+  const { start: rangeStart, end: rangeEnd } = windowBounds(dateFrom, dateTo)
+  const chartData = useMemo(
+    () => dynamicChartData(points, gaps, rangeStart, rangeEnd),
+    [points, gaps, rangeStart, rangeEnd],
+  )
 
   const columns = useMemo<ColumnDef<DynamicPricePoint, unknown>[]>(() => [
     {
@@ -200,6 +217,42 @@ export function DynamicPriceHistoryPanel({ source, tariff }: PanelProps) {
     : historyQuery.data?.stats
   const validityMin = tariff?.valid_from
   const validityMax = tariff ? validityUpperBound(tariff, today) : undefined
+
+  const statCards = stats && (
+    <div className="kpi-row">
+      <StatCard label={t('pages.dynamicSources.history.points')} value={stats.point_count} flat />
+      <StatCard
+        label={t('pages.dynamicSources.history.average')}
+        value={stats.average_chf_per_kwh == null ? '—' : Number(stats.average_chf_per_kwh).toFixed(5)}
+        flat
+      />
+      <StatCard label={t('pages.dynamicSources.history.negative')} value={stats.negative_count} flat />
+      <StatCard
+        label={t('pages.dynamicSources.history.gaps')}
+        value={stats.gap_count}
+        tone={stats.gap_count > 0 ? 'warning' : 'success'}
+      />
+    </div>
+  )
+  const records = (
+    <DataTable
+      data={points}
+      columns={columns}
+      getRowId={(point) => point.valid_from}
+      loading={historyQuery.isLoading}
+      emptyMessage={t('pages.dynamicSources.history.empty')}
+    />
+  )
+  // The chart is a picture; this is its text equivalent, gaps included.
+  const chartSummary = stats && [
+    t('pages.dynamicSources.history.chartLabel', {
+      from: formatShortDate(dateFrom, settings),
+      to: formatShortDate(dateTo, settings),
+      minimum: stats.minimum_chf_per_kwh == null ? '—' : Number(stats.minimum_chf_per_kwh).toFixed(5),
+      maximum: stats.maximum_chf_per_kwh == null ? '—' : Number(stats.maximum_chf_per_kwh).toFixed(5),
+    }),
+    ...missingPriceDates(gaps).map((range) => missingRangeLabel(range, settings, t)),
+  ].join('. ')
 
   return (
     <div className="page-stack">
@@ -238,34 +291,38 @@ export function DynamicPriceHistoryPanel({ source, tariff }: PanelProps) {
 
       {historyQuery.isError && <div className="error-banner">{t('pages.dynamicSources.history.loadError')}</div>}
 
-      {stats && (
-        <div className="kpi-row">
-          <StatCard label={t('pages.dynamicSources.history.points')} value={stats.point_count} flat />
-          <StatCard
-            label={t('pages.dynamicSources.history.average')}
-            value={stats.average_chf_per_kwh == null ? '—' : Number(stats.average_chf_per_kwh).toFixed(5)}
-            flat
-          />
-          <StatCard label={t('pages.dynamicSources.history.negative')} value={stats.negative_count} flat />
-          <StatCard
-            label={t('pages.dynamicSources.history.gaps')}
-            value={stats.gap_count}
-            tone={stats.gap_count > 0 ? 'warning' : 'success'}
-          />
-        </div>
-      )}
+      {!compact && statCards}
 
-      {chartData.length > 0 && (
-        <section className="card">
-          <ResponsiveContainer width="100%" height={280}>
+      {points.length > 0 && (
+        <section
+          className={compact ? undefined : 'card'}
+          role="img"
+          aria-label={chartSummary}
+        >
+          <ResponsiveContainer width="100%" height={compact ? 220 : 280}>
             <LineChart data={chartData} margin={{ top: 8, right: 18, left: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRIDLINE} />
+              {gaps.map((gap) => (
+                <ReferenceArea
+                  key={gap.from}
+                  x1={Date.parse(gap.from)}
+                  x2={Date.parse(gap.to)}
+                  fill={NEGATIVE_COLOR}
+                  fillOpacity={0.12}
+                  stroke="none"
+                />
+              ))}
               <XAxis
                 dataKey="timestamp"
                 type="number"
                 scale="time"
-                domain={['dataMin', 'dataMax']}
-                tickFormatter={(value: number) => formatDateTime(new Date(value).toISOString(), settings)}
+                domain={[rangeStart, rangeEnd]}
+                allowDataOverflow
+                tickFormatter={(value: number) => (
+                  compact
+                    ? formatShortDate(formatBusinessIsoDate(new Date(value)), settings)
+                    : formatDateTime(new Date(value).toISOString(), settings)
+                )}
                 stroke={AXIS_COLOR}
                 fontSize={11}
                 minTickGap={48}
@@ -281,6 +338,7 @@ export function DynamicPriceHistoryPanel({ source, tariff }: PanelProps) {
                 type="stepAfter"
                 stroke={CONS_COLORS[0]}
                 dot={false}
+                connectNulls={false}
                 activeDot={{ r: 4 }}
                 isAnimationActive={false}
               />
@@ -289,7 +347,11 @@ export function DynamicPriceHistoryPanel({ source, tariff }: PanelProps) {
         </section>
       )}
 
-      {historyQuery.data && historyQuery.data.gaps.length > 0 && (
+      {compact && historyQuery.isSuccess && points.length === 0 && (
+        <p className="muted m-0">{t('pages.dynamicSources.history.empty')}</p>
+      )}
+
+      {!compact && historyQuery.data && historyQuery.data.gaps.length > 0 && (
         <section className="warning-banner">
           <strong>{t('pages.dynamicSources.history.gapTitle')}</strong>
           <ul>
@@ -300,13 +362,14 @@ export function DynamicPriceHistoryPanel({ source, tariff }: PanelProps) {
         </section>
       )}
 
-      <DataTable
-        data={points}
-        columns={columns}
-        getRowId={(point) => point.valid_from}
-        loading={historyQuery.isLoading}
-        emptyMessage={t('pages.dynamicSources.history.empty')}
-      />
+      {compact ? (
+        <Disclosure lazy summary={t('pages.dynamicSources.history.sectionTitle')}>
+          <div className="page-stack">
+            {statCards}
+            {records}
+          </div>
+        </Disclosure>
+      ) : records}
     </div>
   )
 }

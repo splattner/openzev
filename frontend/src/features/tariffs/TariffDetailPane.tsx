@@ -20,8 +20,7 @@ import { deltaSummary, formatDelta, versionDeltas, type PriceDelta } from './pri
 import { bandCoverage } from './bandCoverage'
 import { TariffPriceHistoryChart } from './TariffPriceHistoryChart'
 import { TariffBandCoverage } from './TariffBandCoverage'
-import { DynamicPriceHistoryPanel } from './DynamicPriceHistoryModal'
-import { DynamicSourceSummary } from './DynamicSourceSummary'
+import { DynamicSourceSection } from './DynamicSourceSection'
 import { DetailPane } from '../../components/DetailPane'
 import { Disclosure } from '../../components/Disclosure'
 import { IssueText } from '../../components/IssueText'
@@ -241,10 +240,7 @@ export function TariffDetailPane({
                         <div className="tariff-period-section-header">
                             <h4>{t('pages.tariffs.pane.dynamicSource')}</h4>
                         </div>
-                        <DynamicSourceSummary source={source} settings={settings} canOperate={user?.role === 'admin'} />
-                        <Disclosure lazy summary={t('pages.dynamicSources.history.sectionTitle')}>
-                            <DynamicPriceHistoryPanel source={source} tariff={version} />
-                        </Disclosure>
+                        <DynamicSourceSection source={source} tariff={version} settings={settings} canOperate={user?.role === 'admin'} />
                     </section>
                 )}
 

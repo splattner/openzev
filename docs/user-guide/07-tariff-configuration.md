@@ -259,8 +259,18 @@ Managers can choose an existing shared source or create a new source from
 the energy-tariff form. Viewers can inspect linked sources and price history.
 Click a dynamic tariff to see its source name, fetch status and last
 successful fetch. **Source details** unfolds the endpoint, protocol, product,
-stored coverage and usage. Usage counts cover the whole platform. A stored date
-range can still contain gaps; check the price history for the period you need.
+stored coverage and usage. Usage counts cover the whole platform.
+
+Below the source, the pane charts the fetched prices of the last 30 days of the
+tariff's validity without opening anything. If the source has **no price for
+time that has already passed**, a yellow notice says so as dates (for example
+*No prices for 03.10.2026 – 05.10.2026*), the chart shades those stretches red
+and breaks the line there, and **Exact missing intervals** lists the timestamps.
+Invoice generation stops for a period that needs a missing price, so fetch the
+prices again or wait for them to fill in. Dates in the future are not reported,
+as prices may not be published yet. Change the date range above the chart to look
+further back; **Fetched interval prices** opens the statistics and the full
+table.
 Administrators can follow **Manage source in platform admin** to its operational
 row; managers create and reuse sources in the tariff form.
 
