@@ -2736,11 +2736,21 @@ version</strong> rather than editing or creating a second tariff — see
    per-kWh tariff — a <a href="#dynamic-tariffs">dynamic price source</a> if it has one</p>
 </li>
 <li>
-<p>Click <strong>Create Tariff</strong>; the new tariff opens in the pane</p>
+<p>For a per-kWh tariff without a dynamic source, add its <strong>Bands</strong> right in
+   the form: <strong>Add band</strong>, enter price, times, weekdays and months, then
+   <strong>Keep band</strong>. You can edit or remove a band before saving, and the form
+   warns about hours without a band while you build the list (see
+   <a href="#tariff-periods">Tariff Periods</a>)</p>
+<p><img alt="The create form with an HT and an NT band entered before saving" src="../screenshots/07f-tariff-create-bands.png" /></p>
 </li>
 <li>
-<p>For a per-kWh or percentage tariff with fixed bands, add its prices as
-   <a href="#tariff-periods">Tariff Periods</a> — a tariff without a band prices nothing</p>
+<p>Click <strong>Create Tariff</strong>; the tariff and all its bands are created together,
+   or — if the server rejects a band — not at all. The rejected band is marked
+   in the list with the reason; fix it and save again. The new tariff opens in
+   the pane</p>
+<p>A per-kWh tariff created without a band prices nothing until you add one
+ later as a <a href="#tariff-periods">Tariff Period</a>; a percentage tariff starts with
+ its one flat band and takes more later</p>
 </li>
 </ol>
 <h2 id="importing-tariffs-from-your-grid-operator">Importing Tariffs from Your Grid Operator<a class="headerlink" href="#importing-tariffs-from-your-grid-operator" title="Permanent link">&para;</a></h2>
