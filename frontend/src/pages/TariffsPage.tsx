@@ -190,6 +190,7 @@ export function TariffsPage() {
         editingTariff,
         editingPeriod,
         saveError: crudSaveError,
+        saveBandErrors,
         tariffPending,
         periodPending,
         submitTariff,
@@ -410,6 +411,7 @@ export function TariffsPage() {
                         selectedZevId={selectedZevId || ''}
                         isPending={tariffPending}
                         error={crudSaveError}
+                        bandErrors={saveBandErrors}
                         onDelete={editingTariff ? () => confirmDeleteTariff(editingTariff) : undefined}
                         onSubmit={submitTariff}
                         onCancel={cancelEditing}

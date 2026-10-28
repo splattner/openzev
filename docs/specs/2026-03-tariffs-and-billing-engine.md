@@ -332,6 +332,50 @@ importer warns when a document leaves hours unpriced — but a hand-entered
 tariff can still have a hole. Enforcing coverage would make a half-entered
 tariff invalid mid-edit, the same reason month coverage is not enforced either.
 
+### 3.2e Creating a tariff together with its bands (#1113)
+
+`POST /tariffs/tariffs/` accepts an optional write-only, create-only
+`initial_periods`: a non-empty list of bands for a **static `energy`** tariff.
+Each item has the fields `period_type, label, price_chf_per_kwh, percentage,
+time_from, time_to, weekdays, months` (`InitialTariffPeriodSerializer`, a
+`TariffPeriodSerializer` without `tariff` and `id`). It is not part of any
+response; the created bands come back in `periods`.
+
+- **Rejected** (400, error keyed `initial_periods`) on update (PATCH/PUT), for any
+  billing mode other than `energy` (percentage tariffs keep `initial_percentage`,
+  fee tariffs take no bands), when a `dynamic_source` is set, and when the list
+  is empty (`allow_empty=False`).
+- **Validated before anything is written.** `TariffSerializer.validate` builds an
+  unsaved `Tariff` from the validated attributes and runs each band through
+  `TariffPeriodSerializer.validate_parent(attrs, tariff, siblings)`, with the
+  bands before it as `siblings` (in-memory `TariffPeriod`s). That applies the
+  same rules as the band endpoint: the per-mode price/percentage rules of
+  `TariffPeriod.clean()`, a flat band beside a timed band on shared months, a
+  band taking both times or neither, and only one window-less band per month and
+  weekday (§3.2c). Field-level problems (a bad time format) are reported by the
+  child serializer in the same shape.
+- **Error shape**: a list indexed like the request, `{}` for a good band:
+  `{"initial_periods": [{}, {"price_chf_per_kwh": ["A price band needs a price."]}]}`.
+  A rule that names no field appears under `non_field_errors` of its band. A
+  conflict between two bands is reported on the later one.
+- **Atomic**: tariff and bands are saved in one `transaction.atomic()` block in
+  `TariffSerializer.create`; a failure leaves no `Tariff` or `TariffPeriod` row.
+- **Audit**: `TariffViewSet.perform_create` records `tariff.create`, then one
+  `tariff_period.create` per band (`_record_period_created`, shared with
+  `TariffPeriodViewSet.perform_create`; metadata `{"tariff_id": ...}`). Creation with
+  `initial_percentage` records only `tariff.create`, as before. Permissions are
+  those of plain tariff creation.
+
+Frontend: `TariffInput.initial_periods` (`InitialTariffPeriodInput[]`);
+`TariffFormValues.initial_periods` holds the drafts and `mapTariffFormValuesToInput`
+sends them only for a new `energy` tariff without a dynamic source and with at
+least one band. The create form of the detail pane shows a "Bands" section
+(`TariffDraftBands`: add, edit, remove, live `TariffBandCoverage` over the drafts
+and the typed validity) built on the field set shared with the band form
+(`TariffBandFields`). `useTariffCrud` splits a 400 with `splitIndexedErrors`
+(`lib/api/errors.ts`) and hands `saveBandErrors` to the form, which marks the
+rejected rows and shows the messages beside the named fields when a row is opened.
+
 ### 3.2b Seasonal bands
 
 Winter/summer pricing is ordinary in Switzerland. A seasonal tariff is several
@@ -1637,6 +1681,18 @@ community energy to a single participant.
 | Duplicate starts a separate series without touching the source; refuses a blank or identical name | §6.1a |
 | Rename renames every version; refuses a name already in use; identical name is a no-op | §6.1a |
 | A version cannot change the series' category/billing mode/energy type | §3.1.1 |
+
+### Backend (`tariffs/test_initial_periods.py`) — create with bands (19 tests)
+
+| Test case | Validates |
+|---|---|
+| One request creates the tariff and its bands, no `initial_periods` in the response | §3.2e |
+| Bad band: 400 with the error at its index and field; missing price key; several bad bands in one response; nothing written | §3.2e error shape, atomicity |
+| Flat beside timed reported on the later band; two window-less bands on the same hours rejected, different seasons fine; one of the two times rejected | §3.2c rules in the create path |
+| Empty list; percentage, fee and dynamic tariffs; PATCH and PUT rejected | §3.2e rejections |
+| `initial_percentage` still creates one band and logs no band event | unchanged contract |
+| One `tariff.create` plus one `tariff_period.create` per band; none on failure | §3.2e audit |
+| Viewer and a user without access to the ZEV cannot create | permissions |
 
 ### Backend (`tariffs/test_disabled_zev.py`)
 

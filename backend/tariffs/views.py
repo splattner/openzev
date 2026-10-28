@@ -56,6 +56,20 @@ from audit.services import record_audit_event
 _record_tariff_event = partial(record_audit_event, action_category=AuditActionCategory.TARIFF)
 logger = logging.getLogger(__name__)
 
+
+def _record_period_created(request, period):
+    _record_tariff_event(
+        request=request,
+        action_type="tariff_period.create",
+        target_type="tariffs.TariffPeriod",
+        target=period,
+        target_id=str(period.pk),
+        target_display=period.period_type,
+        summary=f"Created tariff period {period.period_type} for tariff {period.tariff.name}.",
+        metadata={"tariff_id": str(period.tariff_id)},
+    )
+
+
 DEFAULT_MAX_PRICE_HISTORY_DAYS = 31
 # A BFE reference-price point covers a whole quarter or month, not a
 # quarter-hour — the entire published history is a few dozen rows, so a wide
@@ -174,6 +188,11 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
             summary=f"Created tariff {tariff.name}.",
             metadata={"zev_id": str(tariff.zev_id), "category": tariff.category},
         )
+        # Bands sent with the tariff read in the audit log like bands added
+        # one by one. A percentage tariff's initial band stays unlogged.
+        if serializer.validated_data.get("initial_periods"):
+            for period in tariff.periods.all():
+                _record_period_created(self.request, period)
 
     def perform_destroy(self, instance):
         # Fully overrides ZevScopedQuerySetMixin.perform_destroy (calls
@@ -464,16 +483,7 @@ class TariffPeriodViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.M
 
     def perform_create(self, serializer):
         period = super().perform_create(serializer)
-        _record_tariff_event(
-            request=self.request,
-            action_type="tariff_period.create",
-            target_type="tariffs.TariffPeriod",
-            target=period,
-            target_id=str(period.pk),
-            target_display=period.period_type,
-            summary=f"Created tariff period {period.period_type} for tariff {period.tariff.name}.",
-            metadata={"tariff_id": str(period.tariff_id)},
-        )
+        _record_period_created(self.request, period)
 
     def perform_destroy(self, instance):
         # Same as TariffViewSet.perform_destroy above: this fully overrides

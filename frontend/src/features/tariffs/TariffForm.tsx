@@ -7,6 +7,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FormModalFooter } from '../../components/FormModalFooter'
 import { CivilDateInput } from '../../components/CivilDateInput'
+import type { ItemFieldErrors } from '../../lib/api/errors'
 import { fetchDynamicTariffSources } from '../../lib/api/tariffs'
 import { queryKeys } from '../../lib/api/queryKeys'
 import type { Tariff, TariffBillingMode, TariffInput, TariffPeriod } from '../../types/api'
@@ -14,6 +15,7 @@ import { dynamicSourceOptions, impliedEnergyType } from './dynamicSources'
 import { DynamicSourceForm } from './DynamicSourceFormModal'
 import { Notice } from '../../components/Notice'
 import { useFocusFirstField } from './useFocusFirstField'
+import { TariffDraftBands } from './TariffDraftBands'
 import {
   defaultTariffFormValues,
   mapTariffFormValuesToInput,
@@ -43,6 +45,8 @@ type TariffFormProps = {
   isPending?: boolean
   /** A failure that belongs to no field: shown in the form, not only as a toast. */
   error?: string | null
+  /** What the server rejected on the bands sent with this new tariff, by position. */
+  bandErrors?: ItemFieldErrors[] | null
   /** Delete the version being edited (asks first); absent while creating a tariff. */
   onDelete?: () => void
   onSubmit: (payload: TariffInput) => void
@@ -60,6 +64,7 @@ export function TariffForm({
   selectedZevId,
   isPending = false,
   error = null,
+  bandErrors = null,
   onDelete,
   onSubmit,
   onCancel,
@@ -69,6 +74,9 @@ export function TariffForm({
   const formId = useId()
   const [showSourceSection, setShowSourceSection] = useState(false)
   const [sourceDirty, setSourceDirty] = useState(false)
+  // A band open in the editor is not part of the tariff until it is kept.
+  const [bandEditorOpen, setBandEditorOpen] = useState(false)
+  const [bandEditorBlocked, setBandEditorBlocked] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   useFocusFirstField(formRef)
 
@@ -96,6 +104,9 @@ export function TariffForm({
     control: form.control,
     name: 'energy_type',
   })
+  const draftBands = useWatch({ control: form.control, name: 'initial_periods' })
+  const validFrom = useWatch({ control: form.control, name: 'valid_from' })
+  const validTo = useWatch({ control: form.control, name: 'valid_to' })
   // An existing tariff is one version of a series; its identity fields are
   // fixed. Creating a new tariff still sets them freely.
   const isVersion = Boolean(initialTariff)
@@ -151,13 +162,22 @@ export function TariffForm({
     }
   }, [dynamicSourceId, isVersion, sourcesData, form])
 
+  // A new static energy tariff can start with its bands; a fetched series
+  // prices a dynamic one, and every other mode has none.
+  const takesInitialBands = !isVersion && billingMode === 'energy' && !dynamicSourceId
+
   function submit(values: TariffFormValues) {
+    if (takesInitialBands && bandEditorOpen) {
+      setBandEditorBlocked(true)
+      return
+    }
     onSubmit(mapTariffFormValuesToInput(values, selectedZevId))
   }
 
   return (
     <div className="tariff-pane-form">
       {error && <Notice tone="error">{error}</Notice>}
+      {bandEditorBlocked && bandEditorOpen && <Notice tone="error">{t('pages.tariffs.form.finishBandFirst')}</Notice>}
       <form ref={formRef} id={formId} onSubmit={form.handleSubmit(submit)} className="form-grid" aria-busy={isPending || undefined}>
        <fieldset className="tariff-pane-fieldset" disabled={isPending}>
         {/* Editing an existing tariff means editing one *version* of it. The name
@@ -359,6 +379,19 @@ export function TariffForm({
 
        </fieldset>
       </form>
+      {takesInitialBands && (
+        <TariffDraftBands
+          bands={draftBands}
+          onChange={(next) => form.setValue('initial_periods', next, { shouldDirty: true })}
+          validity={{ valid_from: validFrom, valid_to: validTo || null }}
+          serverErrors={bandErrors}
+          disabled={isPending}
+          onEditingChange={(open) => {
+            setBandEditorOpen(open)
+            if (!open) setBandEditorBlocked(false)
+          }}
+        />
+      )}
       {showSourceSection && (
         <section className="tariff-pane-section" aria-labelledby={`${formId}-source`}>
           <h3 id={`${formId}-source`}>{t('pages.dynamicSources.createTitle')}</h3>

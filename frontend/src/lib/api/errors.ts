@@ -34,6 +34,10 @@ export function formatApiError(error: unknown, fallbackMessage = 'Request failed
     return error.message || fallbackMessage
   }
 
+  return formatResponseData(responseData, fallbackMessage)
+}
+
+function formatResponseData(responseData: unknown, fallbackMessage: string): string {
   if (typeof responseData === 'string') {
     return responseData
   }
@@ -59,6 +63,35 @@ export function formatApiError(error: unknown, fallbackMessage = 'Request failed
     .map((entry) => entry.replace(/\./g, ' → '))
 
   return cleaned.join(' | ')
+}
+
+/** Errors of one nested object, by field: `{ price_chf_per_kwh: ['A price band needs a price.'] }`. */
+export type ItemFieldErrors = Record<string, string[]>
+
+/**
+ * A 400 on a nested list (`{ key: [{}, { field: ['...'] }] }`) split into the
+ * errors of each item, by position in the request, and what is left of the
+ * response once that key is taken out. `items` is `null` when the response
+ * holds no such list (a plain message under the key is part of `rest`).
+ */
+export function splitIndexedErrors(
+  error: unknown,
+  key: string,
+): { items: ItemFieldErrors[] | null; rest: Record<string, unknown> | null } {
+  const payload = apiErrorPayload(error)
+  if (!payload) return { items: null, rest: null }
+  const { [key]: indexed, ...rest } = payload
+  const isList = Array.isArray(indexed) && indexed.every((entry) => typeof entry === 'object' && entry !== null && !Array.isArray(entry))
+  if (!isList) return { items: null, rest: payload }
+  const items = (indexed as Array<Record<string, unknown>>).map((entry) => Object.fromEntries(
+    Object.entries(entry).map(([field, messages]) => [field, (Array.isArray(messages) ? messages : [messages]).map(String)]),
+  ))
+  return { items, rest }
+}
+
+/** `formatApiError` for a response with one key taken out; `fallbackMessage` when nothing else is left. */
+export function formatApiErrorRest(rest: Record<string, unknown> | null, fallbackMessage: string): string {
+  return rest && Object.keys(rest).length > 0 ? formatResponseData(rest, fallbackMessage) : fallbackMessage
 }
 
 export function apiErrorPayload(error: unknown): Record<string, unknown> | null {

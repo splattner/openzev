@@ -851,7 +851,7 @@ update, and impersonation-denied each emit an audit event with expected payload.
 
 **`AuditPhase3InstrumentationTests`** (10 tests): participant link,
 participant update, metering delete-readings, metering point + assignment
-updates, tariff create/update, tariff period update, user update, and the
+updates, tariff create/update (creating an energy tariff with `initial_periods` also records one `tariff_period.create` per band), tariff period update, user update, and the
 import-without-file failure each emit the correct audit event.
 
 ### Backend — `backend/audit/test_request_context.py` (14 tests)

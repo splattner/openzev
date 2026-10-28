@@ -108,10 +108,20 @@ and the selection as they were.
    [Percentage of Energy Tariff](#percentage-of-energy-tariff)), or — for a
    per-kWh tariff — a [dynamic price source](#dynamic-tariffs) if it has one
 
-5. Click **Create Tariff**; the new tariff opens in the pane
+5. For a per-kWh tariff without a dynamic source, add its **Bands** right in
+   the form: **Add band**, enter price, times, weekdays and months, then
+   **Keep band**. You can edit or remove a band before saving, and the form
+   warns about hours without a band while you build the list (see
+   [Tariff Periods](#tariff-periods))
 
-6. For a per-kWh or percentage tariff with fixed bands, add its prices as
-   [Tariff Periods](#tariff-periods) — a tariff without a band prices nothing
+6. Click **Create Tariff**; the tariff and all its bands are created together,
+   or — if the server rejects a band — not at all. The rejected band is marked
+   in the list with the reason; fix it and save again. The new tariff opens in
+   the pane
+
+   A per-kWh tariff created without a band prices nothing until you add one
+   later as a [Tariff Period](#tariff-periods); a percentage tariff starts with
+   its one flat band and takes more later
 
 ## Importing Tariffs from Your Grid Operator
 

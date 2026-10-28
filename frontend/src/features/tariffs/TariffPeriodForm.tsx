@@ -2,13 +2,12 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useEffect, useId, useRef } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { Notice } from '../../components/Notice'
 import { useFocusFirstField } from './useFocusFirstField'
-import { RecurrenceChips } from './RecurrenceChips'
+import { TariffBandFields, useWatchedBand } from './TariffBandFields'
 import { TariffBandCoverage } from './TariffBandCoverage'
-import { MONTH_KEYS, WEEKDAY_KEYS } from './recurrence'
 import { FormModalFooter } from '../../components/FormModalFooter'
 import type { Tariff, TariffPeriod, TariffPeriodInput } from '../../types/api'
 import {
@@ -73,101 +72,21 @@ export function TariffPeriodForm({
   const isDirty = form.formState.isDirty
   useEffect(() => { onDirtyChange(isDirty) }, [isDirty, onDirtyChange])
 
-  // useWatch rather than form.watch(): the latter returns a fresh function on
-  // every render, which the React Compiler refuses to memoize around.
-  const periodType = useWatch({ control: form.control, name: 'period_type' })
-  const weekdays = useWatch({ control: form.control, name: 'weekdays' })
-  const months = useWatch({ control: form.control, name: 'months' })
-  const billingMode = useWatch({ control: form.control, name: 'billing_mode' })
-  const isPercentage = billingMode === 'percentage_of_energy'
-
   function submit(values: TariffPeriodFormValues) {
     onSubmit(mapTariffPeriodFormValuesToInput(values))
   }
 
   // The version's bands as they would be if this one were saved now.
-  const timeFrom = useWatch({ control: form.control, name: 'time_from' })
-  const timeTo = useWatch({ control: form.control, name: 'time_to' })
-  const price = useWatch({ control: form.control, name: 'price_chf_per_kwh' })
-  const percentage = useWatch({ control: form.control, name: 'percentage' })
-  const draft = { id: initialPeriod?.id, period_type: periodType, label: '', price_chf_per_kwh: price || null, percentage: percentage || null, time_from: timeFrom || null, time_to: timeTo || null, weekdays, months }
+  const { band, complete: draftComplete } = useWatchedBand(form.control)
   const siblings = periods.filter((period) => period.tariff === owner?.id && period.id !== initialPeriod?.id)
-  const versionBands = [...siblings, draft]
-  // Both times, or neither (a band for all other hours): one time alone says nothing about coverage.
-  const draftComplete = periodType === 'flat' || Boolean(timeFrom) === Boolean(timeTo)
-
-  const errors = form.formState.errors
-  const fieldError = (field: 'price_chf_per_kwh' | 'percentage') => errors[field]
-    ? <small className="field-error" role="alert">{t('pages.tariffs.form.errorRequired')}</small>
-    : null
+  const versionBands = [...siblings, { ...band, id: initialPeriod?.id }]
 
   return (
     <div className="tariff-pane-form">
       {error && <Notice tone="error">{error}</Notice>}
       <form ref={formRef} id={formId} onSubmit={form.handleSubmit(submit)} className="form-grid" aria-busy={isPending || undefined}>
        <fieldset className="tariff-pane-fieldset" disabled={isPending}>
-        <label>
-          <span>{t('pages.tariffs.form.periodType')}</span>
-          <select {...form.register('period_type')}>
-            <option value="flat">{t('pages.tariffs.periodTypes.flat')}</option>
-            <option value="high">{t('pages.tariffs.periodTypes.high')}</option>
-            <option value="low">{t('pages.tariffs.periodTypes.low')}</option>
-            <option value="band">{t('pages.tariffs.periodTypes.band')}</option>
-          </select>
-          <small className="muted">{t('pages.tariffs.form.periodTypeHint')}</small>
-        </label>
-        {periodType === 'band' && (
-          <label>
-            <span>{t('pages.tariffs.form.bandLabel')}</span>
-            <input {...form.register('label')} placeholder={t('pages.tariffs.form.bandLabelPlaceholder')} />
-            <small className="muted">{t('pages.tariffs.form.bandLabelHint')}</small>
-          </label>
-        )}
-        {isPercentage ? (
-          <label>
-            <span>{t('pages.tariffs.form.percentage')}</span>
-            <input type="number" step="0.01" min="0" {...form.register('percentage')} required />
-            {fieldError('percentage')}
-          </label>
-        ) : (
-          <label>
-            <span>{t('pages.tariffs.form.pricePerKwh')}</span>
-            <input type="number" step="0.00001" {...form.register('price_chf_per_kwh')} required />
-            {fieldError('price_chf_per_kwh')}
-          </label>
-        )}
-        <label>
-          <span>{t('pages.tariffs.form.timeFrom')}</span>
-          <input type="time" {...form.register('time_from')} />
-        </label>
-        <label>
-          <span>{t('pages.tariffs.form.timeTo')}</span>
-          <input type="time" {...form.register('time_to')} />
-          {periodType !== 'flat' && <small className="muted">{t('pages.tariffs.form.timeWindowHint')}</small>}
-          {(errors.time_from || errors.time_to) && <small className="field-error" role="alert">{t('pages.tariffs.form.errorTimeWindow')}</small>}
-        </label>
-        <RecurrenceChips
-          label={t('pages.tariffs.form.weekdays')}
-          hint={t('pages.tariffs.form.weekdaysHint')}
-          value={weekdays}
-          onChange={(next) => form.setValue('weekdays', next, { shouldDirty: true })}
-          options={WEEKDAY_KEYS.map((key, index) => ({
-            value: index,
-            label: t(`pages.tariffs.weekdaysShort.${key}` as Parameters<typeof t>[0]),
-          }))}
-          columns={7}
-        />
-        <RecurrenceChips
-          label={t('pages.tariffs.form.months')}
-          hint={t('pages.tariffs.form.monthsHint')}
-          value={months}
-          onChange={(next) => form.setValue('months', next, { shouldDirty: true })}
-          options={MONTH_KEYS.map((key, index) => ({
-            value: index + 1,
-            label: t(`pages.tariffs.monthsShort.${key}` as Parameters<typeof t>[0]),
-          }))}
-          columns={6}
-        />
+        <TariffBandFields form={form} />
         {draftComplete && <TariffBandCoverage bands={versionBands} validity={owner} showCovered />}
        </fieldset>
       </form>

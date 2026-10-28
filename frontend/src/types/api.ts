@@ -980,6 +980,13 @@ export interface TariffInput {
      * from the tariff's own drawer once it exists.
      */
     initial_percentage?: string | null
+    /**
+     * Create-only, static `energy` tariff only: the tariff's bands, written
+     * with it in one transaction (all or nothing). A 400 names the failing
+     * band by its index: `{ initial_periods: [{}, { price_chf_per_kwh: [...] }] }`.
+     * Sent for a percentage, fee or dynamic tariff, or on update, it is rejected.
+     */
+    initial_periods?: InitialTariffPeriodInput[]
     split_key?: 'equal' | 'weight'
     valid_from: string
     valid_to?: string | null
@@ -1148,8 +1155,12 @@ export interface TariffVersionInput {
     periods?: Array<Omit<TariffPeriodInput, 'tariff'>>
 }
 
-export interface TariffPeriodInput {
+export interface TariffPeriodInput extends InitialTariffPeriodInput {
     tariff: string
+}
+
+/** A band sent along with a new tariff: a `TariffPeriodInput` without the tariff it will belong to. */
+export interface InitialTariffPeriodInput {
     period_type: TariffPeriodType
     label?: string
     price_chf_per_kwh?: string | null

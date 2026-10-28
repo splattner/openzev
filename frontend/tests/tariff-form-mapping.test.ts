@@ -309,3 +309,52 @@ describe('tariff form mapping', () => {
       .toBe('')
   })
 })
+
+describe('tariff form mapping: initial bands', () => {
+  const band = {
+    ...defaultTariffPeriodFormValues,
+    period_type: 'high' as const,
+    price_chf_per_kwh: '0.295',
+    time_from: '07:00',
+    time_to: '21:00',
+    weekdays: '0,1,2,3,4',
+  }
+  const nt = { ...defaultTariffPeriodFormValues, period_type: 'low' as const, price_chf_per_kwh: '0.225' }
+  const newEnergy = { ...defaultTariffFormValues, name: 'Grid', initial_periods: [band, nt] }
+
+  it('sends the drafted bands of a new static energy tariff, without a tariff reference', () => {
+    const payload = mapTariffFormValuesToInput(newEnergy, 'z-1')
+
+    expect(payload.initial_periods).toEqual([
+      {
+        period_type: 'high', label: '', price_chf_per_kwh: '0.295', percentage: null,
+        time_from: '07:00', time_to: '21:00', weekdays: '0,1,2,3,4', months: '',
+      },
+      {
+        period_type: 'low', label: '', price_chf_per_kwh: '0.225', percentage: null,
+        time_from: null, time_to: null, weekdays: '', months: '',
+      },
+    ])
+    expect(payload.initial_periods?.[0]).not.toHaveProperty('tariff')
+  })
+
+  it('omits the key without bands', () => {
+    expect(mapTariffFormValuesToInput(defaultTariffFormValues, 'z-1')).not.toHaveProperty('initial_periods')
+  })
+
+  it('omits the key on an existing tariff, a fetched series and every other billing mode', () => {
+    expect(mapTariffFormValuesToInput({ ...newEnergy, is_new: false }, 'z-1')).not.toHaveProperty('initial_periods')
+    expect(mapTariffFormValuesToInput({ ...newEnergy, dynamic_source: 's-1' }, 'z-1')).not.toHaveProperty('initial_periods')
+    expect(mapTariffFormValuesToInput({ ...newEnergy, billing_mode: 'percentage_of_energy', initial_percentage: '10' }, 'z-1'))
+      .not.toHaveProperty('initial_periods')
+    expect(mapTariffFormValuesToInput({ ...newEnergy, billing_mode: 'monthly_fee', fixed_price_chf: '5' }, 'z-1'))
+      .not.toHaveProperty('initial_periods')
+  })
+
+  it('names a band only when it is a free band', () => {
+    const labelled = { ...band, label: 'Peak' }
+    const payload = mapTariffFormValuesToInput({ ...newEnergy, initial_periods: [labelled, { ...labelled, period_type: 'band' }] }, 'z-1')
+
+    expect(payload.initial_periods?.map((entry) => entry.label)).toEqual(['', 'Peak'])
+  })
+})

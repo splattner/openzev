@@ -9,7 +9,7 @@ from .periods import has_window, is_catch_all, months_of, weekdays_of
 
 
 class TariffPeriodSerializer(serializers.ModelSerializer):
-    def _reject_flat_beside_timed_bands(self, tariff, attrs):
+    def _reject_flat_beside_timed_bands(self, tariff, attrs, siblings=None):
         """A flat band and a timed band may not price the same months.
 
         The engine returns a flat band's price without looking at any window,
@@ -24,9 +24,10 @@ class TariffPeriodSerializer(serializers.ModelSerializer):
             ),
             months=attrs.get("months", getattr(self.instance, "months", "")),
         )
-        siblings = tariff.periods.all()
-        if self.instance is not None:
-            siblings = siblings.exclude(pk=self.instance.pk)
+        if siblings is None:
+            siblings = tariff.periods.all()
+            if self.instance is not None:
+                siblings = siblings.exclude(pk=self.instance.pk)
 
         candidate_is_flat = candidate.period_type == PeriodType.FLAT
         for sibling in siblings:
@@ -43,7 +44,7 @@ class TariffPeriodSerializer(serializers.ModelSerializer):
                     )
                 })
 
-    def _reject_ambiguous_catch_all(self, tariff, attrs):
+    def _reject_ambiguous_catch_all(self, tariff, attrs, siblings=None):
         """A band takes both times or neither, and only one may take neither.
 
         A band without a window prices every hour the windowed bands of its
@@ -73,9 +74,10 @@ class TariffPeriodSerializer(serializers.ModelSerializer):
         if has_window(candidate) or not is_catch_all(candidate):
             return
 
-        siblings = tariff.periods.all()
-        if self.instance is not None:
-            siblings = siblings.exclude(pk=self.instance.pk)
+        if siblings is None:
+            siblings = tariff.periods.all()
+            if self.instance is not None:
+                siblings = siblings.exclude(pk=self.instance.pk)
         for sibling in siblings:
             if not is_catch_all(sibling):
                 continue
@@ -92,13 +94,22 @@ class TariffPeriodSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         tariff = attrs.get("tariff") or getattr(self.instance, "tariff", None)
+        self.validate_parent(attrs, tariff)
+        return attrs
+
+    def validate_parent(self, attrs, tariff, siblings=None):
+        """Check a band against its tariff and the bands already beside it.
+
+        ``siblings`` replaces the stored bands of ``tariff`` when the tariff is
+        not saved yet (creating a tariff together with its bands).
+        """
         if tariff is not None and getattr(tariff, "dynamic_source_id", None):
             raise serializers.ValidationError("This tariff is priced from a fetched series; price bands do not apply.")
         if tariff and tariff.billing_mode not in (BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY):
             raise serializers.ValidationError("Tariff periods are only supported for energy-based tariffs.")
         if tariff:
-            self._reject_flat_beside_timed_bands(tariff, attrs)
-            self._reject_ambiguous_catch_all(tariff, attrs)
+            self._reject_flat_beside_timed_bands(tariff, attrs, siblings)
+            self._reject_ambiguous_catch_all(tariff, attrs, siblings)
             # The §4.1 per-mode rules (a price band needs a price and no
             # percentage, a percentage band the reverse) live on
             # TariffPeriod.clean(); running it here turns them into field
@@ -117,12 +128,22 @@ class TariffPeriodSerializer(serializers.ModelSerializer):
                 if hasattr(exc, "message_dict"):
                     raise serializers.ValidationError(exc.message_dict)
                 raise serializers.ValidationError(exc.messages)
-        return attrs
 
     class Meta:
         model = TariffPeriod
         fields = "__all__"
         read_only_fields = ["id"]
+
+
+class InitialTariffPeriodSerializer(TariffPeriodSerializer):
+    """A band sent along with a new tariff: same fields, no tariff or id."""
+
+    class Meta:
+        model = TariffPeriod
+        fields = [
+            "period_type", "label", "price_chf_per_kwh", "percentage",
+            "time_from", "time_to", "weekdays", "months",
+        ]
 
 
 class TariffSerializer(serializers.ModelSerializer):
@@ -137,6 +158,14 @@ class TariffSerializer(serializers.ModelSerializer):
     # with none), just like before bands existed.
     initial_percentage = serializers.DecimalField(
         max_digits=5, decimal_places=2, min_value=0, write_only=True, required=False,
+    )
+
+    # Write-only, create-only: the bands of a static energy tariff, written
+    # with it in one transaction. Every band is validated (against the unsaved
+    # tariff and the bands before it) before anything is written, and errors
+    # come back as a list indexed like the request.
+    initial_periods = InitialTariffPeriodSerializer(
+        many=True, write_only=True, required=False, allow_empty=False,
     )
 
     def get_percentage_base_summary(self, obj):
@@ -208,6 +237,16 @@ class TariffSerializer(serializers.ModelSerializer):
         fixed_price_chf = attrs.get("fixed_price_chf") if "fixed_price_chf" in attrs else getattr(self.instance, "fixed_price_chf", None)
         dynamic_source = attrs.get("dynamic_source") if "dynamic_source" in attrs else getattr(self.instance, "dynamic_source_id", None)
 
+        if "initial_periods" in attrs:
+            if self.instance is not None:
+                raise serializers.ValidationError({
+                    "initial_periods": "Add bands from the tariff's own page to change an existing tariff."
+                })
+            if billing_mode != BillingMode.ENERGY or dynamic_source:
+                raise serializers.ValidationError({
+                    "initial_periods": "Only a static energy tariff takes initial bands."
+                })
+
         if "initial_percentage" in attrs:
             if self.instance is not None:
                 raise serializers.ValidationError({
@@ -238,10 +277,29 @@ class TariffSerializer(serializers.ModelSerializer):
             attrs["energy_type"] = None
             attrs["minimum_price_chf_per_kwh"] = None
 
+        if "initial_periods" in attrs:
+            self._validate_initial_periods(attrs)
+
         return attrs
+
+    def _validate_initial_periods(self, attrs):
+        tariff = Tariff(**{key: value for key, value in attrs.items() if key != "initial_periods"})
+        validator = self.fields["initial_periods"].child
+        siblings = []
+        errors = []
+        for band in attrs["initial_periods"]:
+            try:
+                validator.validate_parent(band, tariff, siblings)
+                errors.append({})
+            except serializers.ValidationError as exc:
+                errors.append(serializers.as_serializer_error(exc))
+            siblings.append(TariffPeriod(tariff=tariff, **band))
+        if any(errors):
+            raise serializers.ValidationError({"initial_periods": errors})
 
     def create(self, validated_data):
         initial_percentage = validated_data.pop("initial_percentage", None)
+        initial_periods = validated_data.pop("initial_periods", [])
         tariff = Tariff(**validated_data)
         try:
             tariff.full_clean()
@@ -249,6 +307,8 @@ class TariffSerializer(serializers.ModelSerializer):
             self._raise_validation_error_from_model(exc)
         with transaction.atomic():
             tariff.save()
+            for band in initial_periods:
+                TariffPeriod.objects.create(tariff=tariff, **band)
             if initial_percentage is not None:
                 TariffPeriod.objects.create(
                     tariff=tariff, period_type=PeriodType.FLAT, percentage=initial_percentage,

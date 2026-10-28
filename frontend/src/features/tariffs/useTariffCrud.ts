@@ -10,7 +10,7 @@ import {
 } from '../../lib/api/tariffs'
 import { useAuth } from '../../lib/auth'
 import { useWriteScope } from '../../lib/useWriteScope'
-import { formatApiError } from '../../lib/api/errors'
+import { formatApiError, formatApiErrorRest, splitIndexedErrors, type ItemFieldErrors } from '../../lib/api/errors'
 import { invalidateTariffQueries } from './invalidate'
 import type { Tariff, TariffInput, TariffPeriod, TariffPeriodInput } from '../../types/api'
 
@@ -71,6 +71,8 @@ export function useTariffCrud({
   const [periodFormOpen, setPeriodFormOpen] = useState(false)
   // A failure that belongs to the open form: shown in it, not only as a toast.
   const [saveError, setSaveError] = useState<string | null>(null)
+  // What the server rejected on the bands sent with a new tariff, by position.
+  const [saveBandErrors, setSaveBandErrors] = useState<ItemFieldErrors[] | null>(null)
   // Which editing session a request belongs to. A save that completes after
   // its form was closed, or after another one opened, must not close, select
   // or overwrite anything in the newer session.
@@ -79,6 +81,7 @@ export function useTariffCrud({
   function startSession() {
     session.current += 1
     setSaveError(null)
+    setSaveBandErrors(null)
   }
 
   useLayoutEffect(() => {
@@ -124,7 +127,15 @@ export function useTariffCrud({
     },
     onError: (error, variables) => {
       if (isCurrent(variables.scope) && variables.session === session.current) {
-        setSaveError(formatApiError(error, t('pages.tariffs.messages.saveFailed')))
+        // A band the server refused is marked on its own row; the notice only
+        // carries what is left (or says that bands were refused).
+        const { items, rest } = splitIndexedErrors(error, 'initial_periods')
+        if (items) {
+          setSaveBandErrors(items)
+          setSaveError(formatApiErrorRest(rest, t('pages.tariffs.messages.bandsRejected')))
+        } else {
+          setSaveError(formatApiError(error, t('pages.tariffs.messages.saveFailed')))
+        }
       }
     },
   })
@@ -198,6 +209,7 @@ export function useTariffCrud({
       return
     }
     setSaveError(null)
+    setSaveBandErrors(null)
     tariffMutation.mutate({ id: editingTariffId || undefined, payload: { ...payload, zev: selectedZevId }, scope, session: session.current })
   }
 
@@ -293,6 +305,7 @@ export function useTariffCrud({
     editingTariff,
     editingPeriod,
     saveError,
+    saveBandErrors,
     tariffPending: tariffMutation.isPending,
     periodPending: periodMutation.isPending,
     deleteTariffPending: deleteTariffMutation.isPending,
