@@ -46,8 +46,8 @@ test('the next version is read from the current row and opens through the URL an
     // Every version in force or scheduled is in the pane, each with the change against the one before it.
     await expect(page.locator('.tariff-version-card')).toHaveCount(3)
     await expect(page.locator('.tariff-version-card').nth(1).locator('.tariff-change')).toContainText('+0.02')
-    await page.locator('.tariff-pane header').getByRole('button', { name: 'Close', exact: true }).click()
-    await expect(page.locator('.tariff-pane')).toBeHidden()
+    await page.locator('.detail-pane header').getByRole('button', { name: 'Close', exact: true }).click()
+    await expect(page.locator('.detail-pane')).toBeHidden()
   }
 })
 
@@ -55,8 +55,8 @@ test('active clicks and a bare link use the current version despite a stale acti
   await tariffs(page, [{ ...grid, active_version_id: 'later' }])
   await page.goto('/tariffs?tariff=42%3AGrid')
   await expect(page.locator('.tariff-version-card.is-shown')).toContainText('0.295')
-  await expect(page.locator('.tariff-pane .info-banner')).toHaveCount(0)
-  await page.locator('.tariff-pane header').getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(page.locator('.detail-pane .info-banner')).toHaveCount(0)
+  await page.locator('.detail-pane header').getByRole('button', { name: 'Close', exact: true }).click()
   await page.getByRole('region', { name: 'Current' }).locator('.tariff-select').click()
   await expect(page).toHaveURL(/version=current/)
   await expect(page.locator('.tariff-version-card.is-shown')).toContainText('0.295')
@@ -160,10 +160,10 @@ test('at 400px the list leaves the tab order and the accessibility tree while th
   await tariffs(page, [grid])
   await page.setViewportSize({ width: 400, height: 850 })
   await page.goto('/tariffs?tariff=42%3AGrid')
-  const pane = page.locator('.tariff-pane')
+  const pane = page.locator('.detail-pane')
   await expect(pane).toBeVisible()
-  await expect(page.locator('.tariff-split')).toHaveAttribute('data-layout', 'narrow')
-  const list = page.locator('.tariff-split-list')
+  await expect(page.locator('.detail-split')).toHaveAttribute('data-layout', 'narrow')
+  const list = page.locator('.detail-split-list')
   await expect(list).toBeHidden()
   await expect(list).toHaveAttribute('hidden', '')
   // Hidden content is neither focusable nor exposed: no tariff row button is reachable by Tab.
@@ -174,7 +174,7 @@ test('at 400px the list leaves the tab order and the accessibility tree while th
   const reached = new Set<string>()
   for (let i = 0; i < 40; i++) {
     await page.keyboard.press('Tab')
-    reached.add(await page.evaluate(() => document.activeElement?.closest('.tariff-split-list') ? 'list' : 'other'))
+    reached.add(await page.evaluate(() => document.activeElement?.closest('.detail-split-list') ? 'list' : 'other'))
   }
   expect(reached.has('list')).toBe(false)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
@@ -187,9 +187,9 @@ test('at 400px the list leaves the tab order and the accessibility tree while th
 test('the pane is not modal: no inert, no scroll lock, no focus trap, and Escape and Cancel put focus back', async ({ page }) => {
   await tariffs(page, [grid])
   await page.goto('/tariffs?tariff=42%3AGrid')
-  const pane = page.locator('.tariff-pane')
+  const pane = page.locator('.detail-pane')
   await expect(pane).toBeVisible()
-  await expect(page.locator('.tariff-split')).toHaveAttribute('data-layout', 'wide')
+  await expect(page.locator('.detail-split')).toHaveAttribute('data-layout', 'wide')
   expect(await page.locator('[inert]').count()).toBe(0)
   expect(await pane.getAttribute('aria-modal')).toBeNull()
   expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).not.toBe('hidden')
@@ -197,7 +197,7 @@ test('the pane is not modal: no inert, no scroll lock, no focus trap, and Escape
   const leftPane = new Set<boolean>()
   for (let i = 0; i < 60; i++) {
     await page.keyboard.press('Tab')
-    leftPane.add(await page.evaluate(() => !document.activeElement?.closest('.tariff-pane')))
+    leftPane.add(await page.evaluate(() => !document.activeElement?.closest('.detail-pane')))
   }
   expect(leftPane.has(true)).toBe(true)
 

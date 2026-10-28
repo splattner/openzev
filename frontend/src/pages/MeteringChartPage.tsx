@@ -43,7 +43,7 @@ import { selectedCommunityName } from '../lib/membership'
 import { PageHeader } from '../components/PageHeader'
 import { ScopeGuard } from '../components/ScopeGuard'
 import { Notice } from '../components/Notice'
-import { MeteringGapsDrawer } from '../features/meteringPoints/MeteringGapsDrawer'
+import { MeteringGapsModal } from '../features/meteringPoints/MeteringGapsModal'
 
 // ── Custom Tooltip ────────────────────────────────────────────────────────────
 
@@ -795,7 +795,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                 </AppTabs.Panel>
 
                 <AppTabs.Panel value="quality">
-                    <MeteringGapsDrawer
+                    <MeteringGapsModal
                         point={gapsPoint}
                         period={period}
                         onClose={() => setGapsSelection(null)}

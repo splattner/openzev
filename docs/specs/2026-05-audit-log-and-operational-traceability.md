@@ -101,7 +101,7 @@ hub tabs:
   `embedded` to drop its standalone page header when mounted inside a tab;
   scopes never merge. Owner scope is locked
   to the global ZEV selection. Switching it clears draft/applied search, resets
-  pagination and closes the drawer; no event request runs while the managed
+  pagination and closes the event pane; no event request runs while the managed
   selection is loading, empty or lacks management-view access.
 
 ### ZEV resolution rules
@@ -537,7 +537,24 @@ UI elements:
    entirely instead of showing two permanently disabled buttons. When shown,
    Zurück is disabled on the first page and Weiter on the last page
    (`!data.previous` / `!data.next`).
-8. Detail drawer or modal showing summary, reason, diff, and metadata.
+8. Event detail pane beside the table (`AuditEventPane`, built on the shared
+   `DetailPane`; SPEC-2026-10-ui-patterns §5 rule C, §7.2) showing summary,
+   reason, diff, and metadata. The table and the pane share a `.detail-split`:
+   from a 72rem content width (`SPLIT_MIN_REM`, measured on the split with
+   `useMinWidth`) they sit side by side, the pane in a 28–34rem column that
+   stays in view while the table scrolls, and the table drops its ZEV,
+   category and action columns (`.audit-col-secondary`, all shown in the
+   pane) so Created, Summary, Target, Actor and Status stay readable. Below
+   that width the pane replaces the table (rule E): the table is `hidden`, so
+   out of the tab order too, and X returns to it at the scroll position it
+   left. The pane is not modal: no scrim, focus trap or scroll lock. Picking
+   another row while it is open swaps the contents in place and leaves focus
+   where it is, so the log can be stepped through; opening it from a closed
+   state moves focus to the pane title, and closing it (X, or Escape while
+   focus is in the pane) returns focus to the summary button of the row. The
+   selected row carries `.is-selected` and its summary button
+   `aria-current`. Selection is local state, not a URL parameter, so Back
+   does not close the pane.
 
 The page follows the same admin CRUD/table conventions used by existing admin
 pages and should reuse shared components where available.
@@ -562,7 +579,7 @@ A change in effective URL filters or owner community scope resets pagination to 
 the selected event before the new query runs. Unrelated query/hash changes do
 not reset those states. Reload restores URL filters; edits replace history,
 so Back does not undo individual filter edits. Clear removes contextual keys,
-resets local filters and closes the drawer, retaining unrelated query/hash and
+resets local filters and closes the event pane, retaining unrelated query/hash and
 the selected community.
 Source activity links supply `target_type=tariffs.DynamicTariffSource` and
 `target_id`; Backup links supply `action_category=system` (all system events,
@@ -571,7 +588,7 @@ not exclusively backups).
 Initial event loading uses `PageSkeleton tableRows`; failure uses `Notice`
 with retry. Cached events remain visible on refetch failure, and a failed
 empty result is not also presented as an empty dataset.
-Each event summary is a keyboard-operable button opening its detail drawer;
+Each event summary is a keyboard-operable button opening its detail pane;
 clicking the row remains available.
 
 **Deep-linking an actor** (`?actor=<id>&actorUsername=<username>`, admin scope
@@ -911,18 +928,20 @@ configuration invariants, including the Helm schema constraint on
   and drive the page through the client's contract.
 - `frontend/tests/audit-log-scope.test.ts` for the owner scope binding:
   request carries the selected community, switching rescopes and resets
-  page/drawer, clearing filters keeps the scope, no request without a
+  page/pane, clearing filters keeps the scope, no request without a
   selection, admin scope keeps its own selector, and source links supply visible
   target filters from the first request. Mounted contextual-filter changes reset
-  pagination/drawer while unrelated URL edits retain them; Clear retains URL context.
+  pagination/pane while unrelated URL edits retain them; Clear retains URL context.
   Text typing, including `q`, remains local until Enter/blur, and new actor
-  intents close details. Search tests cover manager/viewer/admin community access,
+  intents close details. A further case checks the pane is a non-modal region
+  named by its title, receives focus on opening, and that Escape closes it,
+  restores the log and returns focus to the row's summary button. Search tests cover manager/viewer/admin community access,
   draft/applied search clearing on community changes with no carried-over query,
   Unicode length limits, participant-only list/options denial, unchanged search
   pagination, pointer Clear without an intermediate request, keyboard blur, HTTP 4xx
   feedback without retries, guarded Refresh/Retry, and escaped markup rendering.
 - `frontend/tests/zev-settings-tabs.test.ts` checks that a community switch from
-  audit page 3 resets the scoped view to page 1 and closes the old drawer.
+  audit page 3 resets the scoped view to page 1 and closes the old event pane.
 - Component/manual validation via `npm run lint`, `npm run build`, and
   `npm run test:unit`.
 

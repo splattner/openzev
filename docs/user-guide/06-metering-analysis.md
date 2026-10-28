@@ -194,9 +194,9 @@ severity first).
 | **Participant** | The most recent holder within the selected period — not necessarily today's holder, if the meter has since changed hands |
 | **Data Completeness** | Percentage of days in the period with at least one reading |
 | **Status** | 🟢 Complete, 🟡 Partial, 🔴 Missing |
-| **Missing Days** | The number of missing days; click it to open a drawer with the missing date ranges and their duration |
+| **Missing Days** | The number of missing days; click it to open a dialog with the missing date ranges and their duration |
 
-The drawer identifies the meter and holder for the selected period. It shows
+The dialog identifies the meter and holder for the selected period. It shows
 the first three gap ranges; click **And N more gaps** to reveal the rest.
 **Go to imports** opens the **Import history** tab with the current period and
 filters preserved. Managers can import a metering file covering the missing

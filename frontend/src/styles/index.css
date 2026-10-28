@@ -59,6 +59,7 @@
 @import './components/verify-card.css' layer(components);
 @import './components/app-tabs.css' layer(components);
 @import './components/disclosure.css' layer(components);
+@import './components/detail-pane.css' layer(components);
 
 @import '../components/RawMeteringTable.css' layer(pages);
 @import '../components/HeldReadingsPanel.css' layer(pages);
@@ -73,7 +74,6 @@
 @import '../features/tariffs/TariffCategorySections.css' layer(pages);
 @import '../features/tariffs/TariffOverview.css' layer(pages);
 @import '../features/tariffs/TariffDetailPane.css' layer(pages);
-@import '../features/tariffs/TariffSplit.css' layer(pages);
 @import './pages/invoice-rows.css' layer(pages);
 @import '../features/invoices/InvoicePeriodRowsTable.css' layer(pages);
 @import '../components/ProgressIcon.css' layer(pages);
@@ -86,8 +86,8 @@
 @import '../pages/AdminTemplatesHubPage.css' layer(pages);
 @import '../pages/FeasibilityCalculatorPage.css' layer(pages);
 @import './pages/login-split.css' layer(pages);
-@import '../features/meteringPoints/MeteringGapsDrawer.css' layer(pages);
-@import '../features/audit/AuditEventDrawer.css' layer(pages);
+@import '../features/meteringPoints/MeteringGapsModal.css' layer(pages);
+@import '../features/audit/AuditEventPane.css' layer(pages);
 @import '../features/audit/ChangesDiff.css' layer(pages);
 @import '../features/tariffs/TariffVersionForm.css' layer(pages);
 @import '../features/tariffs/TariffForm.css' layer(pages);

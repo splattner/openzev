@@ -1,0 +1,54 @@
+/* ── Audit log rows and detail pane ──────────────────────────────────────── */
+
+.audit-event-row {
+  cursor: pointer;
+}
+
+.audit-event-row.is-selected {
+  background: var(--surface-subtle);
+}
+
+/* Beside the pane the log keeps the columns that identify a row; the rest are in the pane. */
+.detail-split[data-layout='wide'][data-pane='open'] .audit-col-secondary {
+  display: none;
+}
+
+.audit-pane-summary {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.45;
+}
+
+.audit-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1.2rem;
+}
+
+.audit-detail-field {
+  min-width: 0;
+}
+
+.audit-detail-field strong {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+
+.audit-detail-field > div {
+  overflow-wrap: anywhere;
+}
+
+.audit-pane-metadata {
+  overflow-x: auto;
+}
+
+@media (max-width: 640px) {
+  .audit-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

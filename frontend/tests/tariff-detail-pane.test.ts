@@ -40,7 +40,7 @@ async function pane(props: Record<string, unknown> = {}): Promise<HTMLElement> {
 describe('TariffDetailPane', () => {
     it('is a region named by its title and is not modal', async () => {
         const container = await pane()
-        const region = container.querySelector('section.tariff-pane')!
+        const region = container.querySelector('section.detail-pane')!
         expect(region.getAttribute('aria-modal')).toBeNull()
         expect(region.getAttribute('role')).toBeNull()
         expect(container.querySelector(`#${region.getAttribute('aria-labelledby')}`)?.textContent).toBe('Grid')
@@ -108,8 +108,8 @@ describe('TariffDetailPane', () => {
 
     it('carries no status pill or version count in its heading', async () => {
         const container = await pane()
-        expect(container.querySelector('.tariff-pane-header .badge')).toBeNull()
-        expect(container.querySelector('.tariff-pane-meta')?.textContent).not.toMatch(/\d/)
+        expect(container.querySelector('.detail-pane-header .badge')).toBeNull()
+        expect(container.querySelector('.detail-pane-meta')?.textContent).not.toMatch(/\d/)
     })
 
     it('closes on Escape unless something inside already took it', async () => {
@@ -135,7 +135,7 @@ describe('TariffDetailPane', () => {
     it('replaces the body with the form being edited and keeps the tariff named', async () => {
         const container = await pane({ editor: { label: 'editing label', content: createElement('form', { className: 'the-form' }) } })
         expect(container.querySelector('h2')?.textContent).toBe('Grid')
-        expect(container.querySelector('.tariff-pane-meta')?.textContent).toBe('editing label')
+        expect(container.querySelector('.detail-pane-meta')?.textContent).toBe('editing label')
         expect(container.querySelector('.the-form')).not.toBeNull()
         expect(container.querySelector('.tariff-version-card')).toBeNull()
     })

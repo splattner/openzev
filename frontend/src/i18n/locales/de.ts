@@ -1261,7 +1261,6 @@ export const de = {
                 reason: 'Begründung',
                 changes: 'Änderungen',
                 metadata: 'Metadaten',
-                close: 'Details schliessen',
                 noChanges: 'Für dieses Ereignis wurden keine Feldänderungen erfasst.',
                 diffField: 'Feld',
                 diffBefore: 'Vorher',

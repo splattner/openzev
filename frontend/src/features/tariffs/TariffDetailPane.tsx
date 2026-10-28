@@ -1,4 +1,4 @@
-import { useId, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import { useState, type ReactNode, type Ref } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
     faChevronDown,
@@ -7,7 +7,6 @@ import {
     faPlus,
     faTag,
     faTriangleExclamation,
-    faXmark,
 } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../lib/appSettings'
@@ -23,61 +22,10 @@ import { TariffPriceHistoryChart } from './TariffPriceHistoryChart'
 import { TariffBandCoverage } from './TariffBandCoverage'
 import { DynamicPriceHistoryPanel } from './DynamicPriceHistoryModal'
 import { DynamicSourceSummary } from './DynamicSourceSummary'
+import { DetailPane } from '../../components/DetailPane'
 import { Disclosure } from '../../components/Disclosure'
 import { IssueText } from '../../components/IssueText'
 import { useAuth } from '../../lib/auth'
-
-type TariffPaneFrameProps = {
-    title: string
-    /** One quiet line under the title. */
-    subtitle?: ReactNode
-    /** Something under the line that needs a look (a failed price fetch). */
-    notice?: ReactNode
-    /** X, and Escape while the pane has focus: leave the pane. */
-    onClose: () => void
-    /** The title is where focus lands when the pane is opened on purpose. */
-    titleRef?: Ref<HTMLHeadingElement>
-    children: ReactNode
-}
-
-/**
- * The pane's chrome, the same for viewing and editing: a region named by its
- * title, a close button, and the body. Not modal: no `aria-modal`, no focus
- * trap, nothing around it made inert.
- */
-export function TariffPaneFrame({ title, subtitle, notice, onClose, titleRef, children }: TariffPaneFrameProps) {
-    const { t } = useTranslation()
-    const titleId = useId()
-
-    function onKeyDown(event: KeyboardEvent<HTMLElement>) {
-        // A menu or picker inside the pane takes the Escape that dismisses it.
-        if (event.key === 'Escape' && !event.defaultPrevented) {
-            event.preventDefault()
-            onClose()
-        }
-    }
-
-    return (
-        <section className="tariff-pane" aria-labelledby={titleId} onKeyDown={onKeyDown}>
-            <header className="tariff-pane-header">
-                <div className="tariff-pane-heading">
-                    <h2 id={titleId} ref={titleRef} tabIndex={-1}>{title}</h2>
-                    {subtitle && <p className="tariff-pane-meta">{subtitle}</p>}
-                    {notice}
-                </div>
-                <button
-                    type="button"
-                    className="button button-secondary"
-                    onClick={onClose}
-                    aria-label={t('common.close')}
-                >
-                    <FontAwesomeIcon icon={faXmark} fixedWidth />
-                </button>
-            </header>
-            {children}
-        </section>
-    )
-}
 
 type TariffDetailPaneProps = {
     series: TariffSeries
@@ -392,15 +340,15 @@ export function TariffDetailPane({
 
     if (editor) {
         return (
-            <TariffPaneFrame title={series.name} subtitle={editor.label} onClose={onClose} titleRef={titleRef}>
-                <div className="tariff-pane-body page-stack">{editor.content}</div>
-            </TariffPaneFrame>
+            <DetailPane title={series.name} subtitle={editor.label} onClose={onClose} titleRef={titleRef}>
+                <div className="detail-pane-body page-stack">{editor.content}</div>
+            </DetailPane>
         )
     }
 
     return (
-        <TariffPaneFrame title={series.name} subtitle={meta} notice={failedFetch || undefined} onClose={onClose} titleRef={titleRef}>
-            <div className="tariff-pane-body page-stack">
+        <DetailPane title={series.name} subtitle={meta} notice={failedFetch || undefined} onClose={onClose} titleRef={titleRef}>
+            <div className="detail-pane-body page-stack">
                 {!readOnly && (
                     <div className="tariff-pane-actions actions-row actions-row-wrap">
                         <button
@@ -472,6 +420,6 @@ export function TariffDetailPane({
                     </Disclosure>
                 )}
             </div>
-        </TariffPaneFrame>
+        </DetailPane>
     )
 }

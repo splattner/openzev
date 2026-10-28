@@ -19,13 +19,21 @@ export default defineConfig([
       'react-hooks/set-state-in-effect': 'off',
       'react-refresh/only-export-components': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
-      // SPEC-2026-10-ui-patterns §7.4: one class mapping for every tab strip.
       'no-restricted-imports': ['error', {
-        paths: [{
-          name: '@mantine/core',
-          importNames: ['Tabs'],
-          message: 'Use AppTabs from components/AppTabs, which applies the app-tabs class mapping.',
-        }],
+        paths: [
+          {
+            // SPEC-2026-10-ui-patterns §7.4: one class mapping for every tab strip.
+            name: '@mantine/core',
+            importNames: ['Tabs'],
+            message: 'Use AppTabs from components/AppTabs, which applies the app-tabs class mapping.',
+          },
+          {
+            // SPEC-2026-10-ui-patterns §5 rule C: no overlay drawers.
+            name: '@mantine/core',
+            importNames: ['Drawer'],
+            message: 'A detail beside a list uses DetailPane; one with no list is a FormModal or an inline section.',
+          },
+        ],
       }],
     },
     languageOptions: {

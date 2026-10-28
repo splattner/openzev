@@ -713,14 +713,14 @@ it('switching the settings community from audit page three remounts its first pa
     await waitForCondition(() => auditSpy.mock.calls.at(-1)?.[0].page === 3, 'page three')
     await waitForCondition(() => !!container.querySelector('tbody tr'), 'page three rows')
     await act(async () => { (container.querySelector('tbody tr') as HTMLElement).click() })
-    await waitForCondition(() => !!document.querySelector('[role="dialog"]'), 'drawer')
+    await waitForCondition(() => !!document.querySelector('.detail-pane'), 'event pane')
     const input = container.querySelector('input')!
     input.dataset.auditMounted = 'yes'
     const before = auditSpy.mock.calls.length
     state.zev = fixtureZev({ id: 'z2', name: 'Second community' })
     await rerender(root, route, client)
     await waitForCondition(() => auditSpy.mock.calls.slice(before).some(([f]) => f.zev === 'z2'), 'new scope')
-    await waitForCondition(() => !document.querySelector('[role="dialog"]'), 'closed scope drawer')
+    await waitForCondition(() => !document.querySelector('.detail-pane'), 'closed scope pane')
     const calls = auditSpy.mock.calls.slice(before).map(([f]) => ({ zev: f.zev, page: f.page }))
     const remounted = !container.querySelector('[data-audit-mounted="yes"]')
     expect(calls).toEqual([{ zev: 'z2', page: 1 }])

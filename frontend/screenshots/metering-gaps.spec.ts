@@ -40,42 +40,42 @@ for (const role of ['admin', 'manager', 'viewer'] as const) {
     await page.goto(`/metering/quality?${query}#details`)
     const trigger = page.getByRole('button', { name: '7 days, show gaps for CH-GAPS-42', exact: true })
     await expect(trigger).toHaveText('7 days')
-    // Rows stay compact: the dates are only rendered in the drawer.
+    // Rows stay compact: the dates are only rendered in the dialog.
     await expect(page.locator('tbody')).not.toContainText('02.10.2026')
 
     for (const width of [1440, 400]) {
       await page.setViewportSize({ width, height: 900 })
       await trigger.focus()
       await page.keyboard.press('Enter')
-      const drawer = page.getByRole('dialog', { name: 'Missing Days' })
-      await expect(drawer).toBeVisible()
-      await expect(drawer).toContainText('CH-GAPS-42')
-      await expect(drawer).toContainText('Historical Holder')
-      await expect(drawer).toContainText('01.10.2026 – 31.10.2026')
-      await expect(drawer.locator('li')).toHaveCount(3)
-      await expect(drawer).toContainText(role === 'viewer' ? 'Ask a manager to import' : 'Import a metering file')
-      await expect(drawer.locator('li').first()).toHaveText('02.10.2026 1 day')
-      await expect(drawer.locator('li').nth(1)).toHaveText('04.10.2026 – 05.10.2026 2 days')
-      const more = drawer.getByRole('button', { name: 'And 2 more gaps' })
+      const dialog = page.getByRole('dialog', { name: 'Missing Days' })
+      await expect(dialog).toBeVisible()
+      await expect(dialog).toContainText('CH-GAPS-42')
+      await expect(dialog).toContainText('Historical Holder')
+      await expect(dialog).toContainText('01.10.2026 – 31.10.2026')
+      await expect(dialog.locator('li')).toHaveCount(3)
+      await expect(dialog).toContainText(role === 'viewer' ? 'Ask a manager to import' : 'Import a metering file')
+      await expect(dialog.locator('li').first()).toHaveText('02.10.2026 1 day')
+      await expect(dialog.locator('li').nth(1)).toHaveText('04.10.2026 – 05.10.2026 2 days')
+      const more = dialog.getByRole('button', { name: 'And 2 more gaps' })
       await expect(more).toHaveAttribute('aria-expanded', 'false')
       await more.click()
-      await expect(drawer.locator('li')).toHaveCount(5)
-      await expect(drawer).toContainText('11.10.2026 – 12.10.2026')
-      await drawer.getByRole('button', { name: 'Show fewer' }).click()
-      await expect(drawer.locator('li')).toHaveCount(3)
+      await expect(dialog.locator('li')).toHaveCount(5)
+      await expect(dialog).toContainText('11.10.2026 – 12.10.2026')
+      await dialog.getByRole('button', { name: 'Show fewer' }).click()
+      await expect(dialog.locator('li')).toHaveCount(3)
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-      await expect(drawer).toBeInViewport({ ratio: 1 })
+      await expect(dialog).toBeInViewport({ ratio: 1 })
       await page.screenshot({ path: testInfo.outputPath(`gaps-${role}-${width}.png`), animations: 'disabled' })
       await more.click()
       await page.keyboard.press('Escape')
-      await expect(drawer).toHaveCount(0)
+      await expect(dialog).toHaveCount(0)
       await expect(trigger).toBeFocused()
     }
 
     await trigger.click()
-    const drawer = page.getByRole('dialog', { name: 'Missing Days' })
-    await expect(drawer.locator('li')).toHaveCount(3) // Reopening resets expansion.
-    await drawer.getByRole('button', { name: 'Go to imports' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Missing Days' })
+    await expect(dialog.locator('li')).toHaveCount(3) // Reopening resets expansion.
+    await dialog.getByRole('button', { name: 'Go to imports' }).click()
     const expectedParams = new URLSearchParams(query)
     expectedParams.delete('tab')
     await expect(page).toHaveURL(`/metering/imports?${expectedParams}#details`)
@@ -86,7 +86,7 @@ for (const role of ['admin', 'manager', 'viewer'] as const) {
   })
 }
 
-test('complete points have no drawer and filter/period changes dismiss old gaps', async ({ page }) => {
+test('complete points have no dialog and filter/period changes dismiss old gaps', async ({ page }) => {
   const errors = await qualityApi(page, { populated: true, meterCount: 2 })
   await page.goto('/metering/quality?period_start=2026-10-01&period_end=2026-10-31')
   await expect(page.locator('tbody tr')).toHaveCount(2)
@@ -110,42 +110,23 @@ test('complete points have no drawer and filter/period changes dismiss old gaps'
   expect(errors).toEqual([])
 })
 
-test('a single gap still opens a drawer and Tab stays inside it', async ({ page }) => {
+test('a single gap still opens a dialog and Tab stays inside it', async ({ page }) => {
   const errors = await qualityApi(page, { populated: true }, 1)
   await page.goto('/metering/quality?period_start=2026-10-01&period_end=2026-10-31')
   const trigger = page.getByRole('button', { name: /show gaps/ })
   await trigger.click()
-  const drawer = page.getByRole('dialog', { name: 'Missing Days' })
-  await expect(drawer.locator('li')).toHaveCount(1)
-  await expect(drawer.getByRole('button', { name: /more gap/ })).toHaveCount(0)
-  const close = drawer.getByRole('button', { name: 'Close' })
+  const dialog = page.getByRole('dialog', { name: 'Missing Days' })
+  await expect(dialog.locator('li')).toHaveCount(1)
+  await expect(dialog.getByRole('button', { name: /more gap/ })).toHaveCount(0)
+  const close = dialog.getByRole('button', { name: 'Close' })
   await close.focus()
   await page.keyboard.press('Shift+Tab')
-  await expect(drawer.getByRole('button', { name: 'Go to imports' })).toBeFocused()
+  await expect(dialog.getByRole('button', { name: 'Go to imports' })).toBeFocused()
   await page.keyboard.press('Tab')
   await expect(close).toBeFocused()
   await close.click()
-  await expect(drawer).toHaveCount(0)
+  await expect(dialog).toHaveCount(0)
   await expect(trigger).toBeFocused()
-  expect(errors).toEqual([])
-})
-
-test('gap details stay visible during the closing animation', async ({ page }, testInfo) => {
-  const errors = await qualityApi(page, { populated: true })
-  await page.emulateMedia({ reducedMotion: 'no-preference' })
-  await page.goto('/metering/quality?period_start=2026-10-01&period_end=2026-10-31')
-  await page.getByRole('button', { name: /show gaps/ }).click()
-  const drawer = page.getByRole('dialog', { name: 'Missing Days' })
-  await expect.poll(() => drawer.evaluate(node => getComputedStyle(node).transform)).toBe('matrix(1, 0, 0, 1, 0, 0)')
-  await page.clock.install({ time: new Date('2026-10-02T12:00:00Z') })
-  await page.clock.pauseAt(new Date('2026-10-02T12:00:01Z'))
-  await drawer.getByRole('button', { name: 'Close' }).evaluate((button: HTMLButtonElement) => button.click())
-  await page.clock.runFor(75)
-  await page.screenshot({ path: testInfo.outputPath('gaps-closing.png') })
-  await expect(drawer).toContainText('CH-GAPS-42')
-  await expect(drawer.locator('li')).toHaveCount(3)
-  await page.clock.runFor(300)
-  await expect(drawer).toHaveCount(0)
   expect(errors).toEqual([])
 })
 
@@ -157,7 +138,7 @@ test('removing the selected community closes gaps from the previous community', 
   await page.goto('/metering/quality?period_start=2026-10-01&period_end=2026-10-31')
   await page.getByRole('button', { name: /show gaps/ }).click()
   await expect(page.getByRole('dialog')).toContainText('CH-GAPS-42')
-  // Access can change while the drawer is open. Refreshing the available
+  // Access can change while the dialog is open. Refreshing the available
   // communities reconciles selection without clicking through the modal.
   state.transitionScope = '42'
   state.zevs = [{ id: '43', name: 'Second ZEV' }]
@@ -175,7 +156,7 @@ test('removing the selected community closes gaps from the previous community', 
   expect(errors).toEqual([])
 })
 
-test('a refetch that drops the selected point closes the drawer for good', async ({ page }) => {
+test('a refetch that drops the selected point closes the dialog for good', async ({ page }) => {
   const errors = await qualityApi(page, { populated: true })
   let dropped = false
   await page.route('**/api/v1/metering/readings/data-quality-status/**', route => dropped

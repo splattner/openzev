@@ -3,7 +3,8 @@ import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, 
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { TariffOverview } from '../features/tariffs/TariffOverview'
-import { TariffDetailPane, TariffPaneFrame } from '../features/tariffs/TariffDetailPane'
+import { TariffDetailPane } from '../features/tariffs/TariffDetailPane'
+import { DetailPane } from '../components/DetailPane'
 import { useTariffCrud } from '../features/tariffs/useTariffCrud'
 import { TariffEmptyState } from '../features/tariffs/TariffEmptyState'
 import { TariffForm } from '../features/tariffs/TariffForm'
@@ -39,7 +40,7 @@ const TARIFF_PARAM = 'tariff'
 const VERSION_PARAM = 'version'
 
 /** Content width from which the list and the pane sit side by side; below it
- * the pane takes the whole area (SPEC-2026-10-tariff-split-view §5.1). */
+ * the pane takes the whole area (SPEC-2026-10-detail-split-view §5.1). */
 const SPLIT_MIN_REM = 62
 
 /** Marks the history entry that opening a tariff from the list added, so X
@@ -466,11 +467,11 @@ export function TariffsPage() {
 
             <div
                 ref={splitRef}
-                className="tariff-split"
+                className="detail-split"
                 data-layout={fitsTwoPanes ? 'wide' : 'narrow'}
                 data-pane={paneOpen ? 'open' : 'closed'}
             >
-                <div className="tariff-split-list" hidden={listHidden}>
+                <div className="detail-split-list" hidden={listHidden}>
                     {tariffs.length === 0 ? (
                         <TariffEmptyState onOpenCreateTariff={createTariff} readOnly={readOnly} />
                     ) : (
@@ -484,13 +485,13 @@ export function TariffsPage() {
                 </div>
 
                 {editor === 'create' && editorPane ? (
-                    <TariffPaneFrame
+                    <DetailPane
                         title={t('pages.tariffs.createTitle')}
                         onClose={escapePane}
                         titleRef={paneTitleRef}
                     >
-                        <div className="tariff-pane-body page-stack">{editorPane.content}</div>
-                    </TariffPaneFrame>
+                        <div className="detail-pane-body page-stack">{editorPane.content}</div>
+                    </DetailPane>
                 ) : openSeries && (
                     <TariffDetailPane
                         series={openSeries}

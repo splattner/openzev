@@ -440,6 +440,8 @@ describe('audit log community scope', () => {
     })
 
     beforeEach(() => {
+        // jsdom has no layout: the pane restores the log's scroll position when it closes.
+        window.scrollTo = vi.fn()
         document.body.innerHTML = ''
         vi.clearAllMocks()
         fetchAuditEvents.mockResolvedValue(emptyPage)
@@ -506,11 +508,11 @@ describe('audit log community scope', () => {
         await page.mount()
         await click(await waitForButton(page.container, 'pages.auditLogs.pagination.next'))
         await click(buttonByText(page.container, sampleEvent.summary))
-        await waitForCondition(() => document.querySelector('[role="dialog"]') !== null, 'actor event drawer')
+        await waitForCondition(() => document.querySelector('.detail-pane') !== null, 'actor event pane')
         await page.navigate('/admin/audit?actor=42&actorUsername=second&from=account#activity')
         await waitForCondition(() => fetchAuditEvents.mock.calls.at(-1)?.[0].actor_user === 42, 'new actor filter')
         expect(fetchAuditEvents).toHaveBeenLastCalledWith(expect.objectContaining({ actor_user: 42, page: 1 }))
-        await waitForCondition(() => document.querySelector('[role="dialog"]') === null, 'closed actor drawer')
+        await waitForCondition(() => document.querySelector('.detail-pane') === null, 'closed actor pane')
         expect(page.location()).toBe('/admin/audit?from=account#activity')
         expect(page.container.querySelector('option[value="42"]')?.textContent).toBe('second')
         page.unmount()
@@ -521,7 +523,7 @@ describe('audit log community scope', () => {
         ['target_type', 'accounts.User'],
         ['action_category', 'system'],
         ['action_type', 'source.fetch'],
-    ])('resets pagination and closes the drawer before requesting a changed %s', async (key, value) => {
+    ])('resets pagination and closes the pane before requesting a changed %s', async (key, value) => {
         mockAdmin()
         mockSelection('z1')
         fetchAuditEvents.mockResolvedValue({ results: [sampleEvent], count: 150, next: 'next', previous: 'previous' })
@@ -532,11 +534,11 @@ describe('audit log community scope', () => {
         await click(await waitForButton(page.container, 'pages.auditLogs.pagination.next'))
         expect(fetchAuditEvents).toHaveBeenLastCalledWith(expect.objectContaining({ page: 3 }))
         await click(page.container.querySelector('tbody tr')!)
-        await waitForCondition(() => document.querySelector('[role="dialog"]') !== null, 'audit drawer')
+        await waitForCondition(() => document.querySelector('.detail-pane') !== null, 'audit pane')
 
         await page.navigate(`${initial}&from=bookmark#activity`)
         expect(fetchAuditEvents).toHaveBeenLastCalledWith(expect.objectContaining({ page: 3 }))
-        expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+        expect(document.querySelector('.detail-pane')).not.toBeNull()
 
         const callsBeforeChange = fetchAuditEvents.mock.calls.length
         const url = new URL(initial, 'https://openzev.test')
@@ -544,7 +546,7 @@ describe('audit log community scope', () => {
         await page.navigate(`${url.pathname}${url.search}`)
         await waitForCondition(() => fetchAuditEvents.mock.calls.length > callsBeforeChange, 'new contextual audit request')
         expect(fetchAuditEvents.mock.calls.slice(callsBeforeChange).map(([filters]) => filters.page)).toEqual([1])
-        await waitForCondition(() => document.querySelector('[role="dialog"]') === null, 'closed audit drawer')
+        await waitForCondition(() => document.querySelector('.detail-pane') === null, 'closed audit pane')
         page.unmount()
     })
 
@@ -584,7 +586,7 @@ describe('audit log community scope', () => {
         page.unmount()
     })
 
-    it('switching communities closes the open event drawer', async () => {
+    it('switching communities closes the open event pane', async () => {
         mockOwner()
         mockSelection('z1')
         fetchAuditEvents.mockResolvedValue({
@@ -603,6 +605,35 @@ describe('audit log community scope', () => {
         mockSelection('z2')
         await page.rerender()
         expect(fetchAuditEvent).toHaveBeenCalledTimes(1)
+        page.unmount()
+    })
+
+    it('shows the event in a pane, and closing it returns focus to its row', async () => {
+        mockOwner()
+        mockSelection('z1')
+        fetchAuditEvents.mockResolvedValue({ results: [sampleEvent], count: 1, next: null, previous: null })
+        const page = renderAuditLogs('owner')
+        await page.mount()
+        const opener = buttonByText(page.container, sampleEvent.summary)
+        await click(opener)
+
+        const pane = page.container.querySelector('section.detail-pane')!
+        expect(pane).not.toBeNull()
+        // In flow, not an overlay: a region named by its title, nothing modal.
+        expect(pane.getAttribute('aria-labelledby')).toBe(pane.querySelector('h2')?.id)
+        expect(document.querySelector('[role="dialog"], [aria-modal]')).toBeNull()
+        // jsdom measures no width, so the split is narrow: the pane replaces the log until it is closed.
+        expect(page.container.querySelector('.detail-split')?.getAttribute('data-layout')).toBe('narrow')
+        expect(page.container.querySelector('.detail-split-list')?.hasAttribute('hidden')).toBe(true)
+        expect(opener.getAttribute('aria-current')).toBe('true')
+        expect(document.activeElement).toBe(pane.querySelector('h2'))
+
+        await act(async () => {
+            pane.querySelector('h2')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+        })
+        expect(page.container.querySelector('.detail-pane')).toBeNull()
+        expect(page.container.querySelector('.detail-split-list')?.hasAttribute('hidden')).toBe(false)
+        expect(document.activeElement).toBe(buttonByText(page.container, sampleEvent.summary))
         page.unmount()
     })
 

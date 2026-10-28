@@ -248,7 +248,7 @@ export async function screenshotFull(page: Page, dir: string, name: string) {
   // caps are 100dvh-relative and would feed a ~1:1 slope into the solver.
   // Where a cap would not bind, pixels match shipped CSS.
   const styleHandle = await page.addStyleTag({
-    content: '.table-scroll, .tariff-split[data-layout] .tariff-pane { max-height: none !important; }',
+    content: '.table-scroll, .detail-split[data-layout] .detail-pane { max-height: none !important; }',
   })
 
   let viewport = BASE_HEIGHT

@@ -1261,7 +1261,6 @@ export const fr = {
                 reason: 'Motif',
                 changes: 'Modifications',
                 metadata: 'Métadonnées',
-                close: 'Fermer les détails',
                 noChanges: 'Aucune modification de champ enregistrée pour cet événement.',
                 diffField: 'Champ',
                 diffBefore: 'Avant',

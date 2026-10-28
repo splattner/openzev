@@ -320,7 +320,7 @@ test.describe('User Guide Screenshots', () => {
     const row = page.getByRole('button', { name: 'Grid Energy HT/NT', expanded: false }).first()
     await row.waitFor({ timeout: 10_000 })
     await row.click()
-    const pane = page.locator('.tariff-pane')
+    const pane = page.locator('.detail-pane')
     await pane.locator('.tariff-version-toggle').click()
     // Waiting on the chart rather than the history: it renders only for a series
     // with more than one version, so it also asserts the seed still has them.
@@ -337,7 +337,7 @@ test.describe('User Guide Screenshots', () => {
     const row = page.getByRole('button', { name: 'Grid Energy HT/NT', expanded: false }).first()
     await row.waitFor({ timeout: 10_000 })
     await row.click()
-    const pane = page.locator('.tariff-pane')
+    const pane = page.locator('.detail-pane')
     await expect(pane.locator('.tariff-version-toggle[aria-expanded="false"]'), `Scheduled change missing — ${SEED_HINT}`).toBeVisible()
     await screenshotFull(page, '07e-tariff-scheduled-change')
   })
@@ -347,7 +347,7 @@ test.describe('User Guide Screenshots', () => {
   test('07f-tariff-create-bands', async ({ page }) => {
     await navigateTo(page, '/tariffs')
     await page.getByRole('button', { name: 'Neuer Tarif' }).first().click()
-    const pane = page.locator('.tariff-pane')
+    const pane = page.locator('.detail-pane')
     await pane.getByLabel('Name', { exact: true }).fill('Netzstrom HT/NT')
     const bands = pane.locator('.tariff-draft-bands')
     for (const [type, price, from, to] of [['high', '0.2850', '06:00', '22:00'], ['low', '0.1950', '22:00', '06:00']]) {
@@ -372,7 +372,7 @@ test.describe('User Guide Screenshots', () => {
     const row = page.getByRole('button', { name: DEMO_DYNAMIC_TARIFF, expanded: false }).first()
     await row.waitFor({ timeout: 10_000 })
     await row.click()
-    const pane = page.locator('.tariff-pane')
+    const pane = page.locator('.detail-pane')
     const details = pane.locator('.tariff-period-section .disclosure > summary').first()
     await details.click()
     await expect(pane.locator('.tariff-period-section .disclosure[open]'), `Dynamic source details missing — ${SEED_HINT}`).toBeVisible()
@@ -648,7 +648,7 @@ test.describe('User Guide Screenshots', () => {
   })
 
   // 17b — Admin Dynamic Price Sources
-  // The same disabled synthetic source as the dynamic tariff drawer above.
+  // The same disabled synthetic source as the dynamic tariff pane above.
   test('17b-admin-dynamic-sources', async ({ page }) => {
     const source = await requireDemoDynamicSource(page)
     await navigateTo(page, '/admin/dynamic-sources')

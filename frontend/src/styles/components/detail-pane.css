@@ -1,0 +1,89 @@
+/* ── A list and its pane ─────────────────────────────────────────────────
+   Two columns when both fit; otherwise the pane takes the whole area and
+   the list steps aside (hidden, so out of the tab order too). The page
+   decides which layout applies (data-layout) from its measured width. */
+
+.detail-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.detail-split[data-layout='wide'][data-pane='open'] {
+  grid-template-columns: minmax(0, 1fr) minmax(28rem, 34rem);
+}
+
+.detail-split-list {
+  min-width: 0;
+}
+
+.detail-split-list[hidden] {
+  display: none;
+}
+
+/* ── Detail pane ─────────────────────────────────────────────────────────
+   Shared by the tariff and audit-log panes (SPEC-2026-10-ui-patterns §7.2).
+   In flow beside the list: it takes its own column, no scrim, no scroll
+   lock. On a wide page it stays in view while the list scrolls, and
+   scrolls on its own when taller than the screen. */
+
+.detail-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sheet);
+}
+
+.detail-split[data-layout='wide'] .detail-pane {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+
+.detail-pane-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-default);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--surface-card);
+}
+
+.detail-pane-heading {
+  display: grid;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.detail-pane-heading h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.detail-pane-heading h2:focus {
+  outline: none;
+}
+
+.detail-pane-meta {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.detail-pane-heading > .badge {
+  justify-self: start;
+}
+
+.detail-pane-body {
+  padding: 1.25rem 1.25rem 1.75rem;
+}

@@ -1240,19 +1240,22 @@ readings appear as Missing.
 gaps and, for every point with gaps (including a single range), a button whose
 text is the pluralized total of `duration_days` (`gapDays`, e.g. "7 days") and
 whose accessible name adds the meter (`showGapsFor`, e.g. "7 days, show gaps
-for CH-…"). `frontend/src/features/meteringPoints/MeteringGapsDrawer.tsx` uses a
-modal Mantine `Drawer` at the right, sized `min(100vw, 32rem)`, with its built-in
-focus trap, Escape handling and labelled close button. It displays the meter
+for CH-…"). `frontend/src/features/meteringPoints/MeteringGapsModal.tsx` opens a
+`FormModal` (size `xs`) titled **Missing Days**, with the dialog's focus trap,
+Escape handling, labelled close button and focus return to the button that
+opened it. It has no list beside it, so SPEC-2026-10-ui-patterns §5 rule C
+makes it a dialog (not a pane or an inline section), which keeps the modal
+interaction the former Mantine `Drawer` had. It displays the meter
 ID, the period's holder (`participant_name`), the selected period, and the first three
 `mp.gaps` ranges with localized dates (`formatShortDate`) and pluralized
 `duration_days`. A pluralized **And N more gaps** toggle reveals all remaining
-ranges and can collapse them again. The drawer reads the existing quality
+ranges and can collapse them again. The dialog reads the existing quality
 payload; it makes no API request. Selection is resolved by ID against the
 current payload and cleared as soon as it no longer resolves: on tab,
 community, period, meter or severity changes, and when a refetch removes the
 point or its gaps — a later refetch restoring them does not reopen it.
-The drawer retains the last point's details during its closing animation;
-the expansion state resets on `point?.id` changes, including close and reopen.
+The expansion state lives in the dialog body, which is keyed by `point.id`, so
+it resets on a different point and on close and reopen.
 **Go to imports** clears selection and navigates to `/metering/imports` via
 `updateParams`, removing legacy `tab` while retaining period, meter, severity,
 other query parameters and hash. It links to the shared import history; upload permissions
@@ -1859,14 +1862,14 @@ both streams stay locked until the transaction commits.
   headings use the membership’s community name when no community record is loaded.
 - Data quality severity indicators and gap display. Unit coverage in
   `frontend/tests/metering-default-selection.test.ts` exercises the real page's
-  selection reconciliation: updated payloads refresh the open drawer; removing
+  selection reconciliation: updated payloads refresh the open dialog; removing
   the point or filling its gaps closes it permanently until selected again;
   tab, community, period, meter and severity changes close it without reopening
   when the previous context returns. These tests run in CI via `test:unit`.
   Browser coverage in
   `frontend/screenshots/metering-gaps.spec.ts` verifies gap expansion/collapse,
-  single-day/range durations, single-gap and complete points, content retained
-  during the closing animation, keyboard focus trapping and return,
+  single-day/range durations, single-gap and complete points, keyboard focus
+  trapping and return,
   closing on period/filter/community changes, staying
   closed after a refetch drops and then restores the selected point,
   role-dependent import guidance, and imports

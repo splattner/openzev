@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { isAxiosError } from 'axios'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -10,14 +10,19 @@ import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { useCommunityAccess, useScopeNote } from '../lib/communityAccess'
 import { CivilDateInput } from '../components/CivilDateInput'
-import { AuditEventDrawer } from '../features/audit/AuditEventDrawer'
+import { AuditEventPane } from '../features/audit/AuditEventPane'
 import type { AuditActionCategory, AuditEventFilters, AuditEventStatus } from '../types/api'
 import { PageHeader } from '../components/PageHeader'
 import { usePageNavigation } from '../lib/usePageNavigation'
+import { useMinWidth } from '../lib/useMinWidth'
 import { Notice } from '../components/Notice'
 import { PageSkeleton } from '../components/PageSkeleton'
 
 type AuditLogsScope = 'admin' | 'owner'
+
+/** Content width from which the log and the event pane sit side by side;
+ * below it the pane takes the whole area (SPEC-2026-10-ui-patterns §5 rule E). */
+const SPLIT_MIN_REM = 72
 
 interface AuditLogsPageProps {
     scope: AuditLogsScope
@@ -198,6 +203,53 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
     }, [optionsQuery.data, filters.actorUser, linkedActorUsername])
 
     const events = eventsQuery.data?.results ?? []
+
+    // The log and the event pane sit side by side when both fit; otherwise the
+    // pane replaces the log until it is closed (rule E).
+    const [splitRef, fitsTwoPanes] = useMinWidth<HTMLDivElement>(SPLIT_MIN_REM)
+    const paneOpen = selectedEventId !== null
+    const listHidden = paneOpen && !fitsTwoPanes
+    const paneTitleRef = useRef<HTMLHeadingElement>(null)
+    // Focus follows the pane: to its title when it opens, back to the row that
+    // opened it when it closes. Picking another row while it is open keeps
+    // focus where it is, so a log can be stepped through from the keyboard.
+    const focusRequest = useRef<{ kind: 'pane' } | { kind: 'row', id: string } | null>(null)
+    const listScroll = useRef<number | null>(null)
+
+    function selectEvent(id: string) {
+        if (selectedEventId === null) {
+            focusRequest.current = { kind: 'pane' }
+            listScroll.current = window.scrollY
+        }
+        setSelectedEventId(id)
+    }
+
+    function closePane() {
+        if (selectedEventId !== null) focusRequest.current = { kind: 'row', id: selectedEventId }
+        setSelectedEventId(null)
+    }
+
+    useEffect(() => {
+        const request = focusRequest.current
+        if (!request) return
+        if (request.kind === 'pane' && paneOpen) {
+            // Beside the log the pane is already in view; only a pane that replaces it needs scrolling to.
+            paneTitleRef.current?.focus({ preventScroll: fitsTwoPanes })
+        } else if (request.kind === 'row' && !paneOpen) {
+            document.querySelector<HTMLElement>(`[data-event-id="${CSS.escape(request.id)}"]`)?.focus()
+        } else {
+            return
+        }
+        focusRequest.current = null
+    }, [paneOpen, fitsTwoPanes])
+
+    // The log comes back where the user left it.
+    useLayoutEffect(() => {
+        if (!listHidden && listScroll.current !== null) {
+            window.scrollTo(0, listScroll.current)
+            listScroll.current = null
+        }
+    }, [listHidden])
 
     function updateFilter<K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) {
         if (key in LINK_FILTER_PARAMS) {
@@ -380,88 +432,106 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
                 </div>
             </section>
 
-            <section className="table-card">
-                {eventsQuery.isLoading && <PageSkeleton variant="tableRows" />}
-                {eventsQuery.isError && (
-                    <Notice tone="error" onRetry={refreshEvents} isRetrying={eventsQuery.isFetching}>
-                        {formatApiError(eventsQuery.error, t('pages.auditLogs.loadError'))}
-                    </Notice>
-                )}
-                {!eventsQuery.isLoading && !eventsQuery.isError && events.length === 0 && <p className="muted">{t('pages.auditLogs.empty')}</p>}
-
-                {events.length > 0 && (
-                    <>
-                        <div className="table-scroll">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>{t('pages.auditLogs.columns.createdAt')}</th>
-                                        <th>{t('pages.auditLogs.columns.summary')}</th>
-                                        <th>{t('pages.auditLogs.columns.zev')}</th>
-                                        <th>{t('pages.auditLogs.columns.category')}</th>
-                                        <th>{t('pages.auditLogs.columns.action')}</th>
-                                        <th>{t('pages.auditLogs.columns.target')}</th>
-                                        <th>{t('pages.auditLogs.columns.actor')}</th>
-                                        <th>{t('pages.auditLogs.columns.status')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {events.map((event) => (
-                                        <tr key={event.id} style={{ cursor: 'pointer', background: selectedEventId === event.id ? 'var(--surface-subtle)' : undefined }} onClick={() => setSelectedEventId(event.id)}>
-                                            <td>{formatDateTime(event.created_at, settings)}</td>
-                                            <td>
-                                                <button
-                                                    type="button"
-                                                    className="audit-event-select"
-                                                    onClick={click => { click.stopPropagation(); setSelectedEventId(event.id) }}
-                                                >
-                                                    {event.summary}
-                                                </button>
-                                            </td>
-                                            <td>{event.zev ? zevNameById.get(event.zev) ?? event.zev : '—'}</td>
-                                            <td>{t(`pages.auditLogs.categories.${event.action_category}`)}</td>
-                                            <td><code>{event.action_type}</code></td>
-                                            <td>{event.target_display || `${event.target_type}:${event.target_id || '-'}`}</td>
-                                            <td>{event.actor_display || '—'}</td>
-                                            <td><span className={statusBadgeClass(event.status)}>{t(`pages.auditLogs.statuses.${event.status}`)}</span></td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Only rendered when the result spans more than one page:
-                            DRF returns next = previous = null exactly when count <= page size. */}
-                        {(eventsQuery.data?.next || eventsQuery.data?.previous) && (
-                            <div className="actions-row actions-row-wrap actions-row-end mt-1">
-                                <span className="muted">{t('pages.auditLogs.pagination.pageLabel', { page: filters.page, total: eventsQuery.data?.count ?? 0 })}</span>
-                                <button
-                                    type="button"
-                                    className="button button-secondary"
-                                    onClick={() => updateFilter('page', Math.max(1, filters.page - 1))}
-                                    disabled={!eventsQuery.data?.previous}
-                                >
-                                    {t('pages.auditLogs.pagination.previous')}
-                                </button>
-                                <button
-                                    type="button"
-                                    className="button button-secondary"
-                                    onClick={() => updateFilter('page', filters.page + 1)}
-                                    disabled={!eventsQuery.data?.next}
-                                >
-                                    {t('pages.auditLogs.pagination.next')}
-                                </button>
-                            </div>
+            <div
+                ref={splitRef}
+                className="detail-split"
+                data-layout={fitsTwoPanes ? 'wide' : 'narrow'}
+                data-pane={paneOpen ? 'open' : 'closed'}
+            >
+                <div className="detail-split-list" hidden={listHidden}>
+                    <section className="table-card">
+                        {eventsQuery.isLoading && <PageSkeleton variant="tableRows" />}
+                        {eventsQuery.isError && (
+                            <Notice tone="error" onRetry={refreshEvents} isRetrying={eventsQuery.isFetching}>
+                                {formatApiError(eventsQuery.error, t('pages.auditLogs.loadError'))}
+                            </Notice>
                         )}
-                    </>
-                )}
-            </section>
+                        {!eventsQuery.isLoading && !eventsQuery.isError && events.length === 0 && <p className="muted">{t('pages.auditLogs.empty')}</p>}
 
-            <AuditEventDrawer
-                eventId={selectedEventId}
-                onClose={() => setSelectedEventId(null)}
-                statusBadgeClass={statusBadgeClass}
-            />
+                        {events.length > 0 && (
+                            <>
+                                <div className="table-scroll">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>{t('pages.auditLogs.columns.createdAt')}</th>
+                                                <th>{t('pages.auditLogs.columns.summary')}</th>
+                                                <th className="audit-col-secondary">{t('pages.auditLogs.columns.zev')}</th>
+                                                <th className="audit-col-secondary">{t('pages.auditLogs.columns.category')}</th>
+                                                <th className="audit-col-secondary">{t('pages.auditLogs.columns.action')}</th>
+                                                <th>{t('pages.auditLogs.columns.target')}</th>
+                                                <th>{t('pages.auditLogs.columns.actor')}</th>
+                                                <th>{t('pages.auditLogs.columns.status')}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {events.map((event) => (
+                                                <tr
+                                                    key={event.id}
+                                                    className={selectedEventId === event.id ? 'audit-event-row is-selected' : 'audit-event-row'}
+                                                    onClick={() => selectEvent(event.id)}
+                                                >
+                                                    <td>{formatDateTime(event.created_at, settings)}</td>
+                                                    <td>
+                                                        <button
+                                                            type="button"
+                                                            className="audit-event-select"
+                                                            data-event-id={event.id}
+                                                            aria-current={selectedEventId === event.id || undefined}
+                                                            onClick={click => { click.stopPropagation(); selectEvent(event.id) }}
+                                                        >
+                                                            {event.summary}
+                                                        </button>
+                                                    </td>
+                                                    <td className="audit-col-secondary">{event.zev ? zevNameById.get(event.zev) ?? event.zev : '—'}</td>
+                                                    <td className="audit-col-secondary">{t(`pages.auditLogs.categories.${event.action_category}`)}</td>
+                                                    <td className="audit-col-secondary"><code>{event.action_type}</code></td>
+                                                    <td>{event.target_display || `${event.target_type}:${event.target_id || '-'}`}</td>
+                                                    <td>{event.actor_display || '—'}</td>
+                                                    <td><span className={statusBadgeClass(event.status)}>{t(`pages.auditLogs.statuses.${event.status}`)}</span></td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Only rendered when the result spans more than one page:
+                                    DRF returns next = previous = null exactly when count <= page size. */}
+                                {(eventsQuery.data?.next || eventsQuery.data?.previous) && (
+                                    <div className="actions-row actions-row-wrap actions-row-end mt-1">
+                                        <span className="muted">{t('pages.auditLogs.pagination.pageLabel', { page: filters.page, total: eventsQuery.data?.count ?? 0 })}</span>
+                                        <button
+                                            type="button"
+                                            className="button button-secondary"
+                                            onClick={() => updateFilter('page', Math.max(1, filters.page - 1))}
+                                            disabled={!eventsQuery.data?.previous}
+                                        >
+                                            {t('pages.auditLogs.pagination.previous')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="button button-secondary"
+                                            onClick={() => updateFilter('page', filters.page + 1)}
+                                            disabled={!eventsQuery.data?.next}
+                                        >
+                                            {t('pages.auditLogs.pagination.next')}
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </section>
+                </div>
+
+                {selectedEventId && (
+                    <AuditEventPane
+                        eventId={selectedEventId}
+                        onClose={closePane}
+                        statusBadgeClass={statusBadgeClass}
+                        titleRef={paneTitleRef}
+                    />
+                )}
+            </div>
         </div>
     )
 }

@@ -20,7 +20,10 @@ implemented (see [tariff split view](2026-10-tariff-split-view.md) §11 for the
 values it recorded). Phase 2 (the shared `FormModal` `size` and dirty guard,
 `Disclosure`, `AppTabs`) is implemented and described in
 [SPEC-2026-04](2026-04-frontend-management-page-design.md); the `DetailPane`
-extraction waits for its second consumer (phase 3). Until a later rollout phase
+extraction landed with its second consumer in phase 3. Phase 3 (the audit-log pane, the metering-gaps dialog, the `Drawer` import ban) is
+implemented and described in
+[SPEC-2026-05](2026-05-audit-log-and-operational-traceability.md) and
+[SPEC-2026-03 metering](2026-03-metering-import-and-quality.md). Until a later rollout phase
 (§11) lands, the baseline specs and the user guide stay authoritative for the
 screens that phase covers.
 
@@ -51,7 +54,7 @@ the code shows it.
 | Wizards sit in dialogs | `ZevListPage` creation (4 steps plus a done screen, 960px) and `ImportWizardModal` (1080px). |
 | Three disclosure mechanisms | Native `<details>` (`BillingPeriodCard`, `BillingPeriodsPage`), hand-rolled `aria-expanded` buttons (`ZevEmailTemplateFields`, `RawMeteringTable`, `MeteringGapsDrawer`, `MeteringPointRow`, `TariffCategorySections`). |
 | Information without a use | Counts and decoration that explain nothing (tariff, fee and version totals; a coloured "In Bearbeitung" on the overview). The participants "Kein Messpunkt" fix link is the model to follow. |
-| Repeated library configuration | `Tabs` with the same `app-tabs` class mapping is configured in nine files; `Drawer` three times. |
+| Repeated library configuration | `Tabs` with the same `app-tabs` class mapping is configured in nine files; `Drawer` three times. (Both resolved: `AppTabs` in phase 2; the drawers in phase 3, with `no-restricted-imports` for `Drawer` and raw `Tabs`.) |
 | Existing responsive tables are reusable | Participants and invoices share `.table-card.invoice-rows`, whose rules are container queries (`@container (max-width: 46rem)` and `28rem`, `frontend/src/styles/pages/invoice-rows.css`). A list narrowed by a pane can reuse them. |
 
 These are inputs to the rules below. A difference is a defect when it makes a
@@ -287,6 +290,22 @@ Consolidate the existing overlay drawers by assessing each one's modal
 semantics, focus, Escape ownership and retained data; do not silently change
 metering gaps' current modal interaction.
 
+**Shipped (phase 3).** `components/DetailPane.tsx` is the pane's chrome (a
+region named by its title, the close button, Escape while focus is inside, no
+`aria-modal`, trap or inertness) and `styles/components/detail-pane.css` holds
+`.detail-split` (the list and pane grid, `data-layout` wide/narrow and
+`data-pane` open/closed) and `.detail-pane*`. The tariff pane and the audit
+event pane (`AuditEventPane`) both use them; each page measures its own split
+with `useMinWidth` and chooses its breakpoint (tariffs 62rem, the audit log
+72rem, because its table needs more room). Focus placement, return and scroll
+restoration stay in each page, since what to return to differs; extract them if
+a third consumer repeats them. The audit log drops its ZEV, category and action
+columns while the pane is open beside it. The metering-gaps drawer became a
+`FormModal` (`MeteringGapsModal`, size `xs`): it opens from a table row with no
+list of its own beside it, a dialog keeps the modal interaction the drawer had
+(focus trap, Escape, focus return), and an inline section would have pushed
+the table down on a page whose point is the table.
+
 ### 7.3 `Disclosure`
 
 A small component over native `details/summary` with one `.disclosure` style,
@@ -457,7 +476,7 @@ matching user-guide chapter; regenerate guide screenshots as a set.
 | 0 | This documentation | Spec and ADR 0040 reviewed |
 | 1 | **Tariff pilot** ([tariff split view](2026-10-tariff-split-view.md)): list treatment, pane with viewing and editing, phone behaviour, the dirty guard | Pilot acceptance passes on a laptop and a phone; widths and breakpoint recorded; ADR 0040 accepted |
 | 2 | **Shared pieces:** `FormModal` `size` and universal dirty guard; `Disclosure`; `AppTabs`; the pane's shared parts once a second consumer exists | Components exist with tests; all `FormModal`s guarded |
-| 3 | **Retire overlay drawers:** audit log to the pane; metering gaps to a dialog or inline section (decided with screenshots); remove raw `Drawer` use and add the `no-restricted-imports` rule | No page or feature imports `Drawer` from Mantine |
+| 3 | **Retire overlay drawers (shipped):** audit log to the pane; metering gaps to a dialog or inline section (decided with screenshots); remove raw `Drawer` use and add the `no-restricted-imports` rule | No page or feature imports `Drawer` from Mantine |
 | 4 | **Dialog sizes:** map each explicit `maxWidth` to a size with screenshots; remove `maxWidth` from the type | `maxWidth` no longer compiles |
 | 5 | **Wizards:** decide ZEV creation and the import wizard against §6.4 | Each flow's outcome recorded; changes implemented |
 | 6 | **Label and count sweep:** overview status decoration, decorative counts, generic pills, actionable issues, billing's narrow labels | §10.1 holds on every screen audited |
@@ -518,8 +537,8 @@ matching user-guide chapter; regenerate guide screenshots as a set.
 
 ## 13. Open questions
 
-1. Audit-log detail: pane beside the log, as the tariff list? (Phase 3.)
-2. Metering gaps: dialog or inline section? It opens from the chart page with no list beside it. (Phase 3.)
+1. Audit-log detail: pane beside the log, as the tariff list? **Yes (phase 3):** screenshots at 1600px and 1920px, a phone and a narrow laptop width show it reads well with the secondary columns hidden; below 72rem it replaces the log.
+2. Metering gaps: dialog or inline section? It opens from the quality table with no list beside it. **Dialog (phase 3):** it keeps the modal interaction, and the content (a short list and one action) fits `xs`.
 3. Dialog size values and the pane's breakpoint: confirmed by pilot screenshots.
 4. ZEV creation and the import wizard: dialog or page, against §6.4. (Phase 5.)
 5. Row click: open the pane everywhere, or only through a named control so text selection and copy keep working?
