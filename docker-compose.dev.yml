@@ -68,7 +68,7 @@ services:
     restart: on-failure
 
   frontend:
-    image: node:24-alpine
+    image: node:26-alpine
     working_dir: /app
     environment:
       VITE_API_BASE_URL: /api/v1
