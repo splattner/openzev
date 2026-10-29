@@ -30,6 +30,8 @@ interface DataTableProps<T> {
     enableSorting?: boolean
     loading?: boolean
     emptyMessage?: ReactNode
+    /** Rows per page; a narrow container passes a short page. Read once, on mount. */
+    pageSize?: number
 }
 
 export function DataTable<T>({
@@ -42,11 +44,12 @@ export function DataTable<T>({
     enableSorting = true,
     loading,
     emptyMessage,
+    pageSize = PAGE_SIZE,
 }: DataTableProps<T>) {
     const { t } = useTranslation()
     const [sorting, setSorting] = useState<SortingState>(initialSorting)
     const [internalFilters, setInternalFilters] = useState<ColumnFiltersState>([])
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: PAGE_SIZE })
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize })
 
     // TanStack Table returns unmemoizable functions, so React Compiler skips
     // this component — safe, the table state lives in the hook itself.
@@ -133,7 +136,7 @@ export function DataTable<T>({
                 disabled buttons. */}
             {rows.length > 0 && table.getPageCount() > 1 && (
                 <div className="data-table-footer actions-row actions-row-end muted">
-                    <span>
+                    <span aria-live="polite">
                         {t('common.pagination.range', {
                             from: table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1,
                             to: Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getFilteredRowModel().rows.length),

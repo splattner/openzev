@@ -16,6 +16,9 @@ import { queryKeys } from '../../lib/api/queryKeys'
 import type { DynamicPriceHistory, DynamicPricePoint, DynamicTariffSource, Tariff } from '../../types/api'
 import { dynamicChartData, elapsedPriceGaps, missingPriceDates, missingRangeLabel, windowBounds } from './dynamicPriceGaps'
 
+/** Interval rows per page in the compact (pane) table: it is for checking a value, the chart is the overview. */
+const COMPACT_PAGE_SIZE = 12
+
 /** What the history view needs from the tariff it was opened for, if any. */
 export type TariffValidityContext = Pick<Tariff, 'valid_from' | 'valid_to' | 'minimum_price_chf_per_kwh'>
 
@@ -241,6 +244,7 @@ export function DynamicPriceHistoryPanel({ source, tariff, compact = false }: Pa
       getRowId={(point) => point.valid_from}
       loading={historyQuery.isLoading}
       emptyMessage={t('pages.dynamicSources.history.empty')}
+      pageSize={compact ? COMPACT_PAGE_SIZE : undefined}
     />
   )
   // The chart is a picture; this is its text equivalent, gaps included.

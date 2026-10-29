@@ -775,7 +775,11 @@ positive coverage and maintenance-link permissions.
   chart is visible without opening anything, with elapsed gaps shaded
   (`ReferenceArea`) and an `aria-label` giving the window, the price range and the
   missing dates; the statistics and the interval table sit in a lazy disclosure
-  “Fetched interval prices”, and the gap list is left to the source summary.
+  “Fetched interval prices”, and the gap list is left to the source summary. The
+  pane's table pages 12 rows at a time (`DataTable`'s `pageSize` prop, default 100)
+  with the shared range label and previous/next buttons; paging keeps the date
+  range, and a new range returns to the first page. The modal keeps the default
+  page size (`tests/dynamic-price-history-paging.test.ts`).
 - **`AdminDynamicSourcesPanel`** — routed as `/admin/dynamic-sources` in the
   Admin Overview hub. It displays global source/point/reuse/failure KPIs and a
   `DataTable` with current fetch state, last error/time and reuse counts. Its

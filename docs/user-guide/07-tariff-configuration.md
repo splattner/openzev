@@ -270,8 +270,8 @@ and breaks the line there, and **Exact missing intervals** lists the timestamps.
 Invoice generation stops for a period that needs a missing price, so fetch the
 prices again or wait for them to fill in. Dates in the future are not reported,
 as prices may not be published yet. Change the date range above the chart to look
-further back; **Fetched interval prices** opens the statistics and the full
-table.
+further back; **Fetched interval prices** opens the statistics and the interval
+table, twelve rows at a time, with previous and next buttons under it.
 Administrators can follow **Manage source in platform admin** to its operational
 row; managers create and reuse sources in the tariff form.
 

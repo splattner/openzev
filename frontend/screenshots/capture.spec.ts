@@ -367,8 +367,8 @@ test.describe('User Guide Screenshots', () => {
   })
 
   // 07d — A dynamic tariff's detail pane: its source with the details
-  // disclosure opened. The fetched prices sit in a second disclosure whose
-  // point table would make the capture several screens tall, so it stays shut.
+  // disclosure opened, and the fetched prices below it. Their point table is
+  // paged (12 rows), so opening it does not grow the capture.
   test('07d-tariff-dynamic-source', async ({ page }) => {
     await requireDemoDynamicSource(page)
     await navigateTo(page, '/tariffs')
@@ -379,6 +379,8 @@ test.describe('User Guide Screenshots', () => {
     const details = pane.locator('.tariff-period-section .disclosure > summary').first()
     await details.click()
     await expect(pane.locator('.tariff-period-section .disclosure[open]'), `Dynamic source details missing — ${SEED_HINT}`).toBeVisible()
+    await pane.locator('.disclosure > summary', { hasText: 'Abgerufene Intervallpreise' }).click()
+    await expect(pane.locator('.data-table tbody tr'), `Fetched prices missing — ${SEED_HINT}`).toHaveCount(12)
     await screenshotFull(page, '07d-tariff-dynamic-source')
   })
 
