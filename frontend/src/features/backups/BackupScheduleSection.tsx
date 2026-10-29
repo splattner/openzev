@@ -9,6 +9,7 @@ import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { useToast } from '../../lib/toast'
+import { CivilTimeInput } from '../../components/CivilTimeInput'
 import type { BackupStatus } from '../../types/api'
 import {
     WEEKDAYS,
@@ -124,7 +125,7 @@ export function BackupScheduleSection({ status }: { status: BackupStatus | undef
 
                     <label>
                         <span>{t('pages.backups.schedule.time', { timezone: saved.timezone })}</span>
-                        <input type="time" value={form.time} onChange={(event) => update({ time: event.target.value })} required />
+                        <CivilTimeInput value={form.time} onChange={(time) => update({ time })} clearable={false} />
                     </label>
                 </div>
 

@@ -256,7 +256,7 @@ export const RESTORE_SECTION_ORDER = [
 export interface ScheduleFormState {
     enabled: boolean
     frequency: 'daily' | 'weekly'
-    /** `HH:MM`, as an `<input type="time">` holds it. */
+    /** `HH:MM`, 24-hour, as `CivilTimeInput` holds it; empty while the field is incomplete. */
     time: string
     day_of_week: number
 }

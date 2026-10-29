@@ -105,7 +105,7 @@ async function render() {
             createElement(MemoryRouter, null, createElement(MantineProvider, null, createElement(BackupSettingsSection)))),
     ))
     await settle()
-    await waitForCondition(() => container.querySelector('input[type="time"]') !== null && client.isFetching() === 0, 'backup operations', 5000)
+    await waitForCondition(() => container.querySelector('input[role="spinbutton"]') !== null && client.isFetching() === 0, 'backup operations', 5000)
     return container
 }
 
@@ -133,7 +133,13 @@ const jobRows = (container: Element) => {
 
 const scheduleCard = (container: Element) =>
     Array.from(container.querySelectorAll('section.card')).find((s) => s.textContent?.includes('pages.backups.schedule.title'))!
-const timeInput = (container: Element) => scheduleCard(container).querySelector<HTMLInputElement>('input[type="time"]')!
+const timeSpins = (container: Element) => Array.from(scheduleCard(container).querySelectorAll<HTMLInputElement>('input[role="spinbutton"]'))
+/** The schedule's time as the picker shows it: hour and minute joined, so a half-empty field reads `:30`. */
+const timeShown = (container: Element) => timeSpins(container).map((input) => input.value).join(':')
+const setTime = async (container: Element, hour: string, minute: string) => {
+    await act(async () => setValue(timeSpins(container)[0], hour))
+    await act(async () => setValue(timeSpins(container)[1], minute))
+}
 const saveButton = (container: Element) => button(scheduleCard(container), 'common.save')
 const submit = (form: HTMLFormElement) =>
     act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
@@ -142,9 +148,9 @@ describe('the schedule', () => {
     it('shows what is saved, and Save stays disabled until something changes', async () => {
         setup({ saved: schedule({ enabled: true, hour: 3, minute: 15 }) })
         const container = await render()
-        expect(timeInput(container).value).toBe('03:15')
+        expect(timeShown(container)).toBe('03:15')
         expect(saveButton(container).disabled).toBe(true)
-        await act(async () => setValue(timeInput(container), '04:00'))
+        await setTime(container, '04', '00')
         expect(saveButton(container).disabled).toBe(false)
     })
 
@@ -153,7 +159,7 @@ describe('the schedule', () => {
         api.updateBackupSchedule.mockResolvedValue(schedule({ enabled: true, hour: 4, minute: 30 }))
         const container = await render()
         await click(scheduleCard(container).querySelector('input[type="checkbox"]'))
-        await act(async () => setValue(timeInput(container), '04:30'))
+        await setTime(container, '04', '30')
         const before = api.fetchBackupStatus.mock.calls.length
         await submit(scheduleCard(container).querySelector('form')!)
         await settle()
@@ -178,10 +184,19 @@ describe('the schedule', () => {
     it('will not save a time that is not a valid HH:MM', async () => {
         setup()
         const container = await render()
-        await act(async () => setValue(timeInput(container), ''))
-        expect(saveButton(container).disabled).toBe(true)
-        await submit(scheduleCard(container).querySelector('form')!)
-        expect(api.updateBackupSchedule).not.toHaveBeenCalled()
+        // A valid change first, so Save is enabled and the refusal below is down to the blanked field.
+        await setTime(container, '04', '00')
+        expect(saveButton(container).disabled).toBe(false)
+        for (const blank of [0, 1]) {
+            await setTime(container, '04', '00')
+            // The picker clears a part with Backspace; an emptied text value is ignored.
+            await act(async () => {
+                timeSpins(container)[blank].dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }))
+            })
+            expect(saveButton(container).disabled).toBe(true)
+            await submit(scheduleCard(container).querySelector('form')!)
+            expect(api.updateBackupSchedule).not.toHaveBeenCalled()
+        }
     })
 
     it('says so loudly when an enabled schedule would write unencrypted backups', async () => {
@@ -225,11 +240,11 @@ describe('the schedule', () => {
         setup()
         api.updateBackupSchedule.mockRejectedValue(new Error('boom'))
         const container = await render()
-        await act(async () => setValue(timeInput(container), '05:00'))
+        await setTime(container, '05', '00')
         await submit(scheduleCard(container).querySelector('form')!)
         await settle()
         expect(pushToast).toHaveBeenCalledWith(expect.any(String), 'error')
-        expect(timeInput(container).value).toBe('05:00')
+        expect(timeShown(container)).toBe('05:00')
     })
 })
 
