@@ -51,7 +51,9 @@ describe('TariffDetailPane', () => {
     it('shows the current and the scheduled version in full, and folds the past into the history', async () => {
         const container = await pane()
         const cards = [...container.querySelectorAll('.tariff-version-card')]
-        expect(cards.slice(0, 2).map((card) => card.querySelector('.badge')?.textContent)).toEqual([
+        // Words, not pills: the standing is text in front of the window.
+        expect(container.querySelector('.tariff-version-card .badge')).toBeNull()
+        expect(cards.slice(0, 2).map((card) => card.querySelector('.tariff-version-card-state')?.textContent)).toEqual([
             'pages.tariffs.overview.current', 'pages.tariffs.overview.upcoming',
         ])
         const history = container.querySelector<HTMLDetailsElement>('.disclosure')!
@@ -64,7 +66,10 @@ describe('TariffDetailPane', () => {
         const container = await pane({ shownVersionId: 'past' })
         expect(container.querySelector<HTMLDetailsElement>('.disclosure')!.open).toBe(true)
         expect(container.querySelector('.tariff-version-row.is-shown.is-ended')).not.toBeNull()
-        expect(container.querySelector('.disclosure .tariff-version-card .badge')?.textContent).toBe('pages.tariffs.versions.statusEnded')
+        // The history heading already says it ended, so the card does not repeat it.
+        const card = container.querySelector('.disclosure .tariff-version-card')!
+        expect(card.querySelector('.badge, .tariff-version-card-state')).toBeNull()
+        expect(card.querySelector('.tariff-version-card-window')?.textContent).toContain('\u2013')
     })
 
     it('says what the scheduled version changes against the one before it', async () => {

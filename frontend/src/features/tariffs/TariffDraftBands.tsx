@@ -125,7 +125,7 @@ export function TariffDraftBands({
                 <div key={index} className={`tariff-period-row${messages.length > 0 ? ' has-error' : ''}`}>
                   <div className="tariff-period-main">
                     <div className="tariff-period-line">
-                      <span className="badge badge-neutral">{name}</span>
+                      <span className="tariff-band-name">{name}</span>
                       <strong>CHF {kwhPrice.format(Number(band.price_chf_per_kwh))}/kWh</strong>
                     </div>
                     <div className="muted tariff-period-meta">{describe(band)}</div>

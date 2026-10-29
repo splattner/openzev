@@ -2156,7 +2156,6 @@ export const de = {
                 renameHint_other: 'Die Umbenennung betrifft alle {{count}} Versionen \u2014 der Name h\u00e4lt sie zusammen.',
                 deleteVersion: 'Diese Version l\u00f6schen',
                 moreActions: 'Mehr',
-                statusEnded: 'Beendet',
                 gapBadge_one: '{{count}} L\u00fccke',
                 gapBadge_other: '{{count}} L\u00fccken',
                 gapTooltip: 'Ein Teil des Zeitverlaufs hat keine Version \u2014 Energie darin wird mit null verrechnet.',

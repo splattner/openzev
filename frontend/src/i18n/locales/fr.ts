@@ -2156,7 +2156,6 @@ export const fr = {
                 renameHint_other: 'Le changement de nom concerne les {{count}} versions \u2014 le nom est ce qui les relie.',
                 deleteVersion: 'Supprimer cette version',
                 moreActions: 'Plus',
-                statusEnded: 'Terminée',
                 gapBadge_one: '{{count}} lacune',
                 gapBadge_other: '{{count}} lacunes',
                 gapTooltip: 'Une partie de la chronologie n\u2019a aucune version : l\u2019\u00e9nergie y est factur\u00e9e \u00e0 z\u00e9ro.',

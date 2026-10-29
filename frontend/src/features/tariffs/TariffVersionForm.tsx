@@ -259,7 +259,7 @@ export function TariffVersionForm({
               <div className="tariff-version-price-list">
                 {periods.map((period, index) => (
                   <label key={`${period.period_type}-${index}`} className="tariff-version-price-row">
-                    <span className="badge badge-neutral">
+                    <span className="tariff-band-name">
                       {t(`pages.tariffs.periodTypes.${period.period_type}` as Parameters<typeof t>[0], {
                         defaultValue: period.period_type,
                       })}

@@ -2167,7 +2167,6 @@ export const en = {
                 renameHint_other: 'Renaming applies to all {{count}} versions — the name is what keeps them together.',
                 deleteVersion: 'Delete this version',
                 moreActions: 'More',
-                statusEnded: 'Ended',
                 gapBadge_one: '{{count}} gap',
                 gapBadge_other: '{{count}} gaps',
                 gapTooltip: 'Part of this tariff\u2019s timeline has no version, so energy there is billed at nothing.',

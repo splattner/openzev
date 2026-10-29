@@ -181,13 +181,19 @@ export function TariffDetailPane({
         const previous = previousOf(version)
         const comparison = previous ? deltaSummary(series, previous, version, (diff) => t('pages.tariffs.change.points', { diff })) : null
         const uncovered = hasBands && version.periods.length > 0 && bandCoverage(version.periods, version).uncovered
-        const status = (
-            <span className={`badge ${state === 'active' ? 'badge-success' : state === 'scheduled' ? 'badge-info' : 'badge-neutral'}`}>
-                {t(state === 'active'
-                    ? 'pages.tariffs.overview.current'
-                    : state === 'scheduled'
-                        ? 'pages.tariffs.overview.upcoming'
-                        : 'pages.tariffs.versions.statusEnded')}
+        // Plain words, not a pill: the state is the text, never a colour. A past
+        // version sits under the history heading, which already says it ended.
+        const standing = (
+            <span className="tariff-version-card-window">
+                {state !== 'expired' && (
+                    <>
+                        <strong className="tariff-version-card-state">
+                            {t(state === 'active' ? 'pages.tariffs.overview.current' : 'pages.tariffs.overview.upcoming')}
+                        </strong>
+                        {' \u00b7 '}
+                    </>
+                )}
+                {dateWindow(version)}
             </span>
         )
         return (
@@ -206,13 +212,11 @@ export function TariffDetailPane({
                             onClick={() => setUnfolded((current) => ({ ...current, [version.id]: !open }))}
                         >
                             <FontAwesomeIcon icon={faChevronDown} className="disclosure-toggle-icon" fixedWidth aria-hidden="true" />
-                            {status}
-                            <span className="tariff-version-card-window">{dateWindow(version)}</span>
+                            {standing}
                         </button>
                     ) : (
                         <div className="tariff-version-card-title">
-                            {status}
-                            <span className="tariff-version-card-window">{dateWindow(version)}</span>
+                            {standing}
                         </div>
                     )}
                     {!readOnly && (
@@ -286,7 +290,7 @@ export function TariffDetailPane({
                                         <div key={period.id} className="tariff-period-row">
                                             <div className="tariff-period-main">
                                                 <div className="tariff-period-line">
-                                                    <span className="badge badge-neutral">
+                                                    <span className="tariff-band-name">
                                                         {bandName(period, t(`pages.tariffs.periodTypes.${period.period_type}` as Parameters<typeof t>[0], { defaultValue: period.period_type }))}
                                                     </span>
                                                     {isPercentageTariff ? (

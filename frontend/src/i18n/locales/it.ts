@@ -2156,7 +2156,6 @@ export const it = {
                 renameHint_other: 'La ridenominazione riguarda tutte le {{count}} versioni \u2014 il nome \u00e8 ci\u00f2 che le tiene insieme.',
                 deleteVersion: 'Elimina questa versione',
                 moreActions: 'Altro',
-                statusEnded: 'Conclusa',
                 gapBadge_one: '{{count}} lacuna',
                 gapBadge_other: '{{count}} lacune',
                 gapTooltip: 'Una parte della cronologia non ha alcuna versione: l\u2019energia vi \u00e8 fatturata a zero.',

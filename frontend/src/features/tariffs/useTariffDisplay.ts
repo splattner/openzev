@@ -4,19 +4,11 @@ import { fetchDynamicTariffSources } from '../../lib/api/tariffs'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { formatShortDate } from '../../lib/appSettings'
 import type { AppSettings, DynamicTariffSource, Tariff, TariffSeries, TariffVersion } from '../../types/api'
-import { validityState, type ValidityState } from './validity'
+import { validityState } from './validity'
 import { MONTH_KEYS, WEEKDAY_KEYS } from './recurrence'
 import { buildRateLines, kwhPrice, type RateLine } from './rateLines'
 
 export type { RateLine }
-
-// Validity is a state, so it keeps the status colours — scheduled is the blue
-// of "upcoming" everywhere else.
-const VALIDITY_BADGE_CLASS: Record<ValidityState, string> = {
-    active: 'badge badge-success',
-    scheduled: 'badge badge-info',
-    expired: 'badge badge-neutral',
-}
 
 /** The band percentages of a percentage-of-energy version, as numbers. */
 export function percentageValues(version: TariffVersion): number[] {
@@ -67,7 +59,6 @@ export function useTariffDisplay(settings: AppSettings, today: string) {
                     ? t('pages.tariffs.validity.until', { date: validTo })
                     : t('pages.tariffs.validity.since', { date: validFrom })
         return {
-            className: VALIDITY_BADGE_CLASS[state],
             label,
             tooltip: `${validFrom} - ${validTo ?? t('pages.tariffs.openEnded')}`,
         }

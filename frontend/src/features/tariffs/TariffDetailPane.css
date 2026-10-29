@@ -63,6 +63,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Current or upcoming, as a word in front of the window. */
+.tariff-version-card-state {
+  color: var(--text-body);
+  font-weight: 600;
+}
+
+/* A band's name: plain text, as the list shows it, in the pane, the draft
+   bands and the version form alike. */
+.tariff-band-name {
+  color: var(--text-body);
+  font-weight: 500;
+}
+
 .tariff-version-card-body {
   display: grid;
   gap: 0.75rem;
