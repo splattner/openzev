@@ -683,8 +683,8 @@ hint; zero points show “No stored prices yet.” Last success is shown only wh
 its timestamp is present. The history panel is scoped to the shown tariff's validity.
 When the stored series has no price for time that has already passed, the summary
 also shows a warning notice (`missing` prop, fed by `useElapsedPriceGaps` through
-`DynamicSourceSection`): the merged missing date ranges in the business timezone
-(“No prices for 03.10.2026 – 05.10.2026”), a line saying invoice generation stops
+`DynamicSourceSection`): the merged missing date ranges in the business timezone, in
+bold, as the notice's heading (“No prices for 03.10.2026 – 05.10.2026”; there is no separate title), a line saying invoice generation stops
 for a period that needs a missing price (§9); the exact timestamps are not listed.
 `dynamicPriceGaps.ts` holds the pure helpers:
 `elapsedPriceGaps` cuts each gap off at now (a gap wholly in the future is dropped,

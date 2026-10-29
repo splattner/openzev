@@ -2286,7 +2286,6 @@ export const fr = {
                 dateFrom: 'Date de début', dateTo: 'Date de fin', validity: 'Validité', price: 'CHF/kWh',
                 points: 'Points', average: 'Moyenne CHF/kWh', negative: 'Prix négatifs', gaps: 'Lacunes de couverture',
                 gapTitle: 'Intervalles sans prix dans cette période', empty: 'Aucun prix dans cette période.',
-                missingTitle: 'Des prix manquent',
                 missingDate: 'Aucun prix pour {{date}}',
                 missingDates: 'Aucun prix pour {{from}} – {{to}}',
                 missingEffect: 'La génération des factures s’arrête pour une période qui nécessite un prix manquant.',

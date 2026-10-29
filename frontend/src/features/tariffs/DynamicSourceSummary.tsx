@@ -39,9 +39,8 @@ export function DynamicSourceSummary({ source, settings, canOperate, missing = [
             {source.last_fetch_status === 'failed' && source.last_fetch_error && <p className="text-error m-0">{source.last_fetch_error}</p>}
             {missing.length > 0 && (
                 <Notice tone="warning">
-                    <strong>{t('pages.dynamicSources.history.missingTitle')}</strong>
                     {missingPriceDates(missing).map((dates) => (
-                        <p key={dates.from} className="m-0">{missingRangeLabel(dates, settings, t)}</p>
+                        <p key={dates.from} className="m-0"><strong>{missingRangeLabel(dates, settings, t)}</strong></p>
                     ))}
                     <p className="muted m-0">{t('pages.dynamicSources.history.missingEffect')}</p>
                 </Notice>
