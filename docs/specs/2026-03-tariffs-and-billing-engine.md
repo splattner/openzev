@@ -1271,7 +1271,7 @@ beside the list when the content area is at least 62rem wide, otherwise the pane
 replaces the list (the list is `hidden`, so it leaves the tab order and the
 accessibility tree). Tariff create, edit, rename, duplicate, schedule price
 change, price-band create/edit and the dynamic source form are forms inside the
-pane; there are no edit dialogs. Delete asks through the shared confirmation.
+pane; there are no edit dialogs. Delete is on the version card's `⋮` menu and the band row's trash icon, not in the forms, and asks through the shared confirmation.
 
 Selection lives in the URL (`tariff`, `version`): opening from the list adds one
 history step, switching tariff or version replaces it, X, Back, Forward and a

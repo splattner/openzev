@@ -90,7 +90,6 @@
 @import '../features/audit/AuditEventPane.css' layer(pages);
 @import '../features/audit/ChangesDiff.css' layer(pages);
 @import '../features/tariffs/TariffVersionForm.css' layer(pages);
-@import '../features/tariffs/TariffForm.css' layer(pages);
 @import '../features/tariffs/TariffPriceHistoryChart.css' layer(pages);
 @import '../pages/PublicInvoicePage.css' layer(pages);
 @import './pages/public-card.css' layer(pages);

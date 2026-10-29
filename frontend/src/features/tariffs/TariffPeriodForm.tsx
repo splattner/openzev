@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCheck, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faCheck, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useEffect, useId, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -33,8 +33,6 @@ type TariffPeriodFormProps = {
   isPending?: boolean
   /** A failure that belongs to no field: shown in the form, not only as a toast. */
   error?: string | null
-  /** Delete the band being edited (asks first); absent while adding one. */
-  onDelete?: () => void
 }
 
 /** Add or change a price band of the shown version, in the detail pane. */
@@ -48,7 +46,6 @@ export function TariffPeriodForm({
   periods,
   isPending = false,
   error = null,
-  onDelete,
 }: TariffPeriodFormProps) {
   const { t } = useTranslation()
   const formId = useId()
@@ -84,20 +81,13 @@ export function TariffPeriodForm({
   return (
     <div className="tariff-pane-form">
       {error && <Notice tone="error">{error}</Notice>}
+      {initialPeriod && <p className="muted m-0">{t('pages.tariffs.form.correctionHint')}</p>}
       <form ref={formRef} id={formId} onSubmit={form.handleSubmit(submit)} className="form-grid" aria-busy={isPending || undefined}>
        <fieldset className="tariff-pane-fieldset" disabled={isPending}>
         <TariffBandFields form={form} />
         {draftComplete && <TariffBandCoverage bands={versionBands} validity={owner} showCovered />}
        </fieldset>
       </form>
-      {onDelete && (
-        <div className="tariff-pane-delete">
-          <button type="button" className="button button-danger button-compact" onClick={onDelete} disabled={isPending}>
-            <FontAwesomeIcon icon={faTrash} fixedWidth />
-            {t('common.delete')}
-          </button>
-        </div>
-      )}
       <FormModalFooter
         formId={formId}
         onCancel={onCancel}

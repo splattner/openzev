@@ -272,10 +272,11 @@ export function useTariffCrud({
     setPeriodTariffId(undefined)
   }
 
-  function confirmDeleteTariff(tariff: Tariff) {
+  /** `window` is the version's validity as the pane writes it: the message names which one goes. */
+  function confirmDeleteTariff(tariff: Pick<Tariff, 'id' | 'name'>, window: string) {
     confirm({
       title: t('pages.tariffs.deleteTitle'),
-      message: t('pages.tariffs.deleteMessage', { name: tariff.name }),
+      message: t('pages.tariffs.deleteMessage', { name: tariff.name, window }),
       confirmText: t('pages.tariffs.deleteConfirm'),
       isDangerous: true,
       onConfirm: () => {

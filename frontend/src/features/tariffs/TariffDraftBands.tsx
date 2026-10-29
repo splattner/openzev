@@ -5,9 +5,9 @@ import { useState, type KeyboardEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import type { ItemFieldErrors } from '../../lib/api/errors'
-import { bandName, bandWindow } from './bands'
-import { MONTH_KEYS, WEEKDAY_KEYS, formatSeason, formatWeekdays } from './recurrence'
-import { kwhPrice } from './rateLines'
+import { bandName } from './bands'
+import { MONTH_KEYS, WEEKDAY_KEYS } from './recurrence'
+import { formatBandSchedule, kwhPrice } from './rateLines'
 import { TariffBandCoverage } from './TariffBandCoverage'
 import { TariffBandFields, toCoverageBand, useWatchedBand } from './TariffBandFields'
 import {
@@ -89,12 +89,7 @@ export function TariffDraftBands({
   }
 
   function describe(band: TariffPeriodFormValues) {
-    const window = bandWindow({ ...band, time_from: band.time_from || null, time_to: band.time_to || null })
-    return [
-      band.period_type === 'flat' ? t('pages.tariffs.allDay') : window ?? t('pages.tariffs.rateCard.allOtherHours'),
-      formatWeekdays(band.weekdays, dayNames) || t('pages.tariffs.allWeekdays'),
-      formatSeason(band.months, monthNames),
-    ].filter(Boolean).join(' · ')
+    return formatBandSchedule({ ...band, time_from: band.time_from || null, time_to: band.time_to || null }, t, dayNames, monthNames)
   }
 
   function rowErrors(index: number) {

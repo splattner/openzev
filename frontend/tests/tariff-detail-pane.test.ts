@@ -3,6 +3,7 @@ import { act } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TariffDetailPane } from '../src/features/tariffs/TariffDetailPane'
 import { renderWithProviders } from './helpers/render'
+import { waitForCondition } from './helpers/waitForCondition'
 import type { TariffSeries, TariffVersion } from '../src/types/api'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
@@ -29,7 +30,7 @@ const noop = () => undefined
 const handlers = {
     onShowVersion: noop, onClose: noop, onEditTariff: noop,
     onOpenCreatePeriod: noop, onEditPeriod: noop, onNewVersion: noop,
-    onDuplicate: noop, onRenameSeries: noop,
+    onDuplicate: noop, onRenameSeries: noop, onDeleteVersion: noop, onDeletePeriod: noop,
 }
 async function pane(props: Record<string, unknown> = {}): Promise<HTMLElement> {
     const element = createElement(TariffDetailPane, { series, allSeries: [series], settings, shownVersionId: null, ...handlers, ...props } as never) as ReactElement
@@ -92,9 +93,35 @@ describe('TariffDetailPane', () => {
         expect(shown.querySelectorAll('.tariff-version-toggle')[0].getAttribute('aria-expanded')).toBe('true')
     })
 
-    it('puts no delete button on the cards: deleting is done from the edit form', async () => {
-        const container = await pane()
-        expect(container.querySelector('.button-danger')).toBeNull()
+    it('offers deleting a version from a menu on its card, which asks the page and does not delete itself', async () => {
+        const onDeleteVersion = vi.fn()
+        const container = await pane({ onDeleteVersion })
+        const trigger = container.querySelector<HTMLButtonElement>('.tariff-version-card [aria-haspopup="menu"]')!
+        expect(trigger.getAttribute('aria-label')).toBe('pages.tariffs.versions.moreActions')
+        act(() => trigger.click())
+        await waitForCondition(() => !!document.querySelector('[role="menuitem"]'), 'the version menu')
+        const item = document.querySelector<HTMLElement>('[role="menuitem"]')!
+        expect(item.textContent).toBe('pages.tariffs.versions.deleteVersion')
+        act(() => item.click())
+        expect(onDeleteVersion).toHaveBeenCalledTimes(1)
+        expect(onDeleteVersion.mock.calls[0][0].id).toBe('current')
+        // The confirmation names which version goes, by its validity window.
+        expect(onDeleteVersion.mock.calls[0][1]).toBe('01.01.2001 \u2013 pages.tariffs.openEnded')
+    })
+
+    it('puts a quiet delete icon beside the edit pen on each band', async () => {
+        const band = (id: string) => ({ id, tariff: 'e1', period_type: 'band', label: id, price_chf_per_kwh: '0.2', percentage: null,
+            time_from: '07:00:00', time_to: '12:00:00', weekdays: '', months: '' })
+        const energy = { ...version('e1', '2001-01-01', null), billing_mode: 'energy', periods: [band('p1'), band('p2')] } as unknown as TariffVersion
+        const energySeries = { ...series, billing_mode: 'energy', version_count: 1, active_version_id: 'e1', versions: [energy] } as unknown as TariffSeries
+        const onDeletePeriod = vi.fn()
+        const container = await pane({ series: energySeries, allSeries: [energySeries], onDeletePeriod })
+        const rows = [...container.querySelectorAll('.tariff-period-row')]
+        expect(rows).toHaveLength(2)
+        const trash = rows[1].querySelector<HTMLButtonElement>('.tariff-period-actions .button-danger')!
+        expect(trash.getAttribute('aria-label')).toBe('common.delete')
+        act(() => trash.click())
+        expect(onDeletePeriod.mock.calls[0][0].id).toBe('p2')
     })
 
     it('shows a version\u2019s notes only where the overview row does not already say them', async () => {
@@ -128,15 +155,23 @@ describe('TariffDetailPane', () => {
         const container = await pane({ readOnly: true, shownVersionId: 'past' })
         expect(container.querySelector('.tariff-pane-actions')).toBeNull()
         expect(container.querySelector('.tariff-version-card .button')).toBeNull()
+        expect(container.querySelector('.tariff-version-card [aria-haspopup="menu"]')).toBeNull()
         expect(container.querySelector('.tariff-version-row .button')).toBeNull()
         expect(container.querySelector('.tariff-version-select')).not.toBeNull()
     })
 
-    it('replaces the body with the form being edited and keeps the tariff named', async () => {
-        const container = await pane({ editor: { label: 'editing label', content: createElement('form', { className: 'the-form' }) } })
-        expect(container.querySelector('h2')?.textContent).toBe('Grid')
-        expect(container.querySelector('.detail-pane-meta')?.textContent).toBe('editing label')
+    it('replaces the body with the form being edited, names the task and keeps the tariff named', async () => {
+        const container = await pane({ editor: { label: 'editing label', content: createElement('form', { className: 'the-form' }), version: current } })
+        expect(container.querySelector('h2')?.textContent).toBe('editing label')
+        expect(container.querySelector('.detail-pane-meta')?.textContent).toBe('Grid \u00b7 01.01.2001 \u2013 pages.tariffs.openEnded')
         expect(container.querySelector('.the-form')).not.toBeNull()
         expect(container.querySelector('.tariff-version-card')).toBeNull()
+    })
+
+    it('has the brand header, both viewing a tariff and editing one', async () => {
+        const viewing = await pane()
+        expect(viewing.querySelector('.detail-pane-header')?.classList.contains('detail-pane-header--brand')).toBe(true)
+        const editing = await pane({ editor: { label: 'editing label', content: createElement('form') } })
+        expect(editing.querySelector('.detail-pane-header')?.classList.contains('detail-pane-header--brand')).toBe(true)
     })
 })

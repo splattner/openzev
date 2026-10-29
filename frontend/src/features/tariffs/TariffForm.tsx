@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCheck, faPlus, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faCheck, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useQuery } from '@tanstack/react-query'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
@@ -47,8 +47,6 @@ type TariffFormProps = {
   error?: string | null
   /** What the server rejected on the bands sent with this new tariff, by position. */
   bandErrors?: ItemFieldErrors[] | null
-  /** Delete the version being edited (asks first); absent while creating a tariff. */
-  onDelete?: () => void
   onSubmit: (payload: TariffInput) => void
   onCancel: () => void
   /** Whether anything was changed, for the pane's unsaved-input guard. */
@@ -65,7 +63,6 @@ export function TariffForm({
   isPending = false,
   error = null,
   bandErrors = null,
-  onDelete,
   onSubmit,
   onCancel,
   onDirtyChange,
@@ -178,40 +175,15 @@ export function TariffForm({
     <div className="tariff-pane-form">
       {error && <Notice tone="error">{error}</Notice>}
       {bandEditorBlocked && bandEditorOpen && <Notice tone="error">{t('pages.tariffs.form.finishBandFirst')}</Notice>}
+      {isVersion && <p className="muted m-0">{t('pages.tariffs.form.correctionHint')}</p>}
       <form ref={formRef} id={formId} onSubmit={form.handleSubmit(submit)} className="form-grid" aria-busy={isPending || undefined}>
        <fieldset className="tariff-pane-fieldset" disabled={isPending}>
-        {/* Editing an existing tariff means editing one *version* of it. The name
-            groups versions, and category/billing mode/energy type must match
-            across them, so the four identity fields are shown as values rather
-            than inputs. Rendering them instead of disabling them is deliberate:
-            react-hook-form treats a disabled registered field as undefined, which
-            would quietly blank the name on save. The values still reach the
-            payload from the form state seeded by reset(). */}
-        {isVersion ? (
-          <div className="tariff-identity-summary grid-span-full">
-            <div>
-              <span className="tariff-detail-label">{t('pages.tariffs.form.name')}</span>
-              <strong>{initialTariff?.name}</strong>
-            </div>
-            <div>
-              <span className="tariff-detail-label">{t('pages.tariffs.form.category')}</span>
-              <span>{t(`pages.tariffs.categories.${initialTariff!.category}` as Parameters<typeof t>[0])}</span>
-            </div>
-            <div>
-              <span className="tariff-detail-label">{t('pages.tariffs.form.billingMode')}</span>
-              <span>{t(`pages.tariffs.billingModes.${initialTariff!.billing_mode}` as Parameters<typeof t>[0], { defaultValue: initialTariff!.billing_mode })}</span>
-            </div>
-            {initialTariff?.energy_type && (
-              <div>
-                <span className="tariff-detail-label">{t('pages.tariffs.form.energyType')}</span>
-                <span>{t(`pages.tariffs.energyTypes.${initialTariff.energy_type}` as Parameters<typeof t>[0])}</span>
-              </div>
-            )}
-            <p className="muted grid-span-full m-0">
-              {t('pages.tariffs.form.identityLockedHint')}
-            </p>
-          </div>
-        ) : (
+        {/* Editing an existing tariff means editing one *version* of it: the pane
+            header already names the tariff, and the name, category, billing mode
+            and energy type are shared by all versions, so none of them is shown
+            as a field. They still reach the payload from the form state seeded by
+            reset(); registering them as disabled inputs would blank them. */}
+        {isVersion ? null : (
           <>
             <label>
               <span>{t('pages.tariffs.form.name')}</span>
@@ -372,9 +344,9 @@ export function TariffForm({
             )}
           />
         </label>
-        <label>
+        <label className="grid-span-full">
           <span>{t('pages.tariffs.form.notes')}</span>
-          <input {...form.register('notes')} />
+          <textarea rows={3} {...form.register('notes')} />
         </label>
 
        </fieldset>
@@ -405,14 +377,6 @@ export function TariffForm({
             }}
           />
         </section>
-      )}
-      {onDelete && (
-        <div className="tariff-pane-delete">
-          <button type="button" className="button button-danger button-compact" onClick={onDelete} disabled={isPending}>
-            <FontAwesomeIcon icon={faTrash} fixedWidth />
-            {t('pages.tariffs.versions.deleteVersion')}
-          </button>
-        </div>
       )}
       <FormModalFooter
         formId={formId}

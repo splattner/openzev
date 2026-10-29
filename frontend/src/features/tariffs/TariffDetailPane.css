@@ -341,9 +341,9 @@
 
 /* Deleting what a form edits: out of the way, below the fields. */
 
-.tariff-pane-delete {
+.tariff-version-card-actions {
   display: flex;
-  justify-content: flex-start;
+  gap: 0.375rem;
 }
 
 /* ── Bands drafted in the create form ────────────────────────────────────── */
@@ -364,4 +364,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+/* A band's delete: the same outlined icon as its pen until it is pointed at, then danger. */
+.tariff-period-actions .button-danger {
+  color: var(--text-muted);
+}
+
+.tariff-period-actions .button-danger:is(:hover, :focus-visible):not(:disabled) {
+  color: var(--danger-700);
 }

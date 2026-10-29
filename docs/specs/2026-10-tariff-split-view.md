@@ -47,7 +47,7 @@ place, and the list never disappears behind it.
 
 | Area | Details |
 |---|---|
-| Overview | Current, Upcoming, collapsed History; plain validity dates; table treatment (§4) |
+| Overview | Tariffs in force (no heading), Upcoming, collapsed Ended tariffs; plain validity dates; table treatment (§4) |
 | Pane | Viewing and editing in one pane; narrow behaviour; navigation (§5) |
 | Editing | Create, edit, rename, schedule a price change, periods (§6) |
 | Labels | Counts and badges on the tariff screen (§4) |
@@ -74,7 +74,7 @@ completion must not select or reopen anything (`useWriteScope`, reference spec �
 `queryKeys.tariffs.series(selectedZevId || undefined)` query and
 `fetchTariffSeries` contract are unchanged.
 
-- Show **Current**, then **Upcoming**, with **History** collapsed by default,
+- Show the tariffs in force (the first group carries no visible heading, only an accessible one), then **Upcoming**, with **Ended tariffs** (formerly History) collapsed by default,
   keeping the energy / grid fees / levies / metering category order inside each.
   This replaces the `FilterTabs` Valid / Upcoming / All view (`TariffListView`).
 - A series with current and future versions can appear in both sections. Each
@@ -138,13 +138,24 @@ completion must not select or reopen anything (`useWriteScope`, reference spec �
 
 - Selecting a tariff starts in viewing mode. **Edit** replaces the body with
   prefilled fields; the title and selected tariff stay recognisable. Only
-  fields the API already permits are editable; immutable identity fields keep
-  their restrictions.
+  fields the API already permits are editable; the identity fields (name,
+  category, billing mode, energy type) are not in the form at all (no read-only
+  identity box: the header already names the tariff), and still reach the
+  payload from the seeded form state.
 - Rename, **Schedule price change** and period changes use the pane's focused
   editing mode, seeded from the selected record and version. **New tariff** opens
   the pane with a blank creation form. Reuse the existing form logic
   (`useTariffForms.ts`) independently of the dialog shell; there is no extra edit
-  dialog.
+  dialog. Every tariff pane, viewing or editing (and **New tariff**), has the brand's
+  dark-green header (`DetailPane` `tone="brand"`, `.detail-pane-header--brand`).
+  In editing mode the heading is the task ("Correct this version", "Schedule
+  price change", ...) and the line under it the tariff name and the version's
+  validity window (for a band, the window of the version it belongs to); in
+  viewing mode it is the tariff name and its facts line. The version and band
+  edit forms open with the hint `pages.tariffs.form.correctionHint` (existing
+  invoices are not recalculated; use Schedule price change for future prices),
+  Notes is a three-row textarea, and `useFocusFirstField` focuses the first
+  enabled field, counting a date picker (`button[data-dates-input]`) as one.
 - **Save** returns to viewing on the saved tariff or version. **Cancel** returns
   to the original viewing context, asking before discarding changed values.
   Cancelling creation restores the previous selection, or the list if there was
@@ -183,7 +194,7 @@ boundary.
 
 | Scenario | Required observation |
 |---|---|
-| Overview hierarchy | Current, then Upcoming, collapsed History; correct price and version in each; no gratuitous counts |
+| Overview hierarchy | In force, then Upcoming, collapsed Ended tariffs; correct price and version in each; no gratuitous counts |
 | Historical / disabled | Grey but readable history; a separate explicit reason for true disablement |
 | Wide layout | List fully visible, reflows by container width, scrolls independently of the pane |
 | Narrow layout | One usable pane, X returns to the list, no horizontal overflow, no detached price, unit or schedule |
@@ -243,9 +254,9 @@ Values and decisions the pilot produced (reference spec §13, open question 3).
 | Scheduled cards | A scheduled version is **folded** to a line by default: a toggle button (`aria-expanded`, `aria-controls`) over status and window, then its price summary, the relative change against the version before it (`deltaSummary`) and an **Hours without a band** issue text when `bandCoverage` finds uncovered hours, so a problem is not hidden by the fold. It is open by default when it is the shown version; opening or folding is remembered per version id for the life of the pane. The current version is never folded. |
 | History | `History` (no count) is a disclosure under the cards, present only when versions have ended. It holds the price-history chart (when the series has more than one version) and a list of the ended versions (window and price, `aria-pressed`); picking one shows its card, marked Ended, below the list. It opens by itself when an ended version is the shown one or nothing is in force or scheduled. |
 | Change against the previous version | `priceDelta.ts`: `versionDeltas` compares each band of a scheduled version with the band of the version before it that applies to the same type, label, hours, weekdays and months (a band with no counterpart gets none), or the fixed fee of a flat-fee tariff; percentage tariffs compare points; a dynamic version has none. `formatDelta` renders `+0.020 (+6.8 %)` (the amount, then the relative change; percentage points for a percentage tariff) and `deltaSummary` the relative figures only, in band order, `±0` for an unchanged band, `null` when nothing moved. Shown beside the band price in the card and, as a summary, in the folded card and in the overview row. A visually hidden prefix names it for screen readers. |
-| Deleting | Version and band **delete** are not on the cards. `TariffForm` (editing a version) and `TariffPeriodForm` (editing a band) take an `onDelete` and show a danger button below the fields, which asks through the shared confirmation; `useTariffCrud` closes the form when the deleted record is the one being edited. The earlier per-row `ActionMenu` and icon-only band delete are gone; `ActionMenu`'s optional `actionKey` stays. |
+| Deleting | Delete sits on the record, not in the forms. A version's card has a `⋮` `ActionMenu` (icon-only, label `pages.tariffs.versions.moreActions`) beside **Edit** with one danger item, **Delete this version**; a band row has a quiet icon-only trash button (`button-danger button-compact`, outlined until hovered) beside its pencil. Both call `onDeleteVersion` / `onDeletePeriod` on `TariffDetailPane`, which the page wires to `useTariffCrud`'s `confirmDeleteTariff` / `confirmDeletePeriod` (the shared confirmation; read-only users get neither control). `TariffForm` and `TariffPeriodForm` carry no delete button, so editing stays fields plus Cancel/Save. `useTariffCrud` still closes a form whose record is deleted; deleting from the card leaves the pane on the series (or closes it when the last version goes). Deleting a whole tariff in one step is not offered; it is a follow-up. |
 | Dynamic source | `DynamicSourceSummary` shows the label, status badges, the admin link (admins only) and the last successful fetch up front; URL, protocol/type/product, stored coverage and platform-wide usage are in a "Source details" disclosure. A failed fetch's error stays visible, and so does a notice naming past dates without a price. |
-| Overview rows | One row per series. `tariffOverview` puts a series in **Current** when a version is in force (the row carries `upcomingVersion`, the nearest scheduled one), else in **Upcoming** (nearest scheduled), else in **History** (most recently ended). The row's validity cell links to the next version: `nextChange` compares the two versions' rate lines; the same bands (same `applies` text and unit) give `From {date}: {prices} {unit}`, different bands give "Prices and schedule change from {date}", and a next version with no prices to show gives "New version from {date}". When the prices are comparable the line adds the relative change per price in brackets (`From 01.11.2026: 0.290 / 0.220 per kWh (−1.7 % / −2.2 %)`, `deltaSummary`), left out when nothing moved. The row is highlighted for either version. |
+| Overview rows | One row per series. `tariffOverview` puts a series in **Current** when a version is in force (the row carries `upcomingVersion`, the nearest scheduled one), else in **Upcoming** (nearest scheduled), else in **Ended tariffs** (the `history` group; most recently ended version). The group is a disclosure styled as a heading like the others, folded by default, and opens by itself for a linked past version; opening a row there gives the normal pane, with Edit, Schedule price change and delete. The row's validity cell links to the next version: `nextChange` compares the two versions' rate lines; the same bands (same `applies` text and unit) give `From {date}: {prices} {unit}`, different bands give "Prices and schedule change from {date}", and a next version with no prices to show gives "New version from {date}". When the prices are comparable the line adds the relative change per price in brackets (`From 01.11.2026: 0.290 / 0.220 per kWh (−1.7 % / −2.2 %)`, `deltaSummary`), left out when nothing moved. The row is highlighted for either version. |
 | Band coverage | `bandCoverage` (`bandCoverage.ts`) mirrors `tariffs.periods.resolve_band` for the hours of a version's bands: month first, flat prices its months outright, a windowed band needs both ends and its weekday, windows are `[start, end)` and wrap past midnight (equal ends are the whole day), a non-flat band without a window is the catch-all that prices every hour on its weekdays no windowed band matches (not counted as an overlap with them; two on one month and day count as one), and hours still unmatched are priced by the first band of the season in model order (type, start, id). It reports uncovered stretches (months, weekdays, hours), the fallback band and overlaps, and for a version with an end date only checks the month/weekday pairs inside it. Shown as **Hours without a band** issue text (`IssueText`) on current and upcoming rows, as a warning under the bands in the pane, and as a live preview in the band form (`showCovered`; hidden while exactly one of the two times is set; both empty means "all other hours"). No API change. |
 | Energy type icon | The second line under a tariff name (its energy type as text) is replaced by `TariffTypeIcon` before the name: a plug for grid, a solar panel for local, an arrow out of a box for feed-in, with the type name as `aria-label` and tooltip (`role="img"`). A tariff without an energy type (fees) has no icon. The detail pane's meta line still says it in words. |
 | Header | The page actions (import, overview PDF, New tariff) moved from a toolbar card into the page header, since the toolbar only held the tabs besides them. |

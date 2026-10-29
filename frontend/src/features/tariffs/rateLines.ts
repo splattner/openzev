@@ -38,6 +38,27 @@ export function formatBandApplies(
     return `${name} ${when}`.trim()
 }
 
+/** When a band applies, as the pane and the band editor say it: hours,
+ * weekdays, and the months if the band is restricted to some.
+ * `07:00–21:00 · Mon–Fri`, `all other hours · every day`. Hours and days
+ * use the same helpers as the list, so they read alike and never as raw
+ * `07:00:00` / `0,1,2,3,4`. */
+export function formatBandSchedule(
+    period: Pick<TariffVersion['periods'][number], 'period_type' | 'time_from' | 'time_to' | 'weekdays' | 'months'>,
+    t: RateLineTranslate,
+    dayNames: string[],
+    monthNames: string[],
+): string {
+    const hours = period.period_type === 'flat'
+        ? t('pages.tariffs.allDay')
+        : bandWindow(period) ?? t('pages.tariffs.rateCard.allOtherHours')
+    return [
+        hours,
+        formatWeekdays(period.weekdays, dayNames) || t('pages.tariffs.allWeekdays'),
+        formatSeason(period.months, monthNames),
+    ].filter(Boolean).join(' · ')
+}
+
 /** Display rows for tariff bands, dynamic averages, or fixed fees. */
 export function buildRateLines(
     series: TariffSeries,

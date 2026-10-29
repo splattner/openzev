@@ -19,16 +19,17 @@ Each tariff has:
 
 ![Tariffs page](screenshots/07-tariffs.png)
 
-The list is grouped by what applies when, with one row per tariff:
-**Current** shows each tariff's version in force today; **Upcoming** shows
-tariffs that have nothing in force yet but a version that starts later (for
-example next year's grid tariff, once imported); **History** is folded away and
-shows tariffs that have ended altogether. When a tariff in force has a later
+The list is grouped by what applies when, with one row per tariff. The first
+group, with no heading of its own, shows each tariff's version in force today;
+**Upcoming** shows tariffs that have nothing in force yet but a version that starts later (for
+example next year's grid tariff, once imported); **Ended tariffs** is folded away and
+shows tariffs that have ended altogether — open it to look at or edit one that
+ended by mistake. When a tariff in force has a later
 version, its row says so under the validity — *From 01.01.2027: 0.315 per kWh
 (+6.8 %)* when the same bands get new prices (the change in brackets, one
 figure per band, in the order of the prices), *Prices and schedule change from
 01.01.2027* when the bands themselves change — and clicking that line opens the
-later version. **History** opens by itself when you follow a link to the past
+later version. **Ended tariffs** opens by itself when you follow a link to the past
 version of a tariff that has ended. The headings carry no counts.
 
 Each category is a rate card, set like the tariff overview PDF, with one row
@@ -64,7 +65,7 @@ days it can contain.
 
 A red badge next to the name means warnings: a gap between
 versions, a failed price fetch, or **Hours without a band** — some hours of the
-year have no band of their own and are billed at the fallback band (see below). Rows in **History** are grey but readable.
+year have no band of their own and are billed at the fallback band (see below). Rows under **Ended tariffs** are grey but readable.
 Click a row to open the tariff's detail pane beside the list, where **Edit**
 and the other actions are; from **Upcoming** it opens on the upcoming version.
 On a narrow screen (a phone, or a small window) the pane takes the whole area
@@ -737,10 +738,10 @@ price; click one to show its card — marked **Ended** — underneath. A tariff
 without ended versions has no history. Switching versions in the pane does not
 change the version shown in the list.
 
-**Delete** is not on the cards: open **Edit** on a version (or a band's
-pencil) and use the **Delete** button below the fields. It asks for
-confirmation, and the form closes afterwards. Correcting a superseded version's
-end date is a normal follow-up to adding a new one, so **Edit** is on every card.
+To delete a version, open the **⋮** menu beside **Edit** on its card and choose
+**Delete this version**; to delete a band, click the trash icon beside its
+pencil. Both ask for confirmation first. Correcting a superseded version's end
+date is a normal follow-up to adding a new one, so **Edit** is on every card.
 
 The pane stays open across a page reload or a shared link — the URL records
 which tariff and version you're looking at. **X**, **Escape** and the browser's
@@ -862,11 +863,14 @@ Edit **future** tariffs freely:
 
 Changes apply to **new invoices only**. Past invoices keep original tariffs.
 
-**Edit** works on one **version**. The four fields that identify the tariff —
-name, category, billing mode, energy type — are therefore shown as values rather
-than inputs: they are shared by every version, so changing them on one alone
+**Edit** works on one **version**: the form is titled *Correct this version*,
+with the tariff's name and the version's validity window under the title, and
+says again that existing invoices are not recalculated. The fields that
+identify the tariff — name, category, billing mode, energy type — are not in the
+form at all: they are shared by every version, so changing them on one alone
 would break the series. Use **Rename** for the name; for a different category,
-billing mode or energy type, create a separate tariff.
+billing mode or energy type, create a separate tariff. The cursor starts in the
+first field, and **Notes** is a multi-line box.
 
 > **Prices changed from a certain date?** Use **Schedule price change** instead of editing.
 > Editing rewrites what the *current* version has always charged; a new version
@@ -885,7 +889,7 @@ Set **Valid To** to exclude from future invoices:
 
 > **Important:** Never delete a tariff—always set Valid To instead. This preserves invoice audit trail.
 
-This applies to **Delete** in a version's edit form too. Deleting a version
+This applies to **Delete this version** too. Deleting a version
 removes the prices that applied in its window, which leaves a gap: energy in
 those days is then billed at nothing. Reserve it for a version created by
 mistake — one you have not billed against.

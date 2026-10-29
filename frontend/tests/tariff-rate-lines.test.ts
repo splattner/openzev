@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { buildRateLines, type RateLineTranslate } from '../src/features/tariffs/rateLines'
+import { buildRateLines, formatBandSchedule, type RateLineTranslate } from '../src/features/tariffs/rateLines'
 import type { TariffSeries, TariffVersion } from '../src/types/api'
 
 vi.mock('react-i18next', () => ({
@@ -20,6 +20,8 @@ function mockT(key: string, opts?: Record<string, unknown>): string {
     if (key === 'pages.tariffs.rateCard.perParticipant') return 'per participant'
     if (key === 'pages.tariffs.rateCard.perMeteringPoint') return 'per metering point'
     if (key === 'pages.tariffs.rateCard.shared') return 'shared by the participants'
+    if (key === 'pages.tariffs.allDay') return 'All day'
+    if (key === 'pages.tariffs.allWeekdays') return 'every day'
     if (key === 'pages.tariffs.rateCard.allHours') return 'All hours'
     if (key === 'pages.tariffs.rateCard.allOtherHours') return 'all other hours'
     if (key === 'pages.tariffs.rateCard.dynamicAverage') return `Dynamic, average ${String(opts?.from)} – ${String(opts?.to)}`
@@ -238,6 +240,29 @@ describe('buildRateLines', () => {
 
 // The stacked narrow card renders each band as one unit with its own CHF,
 // so the hidden desktop Price (CHF) header cannot take the currency with it.
+describe('formatBandSchedule', () => {
+    const schedule = (overrides: Record<string, unknown>) => formatBandSchedule(period('p', overrides), t, DAY_NAMES, MONTH_NAMES)
+
+    it('prints hours without seconds and weekdays as names, not day numbers', () => {
+        expect(schedule({ period_type: 'high', time_from: '07:00:00', time_to: '21:00:00', weekdays: '0,1,2,3,4' }))
+            .toBe('07:00–21:00 · Mon–Fri')
+    })
+
+    it('says every day and all other hours for an unrestricted catch-all band', () => {
+        expect(schedule({ period_type: 'low' })).toBe('all other hours · every day')
+    })
+
+    it('says all day for a flat band and keeps its season', () => {
+        expect(schedule({ period_type: 'flat' })).toBe('All day · every day')
+        expect(schedule({ period_type: 'flat', months: '10,11,12,1,2,3' })).toBe('All day · every day · Oct–Mar')
+    })
+
+    it('groups non-adjacent weekdays and names a season', () => {
+        expect(schedule({ period_type: 'band', time_from: '07:00', time_to: '12:00', weekdays: '0,2,3,6', months: '6,7,8' }))
+            .toBe('07:00–12:00 · Mon, Wed–Thu, Sun · Jun–Aug')
+    })
+})
+
 describe('tariff list narrow markup', () => {
     let container: HTMLDivElement
     let root: ReturnType<typeof createRoot>

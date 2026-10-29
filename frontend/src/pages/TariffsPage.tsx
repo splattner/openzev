@@ -31,7 +31,7 @@ import { useCommunityAccess, useScopeNote } from '../lib/communityAccess'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
-import type { Tariff, TariffSeries } from '../types/api'
+import type { Tariff, TariffSeries, TariffVersion } from '../types/api'
 import { PageHeader } from '../components/PageHeader'
 import { Notice } from '../components/Notice'
 import { ScopeGuard } from '../components/ScopeGuard'
@@ -381,11 +381,12 @@ export function TariffsPage() {
     )
 
     // The form for the task in hand, and what to call it under the tariff's name.
-    function renderEditor(): { label: string, content: ReactNode } | null {
+    function renderEditor(): { label: string, content: ReactNode, version?: Pick<TariffVersion, 'valid_from' | 'valid_to'> } | null {
         const task = versions.dialog
         if (task) {
             return {
                 label: t(`pages.tariffs.pane.task.${task.kind}` as Parameters<typeof t>[0]),
+                version: task.source,
                 content: (
                     <TariffVersionForm
                         key={`${task.kind}:${task.source.id}`}
@@ -405,6 +406,7 @@ export function TariffsPage() {
         if (tariffFormOpen) {
             return {
                 label: editingTariffId ? t('pages.tariffs.pane.task.edit') : '',
+                version: editingTariff,
                 content: (
                     <TariffForm
                         key={editingTariffId ?? 'new'}
@@ -413,7 +415,6 @@ export function TariffsPage() {
                         isPending={tariffPending}
                         error={crudSaveError}
                         bandErrors={saveBandErrors}
-                        onDelete={editingTariff ? () => confirmDeleteTariff(editingTariff) : undefined}
                         onSubmit={submitTariff}
                         onCancel={cancelEditing}
                         onDirtyChange={setFormDirty}
@@ -424,6 +425,7 @@ export function TariffsPage() {
         if (periodFormOpen) {
             return {
                 label: t(editingPeriodId ? 'pages.tariffs.editPeriodTitle' : 'pages.tariffs.createPeriodTitle'),
+                version: tariffs.find((tariff) => tariff.id === (editingPeriod?.tariff ?? periodTariffId)),
                 content: (
                     <TariffPeriodForm
                         key={editingPeriodId ?? 'new'}
@@ -433,7 +435,6 @@ export function TariffsPage() {
                         periods={periods}
                         isPending={periodPending}
                         error={crudSaveError}
-                        onDelete={editingPeriod ? () => confirmDeletePeriod(editingPeriod) : undefined}
                         onSubmit={submitPeriod}
                         onCancel={cancelEditing}
                         onDirtyChange={setFormDirty}
@@ -486,6 +487,7 @@ export function TariffsPage() {
 
                 {editor === 'create' && editorPane ? (
                     <DetailPane
+                        tone="brand"
                         title={t('pages.tariffs.createTitle')}
                         onClose={escapePane}
                         titleRef={paneTitleRef}
@@ -503,6 +505,8 @@ export function TariffsPage() {
                         onEditTariff={(version, actionKey) => beginEditing(actionKey, () => startTariffEdit(version))}
                         onOpenCreatePeriod={(versionId) => beginEditing('add-period', () => openCreatePeriod(versionId))}
                         onEditPeriod={(period, actionKey) => beginEditing(actionKey, () => startPeriodEdit(period))}
+                        onDeleteVersion={confirmDeleteTariff}
+                        onDeletePeriod={confirmDeletePeriod}
                         onNewVersion={(series, source) => beginEditing('new-version', () => versions.openNewVersion(series, source))}
                         onDuplicate={(series, source) => beginEditing('duplicate', () => versions.openDuplicate(series, source))}
                         onRenameSeries={(series, source) => beginEditing('rename', () => versions.openRename(series, source))}

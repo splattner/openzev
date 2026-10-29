@@ -3,9 +3,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
     faChevronDown,
     faClone,
+    faEllipsis,
     faPen,
     faPlus,
     faTag,
+    faTrash,
     faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
@@ -13,7 +15,8 @@ import { formatShortDate } from '../../lib/appSettings'
 import { todayBusinessIso } from '../../lib/dates'
 import type { AppSettings, TariffPeriod, TariffSeries, TariffVersion } from '../../types/api'
 import { bandName } from './bands'
-import { MONTH_KEYS, formatSeason } from './recurrence'
+import { MONTH_KEYS, WEEKDAY_KEYS } from './recurrence'
+import { formatBandSchedule } from './rateLines'
 import { useTariffDisplay } from './useTariffDisplay'
 import { listedVersion, validityState } from './validity'
 import { deltaSummary, formatDelta, versionDeltas, type PriceDelta } from './priceDelta'
@@ -21,6 +24,7 @@ import { bandCoverage } from './bandCoverage'
 import { TariffPriceHistoryChart } from './TariffPriceHistoryChart'
 import { TariffBandCoverage } from './TariffBandCoverage'
 import { DynamicSourceSection } from './DynamicSourceSection'
+import { ActionMenu } from '../../components/ActionMenu'
 import { DetailPane } from '../../components/DetailPane'
 import { Disclosure } from '../../components/Disclosure'
 import { IssueText } from '../../components/IssueText'
@@ -38,6 +42,9 @@ type TariffDetailPaneProps = {
     onEditTariff: (tariff: TariffVersion, actionKey: string) => void
     onOpenCreatePeriod: (tariffId: string) => void
     onEditPeriod: (period: TariffPeriod, actionKey: string) => void
+    /** Asks first; the page owns the confirmation and the request. */
+    onDeleteVersion: (version: TariffVersion, window: string) => void
+    onDeletePeriod: (period: TariffPeriod) => void
     onNewVersion: (series: TariffSeries, source: TariffVersion) => void
     onDuplicate: (series: TariffSeries, source: TariffVersion) => void
     onRenameSeries: (series: TariffSeries, source: TariffVersion) => void
@@ -46,7 +53,7 @@ type TariffDetailPaneProps = {
     /** The title is where focus lands when the pane is opened on purpose. */
     titleRef?: Ref<HTMLHeadingElement>
     /** A form that replaces the body while the tariff is edited, with what it is for. */
-    editor?: { label: string, content: ReactNode }
+    editor?: { label: string, content: ReactNode, version?: Pick<TariffVersion, 'valid_from' | 'valid_to'> }
 }
 
 /**
@@ -66,6 +73,8 @@ export function TariffDetailPane({
     onEditTariff,
     onOpenCreatePeriod,
     onEditPeriod,
+    onDeleteVersion,
+    onDeletePeriod,
     onNewVersion,
     onDuplicate,
     onRenameSeries,
@@ -77,6 +86,9 @@ export function TariffDetailPane({
     const { user } = useAuth()
     const monthNames = MONTH_KEYS.map(
         (key) => t(`pages.tariffs.monthsShort.${key}` as Parameters<typeof t>[0]),
+    )
+    const dayNames = WEEKDAY_KEYS.map(
+        (key) => t(`pages.tariffs.weekdaysShort.${key}` as Parameters<typeof t>[0]),
     )
     const today = todayBusinessIso()
     // A scheduled version starts folded to a line; what a person opened or folded stays so.
@@ -103,7 +115,7 @@ export function TariffDetailPane({
         isDynamic && t('pages.tariffs.dynamicBadge'),
     ].filter(Boolean).join(' · ')
 
-    const dateWindow = (version: TariffVersion) => `${formatShortDate(version.valid_from, settings)} – ${
+    const dateWindow = (version: Pick<TariffVersion, 'valid_from' | 'valid_to'>) => `${formatShortDate(version.valid_from, settings)} – ${
         version.valid_to ? formatShortDate(version.valid_to, settings) : t('pages.tariffs.openEnded')}`
 
     // In time order: what is in force, then what is scheduled (nearest first;
@@ -204,15 +216,29 @@ export function TariffDetailPane({
                         </div>
                     )}
                     {!readOnly && (
-                        <button
-                            className="button button-secondary button-compact"
-                            type="button"
-                            data-action-key={`edit-${version.id}`}
-                            onClick={() => onEditTariff(version, `edit-${version.id}`)}
-                        >
-                            <FontAwesomeIcon icon={faPen} fixedWidth />
-                            {t('common.edit')}
-                        </button>
+                        <div className="tariff-version-card-actions">
+                            <button
+                                className="button button-secondary button-compact"
+                                type="button"
+                                data-action-key={`edit-${version.id}`}
+                                onClick={() => onEditTariff(version, `edit-${version.id}`)}
+                            >
+                                <FontAwesomeIcon icon={faPen} fixedWidth />
+                                {t('common.edit')}
+                            </button>
+                            <ActionMenu
+                                iconOnly
+                                label={t('pages.tariffs.versions.moreActions')}
+                                icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+                                items={[{
+                                    key: 'delete',
+                                    label: t('pages.tariffs.versions.deleteVersion'),
+                                    icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
+                                    danger: true,
+                                    onClick: () => onDeleteVersion(version, dateWindow(version)),
+                                }]}
+                            />
+                        </div>
                     )}
                 </div>
                 {!open && (
@@ -281,12 +307,7 @@ export function TariffDetailPane({
                                                     {periodChange && change(periodChange)}
                                                 </div>
                                                 <div className="muted tariff-period-meta">
-                                                    {period.period_type === 'flat'
-                                                        ? `${t('pages.tariffs.allDay')} · ${t('pages.tariffs.allWeekdays')}`
-                                                        : `${period.time_from && period.time_to ? `${period.time_from} - ${period.time_to}` : t('pages.tariffs.rateCard.allOtherHours')} · ${period.weekdays || t('pages.tariffs.allWeekdays')}`}
-                                                    {/* Without the season a winter price reads as the
-                                                        whole year's price. */}
-                                                    {formatSeason(period.months, monthNames) && ` · ${formatSeason(period.months, monthNames)}`}
+                                                    {formatBandSchedule(period, t, dayNames, monthNames)}
                                                 </div>
                                             </div>
 
@@ -301,6 +322,15 @@ export function TariffDetailPane({
                                                         aria-label={t('common.edit')}
                                                     >
                                                         <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                    </button>
+                                                    <button
+                                                        className="button button-danger button-compact"
+                                                        type="button"
+                                                        onClick={() => onDeletePeriod(period)}
+                                                        title={t('common.delete')}
+                                                        aria-label={t('common.delete')}
+                                                    >
+                                                        <FontAwesomeIcon icon={faTrash} fixedWidth />
                                                     </button>
                                                 </div>
                                             )}
@@ -336,14 +366,20 @@ export function TariffDetailPane({
 
     if (editor) {
         return (
-            <DetailPane title={series.name} subtitle={editor.label} onClose={onClose} titleRef={titleRef}>
+            <DetailPane
+                tone="brand"
+                title={editor.label || series.name}
+                subtitle={[series.name, editor.version && dateWindow(editor.version)].filter(Boolean).join(' · ')}
+                onClose={onClose}
+                titleRef={titleRef}
+            >
                 <div className="detail-pane-body page-stack">{editor.content}</div>
             </DetailPane>
         )
     }
 
     return (
-        <DetailPane title={series.name} subtitle={meta} notice={failedFetch || undefined} onClose={onClose} titleRef={titleRef}>
+        <DetailPane tone="brand" title={series.name} subtitle={meta} notice={failedFetch || undefined} onClose={onClose} titleRef={titleRef}>
             <div className="detail-pane-body page-stack">
                 {!readOnly && (
                     <div className="tariff-pane-actions actions-row actions-row-wrap">

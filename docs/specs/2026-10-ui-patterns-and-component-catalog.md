@@ -290,7 +290,8 @@ metering gaps' current modal interaction.
 
 **Shipped (phase 3).** `components/DetailPane.tsx` is the pane's chrome (a
 region named by its title, the close button, Escape while focus is inside, no
-`aria-modal`, trap or inertness) and `styles/components/detail-pane.css` holds
+`aria-modal`, trap or inertness; `tone="brand"` gives its header the brand's dark
+green, as the tariff pane has it) and `styles/components/detail-pane.css` holds
 `.detail-split` (the list and pane grid, `data-layout` wide/narrow and
 `data-pane` open/closed) and `.detail-pane*`. The tariff pane and the audit
 event pane (`AuditEventPane`) both use them; each page measures its own split

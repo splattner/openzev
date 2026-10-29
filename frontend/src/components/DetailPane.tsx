@@ -11,6 +11,8 @@ type DetailPaneProps = {
     notice?: ReactNode
     /** X, and Escape while the pane has focus: leave the pane. */
     onClose: () => void
+    /** `brand`: the header in the brand's dark green, as the list's group bands. */
+    tone?: 'brand'
     /** The title is where focus lands when the pane is opened on purpose. */
     titleRef?: Ref<HTMLHeadingElement>
     children: ReactNode
@@ -22,7 +24,7 @@ type DetailPaneProps = {
  * no `aria-modal`, no focus trap, nothing around it made inert. Lay it out in a
  * `.detail-split` next to a `.detail-split-list`.
  */
-export function DetailPane({ title, subtitle, notice, onClose, titleRef, children }: DetailPaneProps) {
+export function DetailPane({ title, subtitle, notice, onClose, tone, titleRef, children }: DetailPaneProps) {
     const { t } = useTranslation()
     const titleId = useId()
 
@@ -36,7 +38,7 @@ export function DetailPane({ title, subtitle, notice, onClose, titleRef, childre
 
     return (
         <section className="detail-pane" aria-labelledby={titleId} onKeyDown={onKeyDown}>
-            <header className="detail-pane-header">
+            <header className={`detail-pane-header${tone === 'brand' ? ' detail-pane-header--brand' : ''}`}>
                 <div className="detail-pane-heading">
                     <h2 id={titleId} ref={titleRef} tabIndex={-1}>{title}</h2>
                     {subtitle && <p className="detail-pane-meta">{subtitle}</p>}

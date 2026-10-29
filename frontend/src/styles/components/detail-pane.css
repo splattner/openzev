@@ -59,6 +59,40 @@
   background: var(--surface-card);
 }
 
+/* The brand's dark green, as the list's group bands, with the title, the
+   facts line, a notice and the close button turned to match. */
+.detail-pane-header--brand {
+  border-bottom-color: var(--brand-deep);
+  background: var(--brand-deep);
+}
+
+.detail-pane-header--brand h2 {
+  color: var(--white);
+}
+
+.detail-pane-header--brand .detail-pane-meta {
+  color: var(--brand-accent);
+}
+
+.detail-pane-header--brand .issue-text--error {
+  color: var(--danger-300);
+}
+
+.detail-pane-header--brand .issue-text--warning {
+  color: var(--warning-200);
+}
+
+.detail-pane-header--brand .button-secondary {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--white);
+}
+
+.detail-pane-header--brand .button-secondary:hover:not(:disabled) {
+  background: var(--brand);
+}
+
 .detail-pane-heading {
   display: grid;
   gap: 0.375rem;

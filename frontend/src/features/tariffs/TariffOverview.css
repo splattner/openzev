@@ -1,4 +1,4 @@
-/* Current, Upcoming, and a folded History: one sheet per group. */
+/* The tariffs in force, Upcoming, and a folded group of ended ones: one sheet per group. */
 
 .tariff-overview {
   display: grid;
@@ -10,10 +10,14 @@
   font-size: 1rem;
 }
 
-/* The history disclosure's summary holds the section heading. */
+/* The ended tariffs' disclosure: its summary is a heading like the other
+   groups', with the +/− marker beside it, so the way to old tariffs is seen. */
 
 .tariff-overview-history > summary {
+  justify-content: flex-start;
+  gap: 0.5rem;
   margin-bottom: 0.5rem;
+  color: var(--text-heading);
 }
 
 .tariff-overview-history > summary .tariff-overview-title {

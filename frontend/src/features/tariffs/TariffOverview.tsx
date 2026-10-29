@@ -34,7 +34,7 @@ export function TariffOverview({ groups, settings, selected, onOpenDetail }: Tar
     return (
         <div className="tariff-overview">
             <section aria-labelledby="tariff-overview-current">
-                <h2 id="tariff-overview-current" className="tariff-overview-title">{t('pages.tariffs.overview.current')}</h2>
+                <h2 id="tariff-overview-current" className="visually-hidden">{t('pages.tariffs.overview.current')}</h2>
                 {groups.current.length > 0 ? (
                     <TariffCategorySections rows={groups.current} kind="current" settings={settings} selected={selected} onOpenDetail={onOpenDetail} />
                 ) : (
