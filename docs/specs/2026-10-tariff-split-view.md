@@ -154,6 +154,9 @@ completion must not select or reopen anything (`useWriteScope`, reference spec Â
   viewing mode it is the tariff name and its facts line. The version and band
   edit forms open with the hint `pages.tariffs.form.correctionHint` (existing
   invoices are not recalculated; use Schedule price change for future prices),
+  and both delete confirmations (`confirmDeleteTariff`, `confirmDeletePeriod`)
+  append `pages.tariffs.deleteHint` (the same message). Drafts are untouched
+  by a correction until they are regenerated from the tariffs in force.
   Notes is a three-row textarea, and `useFocusFirstField` focuses the first
   enabled field, counting a date picker (`button[data-dates-input]`) as one. The band
   form's Time from / Time to use `CivilTimeInput` (`components/CivilTimeInput.tsx`,

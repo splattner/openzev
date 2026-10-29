@@ -1861,7 +1861,7 @@ export const it = {
             },
         },
         tariffs: {
-            vatInclusiveNotice: 'Questo CEL include nei prezzi l’IVA non recuperabile. I prezzi mostrati qui sono netti; le fatture aggiungono l’aliquota IVA vigente a energia di rete, utilizzo della rete, tributi e misurazione.',
+            vatInclusiveNotice: 'I prezzi sono netti. Le fatture aggiungono l’aliquota IVA vigente a energia di rete, utilizzo della rete, tributi e misurazione.',
             import: {
                 action: 'Importa dal gestore di rete',
                 title: 'Importa le tariffe dal tuo gestore di rete',
@@ -2164,6 +2164,7 @@ export const it = {
             },
             deleteTitle: 'Elimina versione',
             deleteMessage: 'Sei sicuro di voler eliminare la versione della tariffa "{{name}}" ({{window}})? Questa azione non può essere annullata.',
+            deleteHint: 'Le fatture esistenti non vengono ricalcolate. Per i prezzi futuri, usa «Pianifica una modifica di prezzo».',
             deleteConfirm: 'Elimina versione',
             deletePeriodTitle: 'Elimina periodo tariffario',
             deletePeriodMessage: 'Sei sicuro di voler eliminare questo periodo tariffario per "{{name}}"?',

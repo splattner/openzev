@@ -276,7 +276,7 @@ export function useTariffCrud({
   function confirmDeleteTariff(tariff: Pick<Tariff, 'id' | 'name'>, window: string) {
     confirm({
       title: t('pages.tariffs.deleteTitle'),
-      message: t('pages.tariffs.deleteMessage', { name: tariff.name, window }),
+      message: `${t('pages.tariffs.deleteMessage', { name: tariff.name, window })} ${t('pages.tariffs.deleteHint')}`,
       confirmText: t('pages.tariffs.deleteConfirm'),
       isDangerous: true,
       onConfirm: () => {
@@ -288,7 +288,7 @@ export function useTariffCrud({
   function confirmDeletePeriod(period: TariffPeriod) {
     confirm({
       title: t('pages.tariffs.deletePeriodTitle'),
-      message: t('pages.tariffs.deletePeriodMessage', { name: tariffNameById.get(period.tariff) ?? period.tariff }),
+      message: `${t('pages.tariffs.deletePeriodMessage', { name: tariffNameById.get(period.tariff) ?? period.tariff })} ${t('pages.tariffs.deleteHint')}`,
       confirmText: t('pages.tariffs.deletePeriodConfirm'),
       isDangerous: true,
       onConfirm: () => {

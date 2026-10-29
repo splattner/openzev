@@ -1861,7 +1861,7 @@ export const de = {
             },
         },
         tariffs: {
-            vatInclusiveNotice: 'Dieser ZEV rechnet nicht rückforderbare MWST in die Preise ein. Die hier angezeigten Preise sind netto; Rechnungen schlagen den aktiven MWST-Satz auf Netzstrom, Netznutzung, Abgaben und Messwesen auf.',
+            vatInclusiveNotice: 'Die Preise sind netto. Rechnungen schlagen den aktiven MWST-Satz auf Netzstrom, Netznutzung, Abgaben und Messwesen auf.',
             import: {
                 action: 'Vom Netzbetreiber importieren',
                 title: 'Tarife vom Netzbetreiber importieren',
@@ -2164,6 +2164,7 @@ export const de = {
             },
             deleteTitle: 'Version löschen',
             deleteMessage: 'Möchten Sie die Version von "{{name}}" ({{window}}) wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+            deleteHint: 'Bestehende Rechnungen werden nicht neu berechnet. Für künftige Preise wählen Sie «Preisänderung planen».',
             deleteConfirm: 'Version löschen',
             deletePeriodTitle: 'Tarifperiode löschen',
             deletePeriodMessage: 'Möchten Sie diese Tarifperiode für "{{name}}" wirklich löschen?',

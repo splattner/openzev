@@ -1872,7 +1872,7 @@ export const en = {
             },
         },
         tariffs: {
-            vatInclusiveNotice: 'This ZEV folds non-recoverable VAT into its prices. The prices shown here are net; invoices add the active VAT rate to grid energy, grid fees, levies and metering.',
+            vatInclusiveNotice: 'The prices are net. Invoices add the active VAT rate to grid energy, grid fees, levies and metering.',
             import: {
                 action: 'Import from grid operator',
                 title: 'Import tariffs from your grid operator',
@@ -2175,6 +2175,7 @@ export const en = {
             },
             deleteTitle: 'Delete version',
             deleteMessage: 'Delete the version of "{{name}}" ({{window}})? This action cannot be undone.',
+            deleteHint: 'Existing invoices are not recalculated. For future prices, use Schedule price change.',
             deleteConfirm: 'Delete version',
             deletePeriodTitle: 'Delete Tariff Period',
             deletePeriodMessage: 'Are you sure you want to delete this tariff period for "{{name}}"?',

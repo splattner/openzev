@@ -740,7 +740,8 @@ change the version shown in the list.
 
 To delete a version, open the **⋮** menu beside **Edit** on its card and choose
 **Delete this version**; to delete a band, click the trash icon beside its
-pencil. Both ask for confirmation first. Correcting a superseded version's end
+pencil. Both ask for confirmation first, and the confirmation repeats that
+existing invoices are not recalculated. Correcting a superseded version's end
 date is a normal follow-up to adding a new one, so **Edit** is on every card.
 
 The pane stays open across a page reload or a shared link — the URL records

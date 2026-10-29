@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { waitForCondition } from './helpers/waitForCondition'
 import { useTariffCrud } from '../src/features/tariffs/useTariffCrud'
 import { useTariffVersions } from '../src/features/tariffs/useTariffVersions'
-import type { Tariff, TariffInput, TariffPeriodInput, TariffSeries, TariffVersion } from '../src/types/api'
+import type { Tariff, TariffInput, TariffPeriod, TariffPeriodInput, TariffSeries, TariffVersion } from '../src/types/api'
 import { queryKeys } from '../src/lib/api/queryKeys'
 
 const api = vi.hoisted(() => ({ save: vi.fn(), remove: vi.fn(), rename: vi.fn(), userId: 1 }))
@@ -22,7 +22,7 @@ let crud: ReturnType<typeof useTariffCrud>
 let versions: ReturnType<typeof useTariffVersions>
 let zevId: string
 let canWrite: boolean
-let confirmation: { onConfirm: () => void }
+let confirmation: { message?: string; onConfirm: () => void }
 const toast = vi.fn()
 const tariffSaved = vi.fn()
 const versionSaved = vi.fn()
@@ -69,6 +69,14 @@ it.each(['community', 'permission', 'account'])('resets write dialogs and refuse
     expect(versions.dialog).toBeNull()
     act(() => captured())
     expect(api.remove).not.toHaveBeenCalled()
+})
+
+it.each(['version', 'band'])('tells at the %s delete confirmation that existing invoices are not recalculated', kind => {
+    act(() => {
+        if (kind === 'version') crud.confirmDeleteTariff(tariff, '2026')
+        else crud.confirmDeletePeriod({ id: 'period-1', tariff: tariff.id } as TariffPeriod)
+    })
+    expect(confirmation.message).toContain('pages.tariffs.deleteHint')
 })
 
 it.each(['save', 'rename'])('ignores delayed %s UI completion while invalidating the submitting community', async operation => {
