@@ -2290,7 +2290,6 @@ export const fr = {
                 missingDate: 'Aucun prix pour {{date}}',
                 missingDates: 'Aucun prix pour {{from}} – {{to}}',
                 missingEffect: 'La génération des factures s’arrête pour une période qui nécessite un prix manquant.',
-                exactIntervals: 'Intervalles manquants exacts',
                 chartLabel: 'Graphique des prix {{from}} – {{to}}, de {{minimum}} à {{maximum}} CHF/kWh',
                 loadError: 'Impossible de charger l’historique des prix.',
                 coverage: '{{count}} points stockés · couverture {{from}} – {{to}}',

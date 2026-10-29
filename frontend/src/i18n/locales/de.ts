@@ -2290,7 +2290,6 @@ export const de = {
                 missingDate: 'Keine Preise für {{date}}',
                 missingDates: 'Keine Preise für {{from}} – {{to}}',
                 missingEffect: 'Die Rechnungserstellung stoppt für einen Zeitraum, der einen fehlenden Preis braucht.',
-                exactIntervals: 'Genaue fehlende Intervalle',
                 chartLabel: 'Preisdiagramm {{from}} – {{to}}, von {{minimum}} bis {{maximum}} CHF/kWh',
                 loadError: 'Der Preisverlauf konnte nicht geladen werden.',
                 coverage: '{{count}} Punkte gespeichert · Abdeckung {{from}} – {{to}}',

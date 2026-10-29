@@ -44,13 +44,6 @@ export function DynamicSourceSummary({ source, settings, canOperate, missing = [
                         <p key={dates.from} className="m-0">{missingRangeLabel(dates, settings, t)}</p>
                     ))}
                     <p className="muted m-0">{t('pages.dynamicSources.history.missingEffect')}</p>
-                    <Disclosure lazy summary={t('pages.dynamicSources.history.exactIntervals')}>
-                        <ul className="m-0">
-                            {missing.map((gap) => (
-                                <li key={gap.from}>{formatDateTime(gap.from, settings)} – {formatDateTime(gap.to, settings)}</li>
-                            ))}
-                        </ul>
-                    </Disclosure>
                 </Notice>
             )}
             <Disclosure lazy summary={t('pages.dynamicSources.sourceDetails')}>

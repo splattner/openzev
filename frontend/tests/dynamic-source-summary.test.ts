@@ -72,12 +72,11 @@ describe('DynamicSourceSummary', () => {
         expect(render()).not.toContain('pages.dynamicSources.history.missingTitle')
     })
 
-    it('names the missing dates up front and keeps the exact intervals on demand', () => {
+    it('names the missing dates, without a list of exact intervals', () => {
         const html = render({}, true, missing)
         expect(html).toContain('pages.dynamicSources.history.missingTitle')
         expect(html).toContain('pages.dynamicSources.history.missingDates')
         expect(html).toContain('pages.dynamicSources.history.missingEffect')
-        expect(html).toContain('pages.dynamicSources.history.exactIntervals')
         expect(html).not.toContain('2026-10-02T22:00:00Z')
     })
 

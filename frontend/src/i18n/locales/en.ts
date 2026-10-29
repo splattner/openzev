@@ -2301,7 +2301,6 @@ export const en = {
                 missingDate: 'No prices for {{date}}',
                 missingDates: 'No prices for {{from}} – {{to}}',
                 missingEffect: 'Invoice generation stops for a period that needs a missing price.',
-                exactIntervals: 'Exact missing intervals',
                 chartLabel: 'Price chart {{from}} – {{to}}, from {{minimum}} to {{maximum}} CHF/kWh',
                 loadError: 'Price history could not be loaded.',
                 coverage: '{{count}} points stored · coverage {{from}} – {{to}}',

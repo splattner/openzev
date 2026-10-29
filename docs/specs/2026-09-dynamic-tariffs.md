@@ -685,8 +685,8 @@ When the stored series has no price for time that has already passed, the summar
 also shows a warning notice (`missing` prop, fed by `useElapsedPriceGaps` through
 `DynamicSourceSection`): the merged missing date ranges in the business timezone
 (“No prices for 03.10.2026 – 05.10.2026”), a line saying invoice generation stops
-for a period that needs a missing price (§9), and an “Exact missing intervals”
-disclosure with the timestamps. `dynamicPriceGaps.ts` holds the pure helpers:
+for a period that needs a missing price (§9); the exact timestamps are not listed.
+`dynamicPriceGaps.ts` holds the pure helpers:
 `elapsedPriceGaps` cuts each gap off at now (a gap wholly in the future is dropped,
 since prices may not be published yet), `missingPriceDates` merges adjacent or
 overlapping gaps into inclusive date ranges. The notice reads the window the chart
