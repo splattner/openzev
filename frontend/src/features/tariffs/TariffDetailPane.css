@@ -305,6 +305,14 @@
   gap: 1rem;
 }
 
+/* A label is a grid, so a label stretched to the height of its row (because the
+   field beside it carries a hint) would push its input down. Cells keep their
+   own height and start at the top, so the inputs of a row line up. */
+
+.tariff-pane-form .form-grid {
+  align-items: start;
+}
+
 /* A disabled fieldset is how a saving form stops taking input; it must not
    become a box of its own in the form's grid. */
 
@@ -339,7 +347,7 @@
   border-top: 1px solid var(--border-default);
 }
 
-/* Deleting what a form edits: out of the way, below the fields. */
+/* A version card's Edit button and its ⋮ menu. */
 
 .tariff-version-card-actions {
   display: flex;
