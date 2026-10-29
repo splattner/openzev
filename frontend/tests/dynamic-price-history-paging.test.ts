@@ -13,10 +13,9 @@ vi.mock('react-i18next', () => ({
     }),
 }))
 vi.mock('../src/lib/api/tariffs', () => ({ fetchDynamicPriceHistory: api.fetchDynamicPriceHistory }))
-vi.mock('../src/lib/appSettings', () => ({
-    useAppSettings: () => ({ settings: {} }),
-    formatDateTime: (value: string) => value,
-    formatShortDate: (value: string) => value,
+vi.mock('../src/lib/appSettings', async importOriginal => ({
+    ...await importOriginal<typeof import('../src/lib/appSettings')>(),
+    useAppSettings: () => ({ settings: { date_format_short: 'dd.MM.yyyy', date_time_format: 'dd.MM.yyyy HH:mm' } }),
 }))
 // The date pickers and the chart are not what is under test; jsdom has no
 // layout for the chart anyway.
@@ -104,6 +103,8 @@ describe('the fetched-price table in the tariff pane', () => {
 
         await act(async () => { button('common.pagination.previous').click() })
         expect(bodyRows()).toHaveLength(12)
+        // One validity cell per row, the day named once.
+        expect(bodyRows()[0].querySelector('td')?.textContent).toMatch(/^\d\d\.\d\d\.\d{4} \d\d:\d\d – \d\d:\d\d$/)
         // Paging never refetches: the date range is untouched.
         expect(api.fetchDynamicPriceHistory).toHaveBeenCalledTimes(1)
     })

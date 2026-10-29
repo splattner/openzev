@@ -2,10 +2,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   applyMinimumPrice,
   defaultHistoryDateRange,
+  intervalLabel,
   statsFromPoints,
   type TariffValidityContext,
 } from '../src/features/tariffs/DynamicPriceHistoryModal'
-import type { DynamicPricePoint, DynamicTariffSource } from '../src/types/api'
+import type { AppSettings, DynamicPricePoint, DynamicTariffSource } from '../src/types/api'
 
 // defaultHistoryDateRange reads a BFE source's covers_from/covers_to (UTC
 // instants marking Europe/Zurich civil-month boundaries) via formatIsoDate's
@@ -166,5 +167,30 @@ describe('statsFromPoints', () => {
       negative_count: 0,
       gap_count: 1,
     })
+  })
+})
+
+describe('intervalLabel', () => {
+  const settings = { date_format_short: 'dd.MM.yyyy', date_time_format: 'dd.MM.yyyy HH:mm' } as AppSettings
+
+  it('names the day once when an interval ends on the day it starts', () => {
+    expect(intervalLabel('2026-10-01T00:00:00+02:00', '2026-10-01T00:15:00+02:00', settings))
+      .toBe('01.10.2026 00:00 – 00:15')
+  })
+
+  it('repeats the date when the interval ends on another day', () => {
+    expect(intervalLabel('2026-10-01T23:45:00+02:00', '2026-10-02T00:00:00+02:00', settings))
+      .toBe('01.10.2026 23:45 – 02.10.2026 00:00')
+  })
+
+  it('compares days in the business timezone, not UTC', () => {
+    // 22:00Z and 22:15Z are both on 2 October in Zurich (CEST).
+    expect(intervalLabel('2026-10-01T22:00:00Z', '2026-10-01T22:15:00Z', settings))
+      .toBe('02.10.2026 00:00 – 00:15')
+  })
+
+  it('follows the configured date format', () => {
+    expect(intervalLabel('2026-10-01T00:00:00+02:00', '2026-10-01T00:15:00+02:00', { ...settings, date_time_format: 'yyyy-MM-dd HH:mm' }))
+      .toBe('2026-10-01 00:00 – 00:15')
   })
 })

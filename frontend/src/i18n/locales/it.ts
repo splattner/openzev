@@ -2283,7 +2283,7 @@ export const it = {
             },
             history: {
                 sectionTitle: 'Prezzi importati per intervallo', open: 'Visualizza prezzi', title: 'Cronologia prezzi — {{label}}',
-                dateFrom: 'Data iniziale', dateTo: 'Data finale', from: 'Valido dal', to: 'Valido al', price: 'CHF/kWh',
+                dateFrom: 'Data iniziale', dateTo: 'Data finale', validity: 'Validità', price: 'CHF/kWh',
                 points: 'Punti', average: 'Media CHF/kWh', negative: 'Prezzi negativi', gaps: 'Lacune di copertura',
                 gapTitle: 'Intervalli senza prezzo nel periodo', empty: 'Nessun prezzo in questo periodo.',
                 missingTitle: 'Mancano dei prezzi',

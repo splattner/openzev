@@ -2294,7 +2294,7 @@ export const en = {
             },
             history: {
                 sectionTitle: 'Fetched interval prices', open: 'View prices', title: 'Price history — {{label}}',
-                dateFrom: 'From date', dateTo: 'To date', from: 'Valid from', to: 'Valid to', price: 'CHF/kWh',
+                dateFrom: 'From date', dateTo: 'To date', validity: 'Validity', price: 'CHF/kWh',
                 points: 'Points', average: 'Average CHF/kWh', negative: 'Negative prices', gaps: 'Coverage gaps',
                 gapTitle: 'Unpriced intervals in this window', empty: 'No prices in this date range.',
                 missingTitle: 'Prices are missing',

@@ -2283,7 +2283,7 @@ export const de = {
             },
             history: {
                 sectionTitle: 'Abgerufene Intervallpreise', open: 'Preise anzeigen', title: 'Preisverlauf — {{label}}',
-                dateFrom: 'Von Datum', dateTo: 'Bis Datum', from: 'Gültig ab', to: 'Gültig bis', price: 'CHF/kWh',
+                dateFrom: 'Von Datum', dateTo: 'Bis Datum', validity: 'Gültigkeit', price: 'CHF/kWh',
                 points: 'Punkte', average: 'Durchschnitt CHF/kWh', negative: 'Negative Preise', gaps: 'Abdeckungslücken',
                 gapTitle: 'Unbepreiste Intervalle in diesem Zeitraum', empty: 'Keine Preise in diesem Zeitraum.',
                 missingTitle: 'Preise fehlen',
