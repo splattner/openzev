@@ -780,6 +780,8 @@ positive coverage and maintenance-link permissions.
   with the shared range label and previous/next buttons; paging keeps the date
   range, and a new range returns to the first page. The modal keeps the default
   page size (`tests/dynamic-price-history-paging.test.ts`).
+  The statistics are four flat `StatCard`s in a `.kpi-row.kpi-row--fit` (as many
+  columns as fit, 9.5rem minimum), so the pane shows them two by two.
 - **`AdminDynamicSourcesPanel`** — routed as `/admin/dynamic-sources` in the
   Admin Overview hub. It displays global source/point/reuse/failure KPIs and a
   `DataTable` with current fetch state, last error/time and reuse counts. Its

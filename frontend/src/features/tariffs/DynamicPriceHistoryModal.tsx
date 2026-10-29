@@ -222,7 +222,7 @@ export function DynamicPriceHistoryPanel({ source, tariff, compact = false }: Pa
   const validityMax = tariff ? validityUpperBound(tariff, today) : undefined
 
   const statCards = stats && (
-    <div className="kpi-row">
+    <div className="kpi-row kpi-row--fit">
       <StatCard label={t('pages.dynamicSources.history.points')} value={stats.point_count} flat />
       <StatCard
         label={t('pages.dynamicSources.history.average')}
@@ -234,6 +234,7 @@ export function DynamicPriceHistoryPanel({ source, tariff, compact = false }: Pa
         label={t('pages.dynamicSources.history.gaps')}
         value={stats.gap_count}
         tone={stats.gap_count > 0 ? 'warning' : 'success'}
+        flat
       />
     </div>
   )

@@ -116,6 +116,14 @@
   gap: 1rem;
 }
 
+/* A row of equal tiles with no hero (the fetched-price statistics): as many
+   columns as fit, so a narrow detail pane gets two by two instead of five
+   slivers that break the figures. */
+
+.kpi-row.kpi-row--fit {
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+}
+
 /* The dark figure tile — the invoice's savings tile. At most one per view. */
 
 .stat-card--accent {
