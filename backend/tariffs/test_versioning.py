@@ -395,6 +395,53 @@ def test_duplicate_refuses_the_source_name(owner_client):
     assert "new-version" in str(response.data["name"])
 
 
+def test_duplicate_of_an_ended_version_starting_later_drops_the_obsolete_end_date(owner_client):
+    """The source's end date belongs to the source's timeline; a copy that starts
+    after it would otherwise end before it begins."""
+    client, zev = owner_client
+    ended = energy_version(zev, valid_from="2025-01-01", valid_to="2025-12-31")
+
+    response = client.post(
+        url(ended, "duplicate"),
+        {"name": "Local Energy Reduced", "valid_from": "2026-03-01"},
+        format="json",
+    )
+
+    assert response.status_code == 201, response.data
+    assert response.data["valid_from"] == "2026-03-01"
+    assert response.data["valid_to"] is None
+    ended.refresh_from_db()
+    assert ended.valid_to == date(2025, 12, 31)
+
+
+def test_duplicate_keeps_the_end_date_while_it_still_follows_the_start(owner_client):
+    client, zev = owner_client
+    ended = energy_version(zev, valid_from="2025-01-01", valid_to="2025-12-31")
+
+    response = client.post(
+        url(ended, "duplicate"),
+        {"name": "Local Energy Reduced", "valid_from": "2025-06-01"},
+        format="json",
+    )
+
+    assert response.status_code == 201, response.data
+    assert response.data["valid_to"] == "2025-12-31"
+
+
+def test_duplicate_rejects_an_overlapping_window_with_a_field_error(owner_client):
+    """Model validation failures used to surface as a server error."""
+    client, zev = owner_client
+    original = energy_version(zev, name="Local Energy", valid_from="2026-01-01")
+    energy_version(zev, name="Local Energy Reduced", valid_from="2026-01-01")
+    before = Tariff.objects.count()
+
+    response = client.post(url(original, "duplicate"), {"name": "Local Energy Reduced"}, format="json")
+
+    assert response.status_code == 400, response.data
+    assert "valid_from" in response.data or "name" in response.data
+    assert Tariff.objects.count() == before
+
+
 def test_duplicate_preserves_weight_split_key(owner_client):
     client, zev = owner_client
     original = _shared_fee(zev, split_key=SplitKey.WEIGHT)

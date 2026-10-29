@@ -130,6 +130,14 @@ end-dated last version, are simply periods the series does not cover.
   rejected by the overlap guard for reasons the caller cannot see.
 - Two versions of one series may not share a `valid_from`.
 
+`duplicate` starts a separate series and leaves the source's timeline alone.
+The copy takes the payload's `valid_from` (default: the source's) and keeps the
+source's `valid_to` only while it is on or after that start; a copy that starts
+after the source ended is open-ended instead of ending before it begins.
+Model validation failures (such as an overlapping window under an existing
+name) return `400` with the field errors, not a server error; the pane shows
+them in the open form.
+
 Custom version, duplicate, and rename writes obey the
 [disabled-ZEV rules](2026-03-community-and-access.md#45-write-scoping-zevscopedquerysetmixin).
 

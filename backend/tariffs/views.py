@@ -3,6 +3,7 @@ from datetime import timedelta
 import logging
 from uuid import uuid4
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError as DRFValidationError
@@ -86,6 +87,16 @@ def _parse_required_date(raw, field: str):
     if parsed is None:
         raise DRFValidationError({field: [f'{field} is required as an ISO date (YYYY-MM-DD).']})
     return parsed
+
+
+def _save_or_400(tariff) -> None:
+    """Save a tariff, turning model validation failures into a 400 with field errors."""
+    try:
+        tariff.save()
+    except DjangoValidationError as exc:
+        raise DRFValidationError(
+            exc.message_dict if hasattr(exc, 'message_dict') else exc.messages
+        ) from exc
 
 
 def _apply_price_overrides(tariff, data: dict) -> None:
@@ -386,11 +397,17 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
                 fixed_price_chf=source.fixed_price_chf,
                 notes=source.notes,
                 valid_from=valid_from,
-                valid_to=source.valid_to,
+                # The end date belongs to the source's timeline: a copy that
+                # starts after it would end before it begins.
+                valid_to=(
+                    source.valid_to
+                    if source.valid_to is None or source.valid_to >= valid_from
+                    else None
+                ),
                 dynamic_source=source.dynamic_source,
             )
             _apply_price_overrides(copy, request.data)
-            copy.save()
+            _save_or_400(copy)
             _copy_or_replace_periods(source, copy, request.data.get('periods'))
 
         _record_tariff_event(
