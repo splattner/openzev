@@ -190,6 +190,8 @@ export const fr = {
         participantDescription: 'Votre consommation, votre part issue du RCP et vos factures.',
     },
     common: {
+        timeHours: 'Heure',
+        timeMinutes: 'Minute',
         loading: 'Chargement...',
         empty: 'Aucune donnée.',
         pagination: {

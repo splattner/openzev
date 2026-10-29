@@ -190,6 +190,8 @@ export const de = {
         participantDescription: 'Ihr Verbrauch, Ihr Anteil aus dem ZEV und Ihre Rechnungen.',
     },
     common: {
+        timeHours: 'Stunde',
+        timeMinutes: 'Minute',
         loading: 'Wird geladen...',
         empty: 'Keine Daten vorhanden.',
         pagination: {

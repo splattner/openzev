@@ -190,6 +190,8 @@ export const it = {
         participantDescription: 'Il tuo consumo, la tua quota dal RCP e le tue fatture.',
     },
     common: {
+        timeHours: 'Ora',
+        timeMinutes: 'Minuto',
         loading: 'Caricamento...',
         empty: 'Nessun dato.',
         pagination: {

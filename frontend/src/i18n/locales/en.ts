@@ -199,6 +199,8 @@ export const en = {
         participantDescription: 'Your consumption, your share from the ZEV, and your invoices.',
     },
     common: {
+        timeHours: 'Hour',
+        timeMinutes: 'Minute',
         loading: 'Loading...',
         empty: 'No data yet.',
         pagination: {

@@ -355,8 +355,11 @@ test.describe('User Guide Screenshots', () => {
       const editor = bands.locator('.tariff-draft-band-editor')
       await editor.locator('select').first().selectOption(type)
       await editor.locator('input[type="number"]').fill(price)
-      await editor.locator('input[type="time"]').first().fill(from)
-      await editor.locator('input[type="time"]').nth(1).fill(to)
+      // The time fields are 24-hour pickers: type the digits, the hour hands over to the minutes.
+      for (const [index, time] of [from, to].entries()) {
+        await editor.getByRole('spinbutton', { name: 'Stunde' }).nth(index).click()
+        await page.keyboard.type(time.replace(':', ''))
+      }
       await editor.getByRole('button', { name: 'Band übernehmen' }).click()
     }
     await expect(bands.locator('.tariff-period-row')).toHaveCount(2)

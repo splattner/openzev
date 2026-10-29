@@ -155,7 +155,12 @@ completion must not select or reopen anything (`useWriteScope`, reference spec Â
   edit forms open with the hint `pages.tariffs.form.correctionHint` (existing
   invoices are not recalculated; use Schedule price change for future prices),
   Notes is a three-row textarea, and `useFocusFirstField` focuses the first
-  enabled field, counting a date picker (`button[data-dates-input]`) as one.
+  enabled field, counting a date picker (`button[data-dates-input]`) as one. The band
+  form's Time from / Time to use `CivilTimeInput` (`components/CivilTimeInput.tsx`,
+  a Mantine `TimePicker`, always 24-hour, value `HH:mm`) rather than a native
+  `<input type="time">`, which follows the browser's 12/24-hour setting; and the
+  pane forms' grid cells start at the top (`.tariff-pane-form .form-grid`) so
+  inputs in a row line up whether or not their neighbour has a hint.
 - **Save** returns to viewing on the saved tariff or version. **Cancel** returns
   to the original viewing context, asking before discarding changed values.
   Cancelling creation restores the previous selection, or the list if there was

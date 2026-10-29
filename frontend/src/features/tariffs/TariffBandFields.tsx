@@ -1,5 +1,6 @@
-import { useWatch, type Control, type UseFormReturn } from 'react-hook-form'
+import { Controller, useWatch, type Control, type UseFormReturn } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import { CivilTimeInput } from '../../components/CivilTimeInput'
 import type { ItemFieldErrors } from '../../lib/api/errors'
 import type { CoverageBand } from './bandCoverage'
 import { RecurrenceChips } from './RecurrenceChips'
@@ -74,12 +75,12 @@ export function TariffBandFields({ form, serverErrors }: TariffBandFieldsProps) 
       )}
       <label>
         <span>{t('pages.tariffs.form.timeFrom')}</span>
-        <input type="time" {...form.register('time_from')} />
+        <Controller control={form.control} name="time_from" render={({ field }) => <CivilTimeInput value={field.value} onChange={field.onChange} />} />
         {serverError('time_from')}
       </label>
       <label>
         <span>{t('pages.tariffs.form.timeTo')}</span>
-        <input type="time" {...form.register('time_to')} />
+        <Controller control={form.control} name="time_to" render={({ field }) => <CivilTimeInput value={field.value} onChange={field.onChange} />} />
         {periodType !== 'flat' && <small className="muted">{t('pages.tariffs.form.timeWindowHint')}</small>}
         {(errors.time_from || errors.time_to) && <small className="field-error" role="alert">{t('pages.tariffs.form.errorTimeWindow')}</small>}
         {serverError('time_to')}
