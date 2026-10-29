@@ -2645,16 +2645,17 @@
 </li>
 </ul>
 <p><img alt="Tariffs page" src="../screenshots/07-tariffs.png" /></p>
-<p>The list is grouped by what applies when, with one row per tariff:
-<strong>Current</strong> shows each tariff's version in force today; <strong>Upcoming</strong> shows
-tariffs that have nothing in force yet but a version that starts later (for
-example next year's grid tariff, once imported); <strong>History</strong> is folded away and
-shows tariffs that have ended altogether. When a tariff in force has a later
+<p>The list is grouped by what applies when, with one row per tariff. The first
+group, with no heading of its own, shows each tariff's version in force today;
+<strong>Upcoming</strong> shows tariffs that have nothing in force yet but a version that starts later (for
+example next year's grid tariff, once imported); <strong>Ended tariffs</strong> is folded away and
+shows tariffs that have ended altogether — open it to look at or edit one that
+ended by mistake. When a tariff in force has a later
 version, its row says so under the validity — <em>From 01.01.2027: 0.315 per kWh
 (+6.8 %)</em> when the same bands get new prices (the change in brackets, one
 figure per band, in the order of the prices), <em>Prices and schedule change from
 01.01.2027</em> when the bands themselves change — and clicking that line opens the
-later version. <strong>History</strong> opens by itself when you follow a link to the past
+later version. <strong>Ended tariffs</strong> opens by itself when you follow a link to the past
 version of a tariff that has ended. The headings carry no counts.</p>
 <p>Each category is a rate card, set like the tariff overview PDF, with one row
 per tariff:</p>
@@ -2688,7 +2689,7 @@ every hour of the year. A version of a few weeks is only checked against the
 days it can contain.</p>
 <p>A red badge next to the name means warnings: a gap between
 versions, a failed price fetch, or <strong>Hours without a band</strong> — some hours of the
-year have no band of their own and are billed at the fallback band (see below). Rows in <strong>History</strong> are grey but readable.
+year have no band of their own and are billed at the fallback band (see below). Rows under <strong>Ended tariffs</strong> are grey but readable.
 Click a row to open the tariff's detail pane beside the list, where <strong>Edit</strong>
 and the other actions are; from <strong>Upcoming</strong> it opens on the upcoming version.
 On a narrow screen (a phone, or a small window) the pane takes the whole area
@@ -3401,10 +3402,10 @@ Open it for the price chart and the list of past versions with their window and
 price; click one to show its card — marked <strong>Ended</strong> — underneath. A tariff
 without ended versions has no history. Switching versions in the pane does not
 change the version shown in the list.</p>
-<p><strong>Delete</strong> is not on the cards: open <strong>Edit</strong> on a version (or a band's
-pencil) and use the <strong>Delete</strong> button below the fields. It asks for
-confirmation, and the form closes afterwards. Correcting a superseded version's
-end date is a normal follow-up to adding a new one, so <strong>Edit</strong> is on every card.</p>
+<p>To delete a version, open the <strong>⋮</strong> menu beside <strong>Edit</strong> on its card and choose
+<strong>Delete this version</strong>; to delete a band, click the trash icon beside its
+pencil. Both ask for confirmation first. Correcting a superseded version's end
+date is a normal follow-up to adding a new one, so <strong>Edit</strong> is on every card.</p>
 <p>The pane stays open across a page reload or a shared link — the URL records
 which tariff and version you're looking at. <strong>X</strong>, <strong>Escape</strong> and the browser's
 <strong>Back</strong> button all return to the list.</p>
@@ -3520,11 +3521,14 @@ the pricing. See <a href="../17-zev-transfer/">ZEV Export and Import</a>.</p>
 <li>Click <strong>Save</strong></li>
 </ol>
 <p>Changes apply to <strong>new invoices only</strong>. Past invoices keep original tariffs.</p>
-<p><strong>Edit</strong> works on one <strong>version</strong>. The four fields that identify the tariff —
-name, category, billing mode, energy type — are therefore shown as values rather
-than inputs: they are shared by every version, so changing them on one alone
+<p><strong>Edit</strong> works on one <strong>version</strong>: the form is titled <em>Correct this version</em>,
+with the tariff's name and the version's validity window under the title, and
+says again that existing invoices are not recalculated. The fields that
+identify the tariff — name, category, billing mode, energy type — are not in the
+form at all: they are shared by every version, so changing them on one alone
 would break the series. Use <strong>Rename</strong> for the name; for a different category,
-billing mode or energy type, create a separate tariff.</p>
+billing mode or energy type, create a separate tariff. The cursor starts in the
+first field, and <strong>Notes</strong> is a multi-line box.</p>
 <blockquote>
 <p><strong>Prices changed from a certain date?</strong> Use <strong>Schedule price change</strong> instead of editing.
 Editing rewrites what the <em>current</em> version has always charged; a new version
@@ -3543,7 +3547,7 @@ spanning the switch bill each part correctly. See
 <blockquote>
 <p><strong>Important:</strong> Never delete a tariff—always set Valid To instead. This preserves invoice audit trail.</p>
 </blockquote>
-<p>This applies to <strong>Delete</strong> in a version's edit form too. Deleting a version
+<p>This applies to <strong>Delete this version</strong> too. Deleting a version
 removes the prices that applied in its window, which leaves a gap: energy in
 those days is then billed at nothing. Reserve it for a version created by
 mistake — one you have not billed against.</p>
