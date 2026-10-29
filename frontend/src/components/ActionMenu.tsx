@@ -1,4 +1,4 @@
-import { Fragment, useMemo, type ReactNode } from 'react'
+import { Fragment, useMemo, useRef, type ReactNode } from 'react'
 import { Menu } from '@mantine/core'
 import { closePopupOnEscape } from '../lib/popupKeyboard'
 
@@ -24,6 +24,7 @@ interface ActionMenuProps {
 }
 
 export function ActionMenu({ label, items, icon, iconOnly = false, compact = true, actionKey }: ActionMenuProps) {
+    const triggerRef = useRef<HTMLButtonElement>(null)
     const availableItems = useMemo(() => items.filter((item) => !item.disabled), [items])
     const renderedItems = useMemo(() => {
         return items.map((item, index) => {
@@ -43,10 +44,12 @@ export function ActionMenu({ label, items, icon, iconOnly = false, compact = tru
             position="bottom-end"
             withinPortal
             shadow="md"
+            middlewares={{ size: true }}
             transitionProps={{ transition: 'pop-top-right' }}
         >
             <Menu.Target>
                 <button
+                    ref={triggerRef}
                     type="button"
                     className={`button button-secondary${compact ? ' button-compact' : ''}`}
                     disabled={availableItems.length === 0}
@@ -60,7 +63,7 @@ export function ActionMenu({ label, items, icon, iconOnly = false, compact = tru
                     {iconOnly ? null : label}
                 </button>
             </Menu.Target>
-            <Menu.Dropdown>
+            <Menu.Dropdown className="action-menu-dropdown">
                 {renderedItems.map(({ item, showSection, showDivider }) => (
                     <Fragment key={item.key}>
                         {showDivider && <Menu.Divider />}
@@ -69,7 +72,12 @@ export function ActionMenu({ label, items, icon, iconOnly = false, compact = tru
                             disabled={item.disabled}
                             leftSection={item.icon ? <span className="menu-item-icon" aria-hidden="true">{item.icon}</span> : undefined}
                             className={item.danger ? 'action-menu-item-danger' : undefined}
-                            onClick={item.onClick}
+                            onClick={() => {
+                                // The menu unmounts with the focused item, so a dialog opened from it
+                                // would remember nothing to return to; hand focus to the trigger first.
+                                triggerRef.current?.focus()
+                                item.onClick()
+                            }}
                         >
                             {item.label}
                         </Menu.Item>

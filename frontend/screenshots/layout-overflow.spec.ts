@@ -120,8 +120,7 @@ test('breakpoint changes recover focus from hidden navigation controls', async (
   await hamburger.press('Enter')
   await expect(page.locator('.sidebar.mobile-open')).toBeVisible()
   await expect(page.locator('#app-sidebar')).toBeInViewport({ ratio: 0.95 })
-  await page.keyboard.press('Shift+Tab')
-  await expect(page.locator('.sidebar-footer .user-menu-trigger')).toBeFocused()
+  await expect(page.locator('.mobile-sidebar-close')).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(hamburger).toBeFocused()
   await expect(page.locator('#app-sidebar')).not.toBeInViewport()
@@ -132,6 +131,50 @@ test('breakpoint changes recover focus from hidden navigation controls', async (
   expect(await page.evaluate(() => document.body.style.overflow)).not.toBe('hidden')
   await expect(page.locator('nav a[href="/admin/system-settings"]')).toHaveAccessibleName('Platform: Settings')
   expect(await page.evaluate(() => localStorage.getItem('openzev.sidebarCollapsed'))).toBe('true')
+})
+
+test('the phone drawer is modal for the keyboard', async ({ page }) => {
+  await prepareFocusPage(page, 400)
+  const sidebar = page.locator('#app-sidebar')
+  const hamburger = page.locator('.mobile-menu-button')
+  const focusedIn = () => page.evaluate(() => {
+    const active = document.activeElement
+    if (active === document.body) return 'body'
+    if (active?.closest('#app-sidebar')) return 'sidebar'
+    // The skip link sits before the drawer and closes it.
+    return active?.classList.contains('skip-link') ? 'skip-link' : 'page'
+  })
+
+  // Closed, the off-canvas links are not tabbable: focus never disappears off screen.
+  await expect(sidebar).toHaveAttribute('inert', '')
+  for (let step = 0; step < 40; step++) {
+    await page.keyboard.press('Tab')
+    expect(await focusedIn(), `tab ${step + 1} entered the closed drawer`).not.toBe('sidebar')
+  }
+
+  // Open, focus moves in and cannot reach the page behind the scrim.
+  await hamburger.focus()
+  await hamburger.press('Enter')
+  await expect(page.locator('.mobile-sidebar-close')).toBeFocused()
+  await expect(sidebar).toHaveAttribute('role', 'dialog')
+  for (let step = 0; step < 40; step++) {
+    await page.keyboard.press('Tab')
+    expect(await focusedIn(), `tab ${step + 1} reached the page behind the drawer`).not.toBe('page')
+  }
+
+  await page.keyboard.press('Escape')
+  await expect(hamburger).toBeFocused()
+  await expect(sidebar).toHaveAttribute('inert', '')
+
+  // The close button and the skip link end it as well.
+  await hamburger.press('Enter')
+  await page.locator('.mobile-sidebar-close').press('Enter')
+  await expect(hamburger).toBeFocused()
+  await hamburger.press('Enter')
+  await page.locator('.skip-link').focus()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.sidebar.mobile-open')).toHaveCount(0)
+  await expect(page.locator('#main-content')).toBeFocused()
 })
 
 test('breakpoint changes preserve a textbox value, focus and selection', async ({ page }) => {

@@ -1883,6 +1883,14 @@ There is no header or sidebar scope chip: every page header names its scope
 in the eyebrow (the community, or "Platform administration" under
 `/admin/*`), so the working context stays visible when the nav scrolls, the
 sidebar collapses, or the sidebar lives in the mobile drawer.
+On phones (`max-width: 768px`) the sidebar is an off-canvas drawer that is modal while
+open. Closed, `#app-sidebar` is `inert`, so its off-screen links are not in the tab
+order. Open, focus moves to the drawer's close button (`.mobile-sidebar-close`, shown on
+phones only, label `common.close`), the aside gets `role="dialog"`, `aria-modal` and
+`aria-label` `nav.menu`, and `.content` is `inert`, which keeps Tab and screen-reader
+browsing out of the page behind the scrim. The close button, Escape, the scrim and a
+route change close it; focus returns to the hamburger unless a route change has already
+moved it to the page.
 The Manage action on `/admin/zevs` (`setSelectedZevId` + jump to `/`) is
 how an admin enters a ZEV's working scope from platform scope.
 

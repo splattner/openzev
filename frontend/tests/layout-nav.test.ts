@@ -526,17 +526,64 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         page.unmount()
     })
 
-    it('returns focus to the mobile menu button when Escape closes the drawer', async () => {
-        mockSession('admin')
-        const page = await renderLayout()
-        const mobileButton = page.container.querySelector('.mobile-menu-button') as HTMLElement
-        await act(async () => mobileButton.click())
-        expect(mobileButton.getAttribute('aria-expanded')).toBe('true')
-        page.container.querySelector<HTMLAnchorElement>('nav a')!.focus()
-        await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
-        expect(mobileButton.getAttribute('aria-expanded')).toBe('false')
-        expect(document.activeElement).toBe(mobileButton)
-        page.unmount()
+    describe('phone drawer', () => {
+        async function openDrawer() {
+            mockSession('admin')
+            const viewport = mockMobileViewport(true)
+            const page = await renderLayout()
+            const q = <T extends Element>(selector: string) => page.container.querySelector<T>(selector)!
+            const mobileButton = q<HTMLButtonElement>('.mobile-menu-button')
+            return { viewport, page, q, mobileButton, close: () => { viewport.restore(); page.unmount() } }
+        }
+
+        it('keeps the off-canvas navigation out of the tab order while closed, and not on desktop', async () => {
+            mockSession('admin')
+            const desktop = await renderLayout()
+            expect(desktop.container.querySelector('#app-sidebar')!.hasAttribute('inert')).toBe(false)
+            desktop.unmount()
+
+            const { q, close } = await openDrawer()
+            expect(q('#app-sidebar').hasAttribute('inert')).toBe(true)
+            expect(q('.content').hasAttribute('inert')).toBe(false)
+            close()
+        })
+
+        it('moves focus into the open drawer, makes it modal and the page behind it inert', async () => {
+            const { q, mobileButton, close } = await openDrawer()
+            await act(async () => mobileButton.click())
+            expect(document.activeElement).toBe(q('.mobile-sidebar-close'))
+            expect(q('#app-sidebar').hasAttribute('inert')).toBe(false)
+            expect(q('#app-sidebar').getAttribute('role')).toBe('dialog')
+            expect(q('#app-sidebar').getAttribute('aria-modal')).toBe('true')
+            expect(q('.content').hasAttribute('inert')).toBe(true)
+            close()
+        })
+
+        it('returns focus to the menu button when the close button, Escape or the scrim closes it', async () => {
+            const { q, mobileButton, close } = await openDrawer()
+            for (const dismiss of [
+                () => q<HTMLButtonElement>('.mobile-sidebar-close').click(),
+                () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+                () => q<HTMLElement>('.sidebar-overlay').click(),
+            ]) {
+                await act(async () => mobileButton.click())
+                q<HTMLAnchorElement>('nav a').focus()
+                await act(async () => dismiss())
+                expect(mobileButton.getAttribute('aria-expanded')).toBe('false')
+                expect(q('.content').hasAttribute('inert')).toBe(false)
+                expect(document.activeElement).toBe(mobileButton)
+            }
+            close()
+        })
+
+        it('lets the skip link close the drawer and land on the main content', async () => {
+            const { q, mobileButton, close } = await openDrawer()
+            await act(async () => mobileButton.click())
+            await act(async () => q<HTMLAnchorElement>('.skip-link').click())
+            expect(q('.sidebar.mobile-open')).toBeNull()
+            expect(document.activeElement).toBe(q('#main-content'))
+            close()
+        })
     })
 
     it('expands the collapsed sidebar before opening the account panel at its foot', async () => {

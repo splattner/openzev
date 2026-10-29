@@ -1,3 +1,8 @@
+/* The size middleware caps the height to the room on screen; a long menu scrolls inside it. */
+.action-menu-dropdown {
+  overflow-y: auto;
+}
+
 .menu-item-icon {
   display: inline-flex;
   align-items: center;

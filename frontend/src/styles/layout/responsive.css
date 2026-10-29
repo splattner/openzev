@@ -1,3 +1,8 @@
+/* Close button in the phone drawer, where the hamburger is out of reach. */
+.mobile-sidebar-close {
+  display: none;
+}
+
 /* Hamburger button: part of the phone's app bar. */
 .mobile-menu-button {
   display: inline-flex;
@@ -126,6 +131,31 @@
   /* Collapse button hidden on mobile — hamburger replaces it */
   .sidebar-collapse-button {
     display: none;
+  }
+
+  .mobile-sidebar-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    flex-shrink: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--sidebar-text);
+    cursor: pointer;
+  }
+
+  .mobile-sidebar-close:hover {
+    background: var(--sidebar-hover);
+    color: var(--white);
+  }
+
+  .mobile-sidebar-close svg {
+    width: 1.375rem;
+    height: 1.375rem;
   }
 
   .content {

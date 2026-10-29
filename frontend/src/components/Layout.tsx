@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { flushSync } from 'react-dom'
 import { useMediaQuery } from '@mantine/hooks'
 import { Link, NavLink, Outlet, matchPath, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -83,11 +84,28 @@ export function Layout() {
     const mobileMenuButtonRef = useRef<HTMLButtonElement | null>(null)
     const sidebarRef = useRef<HTMLElement | null>(null)
     const sidebarCollapseButtonRef = useRef<HTMLButtonElement | null>(null)
+    const sidebarCloseButtonRef = useRef<HTMLButtonElement | null>(null)
+    const wasMobileMenuOpenRef = useRef(false)
     const previousIsMobileRef = useRef(isMobile)
     const lastNavigationFocusRef = useRef<HTMLElement | null>(null)
     const mainRef = useRef<HTMLElement | null>(null)
 
     useRouteFocus(mainRef)
+
+    // The phone drawer is modal: focus moves into it when it opens and back to the
+    // hamburger when it closes. The rest of the shell is inert meanwhile (see below).
+    useLayoutEffect(() => {
+        const open = isMobile && isMobileMenuOpen
+        if (open && !wasMobileMenuOpenRef.current) {
+            sidebarCloseButtonRef.current?.focus()
+        } else if (!open && wasMobileMenuOpenRef.current && isMobile) {
+            // Inerting the drawer drops focus on <body>; a route change has already moved it to the page.
+            if (document.activeElement === document.body || sidebarRef.current?.contains(document.activeElement)) {
+                mobileMenuButtonRef.current?.focus()
+            }
+        }
+        wasMobileMenuOpenRef.current = open
+    }, [isMobile, isMobileMenuOpen])
 
     useEffect(() => {
         window.localStorage.setItem('openzev.sidebarCollapsed', String(isSidebarCollapsed))
@@ -142,8 +160,7 @@ export function Layout() {
 
         function handleEscape(event: KeyboardEvent) {
             if (event.key === 'Escape') {
-                if (isMobileMenuOpen) mobileMenuButtonRef.current?.focus()
-                else if (isUserMenuOpen) userMenuTriggerRef.current?.focus()
+                if (!isMobileMenuOpen && isUserMenuOpen) userMenuTriggerRef.current?.focus()
                 setIsUserMenuOpen(false)
                 setIsMobileMenuOpen(false)
             }
@@ -203,7 +220,8 @@ export function Layout() {
                 href="#main-content"
                 onClick={(event) => {
                     event.preventDefault()
-                    setIsMobileMenuOpen(false)
+                    // The page behind an open drawer is inert until the close has rendered.
+                    flushSync(() => setIsMobileMenuOpen(false))
                     mainRef.current?.focus()
                 }}
             >
@@ -213,7 +231,15 @@ export function Layout() {
                 className={`sidebar-overlay${isMobileMenuOpen ? ' visible' : ''}`}
                 onClick={() => setIsMobileMenuOpen(false)}
             />
-            <aside ref={sidebarRef} id="app-sidebar" className={`sidebar${isNavigationCollapsed ? ' collapsed' : ''}${isMobileMenuOpen ? ' mobile-open' : ''}`}>
+            <aside
+                ref={sidebarRef}
+                id="app-sidebar"
+                inert={isMobile && !isMobileMenuOpen}
+                role={isMobile && isMobileMenuOpen ? 'dialog' : undefined}
+                aria-modal={isMobile && isMobileMenuOpen ? true : undefined}
+                aria-label={isMobile && isMobileMenuOpen ? t('nav.menu') : undefined}
+                className={`sidebar${isNavigationCollapsed ? ' collapsed' : ''}${isMobileMenuOpen ? ' mobile-open' : ''}`}
+            >
                 {/* Persistent scope context (replaces switcher on platform routes). */}
                 <div className="sidebar-fixed">
                     <div className="sidebar-brand-row">
@@ -235,6 +261,17 @@ export function Layout() {
                             title={isSidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
                         >
                             <ChevronIcon direction={isSidebarCollapsed ? 'right' : 'left'} />
+                        </button>
+                        <button
+                            ref={sidebarCloseButtonRef}
+                            type="button"
+                            className="mobile-sidebar-close"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            aria-label={t('common.close')}
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M6 6l12 12M18 6L6 18" />
+                            </svg>
                         </button>
                     </div>
                 </div>
@@ -382,7 +419,7 @@ export function Layout() {
                 </div>
             </aside>
 
-            <div className="content">
+            <div className="content" inert={isMobile && isMobileMenuOpen}>
                 <header className="top-nav">
                     <div className="mobile-bar">
                         <button
