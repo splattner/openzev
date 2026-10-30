@@ -21,6 +21,7 @@ from metering.supplementary import sync as sync_service
 from metering.supplementary.serializers import live_state_of
 from metering.supplementary.testing import (
     INGEST_URL,
+    INTEGRATION_KEY,
     SOURCES_URL,
     SupplementaryApiTestCase,
     client_for,
@@ -560,6 +561,7 @@ class ZevEligibleTests(CapabilityTestCase):
         self.assertEqual(self.get(self.manager).status_code, 404)
 
 
+@override_settings(INTEGRATION_ENCRYPTION_KEYS=[INTEGRATION_KEY])
 class HistoryCapabilityGuardTests(CapabilityTestCase):
     def live_only(self):
         response = client_for(self.holder_user).post(
