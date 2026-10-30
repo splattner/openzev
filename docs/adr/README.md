@@ -47,6 +47,7 @@ This directory captures key architectural decisions for OpenZEV.
 - [0041: Serialize billing-input writes and generation with a per-ZEV advisory lock](0041-billing-input-advisory-lock.md)
 - [0042: Serialize meter identities and protect historical reading configuration](0042-meter-identity-and-history-write-boundary.md)
 - [0043: Aggregate annual-report energy in SQL](0043-annual-report-sql-aggregation.md)
+- [0044: Live energy data is ephemeral, measured only, and shows a split only when it is exact](0044-live-energy-data-is-ephemeral-and-measured-only.md)
 
 ## Conventions
 

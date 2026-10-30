@@ -135,6 +135,9 @@ when the capability changes; do not treat them as baselines:
 - `2026-10-supplementary-energy-data.md` (Implemented) — gross production/consumption from a participant's own
   system (Solar Manager pull, push/CSV) for metering points with generation behind the meter, statistics
   only. See [#925](https://github.com/splattner/openzev/issues/925). ADRs 0030, 0031.
+- `2026-10-live-energy-data.md` (Draft) — live power per metering point and the grid connection point,
+  the ZEV snapshot with exact-only split, production forecast, read-only automation API. See
+  [#1032](https://github.com/splattner/openzev/issues/1032). ADR 0044.
 
 ## Archived
 
