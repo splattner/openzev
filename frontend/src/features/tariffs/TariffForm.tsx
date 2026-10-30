@@ -17,22 +17,13 @@ import { Notice } from '../../components/Notice'
 import { useFocusFirstField } from './useFocusFirstField'
 import { TariffDraftBands } from './TariffDraftBands'
 import {
+  FIXED_PRICE_LABELS,
   defaultTariffFormValues,
   mapTariffFormValuesToInput,
   mapTariffToFormValues,
   tariffFormSchema,
   type TariffFormValues,
 } from './useTariffForms'
-
-/** Label for the fixed-price field, per billing mode that has one. */
-const FIXED_PRICE_LABELS: Partial<Record<TariffBillingMode, string>> = {
-  monthly_fee: 'pages.tariffs.form.monthlyFee',
-  yearly_fee: 'pages.tariffs.form.yearlyFee',
-  per_metering_point_monthly_fee: 'pages.tariffs.form.mpMonthlyFee',
-  per_metering_point_yearly_fee: 'pages.tariffs.form.mpYearlyFee',
-  shared_monthly_fee: 'pages.tariffs.form.sharedMonthlyFee',
-  shared_yearly_fee: 'pages.tariffs.form.sharedYearlyFee',
-}
 
 const SHARED_FEE_MODES: TariffBillingMode[] = ['shared_monthly_fee', 'shared_yearly_fee']
 

@@ -6,7 +6,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faFlask } from '@fortawesome/free-solid-svg-icons'
 import { fetchGridOperatorSuggestions } from '../../lib/api/zev'
 import { previewVseTariffImport } from '../../lib/api/tariffs'
-import { formatApiError } from '../../lib/api/errors'
+import { formatTariffError } from '../tariffs/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import type { GridOperator } from '../../types/api'
 
@@ -159,7 +159,7 @@ export function GridOperatorSuggestion({
             {testMutation.isError && (
               <span className="error-text">
                 {t('pages.zevSettings.fields.gridOperatorSuggestion.testFailed', {
-                  error: formatApiError(testMutation.error),
+                  error: formatTariffError(testMutation.error, t('pages.tariffs.import.errors.previewFailed'), t),
                 })}
               </span>
             )}

@@ -13,6 +13,7 @@ import { AXIS_COLOR, CHART_GRIDLINE, CONS_COLORS, NEGATIVE_COLOR } from '../../l
 import { CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { formatBusinessIsoDate, formatIsoDate, todayBusinessIso } from '../../lib/dates'
 import { queryKeys } from '../../lib/api/queryKeys'
+import { formatTariffError } from './errors'
 import type { AppSettings, DynamicPriceHistory, DynamicPricePoint, DynamicTariffSource, Tariff } from '../../types/api'
 import { dynamicChartData, elapsedPriceGaps, missingPriceDates, missingRangeLabel, windowBounds } from './dynamicPriceGaps'
 
@@ -304,7 +305,7 @@ export function DynamicPriceHistoryPanel({ source, tariff, compact = false }: Pa
         </p>
       )}
 
-      {historyQuery.isError && <div className="error-banner">{t('pages.dynamicSources.history.loadError')}</div>}
+      {historyQuery.isError && <div className="error-banner">{formatTariffError(historyQuery.error, t('pages.dynamicSources.history.loadError'), t, settings)}</div>}
 
       {!compact && statCards}
 

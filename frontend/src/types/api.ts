@@ -3043,3 +3043,17 @@ export interface Notification {
     created_at: string
     read_at: string | null
 }
+
+/** Additive diagnostics on tariff API errors; legacy field/message trees remain present. */
+export interface TariffValidationError {
+    code: string
+    field: string | null
+    path: Array<string | number>
+    params: Record<string, unknown>
+    message: string
+}
+
+export interface TariffErrorResponse {
+    validation_errors: TariffValidationError[]
+    [field: string]: unknown
+}

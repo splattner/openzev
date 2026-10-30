@@ -1,0 +1,61 @@
+[
+  {
+    "code": "required",
+    "field": "valid_from",
+    "path": [
+      "valid_from"
+    ],
+    "params": {},
+    "message": "This field is required."
+  },
+  {
+    "code": "invalid_number",
+    "field": "price_chf_per_kwh",
+    "path": [
+      "initial_periods",
+      1,
+      "price_chf_per_kwh"
+    ],
+    "params": {},
+    "message": "A valid number is required."
+  },
+  {
+    "code": "band_time_pair",
+    "field": "time_to",
+    "path": [
+      "initial_periods",
+      1,
+      "time_to"
+    ],
+    "params": {},
+    "message": "A band takes both a start and an end time, or neither: without times it prices all other hours."
+  },
+  {
+    "code": "flat_timed_conflict",
+    "field": "period_type",
+    "path": [
+      "initial_periods",
+      1,
+      "period_type"
+    ],
+    "params": {
+      "months": [
+        1,
+        3
+      ]
+    },
+    "message": "A flat band and a timed band cannot both apply in months 1,3: the flat price is used for every hour, so the timed bands would never apply. Give them different months, or make them all timed."
+  },
+  {
+    "code": "duplicate_date",
+    "field": "valid_from",
+    "path": [
+      "valid_from"
+    ],
+    "params": {
+      "name": "Grid",
+      "date": "2026-01-01"
+    },
+    "message": "A version of \"Grid\" already starts on 2026-01-01."
+  }
+]

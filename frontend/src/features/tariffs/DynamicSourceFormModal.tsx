@@ -7,7 +7,7 @@ import {
   discoverDynamicTariffSource,
   updateDynamicTariffSource,
 } from '../../lib/api/tariffs'
-import { formatApiError } from '../../lib/api/errors'
+import { formatTariffError } from './errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { useToast } from '../../lib/toast'
 import type {
@@ -105,7 +105,7 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
       setStep(2)
     },
     onError: (error) => pushToast(
-      formatApiError(error, t('pages.dynamicSources.discovery.error')),
+      formatTariffError(error, t('pages.dynamicSources.discovery.error'), t),
       'error',
     ),
   })
@@ -151,7 +151,7 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
       onClose()
     },
     onError: (error) => pushToast(
-      formatApiError(error, t('pages.dynamicSources.saveError')),
+      formatTariffError(error, t('pages.dynamicSources.saveError'), t),
       'error',
     ),
   })

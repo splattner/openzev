@@ -11,7 +11,7 @@ import { waitForCondition } from './helpers/waitForCondition'
 
 const submitted = vi.hoisted(() => ({
     handleConfirm: null as (() => Promise<void>) | null,
-    purge: vi.fn(), clear: vi.fn(), delete: vi.fn(),
+    purge: vi.fn(), clear: vi.fn(), delete: vi.fn(), toast: vi.fn(),
 }))
 const zev = { id: '42', name: 'Disabled ZEV', disabled_at: '2026-10-01', zev_type: 'zev', billing_interval: 'monthly', start_date: '2026-01-01' }
 const source = { id: 's1', label: 'Operator source', enabled: true, point_count: 1, linked_tariff_count: 0, linked_zev_count: 0 }
@@ -25,7 +25,7 @@ vi.mock('../src/lib/appSettings', () => ({
     useAppSettings: () => ({ settings: {} }), formatShortDate: (value: string) => value,
     formatDateTime: (value: string) => value,
 }))
-vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: vi.fn() }) }))
+vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: submitted.toast }) }))
 vi.mock('../src/lib/api/zev', async importOriginal => ({
     ...await importOriginal<typeof import('../src/lib/api/zev')>(),
     fetchZevs: async () => [zev], purgeZev: submitted.purge,
@@ -103,4 +103,20 @@ describe('typed confirmation dispatch', () => {
             expect(submitted[action]).toHaveBeenCalledWith(action === 'purge' ? zev.id : source.id, expected)
         })
     }
+})
+
+
+it('shows the translated coded source error without exposing response metadata', async () => {
+    submitted.clear.mockRejectedValue({ isAxiosError: true, response: { data: {
+        confirmation: ['Reworded diagnostic'], validation_errors: [{
+            code: 'source_busy', field: null, path: ['detail'], params: {}, message: 'Reworded diagnostic',
+        }],
+    } } })
+    await render(AdminDynamicSourcesPanel)
+    await click('common.actions')
+    await click('pages.dynamicSources.clearAction')
+    fill(source.label)
+    await act(async () => { await submitted.handleConfirm!() })
+    await waitForCondition(() => submitted.toast.mock.calls.length > 0, 'coded source error toast')
+    expect(submitted.toast).toHaveBeenCalledWith('pages.tariffs.apiErrors.sourceBusy', 'error')
 })
