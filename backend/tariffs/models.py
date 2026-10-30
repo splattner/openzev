@@ -13,6 +13,7 @@ from .dynamic.adapters import DynamicApiVersion
 from .dynamic.protocol import V2_PRODUCT_REQUIRED
 from .periods import hhmm, parse_number_list
 from .series import SERIES_FIELDS
+from .errors import error_detail, model_error
 
 
 class EnergyType(models.TextChoices):
@@ -85,7 +86,8 @@ def _validate_number_list(value: str, *, low: int, high: int, label: str) -> Non
         if not part.isdigit() or not (low <= int(part) <= high):
             raise ValidationError(
                 f"{label} must be comma-separated numbers between {low} and {high}, "
-                f"or blank for all of them. Got {value!r}."
+                f"or blank for all of them. Got {value!r}.",
+                code=f"invalid_{label.lower()}",
             )
 
 
@@ -191,13 +193,13 @@ class Tariff(models.Model):
         errors = {}
 
         if self.valid_to and self.valid_to < self.valid_from:
-            errors["valid_to"] = "valid_to must be on or after valid_from."
+            errors["valid_to"] = model_error("valid_to must be on or after valid_from.", "date_range")
 
         if self.billing_mode in {BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY} and not self.energy_type:
-            errors["energy_type"] = "Energy-based tariffs require an energy type."
+            errors["energy_type"] = model_error("Energy-based tariffs require an energy type.", "energy_type_required")
 
         if self.category == TariffCategory.OTHER:
-            errors["category"] = "Choose energy, grid fees, levies or metering. One-off costs are charges, not tariffs."
+            errors["category"] = model_error("Choose energy, grid fees, levies or metering. One-off costs are charges, not tariffs.", "category")
 
         # Bands are priced per mode: an energy band carries a price, a
         # percentage band carries a percentage. A band of one mode is
@@ -209,25 +211,25 @@ class Tariff(models.Model):
             except Tariff.DoesNotExist:
                 previous_mode = None
             if previous_mode is not None and previous_mode != self.billing_mode and self.periods.exists():
-                errors["billing_mode"] = "Remove this tariff's bands before changing its billing mode."
+                errors["billing_mode"] = model_error("Remove this tariff's bands before changing its billing mode.", "remove_bands_for_mode")
 
         for field, message in self._dynamic_source_errors().items():
-            errors.setdefault(field, message)
+            errors.setdefault(field, model_error(str(message), message.code, **message.code.params))
 
         if self.dynamic_source_id and not self._state.adding and self.periods.exists():
             errors.setdefault(
                 "dynamic_source",
-                "A tariff priced from a fetched series cannot carry price bands.",
+                model_error("A tariff priced from a fetched series cannot carry price bands.", "dynamic_bands"),
             )
 
         if self.minimum_price_chf_per_kwh is not None:
             if not self.dynamic_source_id:
                 errors["minimum_price_chf_per_kwh"] = (
-                    "A minimum price only applies to a tariff priced from a fetched series."
+                    model_error("A minimum price only applies to a tariff priced from a fetched series.", "minimum_dynamic")
                 )
             elif self.energy_type != EnergyType.FEED_IN:
                 errors["minimum_price_chf_per_kwh"] = (
-                    "A minimum price only applies to a feed-in tariff."
+                    model_error("A minimum price only applies to a feed-in tariff.", "minimum_feed_in")
                 )
 
         # A ZEV legitimately carries several simultaneous per-kWh components in
@@ -245,9 +247,9 @@ class Tariff(models.Model):
             )
             if overlaps.exists():
                 errors["valid_from"] = (
-                    f'Another tariff named "{self.name}" in this ZEV already covers part of this '
+                    model_error(f'Another tariff named "{self.name}" in this ZEV already covers part of this '
                     "validity period. Close the previous one with a valid_to date, or give this "
-                    "one a different name if both should apply at the same time."
+                    "one a different name if both should apply at the same time.", "overlap", name=self.name)
                 )
 
             # Tariffs sharing a name are versions of one another, so they must
@@ -263,10 +265,10 @@ class Tariff(models.Model):
                     mine, theirs = getattr(self, field), getattr(sibling, field)
                     if mine != theirs:
                         errors[field] = (
-                            f'Other versions of "{self.name}" in this ZEV use '
+                            model_error(f'Other versions of "{self.name}" in this ZEV use '
                             f"{field}={theirs!r}. Every version of a tariff must agree on its "
                             "category, billing mode, and energy type — use a different name to "
-                            "create a separate tariff instead."
+                            "create a separate tariff instead.", "series_identity", name=self.name)
                         )
 
         if errors:
@@ -286,25 +288,28 @@ class Tariff(models.Model):
         if self.billing_mode != BillingMode.ENERGY:
             return {
                 "dynamic_source": (
-                    "A price series bills per kWh, so it can only be used by a tariff billed "
-                    f"by energy — not by {self.get_billing_mode_display().lower()}."
+                    error_detail(
+                        "A price series bills per kWh, so it can only be used by a tariff billed "
+                        f"by energy — not by {self.get_billing_mode_display().lower()}.",
+                        "source_energy_only",
+                    )
                 )
             }
         try:
             source = self.dynamic_source
         except DynamicTariffSource.DoesNotExist:
-            return {"dynamic_source": "This price series no longer exists."}
+            return {"dynamic_source": error_detail("This price series no longer exists.", "source_missing")}
         if source.api_version == DynamicApiVersion.V2_0_0 and not source.tariff_name.strip():
-            return {"dynamic_source": V2_PRODUCT_REQUIRED}
+            return {"dynamic_source": error_detail(V2_PRODUCT_REQUIRED, "product_required")}
         expected = ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE.get(source.tariff_type)
         if expected is None:
-            return {"dynamic_source": "Storage refunds require storage-qualified metering and cannot be billed as exported energy."}
+            return {"dynamic_source": error_detail("Storage refunds require storage-qualified metering and cannot be billed as exported energy.", "storage_refund")}
         if expected is not None and self.energy_type != expected:
             return {
                 "energy_type": (
-                    f"This price series serves {source.get_tariff_type_display().lower()}, "
+                    error_detail(f"This price series serves {source.get_tariff_type_display().lower()}, "
                     f"which prices {EnergyType(expected).label.lower()} energy, not "
-                    f"{EnergyType(self.energy_type).label.lower() if self.energy_type else 'nothing'}."
+                    f"{EnergyType(self.energy_type).label.lower() if self.energy_type else 'nothing'}.", "source_type_mismatch")
                 )
             }
         return {}
@@ -385,28 +390,28 @@ class TariffPeriod(models.Model):
         # Enforce this at model level because admin writes bypass the serializer.
         if self.tariff_id and self.tariff.dynamic_source_id:
             raise ValidationError({
-                "tariff": "This tariff is priced from a fetched series; price bands do not apply."
+                "tariff": model_error("This tariff is priced from a fetched series; price bands do not apply.", "dynamic_bands")
             })
         # A band that prices no month at all is simply unreachable.
         if self.months and not parse_number_list(self.months):
-            raise ValidationError({"months": "Leave months blank to apply in every month."})
+            raise ValidationError({"months": model_error("Leave months blank to apply in every month.", "months_blank")})
 
         if self.tariff_id:
             billing_mode = self.tariff.billing_mode
             if billing_mode == BillingMode.ENERGY:
                 errors = {}
                 if self.price_chf_per_kwh is None:
-                    errors["price_chf_per_kwh"] = "A price band needs a price."
+                    errors["price_chf_per_kwh"] = model_error("A price band needs a price.", "price_required")
                 if self.percentage is not None:
-                    errors["percentage"] = "Only percentage-of-energy tariffs take a percentage."
+                    errors["percentage"] = model_error("Only percentage-of-energy tariffs take a percentage.", "percentage_mode_only")
                 if errors:
                     raise ValidationError(errors)
             elif billing_mode == BillingMode.PERCENTAGE_OF_ENERGY:
                 errors = {}
                 if self.percentage is None:
-                    errors["percentage"] = "A percentage band needs a percentage."
+                    errors["percentage"] = model_error("A percentage band needs a percentage.", "percentage_required")
                 if self.price_chf_per_kwh is not None:
-                    errors["price_chf_per_kwh"] = "A percentage band takes a percentage, not a price."
+                    errors["price_chf_per_kwh"] = model_error("A percentage band takes a percentage, not a price.", "percentage_not_price")
                 if errors:
                     raise ValidationError(errors)
 

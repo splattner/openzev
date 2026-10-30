@@ -99,7 +99,7 @@ def parse_tariff_response(payload: object, *, api_version: str, tariff_type: str
         return parse_v1(payload, tariff_type=tariff_type)
     if api_version == DynamicApiVersion.V2_0_0:
         if not tariff_name.strip():
-            raise DynamicTariffResponseError(V2_PRODUCT_REQUIRED)
+            raise DynamicTariffResponseError(V2_PRODUCT_REQUIRED, code="product_required")
         if isinstance(payload, dict):
             for row in payload.get("prices", []) if isinstance(payload.get("prices"), list) else []:
                 component = row.get(tariff_type) if isinstance(row, dict) else None

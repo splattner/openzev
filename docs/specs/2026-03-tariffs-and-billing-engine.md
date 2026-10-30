@@ -1380,6 +1380,70 @@ usable cached scope after refresh failures. Missing selection never means all
 communities in the management series filter. Retained tariff/period/version submit
 callbacks and each mutation's API dispatch check the current scope token.
 
+### Tariff API error contract
+
+Tariff, period and shared dynamic-source viewsets, plus VSE preview/apply,
+retain their existing HTTP statuses and DRF field/message trees on errors. They
+add `validation_errors`, a flat list of `{code, field, path, params, message}`.
+A top-level message list is retained under `detail` so the response can also
+carry this metadata:
+
+```json
+{
+  "initial_periods": [{}, {"time_to": ["A timed band needs both a start and an end time."]}],
+  "validation_errors": [{
+    "code": "timed_band_required",
+    "field": "time_to",
+    "path": ["initial_periods", 1, "time_to"],
+    "params": {},
+    "message": "A timed band needs both a start and an end time."
+  }]
+}
+```
+
+`path` contains field names and zero-based nested list indexes; message-list
+positions are omitted. `field` is the last field name, or null for `detail`,
+`non_field_errors` and `__all__`. `message` is a readable, user-safe diagnostic;
+clients must not parse it when they recognize `code`. Empty valid band positions
+produce no entries. Explicit replacement `periods` on version/duplicate requests
+retain their band indexes too. Other apps keep their existing response shapes.
+
+DRF codes survive JSON serialization, including `required`, `null`, `blank`,
+`invalid_choice`, `does_not_exist`, `not_found`, `permission_denied`, `empty`,
+`max_digits`, `max_decimal_places`, `max_whole_digits`, `max_length`,
+`min_length`, `min_value` and `max_value`. Field-specific `invalid` becomes
+`invalid_date`, `invalid_time`, `invalid_number` or `invalid_url`. Length/digit
+limits carry numeric `count`; numeric bounds carry `value`. Fixed-price field
+errors carry `billing_mode` when the create payload or existing instance supplies
+it, so the frontend uses the same fee-specific label as the form.
+
+Business codes use explicit snake-case identifiers (the frontend's `codeKeys`
+maps them to existing DE/EN/FR/IT translations):
+
+| Codes | Parameters |
+|---|---|
+| `flat_timed_conflict`, `catch_all_conflict` | `months`: array of month numbers 1–12 |
+| `duplicate_date` | `name`, `date`: ISO date |
+| `name_exists`, `overlap`, `series_identity` | `name` |
+| `history_limit` | `count`: maximum days |
+| `http_status`, `host_unresolved`, `document_size` | `status`, `host`, `size` (MB), respectively |
+| `name_required`, `use_new_version`, `date_range`, `energy_type_required`, `category`, `remove_bands_for_mode`, `dynamic_bands`, `minimum_dynamic`, `minimum_feed_in`, `source_missing`, `storage_refund`, `bands_energy_only`, `months_blank`, `price_required`, `percentage_mode_only`, `percentage_required`, `percentage_not_price`, `remove_bands_for_source`, `billed_source_change`, `billed_delete`, `initial_bands`, `edit_existing_bands`, `fixed_price_required`, `timed_band_required` (legacy), `band_time_pair`, `source_energy_only`, `source_type_mismatch`, `invalid_weekdays`, `invalid_months` | None, except optional fixed-price `billing_mode` |
+| `product_required`, `source_identity`, `source_range`, `technology`, `bfe_feed_in`, `admin_source`, `history_access`, `source_busy`, `permission`, `reference_missing`, `import_changed`, `import_url`, `public_url`, `download_failed`, `import_json`, `invalid_dynamic_response` | None |
+
+Unclassified diagnostics use `unknown` (or an otherwise unmapped native code)
+and preserve readable text. Remote fetch exceptions propagate only their safe
+message/code/parameters, never `log_detail`. Structured errors are declared in
+the tariff OpenAPI schema without changing successful response schemas.
+
+`formatTariffError` prefers a valid nonempty structured list, localizes month
+numbers and configured date formats, retains band numbers and deduplicates
+matching errors within a band. Unknown codes display their message with a
+translated field label. Uncoded responses and malformed/empty metadata use the
+bounded legacy text mapper; metadata itself is never shown. No application-wide
+error formatter is introduced. `test_error_codes.py` asserts rendered JSON;
+`tariff-errors.test.ts` consumes the same contract fixture and verifies wording
+independence and all four languages.
+
 ## 7. Invoice line-item construction
 
 ### 7.1 Item type mapping

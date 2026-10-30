@@ -16,6 +16,7 @@ changed between the two steps is refused instead of half-applied.
 """
 from __future__ import annotations
 
+
 import logging
 
 from drf_spectacular.utils import extend_schema
@@ -35,6 +36,7 @@ from zev.scoping import assert_zev_not_disabled
 
 from .importers.planner import PlannedCandidate, Selection, apply_import, plan_import
 from .importers.remote import TariffFetchError, fetch_tariff_document
+from .errors import TariffErrorResponseMixin, error_detail
 from .importers.vse_json import ParsedDocument, TariffDocumentError, parse_document
 from .serializers import (
     VseTariffImportApplyRequestSerializer,
@@ -60,16 +62,16 @@ def _fetch_failed(exc, zev) -> Response:
         "VSE tariff import failed for ZEV %s: %s",
         zev.pk, getattr(exc, "log_detail", exc), exc_info=True,
     )
-    return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({"detail": error_detail(str(exc), getattr(exc, "code", "unknown"), **getattr(exc, "params", {}))}, status=status.HTTP_400_BAD_REQUEST)
 
 
 def _resolve_zev(request, zev_id) -> Zev:
     """Resolve the target ZEV and require management access."""
     zev = Zev.objects.filter(pk=zev_id).first()
     if zev is None:
-        raise NotFound("ZEV not found.")
+        raise NotFound(error_detail("ZEV not found.", "reference_missing"))
     if not access.can_manage(request.user, zev):
-        raise PermissionDenied("You do not manage this ZEV.")
+        raise PermissionDenied(error_detail("You do not manage this ZEV.", "permission"))
     return zev
 
 
@@ -79,7 +81,7 @@ def _source_url(zev: Zev, requested: str) -> str:
     if not url:
         raise TariffFetchError(
             "No tariff URL is set for this ZEV. Enter the address at which your grid "
-            "operator publishes its machine-readable tariffs."
+            "operator publishes its machine-readable tariffs.", code="import_url"
         )
     return url
 
@@ -133,7 +135,7 @@ def _candidate_payload(planned: PlannedCandidate) -> dict:
     }
 
 
-class VseTariffImportPreviewView(APIView):
+class VseTariffImportPreviewView(TariffErrorResponseMixin, APIView):
     """Fetch the operator's document and report what importing it would do."""
 
     permission_classes = [IsAuthenticated, HasZevAccess]
@@ -165,7 +167,7 @@ class VseTariffImportPreviewView(APIView):
         )
 
 
-class VseTariffImportApplyView(APIView):
+class VseTariffImportApplyView(TariffErrorResponseMixin, APIView):
     """Create the tariffs the user selected in the preview."""
 
     permission_classes = [IsAuthenticated, HasZevAccess]
@@ -188,8 +190,8 @@ class VseTariffImportApplyView(APIView):
 
         if digest != data["document_digest"]:
             return Response(
-                {"detail": "The operator's document changed since the preview. "
-                           "Run the preview again and check what you are importing."},
+                {"detail": error_detail("The operator's document changed since the preview. "
+                           "Run the preview again and check what you are importing.", "import_changed")},
                 status=status.HTTP_409_CONFLICT,
             )
 

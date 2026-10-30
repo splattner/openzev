@@ -6,9 +6,10 @@ from .dynamic.models import DynamicTariffSource
 from .dynamic.services import tariff_has_dynamic_billing_evidence
 from .models import BillingMode, EnergyType, PeriodType, Tariff, TariffPeriod
 from .periods import has_window, is_catch_all, months_of, weekdays_of
+from .errors import TariffValidationMixin, error_detail, model_validation_error
 
 
-class TariffPeriodSerializer(serializers.ModelSerializer):
+class TariffPeriodSerializer(TariffValidationMixin, serializers.ModelSerializer):
     def _reject_flat_beside_timed_bands(self, tariff, attrs, siblings=None):
         """A flat band and a timed band may not price the same months.
 
@@ -37,10 +38,10 @@ class TariffPeriodSerializer(serializers.ModelSerializer):
             if shared:
                 raise serializers.ValidationError({
                     "period_type": (
-                        "A flat band and a timed band cannot both apply in months "
+                        error_detail("A flat band and a timed band cannot both apply in months "
                         f"{','.join(str(month) for month in sorted(shared))}: the flat "
                         "price is used for every hour, so the timed bands would never "
-                        "apply. Give them different months, or make them all timed."
+                        "apply. Give them different months, or make them all timed.", "flat_timed_conflict", months=sorted(shared))
                     )
                 })
 
@@ -67,8 +68,8 @@ class TariffPeriodSerializer(serializers.ModelSerializer):
             missing = "time_to" if candidate.time_to is None else "time_from"
             raise serializers.ValidationError({
                 missing: (
-                    "A band takes both a start and an end time, or neither: "
-                    "without times it prices all other hours."
+                    error_detail("A band takes both a start and an end time, or neither: "
+                    "without times it prices all other hours.", "band_time_pair")
                 )
             })
         if has_window(candidate) or not is_catch_all(candidate):
@@ -85,10 +86,10 @@ class TariffPeriodSerializer(serializers.ModelSerializer):
             if shared and weekdays_of(candidate) & weekdays_of(sibling):
                 raise serializers.ValidationError({
                     "time_from": (
-                        "Only one band without a time window can apply in months "
+                        error_detail("Only one band without a time window can apply in months "
                         f"{','.join(str(month) for month in sorted(shared))}: it prices all "
                         "hours the other bands leave open. Give one of them a time "
-                        "window or different months."
+                        "window or different months.", "catch_all_conflict", months=sorted(shared))
                     )
                 })
 
@@ -104,9 +105,9 @@ class TariffPeriodSerializer(serializers.ModelSerializer):
         not saved yet (creating a tariff together with its bands).
         """
         if tariff is not None and getattr(tariff, "dynamic_source_id", None):
-            raise serializers.ValidationError("This tariff is priced from a fetched series; price bands do not apply.")
+            raise serializers.ValidationError(error_detail("This tariff is priced from a fetched series; price bands do not apply.", "dynamic_bands"))
         if tariff and tariff.billing_mode not in (BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY):
-            raise serializers.ValidationError("Tariff periods are only supported for energy-based tariffs.")
+            raise serializers.ValidationError(error_detail("Tariff periods are only supported for energy-based tariffs.", "bands_energy_only"))
         if tariff:
             self._reject_flat_beside_timed_bands(tariff, attrs, siblings)
             self._reject_ambiguous_catch_all(tariff, attrs, siblings)
@@ -125,9 +126,7 @@ class TariffPeriodSerializer(serializers.ModelSerializer):
             try:
                 candidate.clean()
             except DjangoValidationError as exc:
-                if hasattr(exc, "message_dict"):
-                    raise serializers.ValidationError(exc.message_dict)
-                raise serializers.ValidationError(exc.messages)
+                raise model_validation_error(exc) from exc
 
     class Meta:
         model = TariffPeriod
@@ -146,7 +145,7 @@ class InitialTariffPeriodSerializer(TariffPeriodSerializer):
         ]
 
 
-class TariffSerializer(serializers.ModelSerializer):
+class TariffSerializer(TariffValidationMixin, serializers.ModelSerializer):
     periods = TariffPeriodSerializer(many=True, read_only=True)
     dynamic_price_summary = serializers.SerializerMethodField()
     percentage_base_summary = serializers.SerializerMethodField()
@@ -200,9 +199,7 @@ class TariffSerializer(serializers.ModelSerializer):
         ).as_dict()
 
     def _raise_validation_error_from_model(self, exc: DjangoValidationError):
-        if hasattr(exc, "message_dict"):
-            raise serializers.ValidationError(exc.message_dict)
-        raise serializers.ValidationError(exc.messages)
+        raise model_validation_error(exc) from exc
 
     def validate(self, attrs):
         # Keep the existing billed-tariff workflow guard. Frozen invoice
@@ -213,7 +210,7 @@ class TariffSerializer(serializers.ModelSerializer):
             if new_source_id and self.instance.periods.exists():
                 raise serializers.ValidationError({
                     "dynamic_source": (
-                        "Remove this tariff's price bands before linking a fetched series."
+                        error_detail("Remove this tariff's price bands before linking a fetched series.", "remove_bands_for_source")
                     )
                 })
             if (
@@ -227,8 +224,8 @@ class TariffSerializer(serializers.ModelSerializer):
             ):
                 raise serializers.ValidationError({
                     "dynamic_source": (
-                        "This tariff priced a non-cancelled invoice from its current "
-                        "dynamic source. Create a new tariff version to change its price source."
+                        error_detail("This tariff priced a non-cancelled invoice from its current "
+                        "dynamic source. Create a new tariff version to change its price source.", "billed_source_change")
                     )
                 })
 
@@ -240,40 +237,40 @@ class TariffSerializer(serializers.ModelSerializer):
         if "initial_periods" in attrs:
             if self.instance is not None:
                 raise serializers.ValidationError({
-                    "initial_periods": "Add bands from the tariff's own page to change an existing tariff."
+                    "initial_periods": error_detail("Add bands from the tariff's own page to change an existing tariff.", "edit_existing_bands")
                 })
             if billing_mode != BillingMode.ENERGY or dynamic_source:
                 raise serializers.ValidationError({
-                    "initial_periods": "Only a static energy tariff takes initial bands."
+                    "initial_periods": error_detail("Only a static energy tariff takes initial bands.", "initial_bands")
                 })
 
         if "initial_percentage" in attrs:
             if self.instance is not None:
                 raise serializers.ValidationError({
-                    "initial_percentage": "Add bands from the tariff's own page to change an existing tariff."
+                    "initial_percentage": error_detail("Add bands from the tariff's own page to change an existing tariff.", "edit_existing_bands")
                 })
             if billing_mode != BillingMode.PERCENTAGE_OF_ENERGY:
                 raise serializers.ValidationError({
-                    "initial_percentage": "Only a percentage-of-energy tariff takes an initial percentage."
+                    "initial_percentage": error_detail("Only a percentage-of-energy tariff takes an initial percentage.", "percentage_mode_only")
                 })
 
         if billing_mode == BillingMode.ENERGY:
             if not energy_type:
-                raise serializers.ValidationError({"energy_type": "Energy tariffs require an energy type."})
+                raise serializers.ValidationError({"energy_type": error_detail("Energy tariffs require an energy type.", "energy_type_required")})
             attrs["fixed_price_chf"] = None
             if energy_type != EnergyType.FEED_IN or not dynamic_source:
                 attrs["minimum_price_chf_per_kwh"] = None
 
         elif billing_mode == BillingMode.PERCENTAGE_OF_ENERGY:
             if not energy_type:
-                raise serializers.ValidationError({"energy_type": "Percentage-of-energy tariffs require an energy type."})
+                raise serializers.ValidationError({"energy_type": error_detail("Percentage-of-energy tariffs require an energy type.", "energy_type_required")})
             attrs["fixed_price_chf"] = None
             attrs["minimum_price_chf_per_kwh"] = None
 
         else:
             # Fixed-fee billing modes
             if fixed_price_chf in (None, ""):
-                raise serializers.ValidationError({"fixed_price_chf": "Fixed-fee tariffs require a price."})
+                raise serializers.ValidationError({"fixed_price_chf": error_detail("Fixed-fee tariffs require a price.", "fixed_price_required")})
             attrs["energy_type"] = None
             attrs["minimum_price_chf_per_kwh"] = None
 
@@ -345,12 +342,12 @@ class TariffSerializer(serializers.ModelSerializer):
 # while the user is deciding, and none of which belong on the model.
 
 
-class VseTariffImportPreviewRequestSerializer(serializers.Serializer):
+class VseTariffImportPreviewRequestSerializer(TariffValidationMixin, serializers.Serializer):
     zev = serializers.UUIDField()
     url = serializers.URLField(max_length=500, required=False, allow_blank=True)
 
 
-class VseTariffImportSelectionSerializer(serializers.Serializer):
+class VseTariffImportSelectionSerializer(TariffValidationMixin, serializers.Serializer):
     """One ticked row: which candidate, and how the user chose to bill it."""
 
     key = serializers.CharField(max_length=300)
@@ -361,7 +358,7 @@ class VseTariffImportSelectionSerializer(serializers.Serializer):
     dynamic_tariff_name = serializers.CharField(max_length=120, required=False, allow_blank=True)
 
 
-class VseTariffImportApplyRequestSerializer(serializers.Serializer):
+class VseTariffImportApplyRequestSerializer(TariffValidationMixin, serializers.Serializer):
     zev = serializers.UUIDField()
     url = serializers.URLField(max_length=500, required=False, allow_blank=True)
     selections = VseTariffImportSelectionSerializer(many=True, allow_empty=False)
@@ -372,7 +369,7 @@ class VseTariffImportApplyRequestSerializer(serializers.Serializer):
     remember_url = serializers.BooleanField(required=False, default=True)
 
 
-class VseTariffPeriodPreviewSerializer(serializers.Serializer):
+class VseTariffPeriodPreviewSerializer(TariffValidationMixin, serializers.Serializer):
     period_type = serializers.CharField()
     price_chf_per_kwh = serializers.DecimalField(max_digits=8, decimal_places=5)
     time_from = serializers.TimeField(allow_null=True)
@@ -381,7 +378,7 @@ class VseTariffPeriodPreviewSerializer(serializers.Serializer):
     months = serializers.CharField(allow_blank=True)
 
 
-class VseTariffCandidateSerializer(serializers.Serializer):
+class VseTariffCandidateSerializer(TariffValidationMixin, serializers.Serializer):
     key = serializers.CharField()
     name = serializers.CharField()
     category = serializers.CharField()
@@ -417,12 +414,12 @@ class VseTariffCandidateSerializer(serializers.Serializer):
     effective_valid_to = serializers.DateField(allow_null=True)
 
 
-class VseTariffImportErrorSerializer(serializers.Serializer):
+class VseTariffImportErrorSerializer(TariffValidationMixin, serializers.Serializer):
     tariff = serializers.CharField()
     error = serializers.CharField()
 
 
-class VseTariffImportPreviewSerializer(serializers.Serializer):
+class VseTariffImportPreviewSerializer(TariffValidationMixin, serializers.Serializer):
     dso_name = serializers.CharField()
     dso_number = serializers.IntegerField(allow_null=True)
     source_url = serializers.CharField()
@@ -431,7 +428,7 @@ class VseTariffImportPreviewSerializer(serializers.Serializer):
     errors = VseTariffImportErrorSerializer(many=True)
 
 
-class VseTariffImportCreatedSerializer(serializers.Serializer):
+class VseTariffImportCreatedSerializer(TariffValidationMixin, serializers.Serializer):
     name = serializers.CharField()
     category = serializers.CharField()
     billing_mode = serializers.CharField()
@@ -447,23 +444,23 @@ class VseTariffImportCreatedSerializer(serializers.Serializer):
     )
 
 
-class VseTariffImportSkippedSerializer(serializers.Serializer):
+class VseTariffImportSkippedSerializer(TariffValidationMixin, serializers.Serializer):
     name = serializers.CharField()
     reason = serializers.CharField()
 
 
-class VseTariffImportAppliedErrorSerializer(serializers.Serializer):
+class VseTariffImportAppliedErrorSerializer(TariffValidationMixin, serializers.Serializer):
     name = serializers.CharField()
     error = serializers.CharField()
 
 
-class VseTariffImportResultSerializer(serializers.Serializer):
+class VseTariffImportResultSerializer(TariffValidationMixin, serializers.Serializer):
     created = VseTariffImportCreatedSerializer(many=True)
     skipped = VseTariffImportSkippedSerializer(many=True)
     errors = VseTariffImportAppliedErrorSerializer(many=True)
 
 
-class DynamicTariffSourceSerializer(serializers.ModelSerializer):
+class DynamicTariffSourceSerializer(TariffValidationMixin, serializers.ModelSerializer):
     """Public configuration and operational summary for a shared source."""
 
     point_count = serializers.IntegerField(read_only=True, default=0)
@@ -488,7 +485,7 @@ class DynamicTariffSourceSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class DynamicTariffSourceWriteSerializer(serializers.ModelSerializer):
+class DynamicTariffSourceWriteSerializer(TariffValidationMixin, serializers.ModelSerializer):
     """Configuration accepted for manual source creation and admin correction."""
 
     api_version = serializers.ChoiceField(
@@ -513,25 +510,25 @@ class DynamicTariffSourceWriteSerializer(serializers.ModelSerializer):
             ]
             if changed_identity:
                 raise serializers.ValidationError({
-                    field: "Create a replacement source instead of changing a price-series identity."
+                    field: error_detail("Create a replacement source instead of changing a price-series identity.", "source_identity")
                     for field in changed_identity
                 })
             if (self.instance.api_version == DynamicApiVersion.V2_0_0
                     and not self.instance.tariff_name.strip()
                     and attrs.get("enabled", self.instance.enabled)):
                 from .dynamic.protocol import V2_PRODUCT_REQUIRED
-                raise serializers.ValidationError({"tariff_name": V2_PRODUCT_REQUIRED})
+                raise serializers.ValidationError({"tariff_name": error_detail(V2_PRODUCT_REQUIRED, "product_required")})
         return attrs
 
 
-class DynamicSourceDiscoverySerializer(serializers.Serializer):
+class DynamicSourceDiscoverySerializer(TariffValidationMixin, serializers.Serializer):
     url = serializers.URLField(max_length=500)
     api_version = serializers.ChoiceField(
         choices=DynamicApiVersion.choices, required=False, allow_null=True
     )
 
 
-class DynamicPriceHistoryQuerySerializer(serializers.Serializer):
+class DynamicPriceHistoryQuerySerializer(TariffValidationMixin, serializers.Serializer):
     date_from = serializers.DateField(required=False)
     date_to = serializers.DateField(required=False)
 
@@ -539,18 +536,18 @@ class DynamicPriceHistoryQuerySerializer(serializers.Serializer):
         date_from = attrs.get("date_from")
         date_to = attrs.get("date_to")
         if date_from and date_to and date_from > date_to:
-            raise serializers.ValidationError({"date_to": "date_to must be on or after date_from."})
+            raise serializers.ValidationError({"date_to": error_detail("date_to must be on or after date_from.", "date_range")})
         # The day-count cap depends on the source's resolution — a quarterly
         # BFE point covers ~91 days, so it belongs in the view, which has the
         # source; this serializer only checks the shape of the query itself.
         return attrs
 
 
-class DynamicSourceFetchSerializer(serializers.Serializer):
+class DynamicSourceFetchSerializer(TariffValidationMixin, serializers.Serializer):
     backfill = serializers.BooleanField(required=False, default=False)
 
 
-class DynamicSourceConfirmationSerializer(serializers.Serializer):
+class DynamicSourceConfirmationSerializer(TariffValidationMixin, serializers.Serializer):
     """Exact source-label confirmation, with an optional audited reason."""
 
     confirmation = serializers.CharField(max_length=200)

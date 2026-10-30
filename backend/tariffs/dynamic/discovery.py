@@ -86,7 +86,7 @@ def probe_bfe_rmp_source(url: str, *, tariff_name: str) -> SourceCapabilities:
     """
     if tariff_name not in BFE_RMP_TECHNOLOGIES:
         raise DynamicTariffResponseError(
-            f"Select a technology: one of {', '.join(BFE_RMP_TECHNOLOGIES)}."
+            f"Select a technology: one of {', '.join(BFE_RMP_TECHNOLOGIES)}.", code="technology"
         )
     text, _digest = fetch_tariff_text(url)
     series = parse_bfe_rmp(text, tariff_name=tariff_name)
@@ -125,7 +125,7 @@ def probe_source_configuration(
     if resolved_version == DynamicApiVersion.V2_0_0 and not tariff_name and len(matching) > 1:
         raise DynamicTariffResponseError("The endpoint returned multiple products. Select a tariff name explicitly.")
     if resolved_version == DynamicApiVersion.V2_0_0 and not resolved_name.strip():
-        raise DynamicTariffResponseError(V2_PRODUCT_REQUIRED)
+        raise DynamicTariffResponseError(V2_PRODUCT_REQUIRED, code="product_required")
     if resolved_version == DynamicApiVersion.V2_0_0 and tariff_name and discovery.components_discovered:
         matching = [item for item in matching if item.tariff_name == tariff_name]
     if not matching:

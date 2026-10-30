@@ -800,6 +800,17 @@ positive coverage and maintenance-link permissions.
   and capture submitted inputs, and follow the shared
   [dialog contract](2026-04-frontend-management-page-design.md#dialog-behavior).
 
+Shared source and linked-tariff API failures retain legacy field/message data
+and add the [tariff code/path/parameters contract](2026-03-tariffs-and-billing-engine.md#tariff-api-error-contract).
+Known configuration, permission, fetch and history-limit diagnostics translate
+by stable code; history limits carry numeric `count`, remote HTTP failures carry
+`status`, and safe fetch messages remain separate from server-only `log_detail`.
+The admin source-operation toasts, source forms, history failure Notice and
+operator-URL test all use `formatTariffError`, so additive metadata never leaks
+through a generic field flattener. Unclassified remote/schema diagnostics
+retain readable text. Stored
+`last_fetch_error` and asynchronous task behavior are unchanged.
+
 ## 11. Transfer archive
 
 `Tariff.dynamic_source` travels as a nested **natural key**
