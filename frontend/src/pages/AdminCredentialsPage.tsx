@@ -65,7 +65,7 @@ export function AdminCredentialsPage({ embedded = false }: { embedded?: boolean 
             title: t('pages.adminCredentials.revokeConfirmTitle'),
             message: t(`pages.adminCredentials.revokeConfirmMessage.${credential.kind}`, {
                 name: credential.name,
-                user: credential.owner.email || credential.owner.username,
+                user: ownerText(credential),
             }),
             confirmText: t('pages.adminCredentials.revoke'),
             isDangerous: true,
@@ -80,6 +80,11 @@ export function AdminCredentialsPage({ embedded = false }: { embedded?: boolean 
             return { label: t('pages.adminCredentials.statusExpiring'), className: 'badge badge-warning' }
         }
         return { label: t('pages.adminCredentials.statusActive'), className: 'badge badge-success' }
+    }
+
+    function ownerText(credential: AdminAccessCredential): string {
+        if (credential.owner) return credential.owner.email || credential.owner.username
+        return t('pages.adminCredentials.ownerZev', { zev: credential.scope.zev_name ?? '' })
     }
 
     function scopeText(credential: AdminAccessCredential): string {
@@ -175,7 +180,7 @@ export function AdminCredentialsPage({ embedded = false }: { embedded?: boolean 
                                                 {t(`account.tokens.access.${credential.access}`)}
                                             </small>
                                         </td>
-                                        <td>{credential.owner.email || credential.owner.username}</td>
+                                        <td>{ownerText(credential)}</td>
                                         <td><code>{credential.prefix}</code></td>
                                         <td>{scopeText(credential)}</td>
                                         <td><span className={status.className}>{status.label}</span></td>

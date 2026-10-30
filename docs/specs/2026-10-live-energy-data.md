@@ -776,8 +776,9 @@ older archives import as history sources).
    push only); a `solar_manager` source without `provides_history`; and, while the live flag is not
    effective, anything live: `provides_live`, `target = connection_point`, `held_by = zev`. A
    push source with `provides_live` can be created and shows `live_state = never`, but
-   `POST /live/ingest/` arrives with PR 2, so no sample is accepted yet. Uncertain at PR 1:
-   ZEV-held push tokens are not listed in the credentials overview (it lists participants' tokens).
+   `POST /live/ingest/` arrives with PR 2, so no sample is accepted yet. ZEV-held push tokens appear in
+   every ZEV manager's Tokens & keys list (`held_by = zev`) and, without an owner, in the admin list
+   (SPEC-2026-tokens-and-keys §3, §5.1).
 3. **PR 2 — live push and snapshot.** `metering/live/` (store, ingest, snapshot, curve, `me`),
    throttles, settings, W002, health keys.
 4. **PR 3 — frontend live.** Cards, curve, manager table, setup on both metering-point pages,

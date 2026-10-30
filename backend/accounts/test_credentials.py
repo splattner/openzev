@@ -9,6 +9,9 @@ from accounts.api_keys import generate_key
 from accounts.models import ApiKey, FeatureFlag
 from analytics.models import AnalyticsToken
 from analytics.testing import enable_tokens
+from metering.models import SupplementarySource
+from testing import factories
+from zev.models import MeteringPointType
 from metering.supplementary.testing import (
     SOURCES_URL,
     SupplementaryApiTestCase,
@@ -191,3 +194,63 @@ class AdminCredentialsTests(CredentialsTestCase):
         admin = client_for(self.admin)
         for params in ({"kind": "password"}, {"status": "weird"}, {"user": "abc"}):
             self.assertEqual(admin.get(ALL, params).status_code, 400, params)
+
+
+class ZevHeldPushTokenTests(CredentialsTestCase):
+    """A ZEV-held source has no participant: its push token is the managers' (SPEC-live §3)."""
+
+    def setUp(self):
+        super().setUp()
+        self.unheld = factories.MeteringPointFactory(zev=self.zev, meter_type=MeteringPointType.CONSUMPTION)
+        self.zev_source = SupplementarySource(
+            zev=self.zev, metering_point=self.unheld, held_by="zev", participant=None, provider="push",
+            provides_history=False, provides_live=True, consented_at=timezone.now(), label="Common area",
+        )
+        self.zev_source.issue_push_token()
+        self.zev_source.save()
+
+    def energy_rows(self, caller, url=ME, **params):
+        response = client_for(caller).get(url, {"kind": "energy_push", **params})
+        self.assertEqual(response.status_code, 200, response.content)
+        return {row["id"]: row for row in response.json()["credentials"]}
+
+    def test_a_manager_of_the_zev_sees_the_token_in_their_own_list(self):
+        row = self.energy_rows(self.manager)[str(self.zev_source.pk)]
+
+        self.assertEqual(row["held_by"], "zev")
+        self.assertEqual(row["name"], "Common area")
+        self.assertEqual(row["prefix"], f"ozs_{self.zev_source.push_token_prefix}")
+        self.assertEqual(row["scope"]["zev"], str(self.zev.pk))
+        self.assertIsNone(row["scope"]["participant"])
+        self.assertEqual(row["scope"]["meter_id"], self.unheld.meter_id)
+        self.assertEqual(row["actions"], ["rotate", "revoke"])
+        self.assertEqual(row["manage_url"], "/metering/points")
+
+    def test_the_managers_list_does_not_gain_participants_tokens(self):
+        self.assertEqual(set(self.energy_rows(self.manager)), {str(self.zev_source.pk)})
+
+    def test_participants_viewers_and_strangers_do_not_see_it(self):
+        for user in (self.holder_user, self.other_user, self.viewer, self.stranger):
+            self.assertNotIn(str(self.zev_source.pk), self.energy_rows(user), user.username)
+
+    def test_an_admin_without_a_grant_sees_it_only_in_the_admin_list(self):
+        self.assertNotIn(str(self.zev_source.pk), self.energy_rows(self.admin))
+        row = self.energy_rows(self.admin, ALL)[str(self.zev_source.pk)]
+        self.assertIsNone(row["owner"])
+        self.assertEqual(row["held_by"], "zev")
+
+    def test_filtering_the_admin_list_by_owner_leaves_it_out(self):
+        rows = self.energy_rows(self.admin, ALL, user=self.manager.pk)
+        self.assertNotIn(str(self.zev_source.pk), rows)
+
+    def test_participant_held_rows_say_held_by_account(self):
+        rows = self.rows()
+        self.assertEqual({row["held_by"] for row in rows.values()}, {"account"})
+
+    def test_the_manager_rotates_and_revokes_it(self):
+        manager = client_for(self.manager)
+        rotated = manager.post(f"{SOURCES_URL}{self.zev_source.pk}/rotate-push-token/")
+        self.assertEqual(rotated.status_code, 200, rotated.content)
+        revoked = manager.post(f"{SOURCES_URL}{self.zev_source.pk}/revoke-push-token/")
+        self.assertEqual(revoked.status_code, 200, revoked.content)
+        self.assertNotIn(str(self.zev_source.pk), self.energy_rows(self.manager))

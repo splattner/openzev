@@ -22,7 +22,7 @@ vi.mock('../src/lib/api/auth', () => authApi)
 
 const noScope = { zev: null, zev_name: null, participant: null, participant_name: null, metering_point: null, meter_id: null }
 const row = (overrides: Partial<AdminAccessCredential>): AdminAccessCredential => ({
-    kind: 'api_key', id: 'k1', name: 'Script', prefix: 'ozv_aaaa', access: 'read_write', scope: noScope, created_at: null,
+    kind: 'api_key', id: 'k1', name: 'Script', prefix: 'ozv_aaaa', access: 'read_write', held_by: 'account', scope: noScope, created_at: null,
     expires_at: null, last_used_at: null, status: 'active', actions: ['revoke'], manage_url: null,
     owner: { id: 7, username: 'pia', email: 'pia@example.com' }, revoked_at: null, ...overrides,
 })
@@ -63,6 +63,21 @@ describe('AdminCredentialsPage', () => {
         const stats = Array.from(container.querySelectorAll('.stat-grid > *')).map((n) => n.textContent)
         expect(stats.join('|')).toMatch(/pages.adminCredentials.statActive.*3/)
         expect(stats.join('|')).toMatch(/pages.adminCredentials.statRevoked.*1/)
+    })
+
+    it('shows a ZEV-held push token as owned by the community', async () => {
+        credentialsApi.fetchAllCredentials.mockResolvedValue([
+            row({
+                kind: 'energy_push', id: 's2', name: 'Common area', prefix: 'ozs_dddd', access: 'write_readings',
+                held_by: 'zev', owner: null, scope: { ...noScope, zev: 'z', zev_name: 'Sonnenhof', meter_id: 'CH-9' },
+                actions: ['rotate', 'revoke'],
+            }),
+        ])
+        const { container } = await mount()
+
+        const text = container.querySelector('tbody tr')!.textContent!
+        expect(text).toContain('pages.adminCredentials.ownerZev')
+        expect(text).not.toContain('pia@example.com')
     })
 
     it('offers revoke only for credentials that are not revoked', async () => {

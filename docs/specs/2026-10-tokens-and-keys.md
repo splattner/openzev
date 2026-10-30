@@ -61,7 +61,7 @@ console gets the same overview across users. The three models stay as they are.
 
 | Actor | Own list (`/auth/me/credentials/`) | Admin list (`/auth/credentials/`) |
 |---|---|---|
-| any signed-in account (session) | the account's API keys, the analytics tokens it created, and the push tokens of sources whose participant is linked to the account | `403` |
+| any signed-in account (session) | the account's API keys, the analytics tokens it created, the push tokens of sources whose participant is linked to the account, and, for a manager, the push tokens of ZEV-held sources in the ZEVs they manage (SPEC-2026-live-energy-data §3) | `403` |
 | `admin` | same as above | every API key, analytics token and push token, with owner |
 | API key, analytics token, push token | `401`: only a session authenticates (`CookieJWTAuthentication` is the one authentication class), so a credential cannot enumerate credentials | same |
 
@@ -100,6 +100,7 @@ No other model changes. The `ApiKey` and `AnalyticsToken` models are untouched.
   "name": "…",                       // api_key/analytics: name; energy_push: source label or "Energy data <meter id>"
   "prefix": "ozv_3f9a1c04b7e2",      // namespace + prefix, never the secret
   "access": "read_write" | "read_only" | "read" | "write_readings",
+  "held_by": "account" | "zev",      // zev: push token of a ZEV-held energy data source (no participant)
   "scope": {                         // all keys always present, null when not applicable
     "zev": "<uuid>" | null, "zev_name": "…" | null,
     "participant": "<uuid>" | null, "participant_name": "…" | null,
@@ -118,7 +119,8 @@ No other model changes. The `ApiKey` and `AnalyticsToken` models are untouched.
 analytics → `read`; energy push → `write_readings`. `status`: `expired` when `expires_at` has passed; revoked
 credentials are not listed.
 
-The admin list adds `owner: {id, username, email}` to each row.
+The admin list adds `owner: {id, username, email}` to each row; it is `null` for a ZEV-held push token, which
+belongs to the ZEV rather than to one account, and a `user` filter leaves such rows out.
 
 ## 5. API
 
@@ -140,9 +142,13 @@ During impersonation both `can_create` flags are false and each credential offer
 
 - API keys: `ApiKey` of the account, not revoked.
 - Analytics tokens: `AnalyticsToken` with `created_by` = account, not revoked, only while the flag is on.
-- Energy push tokens: `SupplementarySource` with `participant__user` = account and a `push_token_prefix`, only
-  while the energy data feature is on (`metering.supplementary.permissions.feature_enabled()`); `manage_url` is
-  the metering-point energy data page of the source.
+- Energy push tokens: `SupplementarySource` with a `push_token_prefix` and either `participant__user` = account,
+  or `held_by = zev` in a ZEV the account manages (`zev.access.managed_zev_ids`; an admin without a grant sees
+  those only in the admin list), only while the energy data feature is on
+  (`metering.supplementary.permissions.feature_enabled()`). `manage_url` is `/me/metering-points` for a
+  participant's source and `/metering/points` for a ZEV-held one; a ZEV-held row's `name` falls back to the
+  meter id, or the ZEV name for the grid connection point. The managers rotate and revoke it through the
+  source's own actions, on which they hold owner rights.
 
 `can_create.analytics` requires the feature flag and a live participant link or viewable ZEV.
 `can_create.api_key` is true for an ordinary session. Both are false during impersonation.
@@ -247,7 +253,7 @@ Backend (near the affected modules):
 
 | Module | Count | Covers |
 |---|---|---|
-| `accounts/test_credentials.py` | 17 | `MyCredentialsTests` (12): the three kinds in one row shape, no secret or hash listed, newest first, revoked excluded and expired flagged, push token created/last-used, a revoked push token leaves the list, flags off hide analytics and energy rows, only the account's own credentials appear, a manager sees no participant's tokens, `can_create`, impersonation offers revocation only, anonymous 401 and an API key or analytics token cannot list; `AdminCredentialsTests` (5): non-admin 403, every kind of every owner with the owner, revoked included and filterable, `kind`/`user` filters, bad filters 400 |
+| `accounts/test_credentials.py` | 24 | `MyCredentialsTests` (12): the three kinds in one row shape, no secret or hash listed, newest first, revoked excluded and expired flagged, push token created/last-used, a revoked push token leaves the list, flags off hide analytics and energy rows, only the account's own credentials appear, a manager sees no participant's tokens, `can_create`, impersonation offers revocation only, anonymous 401 and an API key or analytics token cannot list; `AdminCredentialsTests` (5): non-admin 403, every kind of every owner with the owner, revoked included and filterable, `kind`/`user` filters, bad filters 400; `ZevHeldPushTokenTests` (7): a manager of the ZEV sees the token in their own list with `held_by = zev` and the metering-points link, gains no participant's tokens, participants/viewers/strangers do not see it, an admin without a grant sees it only in the admin list with `owner = null`, the `user` filter leaves it out, participant-held rows say `account`, the manager rotates and revokes it |
 | `analytics/test_tokens.py` | 31 | updated: `test_a_manager_neither_sees_nor_revokes_a_participants_token` replaces the manager-sees-ZEV-tokens test, `test_a_manager_sees_the_tokens_they_made_themself` added; admin still sees all; impersonation refuses and audits creation but allows attributed revocation |
 | `metering/test_supplementary_api.py` | +9 | `RevokePushTokenTests`: creation time on issue, holder revokes and keeps source and readings, the token stops working, rotate issues a new one afterwards, revoking twice 400, admin only besides the holder, audited without the secret, solar manager source 400, a disabled ZEV hides the source from its participant |
 | `metering/test_supplementary_ingest.py` | +1 | `push_token_last_used_at` set on first use and not rewritten within the window |
@@ -257,10 +263,10 @@ Frontend (`frontend/tests/`):
 
 | File | Count | Covers |
 |---|---|---|
-| `tokens-section.test.ts` | 16 | list rows with type, access, scope and prefix; filter chips; expiring badge; empty state; rotate and manage link only on energy tokens; revoke through confirmation and the kind's endpoint; rotate shows the new token once; create API key and analytics token (scope options, participant scope, ready-made command); an administrator can pick any community and an ordinary account triggers no community lookup; impersonation shows disabled creation/rotation with explanatory tooltips, including stale creation capabilities, and preserves revocation; link to the energy data page |
+| `tokens-section.test.ts` | 17 | list rows with type, access, scope and prefix; filter chips; expiring badge; empty state; rotate and manage link only on energy tokens; revoke through confirmation and the kind's endpoint; rotate shows the new token once; create API key and analytics token (scope options, participant scope, ready-made command); an administrator can pick any community and an ordinary account triggers no community lookup; impersonation shows disabled creation/rotation with explanatory tooltips, including stale creation capabilities, and preserves revocation; link to the energy data page; a ZEV-held push token is marked as operated by the community |
 | `credentials-helpers.test.ts` | 6 | counts and filters; `analyticsScopeOptions` for grants, roles, participant records, ended rows, disabled communities, the administrator's extra communities, no memberships |
 | `secret-reveal.test.ts` | 3 | shows, copies and dismisses; copy failure; caller wording and test id |
-| `admin-credentials-page.test.ts` | 4 | every kind with owner and counts; revoke only for non-revoked; revoke as admin through the kind after confirmation; type filter reaches the server |
+| `admin-credentials-page.test.ts` | 5 | every kind with owner and counts; a ZEV-held push token shows the community as owner; revoke only for non-revoked; revoke as admin through the kind after confirmation; type filter reaches the server |
 | `account-tabs.test.ts` (14) | – | `tokens` tab, the old `?tab=api-keys` still opens it; `route-guard-matrix.test.ts` gains `/admin/accounts/tokens` |
 
 Validation: backend `ruff check .`, `manage.py check`, `makemigrations --check`, `pytest -q`; frontend `npm run lint`,

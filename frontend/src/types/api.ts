@@ -496,6 +496,8 @@ export interface AccessCredential {
     /** Namespace and prefix, e.g. `ozv_3f9a1c04b7e2`. */
     prefix: string
     access: CredentialAccess
+    /** `zev`: the push token of a ZEV-held energy data source, shared by the ZEV's managers. */
+    held_by: 'account' | 'zev'
     scope: CredentialScope
     created_at: string | null
     expires_at: string | null
@@ -513,7 +515,8 @@ export interface MyCredentialsResponse {
 
 /** A row as the admin console sees it: plus its owner and, for revoked ones, when. */
 export interface AdminAccessCredential extends AccessCredential {
-    owner: { id: number; username: string; email: string }
+    /** `null` for a ZEV-held push token: it belongs to the ZEV, not to one account. */
+    owner: { id: number; username: string; email: string } | null
     revoked_at: string | null
 }
 

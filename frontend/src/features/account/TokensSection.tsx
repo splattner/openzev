@@ -108,7 +108,9 @@ export function TokensSection({ onRevoke, onRotate }: Props) {
         const { scope } = credential
         const parts = [
             scope.zev_name,
-            scope.participant ? t('account.tokens.scopeOnlyMine') : scope.zev ? t('account.tokens.scopeWholeZev') : null,
+            credential.held_by === 'zev'
+                ? t('account.tokens.scopeHeldByZev')
+                : scope.participant ? t('account.tokens.scopeOnlyMine') : scope.zev ? t('account.tokens.scopeWholeZev') : null,
             scope.meter_id,
         ].filter(Boolean)
         return parts.length ? parts.join(' · ') : null

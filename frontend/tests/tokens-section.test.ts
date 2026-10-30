@@ -46,7 +46,7 @@ vi.mock('../src/lib/api/supplementary', () => supplementaryApi)
 
 const noScope = { zev: null, zev_name: null, participant: null, participant_name: null, metering_point: null, meter_id: null }
 const row = (overrides: Partial<AccessCredential>): AccessCredential => ({
-    kind: 'api_key', id: 'k1', name: 'Script', prefix: 'ozv_aaaa', access: 'read_only', scope: noScope,
+    kind: 'api_key', id: 'k1', name: 'Script', prefix: 'ozv_aaaa', access: 'read_only', held_by: 'account', scope: noScope,
     created_at: '2026-10-01T10:00:00Z', expires_at: null, last_used_at: null, status: 'active', actions: ['revoke'], manage_url: null,
     ...overrides,
 })
@@ -104,6 +104,19 @@ describe('TokensSection list', () => {
         expect(energyRow).toContain('CH-1')
         expect(energyRow).toContain('account.tokens.createdUnknown')
         expect(container.textContent).toContain('ozv_aaaa…')
+    })
+
+    it('marks a ZEV-held push token as operated by the community', async () => {
+        respond([row({
+            kind: 'energy_push', id: 's2', name: 'Common area', prefix: 'ozs_dddd', access: 'write_readings', held_by: 'zev',
+            scope: { ...noScope, zev: 'z1', zev_name: 'Sonnenhof', metering_point: 'mp9', meter_id: 'CH-9' },
+            created_at: null, actions: ['rotate', 'revoke'], manage_url: '/metering/points',
+        })])
+        const { container } = await mount()
+
+        const energyRow = container.querySelector('[data-testid="credential-energy_push"]')!.textContent!
+        expect(energyRow).toContain('account.tokens.scopeHeldByZev')
+        expect(energyRow).not.toContain('account.tokens.scopeWholeZev')
     })
 
     it('filters by type with the chips', async () => {
