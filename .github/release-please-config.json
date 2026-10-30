@@ -3,7 +3,6 @@
   "packages": {
     ".": {
       "release-type": "simple",
-      "release-as": "1.27.0",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         "frontend/package.json",
