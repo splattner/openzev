@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.27.0](https://github.com/splattner/openzev/compare/v1.26.0...v1.27.0) (2026-10-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **metering:** Metering points with billable, held or supplementary history can no longer be deleted or change community/type. Remove or reconcile the protected history before changing their configuration.
+
+### Features
+
+* **audit:** enable scoped search and repair audit redaction ([#1079](https://github.com/splattner/openzev/issues/1079)) ([1e5ea9a](https://github.com/splattner/openzev/commit/1e5ea9abb1fbfc9e2b4b6ab7f88c3181473c0836))
+* **invoices:** record payments from the period row menu ([#1084](https://github.com/splattner/openzev/issues/1084)) ([f9000e9](https://github.com/splattner/openzev/commit/f9000e9e130dba71382916f44bdba89927b6ce94))
+* **metering:** add SDAT-CH import and invoice correction review ([#1083](https://github.com/splattner/openzev/issues/1083)) ([1ee04a8](https://github.com/splattner/openzev/commit/1ee04a81c1fedc9d01845a816bac3f63e43e9f06))
+* **metering:** surface reading quality and held observations ([#1104](https://github.com/splattner/openzev/issues/1104)) ([446be58](https://github.com/splattner/openzev/commit/446be5858b0438db3190e2eb6c16e8ab986565cc))
+* **tariffs:** a band without a time window prices all other hours ([#1118](https://github.com/splattner/openzev/issues/1118)) ([25e2b73](https://github.com/splattner/openzev/commit/25e2b73e1d6fadfa7b3d92c3f20adc5cac2c09e5)), closes [#1109](https://github.com/splattner/openzev/issues/1109)
+* **tariffs:** create a tariff together with its initial bands ([#1119](https://github.com/splattner/openzev/issues/1119)) ([712ca8d](https://github.com/splattner/openzev/commit/712ca8d8c30f9f0f5c96e2d931de7ea2d8e99cef))
+* **tariffs:** page the fetched-price table in the tariff pane ([#1144](https://github.com/splattner/openzev/issues/1144)) ([863c6cd](https://github.com/splattner/openzev/commit/863c6cd0f4f5aff37af6cb78d5668606366a8442))
+* **tariffs:** quieter badges in the tariff pane ([#1139](https://github.com/splattner/openzev/issues/1139)) ([d0990f2](https://github.com/splattner/openzev/commit/d0990f27b011a9e7a367c442d18b36d599920236)), closes [#1133](https://github.com/splattner/openzev/issues/1133)
+* **tariffs:** rework the pane's edit forms and show band hours as text ([#1137](https://github.com/splattner/openzev/issues/1137)) ([fcd3703](https://github.com/splattner/openzev/commit/fcd3703412280a46fef8fdb6fce3365d2ce0f842))
+* **tariffs:** say that corrections do not recalculate invoices and shorten the VAT note ([#1142](https://github.com/splattner/openzev/issues/1142)) ([71aedf2](https://github.com/splattner/openzev/commit/71aedf2349891c3ed94a4bad7743d5fc53a09fb4)), closes [#1116](https://github.com/splattner/openzev/issues/1116)
+* **tariffs:** say when a dynamic tariff is missing prices and show its chart ([#1129](https://github.com/splattner/openzev/issues/1129)) ([5f900a7](https://github.com/splattner/openzev/commit/5f900a7e1dc4c4f14230accb1f334e2b1ac62f3f)), closes [#1114](https://github.com/splattner/openzev/issues/1114)
+* **tariffs:** tariff split view, the detail-pane pilot (UI patterns phase 1) ([#1081](https://github.com/splattner/openzev/issues/1081)) ([1dfdf4a](https://github.com/splattner/openzev/commit/1dfdf4a3af198a9c1f78bc22029c6784e220cfe5))
+
+
+### Bug Fixes
+
+* **auth:** bind OAuth login state to the initiating browser ([#1095](https://github.com/splattner/openzev/issues/1095)) ([a7b25af](https://github.com/splattner/openzev/commit/a7b25afd3a1f5b1d286c14166a64c7d0b3b699bb))
+* **auth:** stop impersonation from minting durable credentials ([#1094](https://github.com/splattner/openzev/issues/1094)) ([14ceb67](https://github.com/splattner/openzev/commit/14ceb67872c200bbd00499fe8882e67f4501d656))
+* **backups:** use a 24-hour time field for the schedule time ([#1145](https://github.com/splattner/openzev/issues/1145)) ([58e6e4b](https://github.com/splattner/openzev/commit/58e6e4bd43e60f4f3362c99811d33a5d17dc4edc)), closes [#1138](https://github.com/splattner/openzev/issues/1138)
+* **billing:** space scope notices inside tab panels ([#1087](https://github.com/splattner/openzev/issues/1087)) ([aaa83d4](https://github.com/splattner/openzev/commit/aaa83d4f773a0e7cca0534250680aa3fa1e5834d))
+* **frontend:** menu focus, scrolling row menus and a modal phone drawer ([#1143](https://github.com/splattner/openzev/issues/1143)) ([c2723be](https://github.com/splattner/openzev/commit/c2723be7f0fee19c3144cc11b25fda7422da0b48))
+* **sdat:** bound reading persistence batches ([#1093](https://github.com/splattner/openzev/issues/1093)) ([b75e527](https://github.com/splattner/openzev/commit/b75e527ccfab695470b8a601048e2cf0a79a0895))
+* **tariffs:** duplicating an ended version drops the obsolete end date ([#1141](https://github.com/splattner/openzev/issues/1141)) ([0f09661](https://github.com/splattner/openzev/commit/0f096616962cdb5c4284bf097238e360f26a2901))
+* **ui:** give dynamic source tables the shared white surface ([#1085](https://github.com/splattner/openzev/issues/1085)) ([42c29c0](https://github.com/splattner/openzev/commit/42c29c024326305d30be16b874eef8a7795b484f))
+
+
+### Performance Improvements
+
+* reduce metering and invoice page-load times ([#1097](https://github.com/splattner/openzev/issues/1097)) ([68c9494](https://github.com/splattner/openzev/commit/68c94942a56e8367ee88ffb90e3e7f64291a2430))
+* reduce report, dashboard and feasibility loading work ([#1130](https://github.com/splattner/openzev/issues/1130)) ([ee6d5cb](https://github.com/splattner/openzev/commit/ee6d5cb2eb677b1113d239d974a97fa78dd1acf4))
+
 ## [1.26.0](https://github.com/splattner/openzev/compare/v1.25.0...v1.26.0) (2026-10-17)
 
 
