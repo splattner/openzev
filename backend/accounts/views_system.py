@@ -240,6 +240,13 @@ def _probe_supplementary() -> dict:
             Q(last_success_at__lt=stale_before) | Q(last_success_at__isnull=True)
         ).count()
         oldest = pull.aggregate(oldest=Min("last_success_at"))["oldest"]
+        # Live freshness never degrades health: a device going offline is the participant's matter.
+        live_enabled = FeatureFlag.is_enabled(FeatureFlag.LIVE_ENERGY_DATA_ENABLED)
+        live = SupplementarySource.objects.filter(enabled=True, provides_live=True)
+        live_sources = live.count()
+        live_fresh = live.filter(
+            live_last_seen_at__gte=datetime.now(timezone.utc) - timedelta(seconds=settings.LIVE_MAX_AGE_S)
+        ).count()
     except Exception:  # noqa: BLE001 — any probe failure degrades, never 500s
         return {"status": "unknown"}
     return {
@@ -249,6 +256,9 @@ def _probe_supplementary() -> dict:
         "sources_by_status": {str(name): count for name, count in counts.items()},
         "stale_sources": stale,
         "oldest_last_success_at": oldest.isoformat() if oldest else None,
+        "live_flag_enabled": live_enabled,
+        "live_sources": live_sources,
+        "live_fresh": live_fresh,
     }
 
 

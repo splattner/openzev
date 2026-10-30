@@ -196,6 +196,10 @@ REST_FRAMEWORK = {
         # Per-IP budgets for the public auth endpoints (accounts.throttling).
         # Per push token (supplementary energy data); a 15-minute feed needs 4/hour.
         "supplementary_push": env("SUPPLEMENTARY_PUSH_THROTTLE_RATE", default="120/hour"),
+        # Per push token for live samples: one per 4 s on average, on top of LIVE_MIN_PUSH_INTERVAL_S.
+        "live_push": env("LIVE_PUSH_THROTTLE_RATE", default="900/hour"),
+        # Per user or API key on the live read endpoints: one request every 5 s.
+        "live_read": env("LIVE_READ_THROTTLE_RATE", default="720/hour"),
         # Per analytics token; a Grafana dashboard refreshing a handful of panels every 30 s needs ~600/hour.
         "analytics_token": env("ANALYTICS_TOKEN_THROTTLE_RATE", default="1200/hour"),
         "auth_login": env("AUTH_LOGIN_THROTTLE_RATE", default="40/hour"),
@@ -300,6 +304,16 @@ INTEGRATION_ENCRYPTION_KEYS = env.list("INTEGRATION_ENCRYPTION_KEYS", default=[]
 SUPPLEMENTARY_SYNC_INTERVAL_S = env.int("SUPPLEMENTARY_SYNC_INTERVAL_S", default=3600)
 # A live sample older than this counts as missing (SPEC-2026-live-energy-data §4.5).
 LIVE_MAX_AGE_S = env.int("LIVE_MAX_AGE_S", default=60)
+# A second push within this window answers 429: a feed every 5 to 10 s is plenty.
+LIVE_MIN_PUSH_INTERVAL_S = env.int("LIVE_MIN_PUSH_INTERVAL_S", default=5)
+# Today's curve: mean of the samples per bucket, kept this long. Cache only (ADR 0044).
+LIVE_CURVE_BUCKET_S = env.int("LIVE_CURVE_BUCKET_S", default=300)
+LIVE_CURVE_RETENTION_H = env.int("LIVE_CURVE_RETENTION_H", default=48)
+# ``live_last_seen_at`` is written at most this often. Keep it well below LIVE_MAX_AGE_S, or a
+# source pushing every 10 s shows as stale between two writes.
+LIVE_LAST_SEEN_RESOLUTION_S = env.int("LIVE_LAST_SEEN_RESOLUTION_S", default=30)
+# Plausibility cap for any pushed value (5 MW).
+LIVE_MAX_ABS_POWER_W = env.int("LIVE_MAX_ABS_POWER_W", default=5_000_000)
 # A rate is shown only when at least this share of the expected 15-minute
 # intervals carries data; below it the rate is withheld rather than misleading.
 SUPPLEMENTARY_MIN_COVERAGE = env.float("SUPPLEMENTARY_MIN_COVERAGE", default=0.95)

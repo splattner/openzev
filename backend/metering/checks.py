@@ -35,3 +35,25 @@ def integration_key_configured(app_configs, **kwargs):
             id="metering.W001",
         )
     ]
+
+
+@register(Tags.caches)
+def live_cache_is_shared(app_configs, **kwargs):
+    """Warn when live energy data is forced on but the cache is per process.
+
+    Live values live in the cache only (ADR 0044). A ``LocMemCache`` gives every web worker its
+    own copy, so a sample pushed to one worker would be invisible to the others. Environment only,
+    like ``integration_key_configured``.
+    """
+    forced_on = os.environ.get("FEATURE_LIVE_ENERGY_DATA_ENABLED", "").lower() in ("1", "true", "yes")
+    backend = settings.CACHES.get("default", {}).get("BACKEND", "")
+    if not forced_on or "redis" in backend.lower():
+        return []
+    return [
+        Warning(
+            f"Live energy data is enabled, but the default cache ({backend or 'unset'}) is not shared "
+            "between processes. Pushed values would only be visible to the worker that received them.",
+            hint="Point CACHE_URL at Valkey or Redis (the default cache backend in settings.py).",
+            id="metering.W002",
+        )
+    ]

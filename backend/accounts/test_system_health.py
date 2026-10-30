@@ -253,3 +253,32 @@ def test_system_health_supplementary_probe_flags_a_source_that_has_stopped_synci
 
     assert probe["status"] == "degraded"
     assert probe["stale_sources"] == 1
+
+
+def test_system_health_supplementary_probe_reports_live_sources_without_degrading(admin_client):
+    from datetime import timedelta
+
+    from cryptography.fernet import Fernet
+    from django.utils import timezone
+
+    from accounts.models import FeatureFlag
+    from metering.models import SupplementarySource
+    from testing import factories
+
+    _flag(True)
+    FeatureFlag.objects.update_or_create(name=FeatureFlag.LIVE_ENERGY_DATA_ENABLED, defaults={"enabled": True})
+    zev = factories.ZevFactory()
+    now = timezone.now()
+    for point_kwargs, seen in (({}, now - timedelta(seconds=10)), ({}, now - timedelta(hours=3)), ({}, None)):
+        point = factories.MeteringPointFactory(zev=zev)
+        SupplementarySource.objects.create(
+            zev=zev, metering_point=point, held_by="zev", provider="push", provides_history=False,
+            provides_live=True, live_last_seen_at=seen,
+        )
+
+    with override_settings(INTEGRATION_ENCRYPTION_KEYS=[Fernet.generate_key().decode()]):
+        probe = admin_client.get(URL).json()["supplementary"]
+
+    assert probe["live_flag_enabled"] is True
+    assert (probe["live_sources"], probe["live_fresh"]) == (3, 1)
+    assert probe["status"] == "ok"  # devices going offline is not the platform's fault

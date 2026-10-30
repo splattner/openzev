@@ -205,6 +205,10 @@ export interface SystemHealth {
         sources_by_status?: Record<string, number>
         stale_sources?: number
         oldest_last_success_at?: string | null
+        /** Live energy data (SPEC-2026-live-energy-data §6.5); never degrades the status. */
+        live_flag_enabled?: boolean
+        live_sources?: number
+        live_fresh?: number
     }
     checked_at: string
 }

@@ -52,6 +52,27 @@ class SupplementaryIsolationTests(SimpleTestCase):
             "Statistics read it through metering.supplementary.stats only.",
         )
 
+    def test_billing_modules_do_not_import_the_live_package(self):
+        # ADR 0044: metering.live reads from allocation/, never the reverse.
+        offenders = [
+            str(path.relative_to(BACKEND))
+            for path in _billing_sources()
+            if "metering.live" in (text := path.read_text(encoding="utf-8")) or "from .live" in text
+            or "from metering import live" in text
+        ]
+        self.assertEqual(offenders, [], "Billing code must not read live energy data (ADR 0044).")
+
+    def test_the_live_package_does_not_import_billing_modules(self):
+        files = sorted((BACKEND / "metering" / "live").glob("*.py"))
+        self.assertGreater(len(files), 5)
+        offenders = [
+            path.name
+            for path in files
+            if not path.name.startswith("test")
+            and any(f"{module}" in path.read_text(encoding="utf-8") for module in ("from invoices", "import invoices", "from tariffs", "import tariffs"))
+        ]
+        self.assertEqual(offenders, [])
+
     def test_the_billing_source_list_covers_the_known_modules(self):
         names = {path.name for path in _billing_sources()}
         self.assertTrue({"engine.py", "split.py", "pdf.py", "tariff_pricing.py"} <= names)

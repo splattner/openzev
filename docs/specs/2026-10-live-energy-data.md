@@ -159,7 +159,7 @@ The model keeps its name, table, audit action names (`supplementary_source.*`) a
 | `provides_live` | **new** | `BooleanField` | `False` | Current power |
 | `provides_forecast` | **new** | `BooleanField` | `False` | Production forecast |
 | `provider` | changed | `CharField(20)` | — | `SupplementaryProvider` gains `forecast_solar` ("forecast.solar (public)") |
-| `live_last_seen_at` | **new** | `DateTimeField(null)` | `None` | Last accepted live sample, written at most once per `LIVE_LAST_SEEN_RESOLUTION_S` (60 s) so a 10-second feed does not write the row 6 times a minute. Status and health only |
+| `live_last_seen_at` | **new** | `DateTimeField(null)` | `None` | Last accepted live sample, written at most once per `LIVE_LAST_SEEN_RESOLUTION_S` (30 s) so a 10-second feed does not write the row 6 times a minute. Status and health only; the resolution stays well below `LIVE_MAX_AGE_S`, or a feed pushing every 10 s would read as stale between two writes |
 
 All other fields keep their meaning. `synced_through`, `covers_from`, `reconciliation` describe the
 history capability only.
@@ -290,7 +290,7 @@ totals.
 | `LIVE_CURVE_RETENTION_H` | `env.int` | `48` | Bucket lifetime |
 | `LIVE_WATCH_TTL_S` | `env.int` | `120` | How long a viewed ZEV keeps its pull sources polled |
 | `LIVE_PULL_INTERVAL_S` | `env.int` | `30` | Beat period of `poll_live_sources`, and the minimum interval per pulled source |
-| `LIVE_LAST_SEEN_RESOLUTION_S` | `env.int` | `60` | `live_last_seen_at` write resolution |
+| `LIVE_LAST_SEEN_RESOLUTION_S` | `env.int` | `30` | `live_last_seen_at` write resolution |
 | `LIVE_MAX_ABS_POWER_W` | `env.int` | `5000000` | Plausibility cap for any value |
 | `FORECAST_REFRESH_INTERVAL_S` | `env.int` | `3600` | Beat period of `refresh_production_forecasts` |
 | `FORECAST_HORIZON_H` | `env.int` | `72` | Hours stored and shown |
@@ -309,7 +309,7 @@ New endpoints under `/api/v1/metering/live/` (registered in `metering/urls.py`, 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
 | `/live/ingest/` | POST | `SupplementaryPushAuthentication`, `IsPushSource`, `LivePushThrottle` | One sample for the token's source (§5.1). `202 {"accepted": true}` |
-| `/live/zevs/{zev_id}/` | GET | `LiveEnergyPermission` | ZEV snapshot (§5.2), narrowed by role. Marks the ZEV as watched (`live:v1:watch:zev`) |
+| `/live/zevs/{zev_id}/` | GET | `LiveEnergyPermission` | ZEV snapshot (§5.2), narrowed by role. From PR 4 on it also marks the ZEV as watched (`live:v1:watch:zev`) |
 | `/live/zevs/{zev_id}/curve/` | GET | `LiveEnergyPermission` | `?date=YYYY-MM-DD` (civil date, default today, at most `LIVE_CURVE_RETENTION_H` back): 5-minute buckets (§5.3) |
 | `/live/zevs/{zev_id}/forecast/` | GET | `LiveEnergyPermission` | Hourly ZEV production forecast for `FORECAST_HORIZON_H` (§5.4) |
 | `/live/me/` | GET | authenticated (JWT or personal API key) | Compact snapshot for each ZEV the caller is a current participant of (§5.5), made for Home Assistant `rest` sensors and n8n |
@@ -358,7 +358,9 @@ Authorization: Bearer ozs_<prefix>_<secret>
 - Accepted samples write `latest` and the bucket, and touch `live_last_seen_at` at its resolution. Not
   audited per sample.
 - Holder clipping: a participant-held source whose holder no longer holds the metering point today
-  is rejected with `403` (the daily task disconnects it later).
+  is rejected with `403` (the daily task disconnects it later). So is a ZEV-held source on a metering
+  point somebody now holds personally, for the same reason as the task's `personal_holder_assigned`.
+  A disabled ZEV accepts nothing (`403`).
 
 ### 5.2 ZEV snapshot
 
@@ -420,8 +422,11 @@ allow them):
   meter_power_w | null, age_s | null, source_id | null}` for every active metering point, plus
   `{"target": "connection_point", …}` when present, and their own `own` block if they are participants
   too.
-- Snapshots are computed per request; the ZEV's sources and points are cached for 30 s
-  (`live:v1:zev:{id}:topology`, invalidated on source or metering-point change).
+- Snapshots are computed per request: three small queries (active points, live sources, personal
+  assignments) and one cache `get_many`. A topology cache was considered and left out until the
+  polling load shows a need; it would have to be invalidated on source, point and assignment changes.
+- Reads answer `404` (not `403`) for a ZEV the caller may not see, a former participant, and, for
+  everyone but admins, a disabled ZEV.
 
 ### 5.3 Curve
 
@@ -702,6 +707,15 @@ status checks); `zev/test_transfer_supplementary.py` gained the capability field
 `CapabilityArchiveTests` class (3 tests: live and ZEV-held round trip, no live state in the archive,
 older archives import as history sources).
 
+PR 2 landed the live package tests, 132 in `metering/live/` (store 13, ingest 32, snapshot 57,
+curve 17, `me` 10, W002 3), the live keys of the system-health probe (1) and the two billing-isolation
+checks for `metering.live` (2). The classes differ slightly from the plan below: `ClassifyTests` (the
+pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests` and
+`SnapshotVisibilityTests` in `test_snapshot.py`; `AcceptedSampleTests`, `ValidationTests`,
+`RefusalTests` and `RateLimitTests` in `test_ingest.py`; `LiveStoreTests`, `BucketTests` and
+`PushSlotTests` in `test_store.py`; `CurveTests` and `CurveEndpointTests`; `LiveMeTests`;
+`LiveCacheCheckTests`.
+
 - `metering/test_supplementary_capabilities.py` — **`SourceCapabilityModelTests`**: migration
   defaults for existing rows; each partial unique constraint; target/holder check constraints;
   provider × capability matrix; history still requires `has_behind_meter_generation`; connection
@@ -781,6 +795,12 @@ older archives import as history sources).
    (SPEC-2026-tokens-and-keys §3, §5.1).
 3. **PR 2 — live push and snapshot.** `metering/live/` (store, ingest, snapshot, curve, `me`),
    throttles, settings, W002, health keys.
+
+   *Rollout (PR 2).* `POST /live/ingest/`, `/live/zevs/{id}/`, `/curve/` and `/live/me/` are live
+   behind the flag. `forecast_next_peak` in `me` is always `null` until PR 5. The "watched ZEV" key and
+   `LIVE_WATCH_TTL_S`, `LIVE_PULL_INTERVAL_S` arrive with the Solar Manager pull (PR 4); the forecast
+   settings and health keys (`forecast_sources`, `forecast_stale`, `forecast_solar_calls_this_hour`)
+   with PR 5. The MCP tool and the frontend types follow in PR 6 and PR 3.
 4. **PR 3 — frontend live.** Cards, curve, manager table, setup on both metering-point pages,
    connection point, i18n.
 5. **PR 4 — Solar Manager live.** Stream pull, bearer cache, demand-driven polling.
