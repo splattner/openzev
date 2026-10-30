@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.28.0](https://github.com/splattner/openzev/compare/v1.27.0...v1.28.0) (2026-10-30)
+
+
+### Features
+
+* **metering:** generalise energy data sources with capabilities ([#1151](https://github.com/splattner/openzev/issues/1151)) ([7f3f5d5](https://github.com/splattner/openzev/commit/7f3f5d557382c782b360255e24e0bcd5b5a437a4))
+* **metering:** live push endpoint and ZEV snapshot ([#1153](https://github.com/splattner/openzev/issues/1153)) ([5fbd65c](https://github.com/splattner/openzev/commit/5fbd65c3c9c8932332579c960140b3c04d3899d0))
+
 ## [1.27.0](https://github.com/splattner/openzev/compare/v1.26.0...v1.27.0) (2026-10-30)
 
 
