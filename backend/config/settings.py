@@ -298,6 +298,8 @@ INTEGRATION_ENCRYPTION_KEYS = env.list("INTEGRATION_ENCRYPTION_KEYS", default=[]
 
 # Supplementary energy data (SPEC-2026-supplementary-energy-data).
 SUPPLEMENTARY_SYNC_INTERVAL_S = env.int("SUPPLEMENTARY_SYNC_INTERVAL_S", default=3600)
+# A live sample older than this counts as missing (SPEC-2026-live-energy-data §4.5).
+LIVE_MAX_AGE_S = env.int("LIVE_MAX_AGE_S", default=60)
 # A rate is shown only when at least this share of the expected 15-minute
 # intervals carries data; below it the rate is withheld rather than misleading.
 SUPPLEMENTARY_MIN_COVERAGE = env.float("SUPPLEMENTARY_MIN_COVERAGE", default=0.95)

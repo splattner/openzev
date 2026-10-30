@@ -1325,6 +1325,8 @@ class SchemaParityTests(TestCase):
         # belong to the instance that held the connection. ``created_by`` is an account.
         "SUPPLEMENTARY_SOURCE_FIELDS": {
             "id",
+            "zev",
+            "live_last_seen_at",
             "metering_point",
             "participant",
             "credential_encrypted",

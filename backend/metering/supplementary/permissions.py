@@ -6,6 +6,9 @@
   it, purge its readings or delete it. A manager never creates a source and never
   reads or sets a credential: the account belongs to the participant.
 * A **viewer** only reads.
+* A **ZEV-held** source (``held_by = zev``: a metering point nobody holds personally, or the
+  grid connection point) has no participant. Its ZEV's managers hold the owner rights on it,
+  credential and push token included (SPEC-2026-live-energy-data §3).
 
 "Holds the metering point personally today" is judged on the Swiss civil date
 (ADR 0026). Community-mode holders cannot connect a source: their readings are
@@ -43,6 +46,11 @@ def feature_enabled() -> bool:
     return FeatureFlag.is_enabled(FeatureFlag.SUPPLEMENTARY_ENERGY_DATA_ENABLED)
 
 
+def live_feature_enabled() -> bool:
+    """The live flag is effective only while the energy data feature is too (SPEC-live §3)."""
+    return feature_enabled() and FeatureFlag.is_enabled(FeatureFlag.LIVE_ENERGY_DATA_ENABLED)
+
+
 def require_feature() -> None:
     """The feature answers ``404`` while its flag is off, as if the endpoints did not exist."""
     if not feature_enabled():
@@ -68,8 +76,20 @@ def holder_participant(user, metering_point: MeteringPoint, on=None) -> Particip
     return assignment.participant if assignment else None
 
 
+def personally_held_today(metering_point: MeteringPoint, on=None) -> bool:
+    """Does anybody hold ``metering_point`` personally on ``on`` (today)? Community mode does not count."""
+    return active_on(
+        MeteringPointAssignment.objects.filter(
+            metering_point=metering_point, allocation_mode=AllocationMode.PERSONAL
+        ),
+        on or timezone.localdate(),
+    ).exists()
+
+
 def is_owner(user, source) -> bool:
-    return user.is_authenticated and source.participant.user_id == user.pk
+    return (
+        user.is_authenticated and source.participant_id is not None and source.participant.user_id == user.pk
+    )
 
 
 def can_create_for(user, metering_point: MeteringPoint) -> Participant | None:
@@ -87,9 +107,10 @@ def role_for(user, source) -> str:
         return "admin"
     if is_owner(user, source):
         return "owner"
-    zev = source.metering_point.zev
+    zev = source.zev
     if access.can_manage(user, zev):
-        return "manager"
+        # Nobody else owns a ZEV-held source, so the ZEV's managers do.
+        return "owner" if source.held_by == "zev" else "manager"
     if access.can_view(user, zev):
         return "viewer"
     return "none"

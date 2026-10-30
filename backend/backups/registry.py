@@ -135,7 +135,7 @@ ZEV_SECTIONS: tuple[tuple[str, tuple[ZevPart, ...]], ...] = (
         # travels as ciphertext only (ADR 0031).
         "supplementary",
         (
-            ZevPart("metering.SupplementarySource", "metering_point__zev"),
+            ZevPart("metering.SupplementarySource", "zev"),
             ZevPart("metering.SupplementaryReading", "metering_point__zev", ("metering_point_id", "timestamp")),
         ),
     ),

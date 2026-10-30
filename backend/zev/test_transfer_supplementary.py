@@ -184,7 +184,8 @@ class SecretsNeverTravelTests(SupplementaryArchiveTestCase):
         for entry in entries:
             self.assertEqual(
                 set(entry),
-                {"id", "meter_id", "participant_id", "provider", "label", "external_id", "consented_at", "covers_from", "synced_through"},
+                {"id", "meter_id", "participant_id", "target", "held_by", "provides_history", "provides_live",
+                 "provides_forecast", "provider", "label", "external_id", "consented_at", "covers_from", "synced_through"},
             )
 
     def test_no_account_reference_travels(self):
@@ -430,3 +431,78 @@ class RejectedSupplementaryArchiveTests(SupplementaryArchiveTestCase):
             self.import_(raw)
         self.assertEqual(Zev.objects.count(), zevs)
         self.assertEqual(SupplementaryReading.objects.count(), 0)
+
+
+class CapabilityArchiveTests(SupplementaryArchiveTestCase):
+    """Live capabilities, ZEV-held sources and the grid connection point travel too (SPEC-2026-live-energy-data §6.5)."""
+
+    def setUp(self):
+        super().setUp()
+        Zev.objects.filter(pk=self.zev.pk).update(zev_type="zev")
+        self.zev.refresh_from_db()
+        # A live-only source next to the history source, a ZEV-held one on an unheld meter, the connection point.
+        SupplementarySource.objects.create(
+            metering_point=self.solar_point, participant=self.alice, provider="push", label="live",
+            provides_history=False, provides_live=True,
+        )
+        self.unheld = MeteringPoint.objects.create(
+            zev=self.zev, meter_id="SX-ZEV-1", meter_type=MeteringPointType.CONSUMPTION
+        )
+        SupplementarySource.objects.create(
+            zev=self.zev, metering_point=self.unheld, held_by="zev", provider="push",
+            provides_history=False, provides_live=True,
+        )
+        SupplementarySource.objects.create(
+            zev=self.zev, target="connection_point", held_by="zev", provider="push",
+            provides_history=False, provides_live=True,
+        )
+
+    def test_the_new_shapes_round_trip_disconnected(self):
+        result, raw = self.roundtrip()
+        zev = Zev.objects.get(pk=result["zev_id"])
+
+        self.assertEqual(result["counts"][SECTION_SUPPLEMENTARY], 5)
+        self.assertEqual(result["counts"]["supplementary_readings"], 6)
+        sources = SupplementarySource.objects.filter(zev=zev)
+        self.assertEqual(sources.count(), 5)
+        self.assertFalse(sources.filter(enabled=True).exists())
+        connection = sources.get(target="connection_point")
+        self.assertEqual((connection.held_by, connection.metering_point_id, connection.participant_id), ("zev", None, None))
+        self.assertTrue(connection.provides_live and not connection.provides_history)
+        zev_held = sources.get(held_by="zev", target="metering_point")
+        self.assertEqual((zev_held.metering_point.meter_id, zev_held.participant_id), ("SX-ZEV-1", None))
+        solar_point = MeteringPoint.objects.get(zev=zev, meter_id="SX-NET-1")
+        self.assertEqual(sources.filter(metering_point=solar_point).count(), 2)
+        self.assertEqual(solar_point.history_source().provider, "solar_manager")
+        self.assertEqual(solar_point.live_source().label, "live")
+
+    def test_live_state_does_not_travel(self):
+        SupplementarySource.objects.filter(target="connection_point").update(live_last_seen_at=START)
+        entries = json.loads(self.members(self.full())[SOURCES_FILE])
+        self.assertEqual(len(entries), 5)
+        for entry in entries:
+            self.assertNotIn("live_last_seen_at", entry)
+            self.assertNotIn("zev", entry)
+        connection = next(entry for entry in entries if entry["target"] == "connection_point")
+        self.assertIsNone(connection["meter_id"])
+        self.assertIsNone(connection["participant_id"])
+
+    def test_an_archive_without_the_capability_fields_imports_as_history_sources(self):
+        raw = export_and_clear(self.zev, ALL)
+        entries = json.loads(self.members(raw)[SOURCES_FILE])
+        old = [
+            {key: value for key, value in entry.items() if key not in ("target", "held_by", "provides_history", "provides_live", "provides_forecast")}
+            for entry in entries
+            if entry["target"] == "metering_point" and entry["held_by"] == "participant" and entry["provides_history"]
+        ]
+        manifest = json.loads(self.members(raw)["manifest.json"])
+        manifest["counts"][SECTION_SUPPLEMENTARY] = len(old)
+        result = self.import_(rewrite_archive(raw, replace={SOURCES_FILE: old, "manifest.json": manifest}))
+
+        sources = SupplementarySource.objects.filter(zev_id=result["zev_id"])
+        self.assertEqual(sources.count(), 2)
+        for source in sources:
+            self.assertEqual(
+                (source.target, source.held_by, source.provides_history, source.provides_live, source.provides_forecast),
+                ("metering_point", "participant", True, False, False),
+            )

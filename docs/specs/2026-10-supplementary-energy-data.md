@@ -97,6 +97,7 @@ All access follows the per-ZEV model of [ADR 0027](../adr/0027-per-zev-access-gr
 |---|---|
 | `admin` | Everything below for any ZEV, including creating a source on a participant's behalf (support). |
 | Manager of the ZEV (`zev_owner`, or a party holding a managing role) | Read sources and status in their ZEVs. `PATCH enabled`, `disconnect`, `purge`, `DELETE`. **Cannot** create a source, set or replace a credential, or rotate a push token. Cannot read any credential. |
+| Manager of the ZEV, for a **ZEV-held** source | A ZEV-held source (`held_by = zev`: a metering point nobody holds personally, or the grid connection point) has no participant, so the ZEV's managers act with the owner's rights on it: create, edit, test, sync, rotate or revoke the push token, import, disconnect, purge, delete. See [live energy data](2026-10-live-energy-data.md) §3. |
 | Viewer of the ZEV | Read-only: source list and status. |
 | `participant` who personally holds the metering point today | Create, test, sync, edit, disconnect, purge and delete **their own** source; rotate their push token; read the gross figures about themselves. |
 | Any other participant | No access to the source. They see the anonymised ZEV-wide figures only, as today. |
@@ -107,6 +108,12 @@ All access follows the per-ZEV model of [ADR 0027](../adr/0027-per-zev-access-gr
 Swiss civil date ([ADR 0026](../adr/0026-swiss-civil-time-for-billing.md)). Community-mode
 holders cannot connect a source: their readings are split by weight and no single person's
 household is described.
+
+**ZEV-held sources and the owner role.** `permissions.role_for` resolves the ZEV from `source.zev` (not
+the metering point, which the grid connection point does not have) and returns `owner` to a manager
+of the ZEV for a source with `held_by = zev`; `is_owner` is false for a source without participant.
+The daily orphan task disconnects a ZEV-held source once somebody holds its metering point
+personally (reason `personal_holder_assigned`) and never touches the grid connection point.
 
 **Backend permission class:** `SupplementarySourcePermission` (new, in
 `metering/permissions.py`), built on `BaseZevScopedPermission` semantics for scoping, with the
@@ -136,14 +143,16 @@ answer `404`, beat tasks skip, and every statistics surface behaves exactly as i
 
 ### 4.1 SupplementarySource
 
-**Model:** `metering.models.SupplementarySource`. One connection between one metering point and
-one external system.
+**Model:** `metering.models.SupplementarySource`. One connection between one metering point (or,
+since the [live energy data](2026-10-live-energy-data.md) spec §4.1, the ZEV's grid connection
+point) and one external system. The capability fields and constraints added by that spec are in
+the second table below; everything else on this page describes the **history** capability.
 
 | Field | Type | Default | Constraints / Notes |
 |---|---|---|---|
 | `id` | `UUIDField` pk | `uuid4` | |
-| `metering_point` | `OneToOneField(zev.MeteringPoint, CASCADE)` | — | `related_name="supplementary_source"`. One source per metering point in v1 |
-| `participant` | `ForeignKey(zev.Participant, CASCADE)` | — | `related_name="supplementary_sources"`. The consenting holder; ingestion is clipped to their personal assignment windows |
+| `metering_point` | `ForeignKey(zev.MeteringPoint, CASCADE, null=True)` | `None` | `related_name="supplementary_sources"` (was a `OneToOneField` named `supplementary_source`; `MeteringPoint.history_source()` / `live_source()` return the one with that capability). Null exactly for the grid connection point |
+| `participant` | `ForeignKey(zev.Participant, CASCADE, null=True)` | — | `related_name="supplementary_sources"`. The consenting holder; ingestion is clipped to their personal assignment windows. Null exactly when `held_by = zev` |
 | `provider` | `CharField(20)` | — | `SupplementaryProvider`: `solar_manager`, `push` ("push or file") |
 | `label` | `CharField(100)` | `""` | Free text, e.g. "Solar Manager at home" |
 | `external_id` | `CharField(64)` | `""` | Solar Manager `smId`; validated `^[A-Za-z0-9]{3,24}$`; required for `solar_manager`, empty for `push` |
@@ -164,21 +173,41 @@ one external system.
 | `created_by` | `ForeignKey(accounts.User, SET_NULL, null)` | `None` | |
 | `created_at` / `updated_at` | `DateTimeField` | auto | |
 
+**Generalisation (live energy data PR 1).** Added to the table above:
+
+| Field | Type | Default | Notes |
+|---|---|---|---|
+| `zev` | `ForeignKey(zev.Zev, CASCADE)` | — | `related_name="energy_data_sources"`; denormalised from the metering point (backfilled by migration `0012_energy_source_capabilities`; `save()` and `clean_fields()` fill it from the metering point when unset) |
+| `target` | `CharField(20)` | `metering_point` | `SourceTarget`: `metering_point`, `connection_point` |
+| `held_by` | `CharField(20)` | `participant` | `SourceHolder`: `participant`, `zev` |
+| `provides_history` / `provides_live` / `provides_forecast` | `BooleanField` | `True` / `False` / `False` | Existing rows are history sources |
+| `live_last_seen_at` | `DateTimeField(null)` | `None` | Status only; written by the live ingest (later PR) |
+
+Constraints: partial unique `uniq_source_history_per_mp`, `uniq_source_live_per_mp`,
+`uniq_source_forecast_per_mp` (on `metering_point`), `uniq_connection_point_per_zev` (on `zev`,
+`target = connection_point`); checks `source_target_consistent`, `source_holder_consistent`,
+`source_has_capability`. So a metering point can have one history source and, next to it, a
+live-only source; reconciliation, statistics, the beat sync and the history push/CSV endpoints use
+history sources only (a source without `provides_history` answers `403 {"detail": "This source
+does not provide history."}` on `/ingest/` and `/import-csv/`, and `400` on `test`, `sync` and
+`reconciliation`).
+
 **Status** is derived, not free-form: `disabled` when `enabled` is false; `reconnect_required`
 when the vendor rejected the credential or it can no longer be decrypted (sync stops until the
 participant enters a key again); `error` after a transient failure (sync is retried on the next
 tick); `ok` after a completed sync; `pending` until the first one.
 
 **Validation (`clean()`):**
-- `metering_point.has_behind_meter_generation` must be true.
-- `participant.zev_id == metering_point.zev_id`.
+- `provides_history` requires `metering_point.has_behind_meter_generation` and `held_by = participant`; `provides_live` needs an active metering point; the connection point needs a physical ZEV (`zev_type = zev`); each capability exists once per metering point.
+- `participant.zev_id == metering_point.zev_id`; `zev_id == metering_point.zev_id`.
 - `solar_manager` requires `external_id`; `push` requires it empty.
 - At creation the participant must hold the metering point personally on the civil date
   (enforced in the serializer, not `clean()`, so a later assignment change does not invalidate
   existing rows).
 
 **Cross-model rule:** `MeteringPointSerializer.validate()` rejects clearing
-`has_behind_meter_generation` (and `MeteringPoint.clean()` the same) while a source exists:
+`has_behind_meter_generation` (and `MeteringPoint.clean()` the same) while a source **with
+`provides_history`** exists (`MeteringPoint._has_history_source()`; a live-only source does not block it):
 `{"has_behind_meter_generation": ["Disconnect the energy data source first."]}`.
 
 **Methods:** `credential` property decrypts on access and is never cached on the instance;
@@ -196,7 +225,14 @@ token once and stores prefix and hash; it arrives with the push endpoint (PR 2).
 (`SerializerMethodField`), `push_token_prefix`, `created_at`, `updated_at`. Write: `label`,
 `enabled`, `external_id`, and the write-only `api_key` (replaces the credential) and `consent`
 (must be `true` on create). Read-only: all others. `participant` is set from the request, not
-accepted, except for admins.
+accepted, except for admins. Added by the live energy data spec: read `zev`, `target`, `held_by`,
+`provides_history`, `provides_live`, `provides_forecast`, `live_last_seen_at` and `live_state`
+(`fresh` within `LIVE_MAX_AGE_S` (default 60) of `live_last_seen_at`, else `stale`; `never` without
+one; `null` without `provides_live`); `metering_point_meter_id` and `participant_name` are `null`
+for the connection point and ZEV-held sources. Write: `provides_*` (also on PATCH; switching live on
+later needs `consent: true`), and on create `target`, `held_by` and, for the connection point,
+`zev`. `MeteringPointSerializer` gains `live_state` next to `supplementary_source_status` (which
+keeps meaning the history source) under the same visibility rule.
 
 ### 4.2 SupplementaryReading
 
@@ -280,8 +316,9 @@ All answer `404` while the feature flag is off.
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
 | `/sources/` | GET | `SupplementarySourcePermission` | Scoped list (admin all; manager/viewer their ZEVs; participant their own). Filter `?zev_id=` (as on every ZEV-scoped list), `?metering_point=` |
-| `/sources/` | POST | holder or admin | Create. Requires `consent: true`, a flagged metering point, a free metering point (one source each). `solar_manager`: needs `external_id` and `api_key`; the key is exchanged and one interval fetched **before** anything is saved, so a wrong key is a `400` with a safe message, not a broken row. Without a configured `INTEGRATION_ENCRYPTION_KEYS`: `503` naming the setting. `push`: returns the push token **once** in `push_token`. A provider that is not registered is refused with `400`. After the commit a backfill sync is queued (`backfill=True`, §6.3); a broker outage is logged and does not fail the request. A manager gets `403`; someone who cannot see the metering point gets `400 Invalid pk`, so its existence is not revealed. Audited `supplementary_source.create` |
-| `/sources/eligible/` | GET | authenticated | The flagged metering points the caller personally holds today (enabled ZEVs only), each with its `source` id or `null`; `[]` for anyone who holds none (an admin included, unless they are also linked to a participant). What "My metering points" offers to connect, and what tells the frontend whether the feature is on (`404` = off) |
+| `/sources/` | POST | holder or admin | Create. Requires `consent: true`, a flagged metering point, a free metering point (one source each). `solar_manager`: needs `external_id` and `api_key`; the key is exchanged and one interval fetched **before** anything is saved, so a wrong key is a `400` with a safe message, not a broken row. Without a configured `INTEGRATION_ENCRYPTION_KEYS`: `503` naming the setting. `push`: returns the push token **once** in `push_token`. A provider that is not registered is refused with `400`. After the commit a backfill sync is queued (`backfill=True`, §6.3); a broker outage is logged and does not fail the request. A manager gets `403`; someone who cannot see the metering point gets `400 Invalid pk`, so its existence is not revealed. Audited `supplementary_source.create`. With the live energy data spec: also accepts `target`, `held_by`, `zev` and `provides_*`, and a manager may create a `held_by = zev` source where nobody holds the metering point (see that spec §3, §5). Audit metadata of create, update, delete and disconnect carries `capabilities`, `target` and `held_by` |
+| `/sources/eligible/` | GET | authenticated | The flagged metering points the caller personally holds today (enabled ZEVs only), each with its `source` id (the history source) or `null`; `[]` for anyone who holds none (an admin included, unless they are also linked to a participant). What "My metering points" offers to connect, and what tells the frontend whether the feature is on (`404` = off). While the live flag is effective every held metering point is listed, each with `eligible_capabilities` (`history` only behind the meter, `live` on any active point) and `sources` `{history, live, forecast}` (ids or `null`) |
+| `/sources/zev-eligible/?zev_id=` | GET | manager of the ZEV, admin | Live flag only (`404` otherwise; `404` for a ZEV the caller cannot see, `403` for a viewer). The ZEV's active metering points that nobody holds personally today, each `{metering_point, meter_id, meter_type, eligible_capabilities, sources}`, plus `connection_point: {available, source}` (available for a physical ZEV without one) |
 | `/sources/{id}/` | GET | scoped | Detail |
 | `/sources/{id}/` | PATCH | holder or admin; manager only for `enabled` | `label`, `enabled`, `external_id`, write-only `api_key`. An absent `api_key` keeps the stored one. A new key, or switching a disabled source back on, queues a sync. Audited `supplementary_source.update` with a diff over the tracked fields and `credential_changed` in metadata, never the value |
 | `/sources/{id}/` | DELETE | holder, manager, admin | Deletes the source **and all its readings**. Audited `supplementary_source.delete` |
@@ -1105,7 +1142,9 @@ model.
 
 1. **Can a ZEV owner connect a source for a participant?** Default **no**: the account is the
    participant's, so the credential stays theirs. An owner can disable, disconnect and delete.
-   Revisit if participants without an account (no `Participant.user`) are common.
+   Revisit if participants without an account (no `Participant.user`) are common. Partly answered by
+   the [live energy data](2026-10-live-energy-data.md) spec: managers connect **ZEV-held** sources
+   (metering points nobody holds personally, the grid connection point), never a participant's.
 2. **Notify the participant when a source needs reconnecting?** Default **status banner only**
    in v1. An email on `reconnect_required` is a small follow-up using the existing email
    infrastructure.
@@ -1117,7 +1156,8 @@ model.
 5. **Batteries and EVs.** Default **out**; the rates are battery-agnostic because they use
    import/export. Add `battery_charge_kwh` / `battery_discharge_kwh` only if a chart needs them.
 6. **A second source per metering point** (e.g. Solar Manager and a Home Assistant push).
-   Default **one**; the one-to-one can become a foreign key with a priority later.
+   Default **one**; answered by the [live energy data](2026-10-live-energy-data.md) spec: the
+   one-to-one became a foreign key with **one source per capability** (history, live, forecast).
 7. **Home Assistant pull.** Default **not built**; revisit for self-hosted deployments where HA
    is reachable from the server.
 

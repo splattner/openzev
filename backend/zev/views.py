@@ -993,7 +993,9 @@ class MeteringPointViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevSco
         # Aggregate readings and assignment history separately to avoid join
         # fan-out; clear ordering within each aggregate subquery.
         qs = self.scope_queryset(
-            MeteringPoint.objects.select_related("zev", "building", "supplementary_source__participant")
+            MeteringPoint.objects.select_related("zev", "building").prefetch_related(
+                "supplementary_sources__participant"
+            )
         )
         building = self.request.query_params.get("building")
         if building:

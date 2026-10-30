@@ -320,17 +320,17 @@ def _write_observation_members(archive, points, model, member_name):
 
 
 def _export_supplementary_sources(zev):
-    """The ZEV's energy data sources, by ``meter_id`` and archive ``participant_id``. No secret, no state."""
+    """The ZEV's energy data sources, by ``meter_id`` and archive ``participant_id`` (``null`` for the grid connection point and ZEV-held sources). No secret, no state."""
     return [
         {
             "id": str(source.id),
-            "meter_id": source.metering_point.meter_id,
-            "participant_id": str(source.participant_id),
+            "meter_id": source.metering_point.meter_id if source.metering_point_id else None,
+            "participant_id": str(source.participant_id) if source.participant_id else None,
             **_fields(source, SUPPLEMENTARY_SOURCE_FIELDS),
         }
-        for source in SupplementarySource.objects.filter(metering_point__zev=zev)
+        for source in SupplementarySource.objects.filter(zev=zev)
         .select_related("metering_point")
-        .order_by("metering_point__meter_id")
+        .order_by("metering_point__meter_id", "created_at", "id")
     ]
 
 
@@ -338,7 +338,7 @@ def _write_supplementary_readings(archive, zev):
     """Stream every source's readings into ``supplementary_readings/<meter>.csv``; returns the row total."""
     total = 0
     for source in (
-        SupplementarySource.objects.filter(metering_point__zev=zev)
+        SupplementarySource.objects.filter(zev=zev, provides_history=True, metering_point__isnull=False)
         .select_related("metering_point")
         .order_by("metering_point__meter_id")
     ):

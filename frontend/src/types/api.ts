@@ -769,6 +769,11 @@ export interface GrossEnergy {
 
 export type SupplementaryProvider = 'solar_manager' | 'push'
 export type SupplementaryStatus = 'pending' | 'ok' | 'error' | 'reconnect_required' | 'disabled'
+export type SourceTarget = 'metering_point' | 'connection_point'
+export type SourceHolder = 'participant' | 'zev'
+export type SourceCapability = 'history' | 'live' | 'forecast'
+/** Freshness of a live source; `null` when the source provides no live data. */
+export type LiveState = 'fresh' | 'stale' | 'never'
 
 /** Result of the last comparison with the official meter. Purely diagnostic. */
 export interface SupplementaryReconciliation {
@@ -780,13 +785,23 @@ export interface SupplementaryReconciliation {
     state?: 'ok' | 'warn' | 'insufficient'
 }
 
-/** The connection between a metering point and a participant's own system. Never carries a secret. */
+/** The connection between a metering point (or the ZEV's grid connection point) and an energy data system. Never carries a secret. */
 export interface SupplementarySource {
     id: string
-    metering_point: string
-    metering_point_meter_id: string
-    participant: string
-    participant_name: string
+    zev: string
+    target: SourceTarget
+    held_by: SourceHolder
+    /** `null` for the grid connection point. */
+    metering_point: string | null
+    metering_point_meter_id: string | null
+    /** `null` for a ZEV-held source. */
+    participant: string | null
+    participant_name: string | null
+    provides_history: boolean
+    provides_live: boolean
+    provides_forecast: boolean
+    live_last_seen_at: string | null
+    live_state: LiveState | null
     provider: SupplementaryProvider
     label: string
     external_id: string
@@ -811,12 +826,19 @@ export interface SupplementarySource {
 export type SupplementarySourceCreated = SupplementarySource & { push_token?: string }
 
 export interface SupplementarySourceInput {
-    metering_point: string
+    metering_point?: string
     provider: SupplementaryProvider
     label?: string
     external_id?: string
     api_key?: string
     consent: boolean
+    /** Create only. The grid connection point needs `zev` and no `metering_point`. */
+    target?: SourceTarget
+    held_by?: SourceHolder
+    zev?: string
+    provides_history?: boolean
+    provides_live?: boolean
+    provides_forecast?: boolean
 }
 
 export interface SupplementarySourceUpdate {
@@ -824,6 +846,11 @@ export interface SupplementarySourceUpdate {
     enabled?: boolean
     external_id?: string
     api_key?: string
+    provides_history?: boolean
+    provides_live?: boolean
+    provides_forecast?: boolean
+    /** Needed when switching live data on. */
+    consent?: boolean
 }
 
 /** A flagged metering point the signed-in user personally holds today, and its source if connected. */
@@ -833,7 +860,28 @@ export interface EligibleMeteringPoint {
     zev: string
     zev_name: string
     participant: string
+    /** The history source id. */
     source: string | null
+    /** Present while the live flag is on. */
+    eligible_capabilities?: SourceCapability[]
+    sources?: SourceIdsByCapability
+}
+
+export type SourceIdsByCapability = Record<SourceCapability, string | null>
+
+/** A metering point nobody holds personally, as a manager sees it when connecting ZEV-operated meters. */
+export interface ZevEligibleMeteringPoint {
+    metering_point: string
+    meter_id: string
+    meter_type: 'consumption' | 'production' | 'bidirectional'
+    eligible_capabilities: SourceCapability[]
+    sources: SourceIdsByCapability
+}
+
+export interface ZevEligibleSources {
+    zev: string
+    metering_points: ZevEligibleMeteringPoint[]
+    connection_point: { available: boolean; source: string | null }
 }
 
 export interface SupplementaryIngestResult {
@@ -867,6 +915,8 @@ export interface MeteringPoint {
     last_reading_at: string | null
     /** Status of the energy data source on this meter; null without one, while the feature is off, or when the caller may not see it. */
     supplementary_source_status: SupplementaryStatus | null
+    /** Freshness of the live source on this meter; null without one, while the live flag is off, or when the caller may not see it. */
+    live_state: LiveState | null
 }
 
 export interface MeteringPointInput {

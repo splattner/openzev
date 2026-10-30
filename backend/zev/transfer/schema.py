@@ -266,7 +266,18 @@ METERING_POINT_FIELDS = (
 # disconnected, and its participant connects again (a new key, or a new push
 # token) on the instance that now holds the data. ``created_by`` is an account
 # reference, and accounts never travel.
+#
+# The capability fields (``target``, ``held_by``, ``provides_*``) travel too; an archive without
+# them (older format-7+ exports) means a participant-held, history-only source on a metering
+# point. A participant-held source has ``participant_id``, a ZEV-held one ``null``; the grid
+# connection point has ``meter_id`` ``null``. ``zev`` is ownership and ``live_last_seen_at``
+# describes a live connection, so neither travels.
 SUPPLEMENTARY_SOURCE_FIELDS = (
+    "target",
+    "held_by",
+    "provides_history",
+    "provides_live",
+    "provides_forecast",
     "provider",
     "label",
     "external_id",

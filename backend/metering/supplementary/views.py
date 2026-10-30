@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import csv
 import io
+import uuid
 
 from django.core.cache import cache
 from django.db import transaction
+from django.http import Http404
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -29,17 +31,18 @@ from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, build_instance_snapshot, record_audit_event
 from django.utils import timezone
 from zev import access
-from zev.models import AllocationMode, MeteringPointAssignment
+from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, Zev
 from zev.scoping import ZevScopedQuerySetMixin
 
 from accounts.permissions import NotWhileImpersonating
 
-from ..models import SupplementaryProvider, SupplementarySource, SupplementaryStatus
-from ..tasks import queue_sync, sync_supplementary_source
+from ..models import SourceTarget, SupplementaryProvider, SupplementarySource, SupplementaryStatus
+from ..tasks import queue_sync, source_audit_metadata, sync_supplementary_source
 from . import ingest as ingest_service
 from . import reconcile as reconcile_service
 from . import sync as sync_service
 from .authentication import IsPushSource, SupplementaryPushAuthentication, SupplementaryPushThrottle
+from . import permissions
 from .permissions import SupplementarySourcePermission, require_feature
 from .providers import PROVIDERS, ProviderAuthError, ProviderError
 from .serializers import (
@@ -52,6 +55,7 @@ from .serializers import (
 
 AUDIT_TARGET = "metering.SupplementarySource"
 TRACKED_FIELDS = ["label", "enabled", "external_id"]
+HISTORY_REFUSED = "This source does not provide history."
 CSV_MAX_BYTES = 8 * 1024 * 1024
 SYNC_COOLDOWN_S = 5 * 60
 
@@ -70,10 +74,10 @@ def _audit(request, action_type, source, summary, *, metadata=None, changes=None
         target_type=AUDIT_TARGET,
         target=source,
         target_id=str(source.pk),
-        target_display=target_display or source.metering_point.meter_id,
+        target_display=target_display or source.display_name,
         summary=summary,
         status=AuditEventStatus.SUCCESS,
-        metadata=metadata or {},
+        metadata={**source_audit_metadata(source), **(metadata or {})},
         changes=changes,
     )
 
@@ -98,7 +102,7 @@ class SupplementarySourceViewSet(
          "import_csv", "revoke_push_token"}
     )
 
-    zev_lookup = "metering_point__zev"
+    zev_lookup = "zev"
     participant_path = "participant"
     # The owner is a participant, so writes are scoped like reads and decided per action
     # in SupplementarySourcePermission instead of by the mixin's manager-only write scope.
@@ -112,7 +116,7 @@ class SupplementarySourceViewSet(
         if getattr(self, "swagger_fake_view", False):
             return SupplementarySource.objects.none()
         qs = self.scope_queryset(
-            SupplementarySource.objects.select_related("metering_point", "metering_point__zev", "participant")
+            SupplementarySource.objects.select_related("metering_point", "zev", "participant")
         )
         metering_point = self.request.query_params.get("metering_point")
         if metering_point:
@@ -130,17 +134,19 @@ class SupplementarySourceViewSet(
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        self._refuse_if_target_zev_disabled(serializer.validated_data["metering_point"])
+        self._refuse_if_target_zev_disabled(serializer.validated_data["zev"])
         with transaction.atomic():
             source = serializer.save()
             _audit(
                 request, "create", source,
-                f"Connected a {source.get_provider_display()} energy data source to {source.metering_point.meter_id}.",
+                f"Connected a {source.get_provider_display()} energy data source to {source.display_name}.",
                 metadata={
-                    "zev_id": str(source.metering_point.zev_id),
+                    "zev_id": str(source.zev_id),
                     "provider": source.provider,
-                    "participant_id": str(source.participant_id),
-                    "created_by_admin": request.user.is_admin and source.participant.user_id != request.user.pk,
+                    "participant_id": str(source.participant_id) if source.participant_id else None,
+                    "created_by_admin": request.user.is_admin and (
+                        source.participant_id is None or source.participant.user_id != request.user.pk
+                    ),
                 },
             )
         queue_sync(source, backfill=True)
@@ -149,8 +155,8 @@ class SupplementarySourceViewSet(
         body = {**data, **({"push_token": push_token} if push_token else {})}
         return Response(body, status=status.HTTP_201_CREATED)
 
-    def _refuse_if_target_zev_disabled(self, metering_point):
-        if not self.request.user.is_admin and metering_point.zev.disabled_at is not None:
+    def _refuse_if_target_zev_disabled(self, zev):
+        if not self.request.user.is_admin and zev.disabled_at is not None:
             raise ValidationError({"detail": "This ZEV is disabled. Ask an admin to re-enable it first."})
 
     def partial_update(self, request, *args, **kwargs):
@@ -164,7 +170,7 @@ class SupplementarySourceViewSet(
             source = serializer.save()
             changes = build_diff(before, build_instance_snapshot(source, TRACKED_FIELDS), TRACKED_FIELDS)
             _audit(
-                request, "update", source, f"Updated energy data source for {source.metering_point.meter_id}.",
+                request, "update", source, f"Updated energy data source for {source.display_name}.",
                 changes=changes, metadata={"credential_changed": bool(getattr(serializer, "credential_changed", False))},
             )
             if source.enabled and (getattr(serializer, "credential_changed", False) or not was_enabled):
@@ -180,8 +186,8 @@ class SupplementarySourceViewSet(
         source = self.get_object()
         self._refuse_if_zev_disabled(source)
         readings = source.readings.count()
-        display = source.metering_point.meter_id
-        zev_id = str(source.metering_point.zev_id)
+        display = source.display_name
+        zev_id = str(source.zev_id)
         with transaction.atomic():
             _audit(
                 request, "delete", source, f"Deleted the energy data source for {display} and its {readings} reading(s).",
@@ -192,41 +198,121 @@ class SupplementarySourceViewSet(
 
     # ---- actions ----
 
+    @staticmethod
+    def _capabilities_of(point, *, held_by_participant: bool) -> list[str]:
+        """What a metering point can offer in this release: history behind the meter, live anywhere active."""
+        capabilities = []
+        if held_by_participant and point.has_behind_meter_generation:
+            capabilities.append("history")
+        if point.is_active:
+            capabilities.append("live")
+        return capabilities
+
+    @staticmethod
+    def _sources_by_capability(point) -> dict:
+        sources = list(point.supplementary_sources.all())
+        return {
+            name: next((str(s.pk) for s in sources if getattr(s, f"provides_{name}")), None)
+            for name in ("history", "live", "forecast")
+        }
+
     @action(detail=False, methods=["get"])
     def eligible(self, request):
-        """The flagged metering points the signed-in user personally holds today, each with its source id.
+        """The metering points the signed-in user personally holds today, each with its source id.
 
-        This is what "My metering points" offers to connect. It lists what the signed-in user holds as
-        a participant, whatever their role: an admin who is also linked to a participant gets those
-        meters too, and one who is not gets nothing (an admin otherwise connects on a participant's
-        behalf from the support view).
+        This is what "My metering points" offers to connect. Without the live flag only the flagged
+        (behind-the-meter) points are listed, as before. With it, every held metering point is listed with
+        the capabilities it qualifies for and its sources per capability; ``source`` stays the history
+        source id. It lists what the signed-in user holds as a participant, whatever their role: an admin
+        who is also linked to a participant gets those meters too, and one who is not gets nothing (an
+        admin otherwise connects on a participant's behalf from the support view).
         """
+        live = permissions.live_feature_enabled()
+        filters = {
+            "participant__user": request.user,
+            "allocation_mode": AllocationMode.PERSONAL,
+            "metering_point__zev__disabled_at__isnull": True,
+        }
+        if not live:
+            filters["metering_point__has_behind_meter_generation"] = True
         assignments = (
             active_on(
-                MeteringPointAssignment.objects.filter(
-                    participant__user=request.user,
-                    allocation_mode=AllocationMode.PERSONAL,
-                    metering_point__has_behind_meter_generation=True,
-                    metering_point__zev__disabled_at__isnull=True,
-                ).filter(access.live_participant_q(prefix="participant__")),
+                MeteringPointAssignment.objects.filter(**filters).filter(access.live_participant_q(prefix="participant__")),
                 timezone.localdate(),
             )
-            .select_related("metering_point__zev", "participant", "metering_point__supplementary_source")
+            .select_related("metering_point__zev", "participant")
+            .prefetch_related("metering_point__supplementary_sources")
             .order_by("metering_point__meter_id", "id")
         )
         rows = []
         for assignment in assignments:
             point = assignment.metering_point
-            source = getattr(point, "supplementary_source", None)
-            rows.append({
+            sources = self._sources_by_capability(point)
+            history = next((s for s in point.supplementary_sources.all() if s.provides_history), None)
+            row = {
                 "metering_point": str(point.pk),
                 "meter_id": point.meter_id,
                 "zev": str(point.zev_id),
                 "zev_name": point.zev.name,
                 "participant": str(assignment.participant_id),
-                "source": str(source.pk) if source and source.participant_id == assignment.participant_id else None,
-            })
+                "source": str(history.pk) if history and history.participant_id == assignment.participant_id else None,
+            }
+            if live:
+                row["eligible_capabilities"] = self._capabilities_of(point, held_by_participant=True)
+                row["sources"] = sources
+            rows.append(row)
         return Response(rows)
+
+    @action(detail=False, methods=["get"], url_path="zev-eligible")
+    def zev_eligible(self, request):
+        """Metering points of a ZEV that nobody holds personally today, and whether its connection point is free.
+
+        For managers (and admins) connecting ZEV-operated meters and the grid connection point.
+        """
+        if not permissions.live_feature_enabled():
+            raise Http404
+        raw = request.query_params.get("zev_id")
+        if not raw:
+            raise ValidationError({"zev_id": ["This field is required."]})
+        try:
+            zev_id = uuid.UUID(str(raw))
+        except (ValueError, TypeError):
+            raise ValidationError({"zev_id": ["Must be a valid UUID."]}) from None
+        zev = Zev.objects.filter(pk=zev_id).first()
+        if zev is None or not (request.user.is_admin or access.can_view(request.user, zev)):
+            raise Http404
+        if not request.user.is_admin and not access.can_manage(request.user, zev):
+            raise PermissionDenied("Only a manager of the ZEV can connect ZEV-operated meters.")
+        held = active_on(
+            MeteringPointAssignment.objects.filter(
+                metering_point__zev=zev, allocation_mode=AllocationMode.PERSONAL
+            ),
+            timezone.localdate(),
+        ).values("metering_point_id")
+        points = (
+            MeteringPoint.objects.filter(zev=zev, is_active=True)
+            .exclude(pk__in=held)
+            .prefetch_related("supplementary_sources")
+            .order_by("meter_id")
+        )
+        connection = SupplementarySource.objects.filter(zev=zev, target=SourceTarget.CONNECTION_POINT).first()
+        return Response({
+            "zev": str(zev.pk),
+            "metering_points": [
+                {
+                    "metering_point": str(point.pk),
+                    "meter_id": point.meter_id,
+                    "meter_type": point.meter_type,
+                    "eligible_capabilities": self._capabilities_of(point, held_by_participant=False),
+                    "sources": self._sources_by_capability(point),
+                }
+                for point in points
+            ],
+            "connection_point": {
+                "available": zev.zev_type == "zev" and connection is None,
+                "source": str(connection.pk) if connection else None,
+            },
+        })
 
     @action(detail=True, methods=["post"])
     def disconnect(self, request, pk=None):
@@ -237,7 +323,7 @@ class SupplementarySourceViewSet(
             source.disconnect()
             source.save()
             _audit(
-                request, "disconnect", source, f"Disconnected the energy data source for {source.metering_point.meter_id}.",
+                request, "disconnect", source, f"Disconnected the energy data source for {source.display_name}.",
                 metadata={"reason": "requested"},
             )
         return Response(self.get_serializer(source).data)
@@ -264,10 +350,14 @@ class SupplementarySourceViewSet(
                 source.save(update_fields=["covers_from", "synced_through", "updated_at"])
             _audit(
                 request, "purge", source, f"Deleted {deleted} reading(s) of the energy data source for "
-                f"{source.metering_point.meter_id}.",
+                f"{source.display_name}.",
                 metadata={"readings_deleted": deleted, "date_from": start, "date_to": end},
             )
         return Response({"deleted": deleted})
+
+    def _require_history(self, source):
+        if not source.provides_history:
+            raise ValidationError({"detail": "This source does not provide history."})
 
     def _pull_provider(self, source):
         provider = PROVIDERS.get(source.provider)
@@ -280,6 +370,7 @@ class SupplementarySourceViewSet(
         """Exchange the stored key and read an hour of data. Never echoes a credential or a vendor response."""
         source = self.get_object()
         self._refuse_if_zev_disabled(source)
+        self._require_history(source)
         provider = self._pull_provider(source)
         if not source.enabled:
             raise ValidationError({"detail": "This source is disconnected."})
@@ -297,6 +388,7 @@ class SupplementarySourceViewSet(
         """Queue a sync now. At most one request per source every five minutes."""
         source = self.get_object()
         self._refuse_if_zev_disabled(source)
+        self._require_history(source)
         self._pull_provider(source)
         if not source.enabled:
             raise ValidationError({"detail": "This source is disconnected."})
@@ -314,6 +406,7 @@ class SupplementarySourceViewSet(
     def reconciliation(self, request, pk=None):
         """Day-by-day comparison with the official meter for the newest 14 comparable days."""
         source = self.get_object()
+        self._require_history(source)
         return Response(reconcile_service.reconcile(source, days=14, include_days=True))
 
     @action(detail=True, methods=["post"], url_path="rotate-push-token")
@@ -331,7 +424,7 @@ class SupplementarySourceViewSet(
             source.save()
             _audit(
                 request, "rotate_push_token", source,
-                f"Issued a new push token for the energy data source of {source.metering_point.meter_id}.",
+                f"Issued a new push token for the energy data source of {source.display_name}.",
             )
         return Response({"push_token": token, "push_token_prefix": source.push_token_prefix})
 
@@ -350,7 +443,7 @@ class SupplementarySourceViewSet(
             source.save()
             _audit(
                 request, "revoke_push_token", source,
-                f"Revoked the push token of the energy data source of {source.metering_point.meter_id}.",
+                f"Revoked the push token of the energy data source of {source.display_name}.",
                 metadata={"prefix": prefix},
             )
         return Response(self.get_serializer(source).data)
@@ -360,6 +453,8 @@ class SupplementarySourceViewSet(
         """Upload readings as CSV. All-or-nothing; ``?dry_run=true`` validates only."""
         source = self.get_object()
         self._refuse_if_zev_disabled(source)
+        if not source.provides_history:
+            raise PermissionDenied(HISTORY_REFUSED)
         if not source.enabled:
             raise PermissionDenied("Source is disabled.")
         upload = CsvUploadSerializer(data=request.data)
@@ -377,7 +472,7 @@ class SupplementarySourceViewSet(
             result = ingest_service.ingest(source, rows)
             _audit(
                 request, "import_csv", source,
-                f"Imported {result.accepted} reading(s) from CSV for {source.metering_point.meter_id}.",
+                f"Imported {result.accepted} reading(s) from CSV for {source.display_name}.",
                 metadata={"accepted": result.accepted, "updated": result.updated,
                           "dropped_outside_assignment": result.dropped_outside_assignment},
             )
@@ -420,6 +515,8 @@ class SupplementaryIngestView(FeatureGatedMixin, APIView):
 
     @extend_schema(request=IngestSerializer, responses={200: IngestResultSerializer})
     def post(self, request):
+        if not request.auth.provides_history:
+            raise PermissionDenied(HISTORY_REFUSED)
         serializer = IngestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         rows = serializer.validated_data["readings"]

@@ -1056,7 +1056,7 @@ _SUPPLEMENTARY_DATETIME_FIELDS = ("consented_at", "covers_from", "synced_through
 
 
 def _import_supplementary_sources(archive, zev, participants_by_archive_id, points_by_meter_id, collector):
-    """Recreate the energy data sources, disconnected, and return them by ``meter_id``.
+    """Recreate the energy data sources, disconnected; returns ``(history sources by meter_id, number imported)``.
 
     No credential or token is in the archive, and an import never starts pulling or accepting data:
     a source arrives ``enabled = False``, which the model shows as *disconnected*. Its participant
@@ -1064,15 +1064,19 @@ def _import_supplementary_sources(archive, zev, participants_by_archive_id, poin
     consent for the instance that now holds their data.
     """
     sources_by_meter_id = {}
+    imported = 0
     for position, raw in enumerate(_load_json(archive, SECTION_FILES[SECTION_SUPPLEMENTARY]), start=1):
         meter_id = (raw.get("meter_id") or "").strip() if isinstance(raw, dict) else ""
         label = meter_id or f"source {position}"
+        # Older archives have no capability fields: a participant-held, history-only source on a metering point.
+        target = (raw.get("target") if isinstance(raw, dict) else None) or "metering_point"
+        held_by = (raw.get("held_by") if isinstance(raw, dict) else None) or "participant"
         point = points_by_meter_id.get(meter_id)
         participant = participants_by_archive_id.get(str(raw.get("participant_id") or "")) if isinstance(raw, dict) else None
-        if point is None:
+        if target == "metering_point" and point is None:
             collector.add(SECTION_SUPPLEMENTARY, position, label, {"meter_id": [f"No imported metering point named '{meter_id}'."]})
             continue
-        if participant is None:
+        if held_by == "participant" and participant is None:
             collector.add(SECTION_SUPPLEMENTARY, position, label, {"participant_id": ["Unknown participant."]})
             continue
         fields = _pick(raw, SUPPLEMENTARY_SOURCE_FIELDS, position, SECTION_SUPPLEMENTARY)
@@ -1081,7 +1085,10 @@ def _import_supplementary_sources(archive, zev, participants_by_archive_id, poin
                 if name in fields:
                     fields[name] = _parse_datetime_utc(fields[name])
             source = SupplementarySource(
-                metering_point=point, participant=participant, enabled=False, **fields
+                zev=zev,
+                metering_point=point if target == "metering_point" else None,
+                participant=participant if held_by == "participant" else None,
+                enabled=False, **fields,
             )
             if source.provider not in SupplementaryProvider.values:
                 raise DjangoValidationError({"provider": [f"Unknown provider '{source.provider}'."]})
@@ -1092,8 +1099,10 @@ def _import_supplementary_sources(archive, zev, participants_by_archive_id, poin
         except (DjangoValidationError, ValueError, TypeError, OverflowError) as exc:
             collector.add(SECTION_SUPPLEMENTARY, position, label, exc)
             continue
-        sources_by_meter_id[meter_id] = source
-    return sources_by_meter_id
+        imported += 1
+        if source.provides_history and source.metering_point_id:
+            sources_by_meter_id[meter_id] = source
+    return sources_by_meter_id, imported
 
 
 def _build_supplementary_reading(row, sources_by_meter_id):
@@ -1442,16 +1451,16 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
         )
 
     if SECTION_SUPPLEMENTARY in sections:
-        sources_by_meter_id = _import_supplementary_sources(
+        sources_by_meter_id, imported_sources = _import_supplementary_sources(
             archive, zev, participants_by_archive_id, points_by_meter_id, collector
         )
-        summary["counts"][SECTION_SUPPLEMENTARY] = len(sources_by_meter_id)
+        summary["counts"][SECTION_SUPPLEMENTARY] = imported_sources
         summary["counts"]["supplementary_readings"] = _import_supplementary_readings(
             archive, sources_by_meter_id, collector
         )
-        if sources_by_meter_id:
+        if imported_sources:
             collector.warn(
-                f"{len(sources_by_meter_id)} energy data source(s) were imported disconnected, without their keys "
+                f"{imported_sources} energy data source(s) were imported disconnected, without their keys "
                 "or tokens. Each participant connects theirs again before new data arrives."
             )
 

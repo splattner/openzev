@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
-from zev.models import MeteringPoint, Participant
+from zev.models import MeteringPoint, Participant, Zev
 
 
 class ReadingDirection(models.TextChoices):
@@ -290,6 +290,16 @@ class SupplementaryProvider(models.TextChoices):
     PUSH = "push", "Push or file upload"
 
 
+class SourceTarget(models.TextChoices):
+    METERING_POINT = "metering_point", "Metering point"
+    CONNECTION_POINT = "connection_point", "Grid connection point"
+
+
+class SourceHolder(models.TextChoices):
+    PARTICIPANT = "participant", "Participant"
+    ZEV = "zev", "ZEV"
+
+
 class SupplementaryStatus(models.TextChoices):
     PENDING = "pending", "Pending"
     OK = "ok", "OK"
@@ -299,19 +309,28 @@ class SupplementaryStatus(models.TextChoices):
 
 
 class SupplementarySource(models.Model):
-    """One connection between a metering point and a participant's own system.
+    """One connection between a metering point (or the ZEV's grid connection point) and an energy data system.
 
-    The participant is the consenting holder: ingestion is clipped to the
-    intervals during which they held the metering point personally.
+    A participant-held source is the participant's consenting connection: ingestion is clipped to the
+    intervals during which they held the metering point personally. A ZEV-held source (``held_by =
+    zev``) is operated by the ZEV's managers on a metering point nobody holds personally, or on the
+    grid connection point. Capabilities (``provides_*``) say what the source delivers.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    metering_point = models.OneToOneField(
-        MeteringPoint, on_delete=models.CASCADE, related_name="supplementary_source"
+    zev = models.ForeignKey(Zev, on_delete=models.CASCADE, related_name="energy_data_sources")
+    target = models.CharField(max_length=20, choices=SourceTarget.choices, default=SourceTarget.METERING_POINT)
+    metering_point = models.ForeignKey(
+        MeteringPoint, on_delete=models.CASCADE, null=True, blank=True, related_name="supplementary_sources"
     )
+    held_by = models.CharField(max_length=20, choices=SourceHolder.choices, default=SourceHolder.PARTICIPANT)
     participant = models.ForeignKey(
-        Participant, on_delete=models.CASCADE, related_name="supplementary_sources"
+        Participant, on_delete=models.CASCADE, null=True, blank=True, related_name="supplementary_sources"
     )
+    provides_history = models.BooleanField(default=True)
+    provides_live = models.BooleanField(default=False)
+    provides_forecast = models.BooleanField(default=False)
+    live_last_seen_at = models.DateTimeField(null=True, blank=True)
     provider = models.CharField(max_length=20, choices=SupplementaryProvider.choices)
     label = models.CharField(max_length=100, blank=True, default="")
     external_id = models.CharField(
@@ -350,22 +369,114 @@ class SupplementarySource(models.Model):
 
     class Meta:
         ordering = ["created_at", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["metering_point"], condition=models.Q(provides_history=True),
+                name="uniq_source_history_per_mp",
+            ),
+            models.UniqueConstraint(
+                fields=["metering_point"], condition=models.Q(provides_live=True),
+                name="uniq_source_live_per_mp",
+            ),
+            models.UniqueConstraint(
+                fields=["metering_point"], condition=models.Q(provides_forecast=True),
+                name="uniq_source_forecast_per_mp",
+            ),
+            models.UniqueConstraint(
+                fields=["zev"], condition=models.Q(target="connection_point"),
+                name="uniq_connection_point_per_zev",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(target="metering_point", metering_point__isnull=False)
+                    | models.Q(
+                        target="connection_point", metering_point__isnull=True, provides_live=True,
+                        provides_history=False, provides_forecast=False, held_by="zev",
+                    )
+                ),
+                name="source_target_consistent",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(held_by="participant", participant__isnull=False)
+                    | models.Q(held_by="zev", participant__isnull=True)
+                ),
+                name="source_holder_consistent",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(provides_history=True) | models.Q(provides_live=True) | models.Q(provides_forecast=True),
+                name="source_has_capability",
+            ),
+        ]
 
     def __str__(self):
-        return f"{self.get_provider_display()} for {self.metering_point_id}"
+        return f"{self.get_provider_display()} for {self.metering_point_id or 'connection point'}"
+
+    @property
+    def display_name(self) -> str:
+        """Meter id of the target, or a fixed label for the grid connection point."""
+        return self.metering_point.meter_id if self.metering_point_id else "Grid connection point"
+
+    @property
+    def capabilities(self) -> list[str]:
+        return [
+            name for name, on in (
+                ("history", self.provides_history), ("live", self.provides_live),
+                ("forecast", self.provides_forecast),
+            ) if on
+        ]
 
     # ---- validation ----
 
+    def clean_fields(self, exclude=None):
+        # ``zev`` is denormalised from the metering point; fill it in when the caller did not.
+        if self.zev_id is None and self.metering_point_id:
+            self.zev_id = self.metering_point.zev_id
+        super().clean_fields(exclude=exclude)
+
     def clean(self):
         errors = {}
-        if self.metering_point_id and not self.metering_point.has_behind_meter_generation:
-            errors["metering_point"] = (
-                "Only metering points with generation behind the meter can have an energy data source."
-            )
-        if self.participant_id and self.metering_point_id and (
-            self.participant.zev_id != self.metering_point.zev_id
-        ):
-            errors["participant"] = "Participant must belong to the same ZEV as the metering point."
+        point = self.metering_point if self.metering_point_id else None
+        if self.target == SourceTarget.CONNECTION_POINT:
+            if point is not None:
+                errors["metering_point"] = "A grid connection point source has no metering point."
+            if self.held_by != SourceHolder.ZEV:
+                errors["held_by"] = "A grid connection point source is held by the ZEV."
+            if self.provides_history or self.provides_forecast or not self.provides_live:
+                errors["provides_live"] = "A grid connection point source provides live data only."
+            if self.zev_id and self.zev.zev_type != "zev":
+                errors["target"] = "Only a physical ZEV has a grid connection point."
+        else:
+            if point is None:
+                errors["metering_point"] = "A metering point is required."
+            else:
+                if self.zev_id and point.zev_id != self.zev_id:
+                    errors["zev"] = "The ZEV must be the metering point's ZEV."
+                if self.provides_history and not point.has_behind_meter_generation:
+                    errors["metering_point"] = (
+                        "Only metering points with generation behind the meter can have an energy data source."
+                    )
+                if self.provides_history and self.held_by != SourceHolder.PARTICIPANT:
+                    errors["provides_history"] = "History is only available for participant-held sources."
+                if (self.provides_live or self.provides_forecast) and not point.is_active:
+                    errors["metering_point"] = "The metering point is not active."
+        if not (self.provides_history or self.provides_live or self.provides_forecast):
+            errors["provides_history"] = "A source must provide at least one kind of data."
+        if point is not None:
+            others = SupplementarySource.objects.filter(metering_point=point).exclude(pk=self.pk)
+            if self.provides_history and others.filter(provides_history=True).exists():
+                errors.setdefault("metering_point", "This metering point already has an energy data source.")
+            if self.provides_live and others.filter(provides_live=True).exists():
+                errors.setdefault("provides_live", "This metering point already has a live data source.")
+            if self.provides_forecast and others.filter(provides_forecast=True).exists():
+                errors.setdefault("provides_forecast", "This metering point already has a forecast source.")
+        if self.held_by == SourceHolder.PARTICIPANT:
+            if self.participant_id is None:
+                errors["participant"] = "A participant-held source needs a participant."
+            elif self.zev_id and self.participant.zev_id != self.zev_id:
+                errors["participant"] = "Participant must belong to the same ZEV as the metering point."
+        elif self.participant_id is not None:
+            errors["participant"] = "A ZEV-held source has no participant."
         if self.provider == SupplementaryProvider.SOLAR_MANAGER:
             if not SOLAR_MANAGER_ID_RE.match(self.external_id or ""):
                 errors["external_id"] = "A Solar Manager id (3 to 24 letters or digits) is required."
@@ -375,6 +486,9 @@ class SupplementarySource(models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        # ``zev`` is denormalised from the metering point; fill it in when the caller did not.
+        if self.zev_id is None and self.metering_point_id:
+            self.zev_id = self.metering_point.zev_id
         # A disabled source is always shown as disabled; re-enabling returns it
         # to ``pending`` until the next sync decides.
         before = self.status

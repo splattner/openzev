@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound
-from django.core.exceptions import ObjectDoesNotExist, ValidationError as DjangoValidationError
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import RegexValidator
 from django.db import transaction
 from .geocoding import get_cached_building_footprint
@@ -63,32 +63,54 @@ class MeteringPointSerializer(serializers.ModelSerializer):
     building = serializers.PrimaryKeyRelatedField(queryset=Building.objects.all(), required=False)
     building_name = serializers.CharField(source="building.name", read_only=True)
     supplementary_source_status = serializers.SerializerMethodField()
+    live_state = serializers.SerializerMethodField()
 
     class Meta:
         model = MeteringPoint
         fields = "__all__"
         read_only_fields = ["id", "created_at", "updated_at"]
 
-    def get_supplementary_source_status(self, obj) -> str | None:
-        """Status of the energy data source on this meter, for those who may see sources (SPEC §5.1).
+    def _source_flags(self) -> tuple[bool, bool]:
+        """``(energy data, live)`` flags, read once per serializer so a list does not query per row."""
+        if not hasattr(self, "_flags"):
+            from metering.supplementary import permissions
 
-        ``None`` while the feature is off, when there is no source, and for anyone who could not
-        read the source itself: another participant must not learn that a neighbour has one.
-        """
+            self._flags = (permissions.feature_enabled(), permissions.live_feature_enabled())
+        return self._flags
+
+    def _visible_source(self, obj, source):
+        """``source`` when the requesting user may read it, else ``None`` (never hints that one exists)."""
         from metering.supplementary import permissions
 
-        if not permissions.feature_enabled():
-            return None
-        try:
-            source = obj.supplementary_source
-        except ObjectDoesNotExist:
+        if source is None:
             return None
         request = self.context.get("request")
         user = getattr(request, "user", None)
         source.metering_point = obj  # already loaded; saves role_for a query
+        source.zev = obj.zev
         if user is None or not user.is_authenticated or permissions.role_for(user, source) == "none":
             return None
-        return source.status
+        return source
+
+    def get_supplementary_source_status(self, obj) -> str | None:
+        """Status of the history source on this meter, for those who may see sources (SPEC §5.1).
+
+        ``None`` while the feature is off, when there is no history source, and for anyone who could
+        not read the source itself: another participant must not learn that a neighbour has one.
+        """
+        if not self._source_flags()[0]:
+            return None
+        source = self._visible_source(obj, obj.history_source())
+        return source.status if source else None
+
+    def get_live_state(self, obj) -> str | None:
+        """``fresh``/``stale``/``never`` of the live source, under the same visibility rule; else ``None``."""
+        from metering.supplementary.serializers import live_state_of
+
+        if not self._source_flags()[1]:
+            return None
+        source = self._visible_source(obj, obj.live_source())
+        return live_state_of(source) if source else None
 
     def get_reading_count(self, obj):
         if hasattr(obj, "reading_count"):
@@ -140,7 +162,7 @@ class MeteringPointSerializer(serializers.ModelSerializer):
         if (
             not has_behind_meter_generation
             and self.instance is not None
-            and getattr(self.instance, "supplementary_source", None) is not None
+            and self.instance._has_history_source()
         ):
             raise serializers.ValidationError(
                 {"has_behind_meter_generation": "Disconnect the energy data source first."}

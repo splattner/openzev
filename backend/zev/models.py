@@ -854,7 +854,7 @@ class MeteringPoint(models.Model):
 
     def has_reading_history(self):
         return (self.readings.exists() or self.quarantined_readings.exists()
-                or self.supplementary_readings.exists() or hasattr(self, "supplementary_source"))
+                or self.supplementary_readings.exists() or self.supplementary_sources.exists())
 
     def validate_history_changes(self, previous, update_fields=None):
         if previous is None:
@@ -906,14 +906,25 @@ class MeteringPoint(models.Model):
                     )
                 }
             )
-        if not self.has_behind_meter_generation and self.pk and self._has_supplementary_source():
+        if not self.has_behind_meter_generation and self.pk and self._has_history_source():
             raise ValidationError(
                 {"has_behind_meter_generation": "Disconnect the energy data source first."}
             )
 
-    def _has_supplementary_source(self) -> bool:
-        # The reverse one-to-one raises a subclass of AttributeError when absent.
-        return getattr(self, "supplementary_source", None) is not None
+    def history_source(self):
+        """The source that provides 15-minute history for this meter, or ``None``.
+
+        Uses the prefetched ``supplementary_sources`` when present, so list serializers stay at
+        one query.
+        """
+        return next((s for s in self.supplementary_sources.all() if s.provides_history), None)
+
+    def live_source(self):
+        """The source that provides live data for this meter, or ``None`` (same prefetch rule)."""
+        return next((s for s in self.supplementary_sources.all() if s.provides_live), None)
+
+    def _has_history_source(self) -> bool:
+        return self.supplementary_sources.filter(provides_history=True).exists()
 
 
 class AllocationMode(models.TextChoices):

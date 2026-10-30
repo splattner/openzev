@@ -694,6 +694,14 @@ Counts are filled in as each PR lands.
 
 ### Backend
 
+PR 1 landed `metering/test_supplementary_capabilities.py` with 77 tests in the classes
+`SourceCapabilityModelTests`, `SourceCreationRightsTests`, `OrphanTaskTests`, `EligibleTests`,
+`ZevEligibleTests`, `HistoryCapabilityGuardTests`, `SourceListScopingTests`, `LiveStateTests` and
+`MeteringPointStatusTests` (the plan below, plus the eligibility, history-guard, list-scoping and
+status checks); `zev/test_transfer_supplementary.py` gained the capability fields and a
+`CapabilityArchiveTests` class (3 tests: live and ZEV-held round trip, no live state in the archive,
+older archives import as history sources).
+
 - `metering/test_supplementary_capabilities.py` — **`SourceCapabilityModelTests`**: migration
   defaults for existing rows; each partial unique constraint; target/holder check constraints;
   provider × capability matrix; history still requires `has_behind_meter_generation`; connection
@@ -761,6 +769,15 @@ Counts are filled in as each PR lands.
 2. **PR 1 — generalise the source.** Fields, constraints, migration with backfill, permissions
    (`held_by = zev`), eligibility endpoints, orphan task, flag, serializer and type changes. No live
    data yet; the supplementary suite stays green.
+
+   *Rollout (PR 1).* Source management accepts the new shapes, but the serializer refuses with a
+   `400` and a field error: `provides_forecast` ("not available yet", until PR 5, which also adds the
+   `forecast_solar` provider); `provides_live` with `provider = solar_manager` (until PR 4; live is
+   push only); a `solar_manager` source without `provides_history`; and, while the live flag is not
+   effective, anything live: `provides_live`, `target = connection_point`, `held_by = zev`. A
+   push source with `provides_live` can be created and shows `live_state = never`, but
+   `POST /live/ingest/` arrives with PR 2, so no sample is accepted yet. Uncertain at PR 1:
+   ZEV-held push tokens are not listed in the credentials overview (it lists participants' tokens).
 3. **PR 2 — live push and snapshot.** `metering/live/` (store, ingest, snapshot, curve, `me`),
    throttles, settings, W002, health keys.
 4. **PR 3 — frontend live.** Cards, curve, manager table, setup on both metering-point pages,

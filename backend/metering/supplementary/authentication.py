@@ -51,7 +51,7 @@ class SupplementaryPushAuthentication(BaseAuthentication):
         if split is None:
             raise invalid
         prefix, secret = split
-        source = SupplementarySource.objects.select_related("metering_point__zev", "participant").filter(
+        source = SupplementarySource.objects.select_related("metering_point", "zev", "participant").filter(
             push_token_prefix=prefix
         ).first()
         # One message for every failure: a caller learns whether their token works,
@@ -74,7 +74,7 @@ class IsPushSource(BasePermission):
         source = request.auth
         if not isinstance(source, SupplementarySource):
             return False
-        if source.metering_point.zev.disabled_at is not None:
+        if source.zev.disabled_at is not None:
             # An admin switched the whole community off; nothing is accepted for it meanwhile.
             self.message = "This ZEV is disabled."
             return False

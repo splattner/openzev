@@ -151,7 +151,7 @@ def gross_energy(
         min_coverage = settings.SUPPLEMENTARY_MIN_COVERAGE
 
     sources = list(
-        SupplementarySource.objects.filter(participant_id__in=list(participant_ids)).order_by("created_at", "id")
+        SupplementarySource.objects.filter(participant_id__in=list(participant_ids), provides_history=True).order_by("created_at", "id")
     )
 
     totals = {key: ZERO for key in ("consumption", "production", "import", "export", "self")}
@@ -258,7 +258,7 @@ def gross_hourly_consumption(
     if min_coverage is None:
         min_coverage = settings.SUPPLEMENTARY_MIN_COVERAGE
 
-    sources = SupplementarySource.objects.filter(participant_id__in=list(participant_ids)).order_by("created_at", "id")
+    sources = SupplementarySource.objects.filter(participant_id__in=list(participant_ids), provides_history=True).order_by("created_at", "id")
     profile = [ZERO] * 24
     expected = present = 0
     for source in sources:

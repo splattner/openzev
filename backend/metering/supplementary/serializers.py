@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
+from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import APIException, PermissionDenied
 
 from zev import access
-from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, Participant
+from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, Participant, Zev
 from allocation.validity import active_on
 
 from ..models import (
     SOLAR_MANAGER_ID_RE,
+    SourceHolder,
+    SourceTarget,
     SupplementaryProvider,
     SupplementarySource,
     SupplementaryStatus,
@@ -34,32 +39,59 @@ def _holds_personally(participant: Participant, metering_point: MeteringPoint) -
     ).exists()
 
 
+def live_state_of(source: SupplementarySource, now=None) -> str | None:
+    """``fresh``, ``stale`` or ``never`` for a source with live data, else ``None``.
+
+    Judged on ``live_last_seen_at`` (written at coarse resolution), so it is a status hint, not the
+    freshness of a value: that is decided on the sample itself.
+    """
+    if not source.provides_live:
+        return None
+    if source.live_last_seen_at is None:
+        return "never"
+    age = (now or timezone.now()) - source.live_last_seen_at
+    return "fresh" if age <= timedelta(seconds=settings.LIVE_MAX_AGE_S) else "stale"
+
+
+CAPABILITY_FIELDS = ("provides_history", "provides_live", "provides_forecast")
+
+
 class SupplementarySourceSerializer(serializers.ModelSerializer):
     """The connection, never its secrets (SPEC §4.1)."""
 
-    metering_point_meter_id = serializers.CharField(source="metering_point.meter_id", read_only=True)
+    metering_point_meter_id = serializers.SerializerMethodField()
     participant_name = serializers.SerializerMethodField()
     has_credential = serializers.SerializerMethodField()
+    live_state = serializers.SerializerMethodField()
     api_key = serializers.CharField(write_only=True, required=False, allow_blank=False, trim_whitespace=True)
     consent = serializers.BooleanField(write_only=True, required=False)
+    provides_history = serializers.BooleanField(required=False)
+    provides_live = serializers.BooleanField(required=False)
+    provides_forecast = serializers.BooleanField(required=False)
 
     class Meta:
         model = SupplementarySource
         fields = [
-            "id", "metering_point", "metering_point_meter_id", "participant", "participant_name",
+            "id", "zev", "target", "held_by", "metering_point", "metering_point_meter_id", "participant",
+            "participant_name", "provides_history", "provides_live", "provides_forecast",
             "provider", "label", "external_id", "enabled", "status", "consented_at", "last_sync_at",
             "last_success_at", "last_error", "synced_through", "covers_from", "reconciliation",
+            "live_last_seen_at", "live_state",
             "has_credential", "push_token_prefix", "push_token_created_at", "push_token_last_used_at",
             "created_at", "updated_at", "api_key", "consent",
         ]
         read_only_fields = [
             "id", "status", "consented_at", "last_sync_at", "last_success_at", "last_error",
             "synced_through", "covers_from", "reconciliation", "push_token_prefix", "push_token_created_at",
-            "push_token_last_used_at", "created_at", "updated_at",
+            "push_token_last_used_at", "live_last_seen_at", "created_at", "updated_at",
         ]
         extra_kwargs = {
             # Set from the request; only an admin acting on a participant's behalf names one.
             "participant": {"required": False},
+            # Derived from the metering point; only the grid connection point names its ZEV.
+            "zev": {"required": False},
+            "target": {"required": False},
+            "held_by": {"required": False},
         }
 
     def __init__(self, *args, **kwargs):
@@ -72,9 +104,18 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
             self.fields["metering_point"].queryset = MeteringPoint.objects.filter(
                 Q(zev__in=access.viewable_zev_ids(user)) | Q(assignments__participant__user=user)
             ).distinct()
+            self.fields["zev"].queryset = Zev.objects.filter(pk__in=access.viewable_zev_ids(user))
 
-    def get_participant_name(self, obj) -> str:
+    def get_metering_point_meter_id(self, obj) -> str | None:
+        return obj.metering_point.meter_id if obj.metering_point_id else None
+
+    def get_participant_name(self, obj) -> str | None:
+        if obj.participant_id is None:
+            return None
         return f"{obj.participant.first_name} {obj.participant.last_name}".strip()
+
+    def get_live_state(self, obj) -> str | None:
+        return live_state_of(obj)
 
     def get_has_credential(self, obj) -> bool:
         return obj.has_credential
@@ -82,7 +123,7 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
     # ---- field level ----
 
     def validate_metering_point(self, metering_point):
-        if self.instance is not None and metering_point.pk != self.instance.metering_point_id:
+        if self.instance is not None and (metering_point is None or metering_point.pk != self.instance.metering_point_id):
             raise serializers.ValidationError("A source cannot be moved to another metering point.")
         return metering_point
 
@@ -101,21 +142,111 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
             return self._validate_create(attrs, user)
         return self._validate_update(attrs, user)
 
+    def _check_rollout(self, *, provider, live, forecast, history, adds_live, target=None, held_by=None):
+        """Restrictions of the first live-data release; each lifts with the PR named in SPEC-live §10."""
+        if forecast:
+            raise serializers.ValidationError({"provides_forecast": ["Production forecasts are not available yet."]})
+        if adds_live and not permissions.live_feature_enabled():
+            raise serializers.ValidationError({"provides_live": ["Live energy data is not enabled."]})
+        if target == SourceTarget.CONNECTION_POINT and not permissions.live_feature_enabled():
+            raise serializers.ValidationError({"target": ["Live energy data is not enabled."]})
+        if held_by == SourceHolder.ZEV and not permissions.live_feature_enabled():
+            raise serializers.ValidationError({"held_by": ["Live energy data is not enabled."]})
+        if live and provider != SupplementaryProvider.PUSH:
+            raise serializers.ValidationError(
+                {"provides_live": ["Live data is only available for push sources at the moment."]}
+            )
+        if provider == SupplementaryProvider.SOLAR_MANAGER and not history:
+            raise serializers.ValidationError(
+                {"provides_history": ["A Solar Manager source provides history."]}
+            )
+
+    def _check_conflicts(self, metering_point, *, history, live, forecast, exclude_pk=None):
+        """A capability exists once per metering point (also guaranteed by partial unique constraints)."""
+        existing = SupplementarySource.objects.filter(metering_point=metering_point)
+        if exclude_pk is not None:
+            existing = existing.exclude(pk=exclude_pk)
+        errors = {}
+        if history and existing.filter(provides_history=True).exists():
+            errors["provides_history"] = ["This metering point already has an energy data source."]
+        if live and existing.filter(provides_live=True).exists():
+            errors["provides_live"] = ["This metering point already has a live data source."]
+        if forecast and existing.filter(provides_forecast=True).exists():
+            errors["provides_forecast"] = ["This metering point already has a forecast source."]
+        if errors:
+            raise serializers.ValidationError(errors)
+
     def _validate_create(self, attrs, user):
-        metering_point = attrs.get("metering_point")
-        if metering_point is None:
-            raise serializers.ValidationError({"metering_point": ["This field is required."]})
+        target = attrs.get("target", SourceTarget.METERING_POINT)
+        is_cp = target == SourceTarget.CONNECTION_POINT
+        held_by = attrs.get("held_by", SourceHolder.ZEV if is_cp else SourceHolder.PARTICIPANT)
         provider = attrs.get("provider")
         if not provider:
             raise serializers.ValidationError({"provider": ["This field is required."]})
+        history = attrs.get("provides_history", not is_cp and held_by == SourceHolder.PARTICIPANT)
+        live = attrs.get("provides_live", is_cp)
+        forecast = attrs.get("provides_forecast", False)
+        attrs.update(target=target, held_by=held_by, provides_history=history, provides_live=live,
+                     provides_forecast=forecast)
 
+        self._check_rollout(
+            provider=provider, live=live, forecast=forecast, history=history, adds_live=live,
+            target=target, held_by=held_by,
+        )
+        if not (history or live or forecast):
+            raise serializers.ValidationError({"provides_history": ["Choose what the source provides."]})
         if not attrs.get("consent"):
             raise serializers.ValidationError(
                 {"consent": ["Consent is required to connect an energy data source."]}
             )
 
-        # Who is the consenting holder?
-        if user.is_admin:
+        if is_cp:
+            self._validate_connection_point(attrs, user, held_by, history, live, forecast)
+        else:
+            self._validate_metering_point_target(attrs, user, held_by, history)
+
+        self._validate_provider_fields(attrs, provider)
+        return attrs
+
+    def _validate_connection_point(self, attrs, user, held_by, history, live, forecast):
+        if attrs.get("metering_point") is not None:
+            raise serializers.ValidationError({"metering_point": ["The grid connection point has no metering point."]})
+        if held_by != SourceHolder.ZEV or history or not live or forecast:
+            raise serializers.ValidationError(
+                {"target": ["The grid connection point is held by the ZEV and provides live data only."]}
+            )
+        zev = attrs.get("zev")
+        if zev is None:
+            raise serializers.ValidationError({"zev": ["This field is required."]})
+        if not user.is_admin and not access.can_manage(user, zev):
+            raise PermissionDenied("Only a manager of the ZEV can connect its grid connection point.")
+        if zev.zev_type != "zev":
+            raise serializers.ValidationError({"target": ["Only a physical ZEV has a grid connection point."]})
+        if SupplementarySource.objects.filter(zev=zev, target=SourceTarget.CONNECTION_POINT).exists():
+            raise serializers.ValidationError({"target": ["This ZEV already has a grid connection point source."]})
+        attrs["participant"] = None
+
+    def _validate_metering_point_target(self, attrs, user, held_by, history):
+        metering_point = attrs.get("metering_point")
+        if metering_point is None:
+            raise serializers.ValidationError({"metering_point": ["This field is required."]})
+        if attrs.get("zev") is not None and attrs["zev"].pk != metering_point.zev_id:
+            raise serializers.ValidationError({"zev": ["This is not the ZEV of the metering point."]})
+        attrs["zev"] = metering_point.zev
+
+        # Who is the consenting holder (or operator)?
+        if held_by == SourceHolder.ZEV:
+            if attrs.get("participant") is not None:
+                raise serializers.ValidationError({"participant": ["A ZEV-held source has no participant."]})
+            if not user.is_admin and not access.can_manage(user, metering_point.zev):
+                raise PermissionDenied("Only a manager of the ZEV can connect a metering point on its behalf.")
+            if permissions.personally_held_today(metering_point):
+                message = "A participant holds this metering point personally; they connect it themselves."
+                if user.is_admin:
+                    raise serializers.ValidationError({"metering_point": [message]})
+                raise PermissionDenied(message)
+            attrs["participant"] = None
+        elif user.is_admin:
             participant = attrs.get("participant")
             if participant is None:
                 raise serializers.ValidationError({"participant": ["An admin names the participant to connect for."]})
@@ -129,15 +260,22 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
                 raise PermissionDenied(
                     "Only the participant who personally holds this metering point can connect an energy data source."
                 )
-        attrs["participant"] = participant
+            attrs["participant"] = participant
 
-        if not metering_point.has_behind_meter_generation:
-            raise serializers.ValidationError(
-                {"metering_point": ["Only metering points with generation behind the meter can have an energy data source."]}
-            )
-        if SupplementarySource.objects.filter(metering_point=metering_point).exists():
-            raise serializers.ValidationError({"metering_point": ["This metering point already has an energy data source."]})
+        if history:
+            if held_by != SourceHolder.PARTICIPANT:
+                raise serializers.ValidationError({"provides_history": ["History is only available for participant-held sources."]})
+            if not metering_point.has_behind_meter_generation:
+                raise serializers.ValidationError(
+                    {"metering_point": ["Only metering points with generation behind the meter can have an energy data source."]}
+                )
+        if attrs["provides_live"] and not metering_point.is_active:
+            raise serializers.ValidationError({"metering_point": ["The metering point is not active."]})
+        self._check_conflicts(
+            metering_point, history=history, live=attrs["provides_live"], forecast=attrs["provides_forecast"]
+        )
 
+    def _validate_provider_fields(self, attrs, provider):
         if provider == SupplementaryProvider.SOLAR_MANAGER:
             errors = {}
             if not attrs.get("external_id"):
@@ -153,16 +291,21 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"external_id": ["Only Solar Manager sources have an external id."]})
             if attrs.get("api_key"):
                 raise serializers.ValidationError({"api_key": ["Only Solar Manager sources take an API key."]})
-        return attrs
 
     def _validate_update(self, attrs, user):
         role = permissions.role_for(user, self.instance)
-        attrs.pop("consent", None)
-        if "participant" in attrs and attrs["participant"] != self.instance.participant:
+        instance = self.instance
+        consent = attrs.pop("consent", None)
+        if "participant" in attrs and attrs["participant"] != instance.participant:
             raise serializers.ValidationError({"participant": ["A source cannot be handed to another participant."]})
         attrs.pop("participant", None)
         attrs.pop("metering_point", None)
-        if "provider" in attrs and attrs["provider"] != self.instance.provider:
+        for name in ("target", "held_by", "zev"):
+            value = attrs.pop(name, None)
+            current = getattr(instance, name)
+            if value is not None and value != current:
+                raise serializers.ValidationError({name: ["This cannot be changed after the source is created."]})
+        if "provider" in attrs and attrs["provider"] != instance.provider:
             raise serializers.ValidationError({"provider": ["The provider cannot be changed."]})
         attrs.pop("provider", None)
 
@@ -172,7 +315,39 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
                 raise PermissionDenied("A ZEV manager can only switch an energy data source on or off.")
             return attrs
 
-        instance = self.instance
+        if any(name in attrs for name in CAPABILITY_FIELDS):
+            history = attrs.get("provides_history", instance.provides_history)
+            live = attrs.get("provides_live", instance.provides_live)
+            forecast = attrs.get("provides_forecast", instance.provides_forecast)
+            adds_live = live and not instance.provides_live
+            self._check_rollout(
+                provider=instance.provider, live=live, forecast=forecast, history=history, adds_live=adds_live,
+            )
+            if not (history or live or forecast):
+                raise serializers.ValidationError({"provides_history": ["A source must provide at least one kind of data."]})
+            if instance.target == SourceTarget.CONNECTION_POINT and (history or forecast or not live):
+                raise serializers.ValidationError(
+                    {"provides_live": ["The grid connection point provides live data only."]}
+                )
+            if adds_live and not consent:
+                raise serializers.ValidationError(
+                    {"consent": ["Consent is required to connect an energy data source."]}
+                )
+            if history and not instance.provides_history:
+                if instance.held_by != SourceHolder.PARTICIPANT:
+                    raise serializers.ValidationError({"provides_history": ["History is only available for participant-held sources."]})
+                if not instance.metering_point.has_behind_meter_generation:
+                    raise serializers.ValidationError({"provides_history": [
+                        "Only metering points with generation behind the meter can have an energy data source."]})
+            if instance.metering_point_id:
+                self._check_conflicts(
+                    instance.metering_point,
+                    history=history and not instance.provides_history,
+                    live=live and not instance.provides_live,
+                    forecast=forecast and not instance.provides_forecast,
+                    exclude_pk=instance.pk,
+                )
+
         if instance.provider != SupplementaryProvider.SOLAR_MANAGER:
             if attrs.get("external_id"):
                 raise serializers.ValidationError({"external_id": ["Only Solar Manager sources have an external id."]})

@@ -5,6 +5,7 @@ import type {
   SupplementarySourceCreated,
   SupplementarySourceInput,
   SupplementarySourceUpdate,
+  ZevEligibleSources,
 } from '../../types/api'
 import { api } from './client'
 import { fetchAllPages } from './pagination'
@@ -35,6 +36,12 @@ export async function listSupplementarySources(): Promise<SupplementarySource[]>
 /** The flagged meters the user personally holds. Answers 404 while the feature is off. */
 export async function listEligibleMeteringPoints(): Promise<EligibleMeteringPoint[]> {
   const { data } = await api.get<EligibleMeteringPoint[]>(`${BASE}eligible/`)
+  return data
+}
+
+/** Metering points nobody holds personally and the connection point, for a manager. 404 while the live flag is off. */
+export async function fetchZevEligibleSources(zevId: string): Promise<ZevEligibleSources> {
+  const { data } = await api.get<ZevEligibleSources>(`${BASE}zev-eligible/`, { params: { zev_id: zevId } })
   return data
 }
 

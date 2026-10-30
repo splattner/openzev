@@ -572,6 +572,7 @@ class FeatureFlag(models.Model):
     MCP_SERVER_ENABLED = "mcp_server_enabled"
     SUPPLEMENTARY_ENERGY_DATA_ENABLED = "supplementary_energy_data_enabled"
     ANALYTICS_TOKENS_ENABLED = "analytics_tokens_enabled"
+    LIVE_ENERGY_DATA_ENABLED = "live_energy_data_enabled"
 
     name = models.CharField(max_length=100, unique=True)
     description = models.CharField(max_length=255, blank=True, default="")
@@ -877,4 +878,12 @@ FeatureFlag.register(
         "INTEGRATION_ENCRYPTION_KEYS is set. Solar Manager calls the vendor's cloud."
     ),
     dynamic_default=_integration_key_configured,
+)
+FeatureFlag.register(
+    FeatureFlag.LIVE_ENERGY_DATA_ENABLED,
+    default=False,
+    description=(
+        "Live power from energy data sources (push), ZEV-operated meters and the grid connection "
+        "point. Needs the energy data feature too. Values are indicative, short-lived, never billing (ADR 0044)."
+    ),
 )

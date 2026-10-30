@@ -59,7 +59,7 @@ def participants_gross(participant_ids: Iterable, start: datetime, end: datetime
     if not feature_enabled():
         return {}
     ids = list(participant_ids)
-    with_source = SupplementarySource.objects.filter(participant_id__in=ids).values_list("participant_id", flat=True)
+    with_source = SupplementarySource.objects.filter(participant_id__in=ids, provides_history=True).values_list("participant_id", flat=True)
     key = bucket_key_for(bucket) if bucket else None
     return {
         str(pid): gross_energy([pid], start, end, bucket_key=key)
@@ -127,7 +127,7 @@ def statement_gross(participant_id, year: int):
     and the year's, or ``(None, None)`` while the feature is off or the participant has no
     source.
     """
-    if not feature_enabled() or not SupplementarySource.objects.filter(participant_id=participant_id).exists():
+    if not feature_enabled() or not SupplementarySource.objects.filter(participant_id=participant_id, provides_history=True).exists():
         return None, None
     months = []
     for month in range(1, 13):
