@@ -102,6 +102,8 @@ export const queryKeys = {
       ['metering', 'quality-status', dateFrom, dateTo, zevId ?? 'all', meteringPointId ?? 'all'] as const,
     supplementarySources: () => ['metering', 'supplementary-sources'] as const,
     supplementaryEligible: () => ['metering', 'supplementary-eligible'] as const,
+    supplementaryZevEligibleAll: () => ['metering', 'supplementary-zev-eligible'] as const,
+    supplementaryZevEligible: (zevId: string) => ['metering', 'supplementary-zev-eligible', zevId] as const,
     supplementaryReconciliation: (sourceId: string) => ['metering', 'supplementary-reconciliation', sourceId] as const,
     hourlyProfile: (dateFrom: string, dateTo: string, zevId?: string, participantId?: string) =>
       ['metering', 'hourly-profile', dateFrom, dateTo, zevId ?? 'all', participantId ?? 'all'] as const,

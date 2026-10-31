@@ -327,6 +327,22 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         }
     })
 
+    it('with the live flag on, a manager gets My metering points for any held meter with a capability, not for one without', async () => {
+        mockSession('manager')
+        const held = (eligible_capabilities: Array<'history' | 'live'>) => [
+            { metering_point: 'mp-1', meter_id: 'CH-1', zev: ZEV.id, zev_name: ZEV.name, participant: 'p-1', source: null, eligible_capabilities },
+        ]
+        for (const [capabilities, expected] of [[['live'], true], [['history', 'live'], true], [[], false]] as const) {
+            mockEligible.mockResolvedValue(held([...capabilities]))
+            const page = await renderLayout()
+            try {
+                expect(page.hasHref('/me/metering-points')).toBe(expected)
+            } finally {
+                page.unmount()
+            }
+        }
+    })
+
     it('participant sees Dashboard, My invoices and Annual statement only', async () => {
         mockSession('participant')
         const page = await renderLayout()

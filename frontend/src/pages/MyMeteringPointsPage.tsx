@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { BehindMeterBadge } from '../components/BehindMeterBadge'
@@ -7,6 +8,7 @@ import { PageHeader } from '../components/PageHeader'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { ScopeGuard } from '../components/ScopeGuard'
 import { MeteringDataLink } from '../features/supplementary/MeteringDataLink'
+import { LiveSourceSection } from '../features/supplementary/LiveSourceSection'
 import { MeteringPointEnergyData } from '../features/supplementary/MeteringPointEnergyData'
 import { queryKeys } from '../lib/api/queryKeys'
 import { listSupplementarySources } from '../lib/api/supplementary'
@@ -14,7 +16,7 @@ import { fetchMeteringPoints } from '../lib/api/zev'
 import { useCommunityAccess, useScopeNote } from '../lib/communityAccess'
 import { useManagedZev } from '../lib/managedZev'
 import { selectedCommunityName } from '../lib/membership'
-import { useEnergyDataEligibility } from '../lib/supplementary'
+import { hasCapability, historyEligible, liveEligible, sourceFor, useEnergyDataEligibility } from '../lib/supplementary'
 import type { MeteringPoint } from '../types/api'
 
 /**
@@ -66,13 +68,14 @@ function MyMeteringPointsView() {
         enabled: energyData.featureOn,
     })
 
-    const eligible = energyData.eligible.filter((point) => point.zev === selectedZevId)
+    // With the live flag on the list holds every held meter: a point is set up here only for a
+    // capability it has (history behind the meter, live anywhere active); the rest stays plain.
+    const eligible = energyData.eligible.filter((point) => point.zev === selectedZevId && hasCapability(point))
     const eligibleByPoint = new Map(eligible.map((point) => [point.metering_point, point]))
     // The key is shared with the metering points page, so a disabled query can still hold the
     // community's whole list from a visit there: only a participant's own list is used.
     const ownPoints = isParticipantScope ? (pointsQuery.data ?? []) : []
     const plainPoints = ownPoints.filter((point) => !eligibleByPoint.has(point.id))
-    const sources = sourcesQuery.data ?? []
 
     const loading = energyData.isLoading || (isParticipantScope && pointsQuery.isLoading)
     if (loading) return <PageSkeleton variant="cardList" />
@@ -107,19 +110,38 @@ function MyMeteringPointsView() {
                 </div>
             )}
 
-            {energyData.featureOn && eligible.length > 0 && (
+            {energyData.featureOn && eligible.some(historyEligible) && (
                 <p className="muted m-0">{t('supplementary.section.description')}</p>
+            )}
+            {energyData.featureOn && eligible.some(liveEligible) && (
+                <p className="muted m-0">{t('supplementary.live.description')}</p>
             )}
 
             {eligible.map((point) => (
-                <MeteringPointEnergyData
-                    key={point.metering_point}
-                    point={point}
-                    source={sources.find((candidate) => candidate.metering_point === point.metering_point)}
-                    sourcesUnavailable={sourcesUnavailable}
-                    onRetrySources={() => void sourcesQuery.refetch()}
-                    confirm={confirm}
-                />
+                <Fragment key={point.metering_point}>
+                    {historyEligible(point) && (
+                        <MeteringPointEnergyData
+                            point={point}
+                            source={sourceFor(sourcesQuery.data, point.metering_point, 'history')}
+                            sourcesUnavailable={sourcesUnavailable}
+                            onRetrySources={() => void sourcesQuery.refetch()}
+                            confirm={confirm}
+                        />
+                    )}
+                    {liveEligible(point) && (
+                        <LiveSourceSection
+                            meteringPointId={point.metering_point}
+                            meterId={point.meter_id}
+                            zevId={point.zev}
+                            zevName={point.zev_name}
+                            heldBy="participant"
+                            sources={sourcesQuery.data}
+                            sourcesUnavailable={point.sources?.live || point.sources?.history ? sourcesUnavailable : undefined}
+                            onRetrySources={() => void sourcesQuery.refetch()}
+                            confirm={confirm}
+                        />
+                    )}
+                </Fragment>
             ))}
 
             {plainPoints.map((point) => (

@@ -10,6 +10,7 @@ import {
   faPlus,
   faRightLeft,
   faSolarPanel,
+  faTowerBroadcast,
   faTrash,
   faUserPlus,
   type IconDefinition,
@@ -24,6 +25,7 @@ import { formatBusinessIsoDate } from '../../lib/dates'
 import { formatNumber } from '../../lib/numbers'
 import { statusTone } from '../../lib/supplementary'
 import type { AppSettings, MeteringPoint, MeteringPointAssignment } from '../../types/api'
+import { LiveStateChip } from './LiveStateChip'
 import { SupplementarySourceStatus } from './SupplementarySourceStatus'
 import {
   assignmentStateBadgeClass,
@@ -71,6 +73,8 @@ type MeteringPointRowProps = {
   onOpenEditAssignment: (assignment: MeteringPointAssignment) => void
   onDeleteMeteringPoint: (id: string) => void
   onDeleteAssignment: (id: string) => void
+  /** A manager can set up live data on this point (nobody holds it personally); opens its live dialog. */
+  onOpenLive?: (point: MeteringPoint) => void
 }
 
 /**
@@ -102,6 +106,7 @@ export function MeteringPointRow({
   onOpenEditAssignment,
   onDeleteMeteringPoint,
   onDeleteAssignment,
+  onOpenLive,
 }: MeteringPointRowProps) {
   const { t } = useTranslation()
   const actionsId = `metering-point-actions-${point.id}`
@@ -184,6 +189,13 @@ export function MeteringPointRow({
         onClick: () => confirmRemoveAssignment(current[0]),
       })
     }
+    if (onOpenLive) pointMenuItems.push({
+      key: 'live',
+      section: pointSection,
+      label: t('pages.meteringPoints.liveData'),
+      icon: <FontAwesomeIcon icon={faTowerBroadcast} fixedWidth />,
+      onClick: () => onOpenLive(point),
+    })
     pointMenuItems.push({
       key: 'edit',
       section: pointSection,
@@ -298,6 +310,9 @@ export function MeteringPointRow({
             )}
             {!point.is_active && <span className="badge badge-neutral">{t('pages.meteringPoints.inactive')}</span>}
             {point.has_behind_meter_generation && <BehindMeterBadge />}
+            {isManagedScope && point.live_state && (
+              <LiveStateChip state={point.live_state} onClick={onOpenLive ? () => onOpenLive(point) : undefined} />
+            )}
             {isManagedScope && sourceNeedsAttention && (
               <SupplementarySourceStatus point={point} canManage={!readOnly} confirm={confirm} />
             )}

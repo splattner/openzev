@@ -12,7 +12,7 @@ import {
     updateSupplementarySource,
 } from '../../lib/api/supplementary'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
-import { STATUS_BADGE_CLASS, statusTone, useEnergyDataEligibility } from '../../lib/supplementary'
+import { STATUS_BADGE_CLASS, sourceFor, statusTone, useEnergyDataEligibility } from '../../lib/supplementary'
 import { useToast } from '../../lib/toast'
 import type { MeteringPoint } from '../../types/api'
 import { ReconciliationSummary } from '../supplementary/ReconciliationSummary'
@@ -41,15 +41,17 @@ interface Props {
 export function SupplementarySourceStatus({ point, canManage, confirm }: Props) {
     const { t } = useTranslation()
     const [open, setOpen] = useState(false)
-    const { featureOn, eligible } = useEnergyDataEligibility()
+    const { featureOn, eligible, historyEligible } = useEnergyDataEligibility()
     // The signed-in user holds this meter themselves (a manager who is also a participant): the
     // credential is theirs, so they set the source up and manage it on their own page.
     const isOwnMeter = eligible.some((entry) => entry.metering_point === point.id)
+    // Only a meter that qualifies for history can be connected here; with the live flag on `eligible` lists every held meter.
+    const canConnectOwn = historyEligible.some((entry) => entry.metering_point === point.id)
     const status = point.supplementary_source_status
     if (!status) {
         // A quiet marker, not a warning: the data is optional and the participant decides.
         if (!featureOn || !point.has_behind_meter_generation) return null
-        return isOwnMeter ? (
+        return canConnectOwn ? (
             <Link className="badge badge-neutral" style={{ textDecoration: 'none' }} to="/me/metering-points" title={t('supplementary.owner.connectOwnHint')}>
                 {t('supplementary.owner.connectOwn')}
             </Link>
@@ -82,7 +84,7 @@ function SourcePanel({ point, canManage, isOwnMeter, confirm, onClose }: Props &
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
     const sourcesQuery = useQuery({ queryKey: queryKeys.metering.supplementarySources(), queryFn: listSupplementarySources })
-    const source = sourcesQuery.data?.find((candidate) => candidate.metering_point === point.id)
+    const source = sourceFor(sourcesQuery.data, point.id, 'history')
 
     function refresh() {
         void queryClient.invalidateQueries({ queryKey: queryKeys.metering.supplementarySources() })

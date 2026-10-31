@@ -12,8 +12,8 @@ import {
     updateSupplementarySource,
 } from '../../lib/api/supplementary'
 import { formatApiError } from '../../lib/api/errors'
-import { queryKeys } from '../../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
+import { invalidateSourceQueries } from '../../lib/supplementary'
 import { useToast } from '../../lib/toast'
 import type { EligibleMeteringPoint, SupplementarySource } from '../../types/api'
 import { CsvImport } from './CsvImport'
@@ -53,13 +53,7 @@ export function SupplementarySourceCard({ point, source, confirm }: Props) {
     const isSolar = source.provider === 'solar_manager'
     const disconnected = !source.enabled
 
-    function refresh() {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.metering.supplementarySources() })
-        void queryClient.invalidateQueries({ queryKey: queryKeys.metering.supplementaryEligible() })
-        void queryClient.invalidateQueries({ queryKey: ['metering', 'dashboard-summary'] })
-        // The status chip on the metering-point list comes from the point itself.
-        void queryClient.invalidateQueries({ queryKey: ['metering', 'points'] })
-    }
+    const refresh = () => invalidateSourceQueries(queryClient)
     const onError = (error: unknown) => pushToast(formatApiError(error, t('common.error')), 'error')
 
     const test = useMutation({

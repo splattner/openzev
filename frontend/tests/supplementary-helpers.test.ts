@@ -1,5 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
-import { grossRate, ingestUrl, statusTone, withheldReasonKey } from '../src/lib/supplementary'
+import {
+    connectionPointSource,
+    grossRate,
+    hasCapability,
+    historyEligible,
+    ingestUrl,
+    liveEligible,
+    liveIngestUrl,
+    sourceFor,
+    statusTone,
+    withheldReasonKey,
+} from '../src/lib/supplementary'
 import type { GrossEnergy } from '../src/types/api'
 
 const gross = (overrides: Partial<GrossEnergy> = {}): GrossEnergy => ({
@@ -84,5 +95,47 @@ describe('ingestUrl', () => {
         expect(absolute('https://zev.example.ch')).toBe('https://api.example.ch/v1/metering/supplementary/ingest/')
         vi.doUnmock('../src/lib/api/client')
         vi.resetModules()
+    })
+})
+
+describe('live endpoint and eligibility helpers', () => {
+    it('derives the live address next to the history address', () => {
+        expect(liveIngestUrl('https://zev.example')).toBe(ingestUrl('https://zev.example').replace('/supplementary/ingest/', '/live/ingest/'))
+        expect(liveIngestUrl('https://zev.example')).toMatch(/\/metering\/live\/ingest\/$/)
+    })
+
+    it('reads history eligibility from the capabilities, and from their absence while the live flag is off', () => {
+        expect(historyEligible({})).toBe(true) // legacy list: behind-meter points only
+        expect(historyEligible({ eligible_capabilities: ['history', 'live'] })).toBe(true)
+        expect(historyEligible({ eligible_capabilities: ['live'] })).toBe(false) // a plain consumption meter
+        expect(historyEligible({ eligible_capabilities: [] })).toBe(false)
+    })
+
+    it('reads live eligibility only from the capabilities', () => {
+        expect(liveEligible({})).toBe(false)
+        expect(liveEligible({ eligible_capabilities: ['live'] })).toBe(true)
+        expect(liveEligible({ eligible_capabilities: ['history'] })).toBe(false)
+    })
+
+    it('has a capability when either history or live is on offer', () => {
+        expect(hasCapability({})).toBe(true)
+        expect(hasCapability({ eligible_capabilities: ['live'] })).toBe(true)
+        expect(hasCapability({ eligible_capabilities: [] })).toBe(false)
+    })
+
+    it('picks the history and the live source of a point, and the connection point source of a ZEV', () => {
+        const base = { zev: 'z1', target: 'metering_point' as const, provides_history: false, provides_live: false }
+        const history = { ...base, id: 'h', metering_point: 'mp-1', provides_history: true }
+        const live = { ...base, id: 'l', metering_point: 'mp-1', provides_live: true }
+        const other = { ...base, id: 'o', metering_point: 'mp-2', provides_live: true }
+        const connection = { ...base, id: 'c', metering_point: null, target: 'connection_point' as const, provides_live: true }
+        const sources = [history, live, other, connection]
+
+        expect(sourceFor(sources, 'mp-1', 'history')?.id).toBe('h')
+        expect(sourceFor(sources, 'mp-1', 'live')?.id).toBe('l')
+        expect(sourceFor(sources, 'mp-3', 'live')).toBeUndefined()
+        expect(sourceFor(undefined, 'mp-1', 'live')).toBeUndefined()
+        expect(connectionPointSource(sources, 'z1')?.id).toBe('c')
+        expect(connectionPointSource(sources, 'z2')).toBeUndefined()
     })
 })

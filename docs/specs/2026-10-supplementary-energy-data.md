@@ -641,7 +641,12 @@ admin gets `[]` unless linked to a participant), the flagged meters they hold pe
   is write-only, input type `password`, never echoed), with a link to where to create the key;
   for Push/File a one-time token display with a copy button, the endpoint URL, the CSV column
   list, and the Home Assistant recipe link.
-- Mutations invalidate `metering.supplementarySources` and the dashboard queries.
+- Mutations invalidate `metering.supplementarySources` and the dashboard queries (through
+  `invalidateSourceQueries`, which also refreshes the live queries and eligibility).
+- **Eligibility with the live flag on.** `eligible` then lists every held point, not only behind-meter
+  ones. The history card, `canConnect`, the dashboards' call to action and the "connect your energy
+  data" badge use `historyEligible` (capability `history`, or no `eligible_capabilities` field while
+  the flag is off); live setup is in SPEC-2026-live-energy-data §7.2.
 - `accountTabs.ts` no longer has an `'energy-data'` tab; `resolveAccountTab` takes only
   `mustChangePassword`.
 

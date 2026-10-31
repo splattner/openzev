@@ -31,7 +31,7 @@ const building = (id: string, name: string, count: number): Building => ({
 const point = (id: string, over: Partial<MeteringPoint> = {}): MeteringPoint => ({
     id, zev: 'z', meter_id: id, meter_type: 'consumption', is_active: true, building: 'b1', building_name: 'Haus A',
     has_behind_meter_generation: false, reading_count: 10, assignment_count: 0, first_reading_at: null,
-    last_reading_at: '2026-10-01T10:00:00Z', supplementary_source_status: null, ...over,
+    last_reading_at: '2026-10-01T10:00:00Z', supplementary_source_status: null, live_state: null, ...over,
 })
 
 const assignment = (id: string, meteringPoint: string, participant: string, over: Partial<MeteringPointAssignment> = {}): MeteringPointAssignment => ({
@@ -422,6 +422,40 @@ describe('MeteringPointsList', () => {
         expect(remove).not.toHaveBeenCalled()
         confirm.mock.calls[0][0].onConfirm()
         expect(remove).toHaveBeenCalledExactlyOnceWith('a1')
+    })
+
+    it('marks a point with a live source with a quiet live chip, and nothing on one without', () => {
+        const view = render({ points: [point('m1', { live_state: 'stale' }), point('m2')], groups: null })
+        const chips = Array.from(view.querySelectorAll('.metering-point-id .badge')).map((node) => node.textContent)
+        expect(chips).toEqual(['supplementary.live.chip.stale'])
+        expect(view.querySelector('.metering-point-id button.badge')).toBeNull()
+    })
+
+    const menuLabels = async (view: HTMLElement) => {
+        act(() => view.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!.click())
+        await waitForCondition(() => !!document.querySelector('[role="menuitem"]'), 'point menu')
+        return Array.from(document.querySelectorAll('[role="menuitem"]')).map((item) => item.textContent ?? '')
+    }
+
+    it('opens the live dialog from the chip and from the point menu of a point the manager can set live data up on', async () => {
+        const open = vi.fn()
+        const view = render({ points: [point('m1', { live_state: 'fresh' })], groups: null, liveSetupPointIds: new Set(['m1']), onOpenLive: open })
+        act(() => view.querySelector<HTMLButtonElement>('.metering-point-id button.badge')!.click())
+        expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: 'm1' }))
+
+        expect((await menuLabels(view)).some((label) => label.includes('pages.meteringPoints.liveData'))).toBe(true)
+    })
+
+    it('offers no live action on a point the manager cannot set live data up on', async () => {
+        const view = render({ points: [point('m2')], groups: null, liveSetupPointIds: new Set(['m1']), onOpenLive: vi.fn() })
+
+        expect((await menuLabels(view)).some((label) => label.includes('pages.meteringPoints.liveData'))).toBe(false)
+    })
+
+    it('shows no live action to a viewer, but keeps the chip as plain text', () => {
+        const view = render({ points: [point('m1', { live_state: 'fresh' })], groups: null, readOnly: true })
+        expect(view.querySelector('.metering-point-id .badge')!.textContent).toBe('supplementary.live.chip.fresh')
+        expect(view.querySelector('.metering-point-id button.badge')).toBeNull()
     })
 
 })
