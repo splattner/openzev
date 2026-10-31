@@ -17,6 +17,7 @@ import { PeriodSelector } from '../../components/PeriodSelector'
 import { ConsumptionSplitCard } from '../../components/dashboard/ConsumptionSplitCard'
 import { GrossEnergyCallToAction, GrossEnergyCard } from '../../components/dashboard/GrossEnergyCard'
 import { EnergyFlowCard } from '../../components/dashboard/EnergyFlowCard'
+import { LiveEnergySection } from '../../components/dashboard/LiveEnergySection'
 import { HourlyProfileSection } from '../../components/dashboard/HourlyProfileSection'
 import { ParticipantInvoicesCard } from '../../components/dashboard/ParticipantInvoicesCard'
 import { type DashboardBodyProps, type DashboardBucket, useBucketLabelFormatters, useHourlyProfileRows } from './dashboardShared'
@@ -102,6 +103,8 @@ export function ParticipantDashboardBody({ interval, period, onPeriodChange, per
 
     return (
         <>
+            {/* Live is "now" and ignores the period selected below. */}
+            <LiveEnergySection zevId={selectedZevId || undefined} />
             <section className="filter-bar">
                 {interval && <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={onPeriodChange} />}
                 <div className="filter-bar-fields">
