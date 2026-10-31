@@ -4080,7 +4080,7 @@ export const it = {
         },
     },
     live: {
-        title: 'Energia in tempo reale',
+        title: 'In questo momento',
         badge: 'In tempo reale, indicativo',
         asOf: 'alle {{time}}',
         none: 'Al momento nessun dato di produzione in tempo reale',

@@ -4080,7 +4080,7 @@ export const fr = {
         },
     },
     live: {
-        title: 'Énergie en direct',
+        title: 'En ce moment',
         badge: 'En direct, indicatif',
         asOf: 'à {{time}}',
         none: 'Aucune donnée de production en direct pour le moment',

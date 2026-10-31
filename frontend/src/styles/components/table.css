@@ -159,7 +159,8 @@
 }
 
 .billing-period-cell,
-.invoice-number-cell {
+.invoice-number-cell,
+.live-meter-cell {
   white-space: nowrap;
 }
 

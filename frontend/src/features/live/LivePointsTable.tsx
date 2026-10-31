@@ -30,7 +30,7 @@ export function LivePointsTable({ points }: { points: LivePoint[] }) {
                     <tbody>
                         {points.map((point) => (
                             <tr key={point.source_id ?? point.metering_point_id ?? point.target}>
-                                <td>{point.target === 'connection_point' ? t('live.points.connection') : point.meter_id}</td>
+                                <td className="live-meter-cell">{point.target === 'connection_point' ? t('live.points.connection') : point.meter_id}</td>
                                 <td>{point.participant_name ?? t('live.points.zevOperated')}</td>
                                 <td className="numeric">{point.meter_power_w === null ? '—' : formatKw(point.meter_power_w)}</td>
                                 <td className="numeric">{point.age_s === null ? '—' : t('live.points.seconds', { count: point.age_s })}</td>

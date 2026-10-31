@@ -4091,7 +4091,7 @@ export const en = {
         },
     },
     live: {
-        title: 'Live energy',
+        title: 'Right now',
         badge: 'Live, indicative',
         asOf: 'as of {{time}}',
         none: 'No live production data right now',
