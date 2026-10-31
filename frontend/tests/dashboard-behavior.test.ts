@@ -54,6 +54,8 @@ vi.mock('../src/lib/supplementary', async (importOriginal) => {
             isLoading: false,
             featureOn: true,
             eligible: eligibility.eligible,
+            historyEligible: eligibility.eligible,
+            liveEligible: [],
             canConnect: eligibility.eligible.length > 0,
         }),
     }

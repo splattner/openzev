@@ -40,6 +40,11 @@ vi.mock('../src/features/supplementary/MeteringPointEnergyData', () => ({
         createElement('article', { 'data-testid': 'energy-data', 'data-unavailable': sourcesUnavailable ?? '' }, `energy:${point.meter_id}`),
 }))
 
+vi.mock('../src/features/supplementary/LiveSourceSection', () => ({
+    LiveSourceSection: ({ meterId, heldBy }: { meterId: string; heldBy: string }) =>
+        createElement('article', { 'data-testid': 'live-section', 'data-held-by': heldBy }, `live:${meterId}`),
+}))
+
 const point = (id: string, flagged: boolean): MeteringPoint => ({
     id, zev: 'zev-1', meter_id: `CH-${id}`, meter_type: 'bidirectional', is_active: true, building: 'b-1', building_name: 'Haus',
     has_behind_meter_generation: flagged, reading_count: 0, assignment_count: 1, first_reading_at: null, last_reading_at: null,
@@ -190,5 +195,46 @@ describe('MyMeteringPointsPage', () => {
         access.participantScope = false
         const manager = await mount()
         expect(manager.container.textContent).toContain('pages.myMeteringPoints.empty.manager')
+    })
+})
+
+describe('MyMeteringPointsPage with the live flag on', () => {
+    const withCapabilities = (id: string, eligible_capabilities: EligibleMeteringPoint['eligible_capabilities']): EligibleMeteringPoint => ({
+        ...eligible(id), eligible_capabilities,
+    })
+
+    it('renders a history section only where history is possible and a live section wherever live is', async () => {
+        api.fetchEligibleOrNull.mockResolvedValue([withCapabilities('1', ['history', 'live']), withCapabilities('2', ['live'])])
+        const { container } = await mount()
+
+        const energy = Array.from(container.querySelectorAll('[data-testid="energy-data"]')).map((node) => node.textContent)
+        const live = Array.from(container.querySelectorAll('[data-testid="live-section"]')).map((node) => node.textContent)
+        expect(energy).toEqual(['energy:CH-1'])
+        expect(live).toEqual(['live:CH-1', 'live:CH-2'])
+        expect(container.querySelector('[data-testid="live-section"]')!.getAttribute('data-held-by')).toBe('participant')
+    })
+
+    it('lists a held meter without any capability plainly, with no section', async () => {
+        api.fetchEligibleOrNull.mockResolvedValue([withCapabilities('1', ['live']), withCapabilities('2', [])])
+        const { container } = await mount()
+
+        expect(container.querySelectorAll('[data-testid="live-section"]')).toHaveLength(1)
+        expect(container.querySelector('article[aria-label="CH-2"]')).not.toBeNull()
+    })
+
+    it('explains history only when some point can have it', async () => {
+        api.fetchEligibleOrNull.mockResolvedValue([withCapabilities('2', ['live'])])
+        const { container } = await mount()
+
+        expect(container.textContent).not.toContain('supplementary.section.description')
+        expect(container.textContent).toContain('supplementary.live.description')
+    })
+
+    it('shows no live section while the live flag is off', async () => {
+        api.fetchEligibleOrNull.mockResolvedValue([eligible('1')])
+        const { container } = await mount()
+
+        expect(container.querySelector('[data-testid="live-section"]')).toBeNull()
+        expect(container.textContent).not.toContain('supplementary.live.description')
     })
 })

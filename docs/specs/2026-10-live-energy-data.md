@@ -591,14 +591,53 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
 
 ### 7.2 Setup
 
-- `/me/metering-points` (`MyMeteringPointsPage`): per held metering point, "Live data" and (for
-  producing points) "Production forecast" sections next to the existing history section, driven by
-  `eligible_capabilities`. Live via push shows the token once and links the user-guide recipes.
-- `/metering/points` (`MeteringPointsPage`): managers see a live-state marker per point and, for
-  points without a personal holder, the same setup as a ZEV-held source; a "Grid connection point"
-  entry (physical ZEV only) for the connection-point live source; a "PV planes" editor on producing
-  points (`PvPlanesEditor.tsx`, at most 4 rows: kWp, tilt, azimuth with an E/S/W helper).
-- Building form: latitude/longitude with "Locate from address".
+Shipped in PR 3b. Live is push only until PR 4 and the forecast is not offered yet.
+
+- **`SupplementarySourceModal`** takes a `mode`: `history` (unchanged: Solar Manager or push, the
+  existing consent), `live` (a holder's own meter: push only, `provides_history: false`,
+  `provides_live: true`, `target: 'metering_point'`, `held_by: 'participant'`; consent as in §3),
+  `zev-live` (a manager, ZEV-operated meter: `held_by: 'zev'`, `zev`, the ZEV-held confirmation) and
+  `connection-point` (`target: 'connection_point'`, `held_by: 'zev'`, `zev`, no `metering_point`; the
+  ZEV-held confirmation plus a line that it reports net power at the grid connection). Field errors of
+  `external_id`, `api_key`, `consent` and `provider` show at their input; `provides_live`,
+  `provides_history`, `held_by`, `target`, `zev` and `metering_point` go to the form banner. A push
+  source ends on the one-time token screen (`PushTokenPanel`); a live source's shows the live endpoint
+  (`POST {API}/metering/live/ingest/`, copy button), a JSON example and the sign convention
+  (`meter_power_w` > 0 drawn in, < 0 fed out), a history source's the CSV endpoint and columns, one
+  with both shows both (`PushEndpoints`).
+- **`LiveSourceSection`** (`features/supplementary/`), one card per held point with the `live`
+  capability, after the history card: without a live source, **Connect live data**; if the point's
+  history source is an enabled push source the primary button is **Also send live data with this
+  source** (confirm with the live consent, `PATCH {provides_live: true, consent: true}`; no new token,
+  the live endpoint is shown) and Connect becomes secondary. With a live source (`LiveSourceDetails`):
+  state badge (`LiveStateBadge`), last value, name, token prefix; a separate push source offers
+  **New push token** (shown once with the live panel), **Revoke token**, **Disconnect**, **Remove
+  source**; one shared with history only **Stop live data** (`PATCH {provides_live: false}`) and shows
+  the live endpoint. Connect, also-send and rotate are disabled while impersonating.
+- **`/me/metering-points`**: per held point a history card only if `historyEligible(point)`, a live
+  section if `liveEligible(point)`; a point with no capability stays a plain card.
+- **`/metering/points`** (`features/meteringPoints/LiveSetup.tsx`; all of it only while
+  `useLiveEnabled` is true): `LiveStateChip` on every row with a non-null `live_state` (in the id line,
+  so both the table and the narrow layout show it; plain text for viewers); for a manager, a **Live
+  data** entry in the point menu and on the chip for points in `fetchZevEligibleSources(zevId)` with the
+  `live` capability (queried only with write scope). Container: a **dialog** (`FormModal`), like the
+  existing source status panel on the same row; `PointLiveDialog` opens the connect modal for a point
+  without a live source and the status dialog (`LiveSourceSection bare`) for one with, chosen once on
+  open so the token screen survives the refetch, and never stacks a dialog on a dialog (only
+  confirmations). `ConnectionPointCard` ("Grid connection point") sits above the toolbar: a manager sees
+  it while `connection_point.available` or a source exists (so never in a vZEV), with Connect or the
+  live source's state and actions; a viewer sees it read-only (no buttons) only when a source exists.
+- **Eligibility semantics.** With the live flag on, `/sources/eligible/` lists every held point, so
+  history logic uses `historyEligible` (capability `history`, or no `eligible_capabilities` field while
+  the flag is off) and `useEnergyDataEligibility` exposes `historyEligible` and `liveEligible`;
+  `canConnect` means history. The "show your real self-sufficiency" call to action
+  (`ParticipantDashboardBody`, `ManagementDashboardBody`) and the "connect your energy data" badge
+  (`SupplementarySourceStatus`) use history only. The manager's **My metering points** nav entry shows
+  for any held meter with a capability (`hasCapability`), live included.
+- Every source mutation calls `invalidateSourceQueries`: `queryKeys.live.all`, the source list,
+  `supplementaryEligible()`, `supplementaryZevEligibleAll()` (prefix of
+  `supplementaryZevEligible(zevId)`), the dashboard summary and `['metering','points']`.
+- Building form: latitude/longitude with "Locate from address" and the PV planes editor (PR 5).
 
 ### TypeScript types
 
@@ -809,6 +848,12 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
   line, points table rows, empty curve) and `tests/live-helpers.test.ts` (16 tests: `formatKw`,
   `formatClock`, `showLiveCard` hidden for `null` or no live source, `liveCardState`, polling stops on
   `null`, curve rows with gaps, the day axis incl. the 25-hour day).
+- PR 3b added `tests/live-setup.test.ts` (26 tests: modal payloads and consent per mode, field errors,
+  push panel endpoints, `LiveSourceSection` states, `PointLiveDialog`, `ConnectionPointCard`
+  visibility for manager, vZEV, flag off and viewer), `tests/energy-data-eligibility.test.ts` (4),
+  eligibility helper tests in `tests/supplementary-helpers.test.ts`, live cases in
+  `tests/my-metering-points-page.test.ts`, `tests/metering-points-list.test.ts` (chip, menu entry,
+  viewer) and `tests/layout-nav.test.ts`.
 - `tests/production-forecast.test.ts`: peak window text, incomplete-forecast hint.
 - `tests/pv-planes-editor.test.ts`: validation and the 4-row limit.
 - Build, lint, style lint, hex sweep; screenshots of `/live` in all tiers, also at ~400 px.
@@ -859,7 +904,9 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
      live source exists. With the flag off the snapshot answers `404` and nothing polls. The dashboards
      are unchanged.
    - **PR 3b — setup.** Source modal capabilities, the push panel with the live endpoint, ZEV-held and
-     connection-point setup on both metering-point pages, the live-state marker.
+     connection-point setup on both metering-point pages, the live-state marker (§7.2). *Rollout (PR 3b).*
+     Everything is behind the live flag; live is push only and the forecast is not offered. It also fixes
+     history logic that took the flag-on eligible list for behind-meter points (`historyEligible`).
 5. **PR 4 — Solar Manager live.** Stream pull, bearer cache, demand-driven polling.
 6. **PR 5 — forecast.** `PvPlane`, building coordinates, `ProductionForecastPoint`, both providers,
    forecast endpoint and chart.
