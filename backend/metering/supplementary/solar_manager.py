@@ -7,9 +7,12 @@ Talks to ``/v3`` of the vendor's cloud API:
   and the old one is dead from that moment, so the new one is persisted, under a row lock,
   before the bearer token is used.
 * ``GET /v3/users/{smId}/data/range?from=&to=&interval=900`` returns the 15-minute series.
+* ``GET /v3/users/{smId}/data/stream`` returns the current power, for the live view
+  (SPEC-2026-live-energy-data §6.1).
 
-Only the four measured flows are read (``cWh``, ``pWh``, ``iWh``, ``eWh``). The vendor's
-derived ``cPvWh`` / ``scWh`` and the ``*W`` power fields are ignored.
+History reads only the four measured flows (``cWh``, ``pWh``, ``iWh``, ``eWh``); the vendor's
+derived ``cPvWh`` / ``scWh`` and the ``*W`` power fields are ignored there. The live stream reads
+``t``, ``iW``, ``eW``, ``pW`` and ``cW`` and nothing else.
 
 The client is deliberately small and defensive: one fixed host, no redirects, a short
 timeout, a response-size cap, the ``smId`` validated before it enters a URL, and no vendor
@@ -31,12 +34,15 @@ from typing import Iterator
 
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from allocation.validity import civil_date, period_end_exclusive_dt, period_start_dt
 
+from ..live import store
+from ..live.store import LiveSample
 from ..models import SOLAR_MANAGER_ID_RE, SupplementarySource
-from .crypto import IntegrationKeyError, IntegrationNotConfigured
+from .crypto import IntegrationKeyError, IntegrationNotConfigured, decrypt_secret, encrypt_secret
 from .providers import PROVIDERS, Point, ProviderAuthError, ProviderError, ProviderRateLimited
 from .stats import INTERVAL, INTERVAL_S
 
@@ -55,6 +61,9 @@ MAX_RESPONSE_BYTES = 2 * 1024 * 1024  # a day at 15 minutes is ~15 KB; this is t
 PAUSE_BETWEEN_REQUESTS_S = 0.25
 #: An access token lives an hour; renew well before so a long backfill never sends an expired one.
 ACCESS_TOKEN_MAX_AGE = timedelta(minutes=45)
+#: The bearer token lives an hour; the live cache keeps it a little less, so a cached one is never
+#: sent when it is about to expire (SPEC-2026-live-energy-data §4.4).
+LIVE_ACCESS_CACHE_S = 50 * 60
 #: Below this, a negative Wh value is sensor noise rather than data and is read as zero.
 NOISE_WH = Decimal("5")
 
@@ -161,8 +170,7 @@ class SolarManagerClient:
 
     def range(self, access_token: str, sm_id: str, start: datetime, end: datetime) -> list[Point]:
         """The 15-minute points whose interval starts in ``[start, end)``."""
-        if not SOLAR_MANAGER_ID_RE.match(sm_id or ""):
-            raise ProviderAuthError("A Solar Manager id has 3 to 24 letters or digits.")
+        _check_sm_id(sm_id)
         payload = self._request(
             "GET",
             f"/v3/users/{urllib.parse.quote(sm_id, safe='')}/data/range",
@@ -170,6 +178,18 @@ class SolarManagerClient:
             bearer=access_token,
         )
         return map_points(payload.get("data"), start, end)
+
+    def stream(self, access_token: str, sm_id: str) -> dict:
+        """The vendor's current-power payload, unmapped (see ``map_stream``)."""
+        _check_sm_id(sm_id)
+        return self._request(
+            "GET", f"/v3/users/{urllib.parse.quote(sm_id, safe='')}/data/stream", bearer=access_token
+        )
+
+
+def _check_sm_id(sm_id: str) -> None:
+    if not SOLAR_MANAGER_ID_RE.match(sm_id or ""):
+        raise ProviderAuthError("A Solar Manager id has 3 to 24 letters or digits.")
 
 
 def _iso(value: datetime) -> str:
@@ -215,6 +235,66 @@ def map_points(data, start: datetime, end: datetime) -> list[Point]:
     return [points[stamp] for stamp in sorted(points)]
 
 
+TENTH = Decimal("0.1")
+NO_STREAM_SAMPLE = "Solar Manager sent no usable power reading."
+
+
+def _watts(raw, *, required: bool) -> Decimal | None:
+    """A power in W to one decimal. ``None`` when an optional figure is missing or not a number.
+
+    A required figure that is missing or not a number, or any figure that is not finite or beyond
+    ``LIVE_MAX_ABS_POWER_W``, makes the whole payload unusable: a power is never invented.
+    """
+    value = None
+    if raw is not None and not isinstance(raw, bool) and isinstance(raw, (int, float, str)):
+        try:
+            value = Decimal(str(raw).strip())
+        except InvalidOperation:
+            value = None
+    if value is None:
+        if required:
+            raise ProviderError(NO_STREAM_SAMPLE)
+        return None
+    if not value.is_finite() or abs(value) > settings.LIVE_MAX_ABS_POWER_W:
+        raise ProviderError(NO_STREAM_SAMPLE)
+    return value
+
+
+def map_stream(payload, source_id: str, now: datetime | None = None) -> LiveSample:
+    """The vendor's stream payload to a ``LiveSample`` (SPEC-2026-live-energy-data §6.1).
+
+    ``meter_power_w = iW - eW`` (positive drawn in, negative fed out), ``production_w = pW`` and
+    ``consumption_w = cW``; battery and device fields are ignored. A missing or unreadable ``iW`` or
+    ``eW`` raises ``ProviderError``: there is no sample rather than a zero. A gross figure that is
+    missing or negative is left out. ``t`` that is missing, naive or unreadable falls back to ``now``,
+    and one in the future is held at ``now``.
+    """
+    if not isinstance(payload, dict):
+        raise ProviderError(NO_STREAM_SAMPLE)
+    now = now or timezone.now()
+    imported = _watts(payload.get("iW"), required=True)
+    exported = _watts(payload.get("eW"), required=True)
+    production = _watts(payload.get("pW"), required=False)
+    consumption = _watts(payload.get("cW"), required=False)
+    stamp = None
+    if isinstance(payload.get("t"), str):
+        try:
+            stamp = parse_datetime(payload["t"])
+        except ValueError:
+            stamp = None
+    if stamp is None or stamp.tzinfo is None:
+        stamp = now
+    stamp = min(stamp.astimezone(dt_timezone.utc), now)
+    return LiveSample(
+        source_id=str(source_id),
+        timestamp=stamp,
+        received_at=now,
+        meter_power_w=(imported - exported).quantize(TENTH, rounding=ROUND_HALF_UP),
+        production_w=production.quantize(TENTH, rounding=ROUND_HALF_UP) if production is not None and production >= 0 else None,
+        consumption_w=consumption.quantize(TENTH, rounding=ROUND_HALF_UP) if consumption is not None and consumption >= 0 else None,
+    )
+
+
 def civil_days(start: datetime, end: datetime) -> Iterator[tuple[datetime, datetime]]:
     """``[start, end)`` cut at Swiss midnights. A DST day is 92 or 100 intervals long, not 96."""
     day: date = civil_date(start)
@@ -248,6 +328,12 @@ class SolarManagerProvider:
         self.client.range(access, external_id, end - timedelta(hours=1), end)
         return keep
 
+    def verify_live(self, external_id: str, credential: str) -> str:
+        """Like ``verify``, for a source that only provides live data: one stream reading, not a history hour."""
+        access, keep = self.client.refresh(credential)
+        map_stream(self.client.stream(access, external_id), "verify")
+        return keep
+
     def _access_token(self, source: SupplementarySource) -> str:
         """Exchange the stored key for a bearer token, persisting a rotated key first (ADR 0031).
 
@@ -276,6 +362,56 @@ class SolarManagerProvider:
         access = self._access_token(source)
         end = _floor_quarter(datetime.now(dt_timezone.utc))
         self.client.range(access, source.external_id, end - timedelta(hours=1), end)
+
+    def check_live(self, source: SupplementarySource) -> None:
+        """Read one stream sample with the stored key, through the bearer cache like a poll."""
+        self.fetch_live(source)
+
+    # ---- live ----
+
+    @staticmethod
+    def _cached_access(source_id) -> str | None:
+        raw = store.get_sm_access(source_id)
+        if not raw:
+            return None
+        try:
+            return decrypt_secret(raw.encode("ascii"))
+        except (IntegrationKeyError, IntegrationNotConfigured, UnicodeEncodeError):
+            store.drop_sm_access(source_id)
+            return None
+
+    @staticmethod
+    def _cache_access(source_id, access: str) -> None:
+        try:
+            store.set_sm_access(source_id, encrypt_secret(access).decode("ascii"), LIVE_ACCESS_CACHE_S)
+        except IntegrationNotConfigured:  # cannot encrypt, so do not cache: the next poll exchanges again
+            pass
+
+    def _fresh_access(self, source: SupplementarySource) -> str:
+        access = self._access_token(source)
+        self._cache_access(source.pk, access)
+        return access
+
+    def fetch_live(self, source: SupplementarySource) -> LiveSample:
+        """One current-power sample (SPEC-2026-live-energy-data §6.1).
+
+        The bearer token comes from the cache, so a 30-second poll does not spend (and rotate) the
+        refresh token every time. When the vendor refuses a cached token it is dropped and one fresh
+        exchange is tried before the failure counts as an auth failure.
+        """
+        _check_sm_id(source.external_id)
+        access = self._cached_access(source.pk)
+        cached = access is not None
+        if access is None:
+            access = self._fresh_access(source)
+        try:
+            payload = self.client.stream(access, source.external_id)
+        except ProviderAuthError:
+            if not cached:
+                raise
+            store.drop_sm_access(source.pk)
+            payload = self.client.stream(self._fresh_access(source), source.external_id)
+        return map_stream(payload, str(source.pk))
 
     # ---- data ----
 

@@ -551,9 +551,15 @@ class SupplementarySource(models.Model):
         self.push_token_last_used_at = None
 
     def clear_credential(self) -> None:
-        """Drop the credential and any push token (not saved)."""
+        """Drop the credential and any push token (not saved).
+
+        The cached Solar Manager bearer token goes too: it would otherwise outlive the key it came from.
+        """
+        from .live import store
+
         self.credential_encrypted = b""
         self.revoke_push_token()
+        store.drop_sm_access(self.pk)
 
     # ---- state transitions (not saved) ----
 
