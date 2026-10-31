@@ -51,6 +51,12 @@ const CONSENT_ITEMS: Record<ConnectCapability, string[]> = {
     live: ['liveVisible', 'liveNotBilling', 'liveRevoke'],
 }
 
+/** Which Solar Manager hint to show for the chosen capabilities (it is polled for live, synced for history). */
+export function solarHintKey(history: boolean, live: boolean): 'solar_manager' | 'solar_manager_live' | 'solar_manager_both' {
+    if (history && live) return 'solar_manager_both'
+    return live ? 'solar_manager_live' : 'solar_manager'
+}
+
 /** The first message of a field error, whether the API sent a list or a string. */
 function firstMessage(body: Record<string, unknown> | null | undefined, key: string): string | undefined {
     const value = body?.[key]
@@ -93,10 +99,11 @@ export function SupplementarySourceModal({ holder = 'participant', point, zevId,
         holder === 'participant' && point
             ? sources?.find((s) => s.metering_point === point.metering_point && s.provider === 'push' && s.enabled && s.held_by === 'participant')
             : undefined
-    // Solar Manager only provides history until its stream arrives; a push source can provide any.
+    // Both providers can provide history, live or both. A ZEV-operated meter and the connection point are
+    // push only: a Solar Manager key is the participant's own account, never a manager's.
     const providers: ProviderChoice[] = zevHeld
         ? ['push']
-        : [...(existing && chosen.length ? (['existing'] as const) : []), ...(!live ? (['solar_manager'] as const) : []), 'push']
+        : [...(existing && chosen.length ? (['existing'] as const) : []), 'solar_manager', 'push']
     const chosenProvider: ProviderChoice = provider && providers.includes(provider) ? provider : providers[0]
     const useExisting = chosenProvider === 'existing'
     const needsCredentials = chosenProvider === 'solar_manager'
@@ -147,7 +154,8 @@ export function SupplementarySourceModal({ holder = 'participant', point, zevId,
                 setToken(created.push_token)
                 return
             }
-            pushToast(t(live && !history ? 'supplementary.modal.liveConnected' : 'supplementary.modal.connected'), 'success')
+            const liveOnly = live && !history
+            pushToast(t(liveOnly ? (chosenProvider === 'solar_manager' ? 'supplementary.modal.liveConnectedPull' : 'supplementary.modal.liveConnected') : 'supplementary.modal.connected'), 'success')
             onClose()
         },
         onError: showErrors,
@@ -268,7 +276,9 @@ export function SupplementarySourceModal({ holder = 'participant', point, zevId,
                             <span>
                                 <strong>{choice === 'existing' ? t('supplementary.modal.existingPush') : t(`supplementary.provider.${choice}`)}</strong>
                                 <small className="muted" style={{ display: 'block' }}>
-                                    {choice === 'existing' ? t('supplementary.modal.existingPushHint') : t(`supplementary.modal.providerHint.${choice}`)}
+                                    {choice === 'existing'
+                                        ? t('supplementary.modal.existingPushHint')
+                                        : t(`supplementary.modal.providerHint.${choice === 'solar_manager' ? solarHintKey(history, live) : choice}`)}
                                 </small>
                             </span>
                         </label>

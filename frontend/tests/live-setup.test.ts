@@ -3,9 +3,9 @@ import { act, createElement, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConnectionPointCard, PointLiveDialog } from '../src/features/meteringPoints/LiveSetup'
 import { PushTokenPanel } from '../src/features/supplementary/PushTokenPanel'
-import { SupplementarySourceModal, type ConnectHolder } from '../src/features/supplementary/SupplementarySourceModal'
+import { SupplementarySourceModal, solarHintKey, type ConnectHolder } from '../src/features/supplementary/SupplementarySourceModal'
 import type { MeteringPoint, SupplementarySource } from '../src/types/api'
-import { renderWithProviders } from './helpers/render'
+import { renderWithProviders, setInputValue } from './helpers/render'
 import { waitForCondition } from './helpers/waitForCondition'
 
 vi.mock('react-i18next', () => ({
@@ -60,6 +60,14 @@ async function click(element: HTMLElement) {
     await act(async () => { element.click() })
 }
 
+describe('solarHintKey', () => {
+    it('says what Solar Manager does for the chosen capabilities', () => {
+        expect(solarHintKey(true, false)).toBe('solar_manager')
+        expect(solarHintKey(false, true)).toBe('solar_manager_live')
+        expect(solarHintKey(true, true)).toBe('solar_manager_both')
+    })
+})
+
 describe('SupplementarySourceModal for live data', () => {
     const point = { metering_point: 'mp-1', meter_id: 'CH-100', zev: 'zev-1' }
     async function open(holder: ConnectHolder, props: Record<string, unknown> = { point, available: ['live'] }) {
@@ -72,11 +80,14 @@ describe('SupplementarySourceModal for live data', () => {
         await act(async () => { buttonWith(modal, 'supplementary.modal.connect')!.click() })
     }
 
+    const radio = (modal: HTMLElement, provider: string) =>
+        Array.from(modal.querySelectorAll<HTMLInputElement>('input[type="radio"]')).find((r) => r.closest('label')?.textContent?.includes(provider))!
+
     it('connects live data for a holder as a push source without history, never forecast', async () => {
         const modal = await open('participant')
-        // Live is push only: nothing to choose, no credentials.
-        expect(modal.querySelectorAll('input[type="radio"]')).toHaveLength(1)
-        expect(modal.textContent).not.toContain('supplementary.provider.solar_manager')
+        // Live can come from Solar Manager or from a push source; Solar Manager is the first choice.
+        expect(modal.querySelectorAll('input[type="radio"]')).toHaveLength(2)
+        await click(radio(modal, 'supplementary.provider.push'))
         expect(modal.querySelector('input[type="password"]')).toBeNull()
         expect(modal.textContent).toContain('supplementary.consent.liveVisible')
         expect(modal.textContent).toContain('supplementary.consent.liveNotBilling')
@@ -95,8 +106,49 @@ describe('SupplementarySourceModal for live data', () => {
         expect(dialog()!.textContent).not.toContain('supplementary.push.columns')
     })
 
-    it('connects a ZEV-operated meter with the ZEV-held confirmation', async () => {
+    it('offers Solar Manager for live data and connects it with its id and key, no token', async () => {
+        const modal = await open('participant')
+        api.createSupplementarySource.mockResolvedValue(liveOnly({ provider: 'solar_manager', push_token_prefix: null, external_id: 'ABC123', has_credential: true }))
+        expect(radio(modal, 'supplementary.provider.solar_manager').checked).toBe(true)
+        expect(modal.textContent).toContain('supplementary.modal.providerHint.solar_manager_live')
+        const [id, key] = [modal.querySelector<HTMLInputElement>('input[type="text"]')!, modal.querySelector<HTMLInputElement>('input[type="password"]')!]
+        expect(buttonWith(modal, 'supplementary.modal.connect')!.disabled).toBe(true)
+        await act(async () => { setInputValue(id, ' ABC123 '); setInputValue(key, ' the-key ') })
+        await submit(modal)
+
+        expect(api.createSupplementarySource.mock.calls[0][0]).toMatchObject({
+            metering_point: 'mp-1', provider: 'solar_manager', target: 'metering_point', held_by: 'participant',
+            provides_history: false, provides_live: true, external_id: 'ABC123', api_key: 'the-key', consent: true,
+        })
+        await waitForCondition(() => pushToast.mock.calls.length > 0, 'the success toast')
+        expect(pushToast).toHaveBeenCalledWith('supplementary.modal.liveConnectedPull', 'success')
+        expect(document.querySelector('[data-testid="push-token"]')).toBeNull()
+    })
+
+    it('offers Solar Manager for history and live together, with the matching hint', async () => {
+        const modal = await open('participant', { point, available: ['history', 'live'], initial: ['history', 'live'] })
+        await click(buttonWith(modal, 'supplementary.modal.next')!)
+
+        expect(radio(modal, 'supplementary.provider.solar_manager').checked).toBe(true)
+        expect(modal.textContent).toContain('supplementary.modal.providerHint.solar_manager_both')
+    })
+
+    it('shows a refused Solar Manager key at the key field', async () => {
+        const modal = await open('participant')
+        api.createSupplementarySource.mockRejectedValue(apiError({ api_key: ['Solar Manager did not accept this API key.'] }))
+        await act(async () => {
+            setInputValue(modal.querySelector<HTMLInputElement>('input[type="text"]')!, 'ABC123')
+            setInputValue(modal.querySelector<HTMLInputElement>('input[type="password"]')!, 'wrong')
+        })
+        await submit(modal)
+
+        await waitForCondition(() => (dialog()?.textContent ?? '').includes('did not accept this API key'), 'the key error')
+    })
+
+    it('connects a ZEV-operated meter with the ZEV-held confirmation, push only', async () => {
         const modal = await open('zev', { point })
+        expect(modal.textContent).not.toContain('supplementary.provider.solar_manager')
+        expect(modal.querySelector('input[type="password"]')).toBeNull()
         expect(modal.textContent).toContain('supplementary.consent.zevHeld')
         expect(modal.querySelectorAll('input[type="radio"]')).toHaveLength(0)
         expect(modal.textContent).not.toContain('supplementary.consent.liveVisible')
@@ -110,6 +162,8 @@ describe('SupplementarySourceModal for live data', () => {
 
     it('connects the grid connection point without a metering point', async () => {
         const modal = await open('connection-point', { zevId: 'zev-1' })
+        expect(modal.textContent).not.toContain('supplementary.provider.solar_manager')
+        expect(modal.querySelector('input[type="password"]')).toBeNull()
         expect(modal.textContent).toContain('supplementary.consent.zevHeld')
         expect(modal.textContent).toContain('supplementary.consent.connectionPoint')
         await submit(modal)
@@ -126,6 +180,7 @@ describe('SupplementarySourceModal for live data', () => {
 
     it('shows a refused capability or holder as a banner', async () => {
         const modal = await open('participant')
+        await click(radio(modal, 'supplementary.provider.push'))
         api.createSupplementarySource.mockRejectedValue(apiError({ provides_live: ['Live is not available for this source yet.'], held_by: ['Not allowed.'] }))
         await submit(modal)
         await waitForCondition(() => (dialog()?.textContent ?? '').includes('Live is not available'), 'the field error')
@@ -135,6 +190,7 @@ describe('SupplementarySourceModal for live data', () => {
 
     it('shows a consent error next to the checkbox', async () => {
         const modal = await open('participant')
+        await click(radio(modal, 'supplementary.provider.push'))
         api.createSupplementarySource.mockRejectedValue(apiError({ consent: ['Consent is required.'] }))
         await submit(modal)
         await waitForCondition(() => (dialog()?.textContent ?? '').includes('Consent is required.'), 'the consent error')

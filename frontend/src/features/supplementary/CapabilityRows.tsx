@@ -66,6 +66,7 @@ export function CapabilityRows({ meteringPointId, capabilities, sources, canMana
                                         </>
                                     ) : (
                                         <>
+                                            {source.status === 'reconnect_required' && <SourceStatusBadge status="reconnect_required" />}
                                             {source.live_state ? <LiveStateBadge state={source.live_state} /> : null}
                                             <small className="muted">{t('supplementary.card.lastValueAt', { date: dateTime(source.live_last_seen_at) })}</small>
                                         </>

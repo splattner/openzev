@@ -37,6 +37,8 @@ export function MeteringPointDataCard({ point, sources, sourcesUnavailable, onRe
     const capabilities = (['history', 'live'] as const).filter((capability) => eligible[capability])
     const unconnected = capabilities.filter((capability) => !sourceFor(sources, point.metering_point, capability))
     const historySource = sourceFor(sources, point.metering_point, 'history')
+    // A Solar Manager key the vendor refused is the whole source's problem, history or live only.
+    const reconnectSource = [historySource, sourceFor(sources, point.metering_point, 'live')].find((source) => source?.status === 'reconnect_required')
     const knowsSource = !!(point.source || point.sources?.history || point.sources?.live)
     // Eligibility says a source exists but its details are not here yet: offering Connect would be wrong.
     const unavailable = knowsSource && !sources ? sourcesUnavailable : undefined
@@ -56,10 +58,10 @@ export function MeteringPointDataCard({ point, sources, sourcesUnavailable, onRe
                     </div>
                 </header>
 
-                {historySource?.status === 'reconnect_required' && (
+                {reconnectSource && (
                     <div className="warning-banner" role="alert">
                         <strong>{t('supplementary.reconnect.title')}</strong>
-                        <p style={{ margin: '0.25rem 0 0' }}>{historySource.last_error || t('supplementary.reconnect.body')}</p>
+                        <p style={{ margin: '0.25rem 0 0' }}>{reconnectSource.last_error || t('supplementary.reconnect.body')}</p>
                     </div>
                 )}
                 {historySource?.status === 'error' && historySource.last_error && (
