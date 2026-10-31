@@ -4080,7 +4080,7 @@ export const de = {
         },
     },
     live: {
-        title: 'Live-Energie',
+        title: 'Jetzt',
         badge: 'Live, ungefähr',
         asOf: 'Stand {{time}}',
         none: 'Zurzeit keine Live-Produktionsdaten',
