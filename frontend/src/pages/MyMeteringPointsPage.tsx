@@ -7,14 +7,14 @@ import { PageHeader } from '../components/PageHeader'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { ScopeGuard } from '../components/ScopeGuard'
 import { MeteringDataLink } from '../features/supplementary/MeteringDataLink'
-import { MeteringPointEnergyData } from '../features/supplementary/MeteringPointEnergyData'
+import { MeteringPointDataCard } from '../features/supplementary/MeteringPointDataCard'
 import { queryKeys } from '../lib/api/queryKeys'
 import { listSupplementarySources } from '../lib/api/supplementary'
 import { fetchMeteringPoints } from '../lib/api/zev'
 import { useCommunityAccess, useScopeNote } from '../lib/communityAccess'
 import { useManagedZev } from '../lib/managedZev'
 import { selectedCommunityName } from '../lib/membership'
-import { useEnergyDataEligibility } from '../lib/supplementary'
+import { hasCapability, historyEligible, liveEligible, useEnergyDataEligibility } from '../lib/supplementary'
 import type { MeteringPoint } from '../types/api'
 
 /**
@@ -66,13 +66,14 @@ function MyMeteringPointsView() {
         enabled: energyData.featureOn,
     })
 
-    const eligible = energyData.eligible.filter((point) => point.zev === selectedZevId)
+    // With the live flag on the list holds every held meter: a point is set up here only for a
+    // capability it has (history behind the meter, live anywhere active); the rest stays plain.
+    const eligible = energyData.eligible.filter((point) => point.zev === selectedZevId && hasCapability(point))
     const eligibleByPoint = new Map(eligible.map((point) => [point.metering_point, point]))
     // The key is shared with the metering points page, so a disabled query can still hold the
     // community's whole list from a visit there: only a participant's own list is used.
     const ownPoints = isParticipantScope ? (pointsQuery.data ?? []) : []
     const plainPoints = ownPoints.filter((point) => !eligibleByPoint.has(point.id))
-    const sources = sourcesQuery.data ?? []
 
     const loading = energyData.isLoading || (isParticipantScope && pointsQuery.isLoading)
     if (loading) return <PageSkeleton variant="cardList" />
@@ -107,15 +108,18 @@ function MyMeteringPointsView() {
                 </div>
             )}
 
-            {energyData.featureOn && eligible.length > 0 && (
+            {energyData.featureOn && eligible.some(historyEligible) && (
                 <p className="muted m-0">{t('supplementary.section.description')}</p>
+            )}
+            {energyData.featureOn && eligible.some(liveEligible) && (
+                <p className="muted m-0">{t('supplementary.live.description')}</p>
             )}
 
             {eligible.map((point) => (
-                <MeteringPointEnergyData
+                <MeteringPointDataCard
                     key={point.metering_point}
                     point={point}
-                    source={sources.find((candidate) => candidate.metering_point === point.metering_point)}
+                    sources={sourcesQuery.data}
                     sourcesUnavailable={sourcesUnavailable}
                     onRetrySources={() => void sourcesQuery.refetch()}
                     confirm={confirm}

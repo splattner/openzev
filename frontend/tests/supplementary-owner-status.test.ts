@@ -27,11 +27,12 @@ vi.mock('../src/lib/api/supplementary', () => api)
 const point = (status: MeteringPoint['supplementary_source_status']): MeteringPoint => ({
     id: 'mp-1', zev: 'zev-1', meter_id: 'CH-100', meter_type: 'bidirectional', is_active: true, building: 'b-1', building_name: 'Haus',
     has_behind_meter_generation: true, reading_count: 0, assignment_count: 1, first_reading_at: null, last_reading_at: null,
-    supplementary_source_status: status,
+    supplementary_source_status: status, live_state: null,
 })
 
 const source: SupplementarySource = {
-    id: 'src-1', metering_point: 'mp-1', metering_point_meter_id: 'CH-100', participant: 'p-1', participant_name: 'Pia Muster',
+    id: 'src-1', zev: 'zev-1', target: 'metering_point', held_by: 'participant', metering_point: 'mp-1', metering_point_meter_id: 'CH-100', participant: 'p-1', participant_name: 'Pia Muster',
+    provides_history: true, provides_live: false, provides_forecast: false, live_last_seen_at: null, live_state: null,
     provider: 'solar_manager', label: '', external_id: 'ABC123', enabled: true, status: 'ok', consented_at: '2026-07-01T00:00:00Z',
     last_sync_at: null, last_success_at: '2026-07-03T10:00:00Z', last_error: '', synced_through: '2026-07-03T10:00:00Z',
     covers_from: '2026-07-01T00:00:00Z', reconciliation: { state: 'warn', days_compared: 7, export_deviation_pct: 14.2, import_deviation_pct: 2, best_shift_intervals: 1 },

@@ -78,7 +78,7 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
     )
     // The manager's own block belongs to "everyone" and to themselves, not to a view of somebody else.
     const showOwnBlock = !selectedParticipantId || ownParticipantIds.includes(selectedParticipantId)
-    const wantsOwnEnergyData = energyData.eligible.some((point) => point.zev === selectedZevId && point.source === null)
+    const wantsOwnEnergyData = energyData.historyEligible.some((point) => point.zev === selectedZevId && point.source === null)
     const highlightParticipantIds = useMemo(
         () => selectedParticipantId ? [selectedParticipantId] : undefined,
         [selectedParticipantId],

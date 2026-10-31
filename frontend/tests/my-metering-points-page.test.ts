@@ -34,9 +34,9 @@ vi.mock('../src/lib/api/supplementary', () => ({
     listSupplementarySources: api.listSupplementarySources,
     fetchEligibleOrNull: api.fetchEligibleOrNull,
 }))
-// The connected-source card and the connect modal have their own tests.
-vi.mock('../src/features/supplementary/MeteringPointEnergyData', () => ({
-    MeteringPointEnergyData: ({ point, sourcesUnavailable }: { point: EligibleMeteringPoint; sourcesUnavailable?: string }) =>
+// The card (rows, source dialog, connect flow) has its own tests.
+vi.mock('../src/features/supplementary/MeteringPointDataCard', () => ({
+    MeteringPointDataCard: ({ point, sourcesUnavailable }: { point: EligibleMeteringPoint; sourcesUnavailable?: string }) =>
         createElement('article', { 'data-testid': 'energy-data', 'data-unavailable': sourcesUnavailable ?? '' }, `energy:${point.meter_id}`),
 }))
 
@@ -190,5 +190,43 @@ describe('MyMeteringPointsPage', () => {
         access.participantScope = false
         const manager = await mount()
         expect(manager.container.textContent).toContain('pages.myMeteringPoints.empty.manager')
+    })
+})
+
+describe('MyMeteringPointsPage with the live flag on', () => {
+    const withCapabilities = (id: string, eligible_capabilities: EligibleMeteringPoint['eligible_capabilities']): EligibleMeteringPoint => ({
+        ...eligible(id), eligible_capabilities,
+    })
+
+    it('renders exactly one card per held meter, for history, live or both', async () => {
+        api.fetchEligibleOrNull.mockResolvedValue([withCapabilities('1', ['history', 'live']), withCapabilities('2', ['live'])])
+        const { container } = await mount()
+
+        const cards = Array.from(container.querySelectorAll('[data-testid="energy-data"]')).map((node) => node.textContent)
+        expect(cards).toEqual(['energy:CH-1', 'energy:CH-2'])
+    })
+
+    it('lists a held meter without any capability plainly, with no card', async () => {
+        api.fetchEligibleOrNull.mockResolvedValue([withCapabilities('1', ['live']), withCapabilities('2', [])])
+        const { container } = await mount()
+
+        expect(container.querySelectorAll('[data-testid="energy-data"]')).toHaveLength(1)
+        expect(container.querySelector('article[aria-label="CH-2"]')).not.toBeNull()
+    })
+
+    it('explains history only when some point can have it', async () => {
+        api.fetchEligibleOrNull.mockResolvedValue([withCapabilities('2', ['live'])])
+        const { container } = await mount()
+
+        expect(container.textContent).not.toContain('supplementary.section.description')
+        expect(container.textContent).toContain('supplementary.live.description')
+    })
+
+    it('shows only the history card while the live flag is off', async () => {
+        api.fetchEligibleOrNull.mockResolvedValue([eligible('1')])
+        const { container } = await mount()
+
+        expect(container.querySelectorAll('[data-testid="energy-data"]')).toHaveLength(1)
+        expect(container.textContent).not.toContain('supplementary.live.description')
     })
 })

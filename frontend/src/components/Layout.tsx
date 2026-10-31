@@ -8,7 +8,7 @@ import { useAuth } from '../lib/auth'
 import { useCommunityAccess } from '../lib/communityAccess'
 import { useOptionalManagedZev } from '../lib/managedZev'
 import { useLiveEnabled } from '../lib/live'
-import { useEnergyDataEligibility } from '../lib/supplementary'
+import { hasCapability, useEnergyDataEligibility } from '../lib/supplementary'
 import { fetchFeasibilityCalculatorEnabled } from '../lib/api/feasibility'
 import { queryKeys } from '../lib/api/queryKeys'
 import { apiErrorPayload } from '../lib/api/errors'
@@ -58,7 +58,8 @@ export function Layout() {
     // A manager or viewer who also holds a flagged meter themselves sets up their own energy data there.
     const energyData = useEnergyDataEligibility()
     const selectedZevId = useOptionalManagedZev()?.selectedZevId
-    const holdsOwnFlaggedMeter = energyData.eligible.some((point) => point.zev === selectedZevId)
+    // With the live flag on the list holds every held meter, so any capability (history or live) is a reason to show the entry.
+    const holdsOwnFlaggedMeter = energyData.eligible.some((point) => point.zev === selectedZevId && hasCapability(point))
     // Query the flag only for accounts with community-wide access.
     const feasibilityEnabledQuery = useQuery({
         queryKey: queryKeys.feasibility.enabled(),
