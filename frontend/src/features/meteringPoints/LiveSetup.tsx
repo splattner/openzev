@@ -5,12 +5,14 @@ import { FormModal } from '../../components/FormModal'
 import { Notice } from '../../components/Notice'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { fetchZevEligibleSources, listSupplementarySources } from '../../lib/api/supplementary'
+import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { useAuth } from '../../lib/auth'
 import { useLiveEnabled } from '../../lib/live'
-import { connectionPointSource } from '../../lib/supplementary'
+import { connectionPointSource, sourceFor } from '../../lib/supplementary'
 import type { MeteringPoint, SupplementarySource } from '../../types/api'
-import { LiveSourceDetails, type ConfirmOptions } from '../supplementary/LiveSourceDetails'
-import { LiveSourceSection } from '../supplementary/LiveSourceSection'
+import { CapabilityRows } from '../supplementary/CapabilityRows'
+import { LiveStateBadge } from '../supplementary/LiveStateBadge'
+import { SourceDetails, SourceDialog, type ConfirmOptions } from '../supplementary/SourceDialog'
 import { SupplementarySourceModal } from '../supplementary/SupplementarySourceModal'
 
 type Confirm = (options: ConfirmOptions) => void
@@ -48,32 +50,58 @@ export function useLiveSetup({ zevId, canWrite, isManagedScope }: SetupArgs) {
 type Setup = ReturnType<typeof useLiveSetup>
 
 /**
- * The "Live data" action of a ZEV-operated metering point. A point without a live source opens the
- * connect dialog straight away; one with a source opens its status and actions. One dialog at a
- * time, so nothing but a confirmation ever opens over another dialog.
+ * The "Live data" action of a ZEV-operated metering point (live only: history belongs to participants).
+ * A point without a live source opens the connect flow straight away; one with a source opens its row,
+ * which opens the source's details. It is one dialog whose content changes with the user's own choices
+ * (rows, details, connect) and never with the source list, so the one-time token of a new source stays
+ * on screen while the lists refetch, and nothing but a confirmation opens over it.
  */
 export function PointLiveDialog({ point, setup, confirm, onClose }: { point: MeteringPoint; setup: Setup; confirm: Confirm; onClose: () => void }) {
     const { t } = useTranslation()
-    // Decided once, when the dialog opens: connecting a source makes the point "have" one while its
-    // one-time token is still on screen, and the connect dialog must not turn into the status dialog then.
-    const [connecting] = useState(() => !setup.zevEligibleByPoint.get(point.id)?.sources.live)
-    if (connecting) {
-        return <SupplementarySourceModal mode="zev-live" point={{ metering_point: point.id, meter_id: point.meter_id, zev: point.zev }} onClose={onClose} />
+    // Decided once, when the dialog opens.
+    const [startsConnecting] = useState(() => !setup.zevEligibleByPoint.get(point.id)?.sources.live)
+    const [view, setView] = useState<'rows' | 'source' | 'connect'>(startsConnecting ? 'connect' : 'rows')
+    const { sourcesQuery } = setup
+    const sources = sourcesQuery.data
+    const liveSource = sourceFor(sources, point.id, 'live')
+
+    if (view === 'connect') {
+        return (
+            <SupplementarySourceModal
+                holder="zev"
+                point={{ metering_point: point.id, meter_id: point.meter_id, zev: point.zev }}
+                sources={sources}
+                onClose={() => (startsConnecting ? onClose() : setView('rows'))}
+            />
+        )
     }
     return (
-        <FormModal isOpen title={t('supplementary.live.dialogTitle', { meter: point.meter_id })} onClose={onClose}>
-            <LiveSourceSection
-                bare
-                meteringPointId={point.id}
-                meterId={point.meter_id}
-                zevId={point.zev}
-                heldBy="zev"
-                sources={setup.sourcesQuery.data}
-                sourcesUnavailable={setup.sourcesQuery.isLoading ? 'loading' : setup.sourcesQuery.isError ? 'error' : undefined}
-                onRetrySources={() => void setup.sourcesQuery.refetch()}
-                confirm={confirm}
-                onGone={onClose}
-            />
+        <FormModal isOpen size="md" title={t(view === 'source' ? 'supplementary.source.title' : 'supplementary.live.dialogTitle', { meter: point.meter_id, subject: point.meter_id })} onClose={onClose}>
+            {!sources ? (
+                sourcesQuery.isError ? (
+                    <Notice tone="error" onRetry={() => void sourcesQuery.refetch()}>{t('supplementary.section.loadError')}</Notice>
+                ) : (
+                    <p className="muted m-0">{t('common.loading')}</p>
+                )
+            ) : view === 'source' && liveSource ? (
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                    <div>
+                        <button type="button" className="button button-ghost button-compact" onClick={() => setView('rows')}>
+                            {t('supplementary.modal.back')}
+                        </button>
+                    </div>
+                    <SourceDetails source={liveSource} sources={sources} confirm={confirm} canManage onGone={onClose} />
+                </div>
+            ) : (
+                <CapabilityRows
+                    meteringPointId={point.id}
+                    capabilities={['live']}
+                    sources={sources}
+                    zevHeld
+                    onOpenSource={() => setView('source')}
+                    onConnect={() => setView('connect')}
+                />
+            )}
         </FormModal>
     )
 }
@@ -87,7 +115,9 @@ export function PointLiveDialog({ point, setup, confirm, onClose }: { point: Met
 export function ConnectionPointCard({ zevId, setup, canWrite, confirm }: { zevId: string; setup: Setup; canWrite: boolean; confirm: Confirm }) {
     const { t } = useTranslation()
     const { isImpersonating } = useAuth()
+    const { settings } = useAppSettings()
     const [connecting, setConnecting] = useState(false)
+    const [detailsOpen, setDetailsOpen] = useState(false)
     const { sourcesQuery, zevEligibleQuery } = setup
 
     const source: SupplementarySource | undefined = connectionPointSource(sourcesQuery.data, zevId)
@@ -99,7 +129,19 @@ export function ConnectionPointCard({ zevId, setup, canWrite, confirm }: { zevId
 
     let body
     if (source) {
-        body = <LiveSourceDetails source={source} confirm={confirm} canManage={canWrite} />
+        body = (
+            <div className="actions-row actions-row-wrap">
+                {source.live_state ? <LiveStateBadge state={source.live_state} /> : null}
+                <small className="muted">
+                    {t('supplementary.card.lastValueAt', { date: source.live_last_seen_at ? formatDateTime(source.live_last_seen_at, settings) : t('supplementary.never') })}
+                </small>
+                {canWrite && (
+                    <button type="button" className="button button-secondary button-compact" onClick={() => setDetailsOpen(true)}>
+                        {t('supplementary.connection.details')}
+                    </button>
+                )}
+            </div>
+        )
     } else if (sourcesQuery.isError) {
         body = (
             <Notice tone="error" onRetry={() => void sourcesQuery.refetch()} isRetrying={sourcesQuery.isFetching}>
@@ -136,7 +178,17 @@ export function ConnectionPointCard({ zevId, setup, canWrite, confirm }: { zevId
                 </div>
                 {body}
             </section>
-            {connecting && <SupplementarySourceModal mode="connection-point" zevId={zevId} onClose={() => setConnecting(false)} />}
+            {connecting && <SupplementarySourceModal holder="connection-point" zevId={zevId} onClose={() => setConnecting(false)} />}
+            {detailsOpen && source && (
+                <SourceDialog
+                    subject={t('supplementary.connection.title')}
+                    source={source}
+                    sources={sourcesQuery.data}
+                    confirm={confirm}
+                    canManage={canWrite}
+                    onClose={() => setDetailsOpen(false)}
+                />
+            )}
         </>
     )
 }

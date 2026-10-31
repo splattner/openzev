@@ -34,15 +34,10 @@ vi.mock('../src/lib/api/supplementary', () => ({
     listSupplementarySources: api.listSupplementarySources,
     fetchEligibleOrNull: api.fetchEligibleOrNull,
 }))
-// The connected-source card and the connect modal have their own tests.
-vi.mock('../src/features/supplementary/MeteringPointEnergyData', () => ({
-    MeteringPointEnergyData: ({ point, sourcesUnavailable }: { point: EligibleMeteringPoint; sourcesUnavailable?: string }) =>
+// The card (rows, source dialog, connect flow) has its own tests.
+vi.mock('../src/features/supplementary/MeteringPointDataCard', () => ({
+    MeteringPointDataCard: ({ point, sourcesUnavailable }: { point: EligibleMeteringPoint; sourcesUnavailable?: string }) =>
         createElement('article', { 'data-testid': 'energy-data', 'data-unavailable': sourcesUnavailable ?? '' }, `energy:${point.meter_id}`),
-}))
-
-vi.mock('../src/features/supplementary/LiveSourceSection', () => ({
-    LiveSourceSection: ({ meterId, heldBy }: { meterId: string; heldBy: string }) =>
-        createElement('article', { 'data-testid': 'live-section', 'data-held-by': heldBy }, `live:${meterId}`),
 }))
 
 const point = (id: string, flagged: boolean): MeteringPoint => ({
@@ -203,22 +198,19 @@ describe('MyMeteringPointsPage with the live flag on', () => {
         ...eligible(id), eligible_capabilities,
     })
 
-    it('renders a history section only where history is possible and a live section wherever live is', async () => {
+    it('renders exactly one card per held meter, for history, live or both', async () => {
         api.fetchEligibleOrNull.mockResolvedValue([withCapabilities('1', ['history', 'live']), withCapabilities('2', ['live'])])
         const { container } = await mount()
 
-        const energy = Array.from(container.querySelectorAll('[data-testid="energy-data"]')).map((node) => node.textContent)
-        const live = Array.from(container.querySelectorAll('[data-testid="live-section"]')).map((node) => node.textContent)
-        expect(energy).toEqual(['energy:CH-1'])
-        expect(live).toEqual(['live:CH-1', 'live:CH-2'])
-        expect(container.querySelector('[data-testid="live-section"]')!.getAttribute('data-held-by')).toBe('participant')
+        const cards = Array.from(container.querySelectorAll('[data-testid="energy-data"]')).map((node) => node.textContent)
+        expect(cards).toEqual(['energy:CH-1', 'energy:CH-2'])
     })
 
-    it('lists a held meter without any capability plainly, with no section', async () => {
+    it('lists a held meter without any capability plainly, with no card', async () => {
         api.fetchEligibleOrNull.mockResolvedValue([withCapabilities('1', ['live']), withCapabilities('2', [])])
         const { container } = await mount()
 
-        expect(container.querySelectorAll('[data-testid="live-section"]')).toHaveLength(1)
+        expect(container.querySelectorAll('[data-testid="energy-data"]')).toHaveLength(1)
         expect(container.querySelector('article[aria-label="CH-2"]')).not.toBeNull()
     })
 
@@ -230,11 +222,11 @@ describe('MyMeteringPointsPage with the live flag on', () => {
         expect(container.textContent).toContain('supplementary.live.description')
     })
 
-    it('shows no live section while the live flag is off', async () => {
+    it('shows only the history card while the live flag is off', async () => {
         api.fetchEligibleOrNull.mockResolvedValue([eligible('1')])
         const { container } = await mount()
 
-        expect(container.querySelector('[data-testid="live-section"]')).toBeNull()
+        expect(container.querySelectorAll('[data-testid="energy-data"]')).toHaveLength(1)
         expect(container.textContent).not.toContain('supplementary.live.description')
     })
 })
