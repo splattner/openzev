@@ -12,7 +12,7 @@ export function LivePointsTable({ points }: { points: LivePoint[] }) {
         <section className="card" aria-labelledby={titleId}>
             <h3 id={titleId}>{t('live.points.title')}</h3>
             <div className="table-scroll">
-                <table className="participant-table">
+                <table className="participant-table live-points-table">
                     <thead>
                         <tr>
                             <th>{t('live.points.meter')}</th>

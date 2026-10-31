@@ -67,6 +67,13 @@
   overflow-wrap: break-word;
 }
 
+/* Meter ids are long and kept on one line: the column takes their width and the wrapper scrolls. */
+
+.live-points-table th:first-child,
+.live-points-table td:first-child {
+  max-width: none;
+}
+
 .participant-table th.numeric,
 .participant-table td.numeric {
   text-align: right;
