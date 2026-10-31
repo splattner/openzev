@@ -196,11 +196,8 @@ with values readable, no duplicate submission, retained form on failure. A
 pending save that outlives the pane applies only to its originating scope and
 editing instance.
 
-Tariff failures prefer the additive `validation_errors` code/path/parameters
-contract in the [billing baseline](2026-03-tariffs-and-billing-engine.md#tariff-api-error-contract).
-All four locales retain nested band numbers, fee-specific field labels and
-configured date formats independently of the server's English wording. Unknown
-diagnostics remain readable; older servers use the bounded legacy fallback.
+Tariff errors follow the [shared contract](2026-03-tariffs-and-billing-engine.md#tariff-api-error-contract),
+with localized field labels, configured dates and nested band indexes.
 
 ## 8. Pilot acceptance
 

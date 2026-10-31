@@ -3,62 +3,11 @@ import { formatApiError, splitIndexedErrors } from '../../lib/api/errors'
 import { formatShortDate } from '../../lib/appSettings'
 import type { AppSettings, TariffValidationError } from '../../types/api'
 import { MONTH_KEYS } from './recurrence'
-import { FIXED_PRICE_LABELS } from './useTariffForms'
+import { FIXED_PRICE_LABELS } from './labels'
 
 type Translate = (key: string, options?: Record<string, unknown>) => string
 
-// shortcut: keep this bounded mapping for older servers until the code contract is deployed everywhere.
-const messageKeys: Record<string, string> = {
-  'A name is required.': 'nameRequired',
-  'Use new-version to add another version under the same name.': 'useNewVersion',
-  'valid_to must be on or after valid_from.': 'dateRange',
-  'date_to must be on or after date_from.': 'dateRange',
-  'Energy-based tariffs require an energy type.': 'energyTypeRequired',
-  'Energy tariffs require an energy type.': 'energyTypeRequired',
-  'Percentage-of-energy tariffs require an energy type.': 'energyTypeRequired',
-  'Choose energy, grid fees, levies or metering. One-off costs are charges, not tariffs.': 'category',
-  "Remove this tariff's bands before changing its billing mode.": 'removeBandsForMode',
-  'A tariff priced from a fetched series cannot carry price bands.': 'dynamicBands',
-  'This tariff is priced from a fetched series; price bands do not apply.': 'dynamicBands',
-  'A minimum price only applies to a tariff priced from a fetched series.': 'minimumDynamic',
-  'A minimum price only applies to a feed-in tariff.': 'minimumFeedIn',
-  'This price series no longer exists.': 'sourceMissing',
-  'Storage refunds require storage-qualified metering and cannot be billed as exported energy.': 'storageRefund',
-  'Tariff periods are only supported for energy-based tariffs.': 'bandsEnergyOnly',
-  'Leave months blank to apply in every month.': 'monthsBlank',
-  'A price band needs a price.': 'priceRequired',
-  'Only percentage-of-energy tariffs take a percentage.': 'percentageModeOnly',
-  'Only a percentage-of-energy tariff takes an initial percentage.': 'percentageModeOnly',
-  'A percentage band needs a percentage.': 'percentageRequired',
-  'A percentage band takes a percentage, not a price.': 'percentageNotPrice',
-  "Remove this tariff's price bands before linking a fetched series.": 'removeBandsForSource',
-  'This tariff priced a non-cancelled invoice from its current dynamic source. Create a new tariff version to change its price source.': 'billedSourceChange',
-  'This tariff priced a non-cancelled invoice from its dynamic source. End its validity instead of deleting it.': 'billedDelete',
-  'Initial bands are only supported when creating a static energy tariff.': 'initialBands',
-  "Add bands from the tariff's own page to change an existing tariff.": 'editExistingBands',
-  'Fixed-fee tariffs require a price.': 'fixedPriceRequired',
-  "Version 2 price sources require a product name. Select or enter the operator's product name.": 'productRequired',
-  'Source identity is immutable; create a replacement source.': 'sourceIdentity',
-  'Create a replacement source instead of changing a price-series identity.': 'sourceIdentity',
-  'An exact-URL source cannot support range queries.': 'sourceRange',
-  'This endpoint does not accept a time range.': 'sourceRange',
-  'Only administrators can operate shared price sources.': 'adminSource',
-  'This price history is only available through a tariff in your ZEV.': 'historyAccess',
-  'This source is currently being fetched. Try again shortly.': 'sourceBusy',
-  'You do not have permission to perform this action.': 'permission',
-  'You do not manage this ZEV.': 'permission',
-  'The URL is invalid.': 'invalidUrl',
-  'Enter a valid URL.': 'invalidUrl',
-  'No URL was given.': 'importUrl',
-  "The document could not be downloaded. Check the address, and that the operator's site is reachable.": 'downloadFailed',
-  'The document at this URL is not valid JSON. Check that the link points at the machine-readable tariff file and not at a web page.': 'importJson',
-  'This list may not be empty.': 'emptyBands',
-  'Invalid pk - object does not exist.': 'referenceMissing',
-  'Not found.': 'referenceMissing',
-  'ZEV not found.': 'referenceMissing',
-}
-
-const codeKeys: Record<string, string> = {
+export const tariffErrorKeys: Record<string, string> = {
   band_time_pair: 'bandTimePair',
   name_required: 'nameRequired',
   use_new_version: 'useNewVersion',
@@ -89,12 +38,17 @@ const codeKeys: Record<string, string> = {
   admin_source: 'adminSource',
   history_access: 'historyAccess',
   source_busy: 'sourceBusy',
+  confirmation_mismatch: 'confirmationMismatch',
+  source_in_use: 'sourceInUse',
+  source_protected: 'sourceProtected',
+  prices_in_use: 'pricesInUse',
+  fetch_unavailable: 'fetchUnavailable',
+  product_selection_required: 'productSelectionRequired',
   permission: 'permission',
   invalid_url: 'invalidUrl',
   import_url: 'importUrl',
   download_failed: 'downloadFailed',
   import_json: 'importJson',
-  empty_bands: 'emptyBands',
   reference_missing: 'referenceMissing',
   duplicate_date: 'duplicateDate',
   name_exists: 'nameExists',
@@ -118,7 +72,6 @@ const codeKeys: Record<string, string> = {
   does_not_exist: 'referenceMissing',
   not_found: 'referenceMissing',
   permission_denied: 'permission',
-  empty: 'emptyBands',
   min_value: 'minValue',
   max_value: 'maxValue',
   max_digits: 'maxDigits',
@@ -129,70 +82,56 @@ const codeKeys: Record<string, string> = {
 }
 
 const fieldKeys: Record<string, string> = {
-  name: 'name', label: 'name', valid_from: 'validFrom', valid_to: 'validTo',
-  category: 'category', billing_mode: 'billingMode', energy_type: 'energyType',
-  dynamic_source: 'dynamicSource', minimum_price_chf_per_kwh: 'minimumPrice',
-  price_chf_per_kwh: 'pricePerKwh', percentage: 'percentage', initial_percentage: 'initialPercentage',
-  fixed_price_chf: 'fixedPrice',
-  period_type: 'periodType', time_from: 'timeFrom', time_to: 'timeTo', weekdays: 'weekdays', months: 'months',
+  name: 'pages.tariffs.form.name', label: 'pages.dynamicSources.form.label',
+  valid_from: 'pages.tariffs.form.validFrom', valid_to: 'pages.tariffs.form.validTo',
+  category: 'pages.tariffs.form.category', billing_mode: 'pages.tariffs.form.billingMode',
+  energy_type: 'pages.tariffs.form.energyType', dynamic_source: 'pages.tariffs.form.dynamicSource',
+  minimum_price_chf_per_kwh: 'pages.tariffs.form.minimumPrice',
+  price_chf_per_kwh: 'pages.tariffs.form.pricePerKwh', percentage: 'pages.tariffs.form.percentage',
+  initial_percentage: 'pages.tariffs.form.initialPercentage', fixed_price_chf: 'pages.tariffs.form.fixedPrice',
+  period_type: 'pages.tariffs.form.periodType', time_from: 'pages.tariffs.form.timeFrom',
+  time_to: 'pages.tariffs.form.timeTo', weekdays: 'pages.tariffs.form.weekdays', months: 'pages.tariffs.form.months',
+  url: 'pages.dynamicSources.form.url', api_version: 'pages.dynamicSources.form.apiVersion',
+  tariff_type: 'pages.dynamicSources.form.tariffType', tariff_name: 'pages.dynamicSources.form.tariffName',
+  dynamic_tariff_name: 'pages.dynamicSources.form.tariffName',
+  date_from: 'pages.dynamicSources.history.dateFrom', date_to: 'pages.dynamicSources.history.dateTo',
+  zev: 'admin.fields.zev', confirmation: 'pages.tariffs.apiErrorFields.confirmation',
+  document_digest: 'pages.tariffs.apiErrorFields.documentDigest',
 }
 
-function translateMessage(message: string, field: string, t: Translate, settings?: AppSettings): string | null {
-  const translated = (key: string, options?: Record<string, unknown>) => t(`pages.tariffs.apiErrors.${key}`, options)
-  const fieldError = (text: string) => fieldKeys[field] ? `${t(`pages.tariffs.form.${fieldKeys[field]}`)}: ${text}` : text
-  if (messageKeys[message]) return translated(messageKeys[message])
-  if (message === 'A timed band needs both a start and an end time.') return t('pages.tariffs.form.errorTimedBand')
-  const conflict = message.match(/^A flat band and a timed band cannot both apply in months ([\d,]+):/)
-  if (conflict) return t('pages.tariffs.form.errorFlatTimed', {
-    months: conflict[1].split(',').map(month => t(`pages.tariffs.monthsShort.${MONTH_KEYS[Number(month) - 1]}`)).join(', '),
-  })
+const parameterKeys: Record<string, string[]> = {
+  duplicate_date: ['name', 'date'], name_exists: ['name'], overlap: ['name'], series_identity: ['name'],
+  source_in_use: ['tariff_count', 'community_count'],
+  confirmation_mismatch: ['name'], host_unresolved: ['host'], http_status: ['status'], document_size: ['size'],
+  history_limit: ['count'], max_digits: ['count'], max_decimal_places: ['count'], max_whole_digits: ['count'],
+  max_length: ['count'], min_length: ['count'], min_value: ['value'], max_value: ['value'],
+}
 
-  let match = message.match(/^A version of "([\s\S]*)" already starts on (\d{4}-\d{2}-\d{2})\.$/)
-  if (match) return translated('duplicateDate', { name: match[1], date: formatShortDate(match[2], settings) })
-  match = message.match(/^A tariff named "([\s\S]*)" already exists in this ZEV\.$/)
-  if (match) return translated('nameExists', { name: match[1] })
-  match = message.match(/^Another tariff named "([\s\S]*)" in this ZEV already covers part of this validity period\./)
-  if (match) return translated('overlap', { name: match[1] })
-  match = message.match(/^Other versions of "([\s\S]*)" in this ZEV use /)
-  if (match) return translated('seriesIdentity', { name: match[1] })
-  if (message.startsWith('A price series bills per kWh, so it can only be used by a tariff billed by energy')) return translated('sourceEnergyOnly')
-  if (message.startsWith('This price series serves ')) return translated('sourceTypeMismatch')
-  if (message.startsWith('Weekdays must be comma-separated numbers between 0 and 6,')) return translated('weekdays')
-  if (message.startsWith('Months must be comma-separated numbers between 1 and 12,')) return translated('months')
-  if (message.startsWith('Select a technology: one of ')) return translated('technology')
-  if (message.startsWith('The BFE reference market price prices exported energy;')) return translated('bfeFeedIn')
-  if (message.startsWith("The operator's document changed since the preview.")) return translated('importChanged')
-  if (message.startsWith('No tariff URL is set for this ZEV.')) return translated('importUrl')
-  if (message.startsWith('Only http and https URLs can be imported, not ') || message.includes('does not resolve to a public address. Tariff documents must be fetched')) return translated('publicUrl')
-  match = message.match(/^The host (.+) could not be resolved\. Check the address for a typo\.$/)
-  if (match) return translated('hostUnresolved', { host: match[1] })
-  match = message.match(/^The operator's server answered HTTP (\d+)\.$/)
-  if (match) return translated('httpStatus', { status: match[1] })
-  match = message.match(/^The document is (?:\d+ KB, )?larger than the (\d+) MB limit\.$/)
-  if (match) return translated('documentSize', { size: match[1] })
-  match = message.match(/^Price history is limited to (\d+) days\.$/)
-  if (match) return translated('historyLimit', { count: Number(match[1]) })
-
-  if (['This field is required.', 'This field may not be null.', 'This field may not be blank.', 'This value cannot be null.', 'This value cannot be blank.'].includes(message)) return fieldError(t('pages.tariffs.form.errorRequired'))
-  if (['A valid number is required.', 'A valid integer is required.', 'Enter a number.', 'Enter a valid decimal.'].includes(message)) return fieldError(t('pages.tariffs.form.errorNumber'))
-  if (message === 'Enter a valid date.' || message.startsWith('Date has wrong format.') || message.endsWith('is required as an ISO date (YYYY-MM-DD).')) return fieldError(translated('invalidDate'))
-  if (message.startsWith('Time has wrong format.')) return fieldError(translated('invalidTime'))
-  if (message.endsWith('is not a valid choice.')) return fieldError(translated('invalidChoice'))
-  if (/^Invalid pk .+ - object does not exist\.$/.test(message)) return fieldError(translated('referenceMissing'))
-  match = message.match(/^Ensure this value is (greater than or equal to|less than or equal to) (.+)\.$/)
-  if (match) return fieldError(translated(match[1] === 'greater than or equal to' ? 'minValue' : 'maxValue', { value: match[2] }))
-  const limits: [RegExp, string][] = [
-    [/^Ensure that there are no more than (\d+) digits in total\.$/, 'maxDigits'],
-    [/^Ensure that there are no more than (\d+) decimal places\.$/, 'maxDecimals'],
-    [/^Ensure that there are no more than (\d+) digits before the decimal point\.$/, 'maxWholeDigits'],
-    [/^Ensure (?:this field|this value) has (?:no more than|at most) (\d+) characters/, 'maxLength'],
-    [/^Ensure (?:this field|this value) has (?:at least) (\d+) characters/, 'minLength'],
-  ]
-  for (const [pattern, key] of limits) {
-    match = message.match(pattern)
-    if (match) return fieldError(translated(key, { count: Number(match[1]) }))
+function translationOptions(code: string, params: Record<string, unknown>, settings?: AppSettings) {
+  const options: Record<string, unknown> = {}
+  const requiredParams = Object.hasOwn(parameterKeys, code) ? parameterKeys[code] : []
+  for (const key of requiredParams) {
+    const value = params[key]
+    if (['count', 'status', 'size', 'tariff_count', 'community_count'].includes(key)) {
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return null
+      if (key !== 'size' && !Number.isInteger(value)) return null
+      if (key === 'status' && (value < 100 || value > 599)) return null
+    } else if (key === 'value') {
+      if (!(typeof value === 'number' && Number.isFinite(value))
+        && !(typeof value === 'string' && /^-?\d+(?:\.\d+)?$/.test(value))) return null
+    } else {
+      if (typeof value !== 'string' || !value.trim()) return null
+      if (key === 'date') {
+        const date = new Date(`${value}T00:00:00Z`)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(date.getTime())
+          || date.toISOString().slice(0, 10) !== value) return null
+        options.date = formatShortDate(value, settings)
+        continue
+      }
+    }
+    options[key] = value
   }
-  return null
+  return options
 }
 
 function isCodedError(value: unknown): value is TariffValidationError {
@@ -208,38 +147,48 @@ function formatCodedError(error: TariffValidationError, t: Translate, settings?:
   const { code, params, path, field, message } = error
   let text: string
   let withField = false
-  if (code === 'timed_band_required') text = t('pages.tariffs.form.errorTimedBand')
-  else if (['flat_timed_conflict', 'catch_all_conflict'].includes(code) && Array.isArray(params.months)) {
-    text = t(code === 'catch_all_conflict' ? 'pages.tariffs.apiErrors.catchAllConflict' : 'pages.tariffs.form.errorFlatTimed', {
-      months: params.months.filter((month): month is number => Number.isInteger(month) && month >= 1 && month <= 12)
-        .map(month => t(`pages.tariffs.monthsShort.${MONTH_KEYS[month - 1]}`)).join(', '),
-    })
+  const options = translationOptions(code, params, settings)
+  if (['flat_timed_conflict', 'catch_all_conflict'].includes(code)) {
+    const months = params.months
+    const valid = Array.isArray(months) && months.length > 0
+      && months.every(month => Number.isInteger(month) && month >= 1 && month <= 12)
+    text = valid ? t(code === 'catch_all_conflict' ? 'pages.tariffs.apiErrors.catchAllConflict' : 'pages.tariffs.form.errorFlatTimed', {
+      months: months.map(month => t(`pages.tariffs.monthsShort.${MONTH_KEYS[month - 1]}`)).join(', '),
+    }) : message
+  } else if (code === 'empty') {
+    const key = path.includes('initial_periods') ? 'emptyBands' : path.includes('selections') ? 'emptySelections' : 'emptyList'
+    text = t(`pages.tariffs.apiErrors.${key}`)
   } else if (['required', 'null', 'blank'].includes(code)) {
     text = t('pages.tariffs.form.errorRequired')
     withField = true
   } else if (code === 'invalid_number') {
     text = t('pages.tariffs.form.errorNumber')
     withField = true
-  } else if (Object.hasOwn(codeKeys, code)) {
-    const options = { ...params }
-    if (code === 'duplicate_date' && typeof params.date === 'string') options.date = formatShortDate(params.date, settings)
-    text = t(`pages.tariffs.apiErrors.${codeKeys[code]}`, options)
+  } else if (code === 'too_many_bands') {
+    text = t('pages.tariffs.progression.errors.tooManyBands')
+  } else if (Object.hasOwn(tariffErrorKeys, code) && options !== null) {
+    text = t(`pages.tariffs.apiErrors.${tariffErrorKeys[code]}`, options)
     withField = ['invalid_date', 'invalid_time', 'invalid_choice', 'does_not_exist', 'min_value', 'max_value',
-      'max_digits', 'max_decimal_places', 'max_whole_digits', 'max_length', 'min_length', 'fixed_price_required'].includes(code)
+      'max_digits', 'max_decimal_places', 'max_whole_digits', 'max_length', 'min_length', 'fixed_price_required', 'series_identity'].includes(code)
   } else {
     text = message
     withField = true
   }
   if (withField && field) {
     const mode = typeof params.billing_mode === 'string' ? params.billing_mode : ''
-    const feeLabel = field === 'fixed_price_chf' ? FIXED_PRICE_LABELS[mode as keyof typeof FIXED_PRICE_LABELS] : undefined
-    const label = feeLabel ? t(feeLabel) : fieldKeys[field] ? t(`pages.tariffs.form.${fieldKeys[field]}`) : field
+    const feeLabel = field === 'fixed_price_chf' && Object.hasOwn(FIXED_PRICE_LABELS, mode)
+      ? FIXED_PRICE_LABELS[mode as keyof typeof FIXED_PRICE_LABELS] : undefined
+    const label = feeLabel ? t(feeLabel) : Object.hasOwn(fieldKeys, field) ? t(fieldKeys[field]) : field
     text = `${label}: ${text}`
   }
   const bandIndex = path.findIndex(key => key === 'initial_periods' || key === 'periods')
   const index = path[bandIndex + 1]
   return bandIndex >= 0 && typeof index === 'number'
     ? `${t('pages.tariffs.bandEntry.band', { number: index + 1 })}: ${text}` : text
+}
+
+function codedErrors(value: unknown): TariffValidationError[] | null {
+  return Array.isArray(value) && value.every(isCodedError) ? value : null
 }
 
 export function formatTariffError(error: unknown, fallback: string, t: Translate, settings?: AppSettings): string {
@@ -249,8 +198,8 @@ export function formatTariffError(error: unknown, fallback: string, t: Translate
 
 export function formatTariffErrorData(data: unknown, fallback: string, t: Translate, settings?: AppSettings): string {
   if (data !== null && typeof data === 'object' && 'validation_errors' in data) {
-    const entries: unknown = data.validation_errors
-    if (Array.isArray(entries) && entries.length && entries.every(isCodedError)) {
+    const entries = codedErrors(data.validation_errors)
+    if (entries?.length) {
       return [...new Set(entries.map(entry => formatCodedError(entry, t, settings)))].filter(Boolean).join(' ') || fallback
     }
   }
@@ -262,13 +211,12 @@ export function formatTariffErrorData(data: unknown, fallback: string, t: Transl
           ? t('pages.tariffs.bandEntry.band', { number: index + 1 }) : context))
     } else if (value !== null && typeof value === 'object') {
       for (const [key, entry] of Object.entries(value)) {
-        if (key === 'validation_errors') continue
+        if (key === 'validation_errors' || (value === data && key === 'code')) continue
         collect(entry, ['detail', 'error', 'non_field_errors', '__all__'].includes(key) ? '' : key, context)
       }
     } else if (typeof value === 'string' && value.trim()) {
-      const translated = translateMessage(value, field, t, settings)
-      const label = fieldKeys[field] ? t(`pages.tariffs.form.${fieldKeys[field]}`) : field
-      const text = translated ?? (label ? `${label}: ${value}` : value)
+      const label = Object.hasOwn(fieldKeys, field) ? t(fieldKeys[field]) : field
+      const text = label ? `${label}: ${value}` : value
       messages.push(context ? `${context}: ${text}` : text)
     }
   }
@@ -276,16 +224,26 @@ export function formatTariffErrorData(data: unknown, fallback: string, t: Transl
   return [...new Set(messages)].join(' ') || fallback
 }
 
-
 export function splitTariffBandErrors(error: unknown, t: Translate, settings?: AppSettings) {
   const { items, rest } = splitIndexedErrors(error, 'initial_periods')
   if (!items) return { items, rest }
-  const entries = Array.isArray(rest?.validation_errors) ? rest.validation_errors.filter(isCodedError) : []
-  const translated = items.map((item, index) => Object.fromEntries(Object.entries(item).map(([field, messages]) => {
-    const coded = entries.filter(entry => entry.path[0] === 'initial_periods' && entry.path[1] === index && entry.field === field)
-    const texts = coded.length ? coded.map(entry => formatCodedError({ ...entry, field: null, path: [] }, t, settings))
-      : messages.map(message => translateMessage(message, '', t, settings) ?? message)
-    return [field, [...new Set(texts)]]
-  })))
-  return { items: translated, rest: rest ? { ...rest, validation_errors: entries.filter(entry => entry.path[0] !== 'initial_periods') } : null }
+  // Initial creation renders inline rows; replacement versions use band-prefixed notices.
+  const entries = codedErrors(rest?.validation_errors)
+  if (!entries) return { items, rest }
+  const bandEntries = entries.filter(entry => entry.path[0] === 'initial_periods')
+  const consumedEntries = new Set<TariffValidationError>()
+  const translatedItems = items.map((item, index) => {
+    const fields = Object.entries(item).map(([field, messages]) => {
+      const coded = bandEntries.filter(entry => entry.path.length === 3
+        && entry.path[1] === index && entry.path[2] === field)
+      coded.forEach(entry => consumedEntries.add(entry))
+      const texts = coded.length
+        ? coded.map(entry => formatCodedError({ ...entry, field: null, path: [] }, t, settings))
+        : messages
+      return [field, [...new Set(texts)]]
+    })
+    return Object.fromEntries(fields)
+  })
+  const remainingEntries = entries.filter(entry => !consumedEntries.has(entry))
+  return { items: translatedItems, rest: rest ? { ...rest, validation_errors: remainingEntries } : null }
 }

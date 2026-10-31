@@ -1,4 +1,5 @@
 import { formatTariffError } from './errors'
+import { useAppSettings } from '../../lib/appSettings'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -50,6 +51,7 @@ const STATUS_BADGE: Record<VseTariffCandidateStatus, string> = {
 
 export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: VseTariffImportModalProps) {
     const { t } = useTranslation()
+    const { settings } = useAppSettings()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
 
@@ -74,7 +76,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
             setYear(null)
         },
         onError: (error) =>
-            pushToast(formatTariffError(error, t('pages.tariffs.import.errors.previewFailed'), t), 'error'),
+            pushToast(formatTariffError(error, t('pages.tariffs.import.errors.previewFailed'), t, settings), 'error'),
     })
 
     const applyMutation = useMutation({
@@ -87,7 +89,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
             }
         },
         onError: (error) =>
-            pushToast(formatTariffError(error, t('pages.tariffs.import.errors.applyFailed'), t), 'error'),
+            pushToast(formatTariffError(error, t('pages.tariffs.import.errors.applyFailed'), t, settings), 'error'),
     })
 
     const years = useMemo(() => candidateYears(preview?.candidates ?? []), [preview])

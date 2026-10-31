@@ -44,8 +44,7 @@ class TariffFetchError(Exception):
     which carry paths and library detail.
 
     So anything of that kind goes in ``log_detail``, which is logged where the
-    request is handled and never leaves the server. The user gets a sentence
-    they can act on about the URL *they* supplied.
+    request is handled and never leaves the server.
     """
 
     def __init__(
@@ -67,21 +66,27 @@ def _check_public_host(url: str) -> None:
         raise TariffFetchError("The URL is invalid.", code="invalid_url", log_detail=str(exc)) from exc
     if parsed.scheme not in ALLOWED_SCHEMES:
         raise TariffFetchError(
-            f"Only http and https URLs can be imported, not {parsed.scheme or 'a URL without a scheme'}.", code="public_url"
+            f"Only http and https URLs can be imported, not {parsed.scheme or 'a URL without a scheme'}.",
+            code="public_url",
         )
     try:
         check_public_host(url, allowed_schemes=ALLOWED_SCHEMES)
     except PublicHostError as exc:
         if exc.reason == "unresolved":
             raise TariffFetchError(
-                f"The host {parsed.hostname} could not be resolved. Check the address for a typo.", code="host_unresolved", params=dict(host=parsed.hostname),
+                f"The host {parsed.hostname} could not be resolved. Check the address for a typo.",
+                code="host_unresolved",
+                params=dict(host=parsed.hostname),
                 log_detail=exc.log_detail,
             ) from exc
         if exc.reason == "invalid_url":
-            raise TariffFetchError(str(exc), code="invalid_url", log_detail=exc.log_detail) from exc
+            raise TariffFetchError(
+                str(exc), code="invalid_url", log_detail=exc.log_detail
+            ) from exc
         host = parsed.hostname or "the host"
         raise TariffFetchError(
-            f"{host} does not resolve to a public address. Tariff documents must be fetched from the operator's public website.", code="public_url",
+            f"{host} does not resolve to a public address. Tariff documents must be fetched from the operator's public website.",
+            code="public_url",
             log_detail=exc.log_detail,
         ) from exc
 
@@ -121,7 +126,9 @@ def _download(url: str, *, accept: str) -> tuple[bytes, str]:
             if declared and declared.isdigit() and int(declared) > MAX_DOCUMENT_BYTES:
                 raise TariffFetchError(
                     f"The document is {int(declared) // 1024} KB, larger than the "
-                    f"{MAX_DOCUMENT_BYTES // (1024 * 1024)} MB limit.", code="document_size", params=dict(size=MAX_DOCUMENT_BYTES // (1024 * 1024))
+                    f"{MAX_DOCUMENT_BYTES // (1024 * 1024)} MB limit.",
+                    code="document_size",
+                    params=dict(size=MAX_DOCUMENT_BYTES // (1024 * 1024)),
                 )
             # One byte past the cap, so a document that lies about (or omits)
             # its length is still caught by what actually arrived.
@@ -130,20 +137,25 @@ def _download(url: str, *, accept: str) -> tuple[bytes, str]:
         # The status code is the actionable part; the reason phrase comes from
         # a server the user pointed us at, so it is logged rather than echoed.
         raise TariffFetchError(
-            f"The operator's server answered HTTP {exc.code}.", code="http_status", params=dict(status=exc.code),
+            f"The operator's server answered HTTP {exc.code}.",
+            code="http_status",
+            params=dict(status=exc.code),
             log_detail=f"HTTP {exc.code} {exc.reason} from {url}",
             status_code=exc.code,
         ) from exc
     except (urllib.error.URLError, TimeoutError, socket.timeout, OSError) as exc:
         raise TariffFetchError(
             "The document could not be downloaded. Check the address, and that the "
-            "operator's site is reachable.", code="download_failed",
+            "operator's site is reachable.",
+            code="download_failed",
             log_detail=f"{type(exc).__name__}: {exc}",
         ) from exc
 
     if len(body) > MAX_DOCUMENT_BYTES:
         raise TariffFetchError(
-            f"The document is larger than the {MAX_DOCUMENT_BYTES // (1024 * 1024)} MB limit.", code="document_size", params=dict(size=MAX_DOCUMENT_BYTES // (1024 * 1024))
+            f"The document is larger than the {MAX_DOCUMENT_BYTES // (1024 * 1024)} MB limit.",
+            code="document_size",
+            params=dict(size=MAX_DOCUMENT_BYTES // (1024 * 1024)),
         )
 
     return body, sha256(body).hexdigest()

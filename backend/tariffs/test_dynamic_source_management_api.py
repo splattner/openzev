@@ -315,6 +315,14 @@ class TestOperations:
         assert event.status == "queued"
         assert event.correlation_id == response.json()["correlation_id"]
 
+    def test_queue_failure_returns_a_safe_code(self, admin_client):
+        source = make_source()
+        with mock.patch("tariffs.views.fetch_dynamic_prices.delay", side_effect=RuntimeError("PRIVATE QUEUE DETAIL")):
+            response = admin_client.post(f"/api/v1/tariffs/dynamic-sources/{source.pk}/fetch/", {})
+        assert response.status_code == 503
+        assert response.json()["validation_errors"][0]["code"] == "fetch_unavailable"
+        assert "PRIVATE QUEUE DETAIL" not in response.content.decode()
+
     def test_owner_cannot_queue_or_clear(self, owner_client):
         source = make_source()
 
@@ -389,6 +397,7 @@ class TestOperations:
         )
 
         assert response.status_code == 409
+        assert response.json()["validation_errors"][0]["code"] == "prices_in_use"
 
     def test_a_draft_invoice_freezes_the_source(self, admin_client, zev):
         source = make_source()
@@ -558,6 +567,8 @@ class TestDeletingASource:
 
         assert response.status_code == 409
         assert "1 tariff" in response.json()["detail"]
+        assert response.json()["validation_errors"][0]["code"] == "source_in_use"
+        assert response.json()["validation_errors"][0]["params"] == {"tariff_count": 1, "community_count": 1}
         assert DynamicTariffSource.objects.filter(pk=source.pk).exists()
 
     def test_deleting_refuses_a_mistyped_label(self, admin_client):
@@ -569,6 +580,7 @@ class TestDeletingASource:
         )
 
         assert response.status_code == 400
+        assert response.json()["validation_errors"][0]["code"] == "confirmation_mismatch"
         assert DynamicTariffSource.objects.filter(pk=source.pk).exists()
 
     def test_deleting_requires_a_confirmation_at_all(self, admin_client):
@@ -602,6 +614,7 @@ class TestDeletingASource:
             )
 
         assert response.status_code == 409
+        assert response.json()["validation_errors"][0]["code"] == "source_busy"
         assert DynamicTariffSource.objects.filter(pk=source.pk).exists()
 
     def test_a_tariff_linked_during_the_delete_still_refuses(self, admin_client, zev):
@@ -622,6 +635,7 @@ class TestDeletingASource:
             )
 
         assert response.status_code == 409
+        assert response.json()["validation_errors"][0]["code"] == "source_protected"
         assert DynamicTariffSource.objects.filter(pk=source.pk).exists()
 
 

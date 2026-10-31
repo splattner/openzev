@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import uuid
 
-from ..errors import model_error
+from ..model_errors import model_error
 from django.core.exceptions import ValidationError
 from django.db import models
 
@@ -160,9 +160,14 @@ class DynamicTariffSource(models.Model):
             original = type(self).objects.get(pk=self.pk)
             for field in ("url", "api_version", "tariff_type", "tariff_name"):
                 if getattr(self, field) != getattr(original, field):
-                    errors[field] = model_error("Source identity is immutable; create a replacement source.", "source_identity")
+                    errors[field] = model_error(
+                        "Create a replacement source to change its URL, API version, type or product.",
+                        "source_identity",
+                    )
         if self.request_mode == DynamicRequestMode.EXACT_URL and self.supports_range:
-            errors["supports_range"] = model_error("An exact-URL source cannot support range queries.", "source_range")
+            errors["supports_range"] = model_error(
+                "An exact-URL source cannot support range queries.", "source_range"
+            )
         if errors:
             raise ValidationError(errors)
 

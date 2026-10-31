@@ -13,6 +13,14 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
+vi.mock('../src/lib/appSettings', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../src/lib/appSettings')>(),
+  useAppSettings: () => ({ settings: {
+    date_format_short: 'dd.MM.yyyy', date_format_long: 'd MMMM yyyy',
+    date_time_format: 'dd.MM.yyyy HH:mm', updated_at: '',
+  } }),
+}))
+
 import { DynamicSourceFormModal } from '../src/features/tariffs/DynamicSourceFormModal'
 import { api } from '../src/lib/api/client'
 import { ToastProvider } from '../src/lib/toast'

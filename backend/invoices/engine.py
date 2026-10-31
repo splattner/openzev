@@ -336,7 +336,10 @@ class DynamicPriceGapError(DynamicTariffError):
 def _validate_dynamic_tariff(tariff):
     errors = tariff._dynamic_source_errors()
     if errors:
-        raise DynamicTariffError(tariff=tariff, message=" ".join(errors.values()))
+        raise DynamicTariffError(
+            tariff=tariff,
+            message=" ".join(message for error in errors.values() for message in error.messages),
+        )
 
 
 def _billable_energy_types_by_timestamp(zev, period_start, period_end):

@@ -912,11 +912,8 @@ the pricing. See [ZEV Export and Import](17-zev-transfer.md).
 
 ### Updating a Tariff
 
-Validation messages use your selected language and date format. When an initial
-price band is invalid, its number identifies the band to correct; fixed-fee
-errors use the corresponding monthly, yearly or shared-fee field label. Your
-entered values remain available after a failed save.
-
+Tariff errors use your selected language where supported. Invalid bands are
+identified by number, and failed saves preserve your entries.
 
 Edit **future** tariffs freely:
 

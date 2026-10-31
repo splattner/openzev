@@ -13,11 +13,11 @@ import { queryKeys } from '../../lib/api/queryKeys'
 import type { Tariff, TariffBillingMode, TariffInput, TariffPeriod } from '../../types/api'
 import { dynamicSourceOptions, impliedEnergyType } from './dynamicSources'
 import { DynamicSourceForm } from './DynamicSourceFormModal'
+import { FIXED_PRICE_LABELS } from './labels'
 import { Notice } from '../../components/Notice'
 import { useFocusFirstField } from './useFocusFirstField'
 import { TariffDraftBands } from './TariffDraftBands'
 import {
-  FIXED_PRICE_LABELS,
   defaultTariffFormValues,
   mapTariffFormValuesToInput,
   mapTariffToFormValues,

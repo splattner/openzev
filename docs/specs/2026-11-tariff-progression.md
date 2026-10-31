@@ -350,6 +350,11 @@ the query with `TariffProgressionQuerySerializer` and delegates to
 `list` does with `tariff_pricing`). The response is built from plain dicts; there
 is no response serializer.
 
+Errors use the [tariff error contract](2026-03-tariffs-and-billing-engine.md#tariff-api-error-contract).
+The 422 response keeps its top-level `code: "too_many_bands"` for existing
+clients and carries one matching structured diagnostic; the code itself is
+not a second message. An inaccessible ZEV returns `not_found` with status 404.
+
 ### Query
 
 | Param | Type | Required | Notes |

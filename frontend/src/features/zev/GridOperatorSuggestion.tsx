@@ -7,6 +7,7 @@ import { faCheck, faFlask } from '@fortawesome/free-solid-svg-icons'
 import { fetchGridOperatorSuggestions } from '../../lib/api/zev'
 import { previewVseTariffImport } from '../../lib/api/tariffs'
 import { formatTariffError } from '../tariffs/errors'
+import { useAppSettings } from '../../lib/appSettings'
 import { queryKeys } from '../../lib/api/queryKeys'
 import type { GridOperator } from '../../types/api'
 
@@ -68,6 +69,7 @@ export function GridOperatorSuggestion({
   onApplyTariffUrl,
 }: GridOperatorSuggestionProps) {
   const { t } = useTranslation()
+  const { settings } = useAppSettings()
   const [debouncedPostalCode] = useDebouncedValue(postalCode.trim(), 400)
 
   const suggestionsQuery = useQuery({
@@ -159,7 +161,7 @@ export function GridOperatorSuggestion({
             {testMutation.isError && (
               <span className="error-text">
                 {t('pages.zevSettings.fields.gridOperatorSuggestion.testFailed', {
-                  error: formatTariffError(testMutation.error, t('pages.tariffs.import.errors.previewFailed'), t),
+                  error: formatTariffError(testMutation.error, t('pages.tariffs.import.errors.previewFailed'), t, settings),
                 })}
               </span>
             )}

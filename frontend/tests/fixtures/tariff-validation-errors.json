@@ -57,5 +57,16 @@
       "date": "2026-01-01"
     },
     "message": "A version of \"Grid\" already starts on 2026-01-01."
+  },
+  {
+    "code": "max_length",
+    "field": "name",
+    "path": [
+      "name"
+    ],
+    "params": {
+      "count": 200
+    },
+    "message": "Ensure this value has at most 200 characters (it has 201)."
   }
 ]

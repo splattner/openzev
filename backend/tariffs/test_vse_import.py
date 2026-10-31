@@ -1622,6 +1622,7 @@ class ImportEndpointTests(TestCase):
         response = self._apply([key], document_digest="b" * 64)
 
         self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["validation_errors"][0]["code"], "import_changed")
         self.assertEqual(Tariff.objects.count(), 0)
 
     def test_the_preview_tells_the_client_which_billing_modes_it_may_offer(self):

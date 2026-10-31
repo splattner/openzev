@@ -97,6 +97,10 @@ class TestProgressionApi:
         response = client.get(URL, {"zev_id": str(uuid.uuid4()), "energy_type": "grid"})
 
         assert response.status_code == 404
+        assert response.json()["validation_errors"] == [{
+            "code": "not_found", "field": None, "path": ["detail"],
+            "params": {}, "message": response.json()["detail"],
+        }]
 
     def test_a_viewer_can_read(self):
         zev = factories.ZevFactory()
@@ -172,7 +176,12 @@ class TestProgressionApi:
         response = get(client, zev)
 
         assert response.status_code == 422
-        assert response.json()["code"] == "too_many_bands"
+        body = response.json()
+        assert body["code"] == "too_many_bands"
+        assert body["validation_errors"] == [{
+            "code": "too_many_bands", "field": None, "path": ["detail"],
+            "params": {}, "message": body["detail"],
+        }]
 
     def test_only_the_requested_zevs_tariffs_are_used(self, owner_client):
         client, zev = owner_client

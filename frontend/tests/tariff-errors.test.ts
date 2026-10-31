@@ -6,7 +6,7 @@ import { fr } from '../src/i18n/locales/fr'
 import { it as italian } from '../src/i18n/locales/it'
 import contract from './fixtures/tariff-validation-errors.json'
 import type { TariffValidationError } from '../src/types/api'
-import { formatTariffError, formatTariffErrorData, splitTariffBandErrors } from '../src/features/tariffs/errors'
+import { formatTariffError, formatTariffErrorData, splitTariffBandErrors, tariffErrorKeys } from '../src/features/tariffs/errors'
 
 const translations = i18n.createInstance()
 beforeAll(async () => {
@@ -16,92 +16,6 @@ beforeAll(async () => {
     interpolation: { escapeValue: false },
   })
 })
-
-describe('tariff errors', () => {
-  it('keeps localized month names in flat/timed conflicts', () => {
-    const message = 'A flat band and a timed band cannot both apply in months 1,3: the flat price is used for every hour.'
-    for (const language of ['de', 'en', 'fr', 'it']) {
-      const t = translations.getFixedT(language)
-      const result = formatTariffError({ isAxiosError: true, response: { data: { period_type: [message] } } }, 'fallback', t)
-      expect(result).toContain(t('pages.tariffs.monthsShort.jan'))
-      expect(result).toContain(t('pages.tariffs.monthsShort.mar'))
-    }
-  })
-
-  it('uses configured dates and a translated fixed-fee field label', () => {
-    const t = translations.getFixedT('en')
-    const settings = { date_format_short: 'MM/dd/yyyy', date_format_long: 'd MMMM yyyy', date_time_format: 'dd.MM.yyyy HH:mm', updated_at: '' }
-    const dateError = { isAxiosError: true, response: { data: { valid_from: ['A version of "Grid" already starts on 2026-10-25.'] } } }
-    expect(formatTariffError(dateError, 'fallback', t, settings)).toContain('10/25/2026')
-    const feeError = { isAxiosError: true, response: { data: { fixed_price_chf: ['Ensure that there are no more than 2 decimal places.'] } } }
-    expect(formatTariffError(feeError, 'fallback', t)).toContain(t('pages.tariffs.form.fixedPrice'))
-    expect(formatTariffError(feeError, 'fallback', t)).not.toContain('fixed_price_chf')
-  })
-
-  it.each([['de', 'bereits'], ['en', 'already starts'], ['fr', 'commence déjà'], ['it', 'inizia già']])('localizes a duplicate start date in %s', (language, phrase) => {
-    const error = { isAxiosError: true, response: { data: { valid_from: ['A version of "test" already starts on 2026-10-25.'] } } }
-    const result = formatTariffError(error, 'fallback', translations.getFixedT(language))
-    expect(result).toContain(phrase)
-    expect(result).toContain('test')
-    expect(result).toContain('25.10.2026')
-    expect(result).not.toContain('valid_from')
-    expect(result).not.toContain('→')
-  })
-
-  it.each([
-    ['valid_to must be on or after valid_from.', 'dateRange'],
-    ['A tariff named "Existing" already exists in this ZEV.', 'nameExists'],
-    ['A price band needs a price.', 'priceRequired'],
-    ['A percentage band needs a percentage.', 'percentageRequired'],
-    ['Remove this tariff\'s bands before changing its billing mode.', 'removeBandsForMode'],
-    ['This tariff priced a non-cancelled invoice from its dynamic source. End its validity instead of deleting it.', 'billedDelete'],
-    ['Create a replacement source instead of changing a price-series identity.', 'sourceIdentity'],
-    ["The operator's server answered HTTP 404.", 'httpStatus'],
-    ["The operator's document changed since the preview. Run the preview again and check what you are importing.", 'importChanged'],
-  ])('localizes tariff validation: %s', (message, key) => {
-    for (const language of ['de', 'en', 'fr', 'it']) {
-      const t = translations.getFixedT(language)
-      const result = formatTariffError({ isAxiosError: true, response: { data: { detail: message } } }, 'fallback', t)
-      expect(result).toBe(t(`pages.tariffs.apiErrors.${key}`, { name: 'Existing', status: '404' }))
-    }
-  })
-
-  it('keeps separate nested band errors, deduplicates matching endpoint errors and preserves decimal punctuation', () => {
-    const t = translations.getFixedT('de')
-    const result = formatTariffError({ isAxiosError: true, response: { data: { initial_periods: [
-      { time_from: ['A timed band needs both a start and an end time.'], time_to: ['A timed band needs both a start and an end time.'] },
-      { price_chf_per_kwh: ['Ensure this value is greater than or equal to 0.00001.'] },
-    ] } } }, 'fallback', t)
-    expect(result).toContain(t('pages.tariffs.bandEntry.band', { number: 1 }))
-    expect(result).toContain(t('pages.tariffs.bandEntry.band', { number: 2 }))
-    expect(result.split(t('pages.tariffs.form.errorTimedBand'))).toHaveLength(2)
-    expect(result).toContain('0.00001')
-    expect(result).not.toContain('price_chf_per_kwh')
-    expect(result).not.toContain('→')
-  })
-  it.each(['time_from', 'time_to'])('translates a missing timed-band endpoint (%s)', field => {
-    const error = { isAxiosError: true, response: { data: {
-      [field]: ['A timed band needs both a start and an end time.'],
-    } } }
-    expect(formatTariffError(error, 'fallback', key => `translated:${key}`))
-      .toBe('translated:pages.tariffs.form.errorTimedBand')
-  })
-
-  it.each(['1,2,3', '1,2,3,4,5,6,7,8,9,10,11,12'])('translates a flat/timed conflict for months %s', months => {
-    const error = { isAxiosError: true, response: { data: {
-      period_type: [`A flat band and a timed band cannot both apply in months ${months}: the flat price is used for every hour, so the timed bands would never apply. Give them different months, or make them all timed.`],
-    } } }
-    expect(formatTariffError(error, 'fallback', key => `translated:${key}`))
-      .toBe('translated:pages.tariffs.form.errorFlatTimed')
-  })
-
-  it('preserves other server errors and the fallback for errors without a response', () => {
-    expect(formatTariffError({ isAxiosError: true, response: { data: { period_type: ['Another conflict'] } } }, 'fallback', key => key))
-      .toBe('pages.tariffs.form.periodType: Another conflict')
-    expect(formatTariffError(new Error('offline'), 'fallback', key => key)).toBe('fallback')
-  })
-})
-
 
 const codedResponse = (entries: TariffValidationError[], legacy = 'Old server text') => ({
   isAxiosError: true, response: { data: { detail: legacy, validation_errors: entries } },
@@ -153,10 +67,10 @@ describe('serialized tariff codes', () => {
   it('deduplicates timed endpoints within each band while retaining distinct band indexes', () => {
     const t = translations.getFixedT('en')
     const entries = [0, 1].flatMap(index => ['time_from', 'time_to'].map(field => ({
-      ...coded('timed_band_required', field), path: ['initial_periods', index, field],
+      ...coded('band_time_pair', field), path: ['initial_periods', index, field],
     })))
     const result = formatTariffError(codedResponse(entries), 'fallback', t)
-    expect(result.split(t('pages.tariffs.form.errorTimedBand'))).toHaveLength(3)
+    expect(result.split(t('pages.tariffs.apiErrors.bandTimePair'))).toHaveLength(3)
     expect(result).toContain(t('pages.tariffs.bandEntry.band', { number: 1 }))
     expect(result).toContain(t('pages.tariffs.bandEntry.band', { number: 2 }))
   })
@@ -173,10 +87,9 @@ describe('serialized tariff codes', () => {
     const t = translations.getFixedT('en')
     expect(formatTariffError({ isAxiosError: true, response: { data: {
       valid_from: ['This field is required.'], validation_errors: metadata,
-    } } }, 'fallback', t)).toBe(`${t('pages.tariffs.form.validFrom')}: ${t('pages.tariffs.form.errorRequired')}`)
+    } } }, 'fallback', t)).toBe(`${t('pages.tariffs.form.validFrom')}: This field is required.`)
   })
 })
-
 
 it.each(['de', 'en', 'fr', 'it'])('localizes indexed errors and keeps the notice separate in %s', language => {
   const t = translations.getFixedT(language)
@@ -194,8 +107,182 @@ it.each(['de', 'en', 'fr', 'it'])('localizes indexed errors and keeps the notice
   expect(formatTariffErrorData(onlyBands.rest, 'bands rejected', t)).toBe('bands rejected')
 })
 
+it.each(['de', 'en', 'fr', 'it'])('translates indexed non-field diagnostics in %s', language => {
+  const t = translations.getFixedT(language)
+  for (const field of ['non_field_errors', '__all__']) {
+    const band = { ...coded('bands_energy_only'), field: null, path: ['initial_periods', 0, field] }
+    const { items, rest } = splitTariffBandErrors({ isAxiosError: true, response: { data: {
+      initial_periods: [{ [field]: ['Reworded diagnostic'] }], validation_errors: [band],
+    } } }, t)
+    expect(items).toEqual([{ [field]: [t('pages.tariffs.apiErrors.bandsEnergyOnly')] }])
+    expect(formatTariffErrorData(rest, 'bands rejected', t)).toBe('bands rejected')
+  }
+})
+
+it.each(['de', 'en', 'fr', 'it'])('keeps unconsumed band diagnostics in the notice in %s', language => {
+  const t = translations.getFixedT(language)
+  const inline = { ...coded('band_time_pair', 'time_to'), path: ['initial_periods', 0, 'time_to'] }
+  const extra = { ...coded('bands_energy_only'), path: ['initial_periods', 4, 'non_field_errors'] }
+  const nested = { ...coded('max_length', 'label', { count: 2 }), path: ['initial_periods', 0, 'future', 'label'] }
+  const range = coded('date_range', 'valid_to')
+  const { items, rest } = splitTariffBandErrors({ isAxiosError: true, response: { data: {
+    initial_periods: [{ time_to: ['Inline diagnostic'], label: ['Legacy label diagnostic'] }],
+    valid_to: ['Range diagnostic'], validation_errors: [inline, extra, nested, range],
+  } } }, t)
+  expect(items).toEqual([{
+    time_to: [t('pages.tariffs.apiErrors.bandTimePair')], label: ['Legacy label diagnostic'],
+  }])
+  expect(rest?.validation_errors).toEqual([extra, nested, range])
+  const notice = formatTariffErrorData(rest, 'fallback', t)
+  expect(notice).toContain(t('pages.tariffs.bandEntry.band', { number: 5 }))
+  expect(notice).toContain(t('pages.tariffs.apiErrors.bandsEnergyOnly'))
+  expect(notice).toContain(t('pages.tariffs.apiErrors.maxLength', { count: 2 }))
+  expect(notice).toContain(t('pages.tariffs.apiErrors.dateRange'))
+})
+
+it.each(['de', 'en', 'fr', 'it'])('identifies the field behind a series identity conflict in %s', language => {
+  const t = translations.getFixedT(language)
+  expect(formatTariffError(codedResponse([coded('series_identity', 'category', { name: 'Grid' })]), 'fallback', t))
+    .toBe(`${t('pages.tariffs.form.category')}: ${t('pages.tariffs.apiErrors.seriesIdentity', { name: 'Grid' })}`)
+})
+
+it.each(['de', 'en', 'fr', 'it'])('handles legacy root messages and wrapped responses in %s', language => {
+  const t = translations.getFixedT(language)
+  expect(formatTariffErrorData(['Readable root diagnostic.'], 'fallback', t)).toBe('Readable root diagnostic.')
+  expect(formatTariffErrorData({ detail: ['Readable root diagnostic.'] }, 'fallback', t)).toBe('Readable root diagnostic.')
+  expect(formatTariffErrorData({ detail: ['Readable root diagnostic.'], validation_errors: [coded('dynamic_bands')] }, 'fallback', t))
+    .toBe(t('pages.tariffs.apiErrors.dynamicBands'))
+})
+
+it.each(['de', 'en', 'fr', 'it'])('uses the progression translation without rendering its response code in %s', language => {
+  const t = translations.getFixedT(language)
+  const response = { detail: 'Too many distinct bands.', code: 'too_many_bands', validation_errors: [coded('too_many_bands')] }
+  expect(formatTariffErrorData(response, 'fallback', t)).toBe(t('pages.tariffs.progression.errors.tooManyBands'))
+  expect(formatTariffErrorData({ ...response, validation_errors: null }, 'fallback', t)).toBe(response.detail)
+})
+
+it('explains the exact-URL configuration restriction', () => {
+  const text = formatTariffError(codedResponse([coded('source_range')]), 'fallback', translations.getFixedT('en'))
+  expect(text).toBe('Exact-URL sources cannot support date-range queries.')
+})
+
 it.each(['de', 'en', 'fr', 'it'])('localizes catch-all conflicts with month parameters in %s', language => {
   const t = translations.getFixedT(language)
   expect(formatTariffError(codedResponse([coded('catch_all_conflict', 'time_from', { months: [1, 3] })]), 'fallback', t))
     .toBe(t('pages.tariffs.apiErrors.catchAllConflict', { months: `${t('pages.tariffs.monthsShort.jan')}, ${t('pages.tariffs.monthsShort.mar')}` }))
+})
+
+it.each(['de', 'en', 'fr', 'it'])('uses context for empty lists in %s', language => {
+  const t = translations.getFixedT(language)
+  for (const [field, key] of [['initial_periods', 'emptyBands'], ['selections', 'emptySelections'], ['other', 'emptyList']]) {
+    const error = { ...coded('empty'), path: [field, 'non_field_errors'] }
+    expect(formatTariffError(codedResponse([error]), 'fallback', t)).toBe(t(`pages.tariffs.apiErrors.${key}`))
+  }
+  const legacy = { selections: { non_field_errors: ['This list may not be empty.'] } }
+  expect(formatTariffErrorData(legacy, 'fallback', t)).toBe('This list may not be empty.')
+})
+
+it.each(['de', 'en', 'fr', 'it'])('translates supported source, history and import fields in %s', language => {
+  const t = translations.getFixedT(language)
+  for (const [field, key] of [
+    ['url', 'pages.dynamicSources.form.url'], ['api_version', 'pages.dynamicSources.form.apiVersion'],
+    ['tariff_type', 'pages.dynamicSources.form.tariffType'], ['tariff_name', 'pages.dynamicSources.form.tariffName'],
+    ['dynamic_tariff_name', 'pages.dynamicSources.form.tariffName'],
+    ['date_from', 'pages.dynamicSources.history.dateFrom'], ['date_to', 'pages.dynamicSources.history.dateTo'],
+    ['zev', 'admin.fields.zev'], ['confirmation', 'pages.tariffs.apiErrorFields.confirmation'],
+    ['document_digest', 'pages.tariffs.apiErrorFields.documentDigest'],
+  ]) {
+    expect(translations.exists(key, { lng: language }), key).toBe(true)
+    const code = field.startsWith('date_') ? 'invalid_date' : 'required'
+    const result = formatTariffError(codedResponse([coded(code, field)]), 'fallback', t)
+    expect(result).toBe(`${t(key)}: ${t(code === 'invalid_date' ? 'pages.tariffs.apiErrors.invalidDate' : 'pages.tariffs.form.errorRequired')}`)
+    expect(result).not.toContain(`${field}:`)
+  }
+})
+
+it.each([
+  ['source_in_use', {}], ['source_in_use', { tariff_count: '3', community_count: 2 }],
+  ['max_length', {}], ['max_length', { count: '200' }], ['max_length', { count: -1 }],
+  ['duplicate_date', { name: 'Grid', date: 'nonsense' }],
+  ['duplicate_date', { name: 'Grid', date: '2026-02-30' }],
+  ['duplicate_date', { date: '2026-01-01' }], ['http_status', { status: {} }],
+  ['http_status', { status: 999 }], ['min_value', { value: {} }],
+  ['document_size', { size: NaN }], ['host_unresolved', { host: [] }],
+  ['flat_timed_conflict', { months: [99] }], ['catch_all_conflict', { months: [] }],
+] as const)('keeps readable text for malformed %s parameters: %j', (code, params) => {
+  for (const language of ['de', 'en', 'fr', 'it']) {
+    expect(formatTariffError(codedResponse([coded(code, null, params)]), 'fallback', translations.getFixedT(language)))
+      .toBe('Arbitrarily reworded server diagnostic.')
+  }
+})
+
+it('passes only interpolation parameters to i18next', () => {
+  const t = translations.getFixedT('en')
+  const params = { count: 200, lng: 'de', defaultValue: 'wrong', interpolation: { prefix: 'wrong' } }
+  expect(formatTariffError(codedResponse([coded('max_length', 'name', params)]), 'fallback', t))
+    .toBe(`${t('pages.tariffs.form.name')}: ${t('pages.tariffs.apiErrors.maxLength', { count: 200 })}`)
+})
+
+it.each(['de', 'en', 'fr', 'it'])('localizes ordinary workflow failures in %s', language => {
+  const t = translations.getFixedT(language)
+  for (const [code, key, params] of [
+    ['confirmation_mismatch', 'confirmationMismatch', { name: 'Source' }],
+    ['source_in_use', 'sourceInUse', { tariff_count: 3, community_count: 2 }], ['source_protected', 'sourceProtected', {}], ['prices_in_use', 'pricesInUse', {}],
+    ['fetch_unavailable', 'fetchUnavailable', {}], ['product_selection_required', 'productSelectionRequired', {}],
+  ] as const) {
+    expect(translations.exists(`pages.tariffs.apiErrors.${key}`, { lng: language })).toBe(true)
+    expect(formatTariffError(codedResponse([coded(code, null, params)]), 'fallback', t))
+      .toBe(t(`pages.tariffs.apiErrors.${key}`, params))
+  }
+})
+
+it('retains readable uncoded diagnostics and ignores obsolete structured codes', () => {
+  const t = translations.getFixedT('en')
+  expect(formatTariffErrorData({ initial_periods: [{ time_to: ['Old readable sentence.'] }] }, 'fallback', t))
+    .toBe(`Band 1: ${t('pages.tariffs.form.timeTo')}: Old readable sentence.`)
+  expect(formatTariffError(codedResponse([coded('timed_band_required')]), 'fallback', t)).toBe('Arbitrarily reworded server diagnostic.')
+  expect(formatTariffError(new Error('offline'), 'fallback', t)).toBe('fallback')
+})
+
+it.each(['constructor', 'toString', '__proto__'])('treats inherited object names as unknown metadata: %s', name => {
+  const t = translations.getFixedT('en')
+  expect(formatTariffError(codedResponse([coded(name)]), 'fallback', t)).toBe('Arbitrarily reworded server diagnostic.')
+  expect(formatTariffError(codedResponse([coded('required', name)]), 'fallback', t))
+    .toBe(`${name}: ${t('pages.tariffs.form.errorRequired')}`)
+  expect(formatTariffError(codedResponse([coded('max_length', 'fixed_price_chf', { count: 2, billing_mode: name })]), 'fallback', t))
+    .toBe(`${t('pages.tariffs.form.fixedPrice')}: ${t('pages.tariffs.apiErrors.maxLength', { count: 2 })}`)
+})
+
+it.each(['de', 'en', 'fr', 'it'])('preserves all diagnostics when band metadata is partly malformed in %s', language => {
+  const t = translations.getFixedT(language)
+  const band = { ...coded('invalid_number', 'price_chf_per_kwh'), path: ['initial_periods', 0, 'price_chf_per_kwh'] }
+  const data = {
+    initial_periods: [{ price_chf_per_kwh: ['Readable band error'] }],
+    valid_to: ['Readable range error'], name: ['Readable name error'],
+    validation_errors: [band, coded('date_range', 'valid_to'), { code: 'required' }],
+  }
+  const split = splitTariffBandErrors({ isAxiosError: true, response: { data } }, t)
+  expect(split.items).toEqual([{ price_chf_per_kwh: ['Readable band error'] }])
+  const notice = formatTariffErrorData(split.rest, 'fallback', t)
+  expect(notice).toContain('Readable range error')
+  expect(notice).toContain('Readable name error')
+})
+
+it.each(['de', 'en', 'fr', 'it'])('has every mapped error translation in %s', language => {
+  for (const key of Object.values(tariffErrorKeys)) {
+    expect(translations.exists(`pages.tariffs.apiErrors.${key}`, { lng: language }), key).toBe(true)
+  }
+})
+
+it.each(['de', 'en', 'fr', 'it'])('keeps source dependency counts and distinguishes clearing prices in %s', language => {
+  const t = translations.getFixedT(language)
+  for (const counts of [{ tariff_count: 1, community_count: 1 }, { tariff_count: 7, community_count: 3 }]) {
+    const text = formatTariffError(codedResponse([coded('source_in_use', null, counts)]), 'fallback', t)
+    expect(text).toContain(String(counts.tariff_count))
+    expect(text).toContain(String(counts.community_count))
+    expect(text).not.toContain('{{')
+  }
+  const clear = formatTariffError(codedResponse([coded('prices_in_use')]), 'fallback', t)
+  expect(clear).toBe(t('pages.tariffs.apiErrors.pricesInUse'))
+  expect(clear).not.toBe(t('pages.tariffs.apiErrors.sourceProtected'))
 })

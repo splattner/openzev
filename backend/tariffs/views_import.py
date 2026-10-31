@@ -16,7 +16,6 @@ changed between the two steps is refused instead of half-applied.
 """
 from __future__ import annotations
 
-
 import logging
 
 from drf_spectacular.utils import extend_schema
@@ -36,7 +35,7 @@ from zev.scoping import assert_zev_not_disabled
 
 from .importers.planner import PlannedCandidate, Selection, apply_import, plan_import
 from .importers.remote import TariffFetchError, fetch_tariff_document
-from .errors import TariffErrorResponseMixin, error_detail
+from .errors import TariffErrorResponseMixin, error_detail, exception_detail
 from .importers.vse_json import ParsedDocument, TariffDocumentError, parse_document
 from .serializers import (
     VseTariffImportApplyRequestSerializer,
@@ -62,7 +61,7 @@ def _fetch_failed(exc, zev) -> Response:
         "VSE tariff import failed for ZEV %s: %s",
         zev.pk, getattr(exc, "log_detail", exc), exc_info=True,
     )
-    return Response({"detail": error_detail(str(exc), getattr(exc, "code", "unknown"), **getattr(exc, "params", {}))}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({"detail": exception_detail(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 def _resolve_zev(request, zev_id) -> Zev:
@@ -138,6 +137,8 @@ def _candidate_payload(planned: PlannedCandidate) -> dict:
 class VseTariffImportPreviewView(TariffErrorResponseMixin, APIView):
     """Fetch the operator's document and report what importing it would do."""
 
+    tariff_error_statuses = {"post": (404,)}
+
     permission_classes = [IsAuthenticated, HasZevAccess]
 
     @extend_schema(
@@ -169,6 +170,8 @@ class VseTariffImportPreviewView(TariffErrorResponseMixin, APIView):
 
 class VseTariffImportApplyView(TariffErrorResponseMixin, APIView):
     """Create the tariffs the user selected in the preview."""
+
+    tariff_error_statuses = {"post": (404, 409)}
 
     permission_classes = [IsAuthenticated, HasZevAccess]
 
