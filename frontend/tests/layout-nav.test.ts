@@ -251,38 +251,63 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         page.unmount()
     })
 
-    it.each(['admin', 'manager', 'viewer', 'participant'] as const)('%s sees the Live entry only while the live flag is on', async (persona) => {
+    it.each(['admin', 'manager', 'viewer', 'participant'] as const)('%s sees My energy system only while live or the energy data feature has something to show', async (persona) => {
         mockSession(persona)
         const on = await renderLayout()
-        expect(on.hasHref('/live')).toBe(true)
+        expect(on.hasHref('/my-energy')).toBe(true)
+        expect(on.hasHref('/live')).toBe(false)
         on.unmount()
 
+        // Live off and the energy data feature off too (the eligibility check answers 404): nothing to see.
         mockLiveEnabled.mockResolvedValue(false)
         const off = await renderLayout()
-        expect(off.hasHref('/live')).toBe(false)
+        expect(off.hasHref('/my-energy')).toBe(false)
         off.unmount()
     })
 
-    it('puts Live right after Energy balance for managers and after Dashboard for participants', async () => {
+    it('without the live flag the entry stays while the feature is on: for community-wide access, and for a participant who holds a flagged meter', async () => {
+        mockLiveEnabled.mockResolvedValue(false)
+        mockEligible.mockResolvedValue([])
+        for (const persona of ['admin', 'manager', 'viewer'] as const) {
+            mockSession(persona)
+            const page = await renderLayout()
+            expect(page.hasHref('/my-energy')).toBe(true)
+            page.unmount()
+        }
+
+        mockSession('participant')
+        const none = await renderLayout()
+        expect(none.hasHref('/my-energy')).toBe(false)
+        none.unmount()
+
+        mockEligible.mockResolvedValue([
+            { metering_point: 'mp-1', meter_id: 'CH-1', zev: ZEV.id, zev_name: ZEV.name, participant: 'p-1', source: null },
+        ])
+        const holder = await renderLayout()
+        expect(holder.hasHref('/my-energy')).toBe(true)
+        holder.unmount()
+    })
+
+    it('puts My energy system right after Energy balance for managers and after Dashboard for participants', async () => {
         const hrefs = (page: Awaited<ReturnType<typeof renderLayout>>) =>
             Array.from(page.container.querySelectorAll('nav a')).map((a) => a.getAttribute('href'))
 
         mockSession('manager')
         const manager = await renderLayout()
         const managerLinks = hrefs(manager)
-        expect(managerLinks[managerLinks.indexOf('/dashboard') + 1]).toBe('/live')
+        expect(managerLinks[managerLinks.indexOf('/dashboard') + 1]).toBe('/my-energy')
         manager.unmount()
 
         mockSession('participant')
         const participant = await renderLayout()
-        expect(hrefs(participant).slice(0, 2)).toEqual(['/', '/live'])
+        expect(hrefs(participant).slice(0, 2)).toEqual(['/', '/my-energy'])
         participant.unmount()
     })
 
-    it('shows a former participant no Live entry', async () => {
+    it('shows a former participant no My energy system entry', async () => {
         mockSession('former')
         const page = await renderLayout()
-        expect(page.hasHref('/live')).toBe(false)
+        expect(page.hasHref('/my-energy')).toBe(false)
         page.unmount()
     })
 

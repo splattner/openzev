@@ -7,6 +7,7 @@ nothing is audited per sample.
 
 from __future__ import annotations
 
+import uuid
 from datetime import date
 
 from django.conf import settings
@@ -121,7 +122,13 @@ class LiveCurveView(LiveReadView):
     """``GET /api/v1/metering/live/zevs/{zev_id}/curve/?date=YYYY-MM-DD``: 5-minute buckets of a civil day."""
 
     @extend_schema(
-        parameters=[OpenApiParameter("date", OpenApiTypes.DATE, description="Civil day, default today.")],
+        parameters=[
+            OpenApiParameter("date", OpenApiTypes.DATE, description="Civil day, default today."),
+            OpenApiParameter(
+                "participant_id", OpenApiTypes.UUID,
+                description="Whose own values: a manager, viewer or admin may name any participant of the ZEV.",
+            ),
+        ],
         responses={200: OpenApiTypes.OBJECT},
     )
     def get(self, request, zev_id):
@@ -140,7 +147,12 @@ class LiveCurveView(LiveReadView):
             raise ValidationError(
                 {"date": [f"Live values are kept for {settings.LIVE_CURVE_RETENTION_H} hours only."]}
             )
-        return Response(zev_curve(self.zev, day, now=now, viewer=request.user))
+        raw_participant = request.query_params.get("participant_id")
+        try:
+            participant_id = uuid.UUID(raw_participant) if raw_participant else None
+        except ValueError:
+            raise ValidationError({"participant_id": ["Not a valid UUID."]}) from None
+        return Response(zev_curve(self.zev, day, now=now, viewer=request.user, participant_id=participant_id))
 
 
 class LiveMeView(LiveFeatureMixin, APIView):

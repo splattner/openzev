@@ -101,3 +101,22 @@ Trade-offs:
 - Settings: `LIVE_MAX_AGE_S` (60), `LIVE_MIN_PUSH_INTERVAL_S` (5), `LIVE_CURVE_BUCKET_S` (300),
   `LIVE_CURVE_RETENTION_H` (48).
 - The tier rules and their tests live in `metering/live/snapshot.py` and `metering/live/test_snapshot.py`.
+
+## Amendment: history and live may meet in one display line (My energy system)
+
+The page that shows live data is now "My energy system" (SPEC-2026-live-energy-data §7), the one place
+for everything that comes from the participant's devices. There a participant's **own** line of today
+combines two sources of the same system: the stored history (`SupplementaryReading`, 15-minute means)
+up to the source's `synced_through`, and live values for the time after it. History is preferred where
+both could answer; where neither does, there is a gap.
+
+This is a display rule, not a data rule, and it changes none of the decisions above:
+
+- Nothing live is persisted, and nothing is aggregated into `SupplementaryReading` or any other history.
+  The curve endpoint returns history and live side by side (`own_history` and the buckets); the page
+  decides where one hands over to the other.
+- The ZEV totals stay live only, with the tier rule unchanged; history never enters a ZEV figure.
+- The hand-over is labelled in the chart (history solid, live dashed, a marker at the hand-over time).
+- Billing, allocation and the history-based statistics still do not read live values (ADR 0030); the
+  history reaches the page through `metering.supplementary.stats.gross_energy` like every other
+  statistics surface.

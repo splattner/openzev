@@ -112,6 +112,8 @@ export const queryKeys = {
     all: ['live'] as const,
     enabled: () => ['live', 'enabled'] as const,
     snapshot: (zevId: string) => ['live', 'snapshot', zevId] as const,
-    curve: (zevId: string, date: string) => ['live', 'curve', zevId, date] as const,
+    curve: (zevId: string, date: string, participantId = '') => ['live', 'curve', zevId, date, participantId] as const,
+    ownSeries: (zevId: string, participantId: string, from: string, to: string, bucket: string) =>
+      ['live', 'own-series', zevId, participantId, from, to, bucket] as const,
   },
 }

@@ -689,17 +689,23 @@ an owner.
 
 ### 7.3 Statistics surfaces
 
-- `ParticipantDashboardBody.tsx`: a net-metered participant with `gross_energy` sees
+- **The own-system card moved** to "My energy system" (`/my-energy`, SPEC-2026-live-energy-data §7.1):
   `components/dashboard/GrossEnergyCard.tsx` (production, consumption, import, export, self-consumption,
-  the two rates, coverage and "based on data from … to …", a production-vs-export timeline) in
-  place of the `—` hint; without a source they see a call to action linking to "My metering points"
-  (only shown while `canConnect`: feature on and a flagged meter held). Rates are labelled "reported by your own system".
-  `ManagementDashboardBody` shows the same card for the selected participant
-  (`selected_gross_energy`), and, as a block under the ZEV figures, the manager's own
-  (`own_gross_energy`, or the call to action when they hold an unconnected flagged meter in this
-  community). The block (and the call to action) shows while nobody or the manager themselves is selected and
-  is hidden while another participant is, whose card replaces it. The own row is marked "You" in
-  the table and the dropdown. Selecting oneself shows the block once. Selecting the selected table row again clears the selection.
+  the two rates, coverage and "based on data from … to …", a production-vs-export timeline, labelled
+  "reported by your own system") and `GrossEnergyCallToAction` (a link to "My metering points", only for
+  a user who `canConnect`: feature on and a flagged meter held) are rendered there, on the 7 days and
+  Period views, from the new `GET /metering/supplementary/zevs/{zev_id}/own-series/` (live spec §5.3a:
+  `gross_energy` over a civil range, bucket `quarter`, `hour` or `day`, gated on this feature's flag,
+  same visibility as the dashboards: a participant reads their own, a manager, viewer or admin any
+  participant of the ZEV). The dashboards keep the `gross_energy`, `selected_gross_energy` and
+  `own_gross_energy` payload fields (the net-metered rates, MCP and the annual report read them).
+- `ParticipantDashboardBody.tsx` and `ManagementDashboardBody` show `components/dashboard/OwnSystemNote.tsx`
+  instead of the card: a muted line and a link to `/my-energy?range=period` (with the dashboard's period,
+  and `participant=` for a selected participant). It shows exactly where the card or the call to action
+  used to: a participant with behind-meter generation who has `gross_energy` or `canConnect`; a manager
+  while nobody or themselves is selected and `own_gross_energy` is present or they hold an unconnected
+  flagged meter; a selected participant other than themselves with `selected_gross_energy`. The own
+  row is marked "You" in the table and the dropdown. Selecting the selected table row again clears the selection.
 - `components/dashboard/ParticipantTableCard.tsx`: the per-participant rate cell of a net-metered
   participant is `NetMeteredRate` (shared with the annual report): the gross rate with an info
   marker when `gross_energy` is present, else `—` as today (with the withheld reason as a tooltip).
@@ -1189,7 +1195,7 @@ model.
 ## 13. Follow-up: a manager's own figures (after PR 6)
 
 `own_gross_energy` on the owner dashboard (7 backend tests, `OwnBlockTests`) and the
-"Your own system" block in `ManagementDashboardBody` (shown while nobody or oneself is selected), with the "You" marker and the call to action;
+"Your own system" block in `ManagementDashboardBody` (shown while nobody or oneself is selected), with the "You" marker and the call to action (the block itself now lives on My energy system; the dashboard keeps a note with a link, §7.3);
 the "Per participant" table now clears its selection on a second click and exposes it as
 `aria-pressed` (`tests/dashboard-behavior.test.ts`, 8 tests). `GrossEnergyCard` uses `useId` for its
 heading, because two of them can be on one page.

@@ -5,7 +5,9 @@ from decimal import Decimal
 
 from django.utils import timezone
 
+from allocation.validity import period_start_dt
 from metering.live import curve, store
+from metering.models import SupplementaryReading, SupplementarySource
 from metering.live.testing import LiveTestCase, client_for, curve_url
 
 NOW = datetime(2026, 10, 30, 12, 0, tzinfo=dt_timezone.utc)  # 13:00 in Zurich, CET
@@ -188,3 +190,83 @@ class CurveEndpointTests(LiveTestCase):
         enable_live(False)
 
         self.assertEqual(self.get(self.manager).status_code, 404)
+
+
+class OwnHistoryTests(CurveCase):
+    """The curve carries the viewer's own history of the day next to the live buckets (SPEC §5.3)."""
+
+    def history(self, participant, point, intervals=8):
+        source = SupplementarySource.objects.create(
+            metering_point=point, participant=participant, zev=self.zev, provider="solar_manager",
+            provides_history=True, provides_live=False, external_id="X",
+        )
+        start = period_start_dt(DAY)
+        for i in range(intervals):
+            SupplementaryReading.objects.create(
+                source=source, metering_point=point, timestamp=start + timedelta(minutes=15 * i),
+                consumption_kwh=Decimal("0.5"), production_kwh=Decimal("0.25"), import_kwh=Decimal("0.5"), export_kwh=0,
+            )
+        source.covers_from, source.synced_through = start, start + timedelta(minutes=15 * intervals)
+        source.save()
+        return source
+
+    def test_the_viewers_own_history_and_its_hand_over_point_come_with_the_curve(self):
+        self.history(self.p1, self.flat1)
+
+        payload = curve.zev_curve(self.zev, DAY, now=NOW, viewer=self.user1)
+
+        self.assertEqual(len(payload["own_history"]), 8)
+        self.assertEqual(
+            payload["own_history"][0],
+            {"start": "2026-10-29T23:00:00+00:00", "consumption_w": 2000.0, "production_w": 1000.0},
+        )
+        self.assertEqual(payload["own_history_through"], "2026-10-30T01:00:00Z")  # 2 h after local midnight (CET)
+
+    def test_history_and_live_are_not_merged_by_the_backend(self):
+        self.history(self.p1, self.flat1)
+        for name, power in (("pv", -1000), ("flat1", 1500), ("flat2", 2500), ("flat3", 1000)):
+            self.put(name, 30, power)
+
+        payload = curve.zev_curve(self.zev, DAY, now=NOW, viewer=self.user1)
+
+        live = next(row for row in payload["buckets"] if row["start"] == self.start(30))
+        self.assertEqual((live["own_consumption_w"], live["own_production_w"]), (1500.0, None))
+        self.assertTrue(all(row["start"].endswith("+00:00") for row in payload["own_history"]))
+
+    def test_a_participant_gets_nobody_elses_history(self):
+        self.history(self.p2, self.flat2)
+
+        payload = curve.zev_curve(self.zev, DAY, now=NOW, viewer=self.user1)
+
+        self.assertEqual((payload["own_history"], payload["own_history_through"]), ([], None))
+
+    def test_a_manager_may_ask_for_a_participant_and_gets_their_live_values_too(self):
+        self.history(self.p2, self.flat2)
+        for name, power in (("pv", -1000), ("flat1", 1500), ("flat2", 2500), ("flat3", 1000)):
+            self.put(name, 30, power)
+
+        payload = curve.zev_curve(self.zev, DAY, now=NOW, viewer=self.manager, participant_id=self.p2.pk)
+
+        live = next(row for row in payload["buckets"] if row["start"] == self.start(30))
+        self.assertEqual(len(payload["own_history"]), 8)
+        self.assertEqual(live["own_consumption_w"], 2500.0)
+
+    def test_without_a_selection_a_manager_gets_no_history_of_others(self):
+        self.history(self.p2, self.flat2)
+
+        payload = curve.zev_curve(self.zev, DAY, now=NOW, viewer=self.manager)
+
+        self.assertEqual(payload["own_history"], [])
+
+    def test_over_http_a_participant_cannot_name_another_participant(self):
+        self.history(self.p2, self.flat2)
+        client = client_for(self.user1)
+
+        denied = client.get(curve_url(self.zev), {"participant_id": str(self.p2.pk)})
+        own = client.get(curve_url(self.zev), {"participant_id": str(self.p1.pk)})
+        manager = client_for(self.manager).get(curve_url(self.zev), {"participant_id": str(self.p2.pk)})
+        malformed = client.get(curve_url(self.zev), {"participant_id": "x"})
+
+        self.assertEqual((denied.status_code, own.status_code, manager.status_code, malformed.status_code), (403, 200, 200, 400))
+        self.assertNotIn("own_history", denied.json())
+        self.assertIn("own_history", manager.json())  # the retention window is today's date, the data is of DAY

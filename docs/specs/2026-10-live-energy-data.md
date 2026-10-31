@@ -65,8 +65,8 @@ local share `min(P, C) / C = 100 %`. Flat 2: `split_consumption(1200, 5000, 8000
 | Ingest | `POST /api/v1/metering/live/ingest/` with the source's push token |
 | Pull | Solar Manager `/v3/users/{smId}/data/stream`, demand-driven |
 | Forecast | Solar Manager `/v3/users/{smId}/data/forecast`; forecast.solar `estimate/watts`; hourly Celery refresh |
-| API | Live snapshot, today's curve, forecast, compact `me` endpoint; source creation for the new capabilities and targets; PV plane CRUD |
-| Frontend | A live page (`/live`) with the live card, today's curve and (forecast from PR 5) the forecast chart; per-point table for managers; per-point table for managers; source setup for live/forecast; PV plane editor; building coordinates; i18n de/fr/it/en |
+| API | Live snapshot, today's curve (with the viewer's own history), own-system series, forecast, compact `me` endpoint; source creation for the new capabilities and targets; PV plane CRUD |
+| Frontend | "My energy system" (`/my-energy`, alias `/live`): the live card and per-point table for managers on top, then Today, 7 days and Period views of the participant's own system (live and history combined, §7.1); (forecast from PR 5) the forecast chart; source setup for live/forecast; PV plane editor; building coordinates; i18n de/fr/it/en |
 | Automation | Personal API keys (read-only) on the live endpoints; MCP tool `live_energy` |
 | Operations | Feature flag, settings, throttles, system-health additions, audit events, backup registry |
 | Docs | User guide chapter with Home Assistant and Shelly recipes; updates to the supplementary-energy-data and buildings specs |
@@ -79,7 +79,8 @@ local share `min(P, C) / C = 100 %`. Flat 2: `split_consumption(1200, 5000, 8000
   **production only**; there is no "surplus expected" figure.
 - Upper bounds ("at most y kW local") with incomplete coverage (ADR 0044).
 - Persisting live values or aggregating them into history (ADR 0044). A "keep until the official
-  data arrives" bridge is a follow-up idea.
+  data arrives" bridge is a follow-up idea. Showing history and live in one own line is allowed
+  (ADR 0044, amendment).
 - Battery flows. Batteries behind a meter are netted out at the meter; Solar Manager's battery fields
   are ignored.
 - Device control. Automation happens in the participant's own system through the read-only API.
@@ -130,12 +131,17 @@ rights on it). New `LiveEnergyPermission` (in `metering/live/permissions.py`): a
 role. The ingest view uses `SupplementaryPushAuthentication` + `IsPushSource` + the new
 `LivePushThrottle`. `NotWhileImpersonating` stays on source creation and token rotation.
 
-**Frontend routes:** one new route, `/live` (`LivePage`, `ProtectedRoute` with the active scopes
-manager, viewer, admin and participant, like `/dashboard`). The live and forecast views sit only there;
-nothing live stays on the dashboards. The sidebar entry "Live" (`nav.live`) follows "Energy balance"
-for managers and viewers and "Dashboard" for participants, and shows only while `/live/enabled/`
-answers `true`. Live setup sits on `/me/metering-points` (holders) and `/metering/points` (managers);
-the connection point and PV planes on the metering-point and ZEV settings screens (§7).
+**Frontend routes:** one route, `/my-energy` (`MyEnergyPage`, `ProtectedRoute` with the active scopes
+manager, viewer, admin and participant, like `/dashboard`); `/live` is an alias that redirects to it
+(`AliasNavigate`, query kept). The live, history and forecast views of a participant's devices sit only
+there; the dashboards show the grid operator's figures and, where the own-system card used to be, a note
+linking here. The sidebar entry "My energy system" (`nav.myEnergy`) follows "Energy balance" for
+managers and viewers and "Dashboard" for participants. Rule (`showMyEnergyEntry` in `lib/myEnergy.ts`):
+shown when `/live/enabled/` answers `true`, **or** the energy data feature is on (`/supplementary/sources/eligible/`
+answers `200`) and the user has community-wide access (manager, viewer, admin) or holds a meter an own
+system can be connected to (`historyEligible`); never for a former participant. Live setup sits on
+`/me/metering-points` (holders) and `/metering/points` (managers); the connection point and PV planes on
+the metering-point and ZEV settings screens (§7).
 
 **Feature flag:** new `FeatureFlag.LIVE_ENERGY_DATA_ENABLED` (`"live_energy_data_enabled"`, env
 override `FEATURE_LIVE_ENERGY_DATA_ENABLED`, default **off**). Effective only while
@@ -315,9 +321,12 @@ New endpoints under `/api/v1/metering/live/` (registered in `metering/urls.py`, 
 | `/live/enabled/` | GET | `IsAuthenticated` | `{"enabled": bool}`: the live flag is effective (`live_feature_enabled()`, the condition `LiveFeatureMixin` uses). Never `404`, so the nav and the page can ask; `401` when anonymous. Function view `live_enabled`, mirrors `/feasibility/enabled/` |
 | `/live/ingest/` | POST | `SupplementaryPushAuthentication`, `IsPushSource`, `LivePushThrottle` | One sample for the token's source (§5.1). `202 {"accepted": true}` |
 | `/live/zevs/{zev_id}/` | GET | `LiveEnergyPermission` | ZEV snapshot (§5.2), narrowed by role. From PR 4 on it also marks the ZEV as watched (`live:v1:watch:zev`) |
-| `/live/zevs/{zev_id}/curve/` | GET | `LiveEnergyPermission` | `?date=YYYY-MM-DD` (civil date, default today, at most `LIVE_CURVE_RETENTION_H` back): 5-minute buckets (§5.3) |
+| `/live/zevs/{zev_id}/curve/` | GET | `LiveEnergyPermission` | `?date=YYYY-MM-DD` (civil date, default today, at most `LIVE_CURVE_RETENTION_H` back), `participant_id` (optional, §5.3): 5-minute buckets plus the viewer's own history of the day (§5.3) |
 | `/live/zevs/{zev_id}/forecast/` | GET | `LiveEnergyPermission` | Hourly ZEV production forecast for `FORECAST_HORIZON_H` (§5.4) |
 | `/live/me/` | GET | authenticated (JWT or personal API key) | Compact snapshot for each ZEV the caller is a current participant of (§5.5), made for Home Assistant `rest` sensors and n8n |
+
+Not under `/live/` and not behind the live flag: `GET /supplementary/zevs/{zev_id}/own-series/` (§5.3a),
+which answers `404` only while the energy data flag is off.
 
 Source management stays on `/supplementary/sources/` (supplementary spec §5) with these changes:
 
@@ -442,20 +451,67 @@ allow them):
 
 ### 5.3 Curve
 
-`GET /live/zevs/{id}/curve/?date=2026-10-30` → buckets of the civil day (`allocation.validity`),
-oldest first:
+`GET /live/zevs/{id}/curve/?date=2026-10-30&participant_id=…` → buckets of the civil day
+(`allocation.validity`), oldest first, and the viewer's own history of that day:
 
 ```json
 { "date": "2026-10-30", "bucket_s": 300,
   "buckets": [ { "start": "2026-10-30T10:00:00Z", "tier": "exact",
                  "production_w": 7800.0, "consumption_w": 5100.0, "surplus_w": 2700.0,
-                 "own_consumption_w": 1150.0, "own_local_w": 1150.0 } ] }
+                 "own_consumption_w": 1150.0, "own_production_w": null, "own_local_w": 1150.0 } ],
+  "own_history": [ { "start": "2026-10-29T23:00:00+00:00", "consumption_w": 2000.0, "production_w": 1000.0 } ],
+  "own_history_through": "2026-10-30T09:00:00Z" }
 ```
 
 The tier rule of §5.2 is applied per bucket: a point counts as fresh in a bucket when its bucket has
 `n > 0`. Values are bucket means, so a bucket's split is a split of means; that is labelled
 "indicative" in the UI like everything live. Manager view adds `points[]` per bucket (`meter_power_w`
-per point id). Buckets with tier `none` carry only `start` and `tier`.
+per point id). Buckets with tier `none` carry only `start` and `tier`. `own_production_w` joins
+`own_consumption_w` wherever the viewer has a live point (`null` for a side they have no point on).
+
+- `own_history`: one row per 15-minute interval of that civil day that a history source of the viewer's
+  participant(s) has stored (`metering.supplementary.own_series.own_history_of_day`, through
+  `stats.gross_energy`, so only intervals inside personal-holding windows between `covers_from` and
+  `synced_through` count; community-mode points never). Power is the interval's kWh x 4000 W, summed over
+  several sources; a missing interval is a missing row. `[]` without a source. `own_history_through` is
+  the **earliest** `synced_through` of those sources (ISO, `Z`), `null` without one.
+- **Precedence (display rule, ADR 0044 amendment).** The server never merges: `own_history` is stored
+  data, the `own_*` bucket values are live. The merge is the pure helper `todayRows` in
+  `frontend/src/lib/myEnergy.ts` (tested): a history row is used before `own_history_through`, a live
+  bucket from it on, and a gap where neither has a value. The ZEV totals are live only.
+- `participant_id` (optional): for a manager, viewer or admin, whose own values: the `own_*` bucket
+  values then describe that participant's live points and `own_history` their history. A participant
+  may name only themselves (`403` otherwise, `404` for an unknown participant or one of another ZEV,
+  `400` for a malformed id). Without it, "own" is the signed-in user's participants in this ZEV. A
+  manager sees any point's value in `points[]` already, so this widens nothing.
+- The endpoint stays behind the live flag. With live off the page reads the same history through §5.3a.
+
+### 5.3a Own-system series
+
+`GET /api/v1/metering/supplementary/zevs/{zev_id}/own-series/?date_from&date_to&bucket=quarter|hour|day[&participant_id]`
+(`metering/supplementary/views.py::OwnSeriesView`, logic in `metering/supplementary/own_series.py`). It
+sits under the supplementary API because it is history; it is gated on the **energy data** flag only
+(`require_feature()`, `404` while off), so "My energy system" works with history alone. `IsAuthenticated`
+plus `readable_zev` (managers, viewers and admins of the ZEV, and its *current* participants; anybody
+else `404`). Whose figures: `participant_ids_for` (a participant: their own, `participant_id` only
+themselves; a manager, viewer or admin: any participant of the ZEV, else their own; same rule as the
+dashboards' selected participant).
+
+```json
+{ "participant_id": "…" | null, "date_from": "2026-10-24", "date_to": "2026-10-30", "bucket": "hour",
+  "history_through": "2026-10-30T09:00:00Z" | null,
+  "gross": { "...": "GrossEnergy of supplementary spec §5.1, with a timeline" } | null }
+```
+
+`gross` is `stats.gross_energy(ids, civil_window(date_from, date_to), bucket_key)`: kWh for consumption,
+production, import, export and self-consumption per bucket, the two rates, `coverage_pct` and
+`rates_withheld_reason` exactly as on the dashboards; `null` when no source expects data in the range.
+Bucket labels: `quarter` the interval start (UTC `isoformat`), `hour` the UTC hour, `day` the civil day
+(`surfaces.bucket_key_for`). `participant_id` in the answer is the one asked about, `null` when the
+user has none or several. Limits, `400` with a field error: `date_from` and `date_to` required
+(`YYYY-MM-DD`), end not before start, and at most 3 days for `quarter`, 31 for `hour`, 400 for `day`;
+an unknown `bucket` is `400`. Display only: nothing is written, and nothing here is read by billing
+(ADR 0030).
 
 ### 5.4 Forecast
 
@@ -546,7 +602,7 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
 
 ## 7. Frontend
 
-### 7.1 The live page and its cards
+### 7.1 My energy system and its cards
 
 - `frontend/src/lib/live.ts` (next to `lib/supplementary.ts`): `useLiveEnergy(zevId)` wraps `useQuery({ queryKey: queryKeys.live.snapshot(zevId),
   queryFn: fetchLiveSnapshotOrNull, refetchInterval: liveSnapshotRefetchInterval (15_000),
@@ -555,11 +611,15 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
   and `liveSnapshotRefetchInterval` returns `false` for `null`, so polling stops for good. There is no
   separate flag query for the snapshot itself. `useLiveEnabled({ enabled? })` wraps `useQuery({ queryKey:
   queryKeys.live.enabled(), queryFn: fetchLiveEnabled, staleTime: 60_000, retry: false })` with no polling;
-  the nav and the page share it. `useLiveCurve(zevId, enabled)` refetches every 60 s and is enabled only while the
+  the nav and the page share it. `useLiveCurve(zevId, enabled, participantId?)` refetches every 60 s and is enabled only while the
   card shows; the date is today's civil date (`todayBusinessIso`). Pure helpers: `kwFigure`, `formatKw`
   (kW, one decimal), `formatClock` (`hh:mm:ss`, Europe/Zurich), `showLiveCard` (snapshot non-null and
   `coverage.live_sources > 0`), `liveCardState` (what the card may say per tier), `liveCurveRows`,
   `liveDayAxis`. `useProductionForecast(zevId)` (every 15 min) comes with PR 5.
+- `frontend/src/lib/myEnergy.ts`: `MyEnergyRange` (`today`, `week`, `period`) with `parseMyEnergyRange`,
+  `shiftIsoDate`/`lastDaysRange`, `showMyEnergyEntry` (the nav rule, §3), `useOwnSeries(params, enabled)`
+  (`queryKeys.live.ownSeries(zevId, participantId, from, to, bucket)`, so a source change invalidates it
+  with `queryKeys.live.all`), `ownHistoryFromSeries` and `todayRows` (the history/live merge, §5.3).
 - `frontend/src/features/live/LiveEnergyCard.tsx`:
   - `none`: "No live production data right now"; the coverage line below says how far live data
     reaches. The forecast peak comes with PR 5.
@@ -576,25 +636,58 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
     (a bidirectional one counts once), taken from `coverage.points_fresh` / `coverage.points`
     (`liveCardState().reporting`), for every viewer. The per-role counts (`producing_*`, `consuming_*`)
     are not shown: merging them would count a bidirectional point twice.
-- `LiveCurveChart.tsx` (today's curve in Recharts: production area from tier `production` up,
-  consumption line in `exact` buckets only, own consumption where present; `none` buckets are `null`
-  gaps with `connectNulls={false}`, never interpolated; x axis the civil day) and
-  `LivePointsTable.tsx`. `LiveEnergyView.tsx` picks what the page shows (below). Chart colours come
-  from `chartTokens`. `ProductionForecastChart.tsx` (hourly bars, min/max band, "Highest production
-  expected 10:00-14:00") follows with PR 5.
-- Placement: its own page, `pages/LivePage.tsx` at `/live` (`PageHeader` with the community eyebrow and
-  scope note, title "Live energy", `ScopeGuard`), rendering `features/live/LiveEnergyView.tsx` for the
-  selected ZEV. The components live in `frontend/src/features/live/`. The dashboards render nothing
-  live. `LiveEnergyView` polls only while the page is mounted, and requests the snapshot only once
-  `/live/enabled/` answered `true`. States, in order: either query fails -> error `Notice` with retry
-  (`pages.live.loadFailed`); flag off -> warning `Notice` `pages.live.disabled`; flag or snapshot still
-  loading -> `PageSkeleton`; snapshot `null` (no access, former participant) -> `Notice`
-  `pages.live.unavailable`; `coverage.live_sources === 0` -> `EmptyState` `pages.live.empty.*`
-  linking to `/metering/points` for managers, viewers and admins (`isZevScope`) and to
-  `/me/metering-points` for participants; otherwise card, curve (when it has data) and, for the
-  per-point payload, the table. The forecast chart goes on this page with PR 5.
-- Manager, viewer and admin: `LivePointsTable.tsx` (meter or "Grid connection point", holder or
-  "ZEV-operated", kW, age, state badge) when the snapshot carries `points`.
+- `LivePointsTable.tsx` (meter or "Grid connection point", holder or "ZEV-operated", kW, age, state
+  badge) for a snapshot that carries `points` (manager, viewer, admin). `ProductionForecastChart.tsx`
+  (hourly bars, min/max band, "Highest production expected 10:00-14:00") follows with PR 5. Chart colours
+  come from `chartTokens`.
+- Placement: its own page, `pages/MyEnergyPage.tsx` at `/my-energy` (alias `/live`; `PageHeader` with the
+  community switch, scope note, title "My energy system", `ScopeGuard`). The page owns the billing period
+  (`useBillingPeriodParams`, like `DashboardPage`) and renders `features/myEnergy/MyEnergyView.tsx`. The
+  components are `features/live/` (card, table, `LiveEnergyView` = the "Right now" block) and
+  `features/myEnergy/` (`MyEnergyView`, `TodayChart`). The dashboards render nothing live; where they
+  showed the own-system card (`GrossEnergyCard`, `GrossEnergyCallToAction`) they show
+  `components/dashboard/OwnSystemNote.tsx`: a muted line and a link to `/my-energy?range=period` carrying
+  the period (and `participant=` for a selected participant), only where the card would have appeared.
+- **Structure of `MyEnergyView`**, top to bottom:
+  1. *States.* Energy data feature off (`useEnergyDataEligibility().featureOn` false) -> warning
+     `Notice` `myEnergy.disabled` and nothing else; eligibility loading -> `PageSkeleton`; failing ->
+     error `Notice` with retry (`myEnergy.loadFailed`).
+  2. *Right now.* `LiveEnergyView`: card and, for managers, viewers and admins, the points table. It
+     polls only while mounted and asks for the snapshot only once `/live/enabled/` answered `true`.
+     Failure -> error `Notice` (`pages.live.loadFailed`); live off -> a muted line
+     `pages.live.disabled`; loading -> `PageSkeleton`; snapshot `null` -> `Notice` `pages.live.unavailable`;
+     `coverage.live_sources === 0` -> `EmptyState` `pages.live.empty.*` linking to `/metering/points`
+     (`isZevScope`) or `/me/metering-points`. None of these hides the views below.
+  3. *Range tabs* `AppTabs` (Today | 7 days | Period, `keepMounted={false}`), the choice in the URL as
+     `?range=week|period` (absent = `today`, `parseMyEnergyRange`; tab changes push history entries). A
+     `filter-bar` under the tabs holds the `PeriodSelector` on the Period tab and, for managers, viewers
+     and admins, the participant picker.
+  4. *Participant picker* (`isZevScope` only): the ZEV's current participants (`fetchParticipants`,
+     filtered to the ZEV and `valid_to` open or not past), the manager's own marked "(You)". `?participant=`
+     in the URL, validated against that list. Default: the participant of a history-eligible point of the
+     user with a source (`historyEligible`, `source !== null`), else none, with the prompt
+     `myEnergy.pickParticipantPrompt`. Participants get no picker and send no `participant_id`; managers
+     always send the selected one (the same permission path as the dashboards' selected participant, §5.3).
+  5. *Today* (`TodayPanel`). With a live card: `useLiveCurve(zevId, true, participantId)`, own history from
+     the curve's `own_history`/`own_history_through`. Without one (live off, no live source, or the curve
+     answered `404`): the own-series endpoint (`bucket=quarter`, today) through `useOwnSeries`,
+     `ownHistoryFromSeries` turning kWh per quarter hour into W. `TodayChart` draws the ZEV production
+     (area) and consumption (line), both live only, and the own line of `todayRows` (§5.3): consumption
+     from history **solid** (`stepAfter`), from live **dashed**, own production likewise when present, a
+     dashed reference line at `own_history_through` labelled "History to live", and a hint saying which
+     part is which and that ZEV totals are live only. Gaps are `null`, `connectNulls={false}`. Nothing at
+     all -> `myEnergy.today.empty`/`emptyHistory`; the hint `myEnergy.today.historyOnly` appears without
+     a live curve.
+  6. *7 days* (`SeriesPanel`): `useOwnSeries` for the last 7 civil days (`lastDaysRange(today, 7)`) in
+     `hour` buckets, shown with `GrossEnergyCard` (totals, rates, chart) and the note "ZEV live totals are
+     kept for 48 hours only; the official figures are on Energy balance" with a link to `/dashboard`.
+  7. *Period*: the same panel for the billing period (`period.from..period.to`, `day` buckets, enabled
+     once `periodReady`), `GrossEnergyCard` titled "Your own system" (`whose="own"`; for a manager looking
+     at somebody else `whose="participant"` with their name).
+  8. *No own system* (`NoOwnSystem`): no participant selected -> the prompt; the viewer's own system and
+     `historyEligible` has a point without a source -> `GrossEnergyCallToAction`; otherwise a muted
+     `myEnergy.noOwnSystem` (own) or `noOwnSystemParticipant`. The own-series answer's `gross: null` or an
+     empty `own_history` is what triggers it.
 
 ### 7.2 Setup
 
@@ -802,9 +895,10 @@ gains `latitude`/`longitude` (`string | null`).
 | Function | Method | Endpoint |
 |---|---|---|
 | `fetchLiveSnapshot(zevId)` | GET | `/metering/live/zevs/{id}/` |
-| `fetchLiveCurve(zevId, date?)` | GET | `/metering/live/zevs/{id}/curve/` |
+| `fetchLiveCurve(zevId, date?, participantId?)` | GET | `/metering/live/zevs/{id}/curve/` |
+| `fetchOwnSeries({zevId, dateFrom, dateTo, bucket, participantId?})` | GET | `/metering/supplementary/zevs/{id}/own-series/` |
 | `fetchLiveEnabled()` | GET | `/metering/live/enabled/` |
-| `fetchLiveSnapshotOrNull(zevId)` / `fetchLiveCurveOrNull(zevId, date?)` | GET | the same, `404` mapped to `null` |
+| `fetchLiveSnapshotOrNull(zevId)` / `fetchLiveCurveOrNull(zevId, date?, participantId?)` | GET | the same, `404` mapped to `null` |
 | `fetchProductionForecast(zevId)` | GET | `/metering/live/zevs/{id}/forecast/` |
 | `fetchZevEligibleSources(zevId)` | GET | `/metering/supplementary/sources/zev-eligible/` |
 | `fetchPvPlanes(mpId)` / `createPvPlane` / `updatePvPlane` / `deletePvPlane` | GET/POST/PATCH/DELETE | `/zev/metering-points/{id}/pv-planes/` |
@@ -867,6 +961,18 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
   coverage assertion of `test_production_when_only_some_consumers_report`. PR 3b added
   `test_a_bidirectional_point_counts_once_in_the_distinct_coverage` and `points`/`points_fresh` to that
   assertion.
+- PR 3b (My energy system) added `metering/test_supplementary_own_series.py` with 25 tests in
+  `OwnSeriesPermissionTests` (participant reads own; cannot read another `403`; manager, viewer and admin
+  read a selected participant; no selection gives the manager's own; other ZEV and stranger `404`; unknown
+  `404`, malformed `400`; anonymous; energy data flag off `404`; live flag not needed; community-mode
+  excluded; former participant `404`), `OwnSeriesShapeTests` (buckets and totals equal the dashboards';
+  `history_through`, also the earliest of several sources; 100 and 92 quarters on the DST days; low
+  coverage withholds the rates), `OwnSeriesRangeTests` (limits per bucket, malformed, missing and reversed
+  dates, unknown bucket, default bucket) and `OwnHistoryOfDayTests` (kWh to W, no invented interval, empty
+  cases), and 6 tests in `metering/live/test_curve.py::OwnHistoryTests` (own history and
+  `own_history_through` in the curve, no server-side merge and `own_production_w`, nobody else's history,
+  a manager naming a participant, none without a selection, `participant_id` permissions over HTTP).
+  `CurveTests`/`CurveEndpointTests` stay (17 in the file before, 23 now).
 - `metering/live/test_snapshot.py` — **`SnapshotTierTests`**: `none` without producers and with one
   producer stale; `production` with partial consumers; `exact` with all points; `exact` through the
   connection point; connection point ignored in a vZEV; `all_points` wins over the connection point;
@@ -918,6 +1024,14 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
   `tests/supplementary-helpers.test.ts`, one-card-per-point cases in
   `tests/my-metering-points-page.test.ts`, `tests/metering-points-list.test.ts` (chip, menu entry,
   viewer) and `tests/layout-nav.test.ts`.
+- My energy system (PR 3b): `tests/my-energy.test.ts` (24 tests: range parsing, civil-day arithmetic,
+  `showMyEnergyEntry`, `ownHistoryFromSeries`, `todayRows` precedence and gaps, and `MyEnergyView`: feature
+  off asks for nothing, participant's Today from the own-series endpoint with live off, the curve's own
+  history while live has data, fallback when the curve is `404`, call to action vs explanation, the 7 days
+  and Period requests, the manager's picker, prompt and default); `tests/live-page.test.ts` now covers the
+  "Right now" block only; `tests/layout-nav.test.ts` covers the `/my-energy` entry and its rule;
+  `tests/dashboard-behavior.test.ts` the note instead of the card; `tests/live-energy-card.test.ts` the
+  `TodayChart` empty states.
 - `tests/production-forecast.test.ts`: peak window text, incomplete-forecast hint.
 - `tests/pv-planes-editor.test.ts`: validation and the 4-row limit.
 - Build, lint, style lint, hex sweep; screenshots of `/live` in all tiers, also at ~400 px.
@@ -967,7 +1081,10 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
      (PR 3a).* The entry shows only once the live flag is on; the page then shows an empty state until a
      live source exists. With the flag off the snapshot answers `404` and nothing polls. The dashboards
      are unchanged.
-   - **PR 3b — setup.** Source modal capabilities, the push panel with the live endpoint, ZEV-held and
+   - **PR 3b — setup and the page.** The page becomes "My energy system" (`/my-energy`, alias `/live`):
+     Today / 7 days / Period, the own line merged from history and live, the manager's participant picker,
+     the curve's `own_history`, `GET /supplementary/zevs/{id}/own-series/`, and the own-system card moved
+     off the dashboards (§3, §5.3, §5.3a, §7.1). Solar Manager live stays PR 4. Source modal capabilities, the push panel with the live endpoint, ZEV-held and
      connection-point setup on both metering-point pages, the live-state marker (§7.2). The holder page
      shows one card per meter with a row per capability, a source dialog and one connect flow (a follow-up
      to the first cut, which had a history card and a live card per meter). *Rollout (PR 3b).*

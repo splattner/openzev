@@ -179,6 +179,14 @@ class Topology:
             if (holder := self.holders.get(point.pk)) is not None and holder.user_id == user.pk
         ]
 
+    def points_of(self, participant_ids: Iterable) -> list[MeteringPoint]:
+        """Active points these participants hold personally today (a manager looking at somebody else's)."""
+        wanted = set(participant_ids)
+        return [
+            point for point in self.points
+            if (holder := self.holders.get(point.pk)) is not None and holder.pk in wanted
+        ]
+
 
 def load_topology(zev: Zev, *, today: date | None = None) -> Topology:
     points = list(MeteringPoint.objects.filter(zev=zev, is_active=True).order_by("meter_id"))

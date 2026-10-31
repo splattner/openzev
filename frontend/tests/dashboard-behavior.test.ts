@@ -1062,56 +1062,63 @@ describe('manager dashboard: the manager as a participant', () => {
         expect(participantSelect(container).textContent).not.toContain('Alice')
     })
 
-    it('shows the manager\'s own figures when nobody is selected and when they select themselves, not for someone else', async () => {
+    const note = (container: Element) => container.querySelector('p.muted a[href^="/my-energy"]')
+    const noteText = (container: Element) => note(container)?.parentElement?.textContent ?? ''
+
+    it('points a manager to My energy system where their own figures used to be, never showing the card itself', async () => {
         asManagerAndParticipant('p2')
         mockState.summary = ((args: Record<string, unknown>) =>
             withOwnBlock(gross(61), args?.participantId ? { selected_participant_name: 'x', selected_gross_energy: gross(args.participantId === 'p2' ? 61 : 40) } : {})) as unknown
         const container = await renderDashboard()
 
-        // Nobody selected: the own block, and nothing else of this kind.
-        expect(container.textContent).toContain('supplementary.gross.titleOwn')
-        expect(container.textContent).toContain('61')
-        expect(cards(container)).toBe(1)
-
-        // Somebody else: only that participant's card, and no own block.
-        await click(container.querySelectorAll('tbody tr')[0]) // Alice
-        expect(cards(container)).toBe(1)
-        expect(container.textContent).toContain('supplementary.gross.titleParticipant')
+        // Nobody selected: the own note, with the period but no participant.
+        expect(noteText(container)).toContain('myEnergy.balanceNote')
+        expect(noteText(container)).not.toContain('balanceNoteParticipant')
+        expect(note(container)?.getAttribute('href')).toMatch(/^\/my-energy\?range=period/)
+        expect(note(container)?.getAttribute('href')).not.toContain('participant=')
+        expect(cards(container)).toBe(0)
         expect(container.textContent).not.toContain('supplementary.gross.titleOwn')
 
-        // Themselves: the own block, once.
-        await click(container.querySelectorAll('tbody tr')[1]) // Bob, the manager
-        expect(cards(container)).toBe(1)
-        expect(container.textContent).toContain('supplementary.gross.titleOwn')
-        expect(container.textContent).not.toContain('supplementary.gross.titleParticipant')
+        // Somebody else: the participant's note names them in the link, and no own note.
+        await click(container.querySelectorAll('tbody tr')[0]) // Alice
+        expect(container.querySelectorAll('a[href^="/my-energy"]')).toHaveLength(1)
+        expect(noteText(container)).toContain('myEnergy.balanceNoteParticipant')
+        expect(note(container)?.getAttribute('href')).toContain('participant=')
 
-        // Cleared again: back to the own block.
+        // Themselves: the own note, once.
+        await click(container.querySelectorAll('tbody tr')[1]) // Bob, the manager
+        expect(container.querySelectorAll('a[href^="/my-energy"]')).toHaveLength(1)
+        expect(noteText(container)).toContain('myEnergy.balanceNote')
+        expect(noteText(container)).not.toContain('balanceNoteParticipant')
+        expect(note(container)?.getAttribute('href')).not.toContain('participant=')
+
+        // Cleared again: back to the own note.
         await click(container.querySelectorAll('tbody tr')[1])
-        expect(container.textContent).toContain('supplementary.gross.titleOwn')
-        expect(cards(container)).toBe(1)
+        expect(noteText(container)).toContain('myEnergy.balanceNote')
     })
 
-    it('gives the call to action to a manager with an unconnected net-metered meter, unless they look at someone else', async () => {
+    it('shows the note, not the call to action, to a manager with an unconnected net-metered meter, unless they look at someone else', async () => {
         asManagerAndParticipant('p2')
         eligibility.eligible = [{ metering_point: 'mp', meter_id: 'M', zev: 'z1', zev_name: 'Z1', participant: 'p2', source: null }]
         mockState.summary = withOwnBlock(null)
         const container = await renderDashboard()
 
-        expect(container.textContent).toContain('supplementary.gross.ctaTitle')
-        expect(container.querySelector('a[href="/me/metering-points"]')).not.toBeNull()
-
-        await click(container.querySelectorAll('tbody tr')[0]) // Alice
         expect(container.textContent).not.toContain('supplementary.gross.ctaTitle')
+        expect(note(container)).not.toBeNull()
+
+        await click(container.querySelectorAll('tbody tr')[0]) // Alice: nothing to say about her
+        expect(note(container)).toBeNull()
         await click(container.querySelectorAll('tbody tr')[1]) // Bob, the manager
-        expect(container.textContent).toContain('supplementary.gross.ctaTitle')
+        expect(note(container)).not.toBeNull()
     })
 
-    it('shows neither block for a manager who has no own energy data and no meter to connect', async () => {
+    it('shows no note for a manager who has no own energy data and no meter to connect', async () => {
         asManagerAndParticipant('p2')
         mockState.summary = withOwnBlock(null)
         const container = await renderDashboard()
 
         expect(cards(container)).toBe(0)
+        expect(note(container)).toBeNull()
         expect(container.textContent).not.toContain('supplementary.gross.ctaTitle')
     })
 

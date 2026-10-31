@@ -40,12 +40,12 @@ export function useLiveEnergy(zevId: string | undefined) {
     })
 }
 
-/** Today's curve; only requested while the live card is shown. */
-export function useLiveCurve(zevId: string | undefined, enabled: boolean) {
+/** Today's curve with the viewer's own history; only requested while the live card is shown. A manager may name whose own values. */
+export function useLiveCurve(zevId: string | undefined, enabled: boolean, participantId?: string) {
     const date = todayBusinessIso()
     return useQuery({
-        queryKey: queryKeys.live.curve(zevId ?? '', date),
-        queryFn: () => fetchLiveCurveOrNull(zevId as string, date),
+        queryKey: queryKeys.live.curve(zevId ?? '', date, participantId),
+        queryFn: () => fetchLiveCurveOrNull(zevId as string, date, participantId),
         enabled: enabled && !!zevId,
         refetchInterval: LIVE_CURVE_INTERVAL_MS,
         refetchIntervalInBackground: false,
@@ -153,6 +153,7 @@ export interface LiveCurveRow {
     production: number | null
     consumption: number | null
     own: number | null
+    ownProduction: number | null
 }
 
 const toKw = (watts: number | null | undefined): number | null => (watts === null || watts === undefined ? null : watts / 1000)
@@ -169,6 +170,7 @@ export function liveCurveRows(buckets: LiveCurveBucket[]): LiveCurveRow[] {
             production: known ? toKw(bucket.production_w) : null,
             consumption: bucket.tier === 'exact' ? toKw(bucket.consumption_w) : null,
             own: known ? toKw(bucket.own_consumption_w) : null,
+            ownProduction: known ? toKw(bucket.own_production_w) : null,
         }
     })
 }

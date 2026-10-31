@@ -20,7 +20,7 @@ const AdminTemplatesHubPage = lazy(async () => ({ default: (await import('../pag
 const BillingHubPage = lazy(async () => ({ default: (await import('../pages/BillingHubPage')).BillingHubPage }))
 const FeasibilityCalculatorPage = lazy(async () => ({ default: (await import('../pages/FeasibilityCalculatorPage')).FeasibilityCalculatorPage }))
 const AdminSystemSettingsPage = lazy(async () => ({ default: (await import('../pages/AdminSystemSettingsPage')).AdminSystemSettingsPage }))
-const LivePage = lazy(async () => ({ default: (await import('../pages/LivePage')).LivePage }))
+const MyEnergyPage = lazy(async () => ({ default: (await import('../pages/MyEnergyPage')).MyEnergyPage }))
 const DashboardPage = lazy(async () => ({ default: (await import('../pages/DashboardPage')).DashboardPage }))
 const HomePage = lazy(async () => ({ default: (await import('../pages/HomePage')).HomePage }))
 const ReportsPage = lazy(async () => ({ default: (await import('../pages/ReportsPage')).ReportsPage }))
@@ -83,7 +83,9 @@ export function AppRoutes() {
         >
           <Route index element={<HomePage />} />
           <Route path="dashboard" element={<ProtectedRoute allowedRoles={ACTIVE_SCOPE}><DashboardPage /></ProtectedRoute>} />
-          <Route path="live" element={<ProtectedRoute allowedRoles={ACTIVE_SCOPE}><LivePage /></ProtectedRoute>} />
+          <Route path="my-energy" element={<ProtectedRoute allowedRoles={ACTIVE_SCOPE}><MyEnergyPage /></ProtectedRoute>} />
+          {/* The former "Live" page, kept for bookmarks and the Home Assistant docs. */}
+          <Route path="live" element={<AliasNavigate to="/my-energy" />} />
           <Route path="account" element={<AccountProfilePage />} />
           {/* Admin console (nav-regroup phase 3): four hub pages with
               tab-as-route. Legacy /admin/* URLs redirect into the matching

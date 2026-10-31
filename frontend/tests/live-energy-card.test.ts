@@ -1,8 +1,8 @@
 import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { LiveCurveChart } from '../src/features/live/LiveCurveChart'
 import { LiveEnergyCard } from '../src/features/live/LiveEnergyCard'
 import { LivePointsTable } from '../src/features/live/LivePointsTable'
+import { TodayChart } from '../src/features/myEnergy/TodayChart'
 import type { LiveOwn, LivePoint, LiveSnapshot } from '../src/types/api'
 import { renderWithProviders } from './helpers/render'
 
@@ -190,11 +190,22 @@ describe('LivePointsTable', () => {
     })
 })
 
-describe('LiveCurveChart', () => {
-    it('says so when the day has no live values yet', async () => {
-        const curve = { date: '2026-10-30', bucket_s: 300, buckets: [{ start: '2026-10-30T07:00:00Z', tier: 'none' as const }] }
-        const { container } = await renderWithProviders(createElement(LiveCurveChart, { curve }), cleanups)
+describe('TodayChart', () => {
+    it('says so when the day has no values yet', async () => {
+        const { container } = await renderWithProviders(
+            createElement(TodayChart, { date: '2026-10-30', rows: [], through: null, hasLive: true }),
+            cleanups,
+        )
 
-        expect(container.textContent).toContain('live.curve.empty')
+        expect(container.textContent).toContain('myEnergy.today.empty')
+    })
+
+    it('says there is no own data today when only the history was asked for', async () => {
+        const { container } = await renderWithProviders(
+            createElement(TodayChart, { date: '2026-10-30', rows: [], through: null, hasLive: false }),
+            cleanups,
+        )
+
+        expect(container.textContent).toContain('myEnergy.today.emptyHistory')
     })
 })

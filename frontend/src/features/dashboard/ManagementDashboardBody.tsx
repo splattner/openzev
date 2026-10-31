@@ -12,7 +12,7 @@ import { PageSkeleton } from '../../components/PageSkeleton'
 import { Notice } from '../../components/Notice'
 import { StatCard } from '../../components/StatCard'
 import { PeriodSelector } from '../../components/PeriodSelector'
-import { GrossEnergyCallToAction, GrossEnergyCard } from '../../components/dashboard/GrossEnergyCard'
+import { OwnSystemNote } from '../../components/dashboard/OwnSystemNote'
 import { BalanceChart } from '../../components/dashboard/BalanceChart'
 import { EnergyFlowCard } from '../../components/dashboard/EnergyFlowCard'
 import { HourlyProfileSection } from '../../components/dashboard/HourlyProfileSection'
@@ -177,15 +177,8 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
                         <StatCard label={t('pages.dashboard.stats.exportedToGrid')} value={dashboardKwhFigure(summary.zev_totals.exported_kwh)} unit="kWh" />
                     </section>
                     {summary.zev_has_behind_meter_generation && <p className="muted">{t('behindMeter.zevNote')}</p>}
-                    {showOwnBlock && summary.own_gross_energy && (
-                        <GrossEnergyCard
-                            gross={summary.own_gross_energy}
-                            whose="own"
-                            formatBucketLabel={formatBucketLabel}
-                            formatBucketTooltipLabel={formatBucketTooltipLabel}
-                        />
-                    )}
-                    {showOwnBlock && !summary.own_gross_energy && wantsOwnEnergyData && <GrossEnergyCallToAction />}
+                    {/* The own system's figures are on My energy system; this note stands where they used to be. */}
+                    {showOwnBlock && (summary.own_gross_energy || wantsOwnEnergyData) && <OwnSystemNote period={period} />}
                     {summary.participant_stats.length > 0 && (
                         <EnergyFlowCard
                             totals={summary.zev_totals}
@@ -203,13 +196,7 @@ export function ManagementDashboardBody({ interval, period, onPeriodChange, peri
                         kwhTick={kwhTick}
                     />
                     {selectedParticipantId && summary.selected_gross_energy && !ownParticipantIds.includes(selectedParticipantId) && (
-                        <GrossEnergyCard
-                            gross={summary.selected_gross_energy}
-                            whose="participant"
-                            participantName={selectedParticipantName ?? undefined}
-                            formatBucketLabel={formatBucketLabel}
-                            formatBucketTooltipLabel={formatBucketTooltipLabel}
-                        />
+                        <OwnSystemNote period={period} participantId={selectedParticipantId} />
                     )}
                     <ParticipantTableCard
                         participantStats={summary.participant_stats}

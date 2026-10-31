@@ -100,15 +100,15 @@ describe('liveCurveRows', () => {
     ])
 
     it('converts W to kW', () => {
-        expect(rows[0]).toEqual({ ts: Date.parse('2026-10-30T08:00:00Z'), production: 8, consumption: 5, own: 1.2 })
+        expect(rows[0]).toEqual({ ts: Date.parse('2026-10-30T08:00:00Z'), production: 8, consumption: 5, own: 1.2, ownProduction: null })
     })
 
     it('leaves a none bucket as a gap in every series', () => {
-        expect(rows[1]).toEqual({ ts: Date.parse('2026-10-30T08:05:00Z'), production: null, consumption: null, own: null })
+        expect(rows[1]).toEqual({ ts: Date.parse('2026-10-30T08:05:00Z'), production: null, consumption: null, own: null, ownProduction: null })
     })
 
     it('has no consumption below exact and no own value that was not sent', () => {
-        expect(rows[2]).toEqual({ ts: Date.parse('2026-10-30T08:10:00Z'), production: 7.5, consumption: null, own: null })
+        expect(rows[2]).toEqual({ ts: Date.parse('2026-10-30T08:10:00Z'), production: 7.5, consumption: null, own: null, ownProduction: null })
     })
 
     it('never drops the production of a production bucket even if consumption was sent', () => {

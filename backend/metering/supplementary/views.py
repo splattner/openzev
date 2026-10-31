@@ -12,6 +12,7 @@ from __future__ import annotations
 import csv
 import io
 import uuid
+from datetime import date
 
 from django.core.cache import cache
 from django.db import transaction
@@ -24,7 +25,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.conf import settings
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 
 from allocation.validity import active_on, period_end_exclusive_dt, period_start_dt
 from audit.models import AuditActionCategory, AuditEventStatus
@@ -36,13 +37,14 @@ from zev.scoping import ZevScopedQuerySetMixin
 
 from accounts.permissions import NotWhileImpersonating
 
+from ..live.permissions import readable_zev
 from ..models import SourceTarget, SupplementaryProvider, SupplementarySource, SupplementaryStatus
 from ..tasks import queue_sync, source_audit_metadata, sync_supplementary_source
 from . import ingest as ingest_service
 from . import reconcile as reconcile_service
 from . import sync as sync_service
 from .authentication import IsPushSource, SupplementaryPushAuthentication, SupplementaryPushThrottle
-from . import permissions
+from . import own_series, permissions
 from .permissions import SupplementarySourcePermission, require_feature
 from .providers import PROVIDERS, ProviderAuthError, ProviderError
 from .serializers import (
@@ -526,3 +528,45 @@ class SupplementaryIngestView(FeatureGatedMixin, APIView):
             )
         source = request.auth
         return Response(ingest_service.ingest(source, rows).as_dict())
+
+
+class OwnSeriesView(APIView):
+    """``GET /api/v1/metering/supplementary/zevs/{zev_id}/own-series/``: a participant's own-system series.
+
+    Query: ``date_from`` and ``date_to`` (civil, inclusive, required), ``bucket`` (``quarter``, ``hour``
+    or ``day``, default ``day``) and, for a manager, viewer or admin, ``participant_id``. Gated on the
+    supplementary flag only, so the page works with history alone. Display only (ADR 0030).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def initial(self, request, *args, **kwargs):
+        require_feature()
+        super().initial(request, *args, **kwargs)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("date_from", OpenApiTypes.DATE, required=True),
+            OpenApiParameter("date_to", OpenApiTypes.DATE, required=True),
+            OpenApiParameter("bucket", OpenApiTypes.STR, enum=list(own_series.BUCKETS)),
+            OpenApiParameter("participant_id", OpenApiTypes.UUID),
+        ],
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def get(self, request, zev_id):
+        zev = readable_zev(request.user, zev_id)
+        dates = {}
+        for name in ("date_from", "date_to"):
+            try:
+                dates[name] = date.fromisoformat(request.query_params.get(name, ""))
+            except ValueError:
+                raise ValidationError({name: ["Use the format YYYY-MM-DD."]}) from None
+        raw = request.query_params.get("participant_id")
+        try:
+            participant_id = uuid.UUID(raw) if raw else None
+        except ValueError:
+            raise ValidationError({"participant_id": ["Not a valid UUID."]}) from None
+        ids = own_series.participant_ids_for(request.user, zev, participant_id)
+        payload = own_series.own_series(ids, dates["date_from"], dates["date_to"], request.query_params.get("bucket", "day"))
+        payload["participant_id"] = str(ids[0]) if len(ids) == 1 else None
+        return Response(payload)

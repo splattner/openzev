@@ -8,6 +8,7 @@ import { useAuth } from '../lib/auth'
 import { useCommunityAccess } from '../lib/communityAccess'
 import { useOptionalManagedZev } from '../lib/managedZev'
 import { useLiveEnabled } from '../lib/live'
+import { showMyEnergyEntry } from '../lib/myEnergy'
 import { hasCapability, useEnergyDataEligibility } from '../lib/supplementary'
 import { fetchFeasibilityCalculatorEnabled } from '../lib/api/feasibility'
 import { queryKeys } from '../lib/api/queryKeys'
@@ -67,9 +68,16 @@ export function Layout() {
         enabled: isZevScope,
         staleTime: 5 * 60 * 1000,
     })
-    // The Live entry shows only while the instance has the feature on; a former participant has no live view.
+    // "My energy system" shows while live is on, or while the energy data feature is on and there is history
+    // to look at (community-wide access, or a held meter an own system can be connected to); a former
+    // participant has no such page.
     const liveEnabledQuery = useLiveEnabled({ enabled: isZevScope || shellRole === 'participant' })
-    const showLive = liveEnabledQuery.data === true
+    const showMyEnergy = showMyEnergyEntry({
+        liveEnabled: liveEnabledQuery.data === true,
+        energyDataOn: energyData.featureOn,
+        isZevScope,
+        holdsHistoryMeter: energyData.historyEligible.length > 0,
+    })
     const location = useLocation()
     const navigate = useNavigate()
     const { pushToast } = useToast()
@@ -287,7 +295,7 @@ export function Layout() {
                             <>
                                 <SidebarLink to="/" label={t('nav.overview')} icon={<DashboardIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/dashboard" label={t('nav.energyBalance')} icon={<EnergyIcon />} collapsed={isNavigationCollapsed} />
-                                {showLive && <SidebarLink to="/live" label={t('nav.live')} icon={<LiveIcon />} collapsed={isNavigationCollapsed} />}
+                                {showMyEnergy && <SidebarLink to="/my-energy" label={t('nav.myEnergy')} icon={<LiveIcon />} collapsed={isNavigationCollapsed} />}
                                 <SidebarLink to="/metering/chart" label={t('nav.metering')} icon={<ChartIcon />} active={meteringActive} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/billing/invoices" label={t('nav.billing')} icon={<InvoiceIcon />} active={billingActive} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/reports" label={t('nav.reports')} icon={<ReportsIcon />} collapsed={isNavigationCollapsed} />
@@ -304,7 +312,7 @@ export function Layout() {
                         {isParticipantScope && !isFormerParticipant && (
                             <>
                                 <SidebarLink to="/" label={t('nav.dashboard')} icon={<DashboardIcon />} collapsed={isNavigationCollapsed} />
-                                {showLive && <SidebarLink to="/live" label={t('nav.live')} icon={<LiveIcon />} collapsed={isNavigationCollapsed} />}
+                                {showMyEnergy && <SidebarLink to="/my-energy" label={t('nav.myEnergy')} icon={<LiveIcon />} collapsed={isNavigationCollapsed} />}
                                 <SidebarLink to="/me/invoices" label={t('nav.myInvoices')} icon={<InvoiceIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/me/statement" label={t('nav.annualStatement')} icon={<ReportsIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/me/metering-points" label={t('nav.myMeteringPoints')} icon={<PlugIcon />} active={myMeteringPointsActive} collapsed={isNavigationCollapsed} />

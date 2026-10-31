@@ -853,14 +853,37 @@ export interface LiveCurveBucket {
     surplus_w?: number | null
     own_consumption_w?: number | null
     own_local_w?: number | null
+    own_production_w?: number | null
     /** Manager, viewer and admin only. */
     points?: Array<{ metering_point_id: string | null; target: SourceTarget; meter_power_w: number | null }>
+}
+
+/** One 15-minute interval of the viewer's own system (stored history), as a mean power in W. */
+export interface OwnHistoryRow {
+    start: string
+    consumption_w: number
+    production_w: number
 }
 
 export interface LiveCurve {
     date: string
     bucket_s: number
     buckets: LiveCurveBucket[]
+    /** The viewer's own history of the day (or the named participant's); stored data, never merged with `buckets` by the server. */
+    own_history: OwnHistoryRow[]
+    /** End of the last history interval of the own source(s): history is used before it, live buckets from it. */
+    own_history_through: string | null
+}
+
+/** The own-system series of a participant for a civil range (`GET /metering/supplementary/zevs/{id}/own-series/`). */
+export interface OwnSeries {
+    participant_id: string | null
+    date_from: string
+    date_to: string
+    bucket: 'quarter' | 'hour' | 'day'
+    history_through: string | null
+    /** `null` while no source of the participant expects data in the range. */
+    gross: GrossEnergy | null
 }
 
 /** Result of the last comparison with the official meter. Purely diagnostic. */
