@@ -28,6 +28,7 @@ export const fr = {
         myInvoices: 'Mes factures',
         annualStatement: 'Décompte annuel',
         myMeteringPoints: 'Mes points de mesure',
+        live: 'Live',
         adminOverview: 'Vue d\'ensemble',
         adminAccounts: 'Comptes',
         adminSystemSettings: 'Paramètres',
@@ -758,6 +759,20 @@ export const fr = {
         },
     },
     pages: {
+        live: {
+            title: 'Énergie en direct',
+            description: 'Valeurs mesurées de la communauté à l\'instant. Indicatives uniquement, jamais utilisées pour la facturation.',
+            disabled: 'Les données d\'énergie en direct ne sont pas activées sur cette instance.',
+            unavailable: 'Les données d\'énergie en direct ne sont pas disponibles pour vous dans cette communauté.',
+            loadFailed: 'Impossible de charger les données d\'énergie en direct.',
+            empty: {
+                title: 'Pas encore de source en direct',
+                manager: 'L\'énergie en direct montre ce que votre communauté produit et consomme à l\'instant, à partir de sources qui transmettent en temps réel. Connectez une source en direct à un point de mesure pour l\'afficher ici.',
+                managerAction: 'Aller aux points de mesure',
+                participant: 'L\'énergie en direct montre ce que votre communauté produit et consomme à l\'instant. Elle apparaît dès qu\'une source en direct est connectée, par exemple pour votre propre compteur.',
+                participantAction: 'Aller à mes points de mesure',
+            },
+        },
         myMeteringPoints: {
             title: 'Mes points de mesure',
             description: 'Les points de mesure qui vous sont attribués.',

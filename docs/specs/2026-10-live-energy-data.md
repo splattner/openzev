@@ -66,7 +66,7 @@ local share `min(P, C) / C = 100 %`. Flat 2: `split_consumption(1200, 5000, 8000
 | Pull | Solar Manager `/v3/users/{smId}/data/stream`, demand-driven |
 | Forecast | Solar Manager `/v3/users/{smId}/data/forecast`; forecast.solar `estimate/watts`; hourly Celery refresh |
 | API | Live snapshot, today's curve, forecast, compact `me` endpoint; source creation for the new capabilities and targets; PV plane CRUD |
-| Frontend | Live and forecast cards on the participant and management dashboards; per-point table for managers; source setup for live/forecast; PV plane editor; building coordinates; i18n de/fr/it/en |
+| Frontend | A live page (`/live`) with the live card, today's curve and (forecast from PR 5) the forecast chart; per-point table for managers; per-point table for managers; source setup for live/forecast; PV plane editor; building coordinates; i18n de/fr/it/en |
 | Automation | Personal API keys (read-only) on the live endpoints; MCP tool `live_energy` |
 | Operations | Feature flag, settings, throttles, system-health additions, audit events, backup registry |
 | Docs | User guide chapter with Home Assistant and Shelly recipes; updates to the supplementary-energy-data and buildings specs |
@@ -130,8 +130,11 @@ rights on it). New `LiveEnergyPermission` (in `metering/live/permissions.py`): a
 role. The ingest view uses `SupplementaryPushAuthentication` + `IsPushSource` + the new
 `LivePushThrottle`. `NotWhileImpersonating` stays on source creation and token rotation.
 
-**Frontend routes:** no new route. The live and forecast cards sit on `/` (participant and management
-dashboards); live setup sits on `/me/metering-points` (holders) and `/metering/points` (managers);
+**Frontend routes:** one new route, `/live` (`LivePage`, `ProtectedRoute` with the active scopes
+manager, viewer, admin and participant, like `/dashboard`). The live and forecast views sit only there;
+nothing live stays on the dashboards. The sidebar entry "Live" (`nav.live`) follows "Energy balance"
+for managers and viewers and "Dashboard" for participants, and shows only while `/live/enabled/`
+answers `true`. Live setup sits on `/me/metering-points` (holders) and `/metering/points` (managers);
 the connection point and PV planes on the metering-point and ZEV settings screens (§7).
 
 **Feature flag:** new `FeatureFlag.LIVE_ENERGY_DATA_ENABLED` (`"live_energy_data_enabled"`, env
@@ -304,10 +307,12 @@ totals.
 ## 5. API contracts
 
 New endpoints under `/api/v1/metering/live/` (registered in `metering/urls.py`, views in
-`metering/live/views.py`). All answer `404` while the live flag is not effective.
+`metering/live/views.py`). All answer `404` while the live flag is not effective, except
+`/live/enabled/`, which answers `200 {"enabled": false}`.
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
+| `/live/enabled/` | GET | `IsAuthenticated` | `{"enabled": bool}`: the live flag is effective (`live_feature_enabled()`, the condition `LiveFeatureMixin` uses). Never `404`, so the nav and the page can ask; `401` when anonymous. Function view `live_enabled`, mirrors `/feasibility/enabled/` |
 | `/live/ingest/` | POST | `SupplementaryPushAuthentication`, `IsPushSource`, `LivePushThrottle` | One sample for the token's source (§5.1). `202 {"accepted": true}` |
 | `/live/zevs/{zev_id}/` | GET | `LiveEnergyPermission` | ZEV snapshot (§5.2), narrowed by role. From PR 4 on it also marks the ZEV as watched (`live:v1:watch:zev`) |
 | `/live/zevs/{zev_id}/curve/` | GET | `LiveEnergyPermission` | `?date=YYYY-MM-DD` (civil date, default today, at most `LIVE_CURVE_RETENTION_H` back): 5-minute buckets (§5.3) |
@@ -538,19 +543,21 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
 
 ## 7. Frontend
 
-### 7.1 Live and forecast cards
+### 7.1 The live page and its cards
 
 - `frontend/src/lib/live.ts` (next to `lib/supplementary.ts`): `useLiveEnergy(zevId)` wraps `useQuery({ queryKey: queryKeys.live.snapshot(zevId),
   queryFn: fetchLiveSnapshotOrNull, refetchInterval: liveSnapshotRefetchInterval (15_000),
   refetchIntervalInBackground: false, staleTime: 10_000, retry: false })`, enabled only with a ZEV. The
   API client maps `404` (flag off, no access) to `null` (`lib/api/live.ts`, `fetchLiveSnapshotOrNull`),
   and `liveSnapshotRefetchInterval` returns `false` for `null`, so polling stops for good. There is no
-  separate flag query. `useLiveCurve(zevId, enabled)` refetches every 60 s and is enabled only while the
+  separate flag query for the snapshot itself. `useLiveEnabled({ enabled? })` wraps `useQuery({ queryKey:
+  queryKeys.live.enabled(), queryFn: fetchLiveEnabled, staleTime: 60_000, retry: false })` with no polling;
+  the nav and the page share it. `useLiveCurve(zevId, enabled)` refetches every 60 s and is enabled only while the
   card shows; the date is today's civil date (`todayBusinessIso`). Pure helpers: `kwFigure`, `formatKw`
   (kW, one decimal), `formatClock` (`hh:mm:ss`, Europe/Zurich), `showLiveCard` (snapshot non-null and
   `coverage.live_sources > 0`), `liveCardState` (what the card may say per tier), `liveCurveRows`,
   `liveDayAxis`. `useProductionForecast(zevId)` (every 15 min) comes with PR 5.
-- `frontend/src/components/dashboard/LiveEnergyCard.tsx`:
+- `frontend/src/features/live/LiveEnergyCard.tsx`:
   - `none`: "No live production data right now"; managers (the payload has `points`) get the
     reason ("Live data from 0 of 1 producing metering points"). The forecast peak comes with PR 5.
   - `production`: "The ZEV produces **x kW** right now" and the note "We don't know how much the other
@@ -565,12 +572,20 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
 - `LiveCurveChart.tsx` (today's curve in Recharts: production area from tier `production` up,
   consumption line in `exact` buckets only, own consumption where present; `none` buckets are `null`
   gaps with `connectNulls={false}`, never interpolated; x axis the civil day) and
-  `LivePointsTable.tsx`. `LiveEnergySection.tsx` combines card, curve and table. Chart colours come
+  `LivePointsTable.tsx`. `LiveEnergyView.tsx` picks what the page shows (below). Chart colours come
   from `chartTokens`. `ProductionForecastChart.tsx` (hourly bars, min/max band, "Highest production
   expected 10:00-14:00") follows with PR 5.
-- Placement: `ParticipantDashboardBody` and `ManagementDashboardBody` render `<LiveEnergySection
-  zevId={selectedZevId}>` **above** the `filter-bar`: live is "now" and does not follow the selected
-  period or (manager) participant filter. It renders only when `showLiveCard`.
+- Placement: its own page, `pages/LivePage.tsx` at `/live` (`PageHeader` with the community eyebrow and
+  scope note, title "Live energy", `ScopeGuard`), rendering `features/live/LiveEnergyView.tsx` for the
+  selected ZEV. The components live in `frontend/src/features/live/`. The dashboards render nothing
+  live. `LiveEnergyView` polls only while the page is mounted, and requests the snapshot only once
+  `/live/enabled/` answered `true`. States, in order: either query fails -> error `Notice` with retry
+  (`pages.live.loadFailed`); flag off -> warning `Notice` `pages.live.disabled`; flag or snapshot still
+  loading -> `PageSkeleton`; snapshot `null` (no access, former participant) -> `Notice`
+  `pages.live.unavailable`; `coverage.live_sources === 0` -> `EmptyState` `pages.live.empty.*`
+  linking to `/metering/points` for managers, viewers and admins (`isZevScope`) and to
+  `/me/metering-points` for participants; otherwise card, curve (when it has data) and, for the
+  per-point payload, the table. The forecast chart goes on this page with PR 5.
 - Manager, viewer and admin: `LivePointsTable.tsx` (meter or "Grid connection point", holder or
   "ZEV-operated", kW, age, state badge) when the snapshot carries `points`.
 
@@ -693,6 +708,7 @@ gains `latitude`/`longitude` (`string | null`).
 |---|---|---|
 | `fetchLiveSnapshot(zevId)` | GET | `/metering/live/zevs/{id}/` |
 | `fetchLiveCurve(zevId, date?)` | GET | `/metering/live/zevs/{id}/curve/` |
+| `fetchLiveEnabled()` | GET | `/metering/live/enabled/` |
 | `fetchLiveSnapshotOrNull(zevId)` / `fetchLiveCurveOrNull(zevId, date?)` | GET | the same, `404` mapped to `null` |
 | `fetchProductionForecast(zevId)` | GET | `/metering/live/zevs/{id}/forecast/` |
 | `fetchZevEligibleSources(zevId)` | GET | `/metering/supplementary/sources/zev-eligible/` |
@@ -782,6 +798,12 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
 
 ### Frontend
 
+- The move to its own page added `metering/live/test_enabled.py` (**`LiveEnabledTests`**, 4 tests: on, off
+  answers `200` false, effective only with the energy data flag, anonymous `401`), `tests/live-page.test.ts`
+  (6 tests: flag off asks for no snapshot, `null` snapshot notice, error with retry, the empty state's
+  link for managers and participants, card and points table with sources) and six cases in
+  `tests/layout-nav.test.ts` (Live entry only with the flag for admin, manager, viewer and participant;
+  its place; none for a former participant).
 - PR 3a landed `tests/live-energy-card.test.ts` (12 tests: the three tiers' texts, the manager's
   reason, "as of", own split only at `exact`, the inconsistent hint, a producer's split, the coverage
   line, points table rows, empty curve) and `tests/live-helpers.test.ts` (16 tests: `formatKw`,
@@ -789,7 +811,7 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
   `null`, curve rows with gaps, the day axis incl. the 25-hour day).
 - `tests/production-forecast.test.ts`: peak window text, incomplete-forecast hint.
 - `tests/pv-planes-editor.test.ts`: validation and the 4-row limit.
-- Build, lint, style lint, hex sweep; screenshots of both dashboards in all tiers, also at ~400 px.
+- Build, lint, style lint, hex sweep; screenshots of `/live` in all tiers, also at ~400 px.
 
 ### Acceptance criteria
 
@@ -830,11 +852,12 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
    settings and health keys (`forecast_sources`, `forecast_stale`, `forecast_solar_calls_this_hour`)
    with PR 5. The MCP tool and the frontend types follow in PR 6 and PR 3.
 4. **PR 3 — frontend live**, split in two:
-   - **PR 3a — dashboards (read-only).** Types, API client, query keys, `lib/live.ts`, the card, the
-     curve and the points table on both dashboards, i18n (`live.*`), and `coverage.live_sources` in the
-     snapshot. *Rollout (PR 3a).* Nothing renders until the live flag is on and a live source exists;
-     with the flag off the snapshot answers `404`, the client maps it to `null` and stops polling. The
-     card sits above the period filter bar on the manager and the participant dashboard.
+   - **PR 3a — live page (read-only).** Types, API client, query keys, `lib/live.ts`, the card, the
+     curve and the points table on the new `/live` page with its sidebar entry, `GET /live/enabled/`,
+     i18n (`live.*`, `pages.live.*`, `nav.live`), and `coverage.live_sources` in the snapshot. *Rollout
+     (PR 3a).* The entry shows only once the live flag is on; the page then shows an empty state until a
+     live source exists. With the flag off the snapshot answers `404` and nothing polls. The dashboards
+     are unchanged.
    - **PR 3b — setup.** Source modal capabilities, the push panel with the live endpoint, ZEV-held and
      connection-point setup on both metering-point pages, the live-state marker.
 5. **PR 4 — Solar Manager live.** Stream pull, bearer cache, demand-driven polling.

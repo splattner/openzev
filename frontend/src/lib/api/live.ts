@@ -30,3 +30,9 @@ export function fetchLiveSnapshotOrNull(zevId: string): Promise<LiveSnapshot | n
 export function fetchLiveCurveOrNull(zevId: string, date?: string): Promise<LiveCurve | null> {
   return notFoundToNull(fetchLiveCurve(zevId, date))
 }
+
+/** Whether the live view is effective on this instance. Unlike the rest, this answers 200 while it is off. */
+export async function fetchLiveEnabled(): Promise<boolean> {
+  const { data } = await api.get<{ enabled: boolean }>('/metering/live/enabled/')
+  return data.enabled
+}

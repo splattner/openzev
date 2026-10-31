@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { fetchLiveCurveOrNull, fetchLiveSnapshotOrNull } from './api/live'
+import { fetchLiveCurveOrNull, fetchLiveEnabled, fetchLiveSnapshotOrNull } from './api/live'
 import { queryKeys } from './api/queryKeys'
 import { BUSINESS_TIME_ZONE, businessDayStartMs, nextIsoDate, todayBusinessIso } from './dates'
 import { formatNumber } from './numbers'
@@ -11,6 +11,17 @@ export const LIVE_CURVE_INTERVAL_MS = 60_000
 /** Polling cadence of the snapshot: stops for good once the server answered 404 (feature off, no access). */
 export function liveSnapshotRefetchInterval(query: { state: { data: unknown } }): number | false {
     return query.state.data === null ? false : LIVE_SNAPSHOT_INTERVAL_MS
+}
+
+/** Whether the instance has the live view on; gates the nav entry and the page. Not polled. */
+export function useLiveEnabled(options: { enabled?: boolean } = {}) {
+    return useQuery({
+        queryKey: queryKeys.live.enabled(),
+        queryFn: fetchLiveEnabled,
+        enabled: options.enabled ?? true,
+        staleTime: 60_000,
+        retry: false,
+    })
 }
 
 /**

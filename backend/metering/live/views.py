@@ -13,8 +13,10 @@ from django.conf import settings
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied, Throttled, ValidationError
 from rest_framework.parsers import JSONParser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -24,7 +26,7 @@ from zev.models import AllocationMode, MeteringPointAssignment, Zev
 
 from ..models import SourceHolder, SourceTarget, SupplementarySource
 from ..supplementary.authentication import IsPushSource, SupplementaryPushAuthentication
-from ..supplementary.permissions import personally_held_today
+from ..supplementary.permissions import live_feature_enabled, personally_held_today
 from . import store
 from .curve import earliest_day_start, zev_curve
 from .permissions import LiveEnergyPermission, LiveFeatureMixin, LivePushThrottle, LiveReadThrottle
@@ -175,3 +177,15 @@ class LiveMeView(LiveFeatureMixin, APIView):
                 }
             )
         return Response({"zevs": entries})
+
+
+@extend_schema(responses={200: OpenApiTypes.OBJECT})
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def live_enabled(request):
+    """Whether the live view is effective, for any authenticated user (nav link and page).
+
+    Unlike the rest of the live API this does not answer ``404`` while it is off: the frontend asks
+    in order to decide whether to show the entry at all. Read-only, like ``/feasibility/enabled/``.
+    """
+    return Response({"enabled": live_feature_enabled()})

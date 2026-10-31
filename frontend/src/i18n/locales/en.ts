@@ -37,6 +37,7 @@ export const en = {
         myInvoices: 'My invoices',
         annualStatement: 'Annual statement',
         myMeteringPoints: 'My metering points',
+        live: 'Live',
         adminOverview: 'Overview',
         adminAccounts: 'Accounts',
         adminSystemSettings: 'Settings',
@@ -767,6 +768,20 @@ export const en = {
         },
     },
     pages: {
+        live: {
+            title: 'Live energy',
+            description: 'Measured values for the community right now. Indicative only, never used for billing.',
+            disabled: 'Live energy data is not enabled on this instance.',
+            unavailable: 'Live energy data is not available for you in this community.',
+            loadFailed: 'Failed to load the live energy data.',
+            empty: {
+                title: 'No live data source yet',
+                manager: 'Live energy shows what your community produces and uses right now, from sources that report in real time. Connect a live source to a metering point to see it here.',
+                managerAction: 'Go to metering points',
+                participant: 'Live energy shows what your community produces and uses right now. It appears as soon as a live source is connected, for example for your own meter.',
+                participantAction: 'Go to my metering points',
+            },
+        },
         myMeteringPoints: {
             title: 'My metering points',
             description: 'The metering points assigned to you.',

@@ -108,6 +108,7 @@ export const queryKeys = {
   },
   live: {
     all: ['live'] as const,
+    enabled: () => ['live', 'enabled'] as const,
     snapshot: (zevId: string) => ['live', 'snapshot', zevId] as const,
     curve: (zevId: string, date: string) => ['live', 'curve', zevId, date] as const,
   },
