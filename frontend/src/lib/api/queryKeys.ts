@@ -106,4 +106,9 @@ export const queryKeys = {
     hourlyProfile: (dateFrom: string, dateTo: string, zevId?: string, participantId?: string) =>
       ['metering', 'hourly-profile', dateFrom, dateTo, zevId ?? 'all', participantId ?? 'all'] as const,
   },
+  live: {
+    all: ['live'] as const,
+    snapshot: (zevId: string) => ['live', 'snapshot', zevId] as const,
+    curve: (zevId: string, date: string) => ['live', 'curve', zevId, date] as const,
+  },
 }

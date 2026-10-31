@@ -161,6 +161,11 @@ class Topology:
     def physical(self) -> bool:
         return self.zev.zev_type == ZevType.ZEV
 
+    @property
+    def live_sources(self) -> int:
+        """Enabled live sources on active points, plus the connection point's. A count only."""
+        return sum(1 for point in self.points if point.pk in self.sources) + (self.connection is not None)
+
     def source_ids(self) -> list:
         ids = [source.pk for source in self.sources.values()]
         if self.connection is not None:
@@ -255,6 +260,7 @@ def zev_snapshot(zev: Zev, *, now: datetime | None = None, viewer, topology: Top
             "connection_point": (
                 live_state(topology.connection, connection_sample, now) if topology.connection is not None else None
             ),
+            "live_sources": topology.live_sources,
         },
         "own": own,
         "max_age_s": settings.LIVE_MAX_AGE_S,
