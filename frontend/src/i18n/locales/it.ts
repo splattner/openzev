@@ -28,6 +28,7 @@ export const it = {
         myInvoices: 'Le mie fatture',
         annualStatement: 'Conteggio annuale',
         myMeteringPoints: 'I miei punti di misura',
+        live: 'Live',
         adminOverview: 'Panoramica',
         adminAccounts: 'Account',
         adminSystemSettings: 'Impostazioni',
@@ -758,6 +759,20 @@ export const it = {
         },
     },
     pages: {
+        live: {
+            title: 'Energia live',
+            description: 'Valori misurati della comunità in questo momento. Solo indicativi, mai usati per la fatturazione.',
+            disabled: 'I dati energetici live non sono attivati su questa istanza.',
+            unavailable: 'I dati energetici live non sono disponibili per te in questa comunità.',
+            loadFailed: 'Impossibile caricare i dati energetici live.',
+            empty: {
+                title: 'Ancora nessuna fonte live',
+                manager: 'L\'energia live mostra cosa la tua comunità produce e consuma in questo momento, da fonti che trasmettono in tempo reale. Collega una fonte live a un punto di misura per vederla qui.',
+                managerAction: 'Vai ai punti di misura',
+                participant: 'L\'energia live mostra cosa la tua comunità produce e consuma in questo momento. Compare non appena è collegata una fonte live, ad esempio per il tuo contatore.',
+                participantAction: 'Vai ai miei punti di misura',
+            },
+        },
         myMeteringPoints: {
             title: 'I miei punti di misura',
             description: 'I punti di misura che le sono assegnati.',

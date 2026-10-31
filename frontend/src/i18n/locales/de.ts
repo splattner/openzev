@@ -28,6 +28,7 @@ export const de = {
         myInvoices: 'Meine Rechnungen',
         annualStatement: 'Jahresabrechnung',
         myMeteringPoints: 'Meine Messpunkte',
+        live: 'Live',
         adminOverview: 'Übersicht',
         adminAccounts: 'Konten',
         adminSystemSettings: 'Einstellungen',
@@ -758,6 +759,20 @@ export const de = {
         },
     },
     pages: {
+        live: {
+            title: 'Live-Energie',
+            description: 'Gemessene Werte der Gemeinschaft im Moment. Nur Richtwerte, nie Grundlage der Abrechnung.',
+            disabled: 'Live-Energiedaten sind auf dieser Instanz nicht aktiviert.',
+            unavailable: 'Live-Energiedaten sind für Sie in dieser Gemeinschaft nicht verfügbar.',
+            loadFailed: 'Die Live-Energiedaten konnten nicht geladen werden.',
+            empty: {
+                title: 'Noch keine Live-Datenquelle',
+                manager: 'Live-Energie zeigt, was Ihre Gemeinschaft im Moment produziert und verbraucht, aus Quellen, die in Echtzeit melden. Verbinden Sie eine Live-Quelle mit einem Messpunkt, damit die Werte hier erscheinen.',
+                managerAction: 'Zu den Messpunkten',
+                participant: 'Live-Energie zeigt, was Ihre Gemeinschaft im Moment produziert und verbraucht. Die Werte erscheinen, sobald eine Live-Quelle verbunden ist, zum Beispiel für Ihren eigenen Zähler.',
+                participantAction: 'Zu meinen Messpunkten',
+            },
+        },
         myMeteringPoints: {
             title: 'Meine Messpunkte',
             description: 'Die Messpunkte, die Ihnen zugeordnet sind.',

@@ -45,6 +45,14 @@ vi.mock('../src/lib/api/feasibility', () => ({
 const mockEligible = vi.hoisted(() => vi.fn())
 vi.mock('../src/lib/api/supplementary', () => ({ fetchEligibleOrNull: mockEligible }))
 
+// The Live entry is gated by this flag (default on here); the gate itself is covered below.
+const mockLiveEnabled = vi.hoisted(() => vi.fn())
+vi.mock('../src/lib/api/live', () => ({
+    fetchLiveEnabled: mockLiveEnabled,
+    fetchLiveSnapshotOrNull: vi.fn(),
+    fetchLiveCurveOrNull: vi.fn(),
+}))
+
 vi.mock('../src/lib/toast', () => ({
     useToast: () => ({ pushToast: vi.fn() }),
 }))
@@ -155,7 +163,10 @@ async function renderLayoutAt(path: string) {
     }
 }
 
-beforeEach(() => mockEligible.mockResolvedValue(null))
+beforeEach(() => {
+    mockEligible.mockResolvedValue(null)
+    mockLiveEnabled.mockResolvedValue(true)
+})
 
 function mockMobileViewport(initialMobile: boolean) {
     const matchMedia = window.matchMedia.bind(window)
@@ -237,6 +248,41 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         // narrow gate on this one link, not a broader admin capability.
         expect(page.hasHref('/zev-settings')).toBe(true)
         expect(page.hasHref('/admin')).toBe(true)
+        page.unmount()
+    })
+
+    it.each(['admin', 'manager', 'viewer', 'participant'] as const)('%s sees the Live entry only while the live flag is on', async (persona) => {
+        mockSession(persona)
+        const on = await renderLayout()
+        expect(on.hasHref('/live')).toBe(true)
+        on.unmount()
+
+        mockLiveEnabled.mockResolvedValue(false)
+        const off = await renderLayout()
+        expect(off.hasHref('/live')).toBe(false)
+        off.unmount()
+    })
+
+    it('puts Live right after Energy balance for managers and after Dashboard for participants', async () => {
+        const hrefs = (page: Awaited<ReturnType<typeof renderLayout>>) =>
+            Array.from(page.container.querySelectorAll('nav a')).map((a) => a.getAttribute('href'))
+
+        mockSession('manager')
+        const manager = await renderLayout()
+        const managerLinks = hrefs(manager)
+        expect(managerLinks[managerLinks.indexOf('/dashboard') + 1]).toBe('/live')
+        manager.unmount()
+
+        mockSession('participant')
+        const participant = await renderLayout()
+        expect(hrefs(participant).slice(0, 2)).toEqual(['/', '/live'])
+        participant.unmount()
+    })
+
+    it('shows a former participant no Live entry', async () => {
+        mockSession('former')
+        const page = await renderLayout()
+        expect(page.hasHref('/live')).toBe(false)
         page.unmount()
     })
 

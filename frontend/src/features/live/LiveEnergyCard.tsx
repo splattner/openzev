@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { formatClock, formatKw, kwFigure, liveCardState } from '../../lib/live'
 import { formatPercentFigure } from '../../lib/numbers'
 import type { LiveSnapshot } from '../../types/api'
-import { StatCard } from '../StatCard'
+import { StatCard } from '../../components/StatCard'
 
 /**
  * What the ZEV produces and uses right now (SPEC-2026-live-energy-data §7.1). The tier decides what

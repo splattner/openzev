@@ -1,8 +1,8 @@
 import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { LiveCurveChart } from '../src/components/dashboard/LiveCurveChart'
-import { LiveEnergyCard } from '../src/components/dashboard/LiveEnergyCard'
-import { LivePointsTable } from '../src/components/dashboard/LivePointsTable'
+import { LiveCurveChart } from '../src/features/live/LiveCurveChart'
+import { LiveEnergyCard } from '../src/features/live/LiveEnergyCard'
+import { LivePointsTable } from '../src/features/live/LivePointsTable'
 import type { LiveOwn, LivePoint, LiveSnapshot } from '../src/types/api'
 import { renderWithProviders } from './helpers/render'
 
