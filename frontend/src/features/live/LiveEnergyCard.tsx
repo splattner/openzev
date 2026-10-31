@@ -78,13 +78,10 @@ export function LiveEnergyCard({ snapshot }: { snapshot: LiveSnapshot }) {
                 </p>
             )}
 
-            {(state.reporting || connectionState) && (
-                <p className="muted">
-                    {state.reporting && t('live.coverage', state.reporting)}
-                    {state.reporting && connectionState && ' · '}
-                    {connectionState && t('live.connectionPoint', { state: t(`live.state.${connectionState}`) })}
-                </p>
-            )}
+            <p className="muted">
+                {t('live.coverage', state.reporting)}
+                {connectionState && ` · ${t('live.connectionPoint', { state: t(`live.state.${connectionState}`) })}`}
+            </p>
         </section>
     )
 }

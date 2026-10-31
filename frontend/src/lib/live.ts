@@ -112,13 +112,12 @@ export interface LiveCardState {
      * a bidirectional point counts once; the participant payload has only per-role counts, which
      * cannot be merged without double counting, so there it is `null`.
      */
-    reporting: { fresh: number; total: number } | null
+    reporting: { fresh: number; total: number }
 }
 
 function reportingPoints(snapshot: LiveSnapshot): LiveCardState['reporting'] {
-    if (!snapshot.points) return null
-    const meters = snapshot.points.filter((point) => point.metering_point_id !== null)
-    return { fresh: meters.filter((point) => point.live_state === 'fresh').length, total: meters.length }
+    const { points, points_fresh } = snapshot.coverage
+    return { fresh: points_fresh, total: points }
 }
 
 /** What the live card may say for a snapshot, or `null` when the card is not shown at all. */

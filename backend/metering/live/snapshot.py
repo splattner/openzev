@@ -261,6 +261,9 @@ def zev_snapshot(zev: Zev, *, now: datetime | None = None, viewer, topology: Top
                 live_state(topology.connection, connection_sample, now) if topology.connection is not None else None
             ),
             "live_sources": topology.live_sources,
+            # Distinct metering points: a bidirectional one is in both counts above but once here.
+            "points": len(topology.points),
+            "points_fresh": sum(1 for point in topology.points if fresh[point.pk] is not None),
         },
         "own": own,
         "max_age_s": settings.LIVE_MAX_AGE_S,

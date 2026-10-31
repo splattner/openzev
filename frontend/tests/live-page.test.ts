@@ -33,7 +33,7 @@ const snapshot = (liveSources: number, overrides: Partial<LiveSnapshot> = {}): L
     surplus_w: 3000,
     grid_import_w: 0,
     local_share_pct: 100,
-    coverage: { producing_points: 1, producing_fresh: 1, consuming_points: 6, consuming_fresh: 1, connection_point: 'fresh', live_sources: liveSources },
+    coverage: { producing_points: 1, producing_fresh: 1, consuming_points: 6, consuming_fresh: 1, connection_point: 'fresh', live_sources: liveSources, points: 7, points_fresh: 2 },
     own: null,
     max_age_s: 60,
     ...overrides,

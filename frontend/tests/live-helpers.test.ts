@@ -21,7 +21,7 @@ const snapshot = (overrides: Partial<LiveSnapshot> = {}, liveSources = 2): LiveS
     surplus_w: 3000,
     grid_import_w: 0,
     local_share_pct: 100,
-    coverage: { producing_points: 1, producing_fresh: 1, consuming_points: 2, consuming_fresh: 2, connection_point: null, live_sources: liveSources },
+    coverage: { producing_points: 1, producing_fresh: 1, consuming_points: 2, consuming_fresh: 2, connection_point: null, live_sources: liveSources, points: 3, points_fresh: 3 },
     own: null,
     max_age_s: 60,
     ...overrides,

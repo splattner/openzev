@@ -835,6 +835,9 @@ export interface LiveSnapshot {
         connection_point: LiveState | null
         /** Enabled live sources in the ZEV, the connection point included. Zero: nothing live to show. */
         live_sources: number
+        /** Distinct active metering points (a bidirectional one counts once), and how many report live now. */
+        points: number
+        points_fresh: number
     }
     own: LiveOwn | null
     points?: LivePoint[]

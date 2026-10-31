@@ -140,7 +140,7 @@ class SnapshotTierTests(SnapshotCase):
         self.assertEqual(
             shot["coverage"],
             {"producing_points": 1, "producing_fresh": 1, "consuming_points": 3, "consuming_fresh": 1,
-             "connection_point": None, "live_sources": 2},
+             "connection_point": None, "live_sources": 2, "points": 4, "points_fresh": 2},
         )
 
     def test_exact_when_every_point_reports(self):
@@ -249,6 +249,17 @@ class SnapshotTierTests(SnapshotCase):
 
         self.assertEqual(shot["coverage"]["producing_points"], 2)
         self.assertEqual((shot["production_w"], shot["consumption_w"]), (1400.0, 500.0))
+
+    def test_a_bidirectional_point_counts_once_in_the_distinct_coverage(self):
+        self.flat1.meter_type = MeteringPointType.BIDIRECTIONAL
+        self.flat1.save()
+        self.wire(pv=-1000, flat1=-400)
+
+        coverage = self.snap()["coverage"]
+
+        # flat1 is in both per-role counts, but once among the four points.
+        self.assertEqual((coverage["producing_points"], coverage["consuming_points"]), (2, 3))
+        self.assertEqual((coverage["points"], coverage["points_fresh"]), (4, 2))
 
     def test_a_bidirectional_household_without_a_source_keeps_the_zev_at_none(self):
         self.flat1.meter_type = MeteringPointType.BIDIRECTIONAL

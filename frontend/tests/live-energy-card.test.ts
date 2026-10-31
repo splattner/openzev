@@ -40,7 +40,7 @@ const exact = (overrides: Partial<LiveSnapshot> = {}): LiveSnapshot => ({
     surplus_w: 3000,
     grid_import_w: 0,
     local_share_pct: 100,
-    coverage: { producing_points: 1, producing_fresh: 1, consuming_points: 6, consuming_fresh: 1, connection_point: 'fresh', live_sources: 2 },
+    coverage: { producing_points: 1, producing_fresh: 1, consuming_points: 6, consuming_fresh: 1, connection_point: 'fresh', live_sources: 2, points: 7, points_fresh: 2 },
     own: own(),
     max_age_s: 60,
     ...overrides,
@@ -76,34 +76,14 @@ describe('LiveEnergyCard', () => {
         expect(out).not.toContain('live.zevProduces')
     })
 
-    it('counts a bidirectional metering point once in the manager coverage line', async () => {
-        const row = (id: string, state: LivePoint['live_state']): LivePoint => ({
-            metering_point_id: id,
-            target: 'metering_point',
-            meter_id: id,
-            meter_type: 'bidirectional',
-            participant_name: null,
-            held_by: 'zev',
-            live_state: state,
-            meter_power_w: null,
-            age_s: null,
-            source_id: null,
-        })
-        const points = [row('m1', 'fresh'), row('m2', 'stale'), row('m3', 'never')]
-        // Per role the payload says 1 of 3 twice; the distinct count is 1 of 3, said once.
-        const coverage = { ...none().coverage, producing_points: 3, producing_fresh: 1, consuming_points: 3, consuming_fresh: 1 }
-        const out = await text(none({ coverage, points }))
+    it('says the distinct point coverage once, for participants and managers alike', async () => {
+        // A vZEV of three bidirectional meters: per role the payload says 1 of 3 twice; the distinct count is said once.
+        const coverage = { ...none().coverage, producing_points: 3, producing_fresh: 1, consuming_points: 3, consuming_fresh: 1, points: 3, points_fresh: 1 }
+        const out = await text(none({ coverage }))
 
         expect(out).toContain('live.none')
         expect(out).toContain('live.coverage|{"fresh":1,"total":3}')
         expect(out.match(/live\.coverage/g)).toHaveLength(1)
-        expect(out).toContain('live.connectionPoint')
-    })
-
-    it('leaves the point count out for a participant, who gets only per-role counts', async () => {
-        const out = await text(none())
-
-        expect(out).not.toContain('live.coverage')
         expect(out).toContain('live.connectionPoint')
     })
 
@@ -153,11 +133,11 @@ describe('LiveEnergyCard', () => {
     })
 
     it('shows the time of the oldest value and the coverage with the connection point', async () => {
-        const out = await text(exact({ points: [] }))
+        const out = await text(exact())
 
         expect(out).toContain('live.asOf|{"time":"12:02:10"}')
         expect(out).toContain('live.badge')
-        expect(out).toContain('live.coverage|{"fresh":0,"total":0}')
+        expect(out).toContain('live.coverage|{"fresh":2,"total":7}')
         expect(out).toContain('live.connectionPoint')
         expect(out).toContain('live.state.fresh')
     })
