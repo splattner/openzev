@@ -20,6 +20,7 @@ from ..models import (
     SupplementarySource,
     SupplementaryStatus,
 )
+from ..live import store as live_store
 from . import crypto, permissions
 from .providers import PROVIDERS, ProviderAuthError, ProviderError
 
@@ -142,8 +143,8 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
             return self._validate_create(attrs, user)
         return self._validate_update(attrs, user)
 
-    def _check_rollout(self, *, provider, live, forecast, history, adds_live, target=None, held_by=None):
-        """Restrictions of the first live-data release; each lifts with the PR named in SPEC-live §10."""
+    def _check_rollout(self, *, provider, forecast, adds_live, target=None, held_by=None):
+        """Restrictions of the live-data release; each lifts with the PR named in SPEC-live §10."""
         if forecast:
             raise serializers.ValidationError({"provides_forecast": ["Production forecasts are not available yet."]})
         if adds_live and not permissions.live_feature_enabled():
@@ -152,13 +153,13 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"target": ["Live energy data is not enabled."]})
         if held_by == SourceHolder.ZEV and not permissions.live_feature_enabled():
             raise serializers.ValidationError({"held_by": ["Live energy data is not enabled."]})
-        if live and provider != SupplementaryProvider.PUSH:
+        if provider == SupplementaryProvider.SOLAR_MANAGER and (
+            held_by == SourceHolder.ZEV or target == SourceTarget.CONNECTION_POINT
+        ):
+            # The key is the participant's own account, so a ZEV's manager cannot hold it (ADR 0031).
             raise serializers.ValidationError(
-                {"provides_live": ["Live data is only available for push sources at the moment."]}
-            )
-        if provider == SupplementaryProvider.SOLAR_MANAGER and not history:
-            raise serializers.ValidationError(
-                {"provides_history": ["A Solar Manager source provides history."]}
+                {"provider": ["A Solar Manager key is personal. A ZEV-operated meter or the grid connection point "
+                              "uses a push source."]}
             )
 
     def _check_conflicts(self, metering_point, *, history, live, forecast, exclude_pk=None):
@@ -190,8 +191,7 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
                      provides_forecast=forecast)
 
         self._check_rollout(
-            provider=provider, live=live, forecast=forecast, history=history, adds_live=live,
-            target=target, held_by=held_by,
+            provider=provider, forecast=forecast, adds_live=live, target=target, held_by=held_by,
         )
         if not (history or live or forecast):
             raise serializers.ValidationError({"provides_history": ["Choose what the source provides."]})
@@ -321,7 +321,7 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
             forecast = attrs.get("provides_forecast", instance.provides_forecast)
             adds_live = live and not instance.provides_live
             self._check_rollout(
-                provider=instance.provider, live=live, forecast=forecast, history=history, adds_live=adds_live,
+                provider=instance.provider, forecast=forecast, adds_live=adds_live,
             )
             if not (history or live or forecast):
                 raise serializers.ValidationError({"provides_history": ["A source must provide at least one kind of data."]})
@@ -332,6 +332,10 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
             if adds_live and not consent:
                 raise serializers.ValidationError(
                     {"consent": ["Consent is required to connect an energy data source."]}
+                )
+            if adds_live and instance.provider == SupplementaryProvider.SOLAR_MANAGER and not instance.has_credential:
+                raise serializers.ValidationError(
+                    {"provides_live": ["Enter the Solar Manager API key again before adding live data."]}
                 )
             if history and not instance.provides_history:
                 if instance.held_by != SourceHolder.PARTICIPANT:
@@ -362,15 +366,18 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
 
     # ---- writes ----
 
-    def _verified_credential(self, provider: str, external_id: str, api_key: str) -> str:
+    def _verified_credential(self, provider: str, external_id: str, api_key: str, *, history: bool = True) -> str:
         """Check ``api_key`` with the vendor and return the credential to store.
 
-        Nothing is saved before this succeeds, so a wrong key never leaves a broken row behind.
+        A source that provides history is verified by reading a history hour; one that only provides
+        live data by reading one stream sample. Nothing is saved before this succeeds, so a wrong key
+        never leaves a broken row behind.
         """
         if not crypto.encryption_configured():
             raise IntegrationNotConfiguredError()
         try:
-            return PROVIDERS[provider].verify(external_id, api_key)
+            vendor = PROVIDERS[provider]
+            return vendor.verify(external_id, api_key) if history else vendor.verify_live(external_id, api_key)
         except ProviderAuthError as exc:
             raise serializers.ValidationError({"api_key": [str(exc) or "The vendor rejected this API key."]}) from exc
         except ProviderError as exc:
@@ -384,7 +391,9 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
         source = SupplementarySource(**validated_data)
         source.full_clean(exclude=["credential_encrypted", "push_token_prefix", "push_token_hash"])
         if source.provider == SupplementaryProvider.SOLAR_MANAGER:
-            credential = self._verified_credential(source.provider, source.external_id, api_key)
+            credential = self._verified_credential(
+                source.provider, source.external_id, api_key, history=source.provides_history
+            )
             source.set_credential(credential)
         else:
             self.push_token = source.issue_push_token()
@@ -397,8 +406,11 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
             setattr(instance, name, value)
         self.credential_changed = False
         if api_key:
-            credential = self._verified_credential(instance.provider, instance.external_id, api_key)
+            credential = self._verified_credential(
+                instance.provider, instance.external_id, api_key, history=instance.provides_history
+            )
             instance.set_credential(credential)
+            live_store.drop_sm_access(instance.pk)  # a bearer token of the old key or installation must not be reused
             self.credential_changed = True
             # A fresh key is a fresh start: the next sync decides the status.
             instance.status = SupplementaryStatus.PENDING
