@@ -782,6 +782,84 @@ export type SourceCapability = 'history' | 'live' | 'forecast'
 /** Freshness of a live source; `null` when the source provides no live data. */
 export type LiveState = 'fresh' | 'stale' | 'never'
 
+/** How much of the ZEV the live values cover (SPEC-2026-live-energy-data §5.2): `none`, `production` only, or `exact`. */
+export type LiveTier = 'none' | 'production' | 'exact'
+
+/** The viewer's own live figures; the split is `null` below tier `exact`. */
+export interface LiveOwn {
+    consumption_w: number | null
+    local_w: number | null
+    grid_w: number | null
+    production_w: number | null
+    to_zev_w: number | null
+    to_grid_w: number | null
+    gross: { production_w: number | null; consumption_w: number | null }
+    /** Every metering point the viewer holds personally reported a fresh value. */
+    complete: boolean
+    points: number
+    points_fresh: number
+    /** The split was withheld because its inputs contradict each other (timing between meters). */
+    split_withheld_reason?: 'inconsistent'
+}
+
+/** One live source's latest value; only in the snapshot of a manager, viewer or admin. */
+export interface LivePoint {
+    metering_point_id: string | null
+    target: SourceTarget
+    meter_id: string | null
+    meter_type: 'consumption' | 'production' | 'bidirectional' | null
+    participant_name: string | null
+    held_by: SourceHolder | null
+    live_state: LiveState
+    meter_power_w: number | null
+    age_s: number | null
+    source_id: string | null
+}
+
+/** The ZEV's live figures in W right now (measured only; `null` where the tier does not allow a figure). */
+export interface LiveSnapshot {
+    zev_id: string
+    as_of: string | null
+    tier: LiveTier
+    consumption_basis: 'all_points' | 'connection_point' | null
+    production_w: number | null
+    consumption_w: number | null
+    surplus_w: number | null
+    grid_import_w: number | null
+    local_share_pct: number | null
+    coverage: {
+        producing_points: number
+        producing_fresh: number
+        consuming_points: number
+        consuming_fresh: number
+        connection_point: LiveState | null
+        /** Enabled live sources in the ZEV, the connection point included. Zero: nothing live to show. */
+        live_sources: number
+    }
+    own: LiveOwn | null
+    points?: LivePoint[]
+    max_age_s: number
+}
+
+/** A 5-minute bucket of the day; a `none` bucket carries only `start` and `tier`. */
+export interface LiveCurveBucket {
+    start: string
+    tier: LiveTier
+    production_w?: number | null
+    consumption_w?: number | null
+    surplus_w?: number | null
+    own_consumption_w?: number | null
+    own_local_w?: number | null
+    /** Manager, viewer and admin only. */
+    points?: Array<{ metering_point_id: string | null; target: SourceTarget; meter_power_w: number | null }>
+}
+
+export interface LiveCurve {
+    date: string
+    bucket_s: number
+    buckets: LiveCurveBucket[]
+}
+
 /** Result of the last comparison with the official meter. Purely diagnostic. */
 export interface SupplementaryReconciliation {
     checked_at?: string
