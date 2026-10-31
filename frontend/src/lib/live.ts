@@ -107,6 +107,18 @@ export interface LiveCardState {
     /** The viewer's local/grid split: shown at `exact`, or withheld as inconsistent, never below `exact`. */
     ownSplit: 'shown' | 'inconsistent' | 'none'
     ownProductionSplit: boolean
+    /**
+     * Distinct metering points with a fresh live value, of all active ones. Counted from `points`, so
+     * a bidirectional point counts once; the participant payload has only per-role counts, which
+     * cannot be merged without double counting, so there it is `null`.
+     */
+    reporting: { fresh: number; total: number } | null
+}
+
+function reportingPoints(snapshot: LiveSnapshot): LiveCardState['reporting'] {
+    if (!snapshot.points) return null
+    const meters = snapshot.points.filter((point) => point.metering_point_id !== null)
+    return { fresh: meters.filter((point) => point.live_state === 'fresh').length, total: meters.length }
 }
 
 /** What the live card may say for a snapshot, or `null` when the card is not shown at all. */
@@ -131,6 +143,7 @@ export function liveCardState(snapshot: LiveSnapshot | null | undefined): LiveCa
         ownProduction,
         ownSplit,
         ownProductionSplit: exact && ownProduction && own.to_zev_w !== null && own.to_grid_w !== null,
+        reporting: reportingPoints(snapshot),
     }
 }
 

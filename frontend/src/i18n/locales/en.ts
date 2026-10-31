@@ -794,6 +794,13 @@ export const en = {
             flagHint: 'Is a PV system behind your meter, but the meter is not marked as such? Ask your community\'s manager to mark it as "Generation behind the meter". Then you can connect your own energy data here.',
             notHolder: 'Only the person who holds this meter personally can connect energy data for it.',
             viewData: 'View metering data',
+            connections: {
+                title: 'My connections',
+                empty: 'Connections appear here once energy data is connected to a meter below.',
+                open: 'Open',
+                openFor: 'Open {{name}}',
+                meters: 'Metering points',
+            },
         },
         myInvoices: {
             title: 'My invoices',
@@ -4188,7 +4195,6 @@ export const en = {
         badge: 'Live, indicative',
         asOf: 'as of {{time}}',
         none: 'No live production data right now',
-        noneReason: 'Live data from {{fresh}} of {{total}} producing metering points',
         zevProduces: 'The ZEV produces {{value}} right now',
         othersUnknown: 'We don\'t know how much the other participants are using at the moment, so part of it may already be in use.',
         production: 'Production',
@@ -4201,7 +4207,7 @@ export const en = {
         ownSplit: 'Of your {{total}}, {{local}} is local and {{grid}} comes from the grid.',
         ownSplitInconsistent: 'Your split can\'t be shown reliably right now: the meters report at slightly different moments.',
         ownProductionSplit: 'Of your {{total}} production, {{toZev}} goes to the ZEV and {{toGrid}} to the grid.',
-        coverage: '{{fresh}} of {{total}} consuming metering points reporting',
+        coverage: 'Live data from {{fresh}} of {{total}} metering points',
         connectionPoint: 'Grid connection point: {{state}}',
         basisConnectionPoint: 'Consumption derived from the grid connection point.',
         state: {

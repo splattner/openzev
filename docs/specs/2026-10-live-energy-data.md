@@ -558,8 +558,8 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
   `coverage.live_sources > 0`), `liveCardState` (what the card may say per tier), `liveCurveRows`,
   `liveDayAxis`. `useProductionForecast(zevId)` (every 15 min) comes with PR 5.
 - `frontend/src/features/live/LiveEnergyCard.tsx`:
-  - `none`: "No live production data right now"; managers (the payload has `points`) get the
-    reason ("Live data from 0 of 1 producing metering points"). The forecast peak comes with PR 5.
+  - `none`: "No live production data right now"; the coverage line below says how far live data
+    reaches. The forecast peak comes with PR 5.
   - `production`: "The ZEV produces **x kW** right now" and the note "We don't know how much the other
     participants are using at the moment, so part of it may already be in use." Own consumption if
     `own.complete`.
@@ -567,8 +567,15 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
     1.2 kW, 1.2 kW is local and 0.0 kW comes from the grid"); a producer's own production with
     `to_zev`/`to_grid`; with `split_withheld_reason = "inconsistent"` a hint instead of the split. The
     split is never shown below `exact`; a value the payload leaves `null` is never shown.
-  - Always: "as of hh:mm:ss" (when `as_of` is set), a "Live, indicative" badge, and a coverage line
-    (consuming fresh of total, connection point state when not `null`).
+  - Always: "as of hh:mm:ss" (when `as_of` is set), a "Live, indicative" badge, and **one** coverage
+    line: "Live data from X of Y metering points", then " · Grid connection point: <state>" when
+    `coverage.connection_point` is not `null`. X and Y count **distinct** active metering points
+    (a bidirectional one counts once), taken from `points` (`liveCardState().reporting`: rows with a
+    `metering_point_id`, X those with `live_state = fresh`), so only managers, viewers and admins get
+    the count. The participant payload has only per-role counts (`producing_*`, `consuming_*`), which
+    cannot be merged without double counting a bidirectional point, so a participant sees just the
+    connection point part (or no line). A distinct count for participants would need new snapshot fields
+    (a future idea, §12).
 - `LiveCurveChart.tsx` (today's curve in Recharts: production area from tier `production` up,
   consumption line in `exact` buckets only, own consumption where present; `none` buckets are `null`
   gaps with `connectNulls={false}`, never interpolated; x axis the civil day) and
@@ -592,6 +599,19 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
 ### 7.2 Setup
 
 Shipped in PR 3b. Live is push only until PR 4 and the forecast is not offered yet.
+
+- **My connections** (`features/supplementary/MyConnections.tsx`): a card at the top of
+  `/me/metering-points`, shown only while the feature is on and the source list has loaded. It lists
+  the sources the signed-in holder owns: `held_by = participant` sources whose `metering_point` is a
+  held point (an `eligible` entry) of the selected community, so no ZEV-held, connection-point or
+  other holder's source. One row per source: provider and label, the metering points it feeds (the
+  meter ids as a list; always one today), a capability chip per capability it provides (**History
+  (15 min)**, **Live (now)**) each followed by its status (`SourceStatusBadge` for history,
+  `LiveStateBadge` for live), and an **Open** button that opens `SourceDialog` (subject: the meter
+  ids; eligibility of the fed point). No source: a muted line saying connections appear here once
+  energy data is connected to a meter below; there is no Connect here, that stays on the meter cards.
+  It is a view only: a source still feeds exactly one metering point. Tests:
+  `tests/my-connections.test.ts` (5) and one case in `tests/my-metering-points-page.test.ts`.
 
 - **One card per held metering point** (`MeteringPointDataCard`, replacing the history card, the live
   section and the source card of the first PR 3b cut): header with meter id, community, the
@@ -877,9 +897,9 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
   link for managers and participants, card and points table with sources) and six cases in
   `tests/layout-nav.test.ts` (Live entry only with the flag for admin, manager, viewer and participant;
   its place; none for a former participant).
-- PR 3a landed `tests/live-energy-card.test.ts` (12 tests: the three tiers' texts, the manager's
-  reason, "as of", own split only at `exact`, the inconsistent hint, a producer's split, the coverage
-  line, points table rows, empty curve) and `tests/live-helpers.test.ts` (16 tests: `formatKw`,
+- PR 3a landed `tests/live-energy-card.test.ts` (13 tests: the three tiers' texts, the single
+  coverage line (a bidirectional point counted once; no count for a participant), "as of", own split
+  only at `exact`, the inconsistent hint, a producer's split, the connection point part, points table rows, empty curve) and `tests/live-helpers.test.ts` (16 tests: `formatKw`,
   `formatClock`, `showLiveCard` hidden for `null` or no live source, `liveCardState`, polling stops on
   `null`, curve rows with gaps, the day axis incl. the 25-hour day).
 - PR 3b added `tests/live-setup.test.ts` (18 tests: live modal payloads and consent per holder,
@@ -986,6 +1006,10 @@ Decided with the issue owner on 2026-10-30 ([#1032](https://github.com/splattner
 
 Future ideas (not planned):
 
+- **Account-level connections feeding several metering points** (one token for several meters), if a
+  use case appears (§7.2: the overview already lists a source's meters as a list).
+- **Distinct coverage counts for participants**: `coverage.points` and `coverage.points_fresh` in the
+  snapshot, so the card can say "Live data from X of Y metering points" without per-point rows.
 - **Native MQTT ingest** (a broker with per-source credentials, or a bridge service).
 - **Direct Home Assistant connection**: pull through the HA REST/WebSocket API with a long-lived token
   and a sensor picker (live via `/api/states/<entity_id>`, history via

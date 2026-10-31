@@ -6,6 +6,7 @@ import { Notice } from '../components/Notice'
 import { PageHeader } from '../components/PageHeader'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { ScopeGuard } from '../components/ScopeGuard'
+import { MyConnections } from '../features/supplementary/MyConnections'
 import { MeteringDataLink } from '../features/supplementary/MeteringDataLink'
 import { MeteringPointDataCard } from '../features/supplementary/MeteringPointDataCard'
 import { queryKeys } from '../lib/api/queryKeys'
@@ -106,6 +107,14 @@ function MyMeteringPointsView() {
                         {t(isParticipantScope ? 'pages.myMeteringPoints.empty.participant' : 'pages.myMeteringPoints.empty.manager')}
                     </p>
                 </div>
+            )}
+
+            {energyData.featureOn && sourcesQuery.data && (
+                <MyConnections
+                    sources={sourcesQuery.data}
+                    held={energyData.eligible.filter((point) => point.zev === selectedZevId)}
+                    confirm={confirm}
+                />
             )}
 
             {energyData.featureOn && eligible.some(historyEligible) && (

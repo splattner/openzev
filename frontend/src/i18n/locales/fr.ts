@@ -785,6 +785,13 @@ export const fr = {
             flagHint: 'Une installation PV se trouve derrière votre compteur, mais le point de mesure n\'est pas marqué comme tel ? Demandez à la gestion de votre communauté de le marquer « Production derrière le compteur ». Vous pourrez alors connecter ici vos propres données énergétiques.',
             notHolder: 'Seule la personne qui détient personnellement ce point de mesure peut y connecter des données énergétiques.',
             viewData: 'Voir les données de mesure',
+            connections: {
+                title: 'Mes connexions',
+                empty: 'Les connexions apparaissent ici dès que des données énergétiques sont connectées à un compteur ci-dessous.',
+                open: 'Ouvrir',
+                openFor: 'Ouvrir {{name}}',
+                meters: 'Points de mesure',
+            },
         },
         myInvoices: {
             title: 'Mes factures',
@@ -4177,7 +4184,6 @@ export const fr = {
         badge: 'En direct, indicatif',
         asOf: 'à {{time}}',
         none: 'Aucune donnée de production en direct pour le moment',
-        noneReason: 'Données en direct de {{fresh}} points de mesure producteurs sur {{total}}',
         zevProduces: 'La CEL produit actuellement {{value}}',
         othersUnknown: 'Nous ne savons pas combien les autres participants consomment en ce moment ; une partie est donc peut-être déjà utilisée.',
         production: 'Production',
@@ -4190,7 +4196,7 @@ export const fr = {
         ownSplit: 'Sur vos {{total}}, {{local}} sont locaux et {{grid}} proviennent du réseau.',
         ownSplitInconsistent: 'Votre répartition ne peut pas être affichée de manière fiable pour le moment : les compteurs transmettent avec un léger décalage.',
         ownProductionSplit: 'Sur votre production de {{total}}, {{toZev}} vont à la CEL et {{toGrid}} au réseau.',
-        coverage: '{{fresh}} points de mesure consommateurs sur {{total}} transmettent',
+        coverage: 'Données en direct de {{fresh}} points de mesure sur {{total}}',
         connectionPoint: 'Point de raccordement au réseau : {{state}}',
         basisConnectionPoint: 'Consommation déduite du point de raccordement au réseau.',
         state: {

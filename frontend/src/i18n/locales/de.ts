@@ -785,6 +785,13 @@ export const de = {
             flagHint: 'Steht eine PV-Anlage hinter Ihrem Zähler, der Messpunkt ist aber nicht so gekennzeichnet? Bitten Sie die Verwaltung Ihrer Gemeinschaft, ihn als «Erzeugung hinter dem Zähler» zu markieren. Danach können Sie hier Ihre eigenen Energiedaten verbinden.',
             notHolder: 'Energiedaten kann nur die Person verbinden, die diesen Messpunkt persönlich hält.',
             viewData: 'Messdaten ansehen',
+            connections: {
+                title: 'Meine Verbindungen',
+                empty: 'Verbindungen erscheinen hier, sobald bei einem Zähler unten Energiedaten verbunden sind.',
+                open: 'Öffnen',
+                openFor: '{{name}} öffnen',
+                meters: 'Messpunkte',
+            },
         },
         myInvoices: {
             title: 'Meine Rechnungen',
@@ -4177,7 +4184,6 @@ export const de = {
         badge: 'Live, ungefähr',
         asOf: 'Stand {{time}}',
         none: 'Zurzeit keine Live-Produktionsdaten',
-        noneReason: 'Live-Daten von {{fresh}} von {{total}} Produktions-Messpunkten',
         zevProduces: 'Das ZEV produziert gerade {{value}}',
         othersUnknown: 'Wir wissen nicht, wie viel die anderen Teilnehmer gerade verbrauchen. Ein Teil davon wird deshalb vielleicht schon genutzt.',
         production: 'Produktion',
@@ -4190,7 +4196,7 @@ export const de = {
         ownSplit: 'Von Ihren {{total}} sind {{local}} lokal und {{grid}} stammen aus dem Netz.',
         ownSplitInconsistent: 'Ihre Aufteilung lässt sich gerade nicht zuverlässig anzeigen: Die Zähler melden leicht versetzt.',
         ownProductionSplit: 'Von Ihrer Produktion von {{total}} gehen {{toZev}} ans ZEV und {{toGrid}} ins Netz.',
-        coverage: '{{fresh}} von {{total}} Verbrauchs-Messpunkten melden',
+        coverage: 'Live-Daten von {{fresh}} von {{total}} Messpunkten',
         connectionPoint: 'Netzanschlusspunkt: {{state}}',
         basisConnectionPoint: 'Verbrauch aus dem Netzanschlusspunkt abgeleitet.',
         state: {

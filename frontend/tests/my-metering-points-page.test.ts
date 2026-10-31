@@ -98,6 +98,16 @@ describe('MyMeteringPointsPage', () => {
         expect(container.textContent).toContain('supplementary.section.description')
     })
 
+    it('shows the connections overview with the feature on and hides it with the feature off', async () => {
+        const on = await mount()
+        expect(on.container.textContent).toContain('pages.myMeteringPoints.connections.title')
+        expect(on.container.textContent).toContain('pages.myMeteringPoints.connections.empty')
+
+        api.fetchEligibleOrNull.mockResolvedValue(null)
+        const off = await mount()
+        expect(off.container.textContent).not.toContain('pages.myMeteringPoints.connections.title')
+    })
+
     it('says nothing about energy data while the feature is off', async () => {
         api.fetchEligibleOrNull.mockResolvedValue(null)
         const { container } = await mount()

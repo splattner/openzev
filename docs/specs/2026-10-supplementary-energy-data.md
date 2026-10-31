@@ -623,6 +623,12 @@ community's, so there the page shows only the meters the user holds with generat
   how (Solar Manager for history only, a new push source, or the meter's existing push source, which
   takes the missing capability with a `PATCH` and consent and no new token), consent for what was chosen,
   and for a new push source one-time token screen. Without the live flag only history is offered.
+- **My connections** (`MyConnections`), a card above the meter cards while the feature is on and the
+  source list has loaded: the participant-held sources on the meters the user holds in the selected
+  community, one row each (provider and label, the meter id(s) it feeds, a History and/or Live chip with
+  its status badge, and **Open** for the source dialog), or a muted empty line. UI only: a source
+  still feeds exactly one metering point (`SupplementarySource.metering_point`); account-level
+  connections are a future idea (SPEC-2026-live-energy-data §12). Details: that spec §7.2.
 - Any other meter: a plain card (meter id, location, active, type, the behind-the-meter badge). A
   flagged one the user does not hold personally says only the holder can connect energy data.
 - Every card, plain or energy data, has a **View metering data** button (`MeteringDataLink`) to
