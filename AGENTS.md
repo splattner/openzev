@@ -122,6 +122,7 @@ After relevant changes, run what CI runs for the side you touched:
 - Backend: `ruff check .`, `python manage.py check`, `python -m pytest -q`
 - Frontend: `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-hex.mjs`, `npm run test:unit`, `npm run build`
 - For user-facing frontend changes, also check the change in the running dev stack (screenshot it, check the console for errors), including a narrow (~400px) viewport.
+- For a UI/UX review of a feature (spec conformance plus whether each role can see and do what it needs, from screenshots), use the `ui-review` skill.
 
 ## Documentation
 
