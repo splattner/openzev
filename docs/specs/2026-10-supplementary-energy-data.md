@@ -641,7 +641,7 @@ community's, so there the page shows only the meters the user holds with generat
   provides, a problem only when there is one, and **Open** for the source pane); shown from two sources on. UI only: a source
   still feeds exactly one metering point (`SupplementarySource.metering_point`); account-level
   connections are a future idea (SPEC-2026-live-energy-data §12). Details: that spec §7.2.
-- Any other meter: a plain card (meter id and one muted line: location, type, "surplus metering" and "inactive" as plain text, no pills). A
+- Any other meter: a plain card (meter id and one muted line: location, type, "surplus metering" and "inactive" as plain text, no pills) with the "Grid operator's meter" band that links to its readings. A
   flagged one the user does not hold personally says only the holder can connect energy data.
 - Every card, plain or energy data, has a **View metering data** button (`MeteringDataLink`) to
   `/metering/chart?metering_point=<id>`: the chart page was already open to participants and the

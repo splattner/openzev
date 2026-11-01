@@ -118,14 +118,14 @@ describe('MyMeteringPointsPage', () => {
         expect(container.textContent).toContain('pages.myMeteringPoints.flagHint')
     })
 
-    it('says in the page description, once, that energy data is never used for billing, and only while the feature is on', async () => {
-        const on = await mount()
-        expect(on.container.textContent).toContain('pages.myMeteringPoints.descriptionEnergy')
-
+    it('gives a meter without energy data the same meter-data band, and no own-data section', async () => {
         api.fetchEligibleOrNull.mockResolvedValue(null)
-        const off = await mount()
-        expect(off.container.textContent).not.toContain('pages.myMeteringPoints.descriptionEnergy')
-        expect(off.container.textContent).toMatch(/pages\.myMeteringPoints\.description(?!Energy)/)
+        const { container } = await mount()
+
+        const article = container.querySelector('article[aria-label="CH-2"]')!
+        expect(article.querySelector('.meter-data-band a')?.getAttribute('href')).toBe('/metering/chart?metering_point=2')
+        expect(article.querySelector('.own-data')).toBeNull()
+        expect(article.querySelector('.badge')).toBeNull()
     })
 
     it('stops telling the participant to ask for a flag once an own system is flagged or connected', async () => {

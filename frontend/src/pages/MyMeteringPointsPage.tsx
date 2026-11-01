@@ -9,7 +9,7 @@ import { PageSkeleton } from '../components/PageSkeleton'
 import { ScopeGuard } from '../components/ScopeGuard'
 import { allowNavigation, useDraftGuard } from '../components/useDraftGuard'
 import { MyConnections } from '../features/supplementary/MyConnections'
-import { MeteringDataLink } from '../features/supplementary/MeteringDataLink'
+import { MeterDataBand } from '../features/supplementary/MeterDataBand'
 import { MeteringPointDataCard } from '../features/supplementary/MeteringPointDataCard'
 import { SourcePane } from '../features/supplementary/SourceDialog'
 import { queryKeys } from '../lib/api/queryKeys'
@@ -43,8 +43,6 @@ export function MyMeteringPointsPage() {
     const { t } = useTranslation()
     const { selectedZevId, selectedZev, entries } = useManagedZev()
     const scopeNote = useScopeNote()
-    // Energy data is only mentioned while the feature is on.
-    const { featureOn } = useEnergyDataEligibility()
 
     return (
         <div className="page-stack">
@@ -52,7 +50,7 @@ export function MyMeteringPointsPage() {
                 eyebrow={selectedCommunityName({ selectedZev, entries, selectedZevId })}
                 scopeNote={scopeNote}
                 title={t('pages.myMeteringPoints.title')}
-                description={t(featureOn ? 'pages.myMeteringPoints.descriptionEnergy' : 'pages.myMeteringPoints.description')}
+                description={t('pages.myMeteringPoints.description')}
             />
             <ScopeGuard>
                 <MyMeteringPointsView />
@@ -280,13 +278,11 @@ function PlainMeteringPoint({ point, showEnergyDataNote }: { point: MeteringPoin
     ].filter(Boolean).join(' · ')
     return (
         <article className="card" style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'minmax(0, 1fr)' }} aria-label={point.meter_id}>
-            <header className="card-header-row">
-                <div className="card-title-block">
-                    <h3>{point.meter_id}</h3>
-                    <small className="muted">{facts}</small>
-                </div>
-                <MeteringDataLink meteringPointId={point.id} />
+            <header className="card-title-block">
+                <h3>{point.meter_id}</h3>
+                <small className="muted">{facts}</small>
             </header>
+            <MeterDataBand meteringPointId={point.id} />
             {showEnergyDataNote && point.has_behind_meter_generation && (
                 <p className="muted m-0">{t('pages.myMeteringPoints.notHolder')}</p>
             )}

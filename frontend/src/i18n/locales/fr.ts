@@ -781,7 +781,6 @@ export const fr = {
         myMeteringPoints: {
             title: 'Mes points de mesure',
             description: 'Les points de mesure qui vous sont attribués.',
-            descriptionEnergy: 'Les points de mesure qui vous sont attribués. Les données énergétiques servent uniquement à l\'affichage et aux statistiques, jamais à la facturation.',
             loadFailed: 'Impossible de charger vos points de mesure.',
             empty: {
                 title: 'Aucun point de mesure',
@@ -790,7 +789,9 @@ export const fr = {
             },
             flagHint: 'Une installation PV se trouve derrière votre compteur, mais le point de mesure n\'est pas marqué comme tel ? Demandez à la gestion de votre communauté de le marquer « Production derrière le compteur ». Vous pourrez alors connecter ici vos propres données énergétiques.',
             notHolder: 'Seule la personne qui détient personnellement ce point de mesure peut y connecter des données énergétiques.',
-            viewData: 'Voir les données de mesure',
+            viewData: 'Voir les données du compteur',
+            meterData: { title: 'Compteur du gestionnaire de réseau', hint: 'Ces valeurs servent de base à la facturation.' },
+            ownData: { title: 'Vos données énergétiques', hint: 'Issues de votre propre système. Uniquement pour l\'affichage et les statistiques, jamais pour la facturation.' },
             connections: {
                 title: 'Mes connexions',
                 open: 'Ouvrir',

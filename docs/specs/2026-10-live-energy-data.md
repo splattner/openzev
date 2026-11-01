@@ -833,9 +833,13 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   connected.
 
 - **One card per held metering point** (`MeteringPointDataCard`, replacing the history card, the live
-  section and the source card of the first PR 3b cut): header with the meter id, one muted line (what the meter is, from the participant's own metering point list, and
+  section and the source card of the first PR 3b cut): the meter id with one muted line (what the meter is, from the participant's own metering point list, and
   "Surplus metering" as plain text when `historyEligible`: a classification is text, not a pill, UI patterns §10.1; the
-  community is the page's eyebrow, not repeated) and a ghost **View metering data**; below it `CapabilityRows`,
+  community is the page's eyebrow, not repeated), then two labelled parts. **Grid operator's meter** (`MeterDataBand`,
+  a tinted band: "These readings are the basis of billing." and **View meter data**, the link to the metering chart) is kept
+  apart from **Your own energy data** (`section.own-data`, with "From your own system. Only shown and used for
+  statistics, never for billing."), so the link to the official readings is not taken for the data of the sources
+  under it. A meter without energy data (the plain card) has the band only. The own-data part holds `CapabilityRows`,
   one row per capability the point is eligible for (`historyEligible` / `liveEligible`; an entry without
   `eligible_capabilities` is history only; a **Forecast** row for a producing point): **History (15 min)** and **Live
   (now)**. A row is the capability, the source that provides it as a `button-ghost` link (`provider · label`) that

@@ -781,7 +781,6 @@ export const de = {
         myMeteringPoints: {
             title: 'Meine Messpunkte',
             description: 'Die Messpunkte, die Ihnen zugeordnet sind.',
-            descriptionEnergy: 'Die Messpunkte, die Ihnen zugeordnet sind. Energiedaten dienen nur der Anzeige und der Statistik, nie der Abrechnung.',
             loadFailed: 'Ihre Messpunkte konnten nicht geladen werden.',
             empty: {
                 title: 'Keine Messpunkte',
@@ -790,7 +789,9 @@ export const de = {
             },
             flagHint: 'Steht eine PV-Anlage hinter Ihrem Zähler, der Messpunkt ist aber nicht so gekennzeichnet? Bitten Sie die Verwaltung Ihrer Gemeinschaft, ihn als «Erzeugung hinter dem Zähler» zu markieren. Danach können Sie hier Ihre eigenen Energiedaten verbinden.',
             notHolder: 'Energiedaten kann nur die Person verbinden, die diesen Messpunkt persönlich hält.',
-            viewData: 'Messdaten ansehen',
+            viewData: 'Zählerdaten ansehen',
+            meterData: { title: 'Zähler des Netzbetreibers', hint: 'Diese Messwerte sind die Grundlage der Abrechnung.' },
+            ownData: { title: 'Eigene Energiedaten', hint: 'Aus Ihrem eigenen System. Nur Anzeige und Statistik, nie für die Abrechnung.' },
             connections: {
                 title: 'Meine Verbindungen',
                 open: 'Öffnen',

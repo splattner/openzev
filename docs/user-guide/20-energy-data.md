@@ -36,8 +36,10 @@ must be marked **Generation behind the meter**, and you must hold it yourself
 | See the status and your figures | yes | yes | yes (read-only) | no |
 | Switch off, disconnect, delete data, remove | yes | yes | no | no |
 
-Each metering point on that page has a **View metering data** button that opens
-the chart of its readings.
+Each metering point on that page has two parts. **Grid operator's meter** holds the
+button **View meter data**, which opens the chart of the readings billing is based on.
+**Your own energy data** holds what you connect here (history, live, forecast), which is only
+shown and used for statistics, never for billing, so the button does not show those figures.
 
 If you are a ZEV manager and hold a metering point yourself, you connect it the
 same way as any participant: **My metering points** appears in your menu, and the

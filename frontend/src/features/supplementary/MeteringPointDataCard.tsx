@@ -5,7 +5,7 @@ import { forecastEligible, historyEligible, liveEligible, sourceFor } from '../.
 import type { EligibleMeteringPoint, SupplementarySource } from '../../types/api'
 import { CapabilityRows } from './CapabilityRows'
 import { ForecastConnectDialog } from './ForecastConnectDialog'
-import { MeteringDataLink } from './MeteringDataLink'
+import { MeterDataBand } from './MeterDataBand'
 import { SupplementarySourceModal, type ConnectCapability } from './SupplementarySourceModal'
 
 interface Props {
@@ -54,64 +54,70 @@ export function MeteringPointDataCard({ point, description, sources, sourcesUnav
     return (
         <>
             <article className="card" style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'minmax(0, 1fr)' }} aria-label={point.meter_id} data-selected={selected || undefined}>
-                <header className="card-header-row">
-                    <div className="card-title-block">
-                        <h3>{point.meter_id}</h3>
-                        {/* A classification is quiet text, not a pill (UI patterns §10.1). */}
-                        <small className="muted">{[description, eligible.history ? t('behindMeter.badge') : null].filter(Boolean).join(' · ')}</small>
-                    </div>
-                    <MeteringDataLink meteringPointId={point.metering_point} />
+                <header className="card-title-block">
+                    <h3>{point.meter_id}</h3>
+                    {/* A classification is quiet text, not a pill (UI patterns §10.1). */}
+                    <small className="muted">{[description, eligible.history ? t('behindMeter.badge') : null].filter(Boolean).join(' · ')}</small>
                 </header>
 
-                {reconnectSource && (
-                    <div className="warning-banner" role="alert">
-                        <strong>{t('supplementary.reconnect.title')}</strong>
-                        <p style={{ margin: '0.25rem 0 0' }}>{reconnectSource.last_error || t('supplementary.reconnect.body')}</p>
-                    </div>
-                )}
-                {historySource?.status === 'error' && historySource.last_error && (
-                    <div className="warning-banner" role="status">
-                        <p className="m-0">{historySource.last_error}</p>
-                    </div>
-                )}
+                <MeterDataBand meteringPointId={point.metering_point} />
 
-                {unavailable === 'loading' && <p className="muted m-0">{t('common.loading')}</p>}
-                {unavailable === 'error' && (
-                    <div className="error-banner" role="alert">
-                        {t('supplementary.section.loadError')}
-                        {onRetrySources && (
-                            <button type="button" className="button button-secondary button-compact" onClick={onRetrySources} style={{ marginLeft: '0.75rem' }}>
-                                {t('common.retry')}
-                            </button>
-                        )}
+                <section className="own-data" aria-labelledby={`own-data-${point.metering_point}`}>
+                    <div className="card-title-block">
+                        <h4 id={`own-data-${point.metering_point}`}>{t('pages.myMeteringPoints.ownData.title')}</h4>
+                        <small className="muted">{t('pages.myMeteringPoints.ownData.hint')}</small>
                     </div>
-                )}
-                {!unavailable && (
-                    <>
-                        <CapabilityRows
-                            meteringPointId={point.metering_point}
-                            capabilities={capabilities}
-                            sources={sources}
-                            onOpenSource={onOpenSource}
-                            selectedSourceId={selectedSourceId}
-                            onConnect={(capability) => (capability === 'forecast' ? setConnectingForecast(true) : setConnecting([capability]))}
-                        />
-                        {/* One missing capability is connected from its own row; the primary is for starting several at once. */}
-                        {connectable.length > 1 && (
-                            <div className="actions-row actions-row-wrap">
-                                <button
-                                    type="button"
-                                    className="button button-primary"
-                                    disabled={isImpersonating}
-                                    title={isImpersonating ? t('account.impersonationRestrictions') : undefined}
-                                    onClick={() => setConnecting(connectable)}
-                                >
-                                    {t('supplementary.card.connect')}
+
+                    {reconnectSource && (
+                        <div className="warning-banner" role="alert">
+                            <strong>{t('supplementary.reconnect.title')}</strong>
+                            <p style={{ margin: '0.25rem 0 0' }}>{reconnectSource.last_error || t('supplementary.reconnect.body')}</p>
+                        </div>
+                    )}
+                    {historySource?.status === 'error' && historySource.last_error && (
+                        <div className="warning-banner" role="status">
+                            <p className="m-0">{historySource.last_error}</p>
+                        </div>
+                    )}
+
+                    {unavailable === 'loading' && <p className="muted m-0">{t('common.loading')}</p>}
+                    {unavailable === 'error' && (
+                        <div className="error-banner" role="alert">
+                            {t('supplementary.section.loadError')}
+                            {onRetrySources && (
+                                <button type="button" className="button button-secondary button-compact" onClick={onRetrySources} style={{ marginLeft: '0.75rem' }}>
+                                    {t('common.retry')}
                                 </button>
-                            </div>
-                        )}
-                    </>
-                )}
+                            )}
+                        </div>
+                    )}
+                    {!unavailable && (
+                        <>
+                            <CapabilityRows
+                                meteringPointId={point.metering_point}
+                                capabilities={capabilities}
+                                sources={sources}
+                                onOpenSource={onOpenSource}
+                                selectedSourceId={selectedSourceId}
+                                onConnect={(capability) => (capability === 'forecast' ? setConnectingForecast(true) : setConnecting([capability]))}
+                            />
+                            {/* One missing capability is connected from its own row; the primary is for starting several at once. */}
+                            {connectable.length > 1 && (
+                                <div className="actions-row actions-row-wrap">
+                                    <button
+                                        type="button"
+                                        className="button button-primary"
+                                        disabled={isImpersonating}
+                                        title={isImpersonating ? t('account.impersonationRestrictions') : undefined}
+                                        onClick={() => setConnecting(connectable)}
+                                    >
+                                        {t('supplementary.card.connect')}
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </section>
             </article>
             {connecting && (
                 <SupplementarySourceModal

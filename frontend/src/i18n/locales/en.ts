@@ -790,7 +790,6 @@ export const en = {
         myMeteringPoints: {
             title: 'My metering points',
             description: 'The metering points assigned to you.',
-            descriptionEnergy: 'The metering points assigned to you. Energy data is only shown and used for statistics, never for billing.',
             loadFailed: 'Failed to load your metering points.',
             empty: {
                 title: 'No metering points',
@@ -799,7 +798,9 @@ export const en = {
             },
             flagHint: 'Is a PV system behind your meter, but the meter is not marked as such? Ask your community\'s manager to mark it as "Generation behind the meter". Then you can connect your own energy data here.',
             notHolder: 'Only the person who holds this meter personally can connect energy data for it.',
-            viewData: 'View metering data',
+            viewData: 'View meter data',
+            meterData: { title: 'Grid operator\'s meter', hint: 'These readings are the basis of billing.' },
+            ownData: { title: 'Your own energy data', hint: 'From your own system. Only shown and used for statistics, never for billing.' },
             connections: {
                 title: 'My connections',
                 open: 'Open',

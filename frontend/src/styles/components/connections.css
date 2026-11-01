@@ -83,15 +83,7 @@
   font-weight: 600;
 }
 
-/* A card's header: what the meter is, and the way to its readings. */
-.card-header-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.5rem 1rem;
-}
-
+/* A card's title: what the meter is. */
 .card-title-block {
   display: grid;
   gap: 0.125rem;
@@ -156,4 +148,33 @@
 .source-reconciliation {
   display: grid;
   gap: 0.25rem;
+}
+
+/* What the grid operator's meter recorded (billing's basis), set apart from the own system's data below it. */
+.meter-data-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.own-data {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.own-data h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+/* On a phone a capability's label has a line of its own, so a long one does not wrap beside its source. */
+@media (max-width: 40em) {
+  .capability-label {
+    flex-basis: 100%;
+  }
 }

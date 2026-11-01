@@ -150,11 +150,28 @@ describe('one card per metering point', () => {
         expect(buttons(container).some((b) => b.textContent === 'supplementary.card.connect')).toBe(false)
     })
 
-    it('shows the behind-meter badge and the metering data link in the header', async () => {
+    it('says "surplus metering" as plain text under the meter id', async () => {
         const { container } = await mount()
 
         expect(container.querySelector('header')!.textContent).toContain('behindMeter.badge')
-        expect(container.querySelector('a')?.getAttribute('href')).toBe('/metering/chart?metering_point=mp-1')
+        expect(container.querySelector('header .badge')).toBeNull()
+    })
+
+    it('keeps the grid operator\'s meter data apart from the own energy data, so the link is not taken for theirs', async () => {
+        const { container } = await mount([source()])
+
+        const band = container.querySelector('.meter-data-band')!
+        const own = container.querySelector('section.own-data')!
+        // The link to the readings (the billing basis) lives in its own band, not among the sources' rows.
+        expect(band.textContent).toContain('pages.myMeteringPoints.meterData.title')
+        expect(band.textContent).toContain('pages.myMeteringPoints.meterData.hint')
+        expect(band.querySelector('a')?.getAttribute('href')).toBe('/metering/chart?metering_point=mp-1')
+        expect(own.querySelector('a')).toBeNull()
+        // The sources are under their own heading, with the note that they are never billed.
+        expect(own.querySelector('h4')!.textContent).toBe('pages.myMeteringPoints.ownData.title')
+        expect(own.textContent).toContain('pages.myMeteringPoints.ownData.hint')
+        expect(own.querySelectorAll('li[data-capability]').length).toBeGreaterThan(0)
+        expect(band.compareDocumentPosition(own) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
     it('has a row for each capability the point is eligible for, and none for forecast', async () => {
@@ -204,7 +221,7 @@ describe('one card per metering point', () => {
     it('shows the reconnect banner of a history source on the card', async () => {
         const { container } = await mount([source({ status: 'reconnect_required', last_error: 'Solar Manager did not accept this API key.' })])
 
-        expect(container.querySelector('article > [role="alert"]')!.textContent).toContain('did not accept this API key')
+        expect(container.querySelector('article [role="alert"]')!.textContent).toContain('did not accept this API key')
     })
 })
 
@@ -795,7 +812,7 @@ describe('a live-only Solar Manager source', () => {
     it('says on the card that the key stopped working, from the live source too', async () => {
         const { container } = await mount([solarLive({ status: 'reconnect_required', last_error: 'Solar Manager did not accept this API key.' })])
 
-        expect(container.querySelector('article > [role="alert"]')!.textContent).toContain('did not accept this API key')
+        expect(container.querySelector('article [role="alert"]')!.textContent).toContain('did not accept this API key')
         expect(row(container, 'live').textContent).toContain('supplementary.status.reconnect_required')
     })
 
