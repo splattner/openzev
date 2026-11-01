@@ -288,6 +288,7 @@ PUSH_TOKEN_NAMESPACE = "ozs"
 class SupplementaryProvider(models.TextChoices):
     SOLAR_MANAGER = "solar_manager", "Solar Manager"
     PUSH = "push", "Push or file upload"
+    FORECAST_SOLAR = "forecast_solar", "forecast.solar (public)"
 
 
 class SourceTarget(models.TextChoices):
@@ -477,6 +478,12 @@ class SupplementarySource(models.Model):
                 errors["participant"] = "Participant must belong to the same ZEV as the metering point."
         elif self.participant_id is not None:
             errors["participant"] = "A ZEV-held source has no participant."
+        if self.provides_forecast and point is not None and point.meter_type not in ("production", "bidirectional"):
+            errors.setdefault("provides_forecast", "Only a producing metering point can have a forecast.")
+        if self.provider == SupplementaryProvider.FORECAST_SOLAR and (self.provides_history or self.provides_live):
+            errors.setdefault("provider", "forecast.solar provides a forecast only.")
+        if self.provider == SupplementaryProvider.PUSH and self.provides_forecast:
+            errors.setdefault("provides_forecast", "A push source cannot provide a forecast.")
         if self.provider == SupplementaryProvider.SOLAR_MANAGER:
             if not SOLAR_MANAGER_ID_RE.match(self.external_id or ""):
                 errors["external_id"] = "A Solar Manager id (3 to 24 letters or digits) is required."
@@ -627,3 +634,26 @@ class SupplementaryReading(models.Model):
 
     def __str__(self):
         return f"{self.metering_point_id} {self.timestamp.isoformat()}"
+
+
+class ProductionForecastPoint(models.Model):
+    """One hour of expected production for a producing metering point (SPEC-2026-live-energy-data §4.2).
+
+    Display only and refetched within hours, so it is not backed up and nothing bills from it (ADR 0044).
+    """
+
+    id = models.BigAutoField(primary_key=True)
+    source = models.ForeignKey(SupplementarySource, on_delete=models.CASCADE, related_name="forecast_points")
+    metering_point = models.ForeignKey(MeteringPoint, on_delete=models.CASCADE, related_name="production_forecast")
+    timestamp = models.DateTimeField(help_text="UTC start of the hour.")
+    power_w = models.DecimalField(max_digits=12, decimal_places=1, help_text="Mean expected power over the hour.")
+    power_min_w = models.DecimalField(max_digits=12, decimal_places=1, null=True, blank=True)
+    power_max_w = models.DecimalField(max_digits=12, decimal_places=1, null=True, blank=True)
+    fetched_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["metering_point", "timestamp", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["metering_point", "timestamp"], name="uniq_forecast_point_mp_ts"),
+            models.CheckConstraint(condition=models.Q(power_w__gte=0), name="forecast_point_power_non_negative"),
+        ]

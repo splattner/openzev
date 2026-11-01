@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 from .views import MeterReadingViewSet, QuarantinedReadingViewSet, ImportLogViewSet, ImportView
-from .live.views import LiveCurveView, LiveIngestView, LiveMeView, LiveSnapshotView, live_enabled
+from .live.views import LiveCurveView, LiveForecastView, LiveIngestView, LiveMeView, LiveSnapshotView, live_enabled
 from .supplementary.views import OwnSeriesView, SupplementaryIngestView, SupplementarySourceViewSet
 
 router = DefaultRouter()
@@ -19,5 +19,6 @@ urlpatterns = [
     path("live/me/", LiveMeView.as_view(), name="live-me"),
     path("live/zevs/<uuid:zev_id>/", LiveSnapshotView.as_view(), name="live-snapshot"),
     path("live/zevs/<uuid:zev_id>/curve/", LiveCurveView.as_view(), name="live-curve"),
+    path("live/zevs/<uuid:zev_id>/forecast/", LiveForecastView.as_view(), name="live-forecast"),
     *router.urls,
 ]

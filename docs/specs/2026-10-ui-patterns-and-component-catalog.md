@@ -180,7 +180,9 @@ Rules that cut across the table:
 - **E. A narrow screen shows one surface at a time.** Two panes that cannot both
   be useful become one: the detail replaces the list, with X and Back to return.
 - **F. Create opens the same container as edit.** "New tariff" opens the pane
-  with a blank form.
+  with a blank form. The exception is a task that *creates* the record through
+  steps of its own (what, how, consent, a secret shown once): connecting an
+  energy source is a dialog, and the new record then opens in its pane.
 
 ## 6. Interaction standards
 
@@ -301,13 +303,26 @@ region named by its title, the close button, Escape while focus is inside, no
 `aria-modal`, trap or inertness; `tone="brand"` gives its header the brand's dark
 green, as the tariff pane has it) and `styles/components/detail-pane.css` holds
 `.detail-split` (the list and pane grid, `data-layout` wide/narrow and
-`data-pane` open/closed) and `.detail-pane*`. The tariff pane and the audit
-event pane (`AuditEventPane`) both use them; each page measures its own split
+`data-pane` open/closed) and `.detail-pane*`. The tariff pane, the audit
+event pane (`AuditEventPane`) and the energy source pane (`SourcePane`, below) all use them; each page measures its own split
 with `useMinWidth` and chooses its breakpoint (tariffs 62rem, the audit log
 72rem, because its table needs more room). Focus placement, return and scroll
 restoration stay in each page, since what to return to differs; extract them if
 a third consumer repeats them. The audit log drops its ZEV, category and action
-columns while the pane is open beside it. The metering-gaps drawer became a
+columns while the pane is open beside it. **Energy source pane.** On `/me/metering-points` the metering point cards are the
+list and a source opens beside them in `SourcePane` (the body of the former
+dialog, `SourceDetails`). It is the third adopter, and the first whose list is
+cards. The selection is `?source=<id>` (one history step in, replaced when
+switching, X takes it back); the pane sits beside the cards from 60rem of content
+and replaces them below; focus goes to the title and back to the control that
+opened it; the open card and button are marked; a typed and unsaved key is a
+draft the guard asks about. Focus, history and scroll handling is now repeated
+in three pages, now one hook for the sources (`useSourcePane`). The managers' dialogs
+The managers' **Energy data** tab of the ZEV settings is the fourth adopter (a list of
+sources with the same pane; `useSourcePane` is the extracted hook): the community's
+sources moved there from the metering-point list, which no longer carries energy data.
+
+The metering-gaps drawer became a
 `FormModal` (`MeteringGapsModal`, size `xs`): it opens from a table row with no
 list of its own beside it, a dialog keeps the modal interaction the drawer had
 (focus trap, Escape, focus return), and an inline section would have pushed
@@ -418,6 +433,28 @@ rows. What remains inline is either dynamic (a computed width, colour or
 position) or has no class yet (`display: block`, `textAlign`, the table cell
 padding, one-off font sizes); those stay until a class earns its place.
 
+### Manage surfaces
+
+A pane or dialog whose body is the status of one connection or record, followed by
+what its owner can do to it (an energy source is the example), has this shape:
+
+- A header that names the record and one facts line (the tariff pane's shape), then
+  status and facts as short blocks, one per thing it provides; a problem as
+  `IssueText` or a banner, never a row of state pills, and nothing at all for what
+  works. Substantial technical details (ids, token prefixes, endpoints) are
+  secondary material in one closed `Disclosure`; short facts that fit stay
+  visible (§10.3 rule 3).
+- **Actions:** at most one visible button, the one that keeps it working right now
+  (sync, or reconnect when it no longer works), and an `ActionMenu` ("⋯") with
+  everything else in sections (connection, data, end). Ending it (disconnect,
+  delete data, remove) is the last section, the destructive items marked `danger`;
+  every one of them confirms through `ConfirmDialog`. A foldable is for reading,
+  never a place for buttons. A choice that depends on the state is absent from the
+  menu, not disabled; while impersonating the menu says why it is disabled.
+- No footer of Cancel and Save: nothing here is a form. A sub-form (a new key) is an
+  inline section with its own Save then Cancel, and counts as a draft for the
+  dirty guard.
+
 ## 10. Feedback, labels and states
 
 ### 10.1 Usefulness before decoration
@@ -432,6 +469,7 @@ act. Being in the data model is not enough.
 | Ordinary dates and validity | Plain, readable text; history visibly muted but readable. |
 | A useful workflow distinction | A precise neutral label, not repeating a state the section heading already gives. |
 | Generic normal state | No decoration (a coloured "In Bearbeitung" that tells nothing). |
+| Connection or freshness state (a source is live, synced, current) | Text, never a pill. A working source says nothing; one that has gone quiet or failed is a concrete problem (`IssueText`, with its fix where the user may act); "no data yet" is muted text. A capability the source provides is a `.badge-tag` or plain text, and a problem is named next to the capability it concerns, once. |
 | A concrete problem | Short warning or error text with a link to its fix when one exists and the user may use it. |
 | Success | A transient confirmation; do not mark every healthy record green. |
 

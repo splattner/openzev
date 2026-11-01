@@ -654,10 +654,10 @@ class SolarManagerLiveSourceApiTests(StubbedTestCase, SupplementaryApiTestCase):
         self.assertIn("provides_live", response.json())
         self.assertEqual(self.vendor.refresh_requests, [])
 
-    def test_a_forecast_is_still_refused(self):
+    def test_a_forecast_needs_a_producing_meter(self):
         response = self.create(provides_history=False, provides_live=True, provides_forecast=True)
         self.assertEqual(response.status_code, 400)
-        self.assertIn("provides_forecast", response.json())
+        self.assertIn("metering_point", response.json())
 
     def test_live_is_added_to_a_history_source_with_the_stored_key_and_the_holders_consent(self):
         created = self.create(self.point, provides_history=True).json()

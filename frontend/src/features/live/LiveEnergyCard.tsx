@@ -17,6 +17,12 @@ export function LiveEnergyCard({ snapshot }: { snapshot: LiveSnapshot }) {
     if (!state) return null
     const { own, coverage } = snapshot
     const connectionState = coverage.connection_point
+    // The viewer's own figures lead (they are what a participant came for); the ZEV totals follow.
+    const ownConsumptionW = own && state.ownConsumption ? own.consumption_w : null
+    const split = own && state.ownSplit === 'shown' && own.local_w !== null && own.grid_w !== null ? { local: own.local_w, grid: own.grid_w } : null
+    const ownProduction = own && state.ownProductionSplit && own.production_w !== null && own.to_zev_w !== null && own.to_grid_w !== null
+        ? { total: own.production_w, toZev: own.to_zev_w, toGrid: own.to_grid_w }
+        : null
 
     return (
         <section className="card" aria-labelledby={titleId}>
@@ -27,6 +33,28 @@ export function LiveEnergyCard({ snapshot }: { snapshot: LiveSnapshot }) {
                 </h3>
                 {snapshot.as_of && <span className="muted">{t('live.asOf', { time: formatClock(snapshot.as_of) })}</span>}
             </div>
+
+            {(ownConsumptionW !== null || ownProduction) && (
+                <div className="stat-grid">
+                    {ownConsumptionW !== null && (
+                        <StatCard
+                            label={t('live.ownConsumptionLabel')}
+                            value={kwFigure(ownConsumptionW)}
+                            unit="kW"
+                            hint={split ? t('live.ownSplitHint', { local: formatKw(split.local), grid: formatKw(split.grid) }) : undefined}
+                        />
+                    )}
+                    {ownProduction && (
+                        <StatCard
+                            label={t('live.ownProductionLabel')}
+                            value={kwFigure(ownProduction.total)}
+                            unit="kW"
+                            hint={t('live.ownProductionSplitHint', { toZev: formatKw(ownProduction.toZev), toGrid: formatKw(ownProduction.toGrid) })}
+                        />
+                    )}
+                </div>
+            )}
+            {ownConsumptionW !== null && state.ownSplit === 'inconsistent' && <p className="muted">{t('live.ownSplitInconsistent')}</p>}
 
             {state.tier === 'none' && (
                 <p>{t('live.none')}</p>
@@ -56,26 +84,6 @@ export function LiveEnergyCard({ snapshot }: { snapshot: LiveSnapshot }) {
             )}
             {state.showExact && snapshot.consumption_basis === 'connection_point' && (
                 <p className="muted">{t('live.basisConnectionPoint')}</p>
-            )}
-
-            {own && state.ownConsumption && own.consumption_w !== null && (
-                <>
-                    {state.ownSplit === 'shown' && own.local_w !== null && own.grid_w !== null ? (
-                        <p>{t('live.ownSplit', { total: formatKw(own.consumption_w), local: formatKw(own.local_w), grid: formatKw(own.grid_w) })}</p>
-                    ) : (
-                        <p>{t('live.ownConsumption', { value: formatKw(own.consumption_w) })}</p>
-                    )}
-                    {state.ownSplit === 'inconsistent' && <p className="muted">{t('live.ownSplitInconsistent')}</p>}
-                </>
-            )}
-            {own && state.ownProductionSplit && own.production_w !== null && own.to_zev_w !== null && own.to_grid_w !== null && (
-                <p>
-                    {t('live.ownProductionSplit', {
-                        total: formatKw(own.production_w),
-                        toZev: formatKw(own.to_zev_w),
-                        toGrid: formatKw(own.to_grid_w),
-                    })}
-                </p>
             )}
 
             <p className="muted">

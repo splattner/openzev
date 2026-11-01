@@ -9,6 +9,8 @@ Talks to ``/v3`` of the vendor's cloud API:
 * ``GET /v3/users/{smId}/data/range?from=&to=&interval=900`` returns the 15-minute series.
 * ``GET /v3/users/{smId}/data/stream`` returns the current power, for the live view
   (SPEC-2026-live-energy-data §6.1).
+* ``GET /v3/users/{smId}/data/forecast`` returns the production forecast for the next days
+  (SPEC-2026-live-energy-data §6.3).
 
 History reads only the four measured flows (``cWh``, ``pWh``, ``iWh``, ``eWh``); the vendor's
 derived ``cPvWh`` / ``scWh`` and the ``*W`` power fields are ignored there. The live stream reads
@@ -40,6 +42,7 @@ from django.utils.dateparse import parse_datetime
 from allocation.validity import civil_date, period_end_exclusive_dt, period_start_dt
 
 from ..live import store
+from ..live.forecast_hours import ForecastHour, to_hours
 from ..live.store import LiveSample
 from ..models import SOLAR_MANAGER_ID_RE, SupplementarySource
 from .crypto import IntegrationKeyError, IntegrationNotConfigured, decrypt_secret, encrypt_secret
@@ -186,6 +189,13 @@ class SolarManagerClient:
             "GET", f"/v3/users/{urllib.parse.quote(sm_id, safe='')}/data/stream", bearer=access_token
         )
 
+    def forecast(self, access_token: str, sm_id: str) -> dict:
+        """The vendor's production forecast for the next days, unmapped (see ``map_forecast``)."""
+        _check_sm_id(sm_id)
+        return self._request(
+            "GET", f"/v3/users/{urllib.parse.quote(sm_id, safe='')}/data/forecast", bearer=access_token
+        )
+
 
 def _check_sm_id(sm_id: str) -> None:
     if not SOLAR_MANAGER_ID_RE.match(sm_id or ""):
@@ -295,6 +305,43 @@ def map_stream(payload, source_id: str, now: datetime | None = None) -> LiveSamp
     )
 
 
+#: What ``t`` of a forecast row stands for. Taken from the vendor's swagger (API 1.88.11); not yet checked
+#: against a real response, as the history timestamps were (SPEC-2026-live-energy-data §6.3). A one-line fix.
+FORECAST_T_MARKS = "start"
+NO_FORECAST = "Solar Manager sent no usable production forecast."
+
+
+def map_forecast(payload) -> list[ForecastHour]:
+    """The vendor's forecast payload (``data[]`` of ``{t, pW, pWmin, pWmax}``) as UTC hours.
+
+    A row without a readable ``t`` or ``pW`` is skipped; the band (``pWmin``/``pWmax``) is optional. A value
+    beyond ``LIVE_MAX_ABS_POWER_W`` rejects the whole payload. No usable row at all is an error, never an
+    empty forecast.
+    """
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, list):
+        raise ProviderError(NO_FORECAST)
+    samples = []
+    for row in data:
+        if not isinstance(row, dict) or not isinstance(row.get("t"), str):
+            continue
+        try:
+            stamp = parse_datetime(row["t"])
+        except ValueError:
+            stamp = None
+        if stamp is None or stamp.tzinfo is None:
+            continue
+        power = _watts(row.get("pW"), required=False)
+        if power is None:
+            continue
+        samples.append((stamp.astimezone(dt_timezone.utc), power, _watts(row.get("pWmin"), required=False),
+                        _watts(row.get("pWmax"), required=False)))
+    hours = to_hours(samples, marks=FORECAST_T_MARKS)
+    if not hours:
+        raise ProviderError(NO_FORECAST)
+    return hours
+
+
 def civil_days(start: datetime, end: datetime) -> Iterator[tuple[datetime, datetime]]:
     """``[start, end)`` cut at Swiss midnights. A DST day is 92 or 100 intervals long, not 96."""
     day: date = civil_date(start)
@@ -392,12 +439,12 @@ class SolarManagerProvider:
         self._cache_access(source.pk, access)
         return access
 
-    def fetch_live(self, source: SupplementarySource) -> LiveSample:
-        """One current-power sample (SPEC-2026-live-energy-data §6.1).
+    def _with_access(self, source: SupplementarySource, call):
+        """``call(access_token)`` with the cached bearer token.
 
-        The bearer token comes from the cache, so a 30-second poll does not spend (and rotate) the
-        refresh token every time. When the vendor refuses a cached token it is dropped and one fresh
-        exchange is tried before the failure counts as an auth failure.
+        The cache means a 30-second poll does not spend (and rotate) the refresh token every time. When the
+        vendor refuses a cached token it is dropped and one fresh exchange is tried before the failure counts
+        as an auth failure.
         """
         _check_sm_id(source.external_id)
         access = self._cached_access(source.pk)
@@ -405,13 +452,25 @@ class SolarManagerProvider:
         if access is None:
             access = self._fresh_access(source)
         try:
-            payload = self.client.stream(access, source.external_id)
+            return call(access)
         except ProviderAuthError:
             if not cached:
                 raise
             store.drop_sm_access(source.pk)
-            payload = self.client.stream(self._fresh_access(source), source.external_id)
+            return call(self._fresh_access(source))
+
+    def fetch_live(self, source: SupplementarySource) -> LiveSample:
+        """One current-power sample (SPEC-2026-live-energy-data §6.1)."""
+        payload = self._with_access(source, lambda access: self.client.stream(access, source.external_id))
         return map_stream(payload, str(source.pk))
+
+    def fetch_forecast(self, source: SupplementarySource) -> list[ForecastHour]:
+        """The hourly production forecast of the installation (SPEC-2026-live-energy-data §6.3)."""
+        payload = self._with_access(source, lambda access: self.client.forecast(access, source.external_id))
+        return map_forecast(payload)
+
+    def check_forecast(self, source: SupplementarySource) -> None:
+        self.fetch_forecast(source)
 
     # ---- data ----
 

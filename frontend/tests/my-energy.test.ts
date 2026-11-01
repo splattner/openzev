@@ -1,7 +1,7 @@
 import { act, createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MyEnergyView } from '../src/features/myEnergy/MyEnergyView'
-import { todayBusinessIso } from '../src/lib/dates'
+import { businessDayStartMs, todayBusinessIso } from '../src/lib/dates'
 import {
     lastDaysRange,
     ownHistoryFromSeries,
@@ -10,7 +10,7 @@ import {
     showMyEnergyEntry,
     todayRows,
 } from '../src/lib/myEnergy'
-import type { EligibleMeteringPoint, GrossEnergy, LiveCurve, LiveSnapshot, OwnSeries } from '../src/types/api'
+import type { EligibleMeteringPoint, GrossEnergy, LiveCurve, LiveSnapshot, OwnSeries, ProductionForecast } from '../src/types/api'
 import { renderWithProviders } from './helpers/render'
 
 vi.mock('react-i18next', () => ({
@@ -35,6 +35,7 @@ const live = vi.hoisted(() => ({
     fetchLiveSnapshotOrNull: vi.fn(),
     fetchLiveCurveOrNull: vi.fn(),
     fetchOwnSeries: vi.fn(),
+    fetchProductionForecastOrNull: vi.fn(),
 }))
 vi.mock('../src/lib/api/live', () => live)
 const eligibleApi = vi.hoisted(() => ({ fetchEligibleOrNull: vi.fn() }))
@@ -66,8 +67,9 @@ const snapshot = (liveSources: number): LiveSnapshot => ({
 })
 
 describe('range and period helpers', () => {
-    it('falls back to today for anything but the two other views', () => {
+    it('falls back to today for anything but the other views', () => {
         expect(parseMyEnergyRange('week')).toBe('week')
+        expect(parseMyEnergyRange('tomorrow')).toBe('tomorrow')
         expect(parseMyEnergyRange('period')).toBe('period')
         expect(parseMyEnergyRange('nope')).toBe('today')
         expect(parseMyEnergyRange(null)).toBe('today')
@@ -192,6 +194,7 @@ beforeEach(() => {
     live.fetchLiveSnapshotOrNull.mockResolvedValue(null)
     live.fetchLiveCurveOrNull.mockResolvedValue(null)
     live.fetchOwnSeries.mockResolvedValue(series())
+    live.fetchProductionForecastOrNull.mockResolvedValue(null)
     eligibleApi.fetchEligibleOrNull.mockResolvedValue([point('s1')])
     zevApi.fetchParticipants.mockResolvedValue([
         { id: 'p-me', zev: 'z1', display_name: 'Me', valid_to: null },
@@ -209,6 +212,7 @@ describe('MyEnergyView', () => {
         expect(container.textContent).toContain('myEnergy.disabled')
         expect(live.fetchLiveEnabled).not.toHaveBeenCalled()
         expect(live.fetchOwnSeries).not.toHaveBeenCalled()
+        expect(live.fetchProductionForecastOrNull).not.toHaveBeenCalled()
     })
 
     it('shows a participant their own history for today with live off, from the own-series endpoint', async () => {
@@ -255,13 +259,17 @@ describe('MyEnergyView', () => {
         expect(container.textContent).toContain('supplementary.gross.ctaTitle')
     })
 
-    it('says a participant has no own system when nothing can be connected', async () => {
+    it('promises a participant without a plant behind the meter no own history, and offers no empty views', async () => {
         eligibleApi.fetchEligibleOrNull.mockResolvedValue([])
+        live.fetchLiveEnabled.mockResolvedValue(true)
+        live.fetchLiveSnapshotOrNull.mockResolvedValue(snapshot(0))
         live.fetchOwnSeries.mockResolvedValue(series({ gross: null, history_through: null }))
         const { container } = await render()
 
         expect(container.textContent).not.toContain('supplementary.gross.ctaTitle')
-        expect(container.textContent).toContain('myEnergy.noOwnSystem')
+        expect(container.textContent).not.toContain('myEnergy.noOwnSystem')
+        expect(container.querySelectorAll('[role="tab"]')).toHaveLength(0)
+        expect(container.textContent).not.toContain('myEnergy.today.title')
     })
 
     it('shows the last seven civil days in hourly buckets on the 7 days tab, with the pointer to Energy balance', async () => {
@@ -298,6 +306,8 @@ describe('MyEnergyView', () => {
             const { container } = await render()
 
             expect(container.textContent).toContain('myEnergy.pickParticipantPrompt')
+            // The prompt is the picker's helper, in the same bar.
+            expect(container.querySelector('.filter-bar .filter-bar-note')?.textContent).toBe('myEnergy.pickParticipantPrompt')
             expect(live.fetchOwnSeries).not.toHaveBeenCalled()
             const options = Array.from(container.querySelectorAll('select option')).map((option) => option.textContent)
             expect(options).toEqual(['myEnergy.pickParticipant', 'Me', 'Other'])
@@ -315,3 +325,90 @@ describe('MyEnergyView', () => {
         })
     })
 })
+
+describe('the forecast in My energy system', () => {
+    const noon = (isoDate: string, hours = 0) => new Date(businessDayStartMs(isoDate) + (12 + hours) * 3_600_000).toISOString()
+    const forecast = (days: string[]): ProductionForecast => ({
+        zev_id: 'z1', horizon_h: 72, complete: true, plants: 1, plants_with_forecast: 1, fetched_at: new Date().toISOString(),
+        hours: days.flatMap((day) => [0, 1].map((h) => ({ start: noon(day, h), power_w: 4000 + h * 1000, min_w: 3000, max_w: 5000 }))),
+        // Today's window ends in the future whatever the time of day: it is only named while it is still ahead.
+        peak_windows: days.map((day) => ({
+            date: day,
+            from: noon(day),
+            to: day === todayBusinessIso() ? new Date(Date.now() + 3_600_000).toISOString() : noon(day, 2),
+            peak_w: 5000,
+        })),
+    })
+    const tabLabels = (container: Element) => Array.from(container.querySelectorAll('[role="tab"]')).map((tab) => tab.textContent)
+
+    beforeEach(() => {
+        live.fetchLiveEnabled.mockResolvedValue(true)
+    })
+
+    describe('todayRows', () => {
+        it('draws each forecast hour flat across its 5-minute steps, with its band, for the given day only', () => {
+            const day = todayBusinessIso()
+            const rows = todayRows(null, [], null, {
+                date: day,
+                hours: [
+                    { start: noon(day), power_w: 4000, min_w: 3000, max_w: 5000 },
+                    { start: noon(shiftIsoDate(day, 1)), power_w: 9000, min_w: null, max_w: null },
+                ],
+            })
+            expect(rows).toHaveLength(12)
+            expect(rows.every((row) => row.forecast === 4 && row.forecastBand?.[0] === 3 && row.forecastBand[1] === 5)).toBe(true)
+            expect(rows.every((row) => row.production === null && row.ownHistory === null)).toBe(true)
+        })
+
+        it('has no forecast without one', () => {
+            expect(todayRows(null, history0, null).every((row) => row.forecast === null && row.forecastBand === null)).toBe(true)
+        })
+    })
+
+    it('shows the forecast with today, also when there is no live data and no own system', async () => {
+        const day = todayBusinessIso()
+        live.fetchProductionForecastOrNull.mockResolvedValue(forecast([day]))
+        live.fetchOwnSeries.mockResolvedValue(series({ gross: null, history_through: null }))
+        eligibleApi.fetchEligibleOrNull.mockResolvedValue([])
+        const { container } = await render()
+
+        expect(container.textContent).toContain('myEnergy.today.title')
+        expect(container.textContent).toContain('myEnergy.today.forecastHint')
+        expect(container.textContent).toContain('forecast.peak.today')
+        expect(tabLabels(container)).toEqual([])
+    })
+
+    it('offers a Tomorrow tab with the forecast alone once there is a forecast for tomorrow', async () => {
+        const tomorrow = shiftIsoDate(todayBusinessIso(), 1)
+        live.fetchProductionForecastOrNull.mockResolvedValue(forecast([todayBusinessIso(), tomorrow]))
+        const { container } = await render()
+
+        expect(tabLabels(container)).toEqual(['myEnergy.tabs.today', 'myEnergy.tabs.tomorrow', 'myEnergy.tabs.week', 'myEnergy.tabs.period'])
+        live.fetchOwnSeries.mockClear()
+        await clickTab(container, 1)
+
+        expect(container.textContent).toContain('myEnergy.tomorrow.title')
+        expect(container.textContent).toContain('forecast.hint')
+        expect(container.textContent).not.toContain('myEnergy.today.title')
+        expect(live.fetchOwnSeries).not.toHaveBeenCalled()
+    })
+
+    it('has no Tomorrow tab when the forecast has nothing for tomorrow or is all dark', async () => {
+        live.fetchProductionForecastOrNull.mockResolvedValue(forecast([todayBusinessIso()]))
+        expect(tabLabels((await render()).container)).not.toContain('myEnergy.tabs.tomorrow')
+        cleanups.splice(0).forEach((cleanup) => cleanup())
+
+        const dark = forecast([todayBusinessIso(), shiftIsoDate(todayBusinessIso(), 1)])
+        dark.hours = dark.hours.map((hour) => ({ ...hour, power_w: 0 }))
+        live.fetchProductionForecastOrNull.mockResolvedValue(dark)
+        expect(tabLabels((await render()).container)).not.toContain('myEnergy.tabs.tomorrow')
+    })
+
+    it('asks for no forecast while live data is off', async () => {
+        live.fetchLiveEnabled.mockResolvedValue(false)
+        await render()
+        expect(live.fetchProductionForecastOrNull).not.toHaveBeenCalled()
+    })
+})
+
+const history0 = [{ start: '2026-10-30T07:30:00Z', consumption_w: 1000, production_w: 0 }]

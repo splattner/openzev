@@ -234,7 +234,9 @@ def _probe_supplementary() -> dict:
         counts = dict(
             SupplementarySource.objects.values_list("status").annotate(n=Count("id")).values_list("status", "n")
         )
-        pull = SupplementarySource.objects.filter(enabled=True).exclude(provider=SupplementaryProvider.PUSH)
+        pull = SupplementarySource.objects.filter(enabled=True, provides_history=True).exclude(
+            provider=SupplementaryProvider.PUSH
+        )
         stale_before = datetime.now(timezone.utc) - 6 * timedelta(seconds=settings.SUPPLEMENTARY_SYNC_INTERVAL_S)
         stale = pull.exclude(status__in=[SupplementaryStatus.RECONNECT_REQUIRED, SupplementaryStatus.PENDING]).filter(
             Q(last_success_at__lt=stale_before) | Q(last_success_at__isnull=True)
@@ -247,10 +249,23 @@ def _probe_supplementary() -> dict:
         live_fresh = live.filter(
             live_last_seen_at__gte=datetime.now(timezone.utc) - timedelta(seconds=settings.LIVE_MAX_AGE_S)
         ).count()
+        from metering.live import forecast as forecast_service
+        from metering.live import store as live_store
+
+        forecast = list(
+            SupplementarySource.objects.filter(enabled=True, provides_forecast=True)
+            .exclude(status=SupplementaryStatus.RECONNECT_REQUIRED).values_list("pk", "created_at")
+        )
+        fetched = forecast_service.latest_fetch([pk for pk, _ in forecast])
+        forecast_cutoff = datetime.now(timezone.utc) - 3 * timedelta(seconds=settings.FORECAST_REFRESH_INTERVAL_S)
+        # Never fetched counts from creation, so a source added a moment ago is not stale yet.
+        forecast_stale = sum(1 for pk, created in forecast if (fetched.get(pk) or created) < forecast_cutoff)
+        forecast_degraded = bool(forecast) and forecast_stale * 2 > len(forecast)
+        forecast_solar_calls = live_store.forecast_solar_calls_last_hour()
     except Exception:  # noqa: BLE001 — any probe failure degrades, never 500s
         return {"status": "unknown"}
     return {
-        "status": "ok" if configured and not stale else "degraded",
+        "status": "ok" if configured and not stale and not forecast_degraded else "degraded",
         "feature_enabled": True,
         "encryption_key_configured": configured,
         "sources_by_status": {str(name): count for name, count in counts.items()},
@@ -259,6 +274,9 @@ def _probe_supplementary() -> dict:
         "live_flag_enabled": live_enabled,
         "live_sources": live_sources,
         "live_fresh": live_fresh,
+        "forecast_sources": len(forecast),
+        "forecast_stale": forecast_stale,
+        "forecast_solar_calls_last_hour": forecast_solar_calls,
     }
 
 

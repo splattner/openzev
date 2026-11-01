@@ -320,6 +320,18 @@ LIVE_WATCH_TTL_S = env.int("LIVE_WATCH_TTL_S", default=120)
 # Beat period of poll_live_sources, and the pace of a pulled source. Keep it below LIVE_MAX_AGE_S,
 # or a value is already stale when the next one arrives (metering.W003 warns).
 LIVE_PULL_INTERVAL_S = env.int("LIVE_PULL_INTERVAL_S", default=30)
+# Production forecast (SPEC-2026-live-energy-data §4.5, §6.3). The horizon is a cap: forecast.solar's public
+# tier reaches today and tomorrow, Solar Manager three days.
+FORECAST_REFRESH_INTERVAL_S = env.int("FORECAST_REFRESH_INTERVAL_S", default=3600)
+FORECAST_HORIZON_H = env.int("FORECAST_HORIZON_H", default=72)
+FORECAST_SOLAR_BASE_URL = env("FORECAST_SOLAR_BASE_URL", default="https://api.forecast.solar")
+FORECAST_SOLAR_API_KEY = env("FORECAST_SOLAR_API_KEY", default="")
+# The public tier allows 12 calls per hour per calling IP and one plane per call, so a plant with n planes
+# costs n calls. Stay below that; a source that does not fit waits for the next tick.
+FORECAST_SOLAR_MAX_CALLS_PER_HOUR = env.int("FORECAST_SOLAR_MAX_CALLS_PER_HOUR", default=10)
+# A forecast.solar source is refreshed at most this often: forecasts move slowly and every plane is a call.
+FORECAST_SOLAR_MIN_REFRESH_S = env.int("FORECAST_SOLAR_MIN_REFRESH_S", default=10800)
+PV_PLANES_MAX_PER_METERING_POINT = env.int("PV_PLANES_MAX_PER_METERING_POINT", default=4)
 # A rate is shown only when at least this share of the expected 15-minute
 # intervals carries data; below it the rate is withheld rather than misleading.
 SUPPLEMENTARY_MIN_COVERAGE = env.float("SUPPLEMENTARY_MIN_COVERAGE", default=0.95)
@@ -427,6 +439,10 @@ CELERY_BEAT_SCHEDULE = {
     "poll-live-sources": {
         "task": "metering.tasks.poll_live_sources",
         "schedule": float(LIVE_PULL_INTERVAL_S),
+    },
+    "refresh-production-forecasts": {
+        "task": "metering.tasks.refresh_production_forecasts",
+        "schedule": float(FORECAST_REFRESH_INTERVAL_S),
     },
     # The consent boundary: a source stops when its participant stops holding the meter.
     "disable-orphaned-supplementary-sources": {

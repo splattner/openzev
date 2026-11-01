@@ -33,6 +33,10 @@ describe('formatKw', () => {
         expect(formatKw(0)).toBe('0.0\u00a0kW')
         expect(formatKw(8000)).toBe('8.0\u00a0kW')
         expect(kwFigure(49)).toBe('0.0')
+        // A power that rounds to zero never carries a minus sign.
+        expect(kwFigure(-49)).toBe('0.0')
+        expect(kwFigure(-0)).toBe('0.0')
+        expect(kwFigure(-60)).toBe('-0.1')
     })
 
     it('shows a dash for a number that is not finite', () => {

@@ -79,7 +79,7 @@ describe('LiveEnergyView', () => {
     })
 
     it.each([
-        [true, '/metering/points', 'pages.live.empty.manager'],
+        [true, '/zev-settings/energy', 'pages.live.empty.manager'],
         [false, '/me/metering-points', 'pages.live.empty.participant'],
     ])('without a live source a manager (%s) is pointed to %s', async (isZevScope, href, text) => {
         mockAccess.mockReturnValue({ isZevScope })

@@ -295,7 +295,7 @@ export function Layout() {
                             <>
                                 <SidebarLink to="/" label={t('nav.overview')} icon={<DashboardIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/dashboard" label={t('nav.energyBalance')} icon={<EnergyIcon />} collapsed={isNavigationCollapsed} />
-                                {showMyEnergy && <SidebarLink to="/my-energy" label={t('nav.myEnergy')} icon={<LiveIcon />} collapsed={isNavigationCollapsed} />}
+                                {showMyEnergy && <SidebarLink to="/my-energy" label={t('nav.liveEnergy')} icon={<LiveIcon />} collapsed={isNavigationCollapsed} />}
                                 <SidebarLink to="/metering/chart" label={t('nav.metering')} icon={<ChartIcon />} active={meteringActive} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/billing/invoices" label={t('nav.billing')} icon={<InvoiceIcon />} active={billingActive} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/reports" label={t('nav.reports')} icon={<ReportsIcon />} collapsed={isNavigationCollapsed} />

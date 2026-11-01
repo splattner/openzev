@@ -24,7 +24,7 @@ from django.db.models import Prefetch
 from invoices.models import Charge, Credit, Invoice
 from metering.models import MeterReading, QuarantinedReading, SupplementaryReading, SupplementarySource
 from tariffs.models import Tariff, TariffPeriod
-from zev.models import Building, MeteringPoint, MeteringPointAssignment, Participant, Party, ZevPartyRole
+from zev.models import Building, MeteringPoint, MeteringPointAssignment, Participant, Party, PvPlane, ZevPartyRole
 
 from .schema import (
     CHARGE_FIELDS,
@@ -41,6 +41,7 @@ from .schema import (
     BUILDING_FIELDS,
     BUILDINGS_FILE,
     METERING_POINT_FIELDS,
+    PV_PLANE_FIELDS,
     PARTICIPANT_FIELDS,
     PARTIES_FILE,
     PARTY_FIELDS,
@@ -180,11 +181,16 @@ def _export_metering_points(zev):
     ):
         assignments_by_point.setdefault(assignment.metering_point_id, []).append(assignment)
 
+    planes_by_point = {}
+    for plane in PvPlane.objects.filter(metering_point__zev=zev).order_by("metering_point_id", "created_at", "id"):
+        planes_by_point.setdefault(plane.metering_point_id, []).append(plane)
+
     return [
         {
             "id": str(point.id),
             "building_id": str(point.building_id),
             **_fields(point, METERING_POINT_FIELDS),
+            "pv_planes": [_fields(plane, PV_PLANE_FIELDS) for plane in planes_by_point.get(point.id, [])],
             "assignments": [
                 {
                     "id": str(assignment.id),

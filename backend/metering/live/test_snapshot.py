@@ -25,6 +25,17 @@ class SnapshotCase(LiveTestCase):
         return snapshot.zev_snapshot(self.zev, now=self.now, viewer=user or self.manager, **kwargs)
 
 
+class WattsTests(LiveTestCase):
+    def test_a_power_that_rounds_to_zero_is_never_negative_zero(self):
+        # math.copysign tells -0.0 from 0.0, which == does not.
+        import math
+
+        self.assertEqual(math.copysign(1, snapshot.watts(Decimal("-0.04"))), 1.0)
+        self.assertEqual(math.copysign(1, snapshot.watts(Decimal("0.0"))), 1.0)
+        self.assertEqual(snapshot.watts(Decimal("-0.06")), -0.1)
+        self.assertIsNone(snapshot.watts(None))
+
+
 class ClassifyTests(LiveTestCase):
     """The pure tier rule, without a database fixture."""
 

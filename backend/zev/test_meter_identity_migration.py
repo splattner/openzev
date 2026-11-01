@@ -5,7 +5,6 @@ from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase
 from testing.helpers import create_managed_zev, make_user
 
-from zev.models import MeteringPoint
 
 BEFORE = [("zev", "0046_meteringpoint_secondary_meter_id")]
 AFTER = [("zev", "0047_meteringpoint_metering_point_secondary_differs_from_primary")]
@@ -13,24 +12,32 @@ AFTER = [("zev", "0047_meteringpoint_metering_point_secondary_differs_from_prima
 
 class MeterIdentityMigrationTests(TransactionTestCase):
     def setUp(self):
-        MigrationExecutor(connection).migrate(BEFORE)
+        executor = MigrationExecutor(connection)
+        executor.migrate(BEFORE)
+        # Historical models: the real ones query columns that later migrations added.
+        apps = executor.loader.project_state(BEFORE).apps
+        self.Building = apps.get_model("zev", "Building")
+        self.Point = apps.get_model("zev", "MeteringPoint")
         self.zev = create_managed_zev(name="Migration ZEV", owner=make_user("migration-owner"))
 
     def tearDown(self):
-        MeteringPoint.objects.all().delete()
+        self.Point.objects.all().delete()
         executor = MigrationExecutor(connection)
         executor.migrate(executor.loader.graph.leaf_nodes())
         super().tearDown()
 
     def point(self, primary, secondary):
-        return MeteringPoint.objects.create(zev=self.zev, meter_id=primary, secondary_meter_id=secondary)
+        building = self.Building.objects.filter(zev_id=self.zev.pk).first() or self.Building.objects.create(
+            zev_id=self.zev.pk, name="Migration building"
+        )
+        return self.Point.objects.create(zev_id=self.zev.pk, building=building, meter_id=primary, secondary_meter_id=secondary)
 
     def test_normalization_collision_aborts_without_changing_any_id(self):
         first = self.point("MIG-A", "MIG-ALIAS")
         second = self.point("MIG-B", None)
         blank = self.point("MIG-C", None)
-        MeteringPoint.objects.filter(pk=second.pk).update(secondary_meter_id=" MIG-ALIAS ")
-        MeteringPoint.objects.filter(pk=blank.pk).update(secondary_meter_id="   ")
+        self.Point.objects.filter(pk=second.pk).update(secondary_meter_id=" MIG-ALIAS ")
+        self.Point.objects.filter(pk=blank.pk).update(secondary_meter_id="   ")
         with self.assertRaisesMessage(RuntimeError, "Correct their secondary IDs"):
             MigrationExecutor(connection).migrate(AFTER)
         first.refresh_from_db()
@@ -44,9 +51,9 @@ class MeterIdentityMigrationTests(TransactionTestCase):
         redundant = self.point("MIG-SELF", None)
         trimmed = self.point("MIG-TRIM", None)
         blank = self.point("MIG-BLANK", None)
-        MeteringPoint.objects.filter(pk=redundant.pk).update(secondary_meter_id="MIG-SELF")
-        MeteringPoint.objects.filter(pk=trimmed.pk).update(secondary_meter_id=" MIG-SELF ")
-        MeteringPoint.objects.filter(pk=blank.pk).update(secondary_meter_id="   ")
+        self.Point.objects.filter(pk=redundant.pk).update(secondary_meter_id="MIG-SELF")
+        self.Point.objects.filter(pk=trimmed.pk).update(secondary_meter_id=" MIG-SELF ")
+        self.Point.objects.filter(pk=blank.pk).update(secondary_meter_id="   ")
         MigrationExecutor(connection).migrate(AFTER)
         redundant.refresh_from_db()
         trimmed.refresh_from_db()

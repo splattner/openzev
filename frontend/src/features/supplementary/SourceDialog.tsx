@@ -1,16 +1,20 @@
-import { useState } from 'react'
+import { useEffect, useState, type Ref } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faEllipsis } from '@fortawesome/free-solid-svg-icons'
+import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
 import { Disclosure } from '../../components/Disclosure'
+import { DetailPane } from '../../components/DetailPane'
 import { FormModal } from '../../components/FormModal'
 import { useAuth } from '../../lib/auth'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
-import { sourceFor } from '../../lib/supplementary'
+import { capabilityProblem, sourceFor } from '../../lib/supplementary'
 import type { SupplementarySource } from '../../types/api'
 import { CsvImport } from './CsvImport'
-import { LiveStateBadge } from './LiveStateBadge'
+import { CapabilityProblemText } from './CapabilityProblemText'
 import { PushEndpoints, PushTokenPanel } from './PushTokenPanel'
 import { ReconciliationSummary } from './ReconciliationSummary'
-import { SourceStatusBadge } from './SourceStatusBadge'
 import { useSourceActions, type ConfirmOptions } from './useSourceActions'
 
 export type { ConfirmOptions } from './useSourceActions'
@@ -19,6 +23,7 @@ export type { ConfirmOptions } from './useSourceActions'
 export interface PointEligibility {
     history: boolean
     live: boolean
+    forecast?: boolean
 }
 
 interface DetailsProps {
@@ -31,6 +36,16 @@ interface DetailsProps {
     canManage: boolean
     /** The source is gone (deleted); the host closes. */
     onGone?: () => void
+    /** A new Solar Manager key has been typed and not saved: the host asks before it lets go of the source. */
+    onDirtyChange?: (dirty: boolean) => void
+    /** Name the source at the top of the body, for a host whose own title does not (a dialog). */
+    identity?: boolean
+    /**
+     * Somebody else's source, seen by a manager of the community: they switch it off or on, delete its data or
+     * remove it, never test it, change its key or its capabilities (the account is the participant's). `own` says
+     * the signed-in user is that participant, who manages it on My metering points instead.
+     */
+    onBehalfOf?: { name: string | null; own: boolean }
 }
 
 const NO_CAPABILITY: PointEligibility = { history: false, live: false }
@@ -40,7 +55,7 @@ const NO_CAPABILITY: PointEligibility = { history: false, live: false }
  * body of `SourceDialog`, and of a host that already is a dialog. The one-time token of a rotation
  * lives here, above everything a refetch can change, and the credential is never shown.
  */
-export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confirm, canManage, onGone }: DetailsProps) {
+export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confirm, canManage, onGone, onDirtyChange, identity = false, onBehalfOf }: DetailsProps) {
     const { t } = useTranslation()
     const { isImpersonating } = useAuth()
     const { settings } = useAppSettings()
@@ -50,8 +65,14 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
     const [newId, setNewId] = useState(source.external_id)
     const [token, setToken] = useState<string | null>(null)
     const [showCsv, setShowCsv] = useState(false)
+    const keyDraft = replacing && newKey.trim() !== ''
+    useEffect(() => {
+        onDirtyChange?.(keyDraft)
+        // Leaving with a draft in it is no longer a draft the host has to guard.
+        return () => onDirtyChange?.(false)
+    }, [keyDraft, onDirtyChange])
 
-    const { test, sync, replaceKey, disconnect, purge, remove, rotate, revoke, capability, busy } = useSourceActions(source, {
+    const { test, sync, replaceKey, setEnabled, disconnect, purge, remove, rotate, revoke, capability, busy } = useSourceActions(source, {
         onToken: setToken,
         onGone,
         onKeyReplaced: () => {
@@ -62,11 +83,10 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
 
     const isSolar = source.provider === 'solar_manager'
     const isPush = source.provider === 'push'
+    const isForecastSolar = source.provider === 'forecast_solar'
     const disconnected = !source.enabled
     const hasHistory = source.provides_history
-    const blockedTitle = isImpersonating ? t('account.impersonationRestrictions') : undefined
     const dateTime = (value: string | null) => (value ? formatDateTime(value, settings) : t('supplementary.never'))
-    const small = 'button button-secondary button-compact'
 
     // Both providers take the other capability on the same connection; Solar Manager reuses its stored key.
     const canAddLive =
@@ -74,18 +94,206 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
     const canAddHistory =
         !disconnected && eligible.history && !source.provides_history && source.held_by === 'participant' &&
         !!source.metering_point && !sourceFor(sources, source.metering_point, 'history')
-    // A source must keep one capability: stopping one is only offered while the other remains.
-    const canStopLive = source.provides_live && source.provides_history
-    const canStopHistory = source.provides_history && source.provides_live
+    // Solar Manager also reads the installation's own forecast with the stored key.
+    const canAddForecast =
+        !disconnected && isSolar && !!eligible.forecast && !source.provides_forecast && !!source.metering_point &&
+        !sourceFor(sources, source.metering_point, 'forecast')
+    // A source must keep one capability: stopping one is only offered while the others remain.
+    const capabilityCount = [source.provides_history, source.provides_live, source.provides_forecast].filter(Boolean).length
+    const canStopLive = source.provides_live && capabilityCount > 1
+    const canStopHistory = source.provides_history && capabilityCount > 1
+    const canStopForecast = source.provides_forecast && capabilityCount > 1
 
     const confirmCapability = (options: Omit<ConfirmOptions, 'isDangerous'>) => confirm({ ...options, isDangerous: false })
 
+    // One visible action: what keeps the connection working right now. Everything else is in the menu.
+    const limited = !!onBehalfOf
+    const needsNewKey = !limited && isSolar && (disconnected || source.status === 'reconnect_required')
+    const canSync = !limited && (isSolar || isForecastSolar) && !disconnected && (hasHistory || source.provides_forecast) && source.status !== 'reconnect_required'
+    const blocked = busy || isImpersonating
+    const section = {
+        connection: t('supplementary.source.menu.connection'),
+        data: t('supplementary.source.menu.data'),
+        end: t('supplementary.source.menu.end'),
+    }
+    const fullMenu: ActionMenuItem[] = []
+    const item = (entry: ActionMenuItem) => fullMenu.push(entry)
+    if ((isSolar || isForecastSolar) && !disconnected) {
+        item({ key: 'test', section: section.connection, label: test.isPending ? t('supplementary.actions.testing') : t('supplementary.actions.test'), disabled: busy, onClick: () => test.mutate() })
+    }
+    if (isSolar && !needsNewKey) {
+        item({ key: 'replace-key', section: section.connection, label: t('supplementary.actions.replaceKey'), disabled: busy, onClick: () => setReplacing(true) })
+    }
+    if (isPush && hasHistory && !disconnected) {
+        item({ key: 'import-csv', section: section.connection, label: t('supplementary.actions.importCsv'), onClick: () => setShowCsv(true) })
+    }
+    if (isPush) {
+        item({
+            key: 'rotate', section: section.connection, label: t('supplementary.actions.rotate'), disabled: blocked,
+            onClick: () => confirm({
+                title: t('supplementary.confirm.rotateTitle'),
+                message: t('supplementary.confirm.rotateMessage'),
+                confirmText: t('supplementary.actions.rotate'),
+                isDangerous: false,
+                onConfirm: () => rotate.mutate(),
+            }),
+        })
+    }
+    if (isPush && source.push_token_prefix) {
+        item({
+            key: 'revoke', section: section.connection, label: t('supplementary.live.revoke'), disabled: busy,
+            onClick: () => confirm({
+                title: t('supplementary.live.confirm.revokeTitle'),
+                message: t('supplementary.live.confirm.revokeMessage'),
+                confirmText: t('supplementary.live.revoke'),
+                isDangerous: false,
+                onConfirm: () => revoke.mutate(),
+            }),
+        })
+    }
+    if (!disconnected) {
+        item({
+            key: 'disconnect', section: section.connection, label: t('supplementary.actions.disconnect'), disabled: busy,
+            onClick: () => confirm({
+                title: t('supplementary.confirm.disconnectTitle'),
+                message: t(hasHistory ? 'supplementary.confirm.disconnectMessage' : source.provides_live ? 'supplementary.live.confirm.disconnectMessage' : 'supplementary.forecast.confirm.disconnectMessage'),
+                confirmText: t('supplementary.actions.disconnect'),
+                isDangerous: false,
+                onConfirm: () => disconnect.mutate(),
+            }),
+        })
+    }
+    if (canAddLive) {
+        item({
+            key: 'add-live', section: section.data, label: t('supplementary.live.alsoSend'), disabled: blocked,
+            onClick: () => confirmCapability({
+                title: t('supplementary.live.confirm.alsoSendTitle'),
+                message: `${t('supplementary.consent.liveVisible')} ${t('supplementary.consent.liveNotBilling')}`,
+                confirmText: t('supplementary.live.alsoSend'),
+                onConfirm: () => capability.mutate({ provides_live: true, consent: true }),
+            }),
+        })
+    }
+    if (canAddHistory) {
+        item({
+            key: 'add-history', section: section.data, label: t('supplementary.source.alsoHistory'), disabled: blocked,
+            onClick: () => confirmCapability({
+                title: t('supplementary.source.confirm.alsoHistoryTitle'),
+                message: `${t('supplementary.consent.stored')} ${t('supplementary.consent.notBilling')}`,
+                confirmText: t('supplementary.source.alsoHistory'),
+                onConfirm: () => capability.mutate({ provides_history: true, consent: true }),
+            }),
+        })
+    }
+    if (canAddForecast) {
+        item({
+            key: 'add-forecast', section: section.data, label: t('supplementary.forecast.alsoUse'), disabled: blocked,
+            onClick: () => confirmCapability({
+                title: t('supplementary.forecast.confirm.alsoTitle'),
+                message: t('supplementary.forecast.confirm.alsoMessage'),
+                confirmText: t('supplementary.forecast.alsoUse'),
+                onConfirm: () => capability.mutate({ provides_forecast: true, consent: true }),
+            }),
+        })
+    }
+    if (canStopForecast) {
+        item({
+            key: 'stop-forecast', section: section.data, label: t('supplementary.forecast.stop'), disabled: busy,
+            onClick: () => confirmCapability({
+                title: t('supplementary.forecast.confirm.stopTitle'),
+                message: t('supplementary.forecast.confirm.stopMessage'),
+                confirmText: t('supplementary.forecast.stop'),
+                onConfirm: () => capability.mutate({ provides_forecast: false }),
+            }),
+        })
+    }
+    if (canStopLive) {
+        item({
+            key: 'stop-live', section: section.data, label: t('supplementary.live.stop'), disabled: busy,
+            onClick: () => confirmCapability({
+                title: t('supplementary.live.confirm.stopTitle'),
+                message: t('supplementary.live.confirm.stopMessage'),
+                confirmText: t('supplementary.live.stop'),
+                onConfirm: () => capability.mutate({ provides_live: false }),
+            }),
+        })
+    }
+    if (canStopHistory) {
+        item({
+            key: 'stop-history', section: section.data, label: t('supplementary.source.stopHistory'), disabled: busy,
+            onClick: () => confirmCapability({
+                title: t('supplementary.source.confirm.stopHistoryTitle'),
+                message: t('supplementary.source.confirm.stopHistoryMessage'),
+                confirmText: t('supplementary.source.stopHistory'),
+                onConfirm: () => capability.mutate({ provides_history: false }),
+            }),
+        })
+    }
+    if (source.provides_history) {
+        item({
+            key: 'delete-data', section: section.end, label: t('supplementary.actions.deleteData'), danger: true, disabled: busy,
+            onClick: () => confirm({
+                title: t('supplementary.confirm.deleteDataTitle'),
+                message: t('supplementary.confirm.deleteDataMessage'),
+                confirmText: t('supplementary.actions.deleteData'),
+                isDangerous: true,
+                onConfirm: () => purge.mutate(),
+            }),
+        })
+    }
+    item({
+        key: 'remove', section: section.end, label: t('supplementary.actions.remove'), danger: true, disabled: busy,
+        onClick: () => confirm({
+            title: t('supplementary.confirm.removeTitle'),
+            message: t(hasHistory ? 'supplementary.confirm.removeMessage' : source.provides_live ? 'supplementary.live.confirm.removeMessage' : 'supplementary.forecast.confirm.removeMessage'),
+            confirmText: t('supplementary.actions.remove'),
+            isDangerous: true,
+            onConfirm: () => remove.mutate(),
+        }),
+    })
+
+    // Somebody else's source: the manager's own rights only (switch off or on, delete the data, remove).
+    const name = onBehalfOf?.name ?? ''
+    const limitedMenu: ActionMenuItem[] = [
+        {
+            key: 'toggle', section: section.connection, label: t(source.enabled ? 'supplementary.owner.disable' : 'supplementary.owner.enable'), disabled: busy,
+            onClick: () => setEnabled.mutate(!source.enabled),
+        },
+        ...(source.provides_history ? [{
+            key: 'delete-data', section: section.end, label: t('supplementary.actions.deleteData'), danger: true, disabled: busy,
+            onClick: () => confirm({
+                title: t('supplementary.confirm.deleteDataTitle'),
+                message: t('supplementary.owner.deleteDataMessage', { name }),
+                confirmText: t('supplementary.actions.deleteData'),
+                isDangerous: true,
+                onConfirm: () => purge.mutate(),
+            }),
+        }] : []),
+        {
+            key: 'remove', section: section.end, label: t('supplementary.actions.remove'), danger: true, disabled: busy,
+            onClick: () => confirm({
+                title: t('supplementary.confirm.removeTitle'),
+                message: t('supplementary.owner.removeMessage', { name }),
+                confirmText: t('supplementary.actions.remove'),
+                isDangerous: true,
+                onConfirm: () => remove.mutate(),
+            }),
+        },
+    ]
+    const menu = limited ? limitedMenu : fullMenu
+
+    const capabilities = { history: source.provides_history, live: source.provides_live }
+    const hasTechnical = !limited && (isSolar || (isPush && !!source.push_token_prefix))
+
     return (
-        <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'minmax(0, 1fr)' }}>
+        <div className="source-details">
+            {identity && (
+                <p className="m-0"><strong>{t(`supplementary.provider.${source.provider}`)}{source.label ? ` · ${source.label}` : ''}</strong></p>
+            )}
             {source.status === 'reconnect_required' && (
                 <div className="warning-banner" role="alert">
                     <strong>{t('supplementary.reconnect.title')}</strong>
-                    <p style={{ margin: '0.25rem 0 0' }}>{source.last_error || t('supplementary.reconnect.body')}</p>
+                    <p className="m-0 mt-05">{source.last_error || t('supplementary.reconnect.body')}</p>
                 </div>
             )}
             {source.status === 'error' && source.last_error && (
@@ -94,82 +302,42 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
                 </div>
             )}
             {disconnected && <p className="muted m-0">{t('supplementary.disconnectedNote')}</p>}
-
-            <dl style={{ display: 'grid', gridTemplateColumns: 'minmax(7rem, max-content) minmax(0, 1fr)', overflowWrap: 'anywhere', gap: '0.4rem 1rem', margin: 0 }}>
-                <dt className="muted">{t('supplementary.source.provider')}</dt>
-                <dd className="m-0">{t(`supplementary.provider.${source.provider}`)}</dd>
-                {source.label && (
-                    <>
-                        <dt className="muted">{t('supplementary.live.name')}</dt>
-                        <dd className="m-0">{source.label}</dd>
-                    </>
-                )}
-                <dt className="muted">{t('supplementary.source.provides')}</dt>
-                <dd className="m-0 actions-row actions-row-wrap">
-                    {source.provides_history && <span className="badge badge-neutral">{t('supplementary.capability.history')}</span>}
-                    {source.provides_live && <span className="badge badge-neutral">{t('supplementary.capability.live')}</span>}
-                </dd>
-                {(source.provides_history || isSolar) && (
-                    <>
-                        <dt className="muted">{t('supplementary.source.status')}</dt>
-                        <dd className="m-0"><SourceStatusBadge status={source.status} /></dd>
-                    </>
-                )}
-                {source.provides_live && (
-                    <>
-                        <dt className="muted">{t('supplementary.live.state')}</dt>
-                        <dd className="m-0">{source.live_state ? <LiveStateBadge state={source.live_state} /> : '—'}</dd>
-                        <dt className="muted">{t('supplementary.live.lastValue')}</dt>
-                        <dd className="m-0">{dateTime(source.live_last_seen_at)}</dd>
-                    </>
-                )}
-                {isSolar && (
-                    <>
-                        <dt className="muted">{t('supplementary.card.smId')}</dt>
-                        <dd className="m-0"><code>{source.external_id}</code></dd>
-                    </>
-                )}
-                {isPush && source.push_token_prefix && (
-                    <>
-                        <dt className="muted">{t('supplementary.card.token')}</dt>
-                        <dd className="m-0"><code>ozs_{source.push_token_prefix}_…</code></dd>
-                        <dt className="muted">{t('supplementary.card.tokenIssued')}</dt>
-                        <dd className="m-0">{dateTime(source.push_token_created_at)}</dd>
-                        <dt className="muted">{t('supplementary.card.tokenLastUsed')}</dt>
-                        <dd className="m-0">{dateTime(source.push_token_last_used_at)}</dd>
-                    </>
-                )}
-                {source.provides_history && (
-                    <>
-                        <dt className="muted">{t('supplementary.card.lastSync')}</dt>
-                        <dd className="m-0">{dateTime(source.last_success_at)}</dd>
-                        <dt className="muted">{t('supplementary.card.covered')}</dt>
-                        <dd className="m-0">
-                            {source.covers_from && source.synced_through
-                                ? t('supplementary.card.coveredRange', {
-                                      from: formatDateTime(source.covers_from, settings),
-                                      to: formatDateTime(source.synced_through, settings),
-                                  })
-                                : t('supplementary.card.noData')}
-                        </dd>
-                        <dt className="muted">{t('supplementary.card.reconciliation')}</dt>
-                        <dd className="m-0"><ReconciliationSummary reconciliation={source.reconciliation} /></dd>
-                    </>
-                )}
-            </dl>
-
-            {token && <PushTokenPanel token={token} onDismiss={() => setToken(null)} capabilities={{ history: source.provides_history, live: source.provides_live }} />}
-            {isPush && !disconnected && !token && (
-                <Disclosure summary={t('supplementary.source.endpoints')}>
-                    <div style={{ display: 'grid', gap: '0.75rem', paddingTop: '0.75rem' }}>
-                        <PushEndpoints capabilities={{ history: source.provides_history, live: source.provides_live }} />
-                    </div>
-                </Disclosure>
+            {onBehalfOf && (
+                <p className="muted m-0">
+                    {onBehalfOf.own
+                        ? <Link to="/me/metering-points">{t('supplementary.owner.manageOwn')}</Link>
+                        : t('supplementary.owner.readOnlyNote', { name: onBehalfOf.name ?? '' })}
+                </p>
             )}
+
+            {canManage && (
+                <div className="actions-row actions-row-wrap">
+                    {needsNewKey && (
+                        <button type="button" className="button button-secondary" disabled={busy} onClick={() => setReplacing(true)}>
+                            {t('supplementary.actions.reconnect')}
+                        </button>
+                    )}
+                    {canSync && (
+                        <button type="button" className="button button-secondary" disabled={busy} onClick={() => sync.mutate()}>
+                            {t(hasHistory ? 'supplementary.actions.sync' : 'supplementary.forecast.refresh')}
+                        </button>
+                    )}
+                    <ActionMenu
+                        iconOnly
+                        compact={false}
+                        label={t('supplementary.source.moreActions')}
+                        icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+                        items={menu}
+                    />
+                </div>
+            )}
+            {canManage && isImpersonating && <small className="muted">{t('account.impersonationRestrictions')}</small>}
+
+            {token && <PushTokenPanel token={token} onDismiss={() => setToken(null)} capabilities={capabilities} />}
 
             {replacing && canManage && (
                 <form
-                    className="form-grid"
+                    className="form-grid form-grid-start"
                     onSubmit={(event) => {
                         event.preventDefault()
                         replaceKey.mutate({ apiKey: newKey, externalId: newId })
@@ -185,11 +353,11 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
                         <small className="muted">{t('supplementary.modal.apiKeyHint')}</small>
                     </label>
                     <div className="actions-row actions-row-wrap grid-span-full">
+                        <button type="button" className="button button-secondary" onClick={() => { setReplacing(false); setNewKey('') }}>
+                            {t('common.cancel')}
+                        </button>
                         <button type="submit" className="button button-primary" disabled={replaceKey.isPending || !newKey.trim()}>
                             {replaceKey.isPending ? t('common.saving') : t('supplementary.actions.saveKey')}
-                        </button>
-                        <button type="button" className="button button-secondary" onClick={() => setReplacing(false)}>
-                            {t('common.cancel')}
                         </button>
                     </div>
                 </form>
@@ -197,190 +365,74 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
 
             {showCsv && !disconnected && canManage && <CsvImport sourceId={source.id} />}
 
-            {canManage && (
-                <div className="actions-row actions-row-wrap">
-                    {isSolar && !disconnected && (
-                        <>
-                            <button type="button" className={small} disabled={busy} onClick={() => test.mutate()}>
-                                {test.isPending ? t('supplementary.actions.testing') : t('supplementary.actions.test')}
-                            </button>
-                            {hasHistory && (
-                                <button type="button" className={small} disabled={busy || source.status === 'reconnect_required'} onClick={() => sync.mutate()}>
-                                    {t('supplementary.actions.sync')}
-                                </button>
+            {source.provides_history && (
+                <section className="source-section">
+                    <h3>{t('supplementary.capability.history')}</h3>
+                    <CapabilityProblemText problem={capabilityProblem(source, 'history')} />
+                    <dl className="source-facts">
+                        <dt className="muted">{t('supplementary.card.lastSync')}</dt>
+                        <dd>{dateTime(source.last_success_at)}</dd>
+                        <dt className="muted">{t('supplementary.card.covered')}</dt>
+                        <dd>
+                            {source.covers_from && source.synced_through
+                                ? t('supplementary.card.coveredRange', {
+                                      from: formatDateTime(source.covers_from, settings),
+                                      to: formatDateTime(source.synced_through, settings),
+                                  })
+                                : t('supplementary.card.noData')}
+                        </dd>
+                        <dt className="muted">{t('supplementary.card.reconciliation')}</dt>
+                        <dd><ReconciliationSummary reconciliation={source.reconciliation} /></dd>
+                    </dl>
+                </section>
+            )}
+            {source.provides_live && (
+                <section className="source-section">
+                    <h3>{t('supplementary.capability.live')}</h3>
+                    <CapabilityProblemText problem={capabilityProblem(source, 'live')} />
+                    <dl className="source-facts">
+                        <dt className="muted">{t('supplementary.live.lastValue')}</dt>
+                        <dd>{dateTime(source.live_last_seen_at)}</dd>
+                    </dl>
+                </section>
+            )}
+            {source.provides_forecast && (
+                <section className="source-section">
+                    <h3>{t('supplementary.capability.forecast')}</h3>
+                    <CapabilityProblemText problem={capabilityProblem(source, 'forecast')} />
+                    {(source.provider === 'forecast_solar' || !source.provides_history) && (
+                        <dl className="source-facts">
+                            <dt className="muted">{t('supplementary.forecast.lastUpdate')}</dt>
+                            <dd>{dateTime(source.last_success_at)}</dd>
+                        </dl>
+                    )}
+                </section>
+            )}
+
+            {hasTechnical && (
+                <Disclosure summary={t('supplementary.source.technical')}>
+                    <div className="source-technical">
+                        <dl className="source-facts">
+                            {isSolar && (
+                                <>
+                                    <dt className="muted">{t('supplementary.card.smId')}</dt>
+                                    <dd>{source.external_id}</dd>
+                                </>
                             )}
-                        </>
-                    )}
-                    {isSolar && (
-                        <button type="button" className={small} disabled={busy} onClick={() => setReplacing((open) => !open)}>
-                            {disconnected || source.status === 'reconnect_required' ? t('supplementary.actions.reconnect') : t('supplementary.actions.replaceKey')}
-                        </button>
-                    )}
-                    {isPush && source.provides_history && !disconnected && (
-                        <button type="button" className={small} onClick={() => setShowCsv((open) => !open)}>
-                            {t('supplementary.actions.importCsv')}
-                        </button>
-                    )}
-                    {canAddLive && (
-                        <button
-                            type="button"
-                            className={small}
-                            disabled={busy || isImpersonating}
-                            title={blockedTitle}
-                            onClick={() =>
-                                confirmCapability({
-                                    title: t('supplementary.live.confirm.alsoSendTitle'),
-                                    message: `${t('supplementary.consent.liveVisible')} ${t('supplementary.consent.liveNotBilling')}`,
-                                    confirmText: t('supplementary.live.alsoSend'),
-                                    onConfirm: () => capability.mutate({ provides_live: true, consent: true }),
-                                })
-                            }
-                        >
-                            {t('supplementary.live.alsoSend')}
-                        </button>
-                    )}
-                    {canAddHistory && (
-                        <button
-                            type="button"
-                            className={small}
-                            disabled={busy || isImpersonating}
-                            title={blockedTitle}
-                            onClick={() =>
-                                confirmCapability({
-                                    title: t('supplementary.source.confirm.alsoHistoryTitle'),
-                                    message: `${t('supplementary.consent.stored')} ${t('supplementary.consent.notBilling')}`,
-                                    confirmText: t('supplementary.source.alsoHistory'),
-                                    onConfirm: () => capability.mutate({ provides_history: true, consent: true }),
-                                })
-                            }
-                        >
-                            {t('supplementary.source.alsoHistory')}
-                        </button>
-                    )}
-                    {canStopLive && (
-                        <button
-                            type="button"
-                            className={small}
-                            disabled={busy}
-                            onClick={() =>
-                                confirmCapability({
-                                    title: t('supplementary.live.confirm.stopTitle'),
-                                    message: t('supplementary.live.confirm.stopMessage'),
-                                    confirmText: t('supplementary.live.stop'),
-                                    onConfirm: () => capability.mutate({ provides_live: false }),
-                                })
-                            }
-                        >
-                            {t('supplementary.live.stop')}
-                        </button>
-                    )}
-                    {canStopHistory && (
-                        <button
-                            type="button"
-                            className={small}
-                            disabled={busy}
-                            onClick={() =>
-                                confirmCapability({
-                                    title: t('supplementary.source.confirm.stopHistoryTitle'),
-                                    message: t('supplementary.source.confirm.stopHistoryMessage'),
-                                    confirmText: t('supplementary.source.stopHistory'),
-                                    onConfirm: () => capability.mutate({ provides_history: false }),
-                                })
-                            }
-                        >
-                            {t('supplementary.source.stopHistory')}
-                        </button>
-                    )}
-                    {isPush && (
-                        <button
-                            type="button"
-                            className={small}
-                            disabled={busy || isImpersonating}
-                            title={blockedTitle}
-                            onClick={() =>
-                                confirm({
-                                    title: t('supplementary.confirm.rotateTitle'),
-                                    message: t('supplementary.confirm.rotateMessage'),
-                                    confirmText: t('supplementary.actions.rotate'),
-                                    isDangerous: false,
-                                    onConfirm: () => rotate.mutate(),
-                                })
-                            }
-                        >
-                            {t('supplementary.actions.rotate')}
-                        </button>
-                    )}
-                    {isPush && source.push_token_prefix && (
-                        <button
-                            type="button"
-                            className={small}
-                            disabled={busy}
-                            onClick={() =>
-                                confirm({
-                                    title: t('supplementary.live.confirm.revokeTitle'),
-                                    message: t('supplementary.live.confirm.revokeMessage'),
-                                    confirmText: t('supplementary.live.revoke'),
-                                    isDangerous: false,
-                                    onConfirm: () => revoke.mutate(),
-                                })
-                            }
-                        >
-                            {t('supplementary.live.revoke')}
-                        </button>
-                    )}
-                    {!disconnected && (
-                        <button
-                            type="button"
-                            className={small}
-                            disabled={busy}
-                            onClick={() =>
-                                confirm({
-                                    title: t('supplementary.confirm.disconnectTitle'),
-                                    message: t(hasHistory ? 'supplementary.confirm.disconnectMessage' : 'supplementary.live.confirm.disconnectMessage'),
-                                    confirmText: t('supplementary.actions.disconnect'),
-                                    isDangerous: false,
-                                    onConfirm: () => disconnect.mutate(),
-                                })
-                            }
-                        >
-                            {t('supplementary.actions.disconnect')}
-                        </button>
-                    )}
-                    {source.provides_history && (
-                        <button
-                            type="button"
-                            className="button button-danger button-compact"
-                            disabled={busy}
-                            onClick={() =>
-                                confirm({
-                                    title: t('supplementary.confirm.deleteDataTitle'),
-                                    message: t('supplementary.confirm.deleteDataMessage'),
-                                    confirmText: t('supplementary.actions.deleteData'),
-                                    isDangerous: true,
-                                    onConfirm: () => purge.mutate(),
-                                })
-                            }
-                        >
-                            {t('supplementary.actions.deleteData')}
-                        </button>
-                    )}
-                    <button
-                        type="button"
-                        className="button button-danger button-compact"
-                        disabled={busy}
-                        onClick={() =>
-                            confirm({
-                                title: t('supplementary.confirm.removeTitle'),
-                                message: t(hasHistory ? 'supplementary.confirm.removeMessage' : 'supplementary.live.confirm.removeMessage'),
-                                confirmText: t('supplementary.actions.remove'),
-                                isDangerous: true,
-                                onConfirm: () => remove.mutate(),
-                            })
-                        }
-                    >
-                        {t('supplementary.actions.remove')}
-                    </button>
-                </div>
+                            {isPush && source.push_token_prefix && (
+                                <>
+                                    <dt className="muted">{t('supplementary.card.token')}</dt>
+                                    <dd><code>ozs_{source.push_token_prefix}_…</code></dd>
+                                    <dt className="muted">{t('supplementary.card.tokenIssued')}</dt>
+                                    <dd>{dateTime(source.push_token_created_at)}</dd>
+                                    <dt className="muted">{t('supplementary.card.tokenLastUsed')}</dt>
+                                    <dd>{dateTime(source.push_token_last_used_at)}</dd>
+                                </>
+                            )}
+                        </dl>
+                        {isPush && !disconnected && !token && <PushEndpoints capabilities={capabilities} />}
+                    </div>
+                </Disclosure>
             )}
         </div>
     )
@@ -401,7 +453,35 @@ export function SourceDialog({ subject, onClose, ...details }: DialogProps) {
     const { t } = useTranslation()
     return (
         <FormModal isOpen size="md" title={t('supplementary.source.title', { subject })} onClose={onClose}>
-            <SourceDetails {...details} onGone={() => { details.onGone?.(); onClose() }} />
+            <SourceDetails {...details} identity onGone={() => { details.onGone?.(); onClose() }} />
         </FormModal>
+    )
+}
+
+interface PaneProps extends DetailsProps {
+    /** What the source belongs to, for the title: the meter id. */
+    subject: string
+    onClose: () => void
+    titleRef?: Ref<HTMLHeadingElement>
+}
+
+/**
+ * One source beside the list it was opened from (SPEC-2026-10-ui-patterns §6.2, rule A): the same body as
+ * the dialog, in a pane that is in flow on a wide screen and replaces the list on a narrow one. The host
+ * keeps it open by the id in the URL, so a refetch of the source list cannot swap it away.
+ */
+export function SourcePane({ subject, onClose, titleRef, ...details }: PaneProps) {
+    const { t } = useTranslation()
+    const { source } = details
+    const title = `${t(`supplementary.provider.${source.provider}`)}${source.label ? ` · ${source.label}` : ''}`
+    const provides = (['history', 'live', 'forecast'] as const)
+        .filter((capability) => source[`provides_${capability}`])
+        .map((capability) => t(`supplementary.capability.${capability}`))
+    return (
+        <DetailPane tone="brand" title={title} subtitle={[subject, provides.join(', ')].filter(Boolean).join(' · ')} onClose={onClose} titleRef={titleRef}>
+            <div className="detail-pane-body">
+                <SourceDetails {...details} onGone={() => { details.onGone?.(); onClose() }} />
+            </div>
+        </DetailPane>
     )
 }

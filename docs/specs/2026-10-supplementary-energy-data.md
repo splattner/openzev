@@ -67,7 +67,7 @@ or without this data.
 | Reconciliation | Source vs official meter: deviation, timestamp-shift detection |
 | API | Source CRUD and actions, push ingest, CSV import, additive `gross_energy` blocks on existing payloads |
 | Statistics | Participant dashboard, owner dashboard, annual report, annual statement PDF, MCP `consumption_summary` |
-| Frontend | "My metering points" page with the energy data setup (participant), source status and "no source" marker on the metering-point list (owner), gross cards and rates, i18n (de/fr/it/en) |
+| Frontend | "My metering points" page with the energy data setup (participant), the community's sources and a manager's rights over a participant's in the Energy data tab of the ZEV settings (owner), gross cards and rates, i18n (de/fr/it/en) |
 | Operations | Feature flag, system-health entry, system check, backup registry + manifest fingerprint, audit events |
 | Transfer archive | Sources (without secrets) and readings (last phase) |
 | Docs | User guide, baseline specs (see §11), `.env.example`, Helm values |
@@ -127,7 +127,7 @@ Data-management actions stay available
 
 **Frontend routes:** the participant UI lives on `/me/metering-points` ("My metering points", §7.1;
 shell roles `participant`, plus managers and viewers who are participants themselves, who reach it
-from their own call to action); the owner view lives on `/metering/points`. It was an Account tab
+from their own call to action); the manager's view of the community's sources is the **Energy data** tab of the ZEV settings (`/zev-settings/energy`, SPEC-2026-live-energy-data §7.3); the metering-point list carries nothing of it. It was an Account tab
 until [#944](https://github.com/splattner/openzev/issues/944); `/account?tab=energy-data` now lands
 on Profile like any unknown tab.
 
@@ -153,7 +153,7 @@ the second table below; everything else on this page describes the **history** c
 | `id` | `UUIDField` pk | `uuid4` | |
 | `metering_point` | `ForeignKey(zev.MeteringPoint, CASCADE, null=True)` | `None` | `related_name="supplementary_sources"` (was a `OneToOneField` named `supplementary_source`; `MeteringPoint.history_source()` / `live_source()` return the one with that capability). Null exactly for the grid connection point |
 | `participant` | `ForeignKey(zev.Participant, CASCADE, null=True)` | — | `related_name="supplementary_sources"`. The consenting holder; ingestion is clipped to their personal assignment windows. Null exactly when `held_by = zev` |
-| `provider` | `CharField(20)` | — | `SupplementaryProvider`: `solar_manager`, `push` ("push or file") |
+| `provider` | `CharField(20)` | — | `SupplementaryProvider`: `solar_manager`, `push` ("push or file"), `forecast_solar` (a forecast-only source, no credential; see the [live energy data spec](2026-10-live-energy-data.md) §4.1, §6.3) |
 | `label` | `CharField(100)` | `""` | Free text, e.g. "Solar Manager at home" |
 | `external_id` | `CharField(64)` | `""` | Solar Manager `smId`; validated `^[A-Za-z0-9]{3,24}$`; required for `solar_manager`, empty for `push` |
 | `credential_encrypted` | `BinaryField` | `b""` | Fernet ciphertext under `INTEGRATION_ENCRYPTION_KEYS` of `{"refresh_token": "..."}`. Never serialized. `solar_manager` only |
@@ -619,26 +619,29 @@ community's, so there the page shows only the meters the user holds with generat
   `MeteringPointDataCard`: meter id, community, the behind-the-meter badge and **View metering data**
   in the header, then a row per capability the point is eligible for (live data adds a **Live (now)**
   row next to **History (15 min)**; SPEC-2026-live-energy-data §7.2). The history row shows the source
-  (provider and name, a button that opens the source dialog), its status chip and the date it is synced
+  (provider and name, a button that opens the source in the page's pane), its status chip and the date it is synced
   through; an unconnected row says "Not connected" with a **Connect** for that capability, and one
   primary **Connect energy data** opens the single connect flow while something is unconnected.
   Reconnect-required and error banners of the history source stay on the card.
-- **Source dialog** (`SourceDialog`, a `FormModal`): everything about one source. Status, last sync,
+- **Source pane** (`SourcePane` beside the cards; `SourceDialog`, a `FormModal`, has the same body for the managers' live
+  dialogs): everything about one source. The pane is in flow beside the cards (the selection is `?source=<id>`, X and Back
+  return to the cards, focus returns to the control, a typed and unsaved key is guarded); see SPEC-2026-live-energy-data §7.2. Status, last sync,
   covered range, reconciliation state, and actions **Test**, **Sync now**, **Replace key** (Solar
   Manager), **New push token**, **Revoke token**, **Import CSV** (push), **Disconnect** (keeps data),
-  **Delete data**, **Remove source**; the push endpoints in a disclosure. Confirmations are the only
-  thing opened over it, and a rotated token stays on screen across refetches.
+  **Delete data**, **Remove source** (one visible action, **Sync now** or **Reconnect**, and the rest in a "⋯" menu with
+  the last section, in red, for ending it); the push endpoints, the Solar Manager id and the token facts in a closed
+  "Technical details" disclosure. Confirmations are the only thing opened over it, and a rotated token stays on screen across refetches.
 - **Connect flow** (`SupplementarySourceModal`): what (history, live; skipped when only one is open),
   how (Solar Manager for history only, a new push source, or the meter's existing push source, which
   takes the missing capability with a `PATCH` and consent and no new token), consent for what was chosen,
   and for a new push source one-time token screen. Without the live flag only history is offered.
 - **My connections** (`MyConnections`), a card above the meter cards while the feature is on and the
   source list has loaded: the participant-held sources on the meters the user holds in the selected
-  community, one row each (provider and label, the meter id(s) it feeds, a History and/or Live chip with
-  its status badge, and **Open** for the source dialog), or a muted empty line. UI only: a source
+  community, one row each (provider and label, the meter id(s) it feeds, a tag per capability it
+  provides, a problem only when there is one, and **Open** for the source pane); shown from two sources on. UI only: a source
   still feeds exactly one metering point (`SupplementarySource.metering_point`); account-level
   connections are a future idea (SPEC-2026-live-energy-data §12). Details: that spec §7.2.
-- Any other meter: a plain card (meter id, location, active, type, the behind-the-meter badge). A
+- Any other meter: a plain card (meter id and one muted line: location, type, "surplus metering" and "inactive" as plain text, no pills) with the "Grid operator's meter" band that links to its readings. A
   flagged one the user does not hold personally says only the holder can connect energy data.
 - Every card, plain or energy data, has a **View metering data** button (`MeteringDataLink`) to
   `/metering/chart?metering_point=<id>`: the chart page was already open to participants and the
@@ -648,9 +651,9 @@ community's, so there the page shows only the meters the user holds with generat
   While the source list is loading or failed, a meter whose eligible entry names a source shows a
   loading or error state with a retry rather than rows and **Connect**; **View metering data** stays in
   the card header.
-- The connect flow and the source dialog are rendered next to the card, never inside it, and kept open
-  by their own state, so a push source's one-time token stays on screen when the refreshed source list
-  changes the rows behind it.
+- The connect flow is rendered next to the card, never inside it, and kept open by its own state; the source pane is
+  kept open by the id in the URL and holds the one-time token of a rotation in its own state, so a push source's token
+  stays on screen when the refreshed source list changes the rows behind it.
 - A closing hint, shown only while the feature is on and only to a participant, says who flags a
   meter: the community's manager (§14). Participants cannot set the flag.
 - While the feature is off (`eligible` answers `404`) the page is a plain meter list: no energy data
@@ -679,22 +682,16 @@ admin gets `[]` unless linked to a participant), the flagged meters they hold pe
 - `accountTabs.ts` no longer has an `'energy-data'` tab; `resolveAccountTab` takes only
   `mustChangePassword`.
 
-### 7.2 Owner: metering-point list
+### 7.2 Owner: the Energy data tab
 
-**File:** `frontend/src/features/meteringPoints/MeteringPointsList.tsx`; new
-`SupplementarySourceStatus.tsx` (a button-styled badge, `badge-button` in `styles/components/badge.css`, and the panel).
-
-Flagged metering points show a status chip from `supplementary_source_status`: on the row when the
-source is in trouble (`error`, `reconnect_required`), otherwise in the row's expanded Measurement card
-(`MeteringPointRow`); a flagged one with no
-source shows a quiet neutral "No energy data source" marker instead (only while the feature is on,
-known from `useEnergyDataEligibility`, never a warning: the data is optional). On a meter the
-signed-in manager holds themselves the marker is a link to "My metering points" (**Connect your energy
-data**) and the panel of a connected source links there instead of the read-only note: the credential
-is theirs to manage. An owner can
-open a read-only panel (status, last sync, coverage, reconciliation) with **Disable**,
-**Delete data** and **Remove source** (manager actions only). No credential field is shown to
-an owner.
+**Files:** `frontend/src/features/supplementary/ZevEnergySources.tsx`, `ZevConnectDialog.tsx` and the tab in
+`frontend/src/pages/ZevSettingsPage.tsx` (SPEC-2026-live-energy-data §7.3). It replaces the status chip, the "no energy data
+source" marker and the read-only panel the metering-point list used to carry (`SupplementarySourceStatus`): that list
+shows no energy data at all. The tab lists every source of the community with a problem only as text. Opening a
+participant's source shows its state (status, last sync, coverage, reconciliation) with **Switch off**/**Switch on**, **Delete
+data** and **Remove source** (manager actions only, confirmed); no credential, test, sync or key. A manager who holds the
+meter themselves is pointed to "My metering points", where the credential is theirs to manage. A viewer sees the list and the
+state without actions.
 
 ### 7.3 Statistics surfaces
 
@@ -742,7 +739,7 @@ an owner.
 **File:** `frontend/src/types/api.ts`
 
 ```typescript
-export type SupplementaryProvider = 'solar_manager' | 'push'
+export type SupplementaryProvider = 'solar_manager' | 'push' | 'forecast_solar'
 export type SupplementaryStatus = 'pending' | 'ok' | 'error' | 'reconnect_required' | 'disabled'
 
 export interface SupplementaryReconciliation {
@@ -1028,7 +1025,7 @@ CI runs `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-he
   field; a push source ends on a one-time token screen; the card per status (ok, reconnect required,
   disconnected, push); test, sync (cooldown), replace key, disconnect, delete data, remove and
   rotate, the destructive ones behind a confirmation; CSV check, import and row errors.
-- **`tests/supplementary-owner-status.test.ts`** (12): no chip without a source, a quiet marker on a flagged
+- **`tests/zev-energy-sources.test.ts`** (11, replacing the former `supplementary-owner-status.test.ts`): the list, the connect dialog and the limited manager pane; the former tests were (12): no chip without a source, a quiet marker on a flagged
   meter without one while the feature is on and nothing without generation or with the feature off; the chip as a
   button with its tone; the panel shows status and comparison but no credential field; a manager
   can switch off, delete data and remove behind confirmations; a viewer has no actions; the

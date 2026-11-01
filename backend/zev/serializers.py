@@ -7,7 +7,7 @@ from .geocoding import get_cached_building_footprint
 from .grid_operators import grid_operator_ids
 from django.utils import timezone
 
-from .models import Building, Zev, Participant, Party, PartyKind, PartyTitle, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode, PartyRole, ZevPartyRole, normalize_secondary_meter_id, validate_meter_identities
+from .models import Building, PvPlane, Zev, Participant, Party, PartyKind, PartyTitle, MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode, PartyRole, ZevPartyRole, normalize_secondary_meter_id, validate_meter_identities
 from .services import (
     account_for_email, create_zev_with_owner_setup, ensure_participant_account, existing_owner_problem,
     lock_participant_account, requires_independent_login,
@@ -550,7 +550,7 @@ class BuildingSerializer(serializers.ModelSerializer):
         model = Building
         fields = [
             "id", "zev", "name", "address_line1", "address_line2", "postal_code", "city", "egid", "notes",
-            "metering_point_count", "building_footprint", "current_participants", "created_at", "updated_at",
+            "latitude", "longitude", "metering_point_count", "building_footprint", "current_participants", "created_at", "updated_at",
         ]
         read_only_fields = [
             "id", "metering_point_count", "building_footprint", "current_participants", "created_at", "updated_at",
@@ -889,3 +889,33 @@ class ZevCreateWithOwnerSerializer(BankIbanValidationMixin, serializers.Serializ
             if "owner" in errors.detail:
                 raise errors from exc
             raise serializers.ValidationError({"metering_points": errors.detail}) from exc
+
+
+class PvPlaneSerializer(serializers.ModelSerializer):
+    """One roof plane of the plant behind a producing metering point (SPEC-2026-live-energy-data §4.3).
+
+    The metering point comes from the URL (``PvPlaneViewSet.create``) and cannot be changed.
+    """
+
+    class Meta:
+        model = PvPlane
+        fields = ["id", "metering_point", "label", "peak_power_kwp", "tilt_deg", "azimuth_deg", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate_metering_point(self, value):
+        if self.instance is not None and value.pk != self.instance.metering_point_id:
+            raise serializers.ValidationError("A PV plane cannot be moved to another metering point.")
+        return value
+
+    def validate(self, attrs):
+        candidate = PvPlane(
+            pk=self.instance.pk if self.instance else None,
+            metering_point=attrs.get("metering_point") or self.instance.metering_point,
+        )
+        for name, value in attrs.items():
+            setattr(candidate, name, value)
+        try:
+            candidate.clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict) from exc
+        return attrs

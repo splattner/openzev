@@ -23,12 +23,13 @@ from audit.services import record_audit_event
 
 from allocation.validity import civil_date
 
+from .live import forecast as forecast_service
 from .live import store as live_store
 from .live.source_state import holder_gone, touch_last_seen
 from .models import SourceHolder, SourceTarget, SupplementaryProvider, SupplementarySource, SupplementaryStatus
 from .supplementary import permissions, sync
 from .supplementary.providers import PROVIDERS
-from .supplementary.providers import ProviderAuthError, ProviderError, ProviderRateLimited
+from .supplementary.providers import ForecastDeferred, ProviderAuthError, ProviderError, ProviderRateLimited
 from .supplementary.stats import personal_windows
 
 logger = logging.getLogger(__name__)
@@ -250,6 +251,96 @@ def poll_live_sources() -> dict:
             continue
         queued += 1
     return {"queued": queued}
+
+
+def refresh_forecast_source_impl(source_id, *, force: bool = False) -> dict:
+    """Fetch and store one source's production forecast (SPEC-2026-live-energy-data §6.3).
+
+    ``force`` skips the minimum refresh interval of forecast.solar (a manual refresh); the call budget still
+    applies. A source that provides only a forecast keeps its status like a history source; one that also
+    provides history or live leaves ``status`` and ``last_error`` to those, except that an auth failure makes
+    the whole source ``reconnect_required``. Nothing is audited per refresh.
+    """
+    source = (
+        SupplementarySource.objects.select_related("metering_point__building", "zev").filter(pk=source_id).first()
+    )
+    if source is None or not source.provides_forecast or not source.enabled:
+        return {"source_id": str(source_id), "skipped": "missing"}
+    if not permissions.live_feature_enabled():
+        return {"source_id": str(source_id), "skipped": "feature_off"}
+    with source_lock(f"forecast-{source.pk}") as acquired:
+        if not acquired:
+            return {"source_id": str(source.pk), "skipped": "busy"}
+        now = timezone.now()
+        if source.provider == SupplementaryProvider.FORECAST_SOLAR and not force:
+            fetched = forecast_service.latest_fetch([source.pk]).get(source.pk)
+            if fetched is not None and (now - fetched).total_seconds() < settings.FORECAST_SOLAR_MIN_REFRESH_S:
+                return {"source_id": str(source.pk), "skipped": "recent"}
+        only_forecast = not (source.provides_history or source.provides_live)
+        try:
+            hours = forecast_service.fetch_hours(source)
+        except ForecastDeferred:
+            return {"source_id": str(source.pk), "skipped": "budget"}
+        except ProviderAuthError as exc:
+            sync.record_failure(source, SupplementaryStatus.RECONNECT_REQUIRED, str(exc))
+            _audit_best_effort(
+                source, "sync", f"Forecast needs a new key: {exc}", status=AuditEventStatus.FAILED,
+                metadata={"zev_id": str(source.zev_id), "capability": "forecast", "outcome": "reconnect_required"},
+            )
+            return {"source_id": str(source.pk), "error": "reconnect_required"}
+        except ProviderError as exc:
+            if only_forecast:
+                sync.record_failure(source, SupplementaryStatus.ERROR, str(exc))
+            else:
+                logger.warning("Forecast refresh failed for supplementary source %s: %s", source.pk, exc)
+            return {"source_id": str(source.pk), "error": "provider"}
+        stored = forecast_service.store_hours(source, hours, now)
+        if only_forecast:
+            sync.record_success(source, now)
+        return {"source_id": str(source.pk), "stored": stored}
+
+
+@shared_task(max_retries=0)
+def refresh_forecast_source(source_id, force: bool = False):
+    """The next beat tick is the retry; a forecast only changes slowly."""
+    return refresh_forecast_source_impl(source_id, force=force)
+
+
+@shared_task
+def refresh_production_forecasts() -> dict:
+    """Queue a forecast refresh for every enabled forecast source, oldest first (beat, ``FORECAST_REFRESH_INTERVAL_S``)."""
+    if not permissions.live_feature_enabled():
+        return {"queued": 0, "skipped": "feature_off"}
+    ids = list(
+        SupplementarySource.objects.filter(enabled=True, provides_forecast=True, zev__disabled_at__isnull=True)
+        .exclude(status=SupplementaryStatus.RECONNECT_REQUIRED)
+        .values_list("pk", flat=True)
+    )
+    fetched = forecast_service.latest_fetch(ids)
+    ids.sort(key=lambda pk: (fetched.get(pk) is not None, fetched.get(pk) or timezone.now()))
+    queued = 0
+    for source_id in ids:
+        try:
+            refresh_forecast_source.delay(str(source_id))
+        except Exception:  # a broker outage must not stop the other sources
+            logger.exception("Could not queue a forecast refresh for supplementary source %s", source_id)
+            continue
+        queued += 1
+    return {"queued": queued}
+
+
+def queue_forecast_refresh(source, *, force: bool = False) -> None:
+    """Queue a forecast refresh once the surrounding transaction commits."""
+    if not source.provides_forecast:
+        return
+
+    def enqueue():
+        try:
+            refresh_forecast_source.delay(str(source.pk), force=force)
+        except Exception:  # a broker outage must not fail the request that already committed
+            logger.exception("Could not queue a forecast refresh for supplementary source %s", source.pk)
+
+    transaction.on_commit(enqueue)
 
 
 def queue_sync(source, *, backfill: bool = False) -> None:

@@ -11,7 +11,8 @@ import { useBillingPeriodParams } from '../lib/useBillingPeriodParams'
 
 /**
  * My energy system (`/my-energy`, alias `/live`): everything that comes from devices, live and the
- * participant's own history (SPEC-2026-live-energy-data §7). The grid operator's official figures stay on
+ * participant's own history (SPEC-2026-live-energy-data §7). It is "My energy system" for a participant and "Live
+ * energy" for a manager, viewer or admin, who see the whole community there. The grid operator's official figures stay on
  * Energy balance. The billing period for the Period view is owned here, as on the dashboard.
  */
 export function MyEnergyPage() {
@@ -38,8 +39,8 @@ export function MyEnergyPage() {
                 eyebrow={selectedCommunityName({ selectedZev, entries, selectedZevId })}
                 communitySwitch
                 scopeNote={scopeNote}
-                title={t('pages.myEnergy.title')}
-                description={t('pages.myEnergy.description')}
+                title={t(isZevScope ? 'pages.myEnergy.titleCommunity' : 'pages.myEnergy.title')}
+                description={t(isZevScope ? 'pages.myEnergy.descriptionCommunity' : 'pages.myEnergy.description')}
             />
             <ScopeGuard skeleton="kpiRow">
                 <MyEnergyView interval={interval} period={period} onPeriodChange={setPeriod} periodReady={periodReady} />

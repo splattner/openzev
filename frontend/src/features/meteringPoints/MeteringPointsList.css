@@ -368,14 +368,6 @@
   overflow-wrap: anywhere;
 }
 
-.metering-detail-source {
-  margin-top: 0.5rem;
-}
-
-.metering-detail-source:empty {
-  display: none;
-}
-
 .metering-assignment-list {
   display: grid;
   margin: 0;

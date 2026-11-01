@@ -15,7 +15,8 @@ import { BuildingHeader } from '../features/meteringPoints/BuildingHeader'
 import { groupMeteringPointsByBuilding } from '../features/meteringPoints/useMeteringPointForms'
 import { MeteringPointsToolbar } from '../features/meteringPoints/MeteringPointsToolbar'
 import { useMeteringPointActions } from '../features/meteringPoints/useMeteringPointActions'
-import { ConnectionPointCard, PointLiveDialog, useLiveSetup } from '../features/meteringPoints/LiveSetup'
+import { PvPlanesDialog } from '../features/meteringPoints/PvPlanesDialog'
+import { useLiveEnabled } from '../lib/live'
 import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
@@ -56,8 +57,9 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
     const { t } = useTranslation()
     const { isZevScope: isManagedScope } = useCommunityAccess()
     const readOnly = !canWrite
-    const liveSetup = useLiveSetup({ zevId: selectedZevId || undefined, canWrite, isManagedScope })
-    const [livePoint, setLivePoint] = useState<MeteringPoint | null>(null)
+    // The roof planes of a plant are for the forecast, which exists while the live view is on.
+    const liveOn = useLiveEnabled({ enabled: isManagedScope }).data === true
+    const [planesPoint, setPlanesPoint] = useState<MeteringPoint | null>(null)
 
     const {
         meteringPointsQuery,
@@ -185,9 +187,6 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                 ) : assignmentsQuery.data === undefined && (
                     <p className="muted" role="status">{t('pages.meteringPoints.assignmentsLoading')}</p>
                 ))}
-                {isManagedScope && selectedZevId && (
-                    <ConnectionPointCard zevId={selectedZevId} setup={liveSetup} canWrite={canWrite} confirm={confirm} />
-                )}
                 <MeteringPointsToolbar
                     isManagedScope={isManagedScope}
                     readOnly={readOnly}
@@ -306,8 +305,7 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                         onOpenEditAssignment={openEditAssignModal}
                         onDeleteMeteringPoint={(id) => deleteMpMutation.mutate({ id, scope })}
                         onDeleteAssignment={(id) => deleteAssignMutation.mutate({ id, scope })}
-                        liveSetupPointIds={canWrite ? new Set(liveSetup.zevEligibleByPoint.keys()) : undefined}
-                        onOpenLive={setLivePoint}
+                        onOpenPlanes={liveOn ? setPlanesPoint : undefined}
                     />
                 )}
 
@@ -328,7 +326,18 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                     }}
                 />
 
-                {livePoint && <PointLiveDialog point={livePoint} setup={liveSetup} confirm={confirm} onClose={() => setLivePoint(null)} />}
+                {planesPoint && (
+                    <PvPlanesDialog
+                        point={planesPoint}
+                        canWrite={canWrite}
+                        building={buildings.find((building) => building.id === planesPoint.building)}
+                        onEditBuilding={(building) => {
+                            setPlanesPoint(null)
+                            openEditBuildingModal(building)
+                        }}
+                        onClose={() => setPlanesPoint(null)}
+                    />
+                )}
 
                 {dialog && (
                     <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />

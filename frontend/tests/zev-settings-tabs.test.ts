@@ -95,6 +95,14 @@ vi.mock('../src/lib/appSettings', () => ({
     formatShortDate: (d: string) => d,
     formatDateTime: (d: string) => d,
 }))
+// Whether the instance has the energy data feature on: the Energy data tab follows it.
+const energy = vi.hoisted(() => ({ on: false }))
+vi.mock('../src/lib/api/supplementary', () => ({
+    fetchEligibleOrNull: async () => (energy.on ? [] : null),
+    listSupplementarySources: async () => [],
+    fetchZevEligibleSources: async () => ({ zev: 'z', metering_points: [], connection_point: { available: false, source: null } }),
+}))
+vi.mock('../src/lib/api/live', async (importOriginal) => ({ ...(await importOriginal<typeof import('../src/lib/api/live')>()), fetchLiveEnabled: async () => false }))
 vi.mock('../src/lib/api/zev', () => ({
     fetchGridOperators: vi.fn().mockResolvedValue({ operators: [] }),
     fetchGridOperatorSuggestions: vi.fn().mockResolvedValue({ operators: [] }),
@@ -244,6 +252,29 @@ describe('merged settings tab bookmarks', () => {
         expect(router.state.location.search).toBe('?focus=issuer&from=bookmark')
         expect(router.state.location.hash).toBe('#people')
     }, 15_000)
+})
+
+describe('the Energy data tab', () => {
+    afterEach(() => { energy.on = false })
+
+    it('is there only while the energy data feature is on', async () => {
+        const off = await renderAt('/zev-settings/general')
+        expect(findTab(off.container, 'energyData')).toBeUndefined()
+        cleanups.splice(0).forEach((cleanup) => cleanup())
+
+        energy.on = true
+        const on = await renderAt('/zev-settings/general')
+        await waitForCondition(() => findTab(on.container, 'energyData') !== undefined, 'the energy data tab')
+    })
+
+    it('opens the community\'s sources, without a save bar', async () => {
+        energy.on = true
+        const { container, router } = await renderAt('/zev-settings/energy')
+        await waitForText(container, 'supplementary.zev.empty.title')
+
+        expect(router.state.location.pathname).toBe('/zev-settings/energy')
+        expect(saveBar(container)).toBeNull()
+    })
 })
 
 describe('ZEV settings routed form', () => {

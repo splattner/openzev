@@ -95,6 +95,14 @@ def record_failure(source: SupplementarySource, status: str, safe_text: str, *, 
     )
 
 
+def record_success(source: SupplementarySource, now: datetime) -> None:
+    """Store an ok outcome without overwriting a concurrent disconnect."""
+    source.mark_ok(at=now)
+    SupplementarySource.objects.filter(pk=source.pk, enabled=True).update(
+        status=source.status, last_sync_at=now, last_success_at=now, last_error="", updated_at=now
+    )
+
+
 def sync_source(source: SupplementarySource, *, backfill: bool = False, now: datetime | None = None) -> SyncResult:
     """Fetch and store what is new for ``source``.
 
@@ -142,10 +150,7 @@ def sync_source(source: SupplementarySource, *, backfill: bool = False, now: dat
         raise
 
     # A run that stored nothing (the vendor had no new data yet) still succeeded.
-    source.mark_ok(at=now)
-    SupplementarySource.objects.filter(pk=source.pk, enabled=True).update(
-        status=source.status, last_sync_at=now, last_success_at=now, last_error="", updated_at=now
-    )
+    record_success(source, now)
     try:
         reconcile.reconcile_and_store(source, now=now)
     except Exception:  # diagnostic only: it must never turn a good sync into a failure

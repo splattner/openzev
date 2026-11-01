@@ -1,6 +1,6 @@
 """Generalised energy data sources: capabilities, ZEV-held sources, grid connection point.
 
-SPEC-2026-live-energy-data §3, §4.1, §5 (forecast refused; a Solar Manager key is personal, so ZEV-held and connection point sources are push only).
+SPEC-2026-live-energy-data §3, §4.1, §5 (a push source has no forecast; a Solar Manager key is personal, so ZEV-held and connection point sources are push only).
 """
 
 import importlib
@@ -331,8 +331,8 @@ class SourceCreationRightsTests(CapabilityTestCase):
 
     # ---- rollout restrictions of this release ----
 
-    def test_forecast_is_not_available_yet(self):
-        response = self.post(self.holder_user, self.plain, provides_forecast=True, **LIVE_ONLY)
+    def test_a_push_source_cannot_provide_a_forecast(self):
+        response = self.post(self.holder_user, self.point, provides_forecast=True, **LIVE_ONLY)
         self.assertEqual(response.status_code, 400)
         self.assertIn("provides_forecast", response.json())
 
@@ -392,7 +392,7 @@ class SourceCreationRightsTests(CapabilityTestCase):
         event = AuditEvent.objects.filter(action_type="supplementary_source.update").latest("created_at")
         self.assertEqual(event.metadata_json["capabilities"], ["history", "live"])
 
-    def test_capabilities_stay_within_the_rollout_when_patched(self):
+    def test_a_push_source_cannot_gain_a_forecast_and_cannot_lose_its_last_capability(self):
         source_id = self.create_push_source().json()["id"]
         url = f"{SOURCES_URL}{source_id}/"
         self.assertEqual(client_for(self.holder_user).patch(url, {"provides_forecast": True}, format="json").status_code, 400)
@@ -497,7 +497,7 @@ class EligibleTests(CapabilityTestCase):
         rows = {r["metering_point"]: r for r in client_for(self.holder_user).get(ELIGIBLE_URL).json()}
         self.assertEqual(set(rows), {str(self.point.pk), str(self.plain.pk)})
         flagged, plain = rows[str(self.point.pk)], rows[str(self.plain.pk)]
-        self.assertEqual(flagged["eligible_capabilities"], ["history", "live"])
+        self.assertEqual(flagged["eligible_capabilities"], ["history", "live", "forecast"])
         self.assertEqual(flagged["sources"], {"history": history_id, "live": None, "forecast": None})
         self.assertEqual(flagged["source"], history_id)
         self.assertEqual(plain["eligible_capabilities"], ["live"])

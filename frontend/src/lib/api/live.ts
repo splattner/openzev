@@ -1,4 +1,4 @@
-import type { LiveCurve, LiveSnapshot, OwnSeries } from '../../types/api'
+import type { LiveCurve, LiveSnapshot, OwnSeries, ProductionForecast } from '../../types/api'
 import { api } from './client'
 
 const BASE = '/metering/live/zevs/'
@@ -53,4 +53,9 @@ export async function fetchOwnSeries({ zevId, dateFrom, dateTo, bucket, particip
 export async function fetchLiveEnabled(): Promise<boolean> {
   const { data } = await api.get<{ enabled: boolean }>('/metering/live/enabled/')
   return data.enabled
+}
+
+/** The ZEV's expected production hour by hour. `null` while the feature is off or the caller may not see the ZEV (404). */
+export function fetchProductionForecastOrNull(zevId: string): Promise<ProductionForecast | null> {
+  return notFoundToNull(api.get<ProductionForecast>(`${BASE}${zevId}/forecast/`).then((response) => response.data))
 }

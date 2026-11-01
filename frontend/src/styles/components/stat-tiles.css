@@ -95,6 +95,12 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
 }
 
+/* Two grids in one card (the viewer's own figures, then the ZEV totals) keep the grid's own gap between them. */
+
+.stat-grid + .stat-grid {
+  margin-top: 1rem;
+}
+
 /* Long compound labels (Amortisationsdauer) hyphenate in narrow tiles. */
 
 .stat-label {

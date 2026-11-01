@@ -49,7 +49,7 @@ export function useSourceActions(source: SupplementarySource, { onToken, onGone,
     })
     const sync = useMutation({
         mutationFn: () => syncSupplementarySource(source.id),
-        onSuccess: () => pushToast(t('supplementary.actions.syncQueued'), 'success'),
+        onSuccess: () => pushToast(t(source.provides_history ? 'supplementary.actions.syncQueued' : 'supplementary.forecast.refreshQueued'), 'success'),
         onError: (error: any) =>
             pushToast(
                 error?.response?.status === 429 ? t('supplementary.actions.syncCooldown') : formatApiError(error, t('common.error')),
@@ -64,6 +64,12 @@ export function useSourceActions(source: SupplementarySource, { onToken, onGone,
             onKeyReplaced?.()
             pushToast(t('supplementary.actions.keyReplaced'), 'success')
         },
+        onError,
+        onSettled: refresh,
+    })
+    /** Switch the whole source on or off (a manager does it on somebody else's source; the credential is untouched). */
+    const setEnabled = useMutation({
+        mutationFn: (enabled: boolean) => updateSupplementarySource(source.id, { enabled }),
         onError,
         onSettled: refresh,
     })
@@ -105,15 +111,17 @@ export function useSourceActions(source: SupplementarySource, { onToken, onGone,
         mutationFn: (input: SupplementarySourceUpdate) => updateSupplementarySource(source.id, input),
         onSuccess: (_data, input) => {
             const key =
-                input.provides_live !== undefined
-                    ? input.provides_live ? 'supplementary.live.alsoSendDone' : 'supplementary.live.stopped'
-                    : input.provides_history ? 'supplementary.source.historyOn' : 'supplementary.source.historyStopped'
+                input.provides_forecast !== undefined
+                    ? input.provides_forecast ? 'supplementary.forecast.alsoUseDone' : 'supplementary.forecast.stopped'
+                    : input.provides_live !== undefined
+                        ? input.provides_live ? 'supplementary.live.alsoSendDone' : 'supplementary.live.stopped'
+                        : input.provides_history ? 'supplementary.source.historyOn' : 'supplementary.source.historyStopped'
             pushToast(t(key), 'success')
         },
         onError,
         onSettled: refresh,
     })
 
-    const busy = [test, sync, replaceKey, disconnect, purge, remove, rotate, revoke, capability].some((mutation) => mutation.isPending)
-    return { test, sync, replaceKey, disconnect, purge, remove, rotate, revoke, capability, busy }
+    const busy = [test, sync, replaceKey, setEnabled, disconnect, purge, remove, rotate, revoke, capability].some((mutation) => mutation.isPending)
+    return { test, sync, replaceKey, setEnabled, disconnect, purge, remove, rotate, revoke, capability, busy }
 }

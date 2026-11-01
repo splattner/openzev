@@ -10,6 +10,7 @@ from rest_framework.exceptions import APIException, PermissionDenied
 
 from zev import access
 from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, Participant, Zev
+from allocation.read_model import PRODUCTION_METER_TYPES
 from allocation.validity import active_on
 
 from ..models import (
@@ -143,12 +144,12 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
             return self._validate_create(attrs, user)
         return self._validate_update(attrs, user)
 
-    def _check_rollout(self, *, provider, forecast, adds_live, target=None, held_by=None):
-        """Restrictions of the live-data release; each lifts with the PR named in SPEC-live §10."""
-        if forecast:
-            raise serializers.ValidationError({"provides_forecast": ["Production forecasts are not available yet."]})
-        if adds_live and not permissions.live_feature_enabled():
-            raise serializers.ValidationError({"provides_live": ["Live energy data is not enabled."]})
+    def _check_rollout(self, *, provider, forecast, adds_live, adds_forecast=False, target=None, held_by=None,
+                       history=False, live=False):
+        """The live release's restrictions (SPEC-live §10): the flag, and who may hold what."""
+        if (adds_live or adds_forecast) and not permissions.live_feature_enabled():
+            field = "provides_live" if adds_live else "provides_forecast"
+            raise serializers.ValidationError({field: ["Live energy data is not enabled."]})
         if target == SourceTarget.CONNECTION_POINT and not permissions.live_feature_enabled():
             raise serializers.ValidationError({"target": ["Live energy data is not enabled."]})
         if held_by == SourceHolder.ZEV and not permissions.live_feature_enabled():
@@ -160,6 +161,21 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"provider": ["A Solar Manager key is personal. A ZEV-operated meter or the grid connection point "
                               "uses a push source."]}
+            )
+        if provider == SupplementaryProvider.FORECAST_SOLAR and (history or live or not forecast):
+            raise serializers.ValidationError({"provider": ["forecast.solar provides a forecast only."]})
+        if provider == SupplementaryProvider.PUSH and forecast:
+            raise serializers.ValidationError({"provides_forecast": ["A push source cannot provide a forecast."]})
+
+    @staticmethod
+    def _check_forecast_setup(metering_point, provider):
+        """forecast.solar needs the plant's roof planes and the building's coordinates (SPEC §4.1, §4.3)."""
+        if provider != SupplementaryProvider.FORECAST_SOLAR:
+            return
+        building = metering_point.building
+        if not metering_point.pv_planes.exists() or building.latitude is None or building.longitude is None:
+            raise serializers.ValidationError(
+                {"provides_forecast": ["Add the roof planes of this plant and the building's coordinates first."]}
             )
 
     def _check_conflicts(self, metering_point, *, history, live, forecast, exclude_pk=None):
@@ -184,18 +200,21 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
         provider = attrs.get("provider")
         if not provider:
             raise serializers.ValidationError({"provider": ["This field is required."]})
-        history = attrs.get("provides_history", not is_cp and held_by == SourceHolder.PARTICIPANT)
+        forecast_only = provider == SupplementaryProvider.FORECAST_SOLAR
+        history = attrs.get("provides_history", not is_cp and held_by == SourceHolder.PARTICIPANT and not forecast_only)
         live = attrs.get("provides_live", is_cp)
-        forecast = attrs.get("provides_forecast", False)
+        forecast = attrs.get("provides_forecast", forecast_only)
         attrs.update(target=target, held_by=held_by, provides_history=history, provides_live=live,
                      provides_forecast=forecast)
 
         self._check_rollout(
-            provider=provider, forecast=forecast, adds_live=live, target=target, held_by=held_by,
+            provider=provider, forecast=forecast, adds_live=live, adds_forecast=forecast, target=target,
+            held_by=held_by, history=history, live=live,
         )
         if not (history or live or forecast):
             raise serializers.ValidationError({"provides_history": ["Choose what the source provides."]})
-        if not attrs.get("consent"):
+        # forecast.solar holds no credential and reads nothing personal: there is nothing to consent to.
+        if not forecast_only and not attrs.get("consent"):
             raise serializers.ValidationError(
                 {"consent": ["Consent is required to connect an energy data source."]}
             )
@@ -271,6 +290,14 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
                 )
         if attrs["provides_live"] and not metering_point.is_active:
             raise serializers.ValidationError({"metering_point": ["The metering point is not active."]})
+        if attrs["provides_forecast"]:
+            if metering_point.meter_type not in PRODUCTION_METER_TYPES:
+                raise serializers.ValidationError(
+                    {"metering_point": ["Only a producing metering point can have a forecast."]}
+                )
+            if not metering_point.is_active:
+                raise serializers.ValidationError({"metering_point": ["The metering point is not active."]})
+            self._check_forecast_setup(metering_point, attrs["provider"])
         self._check_conflicts(
             metering_point, history=history, live=attrs["provides_live"], forecast=attrs["provides_forecast"]
         )
@@ -320,8 +347,10 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
             live = attrs.get("provides_live", instance.provides_live)
             forecast = attrs.get("provides_forecast", instance.provides_forecast)
             adds_live = live and not instance.provides_live
+            adds_forecast = forecast and not instance.provides_forecast
             self._check_rollout(
-                provider=instance.provider, forecast=forecast, adds_live=adds_live,
+                provider=instance.provider, forecast=forecast, adds_live=adds_live, adds_forecast=adds_forecast,
+                history=history, live=live,
             )
             if not (history or live or forecast):
                 raise serializers.ValidationError({"provides_history": ["A source must provide at least one kind of data."]})
@@ -329,14 +358,22 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"provides_live": ["The grid connection point provides live data only."]}
                 )
-            if adds_live and not consent:
+            uses_key = instance.provider == SupplementaryProvider.SOLAR_MANAGER
+            if (adds_live or (adds_forecast and uses_key)) and not consent:
                 raise serializers.ValidationError(
                     {"consent": ["Consent is required to connect an energy data source."]}
                 )
-            if adds_live and instance.provider == SupplementaryProvider.SOLAR_MANAGER and not instance.has_credential:
+            if (adds_live or adds_forecast) and uses_key and not instance.has_credential:
+                field = "provides_live" if adds_live else "provides_forecast"
                 raise serializers.ValidationError(
-                    {"provides_live": ["Enter the Solar Manager API key again before adding live data."]}
+                    {field: ["Enter the Solar Manager API key again before adding live or forecast data."]}
                 )
+            if adds_forecast and instance.metering_point_id:
+                if instance.metering_point.meter_type not in PRODUCTION_METER_TYPES:
+                    raise serializers.ValidationError(
+                        {"provides_forecast": ["Only a producing metering point can have a forecast."]}
+                    )
+                self._check_forecast_setup(instance.metering_point, instance.provider)
             if history and not instance.provides_history:
                 if instance.held_by != SourceHolder.PARTICIPANT:
                     raise serializers.ValidationError({"provides_history": ["History is only available for participant-held sources."]})
@@ -395,7 +432,7 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
                 source.provider, source.external_id, api_key, history=source.provides_history
             )
             source.set_credential(credential)
-        else:
+        elif source.provider == SupplementaryProvider.PUSH:
             self.push_token = source.issue_push_token()
         source.save()
         return source

@@ -424,38 +424,26 @@ describe('MeteringPointsList', () => {
         expect(remove).toHaveBeenCalledExactlyOnceWith('a1')
     })
 
-    it('marks a point with a live source with a quiet live chip, and nothing on one without', () => {
-        const view = render({ points: [point('m1', { live_state: 'stale' }), point('m2')], groups: null })
-        const chips = Array.from(view.querySelectorAll('.metering-point-id .badge')).map((node) => node.textContent)
-        expect(chips).toEqual(['supplementary.live.chip.stale'])
-        expect(view.querySelector('.metering-point-id button.badge')).toBeNull()
-    })
-
     const menuLabels = async (view: HTMLElement) => {
         act(() => view.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!.click())
         await waitForCondition(() => !!document.querySelector('[role="menuitem"]'), 'point menu')
         return Array.from(document.querySelectorAll('[role="menuitem"]')).map((item) => item.textContent ?? '')
     }
 
-    it('opens the live dialog from the chip and from the point menu of a point the manager can set live data up on', async () => {
-        const open = vi.fn()
-        const view = render({ points: [point('m1', { live_state: 'fresh' })], groups: null, liveSetupPointIds: new Set(['m1']), onOpenLive: open })
-        act(() => view.querySelector<HTMLButtonElement>('.metering-point-id button.badge')!.click())
-        expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: 'm1' }))
+    it('says nothing about live or history data: no chip, no energy data badge, no live action', async () => {
+        const view = render({ points: [point('m1', { live_state: 'fresh', supplementary_source_status: 'error' }), point('m2', { live_state: 'stale' })], groups: null })
 
-        expect((await menuLabels(view)).some((label) => label.includes('pages.meteringPoints.liveData'))).toBe(true)
-    })
-
-    it('offers no live action on a point the manager cannot set live data up on', async () => {
-        const view = render({ points: [point('m2')], groups: null, liveSetupPointIds: new Set(['m1']), onOpenLive: vi.fn() })
-
+        expect(view.textContent).not.toContain('supplementary.live.chip')
+        expect(view.textContent).not.toContain('supplementary.owner')
+        expect(view.querySelector('.metering-point-id .badge')).toBeNull()
         expect((await menuLabels(view)).some((label) => label.includes('pages.meteringPoints.liveData'))).toBe(false)
     })
 
-    it('shows no live action to a viewer, but keeps the chip as plain text', () => {
-        const view = render({ points: [point('m1', { live_state: 'fresh' })], groups: null, readOnly: true })
-        expect(view.querySelector('.metering-point-id .badge')!.textContent).toBe('supplementary.live.chip.fresh')
-        expect(view.querySelector('.metering-point-id button.badge')).toBeNull()
+    it('shows the generation-behind-the-meter flag as plain text, not a pill', () => {
+        const view = render({ points: [point('m1', { has_behind_meter_generation: true })], groups: null })
+
+        expect(view.querySelector('.metering-point-id .muted')?.textContent).toBe('behindMeter.badge')
+        expect(view.querySelector('.metering-point-id .badge')).toBeNull()
     })
 
 })

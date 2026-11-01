@@ -123,6 +123,8 @@ class StubSolarManager:
         self.stream_response = None
         self.stream_payload = {"t": None, "iW": 400, "eW": 100, "pW": 900, "cW": 1200, "bW": 50, "soc": 80}
         self.stream_requests: list[dict] = []
+        self.forecast_payload = {"data": []}
+        self.forecast_requests: list[dict] = []
         self.extra_rows = lambda start, end: []
         self.refresh_requests: list[dict] = []
         self.range_requests: list[dict] = []
@@ -184,6 +186,12 @@ class StubSolarManager:
                     if payload.get("t") is None:
                         payload["t"] = datetime.now(dt_timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
                     return self._json(200, payload)
+                if url.path.endswith("/data/forecast"):
+                    vendor.forecast_requests.append({"path": url.path, "bearer": bearer})
+                    if bearer not in vendor.access_tokens:
+                        return self._json(401, {"message": "unauthorized"})
+                    payload = vendor.forecast_payload() if callable(vendor.forecast_payload) else vendor.forecast_payload
+                    return self._json(200, payload)
                 vendor.range_requests.append({"path": url.path, "query": query, "bearer": bearer})
                 number = len(vendor.range_requests)
                 if bearer not in vendor.access_tokens:
@@ -201,6 +209,55 @@ class StubSolarManager:
                     stamp += timedelta(minutes=15)
                 rows.extend(vendor.extra_rows(start, end))
                 self._json(200, {"data": rows, "interval": 900})
+
+        self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=self._server.serve_forever, daemon=True).start()
+        return self
+
+    def stop(self):
+        if self._server:
+            self._server.shutdown()
+            self._server.server_close()
+
+    @property
+    def url(self) -> str:
+        return f"http://127.0.0.1:{self._server.server_address[1]}"
+
+
+class StubForecastSolar:
+    """A local HTTP server that answers ``/estimate/watts/...`` like forecast.solar.
+
+    ``watts`` maps local timestamps (Europe/Zurich) to power; ``status`` and ``headers`` make it misbehave.
+    Every request path is recorded in ``requests``.
+    """
+
+    def __init__(self, watts: dict | None = None, timezone: str = "Europe/Zurich"):
+        self.watts = watts or {}
+        self.timezone = timezone
+        self.status = 200
+        self.headers: dict = {}
+        self.requests: list[str] = []
+        self._server = None
+
+    def start(self):
+        vendor = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_GET(self):  # noqa: N802
+                vendor.requests.append(self.path)
+                body = json.dumps(
+                    {"result": {"watts": vendor.watts}, "message": {"code": 0, "info": {"timezone": vendor.timezone}}}
+                    if vendor.status == 200 else {"result": None, "message": {"code": vendor.status}}
+                ).encode()
+                self.send_response(vendor.status)
+                for name, value in vendor.headers.items():
+                    self.send_header(name, value)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
 
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         threading.Thread(target=self._server.serve_forever, daemon=True).start()

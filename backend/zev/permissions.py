@@ -50,14 +50,14 @@ class BaseZevScopedPermission(BasePermission):
         return False
 
     def _get_zev(self, obj):
-        from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment, Party, ZevPartyRole, Building
+        from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment, Party, ZevPartyRole, Building, PvPlane
         if isinstance(obj, Zev):
             return obj
         if isinstance(obj, (Participant, Party, ZevPartyRole, Building)):
             return obj.zev
         if isinstance(obj, MeteringPoint):
             return obj.zev
-        if isinstance(obj, MeteringPointAssignment):
+        if isinstance(obj, (MeteringPointAssignment, PvPlane)):
             return obj.metering_point.zev
         return None
 

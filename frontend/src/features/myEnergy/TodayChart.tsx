@@ -5,8 +5,10 @@ import {
     ANNOTATION_COLOR, AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CHART_LOCAL, FLOW_GRID_EXP, FLOW_LOCAL_CONS,
 } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
+import { nextPeakWindow, peakDayKind, peakRange } from '../../lib/forecast'
 import { formatClockMinutes, kwFigure, liveDayAxis } from '../../lib/live'
 import type { TodayRow } from '../../lib/myEnergy'
+import type { ForecastPeakWindow } from '../../types/api'
 
 const LIVE_DASH = '5 3'
 
@@ -15,13 +17,15 @@ const LIVE_DASH = '5 3'
  * 5-minute means only. "Your" lines are one merged series: stored history of the own system up to the
  * hand-over (solid), live values after it (dashed). A gap stays a gap, nothing is interpolated.
  */
-export function TodayChart({ date, rows, through, hasLive }: {
+export function TodayChart({ date, rows, through, hasLive, peakWindows = [] }: {
     date: string
     rows: TodayRow[]
     /** End of the last history interval; the hand-over from history to live. */
     through: string | null
     /** The live curve answered; without it the chart shows the history alone. */
     hasLive: boolean
+    /** The forecast's peak windows; today's is named above the chart. */
+    peakWindows?: ForecastPeakWindow[]
 }) {
     const { t } = useTranslation()
     const titleId = useId()
@@ -31,6 +35,9 @@ export function TodayChart({ date, rows, through, hasLive }: {
     const positive = (pick: (row: TodayRow) => number | null) => rows.some((row) => (pick(row) ?? 0) > 0)
     const hasOwnHistory = has((row) => row.ownHistory)
     const hasOwnLive = has((row) => row.ownLive)
+    const hasForecast = has((row) => row.forecast)
+    const hasBand = has((row) => (row.forecastBand ? row.forecastBand[1] : null))
+    const peak = nextPeakWindow(peakWindows.filter((window) => window.date === date))
         const handOver = through ? Date.parse(through) : null
     const showHandOver = handOver !== null && hasOwnHistory && handOver > axis.start && handOver < axis.end
     const kwTooltip = (value: unknown) => (typeof value === 'number' ? `${kwFigure(value * 1000)} kW` : String(value))
@@ -51,10 +58,11 @@ export function TodayChart({ date, rows, through, hasLive }: {
     return (
         <section className="card chart-card" aria-labelledby={titleId}>
             <h3 id={titleId}>{t('myEnergy.today.title')}</h3>
-            {!hasZev && !hasOwnHistory && !hasOwnLive ? (
+            {!hasZev && !hasOwnHistory && !hasOwnLive && !hasForecast ? (
                 <p className="muted">{t(hasLive ? 'myEnergy.today.empty' : 'myEnergy.today.emptyHistory')}</p>
             ) : (
                 <>
+                    {peak && <p><strong>{t(`forecast.peak.${peakDayKind(peak)}`, { range: peakRange(peak) })}</strong></p>}
                     <ResponsiveContainer width="100%" height={280}>
                         <ComposedChart data={rows} margin={{ top: 16, right: 20, bottom: 4, left: 0 }}>
                             <CartesianGrid stroke={CHART_GRIDLINE} strokeDasharray="3 3" vertical={false} />
@@ -80,6 +88,35 @@ export function TodayChart({ date, rows, through, hasLive }: {
                                     stroke={ANNOTATION_COLOR}
                                     strokeDasharray="4 3"
                                     label={{ value: t('myEnergy.today.handOver'), position: 'top', fontSize: 11, fill: ANNOTATION_COLOR }}
+                                />
+                            )}
+                            {hasBand && (
+                                <Area
+                                    type="stepAfter"
+                                    dataKey="forecastBand"
+                                    name={t('forecast.band')}
+                                    stroke="none"
+                                    fill={CHART_LOCAL}
+                                    fillOpacity={0.1}
+                                    legendType="none"
+                                    connectNulls={false}
+                                    isAnimationActive={false}
+                                />
+                            )}
+                            {hasForecast && (
+                                <Area
+                                    type="stepAfter"
+                                    dataKey="forecast"
+                                    name={t('myEnergy.today.forecast')}
+                                    stroke={CHART_LOCAL}
+                                    strokeOpacity={0.55}
+                                    strokeDasharray={LIVE_DASH}
+                                    fill={CHART_LOCAL}
+                                    fillOpacity={0.06}
+                                    strokeWidth={1.5}
+                                    dot={false}
+                                    connectNulls={false}
+                                    isAnimationActive={false}
                                 />
                             )}
                             {hasZev && (
@@ -118,7 +155,8 @@ export function TodayChart({ date, rows, through, hasLive }: {
                     </ResponsiveContainer>
                     <p className="muted">{t('myEnergy.today.hint')}</p>
                     {hasZev && <p className="muted">{t('live.curve.hint')}</p>}
-                    {!hasLive && <p className="muted">{t('myEnergy.today.historyOnly')}</p>}
+                    {hasForecast && <p className="muted">{t('myEnergy.today.forecastHint')}</p>}
+                    {!hasLive && hasOwnHistory && <p className="muted">{t('myEnergy.today.historyOnly')}</p>}
                 </>
             )}
         </section>

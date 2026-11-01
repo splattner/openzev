@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { fetchOwnSeries } from './api/live'
 import { queryKeys } from './api/queryKeys'
+import { businessDayStartMs, nextIsoDate } from './dates'
 import { liveCurveRows } from './live'
-import type { LiveCurve, OwnHistoryRow, OwnSeries } from '../types/api'
+import type { ForecastHour, LiveCurve, OwnHistoryRow, OwnSeries } from '../types/api'
 
-/** The three views of the "My energy system" page; the URL carries the choice as `?range=`. */
-export type MyEnergyRange = 'today' | 'week' | 'period'
-export const MY_ENERGY_RANGES: MyEnergyRange[] = ['today', 'week', 'period']
+/** The views of the "My energy system" page; the URL carries the choice as `?range=`. `tomorrow` only exists while there is a forecast for it. */
+export type MyEnergyRange = 'today' | 'tomorrow' | 'week' | 'period'
+export const MY_ENERGY_RANGES: MyEnergyRange[] = ['today', 'tomorrow', 'week', 'period']
 export const MY_ENERGY_DEFAULT_RANGE: MyEnergyRange = 'today'
 
 export function parseMyEnergyRange(value: string | null | undefined): MyEnergyRange {
@@ -78,6 +79,10 @@ export interface TodayRow {
     /** The same from live buckets, from the hand-over on. */
     ownLive: number | null
     ownLiveProduction: number | null
+    /** The expected production of the ZEV's plants, kW, flat across its hour; `null` where there is no forecast. */
+    forecast: number | null
+    /** `[min, max]` of the expected production, kW, where the forecast gives a band. */
+    forecastBand: [number, number] | null
 }
 
 const HISTORY_INTERVAL_MS = 900_000
@@ -85,6 +90,7 @@ const LIVE_STEP_MS = 300_000
 
 const blankRow = (ts: number): TodayRow => ({
     ts, production: null, consumption: null, ownHistory: null, ownHistoryProduction: null, ownLive: null, ownLiveProduction: null,
+    forecast: null, forecastBand: null,
 })
 
 /**
@@ -92,8 +98,15 @@ const blankRow = (ts: number): TodayRow => ({
  * interval is used before `through` (the end of the last interval the own source synced), a live bucket
  * from `through` on, and where neither has a value there is a gap, never an interpolation. The
  * ZEV totals are live only. The history line is carried to `through`, so it ends where live begins.
+ * The forecast of the civil day `forecast.date` is drawn flat across each of its hours, past hours included
+ * (they show what was expected next to what happened).
  */
-export function todayRows(curve: LiveCurve | null | undefined, history: OwnHistoryRow[], through: string | null): TodayRow[] {
+export function todayRows(
+    curve: LiveCurve | null | undefined,
+    history: OwnHistoryRow[],
+    through: string | null,
+    forecast?: { date: string; hours: ForecastHour[] },
+): TodayRow[] {
     const throughMs = through ? Date.parse(through) : null
     const byTs = new Map<number, TodayRow>()
     const row = (ts: number) => {
@@ -124,6 +137,19 @@ export function todayRows(curve: LiveCurve | null | undefined, history: OwnHisto
             target.ownHistoryProduction = item.production_w / 1000
         }
         if (!last || start > Date.parse(last.start)) last = item
+    }
+    if (forecast) {
+        const dayStart = businessDayStartMs(forecast.date)
+        const dayEnd = businessDayStartMs(nextIsoDate(forecast.date))
+        for (const hour of forecast.hours) {
+            const start = Date.parse(hour.start)
+            for (let ts = start; ts < start + 3_600_000; ts += LIVE_STEP_MS) {
+                if (ts < dayStart || ts >= dayEnd) continue
+                const target = row(ts)
+                target.forecast = hour.power_w / 1000
+                target.forecastBand = hour.min_w !== null && hour.max_w !== null ? [hour.min_w / 1000, hour.max_w / 1000] : null
+            }
+        }
     }
     if (throughMs !== null && last) {
         const edge = row(throughMs)

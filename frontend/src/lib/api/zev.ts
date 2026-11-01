@@ -2,6 +2,8 @@ import type { MeteringReadingsDeletionResult } from '../../types/api'
 import type {
   Building,
   BuildingInput,
+  PvPlane,
+  PvPlaneInput,
   GridOperatorList,
   Party,
   PartyInput,
@@ -322,4 +324,32 @@ export async function updateBuilding(id: string, input: Partial<BuildingInput>):
 
 export async function deleteBuilding(id: string): Promise<void> {
   await api.delete(`/zev/buildings/${id}/`)
+}
+
+/** The coordinates of an address (centre of the mapped building outline), for the building form. Saves nothing. */
+export async function locateBuilding(address: { address_line1: string; postal_code: string; city: string }): Promise<{ latitude: number; longitude: number }> {
+  const { data } = await api.post<{ latitude: number; longitude: number }>('/zev/buildings/locate/', address)
+  return data
+}
+
+// ── PV roof planes (SPEC-2026-live-energy-data §4.3) ──
+
+const planesPath = (meteringPointId: string) => `/zev/metering-points/${meteringPointId}/pv-planes/`
+
+export async function fetchPvPlanes(meteringPointId: string): Promise<PvPlane[]> {
+  return fetchAllPages<PvPlane>(planesPath(meteringPointId))
+}
+
+export async function createPvPlane(meteringPointId: string, input: PvPlaneInput): Promise<PvPlane> {
+  const { data } = await api.post<PvPlane>(planesPath(meteringPointId), input)
+  return data
+}
+
+export async function updatePvPlane(meteringPointId: string, id: string, input: Partial<PvPlaneInput>): Promise<PvPlane> {
+  const { data } = await api.patch<PvPlane>(`${planesPath(meteringPointId)}${id}/`, input)
+  return data
+}
+
+export async function deletePvPlane(meteringPointId: string, id: string): Promise<void> {
+  await api.delete(`${planesPath(meteringPointId)}${id}/`)
 }

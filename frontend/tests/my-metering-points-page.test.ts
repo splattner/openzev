@@ -1,9 +1,9 @@
 import { act, createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MyMeteringPointsPage } from '../src/pages/MyMeteringPointsPage'
-import type { EligibleMeteringPoint, MeteringPoint } from '../src/types/api'
+import type { EligibleMeteringPoint, MeteringPoint, SupplementarySource } from '../src/types/api'
 import { queryKeys } from '../src/lib/api/queryKeys'
-import { renderWithProviders } from './helpers/render'
+import { renderWithDataRouter } from './helpers/render'
 import { waitForCondition } from './helpers/waitForCondition'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
@@ -36,8 +36,22 @@ vi.mock('../src/lib/api/supplementary', () => ({
 }))
 // The card (rows, source dialog, connect flow) has its own tests.
 vi.mock('../src/features/supplementary/MeteringPointDataCard', () => ({
-    MeteringPointDataCard: ({ point, sourcesUnavailable }: { point: EligibleMeteringPoint; sourcesUnavailable?: string }) =>
-        createElement('article', { 'data-testid': 'energy-data', 'data-unavailable': sourcesUnavailable ?? '' }, `energy:${point.meter_id}`),
+    MeteringPointDataCard: ({ point, sources, sourcesUnavailable, onOpenSource }: {
+        point: EligibleMeteringPoint; sources?: SupplementarySource[]; sourcesUnavailable?: string; onOpenSource: (source: SupplementarySource) => void
+    }) =>
+        createElement('article', { 'data-testid': 'energy-data', 'data-unavailable': sourcesUnavailable ?? '' },
+            `energy:${point.meter_id}`,
+            ...(sources ?? []).filter((source) => source.metering_point === point.metering_point).map((source) =>
+                createElement('button', { key: source.id, type: 'button', 'data-source-open': source.id, onClick: () => onOpenSource(source) }, `open:${source.id}`)),
+        ),
+}))
+// The source's body has its own tests; here only where it is shown and what the page does around it.
+vi.mock('../src/features/supplementary/SourceDialog', () => ({
+    SourcePane: ({ subject, source, onClose, onDirtyChange }: { subject: string; source: SupplementarySource; onClose: () => void; onDirtyChange: (dirty: boolean) => void }) =>
+        createElement('section', { 'data-testid': 'pane' },
+            `pane:${subject}:${source.id}`,
+            createElement('button', { type: 'button', 'data-testid': 'pane-close', onClick: onClose }, 'close'),
+            createElement('button', { type: 'button', 'data-testid': 'pane-dirty', onClick: () => onDirtyChange(true) }, 'dirty')),
 }))
 
 const point = (id: string, flagged: boolean): MeteringPoint => ({
@@ -49,6 +63,11 @@ const eligible = (id: string, zev = 'zev-1'): EligibleMeteringPoint => ({
     metering_point: id, meter_id: `CH-${id}`, zev, zev_name: 'Sonnenhof', participant: 'p-1', source: null,
 })
 
+const heldSource = (id: string, meter: string): SupplementarySource => ({
+    id, zev: 'zev-1', target: 'metering_point', held_by: 'participant', metering_point: meter, metering_point_meter_id: `CH-${meter}`,
+    participant: 'p-1', provides_history: true, provides_live: false, provides_forecast: false, provider: 'push', label: '', enabled: true, status: 'ok',
+} as SupplementarySource)
+
 const cleanups: Array<() => void> = []
 beforeEach(() => {
     vi.clearAllMocks()
@@ -59,8 +78,8 @@ beforeEach(() => {
 })
 afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
 
-async function mount() {
-    const view = await renderWithProviders(createElement(MyMeteringPointsPage), cleanups)
+async function mount(entry = '/me/metering-points') {
+    const view = await renderWithDataRouter(createElement(MyMeteringPointsPage), cleanups, [entry])
     await waitForCondition(() => /CH-|myMeteringPoints\.empty/.test(view.container.textContent ?? ''), 'the page content')
     return view
 }
@@ -92,16 +111,48 @@ describe('MyMeteringPointsPage', () => {
     })
 
     it('tells the participant who to ask to flag a meter', async () => {
+        // A meter that can only have live data and nothing connected: no own system behind it yet.
+        api.fetchEligibleOrNull.mockResolvedValue([{ ...eligible('1'), eligible_capabilities: ['live'] }])
         const { container } = await mount()
 
         expect(container.textContent).toContain('pages.myMeteringPoints.flagHint')
-        expect(container.textContent).toContain('supplementary.section.description')
     })
 
-    it('shows the connections overview with the feature on and hides it with the feature off', async () => {
-        const on = await mount()
-        expect(on.container.textContent).toContain('pages.myMeteringPoints.connections.title')
-        expect(on.container.textContent).toContain('pages.myMeteringPoints.connections.empty')
+    it('gives a meter without energy data the same meter-data band, and no own-data section', async () => {
+        api.fetchEligibleOrNull.mockResolvedValue(null)
+        const { container } = await mount()
+
+        const article = container.querySelector('article[aria-label="CH-2"]')!
+        expect(article.querySelector('.meter-data-band a')?.getAttribute('href')).toBe('/metering/chart?metering_point=2')
+        expect(article.querySelector('.own-data')).toBeNull()
+        expect(article.querySelector('.badge')).toBeNull()
+    })
+
+    it('stops telling the participant to ask for a flag once an own system is flagged or connected', async () => {
+        api.fetchEligibleOrNull.mockResolvedValue([{ ...eligible('1'), eligible_capabilities: ['history', 'live'] }])
+        const flagged = await mount()
+        expect(flagged.container.textContent).not.toContain('pages.myMeteringPoints.flagHint')
+
+        api.fetchEligibleOrNull.mockResolvedValue([{ ...eligible('1'), eligible_capabilities: ['live'] }])
+        api.listSupplementarySources.mockResolvedValue([{
+            id: 's1', zev: 'zev-1', target: 'metering_point', held_by: 'participant', metering_point: '1', metering_point_meter_id: 'CH-1',
+            provides_history: false, provides_live: true, provides_forecast: false, provider: 'push', enabled: true, status: 'ok',
+        } as SupplementarySource])
+        const connected = await mount()
+        // The hint is there until the source list has answered.
+        await waitForCondition(() => !connected.container.textContent?.includes('pages.myMeteringPoints.flagHint'), 'the hint to go once a source is connected')
+    })
+
+    it('shows the connections overview from two connections on, and never with the feature off', async () => {
+        api.fetchEligibleOrNull.mockResolvedValue([eligible('1'), eligible('3')])
+
+        api.listSupplementarySources.mockResolvedValue([heldSource('s1', '1')])
+        const single = await mount()
+        expect(single.container.textContent).not.toContain('pages.myMeteringPoints.connections.title')
+
+        api.listSupplementarySources.mockResolvedValue([heldSource('s1', '1'), heldSource('s3', '3')])
+        const two = await mount()
+        expect(two.container.textContent).toContain('pages.myMeteringPoints.connections.title')
 
         api.fetchEligibleOrNull.mockResolvedValue(null)
         const off = await mount()
@@ -165,13 +216,13 @@ describe('MyMeteringPointsPage', () => {
 
     it('still reports a failed list request to a participant', async () => {
         api.fetchMeteringPoints.mockRejectedValue(new Error('boom'))
-        const view = await renderWithProviders(createElement(MyMeteringPointsPage), cleanups)
+        const view = await renderWithDataRouter(createElement(MyMeteringPointsPage), cleanups)
         await waitForCondition(() => (view.container.textContent ?? '').includes('pages.myMeteringPoints.loadFailed'), 'the error')
     })
 
     it('reports a failed eligibility check instead of reading it as the feature being off, and can retry', async () => {
         api.fetchEligibleOrNull.mockRejectedValueOnce(new Error('boom'))
-        const view = await renderWithProviders(createElement(MyMeteringPointsPage), cleanups)
+        const view = await renderWithDataRouter(createElement(MyMeteringPointsPage), cleanups)
         await waitForCondition(() => (view.container.textContent ?? '').includes('supplementary.section.eligibilityError'), 'the error')
 
         expect(view.container.textContent).not.toContain('pages.myMeteringPoints.empty')
@@ -224,19 +275,70 @@ describe('MyMeteringPointsPage with the live flag on', () => {
         expect(container.querySelector('article[aria-label="CH-2"]')).not.toBeNull()
     })
 
-    it('explains history only when some point can have it', async () => {
-        api.fetchEligibleOrNull.mockResolvedValue([withCapabilities('2', ['live'])])
-        const { container } = await mount()
-
-        expect(container.textContent).not.toContain('supplementary.section.description')
-        expect(container.textContent).toContain('supplementary.live.description')
-    })
-
     it('shows only the history card while the live flag is off', async () => {
         api.fetchEligibleOrNull.mockResolvedValue([eligible('1')])
         const { container } = await mount()
 
         expect(container.querySelectorAll('[data-testid="energy-data"]')).toHaveLength(1)
-        expect(container.textContent).not.toContain('supplementary.live.description')
+    })
+})
+
+describe('the source pane', () => {
+    beforeEach(() => {
+        api.fetchEligibleOrNull.mockResolvedValue([eligible('1')])
+        api.listSupplementarySources.mockResolvedValue([heldSource('s1', '1')])
+    })
+    const pane = () => document.querySelector('[data-testid="pane"]')
+    const press = async (selector: string) => { await act(async () => { document.querySelector<HTMLElement>(selector)!.click() }) }
+    const sourceButton = (view: { container: HTMLElement }) => waitForCondition(() => view.container.querySelector('[data-source-open="s1"]') !== null, 'the source button')
+
+    it('opens a source beside the cards, with the choice in the URL, and X takes the step back', async () => {
+        const view = await mount()
+        await sourceButton(view)
+        expect(pane()).toBeNull()
+
+        await press('[data-source-open="s1"]')
+        expect(view.router.state.location.search).toBe('?source=s1')
+        expect(pane()!.textContent).toContain('pane:CH-1:s1')
+        // The cards stay where they were: the pane sits beside them.
+        expect(view.container.textContent).toContain('energy:CH-1')
+        expect(view.container.querySelector('.detail-split')!.getAttribute('data-pane')).toBe('open')
+
+        await press('[data-testid="pane-close"]')
+        expect(view.router.state.location.search).toBe('')
+        expect(pane()).toBeNull()
+    })
+
+    it('reopens from a link', async () => {
+        await mount('/me/metering-points?source=s1')
+        await waitForCondition(() => pane() !== null, 'the pane')
+        expect(pane()!.textContent).toContain('pane:CH-1:s1')
+    })
+
+    it('ignores a link to a source that is not the participant\'s own', async () => {
+        api.listSupplementarySources.mockResolvedValue([{ ...heldSource('s9', '1'), held_by: 'zev' } as SupplementarySource])
+        const view = await mount('/me/metering-points?source=s9')
+        // The list has answered by now: the page is up and nothing is open.
+        await waitForCondition(() => view.container.querySelector('.detail-split') !== null, 'the page')
+        expect(pane()).toBeNull()
+    })
+
+    it('asks before it lets go of a source with a key typed in, and keeps it when the user stays', async () => {
+        const view = await mount()
+        await sourceButton(view)
+        await press('[data-source-open="s1"]')
+        await press('[data-testid="pane-dirty"]')
+
+        await press('[data-testid="pane-close"]')
+        expect(document.body.textContent).toContain('common.unsavedChanges.message')
+        expect(pane()).not.toBeNull()
+        const button = (label: string) => Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find((b) => b.textContent === label)!
+        await act(async () => { button('common.unsavedChanges.keepEditing').click() })
+        expect(pane()).not.toBeNull()
+        expect(view.router.state.location.search).toBe('?source=s1')
+
+        await press('[data-testid="pane-close"]')
+        await act(async () => { button('common.unsavedChanges.discard').click() })
+        expect(pane()).toBeNull()
     })
 })

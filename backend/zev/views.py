@@ -3,6 +3,7 @@ import tempfile
 
 from django.conf import settings as django_settings
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Exists, IntegerField, Max, Min, OuterRef, Prefetch, Q, Subquery, Value
 from django.db.models.functions import Coalesce
@@ -22,12 +23,14 @@ from accounts.models import FeatureFlag, User
 from allocation.validity import period_window
 from metering.models import MeterReading, QuarantinedReading, SupplementaryReading, SupplementarySource
 from . import access, onboarding
-from .models import MANAGING_ROLES, Building, Zev, Participant, Party, PartyRole, MeteringPoint, MeteringPointAssignment, ZevPartyRole
+from .models import MANAGING_ROLES, Building, PvPlane, Zev, Participant, Party, PartyRole, MeteringPoint, MeteringPointAssignment, ZevPartyRole
 from .buildings import ensure_initial_building
+from .geocoding import footprint_centroid, geocode_building_footprint
 from .parties import assign_role, end_role, lock_role_assignment, lock_role_end, set_landowner_building
 from .purge import ZevPurgeError, purge_zev
 from .scoping import ZevScopedQuerySetMixin
 from .serializers import (
+    PvPlaneSerializer,
     django_validation_error,
     GridOperatorListSerializer,
     GridOperatorSuggestionSerializer,
@@ -1234,6 +1237,26 @@ class BuildingViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScopedQu
     def get_audit_destroy_metadata(self, instance):
         return {"zev_id": str(instance.zev_id)}
 
+    @action(detail=False, methods=["post"])
+    def locate(self, request):
+        """The coordinates of an address, for the building form. Nothing is saved: the form saves them like any field.
+
+        Resolves the address through the same Nominatim lookup as the participant map and takes the centre of the
+        building's outline, so only a mapped building answers. At most one lookup per user every two seconds.
+        """
+        address = {name: str(request.data.get(name) or "").strip() for name in ("address_line1", "postal_code", "city")}
+        if not (address["address_line1"] and address["city"]):
+            raise serializers.ValidationError({"address_line1": ["Enter the street and the city first."]})
+        if not cache.add(f"building-locate:{request.user.pk}", 1, timeout=2):
+            return Response({"detail": "Try again in a moment."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        footprint = geocode_building_footprint(**address)
+        centre = footprint_centroid(footprint) if footprint else None
+        if centre is None:
+            raise serializers.ValidationError(
+                {"address_line1": ["This address could not be located. Enter the coordinates by hand."]}
+            )
+        return Response({"latitude": centre[0], "longitude": centre[1]})
+
     def destroy(self, request, *args, **kwargs):
         building = self.get_object()
         if building.metering_points.exists():
@@ -1243,6 +1266,52 @@ class BuildingViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScopedQu
             )
         self.perform_destroy(building)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PvPlaneViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
+    """The roof planes of one producing metering point (SPEC-2026-live-energy-data §4.3).
+
+    Nested under ``/metering-points/{id}/pv-planes/``. Whoever can read the metering point reads; managers and
+    admins write.
+    """
+
+    serializer_class = PvPlaneSerializer
+    permission_classes = [IsAuthenticated, MeteringPointPermission]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+    zev_lookup = "metering_point__zev"
+    participant_path = "metering_point__assignments__participant"
+    participant_distinct = True
+    scope_parent_path = ("metering_point", "zev")
+
+    audit_action_category = AuditActionCategory.METERING
+    audit_action_type = "pv_plane.update"
+    audit_target_type = "zev.PvPlane"
+    audit_target_label = "PV plane"
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return PvPlane.objects.none()
+        return self.scope_queryset(
+            PvPlane.objects.select_related("metering_point__zev").filter(metering_point_id=self.kwargs["metering_point_id"])
+        )
+
+    def create(self, request, *args, **kwargs):
+        # The metering point is the URL's, whatever the body says; the scoping mixin then checks it like any payload.
+        data = request.data.copy() if hasattr(request.data, "copy") else dict(request.data)
+        data["metering_point"] = str(self.kwargs["metering_point_id"])
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def get_audit_target_display(self, instance):
+        return f"{instance.metering_point.meter_id}: {instance}"
+
+    def get_audit_create_metadata(self, instance):
+        return {"zev_id": str(instance.metering_point.zev_id), "metering_point_id": str(instance.metering_point_id)}
+
+    def get_audit_destroy_metadata(self, instance):
+        return self.get_audit_create_metadata(instance)
 
 
 class ZevPartyRoleViewSet(ZevScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet):

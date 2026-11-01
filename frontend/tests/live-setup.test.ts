@@ -1,12 +1,18 @@
 import { AxiosError } from 'axios'
-import { act, createElement, useState } from 'react'
+import { act, createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ConnectionPointCard, PointLiveDialog } from '../src/features/meteringPoints/LiveSetup'
 import { PushTokenPanel } from '../src/features/supplementary/PushTokenPanel'
 import { SupplementarySourceModal, solarHintKey, type ConnectHolder } from '../src/features/supplementary/SupplementarySourceModal'
-import type { MeteringPoint, SupplementarySource } from '../src/types/api'
+import type { SupplementarySource } from '../src/types/api'
 import { renderWithProviders, setInputValue } from './helpers/render'
 import { waitForCondition } from './helpers/waitForCondition'
+
+// The "more actions" menu opens a popup; here its items are laid out where they can be found. The real menu has its own test.
+vi.mock('../src/components/ActionMenu', () => ({
+    ActionMenu: ({ items, label }: { items: Array<{ key: string; label: string; disabled?: boolean; danger?: boolean; onClick: () => void }>; label: string }) =>
+        createElement('div', { role: 'group', 'aria-label': label },
+            ...items.map((entry) => createElement('button', { key: entry.key, type: 'button', disabled: entry.disabled, 'data-danger': entry.danger ? 'true' : undefined, onClick: entry.onClick }, entry.label))),
+}))
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({ t: (key: string, options?: Record<string, unknown>) => (options ? `${key}${JSON.stringify(options)}` : key) }),
@@ -54,7 +60,6 @@ afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
 
 const buttons = (root: ParentNode) => Array.from(root.querySelectorAll<HTMLButtonElement>('button'))
 const buttonWith = (root: ParentNode, label: string) => buttons(root).find((b) => b.textContent?.includes(label))
-const dialogs = () => Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"]'))
 const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]')
 async function click(element: HTMLElement) {
     await act(async () => { element.click() })
@@ -87,8 +92,14 @@ describe('SupplementarySourceModal for live data', () => {
         const modal = await open('participant')
         // Live can come from Solar Manager or from a push source; Solar Manager is the first choice.
         expect(modal.querySelectorAll('input[type="radio"]')).toHaveLength(2)
+        // Live only: the own system sends the power, and there is no file to upload.
+        expect(modal.textContent).toContain('supplementary.modal.providerHint.push_live')
+        expect(modal.textContent).not.toMatch(/providerHint\.push(?!_live)/)
         await click(radio(modal, 'supplementary.provider.push'))
         expect(modal.querySelector('input[type="password"]')).toBeNull()
+        // The submit waits for the consent, and says so.
+        expect(modal.textContent).toContain('supplementary.modal.needsConsent')
+        expect(buttonWith(modal, 'supplementary.modal.connect')!.disabled).toBe(true)
         expect(modal.textContent).toContain('supplementary.consent.liveVisible')
         expect(modal.textContent).toContain('supplementary.consent.liveNotBilling')
         expect(modal.textContent).not.toContain('supplementary.consent.stored')
@@ -123,6 +134,21 @@ describe('SupplementarySourceModal for live data', () => {
         await waitForCondition(() => pushToast.mock.calls.length > 0, 'the success toast')
         expect(pushToast).toHaveBeenCalledWith('supplementary.modal.liveConnectedPull', 'success')
         expect(document.querySelector('[data-testid="push-token"]')).toBeNull()
+    })
+
+    it('hands the new source to the host as the dialog closes, so it can open it', async () => {
+        const onConnected = vi.fn()
+        const onClose = vi.fn()
+        const modal = await open('participant', { point, available: ['live'], onConnected, onClose })
+        api.createSupplementarySource.mockResolvedValue(liveOnly({ id: 'src-new', provider: 'solar_manager', push_token_prefix: null, external_id: 'ABC123', has_credential: true }))
+        await act(async () => {
+            setInputValue(modal.querySelector<HTMLInputElement>('input[type="text"]')!, 'ABC123')
+            setInputValue(modal.querySelector<HTMLInputElement>('input[type="password"]')!, 'the-key')
+        })
+        await submit(modal)
+
+        await waitForCondition(() => onClose.mock.calls.length > 0, 'the dialog to close')
+        expect(onConnected).toHaveBeenCalledWith(expect.objectContaining({ id: 'src-new' }))
     })
 
     it('offers Solar Manager for history and live together, with the matching hint', async () => {
@@ -220,136 +246,5 @@ describe('PushTokenPanel', () => {
         const both = await renderWithProviders(createElement(PushTokenPanel, { token: 'ozs_x', onDismiss: vi.fn(), capabilities: { history: true, live: true } }), cleanups)
         expect(both.container.textContent).toContain('/metering/supplementary/ingest/')
         expect(both.container.querySelector('[data-testid="live-endpoint"]')).not.toBeNull()
-    })
-})
-
-describe('ConnectionPointCard', () => {
-    const setup = (options: { liveOn?: boolean; available?: boolean; sourceId?: string | null; sources?: SupplementarySource[] }) => ({
-        liveOn: options.liveOn ?? true,
-        sourcesQuery: { data: options.sources ?? [], isError: false, isFetching: false, refetch: vi.fn() },
-        zevEligibleQuery: {
-            data: options.available === undefined && options.sourceId === undefined
-                ? undefined
-                : { zev: 'zev-1', metering_points: [], connection_point: { available: options.available ?? false, source: options.sourceId ?? null } },
-        },
-        zevEligibleByPoint: new Map(),
-    }) as never
-    const connection = (overrides: Partial<SupplementarySource> = {}) =>
-        liveOnly({ id: 'src-cp', target: 'connection_point', held_by: 'zev', metering_point: null, metering_point_meter_id: null, participant: null, participant_name: null, ...overrides })
-    const mountCard = (state: ReturnType<typeof setup>, canWrite: boolean) =>
-        renderWithProviders(createElement(ConnectionPointCard, { zevId: 'zev-1', setup: state, canWrite, confirm: vi.fn() }), cleanups)
-
-    it('offers a manager of a physical ZEV to connect the grid connection point', async () => {
-        const { container } = await mountCard(setup({ available: true }), true)
-
-        expect(container.textContent).toContain('supplementary.connection.notConnected')
-        await click(buttonWith(container, 'supplementary.connection.connect')!)
-        expect(dialog()!.textContent).toContain('supplementary.consent.connectionPoint')
-    })
-
-    it('hides the card where the ZEV cannot have a connection point (virtual ZEV: not available, no source)', async () => {
-        const { container } = await mountCard(setup({ available: false, sourceId: null }), true)
-
-        expect(container.querySelector('section')).toBeNull()
-    })
-
-    it('hides the card while the live flag is off', async () => {
-        const { container } = await mountCard(setup({ liveOn: false, available: true }), true)
-
-        expect(container.querySelector('section')).toBeNull()
-    })
-
-    it('shows a manager the connected source with its actions', async () => {
-        const { container } = await mountCard(setup({ available: false, sourceId: 'src-cp', sources: [connection()] }), true)
-
-        expect(container.textContent).toContain('live.state.fresh')
-        expect(buttonWith(container, 'supplementary.connection.connect')).toBeUndefined()
-        expect(buttonWith(container, 'supplementary.actions.rotate')).toBeUndefined()
-
-        // The details and every action are in the source dialog.
-        await click(buttonWith(container, 'supplementary.connection.details')!)
-        expect(dialog()!.textContent).toContain('supplementary.source.title{"subject":"supplementary.connection.title"}')
-        expect(buttonWith(dialog()!, 'supplementary.actions.rotate')).toBeDefined()
-        expect(buttonWith(dialog()!, 'supplementary.actions.remove')).toBeDefined()
-    })
-
-    it('shows a viewer the state only, and nothing when there is no source', async () => {
-        const withSource = await mountCard(setup({ sources: [connection()] }), false)
-        expect(withSource.container.textContent).toContain('live.state.fresh')
-        expect(buttons(withSource.container)).toHaveLength(0)
-
-        const none = await mountCard(setup({ sources: [] }), false)
-        expect(none.container.querySelector('section')).toBeNull()
-    })
-
-    it('does not offer a viewer to connect even when the ZEV could have one', async () => {
-        const { container } = await mountCard(setup({ available: true }), false)
-
-        expect(container.querySelector('section')).toBeNull()
-    })
-})
-
-describe('PointLiveDialog', () => {
-    const mp = { id: 'mp-1', zev: 'zev-1', meter_id: 'CH-100' } as MeteringPoint
-    const zevSource = (overrides: Partial<SupplementarySource> = {}) => liveOnly({ id: 'src-live', held_by: 'zev', participant: null, participant_name: null, ...overrides })
-    const setupWith = (live: string | null, sources: SupplementarySource[] = []) => ({
-        sourcesQuery: { data: sources, isLoading: false, isError: false, refetch: vi.fn() },
-        zevEligibleByPoint: new Map([['mp-1', { sources: { history: null, live, forecast: null } }]]),
-    }) as never
-
-    it('opens the connect flow for a point without a live source and keeps it once the source exists', async () => {
-        function Host() {
-            const [live, setLive] = useState<string | null>(null)
-            return createElement('div', null,
-                createElement('button', { 'data-testid': 'source-created', onClick: () => setLive('src-live') }),
-                createElement(PointLiveDialog, { point: mp, setup: setupWith(live, live ? [zevSource()] : []), confirm: vi.fn(), onClose: vi.fn() }))
-        }
-        await renderWithProviders(createElement(Host), cleanups)
-        expect(dialog()!.textContent).toContain('supplementary.consent.zevHeld')
-
-        // The create succeeded and the lists refetched: the one-time token dialog must not turn into the rows.
-        await click(document.querySelector<HTMLElement>('[data-testid="source-created"]')!)
-        expect(dialog()!.textContent).toContain('supplementary.consent.zevHeld')
-    })
-
-    it('keeps the new source\'s token on screen while the lists refetch', async () => {
-        api.createSupplementarySource.mockResolvedValue({ ...zevSource(), push_token: 'ozs_abcd_secret' })
-        function Host() {
-            const [live, setLive] = useState<string | null>(null)
-            return createElement('div', null,
-                createElement('button', { 'data-testid': 'source-created', onClick: () => setLive('src-live') }),
-                createElement(PointLiveDialog, { point: mp, setup: setupWith(live, live ? [zevSource()] : []), confirm: vi.fn(), onClose: vi.fn() }))
-        }
-        await renderWithProviders(createElement(Host), cleanups)
-        await click(dialog()!.querySelector<HTMLInputElement>('input[type="checkbox"]')!)
-        await act(async () => { buttonWith(dialog()!, 'supplementary.modal.connect')!.click() })
-        await waitForCondition(() => document.querySelector('[data-testid="push-token"]') !== null, 'the token')
-        await click(document.querySelector<HTMLElement>('[data-testid="source-created"]')!)
-
-        expect(document.querySelector('[data-testid="push-token"]')!.textContent).toContain('ozs_abcd_secret')
-        expect(dialogs()).toHaveLength(1)
-    })
-
-    it('opens a live row for a point that already has a live source, and no history row', async () => {
-        await renderWithProviders(createElement(PointLiveDialog, { point: mp, setup: setupWith('src-live', [zevSource()]), confirm: vi.fn(), onClose: vi.fn() }), cleanups)
-
-        expect(dialog()!.textContent).toContain('supplementary.live.dialogTitle')
-        expect(dialog()!.textContent).not.toContain('supplementary.consent.zevHeld')
-        const rows = dialog()!.querySelectorAll('li')
-        expect(Array.from(rows).map((li) => li.dataset.capability)).toEqual(['live'])
-        expect(rows[0].textContent).toContain('live.state.fresh')
-    })
-
-    it('shows the source\'s details and actions from its row, in the same dialog, and goes back', async () => {
-        await renderWithProviders(createElement(PointLiveDialog, { point: mp, setup: setupWith('src-live', [zevSource()]), confirm: vi.fn(), onClose: vi.fn() }), cleanups)
-        await click(dialog()!.querySelector('li button')!)
-
-        expect(dialogs()).toHaveLength(1)
-        expect(dialog()!.textContent).toContain('supplementary.source.title')
-        expect(buttonWith(dialog()!, 'supplementary.actions.rotate')).toBeDefined()
-        expect(buttonWith(dialog()!, 'supplementary.actions.remove')).toBeDefined()
-        expect(buttonWith(dialog()!, 'supplementary.live.alsoSend')).toBeUndefined()
-        await click(buttonWith(dialog()!, 'supplementary.modal.back')!)
-        expect(dialog()!.querySelector('li')).not.toBeNull()
     })
 })

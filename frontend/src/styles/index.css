@@ -46,6 +46,7 @@
 @import './components/charts.css' layer(components);
 @import './components/button.css' layer(components);
 @import './components/form-helpers.css' layer(components);
+@import './components/connections.css' layer(components);
 @import './components/template-editor.css' layer(components);
 @import './components/row-actions.css' layer(components);
 @import './components/list-filters.css' layer(components);
