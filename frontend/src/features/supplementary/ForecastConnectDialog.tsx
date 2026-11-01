@@ -1,10 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { FormModal } from '../../components/FormModal'
 import { FormModalCancelButton } from '../../components/FormModalFooter'
 import { apiErrorPayload, formatApiError } from '../../lib/api/errors'
 import { createSupplementarySource, updateSupplementarySource } from '../../lib/api/supplementary'
+import { useCommunityAccess } from '../../lib/communityAccess'
+import { useOptionalManagedZev } from '../../lib/managedZev'
 import { invalidateSourceQueries } from '../../lib/supplementary'
 import { useToast } from '../../lib/toast'
 import type { ConnectHolder } from './SupplementarySourceModal'
@@ -48,6 +51,11 @@ export function ForecastConnectDialog({ holder, point, sources, onClose, onConne
     const queryClient = useQueryClient()
     const [error, setError] = useState<string | null>(null)
     const [consent, setConsent] = useState(false)
+    // Who adds the roof planes and the building's location is decided by the user's rights in the plant's community,
+    // not by who holds the source: a manager who connects their own plant can set them up, a participant must ask.
+    const { canManage } = useCommunityAccess()
+    const managedZevId = useOptionalManagedZev()?.selectedZevId
+    const canSetUp = canManage && (!managedZevId || managedZevId === point.zev)
 
     // A holder's Solar Manager connection that still works can read its own forecast with the stored key.
     const existing =
@@ -86,7 +94,7 @@ export function ForecastConnectDialog({ holder, point, sources, onClose, onConne
             const problem = firstProblem(failure)
             // The server's answer is English; this refusal has a translated text that says who adds what.
             setError(problem && SETUP_MISSING.test(problem)
-                ? t(holder === 'zev' ? 'supplementary.forecast.setupMissingManager' : 'supplementary.forecast.setupMissingParticipant')
+                ? t(canSetUp ? 'supplementary.forecast.setupMissingManager' : 'supplementary.forecast.setupMissingParticipant')
                 : problem ?? formatApiError(failure, t('common.error')))
         },
     })
@@ -119,7 +127,14 @@ export function ForecastConnectDialog({ holder, point, sources, onClose, onConne
                 <>
                     <p className="m-0">{t('supplementary.forecast.intro')}</p>
                     <p className="muted m-0">{t('supplementary.forecast.privacy')}</p>
-                    <p className="muted m-0">{t(holder === 'zev' ? 'supplementary.forecast.needsManager' : 'supplementary.forecast.needsParticipant')}</p>
+                    <p className="muted m-0">{t(canSetUp ? 'supplementary.forecast.needsManager' : 'supplementary.forecast.needsParticipant')}</p>
+                    {canSetUp && (
+                        <div className="actions-row">
+                            <Link className="button button-secondary" to={`/metering/points?search=${encodeURIComponent(point.meter_id)}`} onClick={onClose}>
+                                {t('supplementary.forecast.setUp')}
+                            </Link>
+                        </div>
+                    )}
                     {holder === 'participant' && !existing && <p className="muted m-0">{t('supplementary.forecast.solarManagerHint')}</p>}
                 </>
             )}

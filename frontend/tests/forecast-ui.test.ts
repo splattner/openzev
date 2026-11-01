@@ -19,6 +19,10 @@ vi.mock('recharts', () => {
         Area: () => null, Bar: () => null, CartesianGrid: () => null, Tooltip: () => null, XAxis: () => null, YAxis: () => null,
     }
 })
+const access = vi.hoisted(() => ({ canManage: false }))
+vi.mock('../src/lib/communityAccess', () => ({ useCommunityAccess: () => ({ canManage: access.canManage }) }))
+const managed = vi.hoisted(() => ({ selectedZevId: undefined as string | undefined }))
+vi.mock('../src/lib/managedZev', () => ({ useOptionalManagedZev: () => (managed.selectedZevId ? { selectedZevId: managed.selectedZevId } : null) }))
 const pushToast = vi.fn()
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast }) }))
 
@@ -68,8 +72,10 @@ describe('ProductionForecastChart', () => {
 
 describe('ForecastConnectDialog', () => {
     const point = { metering_point: 'mp-1', meter_id: 'CH-100', zev: 'zev-1' }
+    beforeEach(() => { access.canManage = false; managed.selectedZevId = undefined })
 
     it('connects forecast.solar to a ZEV-operated plant without consent, credentials or a token', async () => {
+        access.canManage = true
         supplementary.createSupplementarySource.mockResolvedValue({})
         const onClose = vi.fn()
         await renderWithProviders(createElement(ForecastConnectDialog, { holder: 'zev', point, onClose }), cleanups)
@@ -94,6 +100,7 @@ describe('ForecastConnectDialog', () => {
     })
 
     it('says in its own language who adds the missing roof planes, and stays open', async () => {
+        access.canManage = true
         supplementary.createSupplementarySource.mockRejectedValue(apiError({ provides_forecast: ["Add the roof planes of this plant and the building's coordinates first."] }))
         const onClose = vi.fn()
         await renderWithProviders(createElement(ForecastConnectDialog, { holder: 'zev', point, onClose }), cleanups)
@@ -101,6 +108,32 @@ describe('ForecastConnectDialog', () => {
         await waitForCondition(() => dialog()!.textContent?.includes('supplementary.forecast.setupMissingManager') === true, 'the translated refusal')
         expect(dialog()!.textContent).not.toContain('Add the roof planes')
         expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it('gives a manager who connects their own plant the setup guidance and a way to it, not "ask a manager"', async () => {
+        access.canManage = true
+        managed.selectedZevId = 'zev-1'
+        supplementary.createSupplementarySource.mockRejectedValueOnce(apiError({ provides_forecast: ["Add the roof planes of this plant and the building's coordinates first."] }))
+        await renderWithProviders(createElement(ForecastConnectDialog, { holder: 'participant', point, onClose: vi.fn() }), cleanups)
+
+        expect(dialog()!.textContent).toContain('supplementary.forecast.needsManager')
+        expect(dialog()!.textContent).not.toContain('supplementary.forecast.needsParticipant')
+        expect(dialog()!.querySelector('a')?.getAttribute('href')).toBe('/metering/points?search=CH-100')
+        await act(async () => { buttonWith(dialog()!, 'supplementary.forecast.connect')!.click() })
+        await waitForCondition(() => dialog()!.textContent?.includes('supplementary.forecast.setupMissingManager') === true, 'the manager text')
+    })
+
+    it('keeps "ask your manager", with no link, for a participant, also one who manages another community', async () => {
+        await renderWithProviders(createElement(ForecastConnectDialog, { holder: 'participant', point, onClose: vi.fn() }), cleanups)
+        expect(dialog()!.textContent).toContain('supplementary.forecast.needsParticipant')
+        expect(dialog()!.querySelector('a')).toBeNull()
+        cleanups.splice(0).forEach((cleanup) => cleanup())
+
+        access.canManage = true
+        managed.selectedZevId = 'zev-2'
+        await renderWithProviders(createElement(ForecastConnectDialog, { holder: 'participant', point, onClose: vi.fn() }), cleanups)
+        expect(dialog()!.textContent).toContain('supplementary.forecast.needsParticipant')
+        expect(dialog()!.querySelector('a')).toBeNull()
     })
 
     it('tells a participant to ask the management, and shows any other refusal as the server words it', async () => {

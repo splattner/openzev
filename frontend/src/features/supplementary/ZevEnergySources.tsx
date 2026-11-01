@@ -81,17 +81,20 @@ export function ZevEnergySources({ zevId, canManage }: Props) {
 
     return (
         <section className="page-stack">
-            <div className="actions-row actions-row-wrap actions-row-between">
-                <p className="muted m-0 energy-sources-intro">{t(canManage ? 'supplementary.zev.description' : 'supplementary.zev.descriptionReadOnly')}</p>
-                {canConnect && (
-                    <div className="energy-sources-connect">
-                        <button type="button" className="button button-primary" disabled={!targets.any} onClick={() => setConnecting(true)}>
-                            {t('supplementary.zev.connect')}
-                        </button>
-                        {!targets.any && <small className="muted">{t('supplementary.zev.nothingToConnect')}</small>}
-                    </div>
-                )}
-            </div>
+            {/* An empty list explains itself once, in the empty state with its own button; the intro and the toolbar button come with the first source. */}
+            {sources.length > 0 && (
+                <div className="actions-row actions-row-wrap actions-row-between">
+                    <p className="muted m-0 energy-sources-intro">{t(canManage ? 'supplementary.zev.description' : 'supplementary.zev.descriptionReadOnly')}</p>
+                    {canConnect && (
+                        <div className="energy-sources-connect">
+                            <button type="button" className="button button-primary" disabled={!targets.any} onClick={() => setConnecting(true)}>
+                                {t('supplementary.zev.connect')}
+                            </button>
+                            {!targets.any && <small className="muted">{t('supplementary.zev.nothingToConnect')}</small>}
+                        </div>
+                    )}
+                </div>
+            )}
 
             <div
                 ref={splitRef}
@@ -103,7 +106,7 @@ export function ZevEnergySources({ zevId, canManage }: Props) {
                     {sources.length === 0 ? (
                         <EmptyState
                             titleKey="supplementary.zev.empty.title"
-                            descriptionKey={canConnect ? 'supplementary.zev.empty.manager' : 'supplementary.zev.empty.other'}
+                            descriptionKey={canConnect ? (targets.any ? 'supplementary.zev.empty.manager' : 'supplementary.zev.empty.nothing') : 'supplementary.zev.empty.other'}
                             actions={canConnect && targets.any ? [{ labelKey: 'supplementary.zev.connect', onClick: () => setConnecting(true) }] : undefined}
                         />
                     ) : (

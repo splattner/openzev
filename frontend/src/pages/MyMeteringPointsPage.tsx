@@ -167,7 +167,10 @@ function MyMeteringPointsView() {
 
                     {/* Only while the feature is on (with it off the page says nothing about energy data), and only for someone who has not got an own system connected or flagged yet. */}
                     {energyData.featureOn && isParticipantScope && !isEmpty && !eligible.some(historyEligible) && !hasConnection && (
-                        <p className="muted">{t('pages.myMeteringPoints.flagHint')}</p>
+                        <p className="muted">
+                            {t('pages.myMeteringPoints.flagHint')}
+                            {eligible.some(liveEligible) && ` ${t('pages.myMeteringPoints.flagHintLive')}`}
+                        </p>
                     )}
                 </div>
 

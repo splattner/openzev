@@ -107,6 +107,8 @@ describe('ZevEnergySources', () => {
         const connectable = await mount()
         const primary = Array.from(connectable.container.querySelectorAll('button')).find((b) => b.textContent === 'supplementary.zev.connect')!
         expect(primary.disabled).toBe(false)
+        // The toolbar returns with the first source, with the intro.
+        expect(connectable.container.textContent).toContain('supplementary.zev.description')
         cleanups.splice(0).forEach((cleanup) => cleanup())
 
         api.fetchZevEligibleSources.mockResolvedValue(eligibility({ metering_points: [], connection_point: { available: false, source: 'src-cp' } }))
@@ -115,15 +117,28 @@ describe('ZevEnergySources', () => {
         expect(none.container.textContent).toContain('supplementary.zev.nothingToConnect')
     })
 
+    it('says there is nothing to connect, without a dead button, when the empty community has nothing it could connect', async () => {
+        api.fetchZevEligibleSources.mockResolvedValue(eligibility({ metering_points: [], connection_point: { available: false, source: null } }))
+        const { container } = await mount()
+
+        expect(container.textContent).toContain('supplementary.zev.empty.nothing')
+        expect(Array.from(container.querySelectorAll('button')).some((b) => b.textContent === 'supplementary.zev.connect')).toBe(false)
+    })
+
     it('has an empty state, and a viewer cannot connect anything', async () => {
         const manager = await mount()
         expect(manager.container.textContent).toContain('supplementary.zev.empty.title')
         expect(manager.container.textContent).toContain('supplementary.zev.empty.manager')
+        // One explanation and one primary action while the list is empty: no intro above, no second connect button.
+        expect(manager.container.textContent).not.toContain('supplementary.zev.description')
+        expect(Array.from(manager.container.querySelectorAll('button')).filter((b) => b.textContent === 'supplementary.zev.connect')).toHaveLength(1)
+        expect(manager.container.querySelector('.empty-state button')?.textContent).toBe('supplementary.zev.connect')
         cleanups.splice(0).forEach((cleanup) => cleanup())
         api.fetchZevEligibleSources.mockClear()
 
         const viewer = await mount({ canManage: false })
         expect(viewer.container.textContent).toContain('supplementary.zev.empty.other')
+        expect(viewer.container.textContent).not.toContain('supplementary.zev.descriptionReadOnly')
         expect(Array.from(viewer.container.querySelectorAll('button')).some((b) => b.textContent === 'supplementary.zev.connect')).toBe(false)
         expect(api.fetchZevEligibleSources).not.toHaveBeenCalled()
     })

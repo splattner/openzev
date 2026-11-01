@@ -956,12 +956,15 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   manager sets, shown as plain text next to the meter id (a classification, UI patterns §10.1).
 - **7.3 The Energy data tab of the ZEV settings** (`features/supplementary/ZevEnergySources.tsx`; the tab `energy` of
   `/zev-settings/:tab`, shown while the energy data feature is on, and outside the settings form: no save bar). It is where
-  a manager looks after the community's sources, and what the metering-point list used to carry. A short description, then
-  every source of the selected community in one list (`source-rows`: the grid connection point first, then the meters by
+  a manager looks after the community's sources, and what the metering-point list used to carry. With **no source** the tab
+  shows one `EmptyState` and nothing else: its explanation (`supplementary.zev.empty.manager`, which already says who connects what;
+  `empty.nothing` when the community has nothing it could connect; `empty.other` for a viewer) and, for a manager with something to connect, its
+  **Connect a source** button, the one primary action (UI patterns §9, §10.3 rule 12). The short description and the toolbar button come
+  with the first source. Then every source of the selected community in one list (`source-rows`: the grid connection point first, then the meters by
   id; each row the meter id, the holder or "ZEV-operated" and what it provides as plain text with a problem as
   `IssueText` next to the capability it concerns, no pills) and, beside it, the source in a `SourcePane`
   (`useSourcePane`: `?source=<id>`, from 56rem of content, focus and draft handling as on My metering points). Managers get a primary
-  **Connect a source** (live flag on; disabled with "There is nothing left to connect." when `zevEligibleByPoint` and the
+  **Connect a source** in the toolbar (live flag on; disabled with "There is nothing left to connect." when `zevEligibleByPoint` and the
   connection point offer nothing): `ZevConnectDialog` asks what the source reports on (the grid connection point, or a meter
   nobody holds personally with the capabilities it can still get: live, forecast), then runs the existing flows
   (`SupplementarySourceModal` with `holder="connection-point"` or `"zev"`, `ForecastConnectDialog`), and the new source
@@ -983,9 +986,14 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   `forecastEligible`) for a producing point: the source as a button with its status badge and, for forecast.solar, "updated
   <time>". Its **Connect** opens `ForecastConnectDialog` instead of the shared connect flow (forecast.solar needs no
   credential or consent): what the forecast is, what leaves the instance (location rounded to a kilometre and the planes'
-  size, tilt and direction), that a manager must have entered the planes and the building's location (the server's refusal
+  size, tilt and direction), that the roof planes and the building's location must have been entered (the server's refusal
   "Add the roof planes ..." is replaced by a translated text, `setupMissingManager` or `setupMissingParticipant`, that says
-  who adds what; any other refusal is shown as the server words it), and for a holder whose meter has a working Solar Manager connection (enabled, key stored, no forecast yet) a choice
+  who adds what; any other refusal is shown as the server words it). **Who adds what follows the user's management rights in
+  the plant's community, not who holds the source** (UI review of #1032, #1164): `useCommunityAccess().canManage` with the plant's
+  ZEV equal to the selected one (or none selected) gets `needsManager`/`setupMissingManager` and a **Set up roof planes and
+  location** button (`.button-secondary` link to `/metering/points?search=<meter id>`, closing the dialog) to the page whose
+  metering-point menu has **Roof planes** and whose buildings carry the location; anybody else, a participant or a manager of another
+  community, keeps `needsParticipant`/`setupMissingParticipant` ("ask your community's management") without a link, and for a holder whose meter has a working Solar Manager connection (enabled, key stored, no forecast yet) a choice
   between that connection (default; consent checkbox, `PATCH {provides_forecast: true, consent: true}` instead of a new source) and
   forecast.solar. It creates `{provider: forecast_solar, provides_forecast: true, provides_history: false,
   provides_live: false, held_by, target: metering_point, consent: false}`. A holder's card hosts it directly; the
@@ -1298,6 +1306,9 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
   the viewer's explanation without a button and the manager's and participant's task buttons; `tests/live-energy-card.test.ts` the closed
   points table with the missing count, the underlined Connect link, the quiet-own-source warning, the person's empty text and the chart's
   one visible hint with the rest in a `Disclosure`; `tests/gross-energy-card.test.ts` the provider-free provenance line.
+- Setup guidance (#1164): `tests/forecast-ui.test.ts` gained the manager who connects their own plant (setup text and link) and the participant, or the
+  manager of another community, who is told to ask; `tests/zev-energy-sources.test.ts` the empty tab with one explanation and one button (and none
+  when nothing can be connected), the intro and toolbar button once a source exists; `tests/my-metering-points-page.test.ts` the history-only hint with and without the live pointer.
 - `tests/production-forecast.test.ts`: peak window text, incomplete-forecast hint.
 - `tests/pv-planes-editor.test.ts`: validation and the 4-row limit.
 - Build, lint, style lint, hex sweep; screenshots of `/live` in all tiers, also at ~400 px.
