@@ -7,7 +7,6 @@ import type { EligibleMeteringPoint, SupplementarySource } from '../../types/api
 import { CapabilityRows } from './CapabilityRows'
 import { ForecastConnectDialog } from './ForecastConnectDialog'
 import { MeteringDataLink } from './MeteringDataLink'
-import { SourceDialog, type ConfirmOptions } from './SourceDialog'
 import { SupplementarySourceModal, type ConnectCapability } from './SupplementarySourceModal'
 
 interface Props {
@@ -17,23 +16,25 @@ interface Props {
     /** The source list is still loading or failed: a source the point is known to have cannot be shown yet. */
     sourcesUnavailable?: 'loading' | 'error'
     onRetrySources?: () => void
-    confirm: (options: ConfirmOptions) => void
+    /** Open a source's details: the host shows them beside the cards (SPEC-2026-10-ui-patterns rule A). */
+    onOpenSource: (source: SupplementarySource) => void
+    /** The source whose details are open, to mark its card and button. */
+    selectedSourceId?: string | null
+    /** A source was just connected from this card; the host opens it. */
+    onConnected?: (source: SupplementarySource) => void
 }
 
 /**
  * The energy data of one metering point the participant holds, in one card: a row per capability the
  * point can have (history, live) with the source that provides it, a Connect on each row that has none and,
  * while several are missing, one primary that starts them together. Everything about a
- * source is in its dialog. The figures are only shown (live) or used for statistics (history), never
+ * source is in its pane, which the page owns. The figures are only shown (live) or used for statistics (history), never
  * for billing.
  */
-export function MeteringPointDataCard({ point, sources, sourcesUnavailable, onRetrySources, confirm }: Props) {
+export function MeteringPointDataCard({ point, sources, sourcesUnavailable, onRetrySources, onOpenSource, selectedSourceId, onConnected }: Props) {
     const { t } = useTranslation()
     const { isImpersonating } = useAuth()
     const [connecting, setConnecting] = useState<ConnectCapability[] | null>(null)
-    // The dialogs are rendered next to the card and decided by their own state, never by what the source
-    // list says: creating a source changes the rows while a push source's one-time token is on screen.
-    const [openSourceId, setOpenSourceId] = useState<string | null>(null)
 
     const eligible = { history: historyEligible(point), live: liveEligible(point), forecast: forecastEligible(point) }
     const capabilities = (['history', 'live', 'forecast'] as const).filter((capability) => eligible[capability])
@@ -47,11 +48,11 @@ export function MeteringPointDataCard({ point, sources, sourcesUnavailable, onRe
     const knowsSource = !!(point.source || point.sources?.history || point.sources?.live || point.sources?.forecast)
     // Eligibility says a source exists but its details are not here yet: offering Connect would be wrong.
     const unavailable = knowsSource && !sources ? sourcesUnavailable : undefined
-    const openSource = sources?.find((source) => source.id === openSourceId)
+    const selected = !!selectedSourceId && !!sources?.some((source) => source.id === selectedSourceId && source.metering_point === point.metering_point)
 
     return (
         <>
-            <article className="card" style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'minmax(0, 1fr)' }} aria-label={point.meter_id}>
+            <article className="card" style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'minmax(0, 1fr)' }} aria-label={point.meter_id} data-selected={selected || undefined}>
                 <header style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                     <div>
                         <h3 style={{ margin: 0, overflowWrap: 'anywhere' }}>{point.meter_id}</h3>
@@ -92,7 +93,8 @@ export function MeteringPointDataCard({ point, sources, sourcesUnavailable, onRe
                             meteringPointId={point.metering_point}
                             capabilities={capabilities}
                             sources={sources}
-                            onOpenSource={(source) => setOpenSourceId(source.id)}
+                            onOpenSource={onOpenSource}
+                            selectedSourceId={selectedSourceId}
                             onConnect={(capability) => (capability === 'forecast' ? setConnectingForecast(true) : setConnecting([capability]))}
                         />
                         {/* One missing capability is connected from its own row; the primary is for starting several at once. */}
@@ -118,21 +120,11 @@ export function MeteringPointDataCard({ point, sources, sourcesUnavailable, onRe
                     available={connectable}
                     initial={connecting}
                     sources={sources}
+                    onConnected={onConnected}
                     onClose={() => setConnecting(null)}
                 />
             )}
             {connectingForecast && <ForecastConnectDialog holder="participant" point={point} sources={sources} onClose={() => setConnectingForecast(false)} />}
-            {openSource && (
-                <SourceDialog
-                    subject={point.meter_id}
-                    source={openSource}
-                    sources={sources}
-                    eligible={eligible}
-                    confirm={confirm}
-                    canManage
-                    onClose={() => setOpenSourceId(null)}
-                />
-            )}
         </>
     )
 }

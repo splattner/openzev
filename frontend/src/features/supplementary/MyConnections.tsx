@@ -1,16 +1,16 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { IssueText } from '../../components/IssueText'
-import { capabilityProblem, forecastEligible, historyEligible, liveEligible } from '../../lib/supplementary'
+import { capabilityProblem } from '../../lib/supplementary'
 import type { EligibleMeteringPoint, SupplementarySource } from '../../types/api'
-import { SourceDialog, type ConfirmOptions } from './SourceDialog'
 
 interface Props {
     /** The signed-in user's visible sources, loaded. */
     sources: SupplementarySource[]
     /** The metering points the user holds personally in the selected community. */
     held: EligibleMeteringPoint[]
-    confirm: (options: ConfirmOptions) => void
+    /** Open the source's details beside the list. */
+    onOpenSource: (source: SupplementarySource) => void
+    selectedSourceId?: string | null
 }
 
 /** The metering points a source feeds. Always one today; a list so a connection feeding several fits. */
@@ -19,16 +19,13 @@ const fedMeters = (source: SupplementarySource): string[] => (source.metering_po
 /**
  * The energy data sources the signed-in holder owns, in one place (SPEC-2026-live-energy-data §7.2): who
  * provides what, with a problem named next to the capability it concerns and the source dialog behind a
- * button. Only from two sources on: one is all on its meter's card. Only participant-held sources on held
+ * button (the details open beside the page's cards). Only from two sources on: one is all on its meter's card. Only participant-held sources on held
  * meters; connecting stays on the meter cards below.
  */
-export function MyConnections({ sources, held, confirm }: Props) {
+export function MyConnections({ sources, held, onOpenSource, selectedSourceId }: Props) {
     const { t } = useTranslation()
-    const [openSourceId, setOpenSourceId] = useState<string | null>(null)
     const heldById = new Map(held.map((point) => [point.metering_point, point]))
     const own = sources.filter((source) => source.held_by === 'participant' && source.metering_point !== null && heldById.has(source.metering_point))
-    const openSource = own.find((source) => source.id === openSourceId)
-    const openPoint = openSource?.metering_point ? heldById.get(openSource.metering_point) : undefined
 
     // One connection is already on its meter's card below; the overview is for telling several apart.
     if (own.length < 2) return null
@@ -66,7 +63,9 @@ export function MyConnections({ sources, held, confirm }: Props) {
                                     type="button"
                                     className="button button-secondary button-compact"
                                     aria-label={t('pages.myMeteringPoints.connections.openFor', { name })}
-                                    onClick={() => setOpenSourceId(source.id)}
+                                    data-source-open={source.id}
+                                    aria-current={source.id === selectedSourceId ? 'true' : undefined}
+                                    onClick={() => onOpenSource(source)}
                                 >
                                     {t('pages.myMeteringPoints.connections.open')}
                                 </button>
@@ -75,17 +74,6 @@ export function MyConnections({ sources, held, confirm }: Props) {
                     )
                 })}
             </ul>
-            {openSource && (
-                <SourceDialog
-                    subject={fedMeters(openSource).join(', ')}
-                    source={openSource}
-                    sources={sources}
-                    eligible={openPoint ? { history: historyEligible(openPoint), live: liveEligible(openPoint), forecast: forecastEligible(openPoint) } : undefined}
-                    confirm={confirm}
-                    canManage
-                    onClose={() => setOpenSourceId(null)}
-                />
-            )}
         </section>
     )
 }

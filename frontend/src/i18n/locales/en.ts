@@ -38,6 +38,7 @@ export const en = {
         annualStatement: 'Annual statement',
         myMeteringPoints: 'My metering points',
         myEnergy: 'My energy system',
+        liveEnergy: 'Live energy',
         adminOverview: 'Overview',
         adminAccounts: 'Accounts',
         adminSystemSettings: 'Settings',
@@ -771,6 +772,8 @@ export const en = {
         myEnergy: {
             title: 'My energy system',
             description: 'What your devices report: live values and the history of your own system. Indicative only and never used for billing. The grid operator\'s official figures are on Energy balance.',
+            titleCommunity: 'Live energy',
+            descriptionCommunity: 'What the community\'s devices report: live values, the expected production and the history of a participant\'s system. Indicative only, never a basis for billing. The grid operator\'s official figures are on Energy balance.',
         },
         live: {
             disabled: 'Live energy data is not enabled on this instance.',

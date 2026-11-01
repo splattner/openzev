@@ -29,6 +29,7 @@ export const de = {
         annualStatement: 'Jahresabrechnung',
         myMeteringPoints: 'Meine Messpunkte',
         myEnergy: 'Mein Energiesystem',
+        liveEnergy: 'Live-Energie',
         adminOverview: 'Übersicht',
         adminAccounts: 'Konten',
         adminSystemSettings: 'Einstellungen',
@@ -762,6 +763,8 @@ export const de = {
         myEnergy: {
             title: 'Mein Energiesystem',
             description: 'Was Ihre Geräte melden: Live-Werte und der Verlauf Ihrer eigenen Anlage. Nur Richtwerte, nie Grundlage der Abrechnung. Die offiziellen Zahlen des Netzbetreibers finden Sie in der Energiebilanz.',
+            titleCommunity: 'Live-Energie',
+            descriptionCommunity: 'Was die Geräte der Gemeinschaft melden: Live-Werte, die erwartete Produktion und der Verlauf der Anlage eines Teilnehmers. Nur Richtwerte, nie Grundlage der Abrechnung. Die offiziellen Zahlen des Netzbetreibers finden Sie in der Energiebilanz.',
         },
         live: {
             disabled: 'Live-Energiedaten sind auf dieser Instanz nicht aktiviert.',

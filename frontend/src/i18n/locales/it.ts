@@ -29,6 +29,7 @@ export const it = {
         annualStatement: 'Conteggio annuale',
         myMeteringPoints: 'I miei punti di misura',
         myEnergy: 'Il mio sistema energetico',
+        liveEnergy: 'Energia in tempo reale',
         adminOverview: 'Panoramica',
         adminAccounts: 'Account',
         adminSystemSettings: 'Impostazioni',
@@ -762,6 +763,8 @@ export const it = {
         myEnergy: {
             title: 'Il mio sistema energetico',
             description: 'Ciò che trasmettono i vostri dispositivi: valori live e storico del vostro impianto. Solo indicativi, mai usati per la fatturazione. I dati ufficiali del gestore di rete si trovano nel bilancio energetico.',
+            titleCommunity: 'Energia in tempo reale',
+            descriptionCommunity: 'Ciò che segnalano i dispositivi della comunità: valori in tempo reale, la produzione attesa e lo storico dell\'impianto di un partecipante. Solo indicativo, mai alla base della fatturazione. Le cifre ufficiali del gestore di rete si trovano nel bilancio energetico.',
         },
         live: {
             disabled: 'I dati energetici live non sono attivati su questa istanza.',

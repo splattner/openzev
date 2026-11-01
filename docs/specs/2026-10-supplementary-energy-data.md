@@ -619,23 +619,25 @@ community's, so there the page shows only the meters the user holds with generat
   `MeteringPointDataCard`: meter id, community, the behind-the-meter badge and **View metering data**
   in the header, then a row per capability the point is eligible for (live data adds a **Live (now)**
   row next to **History (15 min)**; SPEC-2026-live-energy-data §7.2). The history row shows the source
-  (provider and name, a button that opens the source dialog), its status chip and the date it is synced
+  (provider and name, a button that opens the source in the page's pane), its status chip and the date it is synced
   through; an unconnected row says "Not connected" with a **Connect** for that capability, and one
   primary **Connect energy data** opens the single connect flow while something is unconnected.
   Reconnect-required and error banners of the history source stay on the card.
-- **Source dialog** (`SourceDialog`, a `FormModal`): everything about one source. Status, last sync,
+- **Source pane** (`SourcePane` beside the cards; `SourceDialog`, a `FormModal`, has the same body for the managers' live
+  dialogs): everything about one source. The pane is in flow beside the cards (the selection is `?source=<id>`, X and Back
+  return to the cards, focus returns to the control, a typed and unsaved key is guarded); see SPEC-2026-live-energy-data §7.2. Status, last sync,
   covered range, reconciliation state, and actions **Test**, **Sync now**, **Replace key** (Solar
   Manager), **New push token**, **Revoke token**, **Import CSV** (push), **Disconnect** (keeps data),
-  **Delete data**, **Remove source**; the push endpoints in a disclosure. Confirmations are the only
-  thing opened over it, and a rotated token stays on screen across refetches.
+  **Delete data**, **Remove source** (these three in an "End the connection" disclosure); the push endpoints in a
+  disclosure. Confirmations are the only thing opened over it, and a rotated token stays on screen across refetches.
 - **Connect flow** (`SupplementarySourceModal`): what (history, live; skipped when only one is open),
   how (Solar Manager for history only, a new push source, or the meter's existing push source, which
   takes the missing capability with a `PATCH` and consent and no new token), consent for what was chosen,
   and for a new push source one-time token screen. Without the live flag only history is offered.
 - **My connections** (`MyConnections`), a card above the meter cards while the feature is on and the
   source list has loaded: the participant-held sources on the meters the user holds in the selected
-  community, one row each (provider and label, the meter id(s) it feeds, a History and/or Live chip with
-  its status badge, and **Open** for the source dialog), or a muted empty line. UI only: a source
+  community, one row each (provider and label, the meter id(s) it feeds, a tag per capability it
+  provides, a problem only when there is one, and **Open** for the source pane); shown from two sources on. UI only: a source
   still feeds exactly one metering point (`SupplementarySource.metering_point`); account-level
   connections are a future idea (SPEC-2026-live-energy-data §12). Details: that spec §7.2.
 - Any other meter: a plain card (meter id, location, active, type, the behind-the-meter badge). A
@@ -648,9 +650,9 @@ community's, so there the page shows only the meters the user holds with generat
   While the source list is loading or failed, a meter whose eligible entry names a source shows a
   loading or error state with a retry rather than rows and **Connect**; **View metering data** stays in
   the card header.
-- The connect flow and the source dialog are rendered next to the card, never inside it, and kept open
-  by their own state, so a push source's one-time token stays on screen when the refreshed source list
-  changes the rows behind it.
+- The connect flow is rendered next to the card, never inside it, and kept open by its own state; the source pane is
+  kept open by the id in the URL and holds the one-time token of a rotation in its own state, so a push source's token
+  stays on screen when the refreshed source list changes the rows behind it.
 - A closing hint, shown only while the feature is on and only to a participant, says who flags a
   meter: the community's manager (§14). Participants cannot set the flag.
 - While the feature is off (`eligible` answers `404`) the page is a plain meter list: no energy data

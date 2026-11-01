@@ -16,6 +16,8 @@ interface Props {
     /** The caller may connect and change sources; a viewer only reads. */
     canManage?: boolean
     onOpenSource: (source: SupplementarySource) => void
+    /** The source whose details are open beside the list, to be marked. */
+    selectedSourceId?: string | null
     onConnect: (capability: RowCapability) => void
     /** Wording of an unconnected live row on a ZEV-operated meter. */
     zevHeld?: boolean
@@ -26,7 +28,7 @@ interface Props {
  * opens the source (a source providing both is in both rows and opens the same dialog) and how it is
  * doing, or "Not connected" with a Connect for that capability.
  */
-export function CapabilityRows({ meteringPointId, capabilities, sources, canManage = true, onOpenSource, onConnect, zevHeld = false }: Props) {
+export function CapabilityRows({ meteringPointId, capabilities, sources, canManage = true, onOpenSource, selectedSourceId, onConnect, zevHeld = false }: Props) {
     const { t } = useTranslation()
     const { isImpersonating } = useAuth()
     const { settings } = useAppSettings()
@@ -50,6 +52,8 @@ export function CapabilityRows({ meteringPointId, capabilities, sources, canMana
                                         type="button"
                                         className="button button-secondary button-compact"
                                         style={{ maxWidth: '100%', overflowWrap: 'anywhere' }}
+                                        data-source-open={source.id}
+                                        aria-current={source.id === selectedSourceId ? 'true' : undefined}
                                         onClick={() => onOpenSource(source)}
                                     >
                                         {t(`supplementary.provider.${source.provider}`)}

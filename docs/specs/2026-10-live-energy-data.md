@@ -66,7 +66,7 @@ local share `min(P, C) / C = 100 %`. Flat 2: `split_consumption(1200, 5000, 8000
 | Pull | Solar Manager `/v3/users/{smId}/data/stream`, demand-driven |
 | Forecast | Solar Manager `/v3/users/{smId}/data/forecast`; forecast.solar `estimate/watts`; hourly Celery refresh |
 | API | Live snapshot, today's curve (with the viewer's own history), own-system series, forecast, compact `me` endpoint; source creation for the new capabilities and targets; PV plane CRUD |
-| Frontend | "My energy system" (`/my-energy`, alias `/live`): the live card and per-point table for managers on top, then Today, 7 days and Period views of the participant's own system (live and history combined, §7.1); (forecast from PR 5) the forecast chart; source setup for live/forecast; PV plane editor; building coordinates; i18n de/fr/it/en |
+| Frontend | "My energy system" for participants, "Live energy" for managers, viewers and admins (`/my-energy`, alias `/live`; §7.1): the live card and per-point table for managers on top, then Today, 7 days and Period views of the participant's own system (live and history combined, §7.1); (forecast from PR 5) the forecast chart; source setup for live/forecast; PV plane editor; building coordinates; i18n de/fr/it/en |
 | Automation | Personal API keys (read-only) on the live endpoints; MCP tool `live_energy` |
 | Operations | Feature flag, settings, throttles, system-health additions, audit events, backup registry |
 | Docs | User guide chapter with Home Assistant and Shelly recipes; updates to the supplementary-energy-data and buildings specs |
@@ -135,8 +135,10 @@ role. The ingest view uses `SupplementaryPushAuthentication` + `IsPushSource` + 
 manager, viewer, admin and participant, like `/dashboard`); `/live` is an alias that redirects to it
 (`AliasNavigate`, query kept). The live, history and forecast views of a participant's devices sit only
 there; the dashboards show the grid operator's figures and, where the own-system card used to be, a note
-linking here. The sidebar entry "My energy system" (`nav.myEnergy`) follows "Energy balance" for
-managers and viewers and "Dashboard" for participants. Rule (`showMyEnergyEntry` in `lib/myEnergy.ts`):
+linking here. The sidebar entry follows "Energy balance" for managers and viewers, named "Live energy"
+(`nav.liveEnergy`), and "Dashboard" for participants, named "My energy system" (`nav.myEnergy`): the
+same page, named for what each role sees on it (a manager or viewer sees the whole community, a participant their
+own system). Rule (`showMyEnergyEntry` in `lib/myEnergy.ts`):
 shown when `/live/enabled/` answers `true`, **or** the energy data feature is on (`/supplementary/sources/eligible/`
 answers `200`) and the user has community-wide access (manager, viewer, admin) or holds a meter an own
 system can be connected to (`historyEligible`); never for a former participant. Live setup sits on
@@ -742,7 +744,9 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
   day only on a chart that spans more than one, "Forecast for 1 of 2 plants" when the sum is partial, and the hint that it is an estimate and never a claim that power
   is spare. Chart colours come from `chartTokens`.
 - Placement: its own page, `pages/MyEnergyPage.tsx` at `/my-energy` (alias `/live`; `PageHeader` with the
-  community switch, scope note, title "My energy system", `ScopeGuard`). The page owns the billing period
+  community switch, scope note, `ScopeGuard`; the title and description follow the role: `pages.myEnergy.title` "My energy
+  system" for a participant, `titleCommunity` "Live energy" (and a description about the community's devices) when
+  `isZevScope`, which is also the browser-tab title). The page owns the billing period
   (`useBillingPeriodParams`, like `DashboardPage`) and renders `features/myEnergy/MyEnergyView.tsx`. The
   components are `features/live/` (card, table, `LiveEnergyView` = the "Right now" block) and
   `features/myEnergy/` (`MyEnergyView`, `TodayChart`). The dashboards render nothing live; where they
@@ -820,10 +824,11 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   (15 min)**, **Live (now)**, **Forecast**) followed by a problem only when there is one
   (`capabilityProblem`: switched off and "no data yet" as muted text, a stale live source, a source in error or
   needing a new key as `IssueText`), never a status for a source that simply works (UI patterns §10.1), and an
-  **Open** button that opens `SourceDialog` (subject: the meter ids; eligibility of the fed point). There is no
+  **Open** button that asks the page to open the source in its pane (§ pane below). There is no
   Connect here, that stays on the meter cards. It is a view only: a source still feeds exactly one metering
   point. The classes are `connection-*` (`styles/components/connections.css`). Tests:
-  `tests/my-connections.test.ts` (8) and two cases in `tests/my-metering-points-page.test.ts`. The page's hint
+  `tests/my-connections.test.ts` (7) and the cases of `tests/my-metering-points-page.test.ts` (25, with the pane in
+  `describe('the source pane')`). The page's hint
   about asking a manager to flag a meter shows only while no held point is history-eligible and no own source is
   connected.
 
@@ -833,16 +838,30 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   one row per capability the point is eligible for (`historyEligible` / `liveEligible`; an entry without
   `eligible_capabilities` is history only; a **Forecast** row for a producing point): **History (15 min)** and **Live
   (now)**. A row shows the source that provides the capability as a button (`provider · label`) that
-  opens the source dialog, with its status (history: `SourceStatusBadge` and "up to <synced through>";
+  opens the source in the page's pane, with its status (history: `SourceStatusBadge` and "up to <synced through>";
   live: `LiveStateBadge` and "last value <time>"); a push source providing both is in both rows and
-  opens the same dialog. An unconnected row says "Not connected" with a secondary **Connect** that opens
+  opens the same pane. An unconnected row says "Not connected" with a secondary **Connect** that opens
   the connect flow with that capability preselected. One primary **Connect energy data** shows only while **two or more**
   capabilities that share the connect flow (history, live) are unconnected (preselecting them); with one left, its own
   row's **Connect** is the only button. Connect and the row Connect are disabled while
   impersonating. A history source's reconnect-required and error banners stay on the card. While the
   source list is loading or failed and eligibility names a source (`source`, `sources.history` or
   `sources.live`), the card shows a loading or error state with a retry instead of rows.
-- **`SourceDialog`** (`features/supplementary/SourceDialog.tsx`; `SourceDetails` is its body) holds
+- **The source pane** (`SourcePane` in `features/supplementary/SourceDialog.tsx`, owned by
+  `MyMeteringPointsPage`): a source opened from a card's row or from My connections opens **beside the cards**, not in a
+  dialog (UI patterns rule A: a record opened from a list). The cards are the list; `.detail-split` puts the pane next to
+  them from 60rem of content width (`useMinWidth`), below it the pane replaces the cards until X or Back. The open source
+  is `?source=<id>` in the URL (a reload, a link or Back reopens it; opening from the cards adds one history step,
+  switching to another source replaces it, X takes the step back), only for a participant-held source on a meter the user
+  holds. Focus moves to the pane's title when it opens and back to the control that opened it when it closes. The card
+  and button of the open source are marked (`data-selected`, `aria-current`). A new Solar Manager key typed and not
+  saved is a draft: closing the pane, opening another source or leaving the page asks first (`useDraftGuard`, fed by
+  `SourceDetails`' `onDirtyChange`). Connecting stays a dialog: after it closes the new source opens in the pane
+  (`SupplementarySourceModal`'s `onConnected`). That is a deliberate exception to rule F: the connect flow is a short
+  task that creates the record, with its own steps (what, how, consent, one-time token). The managers' **Live data**
+  dialog and the grid connection card on the metering-point page still open the source in a `SourceDialog`
+  (same body), because they open from a menu or a card of a list that has its own filters, not from a record of it.
+- **`SourceDialog`** (`features/supplementary/SourceDialog.tsx`; `SourceDetails` is its body, shared with the pane) holds
   everything about one source: provider, name, capabilities, history status and coverage and the meter
   comparison (history only), live state and last value (live only), Solar Manager id or push token
   prefix, issued and last used; the push **endpoints** in a `Disclosure` (CSV endpoint and columns for

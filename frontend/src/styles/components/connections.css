@@ -39,3 +39,8 @@
   align-items: baseline;
   gap: 0.4rem;
 }
+
+/* The card whose source is open in the pane beside it. */
+.card[data-selected='true'] {
+  border-color: var(--interactive);
+}

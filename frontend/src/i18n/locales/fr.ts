@@ -29,6 +29,7 @@ export const fr = {
         annualStatement: 'Décompte annuel',
         myMeteringPoints: 'Mes points de mesure',
         myEnergy: 'Mon système énergétique',
+        liveEnergy: 'Énergie en direct',
         adminOverview: 'Vue d\'ensemble',
         adminAccounts: 'Comptes',
         adminSystemSettings: 'Paramètres',
@@ -762,6 +763,8 @@ export const fr = {
         myEnergy: {
             title: 'Mon système énergétique',
             description: 'Ce que vos appareils transmettent : valeurs en direct et historique de votre propre installation. Indicatif uniquement, jamais utilisé pour la facturation. Les chiffres officiels du gestionnaire de réseau se trouvent dans le bilan énergétique.',
+            titleCommunity: 'Énergie en direct',
+            descriptionCommunity: 'Ce que transmettent les appareils de la communauté : valeurs en direct, production attendue et historique de l\'installation d\'un participant. Indicatif uniquement, jamais utilisé pour la facturation. Les chiffres officiels du gestionnaire de réseau se trouvent dans le bilan énergétique.',
         },
         live: {
             disabled: 'Les données d\'énergie en direct ne sont pas activées sur cette instance.',

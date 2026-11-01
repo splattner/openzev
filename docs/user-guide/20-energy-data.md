@@ -193,7 +193,8 @@ Semicolons and decimal commas (as in a Swiss Excel export) are accepted. Choose
 ### My energy system
 
 Everything your own devices report lives on the page **My energy system** in the
-sidebar. Your dashboard (**Energy balance** for managers) keeps the grid operator's
+sidebar. For managers and viewers the same page is called **Live energy**: they see the
+whole community there and pick a participant for the own-system views. Your dashboard (**Energy balance** for managers) keeps the grid operator's
 official figures and only points to this page, with a link that opens the same period.
 
 **Right now** is at the top: what your community produces and uses at this moment,
@@ -261,7 +262,7 @@ self-sufficiency. The energy sums are still shown.
   columns keep the meter value and add the own system's figure under it
   (**Own system: x kWh**, also marked with an info icon, and only with enough data).
   Selecting a participant draws their own-system line in the 24-hour profile; the full
-  card is on **My energy system**, which the dashboard links to. A manager who is also a
+  card is on **Live energy** (**My energy system** for a participant), which the dashboard links to. A manager who is also a
   participant has their own row marked **You**.
   Selecting a row in the table again clears the selection.
 - The **annual report** shows it per participant.
@@ -292,7 +293,7 @@ A forecast needs three things, set up in three places:
 
 Managers connect the forecast for ZEV-operated plants; a participant connects it for a meter they hold,
 and a manager enters the roof planes and the location. Once connected the forecast is fetched every
-hour. **Tomorrow** appears on **My energy system** as soon as there is a forecast for it.
+hour. **Tomorrow** appears on that page as soon as there is a forecast for it.
 
 ## Does it match the meter?
 
@@ -311,6 +312,15 @@ meter always wins and nothing is corrected. The result shows on the source:
 - **Not enough to compare** — there are fewer than two days present in both, for
   example because the meter data has not been imported yet.
 
+## Open a source
+
+On **My metering points**, choosing a source on a meter's card (or **Open** in **My connections**, which
+appears once you have two or more connections) opens its details **beside the cards**; on a narrow screen
+they take the place of the cards until you close them with the X or the browser's Back button. The card
+whose source is open is outlined. The address keeps the choice, so a reload or a shared link opens the same
+source. If you have typed a new Solar Manager key and not saved it, closing asks before it is lost. After you
+connect a source, it opens there by itself.
+
 ## Disconnect, delete, remove
 
 | Action | Stops new data | Deletes data | Keeps the connection |
@@ -319,7 +329,7 @@ meter always wins and nothing is corrected. The result shows on the source:
 | **Delete data** | no | yes, all readings | yes |
 | **Remove source** | yes | yes, all readings | no |
 
-In the source's dialog these three sit in their own section, **End the connection**, away from
+In the source's details these three sit in their own section, **End the connection**, away from
 the everyday actions. A ZEV manager sees the same buttons for a participant's source, except for the
 ones that touch the key. Deleting a participant or a metering point deletes their
 sources and readings with them.

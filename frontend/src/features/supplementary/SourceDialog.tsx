@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Disclosure } from '../../components/Disclosure'
+import { DetailPane } from '../../components/DetailPane'
 import { FormModal } from '../../components/FormModal'
 import { useAuth } from '../../lib/auth'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
@@ -32,6 +33,8 @@ interface DetailsProps {
     canManage: boolean
     /** The source is gone (deleted); the host closes. */
     onGone?: () => void
+    /** A new Solar Manager key has been typed and not saved: the host asks before it lets go of the source. */
+    onDirtyChange?: (dirty: boolean) => void
 }
 
 const NO_CAPABILITY: PointEligibility = { history: false, live: false }
@@ -41,7 +44,7 @@ const NO_CAPABILITY: PointEligibility = { history: false, live: false }
  * body of `SourceDialog`, and of a host that already is a dialog. The one-time token of a rotation
  * lives here, above everything a refetch can change, and the credential is never shown.
  */
-export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confirm, canManage, onGone }: DetailsProps) {
+export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confirm, canManage, onGone, onDirtyChange }: DetailsProps) {
     const { t } = useTranslation()
     const { isImpersonating } = useAuth()
     const { settings } = useAppSettings()
@@ -51,6 +54,12 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
     const [newId, setNewId] = useState(source.external_id)
     const [token, setToken] = useState<string | null>(null)
     const [showCsv, setShowCsv] = useState(false)
+    const keyDraft = replacing && newKey.trim() !== ''
+    useEffect(() => {
+        onDirtyChange?.(keyDraft)
+        // Leaving with a draft in it is no longer a draft the host has to guard.
+        return () => onDirtyChange?.(false)
+    }, [keyDraft, onDirtyChange])
 
     const { test, sync, replaceKey, disconnect, purge, remove, rotate, revoke, capability, busy } = useSourceActions(source, {
         onToken: setToken,
@@ -459,5 +468,28 @@ export function SourceDialog({ subject, onClose, ...details }: DialogProps) {
         <FormModal isOpen size="md" title={t('supplementary.source.title', { subject })} onClose={onClose}>
             <SourceDetails {...details} onGone={() => { details.onGone?.(); onClose() }} />
         </FormModal>
+    )
+}
+
+interface PaneProps extends DetailsProps {
+    /** What the source belongs to, for the title: the meter id. */
+    subject: string
+    onClose: () => void
+    titleRef?: Ref<HTMLHeadingElement>
+}
+
+/**
+ * One source beside the list it was opened from (SPEC-2026-10-ui-patterns §6.2, rule A): the same body as
+ * the dialog, in a pane that is in flow on a wide screen and replaces the list on a narrow one. The host
+ * keeps it open by the id in the URL, so a refetch of the source list cannot swap it away.
+ */
+export function SourcePane({ subject, onClose, titleRef, ...details }: PaneProps) {
+    const { t } = useTranslation()
+    return (
+        <DetailPane title={t('supplementary.source.title', { subject })} onClose={onClose} titleRef={titleRef}>
+            <div className="detail-pane-body">
+                <SourceDetails {...details} onGone={() => { details.onGone?.(); onClose() }} />
+            </div>
+        </DetailPane>
     )
 }

@@ -131,6 +131,21 @@ describe('SupplementarySourceModal for live data', () => {
         expect(document.querySelector('[data-testid="push-token"]')).toBeNull()
     })
 
+    it('hands the new source to the host as the dialog closes, so it can open it', async () => {
+        const onConnected = vi.fn()
+        const onClose = vi.fn()
+        const modal = await open('participant', { point, available: ['live'], onConnected, onClose })
+        api.createSupplementarySource.mockResolvedValue(liveOnly({ id: 'src-new', provider: 'solar_manager', push_token_prefix: null, external_id: 'ABC123', has_credential: true }))
+        await act(async () => {
+            setInputValue(modal.querySelector<HTMLInputElement>('input[type="text"]')!, 'ABC123')
+            setInputValue(modal.querySelector<HTMLInputElement>('input[type="password"]')!, 'the-key')
+        })
+        await submit(modal)
+
+        await waitForCondition(() => onClose.mock.calls.length > 0, 'the dialog to close')
+        expect(onConnected).toHaveBeenCalledWith(expect.objectContaining({ id: 'src-new' }))
+    })
+
     it('offers Solar Manager for history and live together, with the matching hint', async () => {
         const modal = await open('participant', { point, available: ['history', 'live'], initial: ['history', 'live'] })
         await click(buttonWith(modal, 'supplementary.modal.next')!)

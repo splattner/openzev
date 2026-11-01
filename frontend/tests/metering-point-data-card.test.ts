@@ -1,8 +1,10 @@
-import { act, createElement } from 'react'
+import { act, createElement, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useQuery } from '@tanstack/react-query'
 import { ConfirmDialog, useConfirmDialog } from '../src/components/ConfirmDialog'
 import { MeteringPointDataCard } from '../src/features/supplementary/MeteringPointDataCard'
+import { SourceDialog } from '../src/features/supplementary/SourceDialog'
+import { forecastEligible, historyEligible, liveEligible } from '../src/lib/supplementary'
 import { queryKeys } from '../src/lib/api/queryKeys'
 import type { EligibleMeteringPoint, SupplementarySource } from '../src/types/api'
 import { renderWithProviders, setInputValue } from './helpers/render'
@@ -68,14 +70,24 @@ const solarLive = (overrides: Partial<SupplementarySource> = {}) =>
 const both = (overrides: Partial<SupplementarySource> = {}) => push({ provides_live: true, live_state: 'stale', ...overrides })
 
 const cleanups: Array<() => void> = []
+const keyDraft = vi.fn()
 
-/** What the page around the card provides: the source list and the confirm dialog. */
+/**
+ * What the page around the card provides: the source list, the confirm dialog and somewhere to show an
+ * opened source. The real page shows it in a pane; the details are the same body, so a dialog serves here.
+ */
 function Harness({ eligibility }: { eligibility: EligibleMeteringPoint }) {
     const sources = useQuery({ queryKey: queryKeys.metering.supplementarySources(), queryFn: api.listSupplementarySources })
     const { dialog, confirm, handleConfirm, handleCancel, isLoading } = useConfirmDialog()
+    const [openId, setOpenId] = useState<string | null>(null)
     if (!sources.data) return null
+    const open = sources.data.find((source) => source.id === openId)
     return createElement('div', null,
-        createElement(MeteringPointDataCard, { point: eligibility, sources: sources.data, confirm }),
+        createElement(MeteringPointDataCard, { point: eligibility, sources: sources.data, onOpenSource: (source: SupplementarySource) => setOpenId(source.id), selectedSourceId: openId }),
+        open && createElement(SourceDialog, {
+            subject: eligibility.meter_id, source: open, sources: sources.data, confirm, canManage: true, onDirtyChange: keyDraft, onClose: () => setOpenId(null),
+            eligible: { history: historyEligible(eligibility), live: liveEligible(eligibility), forecast: forecastEligible(eligibility) },
+        }),
         dialog && createElement(ConfirmDialog, { ...dialog, isLoading, onConfirm: handleConfirm, onCancel: handleCancel }),
     )
 }
@@ -210,7 +222,7 @@ describe('impersonation', () => {
 describe('a source that eligibility knows about but whose details are missing', () => {
     const known = { ...point, source: 'src-1' }
     const render = (props: { sourcesUnavailable?: 'loading' | 'error'; onRetrySources?: () => void }) =>
-        renderWithProviders(createElement(MeteringPointDataCard, { point: known, sources: undefined, confirm: vi.fn(), ...props }), cleanups)
+        renderWithProviders(createElement(MeteringPointDataCard, { point: known, sources: undefined, onOpenSource: vi.fn(), ...props }), cleanups)
 
     it.each(['loading', 'error'] as const)('does not offer Connect while the details are %s', async (state) => {
         const { container } = await render({ sourcesUnavailable: state })
@@ -229,13 +241,13 @@ describe('a source that eligibility knows about but whose details are missing', 
     })
 
     it('offers Connect again once the list is known not to contain the source', async () => {
-        const { container } = await renderWithProviders(createElement(MeteringPointDataCard, { point: known, sources: [], confirm: vi.fn() }), cleanups)
+        const { container } = await renderWithProviders(createElement(MeteringPointDataCard, { point: known, sources: [], onOpenSource: vi.fn() }), cleanups)
 
         expect(primaryConnect(container)).toBeDefined()
     })
 
     it('does not wait for the list for a point that has no source', async () => {
-        const { container } = await renderWithProviders(createElement(MeteringPointDataCard, { point, sources: undefined, sourcesUnavailable: 'loading', confirm: vi.fn() }), cleanups)
+        const { container } = await renderWithProviders(createElement(MeteringPointDataCard, { point, sources: undefined, sourcesUnavailable: 'loading', onOpenSource: vi.fn() }), cleanups)
 
         expect(primaryConnect(container)).toBeDefined()
     })
@@ -557,7 +569,10 @@ describe('source dialog', () => {
         const form = modal.querySelector('form')!
         const keyInput = form.querySelector<HTMLInputElement>('input[type="password"]')!
 
+        expect(keyDraft).not.toHaveBeenCalledWith(true)
         await act(async () => setInputValue(keyInput, 'fresh-key'))
+        // A key typed and not saved is what the host guards against losing.
+        expect(keyDraft).toHaveBeenLastCalledWith(true)
         await act(async () => { buttonWith(form, 'supplementary.actions.saveKey').click() })
         await waitForCondition(() => api.updateSupplementarySource.mock.calls.length === 1, 'the update')
 

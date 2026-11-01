@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
@@ -31,6 +31,8 @@ interface Props {
     /** The visible sources, to find the point's push source that could take the missing capability. */
     sources?: SupplementarySource[]
     onClose: () => void
+    /** Called as the dialog closes after a source was created or extended, so the host can open it. */
+    onConnected?: (source: SupplementarySource) => void
     /**
      * Where the dialog is drawn: a `FormModal` by default, or a host's own dialog whose content this
      * replaces (a host that is already a dialog must not open a second one over itself).
@@ -74,7 +76,7 @@ function firstMessage(body: Record<string, unknown> | null | undefined, key: str
  * A new push source ends on a one-time token screen; an existing one on its endpoints. A ZEV-operated
  * meter or the connection point is confirmed by the manager instead of consented to by a participant.
  */
-export function SupplementarySourceModal({ holder = 'participant', point, zevId, available, initial, sources, onClose, frame }: Props) {
+export function SupplementarySourceModal({ holder = 'participant', point, zevId, available, initial, sources, onClose: close, onConnected, frame }: Props) {
     const { t } = useTranslation()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
@@ -92,6 +94,13 @@ export function SupplementarySourceModal({ holder = 'participant', point, zevId,
     const [formError, setFormError] = useState<string | null>(null)
     const [token, setToken] = useState<string | null>(null)
     const [reused, setReused] = useState<SupplementarySource | null>(null)
+    const connected = useRef<SupplementarySource | null>(null)
+    function onClose() {
+        const source = connected.current
+        connected.current = null
+        close()
+        if (source) onConnected?.(source)
+    }
 
     const history = chosen.includes('history')
     const live = chosen.includes('live')
@@ -148,6 +157,7 @@ export function SupplementarySourceModal({ holder = 'participant', point, zevId,
     const create = useMutation({
         mutationFn: () => createSupplementarySource(createPayload()),
         onSuccess: (created) => {
+            connected.current = created
             setApiKey('')
             invalidateSourceQueries(queryClient)
             if (created.push_token) {
@@ -170,6 +180,7 @@ export function SupplementarySourceModal({ holder = 'participant', point, zevId,
             return updateSupplementarySource(existing!.id, update)
         },
         onSuccess: (updated) => {
+            connected.current = updated
             invalidateSourceQueries(queryClient)
             setReused(updated)
         },

@@ -1,4 +1,4 @@
-import { act, createElement } from 'react'
+import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MyConnections } from '../src/features/supplementary/MyConnections'
 import type { EligibleMeteringPoint, SupplementarySource } from '../src/types/api'
@@ -13,12 +13,6 @@ vi.mock('../src/lib/appSettings', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../src/lib/appSettings')>()
     return { ...actual, useAppSettings: () => ({ settings: actual.DEFAULT_APP_SETTINGS, isLoading: false }) }
 })
-// The dialog has its own tests; here only that it opens for the right source.
-vi.mock('../src/features/supplementary/SourceDialog', () => ({
-    SourceDialog: ({ source, subject, eligible }: { source: SupplementarySource; subject: string; eligible?: Record<string, boolean> }) =>
-        createElement('div', { 'data-testid': 'dialog', 'data-eligible': JSON.stringify(eligible) }, `${source.id}:${subject}`),
-}))
-
 const held: EligibleMeteringPoint[] = [
     { metering_point: 'mp-1', meter_id: 'CH-100', zev: 'zev-1', zev_name: 'Sonnenhof', participant: 'p-1', source: null, eligible_capabilities: ['history', 'live', 'forecast'] },
 ]
@@ -41,8 +35,8 @@ const second = (overrides: Partial<SupplementarySource> = {}) =>
     source({ id: 'src-2', metering_point: 'mp-2', metering_point_meter_id: 'CH-200', ...overrides })
 const held2: EligibleMeteringPoint[] = [...held, { ...held[0], metering_point: 'mp-2', meter_id: 'CH-200' }]
 
-const mount = (sources: SupplementarySource[]) =>
-    renderWithProviders(createElement(MyConnections, { sources, held: held2, confirm: vi.fn() }), cleanups)
+const mount = (sources: SupplementarySource[], props: { onOpenSource?: (source: SupplementarySource) => void; selectedSourceId?: string | null } = {}) =>
+    renderWithProviders(createElement(MyConnections, { sources, held: held2, onOpenSource: vi.fn(), ...props }), cleanups)
 
 describe('MyConnections', () => {
     it('lists only the participant-held sources on meters the user holds', async () => {
@@ -102,25 +96,16 @@ describe('MyConnections', () => {
         expect(row.textContent).not.toContain('supplementary.capability.live')
     })
 
-    it('opens the source dialog for the chosen source', async () => {
-        const { container } = await mount([source(), second()])
-        expect(container.querySelector('[data-testid="dialog"]')).toBeNull()
+    it('asks the page to open the chosen source, and marks the open one', async () => {
+        const onOpenSource = vi.fn()
+        const { container } = await mount([source(), second()], { onOpenSource, selectedSourceId: 'src-2' })
 
-        await act(async () => {
-            container.querySelector<HTMLButtonElement>('li[data-source="src-1"] button')!.click()
-        })
-
-        expect(container.querySelector('[data-testid="dialog"]')!.textContent).toBe('src-1:CH-100')
-    })
-
-    it('passes what the meter can still offer, forecast included, to the source dialog', async () => {
-        const { container } = await mount([source({ provider: 'solar_manager' }), second()])
-        await act(async () => {
-            container.querySelector<HTMLButtonElement>('li[data-source="src-1"] button')!.click()
-        })
-        expect(JSON.parse(container.querySelector('[data-testid="dialog"]')!.getAttribute('data-eligible')!)).toEqual({
-            history: true, live: true, forecast: true,
-        })
+        container.querySelector<HTMLButtonElement>('li[data-source="src-1"] button')!.click()
+        expect(onOpenSource).toHaveBeenCalledWith(expect.objectContaining({ id: 'src-1' }))
+        // The page returns focus to this control when the pane closes.
+        expect(container.querySelector('li[data-source="src-1"] button')!.getAttribute('data-source-open')).toBe('src-1')
+        expect(container.querySelector('li[data-source="src-2"] button')!.getAttribute('aria-current')).toBe('true')
+        expect(container.querySelector('li[data-source="src-1"] button')!.getAttribute('aria-current')).toBeNull()
     })
 
     it('shows a forecast chip for a source that provides the forecast', async () => {
