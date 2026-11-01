@@ -7,6 +7,7 @@ import { Notice } from '../../components/Notice'
 import { PageSkeleton } from '../../components/PageSkeleton'
 import { PeriodSelector } from '../../components/PeriodSelector'
 import { GrossEnergyCallToAction, GrossEnergyCard } from '../../components/dashboard/GrossEnergyCard'
+import { listSupplementarySources } from '../../lib/api/supplementary'
 import { fetchParticipants } from '../../lib/api/zev'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { useAuth } from '../../lib/auth'
@@ -92,6 +93,12 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
     const selectedParticipantId = isZevScope
         ? (participants.some((participant) => participant.id === requested) ? requested : defaultParticipantId)
         : ''
+    // Two participants may share a name (a household's members); the e-mail then tells them apart.
+    const participantLabel = (participant: (typeof participants)[number]) => {
+        const name = participant.display_name || participant.id
+        const twins = participants.filter((other) => (other.display_name || other.id) === name).length > 1
+        return twins && participant.email ? `${name} · ${participant.email}` : name
+    }
     const selectedName = participants.find((participant) => participant.id === selectedParticipantId)?.display_name
     const subject: Subject = isZevScope
         ? {
@@ -102,8 +109,19 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
         }
         : { participantId: undefined, ready: true, isOwn: true, name: undefined }
     const canConnect = energyData.historyEligible.some((point) => point.zev === selectedZevId && point.source === null)
-    // A history can only appear for a participant whose meter has a plant behind it; a manager looks at other people's.
-    const historyPossible = isZevScope || energyData.historyEligible.some((point) => point.zev === selectedZevId)
+    // The user's own system already has a source (so "nothing yet" means it has not synced, not that nothing is connected).
+    const hasOwnSource = energyData.historyEligible.some((point) => point.zev === selectedZevId && point.source !== null)
+    // A manager looks at other people's histories, which exist only where some source provides one; asked for
+    // only while the page is a manager's, and shared with the Energy data tab through the same query key.
+    const sourcesQuery = useQuery({
+        queryKey: queryKeys.metering.supplementarySources(),
+        queryFn: listSupplementarySources,
+        enabled: isZevScope && energyData.featureOn,
+    })
+    // A history can only appear for a participant whose meter has a plant behind it, or wherever a source provides one.
+    const historyPossible = isZevScope
+        ? sourcesQuery.isPending || (sourcesQuery.data ?? []).some((source) => source.zev === selectedZevId && source.provides_history)
+        : energyData.historyEligible.some((point) => point.zev === selectedZevId)
     // Without a plant, a live source or a forecast there is nothing to put under the live card's own setup prompt.
     const liveSettled = !liveEnabled || !snapshotQuery.isPending
     const hasViews = historyPossible || liveShown || !!forecast || !liveSettled
@@ -136,6 +154,26 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
         <>
             <LiveEnergyView zevId={selectedZevId || undefined} />
 
+            {hasViews && isZevScope && range !== 'tomorrow' && (
+                // The picker decides what the views below show, so it comes first (UI patterns §10.3 rule 2).
+                <section className="filter-bar">
+                    <div className="filter-bar-fields">
+                        <label>
+                            <span>{t('pages.dashboard.participant')}</span>
+                            <select value={selectedParticipantId} onChange={(event) => setParticipant(event.target.value)}>
+                                {!selectedParticipantId && <option value="">{t('myEnergy.pickParticipant')}</option>}
+                                {participants.map((participant) => (
+                                    <option key={participant.id} value={participant.id}>
+                                        {participantLabel(participant)}
+                                        {ownParticipantIds.includes(participant.id) ? ` (${t('pages.dashboard.youBadge')})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    </div>
+                </section>
+            )}
+
             {hasViews && (
                 <AppTabs value={range} onChange={(value) => setRange(parseMyEnergyRange(value))} keepMounted={false}>
                     {showTabs && (
@@ -147,33 +185,14 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
                         </AppTabs.List>
                     )}
 
-                    <section className="filter-bar">
-                        {range === 'period' && interval && (
+                    {range === 'period' && interval && (
+                        <section className="filter-bar">
                             <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={onPeriodChange} />
-                        )}
-                        {isZevScope && range !== 'tomorrow' && (
-                            <>
-                                <div className="filter-bar-fields">
-                                    <label>
-                                        <span>{t('pages.dashboard.participant')}</span>
-                                        <select value={selectedParticipantId} onChange={(event) => setParticipant(event.target.value)}>
-                                            {!selectedParticipantId && <option value="">{t('myEnergy.pickParticipant')}</option>}
-                                            {participants.map((participant) => (
-                                                <option key={participant.id} value={participant.id}>
-                                                    {participant.display_name || participant.id}
-                                                    {ownParticipantIds.includes(participant.id) ? ` (${t('pages.dashboard.youBadge')})` : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </label>
-                                </div>
-                                {!subject.ready && <p className="muted filter-bar-note">{t('myEnergy.pickParticipantPrompt')}</p>}
-                            </>
-                        )}
-                    </section>
+                        </section>
+                    )}
 
                     <AppTabs.Panel value="today">
-                        <TodayPanel zevId={selectedZevId || undefined} subject={subject} canConnect={canConnect} historyPossible={historyPossible} forecast={forecast} />
+                        <TodayPanel zevId={selectedZevId || undefined} subject={subject} canConnect={canConnect} hasOwnSource={hasOwnSource} historyPossible={historyPossible} forecast={forecast} />
                     </AppTabs.Panel>
                     {hasTomorrow && forecast && (
                         <AppTabs.Panel value="tomorrow">
@@ -185,13 +204,14 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
                             zevId={selectedZevId || undefined}
                             subject={subject}
                             canConnect={canConnect}
+                            hasOwnSource={hasOwnSource}
                             historyPossible={historyPossible}
                             range={lastDaysRange(today, 7)}
                             bucket="hour"
                             footer={
                                 <p className="muted">
-                                    {t('myEnergy.week.note')}{' '}
-                                    <Link to="/dashboard">{t('myEnergy.week.noteLink')}</Link>
+                                    {t(subject.isOwn ? 'myEnergy.week.note' : 'myEnergy.week.notePerson')}{' '}
+                                    <Link className="text-link" to="/dashboard">{t('myEnergy.week.noteLink')}</Link>
                                 </p>
                             }
                         />
@@ -201,6 +221,7 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
                             zevId={selectedZevId || undefined}
                             subject={subject}
                             canConnect={canConnect}
+                            hasOwnSource={hasOwnSource}
                             historyPossible={historyPossible}
                             range={period}
                             bucket="day"
@@ -214,22 +235,35 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
 }
 
 /** What to say where there is nothing of the own system to show. */
-function NoOwnSystem({ subject, canConnect, historyPossible }: { subject: Subject; canConnect: boolean; historyPossible: boolean }) {
+function NoOwnSystem({ subject, canConnect, hasOwnSource, historyPossible }: {
+    subject: Subject
+    canConnect: boolean
+    hasOwnSource: boolean
+    historyPossible: boolean
+}) {
     const { t } = useTranslation()
-    // The prompt to pick a participant sits by the picker; a meter that cannot have a history has nothing to wait for.
+    // The picker's placeholder asks for a participant; a meter that cannot have a history has nothing to wait for.
     if (!subject.ready || (subject.isOwn && !historyPossible)) return null
-    if (subject.isOwn && canConnect) return <GrossEnergyCallToAction />
-    return <p className="muted">{t(subject.isOwn ? 'myEnergy.noOwnSystem' : 'myEnergy.noOwnSystemParticipant')}</p>
+    if (!subject.isOwn) return <p className="muted">{t('myEnergy.noOwnSystemParticipant')}</p>
+    if (canConnect) return <GrossEnergyCallToAction />
+    // A source exists: the data is on its way, and the connection is where to look when it is not.
+    return (
+        <p className="muted">
+            {t(hasOwnSource ? 'myEnergy.notSynced' : 'myEnergy.noOwnSystem')}{' '}
+            <Link className="text-link" to="/me/metering-points">{t('myEnergy.toMeteringPoints')}</Link>
+        </p>
+    )
 }
 
 /**
  * Today: the live curve (when the live view has data) with the own line merged from history and live,
  * or the history alone through the own-series endpoint when there is no live curve.
  */
-function TodayPanel({ zevId, subject, canConnect, historyPossible, forecast }: {
+function TodayPanel({ zevId, subject, canConnect, hasOwnSource, historyPossible, forecast }: {
     zevId: string | undefined
     subject: Subject
     canConnect: boolean
+    hasOwnSource: boolean
     historyPossible: boolean
     forecast: ProductionForecast | null
 }) {
@@ -264,18 +298,19 @@ function TodayPanel({ zevId, subject, canConnect, historyPossible, forecast }: {
         <>
             {seriesQuery.isError && <Notice tone="error">{t('myEnergy.loadFailed')}</Notice>}
             {(liveShown || hasOwn || rows.some((row) => row.forecast !== null)) && (
-                <TodayChart date={date} rows={rows} through={history.through} hasLive={!!curve} peakWindows={forecast?.peak_windows} />
+                <TodayChart date={date} rows={rows} through={history.through} hasLive={!!curve} isOwn={subject.isOwn} peakWindows={forecast?.peak_windows} />
             )}
-            {!hasOwn && !seriesQuery.isError && <NoOwnSystem subject={subject} canConnect={canConnect} historyPossible={historyPossible} />}
+            {!hasOwn && !seriesQuery.isError && <NoOwnSystem subject={subject} canConnect={canConnect} hasOwnSource={hasOwnSource} historyPossible={historyPossible} />}
         </>
     )
 }
 
 /** Seven days or the billing period: the own system's totals and chart, as the dashboards used to show them. */
-function SeriesPanel({ zevId, subject, canConnect, historyPossible, range, bucket, ready = true, footer }: {
+function SeriesPanel({ zevId, subject, canConnect, hasOwnSource, historyPossible, range, bucket, ready = true, footer }: {
     zevId: string | undefined
     subject: Subject
     canConnect: boolean
+    hasOwnSource: boolean
     historyPossible: boolean
     range: { from: string; to: string }
     bucket: 'hour' | 'day'
@@ -309,7 +344,7 @@ function SeriesPanel({ zevId, subject, canConnect, historyPossible, range, bucke
                     formatBucketTooltipLabel={formatBucketTooltipLabel}
                 />
             ) : (
-                <NoOwnSystem subject={subject} canConnect={canConnect} historyPossible={historyPossible} />
+                <NoOwnSystem subject={subject} canConnect={canConnect} hasOwnSource={hasOwnSource} historyPossible={historyPossible} />
             )}
             {footer}
         </>

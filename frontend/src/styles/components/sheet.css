@@ -164,6 +164,19 @@ select.select-compact {
   text-decoration: underline;
 }
 
+/* A link inside a sentence or beside a status, which colour and weight alone would not set apart from the
+   text around it (UI patterns §10.3 rule 11): underlined all the time. */
+.text-link {
+  color: var(--interactive);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.text-link:hover {
+  color: var(--interactive-hover);
+}
+
 /* Context under a sheet's title, as under the document's section titles. */
 :is(.card, .table-card) > :is(h2, h3):first-child + p.muted,
 :is(.card, .table-card) > div:first-child:not([class]) > :is(h2, h3):first-child + p.muted {

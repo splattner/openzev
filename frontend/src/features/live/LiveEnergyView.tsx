@@ -15,7 +15,7 @@ import { LivePointsTable } from './LivePointsTable'
  */
 export function LiveEnergyView({ zevId }: { zevId: string | undefined }) {
     const { t } = useTranslation()
-    const { isZevScope } = useCommunityAccess()
+    const { isZevScope, canManage } = useCommunityAccess()
     const enabledQuery = useLiveEnabled()
     const enabled = enabledQuery.data === true
     const snapshotQuery = useLiveEnergy(enabled ? zevId : undefined)
@@ -34,13 +34,16 @@ export function LiveEnergyView({ zevId }: { zevId: string | undefined }) {
     if (enabledQuery.isPending || !zevId || snapshot === undefined) return <PageSkeleton variant="kpiRow" />
     if (snapshot === null) return <Notice tone="warning">{t('pages.live.unavailable')}</Notice>
     if (!state) {
+        // Only who can act gets a button: a manager connects the community's source, a participant their own,
+        // and a viewer is told who can (UI patterns §10.3 rule 1).
+        const role = canManage ? 'manager' : isZevScope ? 'viewer' : 'participant'
         return (
             <EmptyState
                 titleKey="pages.live.empty.title"
-                descriptionKey={isZevScope ? 'pages.live.empty.manager' : 'pages.live.empty.participant'}
-                actions={[{
-                    labelKey: isZevScope ? 'pages.live.empty.managerAction' : 'pages.live.empty.participantAction',
-                    to: isZevScope ? '/zev-settings/energy' : '/me/metering-points',
+                descriptionKey={`pages.live.empty.${role}`}
+                actions={role === 'viewer' ? undefined : [{
+                    labelKey: `pages.live.empty.${role}Action`,
+                    to: role === 'manager' ? '/zev-settings/energy' : '/me/metering-points',
                 }]}
             />
         )

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { formatClock, formatKw, kwFigure, liveCardState } from '../../lib/live'
 import { formatPercentFigure } from '../../lib/numbers'
 import type { LiveSnapshot } from '../../types/api'
+import { IssueText } from '../../components/IssueText'
 import { StatCard } from '../../components/StatCard'
 
 /**
@@ -33,6 +34,15 @@ export function LiveEnergyCard({ snapshot }: { snapshot: LiveSnapshot }) {
                 </h3>
                 {snapshot.as_of && <span className="muted">{t('live.asOf', { time: formatClock(snapshot.as_of) })}</span>}
             </div>
+
+            {own && !own.complete && (
+                // The viewer's own tiles are withheld unless every one of their points reports; say why they are missing.
+                <p>
+                    <IssueText tone="warning" to="/me/metering-points">
+                        {t(own.points_fresh === 0 ? 'live.ownQuiet' : 'live.ownPartlyQuiet')}
+                    </IssueText>
+                </p>
+            )}
 
             {(ownConsumptionW !== null || ownProduction) && (
                 <div className="stat-grid">

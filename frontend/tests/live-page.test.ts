@@ -79,16 +79,26 @@ describe('LiveEnergyView', () => {
     })
 
     it.each([
-        [true, '/zev-settings/energy', 'pages.live.empty.manager'],
-        [false, '/me/metering-points', 'pages.live.empty.participant'],
-    ])('without a live source a manager (%s) is pointed to %s', async (isZevScope, href, text) => {
-        mockAccess.mockReturnValue({ isZevScope })
+        [{ isZevScope: true, canManage: true }, '/zev-settings/energy', 'pages.live.empty.manager', 'pages.live.empty.managerAction'],
+        [{ isZevScope: false, canManage: false }, '/me/metering-points', 'pages.live.empty.participant', 'pages.live.empty.participantAction'],
+    ])('without a live source %j is pointed to %s', async (access, href, text, action) => {
+        mockAccess.mockReturnValue(access)
         api.fetchLiveSnapshotOrNull.mockResolvedValue(snapshot(0))
         const { container } = await render()
 
         expect(container.textContent).toContain(text)
         expect(container.querySelector('.empty-state a')?.getAttribute('href')).toBe(href)
+        expect(container.querySelector('.empty-state a')?.textContent).toBe(action)
         expect(api.fetchLiveCurveOrNull).not.toHaveBeenCalled()
+    })
+
+    it('tells a viewer who can connect a source instead of offering a button they cannot use', async () => {
+        mockAccess.mockReturnValue({ isZevScope: true, canManage: false })
+        api.fetchLiveSnapshotOrNull.mockResolvedValue(snapshot(0))
+        const { container } = await render()
+
+        expect(container.textContent).toContain('pages.live.empty.viewer')
+        expect(container.querySelector('.empty-state a, .empty-state button')).toBeNull()
     })
 
     it('shows the card, and the points table for a manager, when live sources exist, without the curve', async () => {

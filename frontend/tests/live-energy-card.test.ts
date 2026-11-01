@@ -156,6 +156,26 @@ describe('LiveEnergyCard', () => {
         expect(out).not.toContain('live.connectionPoint')
     })
 
+    it('says, with a way to the connection, when the viewer\'s own source has gone quiet and the own tiles are therefore gone', async () => {
+        const quiet = await renderWithProviders(
+            createElement(LiveEnergyCard, { snapshot: exact({ own: own({ complete: false, points: 1, points_fresh: 0, consumption_w: null, local_w: null, grid_w: null }) }) }),
+            cleanups,
+        )
+        const issue = quiet.container.querySelector('a.issue-text--warning')
+        expect(issue?.textContent).toBe('live.ownQuiet')
+        expect(issue?.getAttribute('href')).toBe('/me/metering-points')
+        expect(quiet.container.textContent).not.toContain('live.ownConsumptionLabel')
+
+        const partly = await renderWithProviders(
+            createElement(LiveEnergyCard, { snapshot: exact({ own: own({ complete: false, points: 2, points_fresh: 1 }) }) }),
+            cleanups,
+        )
+        expect(partly.container.querySelector('.issue-text--warning')?.textContent).toBe('live.ownPartlyQuiet')
+
+        const fine = await renderWithProviders(createElement(LiveEnergyCard, { snapshot: exact() }), cleanups)
+        expect(fine.container.querySelector('.issue-text--warning')).toBeNull()
+    })
+
     it('never prints a value the payload leaves out', async () => {
         const out = await text(exact({ local_share_pct: null }))
 
@@ -223,14 +243,22 @@ describe('LivePointsTable', () => {
         expect(out).not.toMatch(/-\d+\.\d/)
     })
 
-    it('summarises how many points report, open only while some do not', async () => {
-        const partial = [point({}), point({ metering_point_id: 'm2', meter_id: 'CH-2', live_state: 'never', source_id: null, meter_power_w: null, age_s: null })]
+    it('is closed, and says how many metering points have no current value, counted as the card counts them', async () => {
+        const partial = [
+            point({}),
+            point({ metering_point_id: 'm2', meter_id: 'CH-2', live_state: 'never', source_id: null, meter_power_w: null, age_s: null }),
+            point({ metering_point_id: null, target: 'connection_point', meter_id: null, live_state: 'stale', source_id: 's2' }),
+        ]
         const { container } = await renderWithProviders(createElement(LivePointsTable, { points: partial }), cleanups)
-        expect(container.querySelector('summary')?.textContent).toContain('live.points.summary|{"live":1,"total":2}')
-        expect(container.querySelector('details')?.open).toBe(true)
+        const summary = container.querySelector('summary')?.textContent ?? ''
+        // The grid connection point is not a metering point of the card's "X of Y", so it is not in this count either.
+        expect(summary).toContain('live.points.summary')
+        expect(summary).toContain('live.points.quiet|{"missing":1}')
+        expect(summary).not.toContain('"total"')
+        expect(container.querySelector('details')?.open).toBe(false)
 
         const complete = await renderWithProviders(createElement(LivePointsTable, { points: [point({})] }), cleanups)
-        expect(complete.container.querySelector('details')?.open).toBe(false)
+        expect(complete.container.querySelector('summary')?.textContent).not.toContain('live.points.quiet')
     })
 
     it('offers a manager the way to connect a point nobody holds, and tells a viewer or a holder\'s point nothing to do', async () => {
@@ -239,6 +267,8 @@ describe('LivePointsTable', () => {
         const manager = await renderWithProviders(createElement(LivePointsTable, { points: [open, held] }), cleanups)
         const link = manager.container.querySelector('table a')
         expect(link?.getAttribute('href')).toBe('/zev-settings/energy')
+        // A link beside a status must not differ from the text by colour and weight alone (UI patterns §10.3 rule 11).
+        expect(link?.classList.contains('text-link')).toBe(true)
         expect(manager.container.querySelectorAll('table a')).toHaveLength(1)
         expect(manager.container.querySelector('table')?.textContent).toContain('live.points.holderConnects')
 
@@ -264,6 +294,32 @@ describe('TodayChart', () => {
             cleanups,
         )
 
-        expect(container.textContent).toContain('myEnergy.today.emptyHistory')
+        expect(container.textContent).toContain('myEnergy.today.ownEmptyHistory')
+    })
+
+    it('speaks of the person, not of "you", for a manager looking at somebody else', async () => {
+        const { container } = await renderWithProviders(
+            createElement(TodayChart, { date: '2026-10-30', rows: [], through: null, hasLive: false, isOwn: false }),
+            cleanups,
+        )
+
+        expect(container.textContent).toContain('myEnergy.today.personEmptyHistory')
+        expect(container.textContent).not.toContain('myEnergy.today.ownEmptyHistory')
+    })
+
+    it('keeps the forecast distinction visible and the rest of the explanation on request, with no heading repeating the tab', async () => {
+        const row = { ts: Date.parse('2026-10-30T10:00:00Z'), production: 2, consumption: 1, ownHistory: null, ownLive: null, ownHistoryProduction: null, ownLiveProduction: null, forecast: 3, forecastBand: null }
+        const { container } = await renderWithProviders(
+            createElement(TodayChart, { date: '2026-10-30', rows: [row], through: null, hasLive: true }),
+            cleanups,
+        )
+
+        expect(container.querySelector('h3')).toBeNull()
+        const visible = Array.from(container.querySelectorAll('.chart-card > p')).map((p) => p.textContent)
+        expect(visible).toContain('myEnergy.today.forecastHint')
+        const help = container.querySelector('details')!
+        expect(help.open).toBe(false)
+        expect(help.textContent).toContain('myEnergy.today.ownHint')
+        expect(help.textContent).toContain('live.curve.hint')
     })
 })

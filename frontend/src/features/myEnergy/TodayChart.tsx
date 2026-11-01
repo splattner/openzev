@@ -1,9 +1,9 @@
-import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Area, CartesianGrid, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import {
     ANNOTATION_COLOR, AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CHART_LOCAL, FLOW_GRID_EXP, FLOW_LOCAL_CONS,
 } from '../../lib/chartTokens'
+import { Disclosure } from '../../components/Disclosure'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { nextPeakWindow, peakDayKind, peakRange } from '../../lib/forecast'
 import { formatClockMinutes, kwFigure, liveDayAxis } from '../../lib/live'
@@ -17,18 +17,20 @@ const LIVE_DASH = '5 3'
  * 5-minute means only. "Your" lines are one merged series: stored history of the own system up to the
  * hand-over (solid), live values after it (dashed). A gap stays a gap, nothing is interpolated.
  */
-export function TodayChart({ date, rows, through, hasLive, peakWindows = [] }: {
+export function TodayChart({ date, rows, through, hasLive, isOwn = true, peakWindows = [] }: {
     date: string
     rows: TodayRow[]
     /** End of the last history interval; the hand-over from history to live. */
     through: string | null
     /** The live curve answered; without it the chart shows the history alone. */
     hasLive: boolean
+    /** The "own" lines are the signed-in user's; for a manager looking at somebody else they speak of "the person". */
+    isOwn?: boolean
     /** The forecast's peak windows; today's is named above the chart. */
     peakWindows?: ForecastPeakWindow[]
 }) {
     const { t } = useTranslation()
-    const titleId = useId()
+    const who = isOwn ? 'own' : 'person'
     const axis = liveDayAxis(date)
     const has = (pick: (row: TodayRow) => number | null) => rows.some((row) => pick(row) !== null)
     const hasZev = has((row) => row.production)
@@ -38,7 +40,7 @@ export function TodayChart({ date, rows, through, hasLive, peakWindows = [] }: {
     const hasForecast = has((row) => row.forecast)
     const hasBand = has((row) => (row.forecastBand ? row.forecastBand[1] : null))
     const peak = nextPeakWindow(peakWindows.filter((window) => window.date === date))
-        const handOver = through ? Date.parse(through) : null
+    const handOver = through ? Date.parse(through) : null
     const showHandOver = handOver !== null && hasOwnHistory && handOver > axis.start && handOver < axis.end
     const kwTooltip = (value: unknown) => (typeof value === 'number' ? `${kwFigure(value * 1000)} kW` : String(value))
     const ownLine = (dataKey: keyof TodayRow, name: string, stroke: string, live: boolean) => (
@@ -56,10 +58,10 @@ export function TodayChart({ date, rows, through, hasLive, peakWindows = [] }: {
     )
 
     return (
-        <section className="card chart-card" aria-labelledby={titleId}>
-            <h3 id={titleId}>{t('myEnergy.today.title')}</h3>
+        // The tab above already says "Today"; the card does not repeat it as a heading (UI patterns §10.3 rule 12).
+        <section className="card chart-card">
             {!hasZev && !hasOwnHistory && !hasOwnLive && !hasForecast ? (
-                <p className="muted">{t(hasLive ? 'myEnergy.today.empty' : 'myEnergy.today.emptyHistory')}</p>
+                <p className="muted">{t(hasLive ? 'myEnergy.today.empty' : `myEnergy.today.${who}EmptyHistory`)}</p>
             ) : (
                 <>
                     {peak && <p><strong>{t(`forecast.peak.${peakDayKind(peak)}`, { range: peakRange(peak) })}</strong></p>}
@@ -145,18 +147,21 @@ export function TodayChart({ date, rows, through, hasLive, peakWindows = [] }: {
                                     isAnimationActive={false}
                                 />
                             )}
-                            {hasOwnHistory && ownLine('ownHistory', t('myEnergy.today.ownHistory'), CHART_GRID, false)}
-                            {hasOwnLive && ownLine('ownLive', t('myEnergy.today.ownLive'), CHART_GRID, true)}
+                            {hasOwnHistory && ownLine('ownHistory', t(`myEnergy.today.${who}History`), CHART_GRID, false)}
+                            {hasOwnLive && ownLine('ownLive', t(`myEnergy.today.${who}Live`), CHART_GRID, true)}
                             {positive((row) => row.ownHistoryProduction) &&
-                                ownLine('ownHistoryProduction', t('myEnergy.today.ownProductionHistory'), FLOW_GRID_EXP, false)}
+                                ownLine('ownHistoryProduction', t(`myEnergy.today.${who}ProductionHistory`), FLOW_GRID_EXP, false)}
                             {positive((row) => row.ownLiveProduction) &&
-                                ownLine('ownLiveProduction', t('myEnergy.today.ownProductionLive'), FLOW_GRID_EXP, true)}
+                                ownLine('ownLiveProduction', t(`myEnergy.today.${who}ProductionLive`), FLOW_GRID_EXP, true)}
                         </ComposedChart>
                     </ResponsiveContainer>
-                    <p className="muted">{t('myEnergy.today.hint')}</p>
-                    {hasZev && <p className="muted">{t('live.curve.hint')}</p>}
+                    {/* The one thing a reader must not mistake stays visible; how the lines join and what a gap means is on request. */}
                     {hasForecast && <p className="muted">{t('myEnergy.today.forecastHint')}</p>}
-                    {!hasLive && hasOwnHistory && <p className="muted">{t('myEnergy.today.historyOnly')}</p>}
+                    <Disclosure className="disclosure-sm" summary={t('myEnergy.today.readingHelp')}>
+                        <p className="muted">{t(`myEnergy.today.${who}Hint`)}</p>
+                        {hasZev && <p className="muted">{t('live.curve.hint')}</p>}
+                        {!hasLive && hasOwnHistory && <p className="muted">{t(`myEnergy.today.${who}HistoryOnly`)}</p>}
+                    </Disclosure>
                 </>
             )}
         </section>
