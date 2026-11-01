@@ -94,15 +94,17 @@ describe('LiveEnergyCard', () => {
         expect(out).toContain('live.othersUnknown')
         expect(out).not.toContain('live.spare')
         expect(out).not.toContain('live.localShare')
-        expect(out).not.toContain('live.ownSplit')
-        // The viewer's own consumption is measured, so it is shown, but no split.
-        expect(out).toContain('live.ownConsumption|{"value":"1.2\u00a0kW"}')
+        expect(out).not.toContain('live.ownSplitHint')
+        // The viewer's own consumption is measured, so it is shown as a figure of its own, but with no split.
+        expect(out).toContain('live.ownConsumptionLabel')
+        expect(out).toContain('1.2')
+        expect(out).not.toContain('live.ownSplitHint')
     })
 
     it('leaves the own consumption out while the viewer\'s points are incomplete', async () => {
         const out = await text(production({ own: own({ complete: false, consumption_w: null, local_w: null, grid_w: null }) }))
 
-        expect(out).not.toContain('live.ownConsumption')
+        expect(out).not.toContain('live.ownConsumptionLabel')
     })
 
     it('shows production, consumption, spare power, share and the own split at tier exact', async () => {
@@ -113,7 +115,8 @@ describe('LiveEnergyCard', () => {
         expect(out).toContain('live.spare')
         expect(out).toContain('3.0')
         expect(out).toContain('live.localShare')
-        expect(out).toContain('live.ownSplit|{"total":"1.2\u00a0kW","local":"1.2\u00a0kW","grid":"0.0\u00a0kW"}')
+        expect(out).toContain('live.ownConsumptionLabel')
+        expect(out).toContain('live.ownSplitHint|{"local":"1.2\u00a0kW","grid":"0.0\u00a0kW"}')
         expect(out).toContain('live.basisConnectionPoint')
         expect(out).not.toContain('live.othersUnknown')
     })
@@ -122,14 +125,15 @@ describe('LiveEnergyCard', () => {
         const out = await text(exact({ own: own({ local_w: null, grid_w: null, split_withheld_reason: 'inconsistent' }) }))
 
         expect(out).toContain('live.ownSplitInconsistent')
-        expect(out).not.toContain('live.ownSplit|')
-        expect(out).toContain('live.ownConsumption')
+        expect(out).not.toContain('live.ownSplitHint')
+        expect(out).toContain('live.ownConsumptionLabel')
     })
 
     it('shows how a producer\'s own production is shared at tier exact', async () => {
         const out = await text(exact({ own: own({ consumption_w: null, local_w: null, grid_w: null, production_w: 4000, to_zev_w: 3000, to_grid_w: 1000 }) }))
 
-        expect(out).toContain('live.ownProductionSplit|{"total":"4.0\u00a0kW","toZev":"3.0\u00a0kW","toGrid":"1.0\u00a0kW"}')
+        expect(out).toContain('live.ownProductionLabel')
+        expect(out).toContain('live.ownProductionSplitHint|{"toZev":"3.0\u00a0kW","toGrid":"1.0\u00a0kW"}')
     })
 
     it('shows the time of the oldest value and the coverage with the connection point', async () => {
