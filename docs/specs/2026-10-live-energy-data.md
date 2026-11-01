@@ -649,8 +649,10 @@ source `reconnect_required` (like a sync, audited once as `supplementary_source.
   audited once as `supplementary_source.sync` with `capability: forecast`. Nothing is audited per refresh.
   `refresh_forecast_source` is not retried: the next beat tick is the retry. Both tasks do nothing while the live flag is off.
 - **Solar Manager timestamps.** `t` of a forecast row is read as the *start* of its interval (`FORECAST_T_MARKS`
-  in `solar_manager.py`, a one-line fix), taken from the vendor's swagger (API 1.88.11) and **not yet checked against
-  a real `/data/forecast` response**. A row without `t` or `pW` is skipped; no usable row is an error.
+  in `solar_manager.py`, a one-line fix). *Checked against a real response on 2026-11-01:* `data[]` of 276 rows,
+  15 minutes apart, each exactly `{t, pW, pWmin, pWmax}` (W, `t` in UTC with `Z`), from the next quarter hour for three days. The shape
+  matches. The response cannot tell whether `t` marks the start or the end of its quarter hour; the hourly means differ by at most
+  15 minutes either way, so the display is unaffected. A row without `t` or `pW` is skipped; no usable row is an error.
 
 ### 6.4 Time
 
@@ -1264,8 +1266,8 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
    only when it is the source's only capability; "Locate from address" saves nothing and is its own endpoint so the
    building form can use it before the building exists; roof planes are written by managers only, so a participant
    whose plant has none asks one. The system-health probe's history staleness now counts only sources that provide history.
-   **Still open before merge:** the Solar Manager `/data/forecast` shape and timestamps follow the swagger and have not
-   been checked against a real response; forecast.solar's real response has not been fetched from this instance
+   **Still open before merge:** the Solar Manager `/data/forecast` shape was confirmed against a real response (§6.3), only the
+   meaning of `t` is open (`FORECAST_T_MARKS`); forecast.solar's real response has not been fetched from this instance
    (the mapping follows its documentation and is tested against a stand-in); the forecast cards were looked at in the dev stack with
    pre-filled hours at 1440 and 400 px, the connect dialogs only through tests.
 7. **PR 6 — automation and docs.** MCP `live_energy`, user-guide chapter with the Home Assistant
