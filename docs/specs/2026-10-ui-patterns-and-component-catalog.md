@@ -1,12 +1,12 @@
 # Reference Spec: UI patterns and component catalog
 
 - Spec ID: SPEC-2026-10-ui-patterns
-- Status: Draft
+- Status: Accepted
 - Scope: Major
 - Type: Change
 - Owners: Core maintainers
 - Created: 2026-10-15
-- Updated: 2026-10-17
+- Updated: 2026-11-01
 - Target Release: Ongoing reference; tariff pilot first, then the phases in §11
 - Related Issues: n/a
 - Related ADRs: [0040](../adr/0040-overlay-and-disclosure-pattern-rules.md), [0032](../adr/0032-one-visual-language-for-screen-and-documents.md)
@@ -15,7 +15,15 @@
 
 ---
 
-This document defines target guidance. Phase 1 (the tariff pilot) is
+This document is the accepted reference for UI patterns and usability rules.
+Acceptance establishes the design contract; it does not mean every existing
+screen already complies. The usability rules in §10.3 apply to new and changed
+UI, with the remaining existing-screen audit tracked in §11 phase 9. They
+supersede conflicting general guidance in the management-page reference spec.
+Baseline specs and the user guide continue to describe shipped behaviour until
+the relevant implementation changes land.
+
+Phase 1 (the tariff pilot) is
 implemented (see [tariff split view](2026-10-tariff-split-view.md) §11 for the
 values it recorded). Phase 2 (the shared `FormModal` `size` and dirty guard,
 `Disclosure`, `AppTabs`) is implemented and described in
@@ -247,8 +255,8 @@ every adopter shares.
 
 | Shape | Use | Implementation |
 |---|---|---|
-| Section disclosure | Secondary content in a sheet or form: history, technical detail, a field reference | `Disclosure` (native `details/summary`), usually closed |
-| Row expansion | Short information best read beneath its row (assignments under a metering point) | A named button with `aria-expanded` and `aria-controls`; independent state per row (`MeteringPointRow` is the reference) |
+| Section disclosure | Substantial secondary content in a sheet or form: history, technical detail, a field reference; short content that fits stays visible (§10.3 rule 3) | `Disclosure` (native `details/summary`), usually closed |
+| Row expansion | Supplementary information best read beneath its row (such as a substantial assignment history); not short content that fits inline (§10.3 rule 3) | A named button with `aria-expanded` and `aria-controls`; independent state per row (`MeteringPointRow` is the reference) |
 | Show more | A deliberately shortened list | A `button-ghost` toggle that says what it reveals, with a count only if useful |
 
 Actions alone do not force a row expansion into a pane: assignment rows already
@@ -345,6 +353,10 @@ groups. Label above the control, helper below it, error below that; required
 fields use the shared marker. Never solve a layout problem with a per-field
 `size` (SPEC-2026-04 §4.2).
 
+Place a field that influences another field before it in reading and keyboard
+order: above it, or to its left in a multi-column layout (§10.3 rule 2).
+Keep that dependency order when the layout collapses to one column.
+
 ### 8.2 Validation, saving and drafts
 
 - Validate on submit first; after that, update affected errors as the user
@@ -382,8 +394,12 @@ SPEC-2026-04 §7.3 stays the reference: primary, secondary, overflow, destructiv
   in rows). The two stray forms (`button danger`, `button button-primary
   button-outline`) are errors. Component-owned controls (tab, menu item,
   switch) are not reformatted into action buttons.
-- Visible labels on primary mobile actions. Disabled controls say why, near the
-  control; a tooltip may supplement but is never the only route.
+- Use icon-only controls for self-explanatory actions, including on mobile;
+  task-specific or ambiguous actions keep visible labels (§10.3 rule 5).
+  Omit controls that cannot have an effect. An action that is temporarily
+  unavailable but useful to discover may remain disabled with an explanation
+  near the control; a tooltip may supplement but is never the only route
+  (§10.3 rule 8).
 
 **Shipped (phase 7).** The invoice access-link revoke button and the
 confirm dialog's dangerous confirm use `button button-danger`; the metering-point
@@ -461,6 +477,87 @@ Prefer the concrete condition or next step over vague workflow text:
 "Processing…" only for work that is running, not as a stand-in for "Awaiting
 review". Keep important explanations visible and add an action when one exists.
 
+### 10.3 Usability rules
+
+These rules govern user-facing UI content and interaction, not the formatting
+of specifications or other contributor documentation. Use existing shared
+components and design tokens. A justified exception follows ADR 0040's rule:
+record the rule and the reason, rather than silently departing from it.
+
+1. **Actionable prompts.** Never instruct the user to do something without a
+   direct way to do it. Offer a button that performs or starts the task; when
+   the task belongs elsewhere, offer a link to that destination. Keep the
+   control beside the instruction. When the user lacks permission or the task
+   cannot be offered in the app, explain the condition or who can resolve it
+   rather than presenting an instruction the user cannot carry out.
+2. **Dependency-based field order.** Put fields that influence other fields
+   before them: above, or to the left. Visual, DOM and keyboard order must agree,
+   including at narrow widths. For example, choose the tariff type before its
+   type-specific price fields, not after them.
+3. **Keep short information visible.** Do not hide short content in dropdowns,
+   disclosures or behind buttons when it fits legibly in the available layout.
+   Show it inline. Disclosure remains appropriate for substantial history,
+   technical detail or other secondary content that would crowd the task
+   (§6.3); it is not a default wrapper for a sentence or a few facts. This rule
+   concerns information, not the lower-frequency actions assigned to overflow
+   menus in §9.
+4. **Consistent typography.** Use the established type hierarchy
+   (`2026-08-ui-redesign-pdf-style` §7.3). Keep the number of distinct text styles
+   in a page or section to the minimum needed to distinguish heading, body,
+   label and supporting information. Do not introduce one-off sizes, weights,
+   casing or colours to differentiate content that has the same role.
+5. **No labels on obvious icons.** A self-explanatory action, such as the edit
+   pencil, is an icon-only button or link, without a redundant visible label.
+   Judge clarity for the intended audience and context; ambiguous or
+   task-specific actions retain visible text. Every icon-only control still
+   has a translated accessible name, a tooltip available on hover and keyboard
+   focus, a visible focus indicator and an adequate target size. Do not rely on
+   the tooltip to make an ambiguous action understandable. Responsive layouts
+   follow the same rule rather than removing labels solely to save space.
+6. **Lists only for real lists.** Do not use a bullet for a single item or for
+   ordinary body text. Use a paragraph for an explanation and a semantic list
+   for multiple related items that benefit from scanning. Use an ordered list
+   when sequence matters.
+7. **Purposeful icons and legends.** On main content pages, outside the sidebar,
+   use icons only on action controls (buttons or action links) or in place of
+   repetitive text, not as decoration beside headings or ordinary prose. When
+   icons replace repetitive information, provide one visible legend mapping
+   each displayed icon to its meaning, near the affected content; accessible
+   names or tooltips do not replace that legend. The legend requirement applies
+   to information encoded as icons, not to action icons, whose names follow
+   rule 5. Shared warning indicators such as `IssueText` qualify when they
+   replace a repeated warning label; use one legend for those indicators too.
+8. **No dead controls.** Do not render controls that cannot produce a meaningful
+   change: no sorting for a list with fewer than two items, pagination for a
+   single page, or expansion for content that is absent. Hide state-inapplicable
+   actions. A temporarily unavailable action may remain disabled only when its
+   presence helps the user understand the workflow, with the reason and any
+   available remedy visible nearby. Loading and in-flight submission guards
+   remain necessary; they are not dead controls.
+9. **One term per concept.** Choose one user-facing term for each concept in
+   each locale and reuse it across headings, fields, actions, help text and
+   documents. Do not alternate synonyms such as “Freigabe” / “Genehmigung” or
+   “Preisbänder” / “Tarifperioden” for the same concept. Distinct concepts may
+   need distinct terms; do not merge them just because their labels are similar.
+   Record the chosen wording in the relevant feature spec when introducing or
+   resolving terminology, and reuse translation keys when meaning and grammar
+   match. API field names need not mirror user-facing wording.
+10. **Honest cursor feedback.** Use a pointer cursor only on elements that are
+    actually clickable. Static text, non-interactive rows and disabled controls
+    must not suggest a click action. Clickable elements also need correct
+    semantics and keyboard operation; a pointer alone is not an affordance.
+11. **Visible links.** Do not distinguish links from surrounding text by colour
+    alone. Provide a persistent non-colour cue, such as an underline, border or
+    accompanying arrow, not only a hover effect. Links styled as buttons already
+    have an action-control affordance. Preserve visible keyboard focus and
+    recognisability in forced-colour modes.
+12. **No redundant text.** State each fact or instruction once within a screen's
+    working context. Do not repeat a heading as a badge, the same status in
+    multiple blocks, or helper text that only restates the label. Reference the
+    existing information or combine the presentation instead. Repeated labels
+    needed to identify separate records, accessible names and destructive-action
+    confirmations are not redundant: keep the context needed to act safely.
+
 ## 11. Rollout
 
 Each phase is independently mergeable and has an exit criterion. The sequence is
@@ -481,6 +578,7 @@ matching user-guide chapter; regenerate guide screenshots as a set.
 | 6 | **Label and count sweep:** overview status decoration, decorative counts, generic pills, actionable issues, billing's narrow labels | §10.1 holds on every screen audited |
 | 7 | **Buttons and inline styles:** stray variants, missing `button` class, static `style={{}}` into CSS | Two stray forms gone; no static presentation in `style` where a class exists |
 | 8 | **Invoice labels** ([spec](2026-10-audience-specific-invoice-labels.md)) | Per that spec |
+| 9 | **Usability audit (planned):** audit existing screens against all twelve rules in §10.3, including icon labels, legends, terminology and ineffective controls; migrate in scoped UI changes | Each audited screen records applicable rules and any justified exception; affected baseline specs and user-guide chapters reflect the shipped changes; desktop, narrow-layout and keyboard checks pass |
 
 ### Risks
 
@@ -523,6 +621,7 @@ matching user-guide chapter; regenerate guide screenshots as a set.
 - [ ] Forms protect unsaved work and show actionable errors.
 - [ ] Existing components and styles are reused; a new abstraction has real consumers.
 - [ ] Labels and counts help their audience; problems link to a fix where one is available.
+- [ ] The changed UI meets all applicable §10.3 rules: actionable prompts, dependency order, visible short content, typography, icon labels, real lists, purposeful icons and legends, effective controls, terminology, cursors, visible links and no redundant text.
 - [ ] Permissions, scope changes, keyboard access and translated text stay correct.
 - [ ] The changed workflow has automated checks and visual review at desktop and phone width.
 
