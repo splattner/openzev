@@ -278,7 +278,7 @@ export function SupplementarySourceModal({ holder = 'participant', point, zevId,
                                 <small className="muted" style={{ display: 'block' }}>
                                     {choice === 'existing'
                                         ? t('supplementary.modal.existingPushHint')
-                                        : t(`supplementary.modal.providerHint.${choice === 'solar_manager' ? solarHintKey(history, live) : choice}`)}
+                                        : t(`supplementary.modal.providerHint.${choice === 'solar_manager' ? solarHintKey(history, live) : history ? 'push' : 'push_live'}`)}
                                 </small>
                             </span>
                         </label>
@@ -337,6 +337,8 @@ export function SupplementarySourceModal({ holder = 'participant', point, zevId,
                     {formError}
                 </div>
             )}
+
+            {!consent && <small className="muted grid-span-full">{t('supplementary.modal.needsConsent')}</small>}
 
             <div className="dialog-actions grid-span-full mt-1">
                 <FormModalCancelButton onCancel={onClose} />

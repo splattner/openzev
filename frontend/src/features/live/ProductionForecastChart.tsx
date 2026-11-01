@@ -1,3 +1,4 @@
+import { useMediaQuery } from '@mantine/hooks'
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Area, Bar, CartesianGrid, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -24,10 +25,11 @@ function tickLabel(ts: number, namesDays: boolean): string {
 export function ProductionForecastChart({ forecast, title }: { forecast: ProductionForecast; title?: string }) {
     const { t } = useTranslation()
     const titleId = useId()
+    const narrow = useMediaQuery('(max-width: 30em)')
     const rows = forecastRows(forecast.hours)
     const hasBand = rows.some((row) => row.band)
-    // A tick every three hours (six beyond a day and a half, so a phone fits them), and midnight names the day.
-    const step = rows.length > 36 ? 6 : 3
+    // A tick every three hours, six beyond a day and a half or on a phone (nine labels do not fit its width), and midnight names the day.
+    const step = narrow || rows.length > 36 ? 6 : 3
     // One day needs no day name (the title says which), and the long label would collide with its neighbour on a phone.
     const namesDays = rows.length > 24
     const ticks = rows.filter((row) => localHour(row.ts) % step === 0).map((row) => row.ts)

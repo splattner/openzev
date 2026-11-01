@@ -22,7 +22,8 @@ interface Props {
 
 /**
  * The energy data of one metering point the participant holds, in one card: a row per capability the
- * point can have (history, live) with the source that provides it, and one Connect. Everything about a
+ * point can have (history, live) with the source that provides it, a Connect on each row that has none and,
+ * while several are missing, one primary that starts them together. Everything about a
  * source is in its dialog. The figures are only shown (live) or used for statistics (history), never
  * for billing.
  */
@@ -94,7 +95,8 @@ export function MeteringPointDataCard({ point, sources, sourcesUnavailable, onRe
                             onOpenSource={(source) => setOpenSourceId(source.id)}
                             onConnect={(capability) => (capability === 'forecast' ? setConnectingForecast(true) : setConnecting([capability]))}
                         />
-                        {connectable.length > 0 && (
+                        {/* One missing capability is connected from its own row; the primary is for starting several at once. */}
+                        {connectable.length > 1 && (
                             <div className="actions-row actions-row-wrap">
                                 <button
                                     type="button"

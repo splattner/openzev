@@ -97,6 +97,8 @@ async function mount(sources: SupplementarySource[] = [], eligibility: EligibleM
 const buttons = (root: ParentNode) => Array.from(root.querySelectorAll<HTMLButtonElement>('button'))
 const buttonWith = (root: ParentNode, label: string) => buttons(root).find((b) => b.textContent?.includes(label))!
 const primaryConnect = (root: ParentNode) => buttons(root).find((b) => b.textContent === 'supplementary.card.connect')!
+/** The way into the connect flow: the primary while several capabilities are missing, else the row of the one that is. */
+const startConnect = (root: ParentNode) => primaryConnect(root) ?? buttons(root).find((b) => b.textContent === 'supplementary.card.connectRow')!
 const dialogs = () => Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"]'))
 /** The topmost dialog: a confirmation when one is open over the source dialog. */
 const dialog = () => dialogs().at(-1) ?? null
@@ -148,13 +150,18 @@ describe('one card per metering point', () => {
         expect(Array.from(old.container.querySelectorAll('li')).map((li) => li.dataset.capability)).toEqual(['history'])
     })
 
-    it('shows "not connected" with a Connect on every unconnected row and one primary Connect', async () => {
+    it('shows "not connected" with a Connect on every unconnected row, and one primary only while several are missing', async () => {
         const { container } = await mount([source()])
 
         expect(row(container, 'history').textContent).not.toContain('supplementary.card.notConnected')
         expect(row(container, 'live').textContent).toContain('supplementary.card.notConnected')
         expect(buttons(row(container, 'live')).some((b) => b.textContent === 'supplementary.card.connectRow')).toBe(true)
-        expect(buttons(container).filter((b) => b.textContent === 'supplementary.card.connect')).toHaveLength(1)
+        // One capability left: its own row is the way to connect it, a second button would say the same.
+        expect(buttons(container).some((b) => b.textContent === 'supplementary.card.connect')).toBe(false)
+
+        const none = await mount()
+        expect(buttons(none.container).filter((b) => b.textContent === 'supplementary.card.connectRow')).toHaveLength(2)
+        expect(buttons(none.container).filter((b) => b.textContent === 'supplementary.card.connect')).toHaveLength(1)
     })
 
     it('keeps a shared push source in both rows and opens one dialog for it', async () => {
@@ -255,7 +262,7 @@ describe('connect flow', () => {
 
     it('only offers the capabilities that are not connected yet', async () => {
         const { container } = await mount([source()])
-        await click(primaryConnect(container))
+        await click(startConnect(container))
 
         // One left, so there is nothing to choose: the flow starts at "how".
         expect(checkboxes(dialog()!)).toHaveLength(0)
@@ -266,7 +273,7 @@ describe('connect flow', () => {
 
     it('offers Solar Manager and push for whatever is chosen, with the hint of what Solar Manager then does', async () => {
         const { container } = await mount()
-        await click(primaryConnect(container))
+        await click(startConnect(container))
         const modal = dialog()!
 
         // history + live
@@ -292,7 +299,7 @@ describe('connect flow', () => {
 
     it('cannot go on without choosing something', async () => {
         const { container } = await mount()
-        await click(primaryConnect(container))
+        await click(startConnect(container))
         await click(checkboxes(dialog()!)[0])
         await click(checkboxes(dialog()!)[1])
 
@@ -303,7 +310,7 @@ describe('connect flow', () => {
         const created = both()
         api.createSupplementarySource.mockResolvedValue({ ...created, push_token: 'ozs_abcd_secret' })
         const { container } = await mount()
-        await click(primaryConnect(container))
+        await click(startConnect(container))
         await click(buttonWith(dialog()!, 'supplementary.modal.next'))
         const modal = dialog()!
         await choosePush(modal)
@@ -332,7 +339,7 @@ describe('connect flow', () => {
         const created = push()
         api.createSupplementarySource.mockResolvedValue({ ...created, push_token: 'ozs_abcd_secret' })
         const { container } = await mount([], legacy)
-        await click(primaryConnect(container))
+        await click(startConnect(container))
         const modal = dialog()!
         await click(radios(modal)[1])
         await click(modal.querySelector<HTMLInputElement>('input[type="checkbox"]')!)
@@ -351,7 +358,7 @@ describe('connect flow', () => {
     it('offers the point\'s own push source first and adds the capability to it with the consent, without a new token', async () => {
         api.updateSupplementarySource.mockResolvedValue(both())
         const { container } = await mount([push()])
-        await click(primaryConnect(container))
+        await click(startConnect(container))
         const modal = dialog()!
 
         expect(radios(modal).map((r) => r.checked)).toEqual([true, false, false])
@@ -372,7 +379,7 @@ describe('connect flow', () => {
 
     it('does not offer a Solar Manager history source to carry live data', async () => {
         const { container } = await mount([source()])
-        await click(primaryConnect(container))
+        await click(startConnect(container))
 
         expect(dialog()!.textContent).not.toContain('supplementary.modal.existingPush')
         // Solar Manager and a new push source: the Solar Manager key is a different source, not the existing one.
@@ -381,7 +388,7 @@ describe('connect flow', () => {
 
     it('keeps the key write-only and the submit disabled until consent, id and key are given', async () => {
         const { container } = await mount([], legacy)
-        await click(primaryConnect(container))
+        await click(startConnect(container))
         const modal = dialog()!
         const [idInput, keyInput] = Array.from(modal.querySelectorAll<HTMLInputElement>('input[type="text"], input[type="password"]'))
 
@@ -397,7 +404,7 @@ describe('connect flow', () => {
     it('sends the consent and the key once and closes on success', async () => {
         api.createSupplementarySource.mockResolvedValue(source())
         const { container } = await mount([], legacy)
-        await click(primaryConnect(container))
+        await click(startConnect(container))
         const modal = dialog()!
         const [idInput, keyInput] = Array.from(modal.querySelectorAll<HTMLInputElement>('input[type="text"], input[type="password"]'))
         await act(async () => { setInputValue(idInput, ' ABC123 '); setInputValue(keyInput, ' secret-key ') })
@@ -417,7 +424,7 @@ describe('connect flow', () => {
     it('shows the vendor\'s rejection next to the key field and stays open', async () => {
         api.createSupplementarySource.mockRejectedValue({ isAxiosError: true, response: { status: 400, data: { api_key: ['Solar Manager did not accept this API key.'] } } })
         const { container } = await mount([], legacy)
-        await click(primaryConnect(container))
+        await click(startConnect(container))
         const modal = dialog()!
         const [idInput, keyInput] = Array.from(modal.querySelectorAll<HTMLInputElement>('input[type="text"], input[type="password"]'))
         await act(async () => { setInputValue(idInput, 'ABC123'); setInputValue(keyInput, 'wrong') })
@@ -435,7 +442,7 @@ describe('connect flow', () => {
             response: { status: 400, data: { provides_live: ['Live data is not enabled.'], consent: ['Consent is required.'] } },
         })
         const { container } = await mount([], consumptionOnly)
-        await click(primaryConnect(container))
+        await click(startConnect(container))
         await choosePush(dialog()!)
         await click(dialog()!.querySelector<HTMLInputElement>('input[type="checkbox"]')!)
         await act(async () => { submit().click() })
@@ -555,6 +562,21 @@ describe('source dialog', () => {
         await waitForCondition(() => api.updateSupplementarySource.mock.calls.length === 1, 'the update')
 
         expect(api.updateSupplementarySource).toHaveBeenCalledWith('src-1', { api_key: 'fresh-key', external_id: 'ABC123', enabled: true })
+    })
+
+    it('keeps the ways to end a connection in their own section, away from the everyday actions', async () => {
+        const { container } = await mount([source()])
+        const modal = await openSource(container)
+
+        const end = modal.querySelector<HTMLDetailsElement>('details.disclosure')!
+        expect(end.querySelector('summary')!.textContent).toBe('supplementary.source.endTitle')
+        // Closed while the source works; its buttons are the three that stop or erase it.
+        expect(end.open).toBe(false)
+        expect(Array.from(end.querySelectorAll('button')).map((b) => b.textContent)).toEqual([
+            'supplementary.actions.disconnect', 'supplementary.actions.deleteData', 'supplementary.actions.remove',
+        ])
+        expect(modal.querySelectorAll('.button-danger')).toHaveLength(2)
+        expect(Array.from(modal.querySelectorAll('.button-danger')).every((b) => end.contains(b))).toBe(true)
     })
 
     it('asks before disconnecting, and keeps the data', async () => {

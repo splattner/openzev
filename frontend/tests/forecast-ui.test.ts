@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProductionForecastChart } from '../src/features/live/ProductionForecastChart'
 import { PvPlanesDialog } from '../src/features/meteringPoints/PvPlanesDialog'
 import { ForecastConnectDialog } from '../src/features/supplementary/ForecastConnectDialog'
-import type { MeteringPoint, ProductionForecast, PvPlane, SupplementarySource } from '../src/types/api'
+import type { Building, MeteringPoint, ProductionForecast, PvPlane, SupplementarySource } from '../src/types/api'
 import { renderWithProviders, setInputValue } from './helpers/render'
 import { waitForCondition } from './helpers/waitForCondition'
 
@@ -203,6 +203,31 @@ describe('PvPlanesDialog', () => {
         expect(zev.createPvPlane).not.toHaveBeenCalled()
         expect(dialog()!.textContent).toContain('pages.meteringPoints.planes.errors.tilt')
         expect(dialog()!.textContent).not.toContain('pages.meteringPoints.planes.errors.kwp')
+    })
+
+    it('mentions the building location only while it is missing, with the way to set it', async () => {
+        zev.fetchPvPlanes.mockResolvedValue([plane()])
+        const onEditBuilding = vi.fn()
+        const located = { id: 'b-1', latitude: '47.376910', longitude: '8.541690' } as Building
+        const missing = { id: 'b-1', latitude: null, longitude: null } as Building
+
+        await renderWithProviders(createElement(PvPlanesDialog, { point, canWrite: true, building: located, onEditBuilding, onClose: vi.fn() }), cleanups)
+        await waitForCondition(() => dialog()!.textContent?.includes('South') === true, 'the planes')
+        expect(dialog()!.textContent).not.toContain('pages.meteringPoints.planes.locationHint')
+        cleanups.splice(0).forEach((cleanup) => cleanup())
+
+        await renderWithProviders(createElement(PvPlanesDialog, { point, canWrite: true, building: missing, onEditBuilding, onClose: vi.fn() }), cleanups)
+        await waitForCondition(() => dialog()!.textContent?.includes('South') === true, 'the planes')
+        expect(dialog()!.textContent).toContain('pages.meteringPoints.planes.locationHint')
+        await act(async () => { buttonWith(dialog()!, 'pages.meteringPoints.planes.editBuilding')!.click() })
+        expect(onEditBuilding).toHaveBeenCalledWith(missing)
+        cleanups.splice(0).forEach((cleanup) => cleanup())
+
+        // Someone who cannot edit the building is told, without a button that would not work.
+        await renderWithProviders(createElement(PvPlanesDialog, { point, canWrite: false, building: missing, onEditBuilding, onClose: vi.fn() }), cleanups)
+        await waitForCondition(() => dialog()!.textContent?.includes('South') === true, 'the planes')
+        expect(dialog()!.textContent).toContain('pages.meteringPoints.planes.locationHint')
+        expect(buttonWith(dialog()!, 'pages.meteringPoints.planes.editBuilding')).toBeUndefined()
     })
 
     it('is read-only for someone who cannot write', async () => {

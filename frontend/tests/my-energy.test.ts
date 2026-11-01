@@ -259,13 +259,17 @@ describe('MyEnergyView', () => {
         expect(container.textContent).toContain('supplementary.gross.ctaTitle')
     })
 
-    it('says a participant has no own system when nothing can be connected', async () => {
+    it('promises a participant without a plant behind the meter no own history, and offers no empty views', async () => {
         eligibleApi.fetchEligibleOrNull.mockResolvedValue([])
+        live.fetchLiveEnabled.mockResolvedValue(true)
+        live.fetchLiveSnapshotOrNull.mockResolvedValue(snapshot(0))
         live.fetchOwnSeries.mockResolvedValue(series({ gross: null, history_through: null }))
         const { container } = await render()
 
         expect(container.textContent).not.toContain('supplementary.gross.ctaTitle')
-        expect(container.textContent).toContain('myEnergy.noOwnSystem')
+        expect(container.textContent).not.toContain('myEnergy.noOwnSystem')
+        expect(container.querySelectorAll('[role="tab"]')).toHaveLength(0)
+        expect(container.textContent).not.toContain('myEnergy.today.title')
     })
 
     it('shows the last seven civil days in hourly buckets on the 7 days tab, with the pointer to Energy balance', async () => {
@@ -302,6 +306,8 @@ describe('MyEnergyView', () => {
             const { container } = await render()
 
             expect(container.textContent).toContain('myEnergy.pickParticipantPrompt')
+            // The prompt is the picker's helper, in the same bar.
+            expect(container.querySelector('.filter-bar .filter-bar-note')?.textContent).toBe('myEnergy.pickParticipantPrompt')
             expect(live.fetchOwnSeries).not.toHaveBeenCalled()
             const options = Array.from(container.querySelectorAll('select option')).map((option) => option.textContent)
             expect(options).toEqual(['myEnergy.pickParticipant', 'Me', 'Other'])
@@ -325,7 +331,13 @@ describe('the forecast in My energy system', () => {
     const forecast = (days: string[]): ProductionForecast => ({
         zev_id: 'z1', horizon_h: 72, complete: true, plants: 1, plants_with_forecast: 1, fetched_at: new Date().toISOString(),
         hours: days.flatMap((day) => [0, 1].map((h) => ({ start: noon(day, h), power_w: 4000 + h * 1000, min_w: 3000, max_w: 5000 }))),
-        peak_windows: days.map((day) => ({ date: day, from: noon(day), to: noon(day, 2), peak_w: 5000 })),
+        // Today's window ends in the future whatever the time of day: it is only named while it is still ahead.
+        peak_windows: days.map((day) => ({
+            date: day,
+            from: noon(day),
+            to: day === todayBusinessIso() ? new Date(Date.now() + 3_600_000).toISOString() : noon(day, 2),
+            peak_w: 5000,
+        })),
     })
     const tabLabels = (container: Element) => Array.from(container.querySelectorAll('[role="tab"]')).map((tab) => tab.textContent)
 
@@ -363,7 +375,7 @@ describe('the forecast in My energy system', () => {
         expect(container.textContent).toContain('myEnergy.today.title')
         expect(container.textContent).toContain('myEnergy.today.forecastHint')
         expect(container.textContent).toContain('forecast.peak.today')
-        expect(tabLabels(container)).toEqual(['myEnergy.tabs.today', 'myEnergy.tabs.week', 'myEnergy.tabs.period'])
+        expect(tabLabels(container)).toEqual([])
     })
 
     it('offers a Tomorrow tab with the forecast alone once there is a forecast for tomorrow', async () => {

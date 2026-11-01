@@ -721,7 +721,15 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
     (`liveCardState().reporting`), for every viewer. The per-role counts (`producing_*`, `consuming_*`)
     are not shown: merging them would count a bidirectional point twice.
 - `LivePointsTable.tsx` (meter or "Grid connection point", holder or "ZEV-operated", kW, age, state)
-  for a snapshot that carries `points` (manager, viewer, admin). From 640 px down the columns give way to one small
+  for a snapshot that carries `points` (manager, viewer, admin). It is a `Disclosure` inside a card, its summary
+  "Live values per metering point · X of Y live" (X the points in state `fresh`), closed once every point reports
+  and open while some do not, so a community with most points unconnected still shows what is missing. The power
+  reads in words, never with the meter's sign (a meter counts positive when it draws, negative when it feeds out):
+  `livePointFlow` gives *6.2 kW produced* (production meter), *consumed* (positive), *fed in* (negative on any other
+  meter), *from the grid* / *to the grid* (grid connection point); a power that rounds to `0.0` has no direction. A
+  point without a source (`source_id` null, a metering point) gets a note beside its state: a point with a personal
+  holder says "the participant connects it" (muted); a point nobody holds gives a manager (`canManage`) a
+  **Connect** link to `/metering/points?search=<meter id>` and a viewer nothing. From 640 px down the columns give way to one small
   card per point (`.live-points-list`), so the kW is never behind a horizontal scroll. The state is text
   (`LiveStateBadge`): a current value is plain, a source gone quiet is an `IssueText` warning and a point with no data a
   muted note; no coloured pill (UI patterns §10.1). `LiveStateChip` on the metering-point rows is a `badge-tag`
@@ -729,7 +737,8 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
 - `ProductionForecastChart.tsx` (`features/live/`, the body of the **Tomorrow** tab, §7.1 structure; it replaces the separate forecast card of the first cut): the title "Expected
   production" with "as of hh:mm", the next peak window in bold ("Highest production expected today 10:00-14:00",
   "tomorrow" or the date), hourly bars in kW (hours already past lighter) with the min/max band as an area only where the
-  forecast gives one, an x axis with a tick every three hours (six beyond a day and a half), whose midnight tick names the
+  forecast gives one, an x axis with a tick every three hours (six beyond a day and a half or below 30em, where nine
+  labels would collide), whose midnight tick names the
   day only on a chart that spans more than one, "Forecast for 1 of 2 plants" when the sum is partial, and the hint that it is an estimate and never a claim that power
   is spare. Chart colours come from `chartTokens`.
 - Placement: its own page, `pages/MyEnergyPage.tsx` at `/my-energy` (alias `/live`; `PageHeader` with the
@@ -755,12 +764,16 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
      **Tomorrow** tab exists only while the ZEV forecast has an hour above zero for tomorrow's civil day
      (`hasExpectedProduction`); without one, `?range=tomorrow` falls back to Today. A
      `filter-bar` under the tabs holds the `PeriodSelector` on the Period tab and, for managers, viewers
-     and admins, the participant picker (not on Tomorrow, which is not about a participant).
+     and admins, the participant picker (not on Tomorrow, which is not about a participant), with the prompt
+     `myEnergy.pickParticipantPrompt` as its helper (`filter-bar-note`) while nobody is selected. 7 days and Period
+     exist only where a history is possible (`historyPossible`: managers, viewers and admins, or a participant with a
+     history-eligible point in the community); a participant without one sees Today, and the strip is left out
+     while there is a single view. With no live data, no forecast and no possible history the whole block is left out:
+     the empty `EmptyState` above already says what to do.
   4. *Participant picker* (`isZevScope` only): the ZEV's current participants (`fetchParticipants`,
      filtered to the ZEV and `valid_to` open or not past), the manager's own marked "(You)". `?participant=`
      in the URL, validated against that list. Default: the participant of a history-eligible point of the
-     user with a source (`historyEligible`, `source !== null`), else none, with the prompt
-     `myEnergy.pickParticipantPrompt`. Participants get no picker and send no `participant_id`; managers
+     user with a source (`historyEligible`, `source !== null`), else none. Participants get no picker and send no `participant_id`; managers
      always send the selected one (the same permission path as the dashboards' selected participant, §5.3).
   5. *Today* (`TodayPanel`). With a live card: `useLiveCurve(zevId, true, participantId)`, own history from
      the curve's `own_history`/`own_history_through`. Without one (live off, no live source, or the curve
@@ -787,7 +800,8 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
   7. *Period*: the same panel for the billing period (`period.from..period.to`, `day` buckets, enabled
      once `periodReady`), `GrossEnergyCard` titled "Your own system" (`whose="own"`; for a manager looking
      at somebody else `whose="participant"` with their name).
-  8. *No own system* (`NoOwnSystem`): no participant selected -> the prompt; the viewer's own system and
+  8. *No own system* (`NoOwnSystem`): no participant selected -> nothing (the prompt is by the picker); the viewer's
+     own system without a history-eligible point -> nothing (there is no history to wait for); the viewer's own system and
      `historyEligible` has a point without a source -> `GrossEnergyCallToAction`; otherwise a muted
      `myEnergy.noOwnSystem` (own) or `noOwnSystemParticipant`. The own-series answer's `gross: null` or an
      empty `own_history` is what triggers it.
@@ -797,17 +811,21 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
 Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 5 (below).
 
 - **My connections** (`features/supplementary/MyConnections.tsx`): a card at the top of
-  `/me/metering-points`, shown only while the feature is on and the source list has loaded. It lists
+  `/me/metering-points`, shown only while the feature is on, the source list has loaded and the holder has **two
+  or more** such sources (one source is all on its meter's card; none is said by the cards' "Not connected"). It lists
   the sources the signed-in holder owns: `held_by = participant` sources whose `metering_point` is a
   held point (an `eligible` entry) of the selected community, so no ZEV-held, connection-point or
   other holder's source. One row per source: provider and label, the metering points it feeds (the
-  meter ids as a list; always one today), a capability chip per capability it provides (**History
-  (15 min)**, **Live (now)**) each followed by its status (`SourceStatusBadge` for history,
-  `LiveStateBadge` for live), and an **Open** button that opens `SourceDialog` (subject: the meter
-  ids; eligibility of the fed point). No source: a muted line saying connections appear here once
-  energy data is connected to a meter below; there is no Connect here, that stays on the meter cards.
-  It is a view only: a source still feeds exactly one metering point. Tests:
-  `tests/my-connections.test.ts` (5) and one case in `tests/my-metering-points-page.test.ts`.
+  meter ids as a list; always one today), a `badge-tag` per capability it provides (**History
+  (15 min)**, **Live (now)**, **Forecast**) followed by a problem only when there is one
+  (`capabilityProblem`: switched off and "no data yet" as muted text, a stale live source, a source in error or
+  needing a new key as `IssueText`), never a status for a source that simply works (UI patterns §10.1), and an
+  **Open** button that opens `SourceDialog` (subject: the meter ids; eligibility of the fed point). There is no
+  Connect here, that stays on the meter cards. It is a view only: a source still feeds exactly one metering
+  point. The classes are `connection-*` (`styles/components/connections.css`). Tests:
+  `tests/my-connections.test.ts` (8) and two cases in `tests/my-metering-points-page.test.ts`. The page's hint
+  about asking a manager to flag a meter shows only while no held point is history-eligible and no own source is
+  connected.
 
 - **One card per held metering point** (`MeteringPointDataCard`, replacing the history card, the live
   section and the source card of the first PR 3b cut): header with meter id, community, the
@@ -818,8 +836,9 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   opens the source dialog, with its status (history: `SourceStatusBadge` and "up to <synced through>";
   live: `LiveStateBadge` and "last value <time>"); a push source providing both is in both rows and
   opens the same dialog. An unconnected row says "Not connected" with a secondary **Connect** that opens
-  the connect flow with that capability preselected. One primary **Connect energy data** shows while a
-  capability is unconnected (preselecting all of them). Connect and the row Connect are disabled while
+  the connect flow with that capability preselected. One primary **Connect energy data** shows only while **two or more**
+  capabilities that share the connect flow (history, live) are unconnected (preselecting them); with one left, its own
+  row's **Connect** is the only button. Connect and the row Connect are disabled while
   impersonating. A history source's reconnect-required and error banners stay on the card. While the
   source list is loading or failed and eligibility names a source (`source`, `sources.history` or
   `sources.live`), the card shows a loading or error state with a retry instead of rows.
@@ -830,7 +849,7 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   history, live endpoint, JSON example and sign convention for live: `PushEndpoints`); actions test,
   sync, replace key or reconnect (Solar Manager), CSV import (push history), **New push token**
   (shown once in `PushTokenPanel` with the endpoints of everything the source provides), **Revoke
-  token**, **Disconnect**, **Delete data** (history), **Remove source**, and the capability switches
+  token**, and the capability switches
   on the same connection: **Also send live data with this source** (confirm with the live consent,
   `PATCH {provides_live: true, consent: true}`, only a push source on a live-eligible point whose live
   slot is free), **Stop live data** (`PATCH {provides_live: false}`) and, for history,
@@ -841,7 +860,9 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   opened from a card with no list beside it), with confirmations as the only thing opened over it.
   The host keeps it open by its own state (a source id), never by what the source list says, and the
   rotated token lives in the dialog above everything a refetch can change, so a refetch cannot swap the
-  token screen away.
+  token screen away. **Disconnect**, **Delete data** (history) and **Remove source** are not among the everyday
+  actions: they sit in their own `Disclosure` "End the connection" (closed while the source works, open once it is
+  disconnected), with the two destructive ones as `button-danger` (UI patterns §9).
 - **`SupplementarySourceModal`** is the one connect flow, taking `holder` (`participant`, `zev`,
   `connection-point`), the point, `available` (what the point offers and does not have yet), `initial`
   (preselected), the visible `sources` and an optional `frame` (so a host that is already a dialog draws
@@ -864,6 +885,10 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   **Also provide history** for a Solar Manager source as for a push one (the stored key is reused), hides
   Sync and the endpoints for a live-only one, and the card shows the reconnect banner for a live-only
   Solar Manager source too.
+  Wording for a community member (no developer vocabulary): the push provider is **Own system / file** (not "Push");
+  its hint names Home Assistant, Shelly or a script, mentions the CSV upload only when history is among the chosen
+  capabilities (`providerHint.push`, else `push_live`: "sends the current power"), and the submit stays disabled until the
+  consent box is ticked, with `modal.needsConsent` saying so.
 - **`/me/metering-points`**: per held point with a capability exactly one `MeteringPointDataCard`; a
   point with no capability stays a plain card.
 - **`/metering/points`** (`features/meteringPoints/LiveSetup.tsx`; all of it only while
@@ -912,10 +937,14 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   facing south") with Edit and Delete and a form for name, peak power (kWp), tilt and direction (degrees, 0 south, 90 west,
   -90 east, 180 north); `planeInput` checks the same ranges as the server before asking it (`lib/pvPlanes.ts`). The form is
   `noValidate`: after the first save a message by the field (`planeFieldProblems`, `planes.errors.kwp|tilt|azimuth`) names
-  what is missing or out of range, so the browser's own tooltip never appears. Cancel comes before Save.
+  what is missing or out of range, so the browser's own tooltip never appears. Cancel comes before Save. The note that
+  the forecast also needs the building's location shows only while the building has no coordinates (the page passes
+  the point's building), with **Edit building** for someone who may write; it closes the dialog and opens the building
+  form, so only one layer is ever open.
 - **Building form** (`BuildingFormModal`): latitude and longitude (decimal degrees, comma accepted, both or neither,
   `coordinateInput`) with **Locate from address** (`locateBuilding`, enabled once street and city are filled; it fills the two
-  fields and saves nothing).
+  fields and saves nothing). Its hint names the service, since the street address leaves the instance: "sends the
+  address to OpenStreetMap (Nominatim)". The two fields have no example placeholder (an example looks like an entry).
 
 ### TypeScript types
 

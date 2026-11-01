@@ -83,6 +83,16 @@ as history. If Solar Manager limits requests, OpenZEV waits and tries again by i
 a ZEV-operated meter or the grid connection point still comes from a push source: a Solar Manager key
 is your personal credential, so a manager cannot connect one on your behalf.
 
+### Live data from your own system
+
+A meter that only reports its current power needs no history: on **My metering points** its row says
+*Live (now)* and *Not connected*, with its own **Connect**. Choose **Own system** and your system (Home
+Assistant, Shelly, a script) sends the current power with a push token, as described below. Where a
+point could provide both history and live data and neither is connected yet, a single **Connect energy
+data** at the bottom of the card starts both together; with only one missing, the **Connect** in its row
+is the only button. A community manager connects live data for meters nobody holds personally and for
+the grid connection point from the metering point list (**Live data** in the row's menu).
+
 ### What is stored
 
 Four values per quarter hour: **consumption**, **production**, **grid import**
@@ -92,7 +102,7 @@ read. Only the time you held the metering point is stored.
 ## Send the data yourself (push or file)
 
 If you do not use Solar Manager — for instance with Home Assistant, n8n or a
-script — choose **Push / file** when you connect. You get a **push token**
+script — choose **Own system / file** when you connect. You get a **push token**
 shown **once**; copy it right away. OpenZEV stores only a hash, so if you lose
 it you issue a new one (**New push token**), which stops the old one at once.
 The token also appears under **Account → Tokens & keys** with when it was issued and last
@@ -185,17 +195,33 @@ Semicolons and decimal commas (as in a Swiss Excel export) are accepted. Choose
 Everything your own devices report lives on the page **My energy system** in the
 sidebar. Your dashboard (**Energy balance** for managers) keeps the grid operator's
 official figures and only points to this page, with a link that opens the same period.
-The page has three views, chosen with the tabs **Today**, **7 days** and **Period**
-(the billing period, with the usual period selector). Managers and viewers pick the
-participant whose system they want to see; a manager who is a participant with a
+
+**Right now** is at the top: what your community produces and uses at this moment,
+marked *Live, indicative* and never used for billing. If you have a live source, your own
+consumption and production come first, with how much of it was local and how much came from or
+went to the grid; the ZEV's **Production**, **Consumption**, **Spare now** and **Local share** follow.
+A line says how many metering points report live data. Nothing is estimated: a meter that does not
+report is simply missing. Without any live source the card says so and links to where to connect one.
+
+Managers and viewers also get **Live values per metering point**: a table (a small card per
+point on a phone) with each point's power, how old the value is and its state. A power reads
+in words (*6.2 kW produced*, *2.0 kW to the grid*), not with the meter's minus sign. The table is closed
+once every point reports, and open while some do not; for a point of the community with no source it
+offers **Connect**, and for one a participant holds it says the participant connects it.
+
+Below it the views are chosen with the tabs **Today**, **Tomorrow** (when there is a
+forecast for it), **7 days** and **Period** (the billing period, with the usual period selector).
+A participant who cannot have a history (no plant behind their meter) sees only **Today**. Managers and
+viewers pick the participant whose system they want to see; a manager who is a participant with a
 connected source starts on themselves.
 
 **Today** draws your own consumption (and production, if you have a PV system) in one
 line: from your source's **history** up to its last synchronisation (solid line), and
 from **live** values after that (dashed line). A marker shows where history hands over
 to live. Where neither has a value, the line has a gap; nothing is estimated. The ZEV's
-totals in the same chart are live only. **7 days** and **Period** show the card
-described below.
+totals in the same chart are live only. With a production forecast, its expected production is drawn
+dashed and the highest expected production of the day is named above the chart. **7 days** and
+**Period** show the card described below.
 
 With a connected source, the card **Your own system** shows
 production, consumption, self-consumption, grid import and export, your
@@ -245,6 +271,29 @@ self-sufficiency. The energy sums are still shown.
 - The [AI assistant tools](19-ai-assistants.md) report it as
   `gross_self_sufficiency_pct` and `gross_self_consumption_pct`.
 
+## Production forecast
+
+OpenZEV can show **when your community's plants are expected to produce most**, today and tomorrow. It is
+an estimate from the weather and the plants' setup, never a measurement, and it says when production is
+expected, not that power will be spare. It is never used for billing.
+
+A forecast needs three things, set up in three places:
+
+1. **Roof planes** of the plant: size (kWp), tilt and direction. In the metering point list, open the
+   menu of the producing metering point and choose **Roof planes**; a plant on an east and a west roof has
+   two. Direction is 0 for south, 90 for west, -90 for east and 180 for north.
+2. **The building's location**, in the building's settings (latitude and longitude; **Locate from
+   address** fills them in, and sends the address to OpenStreetMap's Nominatim service to do so). The
+   roof planes dialog tells you while the location is still missing, with a button to the building.
+3. **A forecast source** on the producing metering point: **Connect forecast** uses the free public
+   service forecast.solar, with nothing to sign in to. Only the location, rounded to about one kilometre,
+   and the roof planes' size, tilt and direction are sent. If the plant already has a Solar Manager
+   connection, its own forecast can be switched on instead (**Also use the Solar Manager forecast**).
+
+Managers connect the forecast for ZEV-operated plants; a participant connects it for a meter they hold,
+and a manager enters the roof planes and the location. Once connected the forecast is fetched every
+hour. **Tomorrow** appears on **My energy system** as soon as there is a forecast for it.
+
 ## Does it match the meter?
 
 ![Source status with the meter comparison](screenshots/24-energy-data-status.png)
@@ -270,7 +319,8 @@ meter always wins and nothing is corrected. The result shows on the source:
 | **Delete data** | no | yes, all readings | yes |
 | **Remove source** | yes | yes, all readings | no |
 
-A ZEV manager sees the same buttons for a participant's source, except for the
+In the source's dialog these three sit in their own section, **End the connection**, away from
+the everyday actions. A ZEV manager sees the same buttons for a participant's source, except for the
 ones that touch the key. Deleting a participant or a metering point deletes their
 sources and readings with them.
 

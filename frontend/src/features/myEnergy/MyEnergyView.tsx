@@ -58,11 +58,11 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
     const liveEnabled = useLiveEnabled({ enabled: energyData.featureOn }).data === true
     const forecastQuery = useProductionForecast(selectedZevId || undefined, liveEnabled)
     const forecast = hasForecast(forecastQuery.data) ? forecastQuery.data : null
+    const snapshotQuery = useLiveEnergy(liveEnabled ? selectedZevId || undefined : undefined)
+    const liveShown = !!liveCardState(snapshotQuery.data)
     // Tomorrow is only offered while the forecast has something to say about it.
     const tomorrow = tomorrowBusinessIso()
     const hasTomorrow = hasExpectedProduction(forecast, tomorrow)
-    const requestedRange = parseMyEnergyRange(searchParams.get('range'))
-    const range: MyEnergyRange = requestedRange === 'tomorrow' && !hasTomorrow ? MY_ENERGY_DEFAULT_RANGE : requestedRange
 
     const participantsQuery = useQuery({
         queryKey: queryKeys.zev.participants(selectedZevId || undefined),
@@ -102,6 +102,16 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
         }
         : { participantId: undefined, ready: true, isOwn: true, name: undefined }
     const canConnect = energyData.historyEligible.some((point) => point.zev === selectedZevId && point.source === null)
+    // A history can only appear for a participant whose meter has a plant behind it; a manager looks at other people's.
+    const historyPossible = isZevScope || energyData.historyEligible.some((point) => point.zev === selectedZevId)
+    // Without a plant, a live source or a forecast there is nothing to put under the live card's own setup prompt.
+    const liveSettled = !liveEnabled || !snapshotQuery.isPending
+    const hasViews = historyPossible || liveShown || !!forecast || !liveSettled
+    const requestedRange = parseMyEnergyRange(searchParams.get('range'))
+    const offered = requestedRange === 'today' || (requestedRange === 'tomorrow' ? hasTomorrow : historyPossible)
+    const range: MyEnergyRange = offered ? requestedRange : MY_ENERGY_DEFAULT_RANGE
+    // A single view needs no tab strip.
+    const showTabs = historyPossible || hasTomorrow
 
     const setRange = (next: MyEnergyRange) => updateParams((params) => {
         if (next === MY_ENERGY_DEFAULT_RANGE) params.delete('range')
@@ -126,78 +136,88 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
         <>
             <LiveEnergyView zevId={selectedZevId || undefined} />
 
-            <AppTabs value={range} onChange={(value) => setRange(parseMyEnergyRange(value))} keepMounted={false}>
-                <AppTabs.List aria-label={t('myEnergy.rangeLabel')}>
-                    <AppTabs.Tab value="today">{t('myEnergy.tabs.today')}</AppTabs.Tab>
-                    {hasTomorrow && <AppTabs.Tab value="tomorrow">{t('myEnergy.tabs.tomorrow')}</AppTabs.Tab>}
-                    <AppTabs.Tab value="week">{t('myEnergy.tabs.week')}</AppTabs.Tab>
-                    <AppTabs.Tab value="period">{t('myEnergy.tabs.period')}</AppTabs.Tab>
-                </AppTabs.List>
-
-                <section className="filter-bar">
-                    {range === 'period' && interval && (
-                        <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={onPeriodChange} />
+            {hasViews && (
+                <AppTabs value={range} onChange={(value) => setRange(parseMyEnergyRange(value))} keepMounted={false}>
+                    {showTabs && (
+                        <AppTabs.List aria-label={t('myEnergy.rangeLabel')}>
+                            <AppTabs.Tab value="today">{t('myEnergy.tabs.today')}</AppTabs.Tab>
+                            {hasTomorrow && <AppTabs.Tab value="tomorrow">{t('myEnergy.tabs.tomorrow')}</AppTabs.Tab>}
+                            {historyPossible && <AppTabs.Tab value="week">{t('myEnergy.tabs.week')}</AppTabs.Tab>}
+                            {historyPossible && <AppTabs.Tab value="period">{t('myEnergy.tabs.period')}</AppTabs.Tab>}
+                        </AppTabs.List>
                     )}
-                    {isZevScope && range !== 'tomorrow' && (
-                        <div className="filter-bar-fields">
-                            <label>
-                                <span>{t('pages.dashboard.participant')}</span>
-                                <select value={selectedParticipantId} onChange={(event) => setParticipant(event.target.value)}>
-                                    {!selectedParticipantId && <option value="">{t('myEnergy.pickParticipant')}</option>}
-                                    {participants.map((participant) => (
-                                        <option key={participant.id} value={participant.id}>
-                                            {participant.display_name || participant.id}
-                                            {ownParticipantIds.includes(participant.id) ? ` (${t('pages.dashboard.youBadge')})` : ''}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                        </div>
-                    )}
-                </section>
 
-                <AppTabs.Panel value="today">
-                    <TodayPanel zevId={selectedZevId || undefined} subject={subject} canConnect={canConnect} forecast={forecast} />
-                </AppTabs.Panel>
-                {hasTomorrow && forecast && (
-                    <AppTabs.Panel value="tomorrow">
-                        <ProductionForecastChart forecast={forecastForDay(forecast, tomorrow)} title={t('myEnergy.tomorrow.title')} />
+                    <section className="filter-bar">
+                        {range === 'period' && interval && (
+                            <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={onPeriodChange} />
+                        )}
+                        {isZevScope && range !== 'tomorrow' && (
+                            <>
+                                <div className="filter-bar-fields">
+                                    <label>
+                                        <span>{t('pages.dashboard.participant')}</span>
+                                        <select value={selectedParticipantId} onChange={(event) => setParticipant(event.target.value)}>
+                                            {!selectedParticipantId && <option value="">{t('myEnergy.pickParticipant')}</option>}
+                                            {participants.map((participant) => (
+                                                <option key={participant.id} value={participant.id}>
+                                                    {participant.display_name || participant.id}
+                                                    {ownParticipantIds.includes(participant.id) ? ` (${t('pages.dashboard.youBadge')})` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                </div>
+                                {!subject.ready && <p className="muted filter-bar-note">{t('myEnergy.pickParticipantPrompt')}</p>}
+                            </>
+                        )}
+                    </section>
+
+                    <AppTabs.Panel value="today">
+                        <TodayPanel zevId={selectedZevId || undefined} subject={subject} canConnect={canConnect} historyPossible={historyPossible} forecast={forecast} />
                     </AppTabs.Panel>
-                )}
-                <AppTabs.Panel value="week">
-                    <SeriesPanel
-                        zevId={selectedZevId || undefined}
-                        subject={subject}
-                        canConnect={canConnect}
-                        range={lastDaysRange(today, 7)}
-                        bucket="hour"
-                        footer={
-                            <p className="muted">
-                                {t('myEnergy.week.note')}{' '}
-                                <Link to="/dashboard">{t('myEnergy.week.noteLink')}</Link>
-                            </p>
-                        }
-                    />
-                </AppTabs.Panel>
-                <AppTabs.Panel value="period">
-                    <SeriesPanel
-                        zevId={selectedZevId || undefined}
-                        subject={subject}
-                        canConnect={canConnect}
-                        range={period}
-                        bucket="day"
-                        ready={periodReady}
-                    />
-                </AppTabs.Panel>
-            </AppTabs>
+                    {hasTomorrow && forecast && (
+                        <AppTabs.Panel value="tomorrow">
+                            <ProductionForecastChart forecast={forecastForDay(forecast, tomorrow)} title={t('myEnergy.tomorrow.title')} />
+                        </AppTabs.Panel>
+                    )}
+                    <AppTabs.Panel value="week">
+                        <SeriesPanel
+                            zevId={selectedZevId || undefined}
+                            subject={subject}
+                            canConnect={canConnect}
+                            historyPossible={historyPossible}
+                            range={lastDaysRange(today, 7)}
+                            bucket="hour"
+                            footer={
+                                <p className="muted">
+                                    {t('myEnergy.week.note')}{' '}
+                                    <Link to="/dashboard">{t('myEnergy.week.noteLink')}</Link>
+                                </p>
+                            }
+                        />
+                    </AppTabs.Panel>
+                    <AppTabs.Panel value="period">
+                        <SeriesPanel
+                            zevId={selectedZevId || undefined}
+                            subject={subject}
+                            canConnect={canConnect}
+                            historyPossible={historyPossible}
+                            range={period}
+                            bucket="day"
+                            ready={periodReady}
+                        />
+                    </AppTabs.Panel>
+                </AppTabs>
+            )}
         </>
     )
 }
 
 /** What to say where there is nothing of the own system to show. */
-function NoOwnSystem({ subject, canConnect }: { subject: Subject; canConnect: boolean }) {
+function NoOwnSystem({ subject, canConnect, historyPossible }: { subject: Subject; canConnect: boolean; historyPossible: boolean }) {
     const { t } = useTranslation()
-    if (!subject.ready) return <p className="muted">{t('myEnergy.pickParticipantPrompt')}</p>
+    // The prompt to pick a participant sits by the picker; a meter that cannot have a history has nothing to wait for.
+    if (!subject.ready || (subject.isOwn && !historyPossible)) return null
     if (subject.isOwn && canConnect) return <GrossEnergyCallToAction />
     return <p className="muted">{t(subject.isOwn ? 'myEnergy.noOwnSystem' : 'myEnergy.noOwnSystemParticipant')}</p>
 }
@@ -206,10 +226,11 @@ function NoOwnSystem({ subject, canConnect }: { subject: Subject; canConnect: bo
  * Today: the live curve (when the live view has data) with the own line merged from history and live,
  * or the history alone through the own-series endpoint when there is no live curve.
  */
-function TodayPanel({ zevId, subject, canConnect, forecast }: {
+function TodayPanel({ zevId, subject, canConnect, historyPossible, forecast }: {
     zevId: string | undefined
     subject: Subject
     canConnect: boolean
+    historyPossible: boolean
     forecast: ProductionForecast | null
 }) {
     const { t } = useTranslation()
@@ -245,16 +266,17 @@ function TodayPanel({ zevId, subject, canConnect, forecast }: {
             {(liveShown || hasOwn || rows.some((row) => row.forecast !== null)) && (
                 <TodayChart date={date} rows={rows} through={history.through} hasLive={!!curve} peakWindows={forecast?.peak_windows} />
             )}
-            {!hasOwn && !seriesQuery.isError && <NoOwnSystem subject={subject} canConnect={canConnect} />}
+            {!hasOwn && !seriesQuery.isError && <NoOwnSystem subject={subject} canConnect={canConnect} historyPossible={historyPossible} />}
         </>
     )
 }
 
 /** Seven days or the billing period: the own system's totals and chart, as the dashboards used to show them. */
-function SeriesPanel({ zevId, subject, canConnect, range, bucket, ready = true, footer }: {
+function SeriesPanel({ zevId, subject, canConnect, historyPossible, range, bucket, ready = true, footer }: {
     zevId: string | undefined
     subject: Subject
     canConnect: boolean
+    historyPossible: boolean
     range: { from: string; to: string }
     bucket: 'hour' | 'day'
     ready?: boolean
@@ -287,7 +309,7 @@ function SeriesPanel({ zevId, subject, canConnect, range, bucket, ready = true, 
                     formatBucketTooltipLabel={formatBucketTooltipLabel}
                 />
             ) : (
-                <NoOwnSystem subject={subject} canConnect={canConnect} />
+                <NoOwnSystem subject={subject} canConnect={canConnect} historyPossible={historyPossible} />
             )}
             {footer}
         </>

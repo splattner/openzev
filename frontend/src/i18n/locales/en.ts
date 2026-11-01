@@ -798,7 +798,6 @@ export const en = {
             viewData: 'View metering data',
             connections: {
                 title: 'My connections',
-                empty: 'Connections appear here once energy data is connected to a meter below.',
                 open: 'Open',
                 openFor: 'Open {{name}}',
                 meters: 'Metering points',
@@ -2364,7 +2363,8 @@ export const en = {
                     tilt: 'Enter a tilt as a whole number from 0 to 90.',
                     azimuth: 'Enter a direction as a whole number from -180 to 180.',
                 },
-                locationHint: 'The forecast also needs the location of the building: set it in the building\'s settings.',
+                locationHint: 'The forecast also needs the building\'s location. It is still missing.',
+                editBuilding: 'Edit building',
                 direction: {
                     south: 'south',
                     southWest: 'south-west',
@@ -2464,7 +2464,7 @@ export const en = {
                 locate: 'Locate from address',
                 locating: 'Locating…',
                 locateFailed: 'The address could not be located.',
-                locationHint: 'Optional. Only needed for the production forecast; sent rounded to about one kilometre.',
+                locationHint: 'Optional. Only needed for the production forecast; sent rounded to about one kilometre. "Locate from address" sends the address to OpenStreetMap (Nominatim).',
                 locationInvalid: 'Enter both coordinates as decimal degrees (latitude -90 to 90, longitude -180 to 180), or leave both empty.',
                 egidInvalid: 'The EGID is a whole number of up to 9 digits.',
                 egidBadge: 'EGID {{egid}}',
@@ -3990,7 +3990,7 @@ export const en = {
         },
         provider: {
             solar_manager: 'Solar Manager',
-            push: 'Push / file',
+            push: 'Own system / file',
             forecast_solar: 'forecast.solar',
         },
         withheld: {
@@ -4023,6 +4023,7 @@ export const en = {
             provides: 'Provides',
             status: 'Status',
             endpoints: 'Where to send the data',
+            endTitle: 'End the connection',
             alsoHistory: 'Also provide history with this source',
             stopHistory: 'Stop history data',
             historyOn: 'History is on. Send readings with the same token to the history address.',
@@ -4121,7 +4122,8 @@ export const en = {
                 solar_manager: 'OpenZEV fetches your data from your Solar Manager account every hour.',
                 solar_manager_live: 'OpenZEV reads the current power from your Solar Manager account, but only while someone has the live page open.',
                 solar_manager_both: 'OpenZEV fetches your data from your Solar Manager account every hour, and reads the current power while someone has the live page open.',
-                push: 'Your own system (Home Assistant, n8n, a script) sends the data, or you upload a CSV file.',
+                push: 'Your own system (Home Assistant, Shelly, a script) sends the values, or you upload a CSV file.',
+                push_live: 'Your own system (Home Assistant, Shelly, a script) sends the current power.',
             },
             smId: 'Solar Manager ID',
             smIdHint: 'The ID of your installation in Solar Manager, 3 to 24 letters or digits.',
@@ -4135,7 +4137,8 @@ export const en = {
             connectionTitle: 'Connect the grid connection point',
             liveConnected: 'Live data was connected. Send the first value with the push token.',
             liveConnectedPull: 'Live data was connected. The current power appears while the live page is open.',
-            livePushHint: 'Your own system (Home Assistant, Shelly, n8n, a script) sends the current power through a push token.',
+            livePushHint: 'Your own system (Home Assistant, Shelly, a script) sends the current power with an access key (push token).',
+            needsConsent: 'Confirm the consent above first.',
             connectionHint: 'This source reports the net power at the grid connection: positive when the ZEV draws power from the grid, negative when it feeds power in.',
         },
         push: {
@@ -4306,7 +4309,7 @@ export const en = {
             hint: 'Gaps mean no complete live data in that period; nothing is estimated.',
         },
         points: {
-            title: 'Live values per metering point',
+            summary: 'Live values per metering point · {{live}} of {{total}} live',
             meter: 'Metering point',
             holder: 'Holder',
             power: 'Power',
@@ -4315,6 +4318,15 @@ export const en = {
             connection: 'Grid connection point',
             zevOperated: 'ZEV-operated',
             seconds: '{{count}} s',
+            connect: 'Connect',
+            holderConnects: 'the participant connects it',
+            flow: {
+                produced: '{{value}} produced',
+                consumed: '{{value}} consumed',
+                fed: '{{value}} fed in',
+                fromGrid: '{{value}} from the grid',
+                toGrid: '{{value}} to the grid',
+            },
         },
     },
     forecast: {

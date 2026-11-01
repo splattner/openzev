@@ -94,6 +94,9 @@ function MyMeteringPointsView() {
     }
 
     const isEmpty = eligible.length === 0 && plainPoints.length === 0
+    const hasConnection = (sourcesQuery.data ?? []).some(
+        (source) => source.held_by === 'participant' && source.metering_point !== null && eligibleByPoint.has(source.metering_point),
+    )
     const sourcesUnavailable = sourcesQuery.isLoading ? 'loading' : sourcesQuery.isError ? 'error' : undefined
 
     return (
@@ -139,8 +142,8 @@ function MyMeteringPointsView() {
                 <PlainMeteringPoint key={point.id} point={point} showEnergyDataNote={energyData.featureOn} />
             ))}
 
-            {/* Only while the feature is on: with it off the page says nothing about energy data. */}
-            {energyData.featureOn && isParticipantScope && !isEmpty && (
+            {/* Only while the feature is on (with it off the page says nothing about energy data), and only for someone who has not got an own system connected or flagged yet. */}
+            {energyData.featureOn && isParticipantScope && !isEmpty && !eligible.some(historyEligible) && !hasConnection && (
                 <p className="muted">{t('pages.myMeteringPoints.flagHint')}</p>
             )}
 

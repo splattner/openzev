@@ -1,58 +1,103 @@
-import { useId } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { formatKw } from '../../lib/live'
+import { Disclosure } from '../../components/Disclosure'
+import { useCommunityAccess } from '../../lib/communityAccess'
+import { formatKw, livePointFlow } from '../../lib/live'
 import type { LivePoint } from '../../types/api'
 import { LiveStateBadge } from '../supplementary/LiveStateBadge'
 
-/** Each live source's latest value, for whoever manages or may view the ZEV (the snapshot carries `points` only for them). */
+function pointKey(point: LivePoint) {
+    return point.source_id ?? point.metering_point_id ?? point.target
+}
+
+/** The meter, or the grid connection, which has none. */
+function PointName({ point }: { point: LivePoint }) {
+    const { t } = useTranslation()
+    return <>{point.target === 'connection_point' ? t('live.points.connection') : point.meter_id}</>
+}
+
+/** The power with its direction in words, never the meter's minus sign. */
+function usePointPower() {
+    const { t } = useTranslation()
+    return (point: LivePoint) => {
+        if (point.meter_power_w === null) return '—'
+        const flow = livePointFlow(point)
+        return flow ? t(`live.points.flow.${flow.flow}`, { value: formatKw(flow.watts) }) : formatKw(point.meter_power_w)
+    }
+}
+
+/** What a point with no source offers next: a manager connects one the community operates, a participant's own is theirs to connect. */
+function ConnectNote({ point }: { point: LivePoint }) {
+    const { t } = useTranslation()
+    const { canManage } = useCommunityAccess()
+    if (point.source_id !== null || point.target !== 'metering_point') return null
+    if (point.participant_name !== null) return <span className="muted"> · {t('live.points.holderConnects')}</span>
+    if (!canManage || !point.meter_id) return null
+    return (
+        <>
+            {' · '}
+            <Link to={`/metering/points?search=${encodeURIComponent(point.meter_id)}`}>{t('live.points.connect')}</Link>
+        </>
+    )
+}
+
+/**
+ * Each live source's latest value, for whoever manages or may view the ZEV (the snapshot carries `points` only
+ * for them). It supports the card above it, so it is a disclosure, open while some points still report nothing.
+ */
 export function LivePointsTable({ points }: { points: LivePoint[] }) {
     const { t } = useTranslation()
-    const titleId = useId()
+    const power = usePointPower()
+    const live = points.filter((point) => point.live_state === 'fresh').length
     return (
-        <section className="card" aria-labelledby={titleId}>
-            <h3 id={titleId}>{t('live.points.title')}</h3>
-            <div className="table-scroll live-points-wide">
-                <table className="participant-table live-points-table">
-                    <thead>
-                        <tr>
-                            <th>{t('live.points.meter')}</th>
-                            <th>{t('live.points.holder')}</th>
-                            <th className="numeric">{t('live.points.power')}</th>
-                            <th className="numeric">{t('live.points.age')}</th>
-                            <th>{t('live.points.state')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {points.map((point) => (
-                            <tr key={point.source_id ?? point.metering_point_id ?? point.target}>
-                                <td className="live-meter-cell">{point.target === 'connection_point' ? t('live.points.connection') : point.meter_id}</td>
-                                <td>{point.participant_name ?? t('live.points.zevOperated')}</td>
-                                <td className="numeric">{point.meter_power_w === null ? '—' : formatKw(point.meter_power_w)}</td>
-                                <td className="numeric">{point.age_s === null ? '—' : t('live.points.seconds', { count: point.age_s })}</td>
-                                <td><LiveStateBadge state={point.live_state} /></td>
+        <section className="card">
+            <Disclosure
+                defaultOpen={live < points.length}
+                summary={<span>{t('live.points.summary', { live, total: points.length })}</span>}
+            >
+                <div className="table-scroll live-points-wide">
+                    <table className="participant-table live-points-table">
+                        <thead>
+                            <tr>
+                                <th>{t('live.points.meter')}</th>
+                                <th>{t('live.points.holder')}</th>
+                                <th className="numeric">{t('live.points.power')}</th>
+                                <th className="numeric">{t('live.points.age')}</th>
+                                <th>{t('live.points.state')}</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-            {/* On a phone the columns would hide the one thing the table is for (the kW), so each point is a small card. */}
-            <ul className="live-points-list">
-                {points.map((point) => (
-                    <li key={point.source_id ?? point.metering_point_id ?? point.target}>
-                        <div className="live-points-list-head">
-                            <strong>{point.target === 'connection_point' ? t('live.points.connection') : point.meter_id}</strong>
-                            <LiveStateBadge state={point.live_state} />
-                        </div>
-                        <span className="muted">{point.participant_name ?? t('live.points.zevOperated')}</span>
-                        {point.meter_power_w !== null && (
-                            <span>
-                                {formatKw(point.meter_power_w)}
-                                {point.age_s !== null && ` · ${t('live.points.seconds', { count: point.age_s })}`}
-                            </span>
-                        )}
-                    </li>
-                ))}
-            </ul>
+                        </thead>
+                        <tbody>
+                            {points.map((point) => (
+                                <tr key={pointKey(point)}>
+                                    <td className="live-meter-cell"><PointName point={point} /></td>
+                                    <td>{point.participant_name ?? t('live.points.zevOperated')}</td>
+                                    <td className="numeric">{power(point)}</td>
+                                    <td className="numeric">{point.age_s === null ? '—' : t('live.points.seconds', { count: point.age_s })}</td>
+                                    <td><LiveStateBadge state={point.live_state} /><ConnectNote point={point} /></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                {/* On a phone the columns would hide the one thing the table is for (the kW), so each point is a small card. */}
+                <ul className="live-points-list">
+                    {points.map((point) => (
+                        <li key={pointKey(point)}>
+                            <div className="live-points-list-head">
+                                <strong><PointName point={point} /></strong>
+                                <span><LiveStateBadge state={point.live_state} /><ConnectNote point={point} /></span>
+                            </div>
+                            <span className="muted">{point.participant_name ?? t('live.points.zevOperated')}</span>
+                            {point.meter_power_w !== null && (
+                                <span>
+                                    {power(point)}
+                                    {point.age_s !== null && ` · ${t('live.points.seconds', { count: point.age_s })}`}
+                                </span>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            </Disclosure>
         </section>
     )
 }

@@ -6,6 +6,9 @@ import { TodayChart } from '../src/features/myEnergy/TodayChart'
 import type { LiveOwn, LivePoint, LiveSnapshot } from '../src/types/api'
 import { renderWithProviders } from './helpers/render'
 
+const mockAccess = vi.hoisted(() => vi.fn(() => ({ canManage: true })))
+vi.mock('../src/lib/communityAccess', () => ({ useCommunityAccess: () => mockAccess() }))
+
 // The mock prints the key and its values, so a test sees which text the card chose.
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
@@ -185,7 +188,7 @@ describe('LivePointsTable', () => {
         const out = container.textContent ?? ''
         expect(out).toContain('CH-1')
         expect(out).toContain('Anna')
-        expect(out).toContain('1.2\u00a0kW')
+        expect(out).toContain('live.points.flow.consumed|{"value":"1.2\u00a0kW"}')
         expect(out).toContain('live.points.seconds|{"count":7}')
         expect(out).toContain('live.points.connection')
         expect(out).toContain('live.points.zevOperated')
@@ -200,8 +203,48 @@ describe('LivePointsTable', () => {
 
         const card = container.querySelector('.live-points-list li')
         expect(card?.textContent).toContain('CH-1')
-        expect(card?.textContent).toContain('1.2\u00a0kW')
+        expect(card?.textContent).toContain('live.points.flow.consumed|{"value":"1.2\u00a0kW"}')
         expect(card?.textContent).toContain('live.points.seconds|{"count":7}')
+    })
+
+    it('says the direction in words and never prints the meter\'s minus', async () => {
+        const rows = [
+            point({ meter_type: 'production', meter_power_w: -6200 }),
+            point({ metering_point_id: null, target: 'connection_point', meter_id: null, meter_type: null, meter_power_w: -2000, source_id: 's2' }),
+            point({ metering_point_id: 'm3', meter_id: 'CH-3', meter_power_w: 30 }),
+        ]
+        const { container } = await renderWithProviders(createElement(LivePointsTable, { points: rows }), cleanups)
+
+        const out = container.querySelector('table')?.textContent ?? ''
+        expect(out).toContain('live.points.flow.produced|{"value":"6.2\u00a0kW"}')
+        expect(out).toContain('live.points.flow.toGrid|{"value":"2.0\u00a0kW"}')
+        // Below the display resolution there is no direction.
+        expect(out).toContain('0.0\u00a0kW')
+        expect(out).not.toMatch(/-\d+\.\d/)
+    })
+
+    it('summarises how many points report, open only while some do not', async () => {
+        const partial = [point({}), point({ metering_point_id: 'm2', meter_id: 'CH-2', live_state: 'never', source_id: null, meter_power_w: null, age_s: null })]
+        const { container } = await renderWithProviders(createElement(LivePointsTable, { points: partial }), cleanups)
+        expect(container.querySelector('summary')?.textContent).toContain('live.points.summary|{"live":1,"total":2}')
+        expect(container.querySelector('details')?.open).toBe(true)
+
+        const complete = await renderWithProviders(createElement(LivePointsTable, { points: [point({})] }), cleanups)
+        expect(complete.container.querySelector('details')?.open).toBe(false)
+    })
+
+    it('offers a manager the way to connect a point nobody holds, and tells a viewer or a holder\'s point nothing to do', async () => {
+        const open = point({ meter_id: 'CH-9', participant_name: null, held_by: null, source_id: null, live_state: 'never', meter_power_w: null, age_s: null })
+        const held = point({ metering_point_id: 'm2', meter_id: 'CH-2', source_id: null, live_state: 'never', meter_power_w: null, age_s: null })
+        const manager = await renderWithProviders(createElement(LivePointsTable, { points: [open, held] }), cleanups)
+        const link = manager.container.querySelector('table a')
+        expect(link?.getAttribute('href')).toBe('/metering/points?search=CH-9')
+        expect(manager.container.querySelectorAll('table a')).toHaveLength(1)
+        expect(manager.container.querySelector('table')?.textContent).toContain('live.points.holderConnects')
+
+        mockAccess.mockReturnValueOnce({ canManage: false })
+        const viewer = await renderWithProviders(createElement(LivePointsTable, { points: [open] }), cleanups)
+        expect(viewer.container.querySelector('table a')).toBeNull()
     })
 })
 

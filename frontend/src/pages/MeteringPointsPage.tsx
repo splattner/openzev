@@ -331,7 +331,18 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                     }}
                 />
 
-                {planesPoint && <PvPlanesDialog point={planesPoint} canWrite={canWrite} onClose={() => setPlanesPoint(null)} />}
+                {planesPoint && (
+                    <PvPlanesDialog
+                        point={planesPoint}
+                        canWrite={canWrite}
+                        building={buildings.find((building) => building.id === planesPoint.building)}
+                        onEditBuilding={(building) => {
+                            setPlanesPoint(null)
+                            openEditBuildingModal(building)
+                        }}
+                        onClose={() => setPlanesPoint(null)}
+                    />
+                )}
                 {livePoint && <PointLiveDialog point={livePoint} setup={liveSetup} confirm={confirm} onClose={() => setLivePoint(null)} />}
 
                 {dialog && (

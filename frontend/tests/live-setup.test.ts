@@ -87,8 +87,14 @@ describe('SupplementarySourceModal for live data', () => {
         const modal = await open('participant')
         // Live can come from Solar Manager or from a push source; Solar Manager is the first choice.
         expect(modal.querySelectorAll('input[type="radio"]')).toHaveLength(2)
+        // Live only: the own system sends the power, and there is no file to upload.
+        expect(modal.textContent).toContain('supplementary.modal.providerHint.push_live')
+        expect(modal.textContent).not.toMatch(/providerHint\.push(?!_live)/)
         await click(radio(modal, 'supplementary.provider.push'))
         expect(modal.querySelector('input[type="password"]')).toBeNull()
+        // The submit waits for the consent, and says so.
+        expect(modal.textContent).toContain('supplementary.modal.needsConsent')
+        expect(buttonWith(modal, 'supplementary.modal.connect')!.disabled).toBe(true)
         expect(modal.textContent).toContain('supplementary.consent.liveVisible')
         expect(modal.textContent).toContain('supplementary.consent.liveNotBilling')
         expect(modal.textContent).not.toContain('supplementary.consent.stored')

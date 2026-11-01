@@ -789,7 +789,6 @@ export const it = {
             viewData: 'Dati di misura',
             connections: {
                 title: 'Le mie connessioni',
-                empty: 'Le connessioni compaiono qui non appena i dati energetici sono collegati a un contatore qui sotto.',
                 open: 'Apri',
                 openFor: 'Apri {{name}}',
                 meters: 'Punti di misura',
@@ -2353,7 +2352,8 @@ export const it = {
                     tilt: "Inserite un'inclinazione intera da 0 a 90.",
                     azimuth: 'Inserite un orientamento intero da -180 a 180.',
                 },
-                locationHint: 'La previsione richiede anche la posizione dell\'edificio: si inserisce nelle impostazioni dell\'edificio.',
+                locationHint: 'La previsione richiede anche la posizione dell\'edificio. Manca ancora.',
+                editBuilding: 'Modifica edificio',
                 direction: {
                     south: 'sud',
                     southWest: 'sud-ovest',
@@ -2453,7 +2453,7 @@ export const it = {
                 locate: 'Trova dall\'indirizzo',
                 locating: 'Ricerca…',
                 locateFailed: 'Impossibile trovare l\'indirizzo.',
-                locationHint: 'Facoltativo. Serve solo per la previsione di produzione; inviata arrotondata a circa un chilometro.',
+                locationHint: 'Facoltativo. Serve solo per la previsione di produzione; inviata arrotondata a circa un chilometro. «Trova dall\'indirizzo» invia l\'indirizzo a OpenStreetMap (Nominatim).',
                 locationInvalid: 'Inserite entrambe le coordinate in gradi decimali (latitudine da -90 a 90, longitudine da -180 a 180) oppure lasciate vuote entrambe.',
                 egidInvalid: 'L\'EGID è un numero intero di al massimo 9 cifre.',
                 egidBadge: 'EGID {{egid}}',
@@ -3979,7 +3979,7 @@ export const it = {
         },
         provider: {
             solar_manager: 'Solar Manager',
-            push: 'Push / file',
+            push: 'Sistema proprio / file',
             forecast_solar: 'forecast.solar',
         },
         withheld: {
@@ -4012,6 +4012,7 @@ export const it = {
             provides: 'Fornisce',
             status: 'Stato',
             endpoints: 'Dove inviare i dati',
+            endTitle: 'Termina la connessione',
             alsoHistory: 'Fornisci anche lo storico con questa fonte',
             stopHistory: 'Interrompi i dati storici',
             historyOn: 'Lo storico è attivo. Invia le letture con lo stesso token all\'indirizzo dello storico.',
@@ -4110,7 +4111,8 @@ export const it = {
                 solar_manager: 'OpenZEV preleva i vostri dati ogni ora dal vostro account Solar Manager.',
                 solar_manager_live: 'OpenZEV legge la potenza attuale dal vostro account Solar Manager, ma solo finché qualcuno ha aperto la pagina in tempo reale.',
                 solar_manager_both: 'OpenZEV preleva i vostri dati ogni ora dal vostro account Solar Manager e legge la potenza attuale finché qualcuno ha aperto la pagina in tempo reale.',
-                push: 'Il vostro sistema (Home Assistant, n8n, uno script) invia i dati, oppure caricate un file CSV.',
+                push: 'Il vostro sistema (Home Assistant, Shelly, uno script) invia i valori, oppure caricate un file CSV.',
+                push_live: 'Il vostro sistema (Home Assistant, Shelly, uno script) invia la potenza attuale.',
             },
             smId: 'ID Solar Manager',
             smIdHint: 'L\'ID del vostro impianto in Solar Manager, da 3 a 24 lettere o cifre.',
@@ -4124,7 +4126,8 @@ export const it = {
             connectionTitle: 'Collega il punto di allacciamento alla rete',
             liveConnected: 'I dati in tempo reale sono stati collegati. Invia il primo valore con il token push.',
             liveConnectedPull: 'I dati in tempo reale sono stati collegati. La potenza attuale appare finché la pagina in tempo reale è aperta.',
-            livePushHint: 'Il tuo sistema (Home Assistant, Shelly, n8n, uno script) invia la potenza attuale con un token push.',
+            livePushHint: 'Il tuo sistema (Home Assistant, Shelly, uno script) invia la potenza attuale con una chiave d\'accesso (token push).',
+            needsConsent: 'Confermate prima il consenso qui sopra.',
             connectionHint: 'Questa fonte comunica la potenza netta all\'allacciamento alla rete: positiva quando lo ZEV preleva dalla rete, negativa quando immette.',
         },
         push: {
@@ -4295,7 +4298,7 @@ export const it = {
             hint: 'Le interruzioni indicano che in quel periodo non ci sono dati in tempo reale completi; nulla viene stimato.',
         },
         points: {
-            title: 'Valori in tempo reale per punto di misura',
+            summary: 'Valori in tempo reale per punto di misura · {{live}} su {{total}} in tempo reale',
             meter: 'Punto di misura',
             holder: 'Titolare',
             power: 'Potenza',
@@ -4304,6 +4307,15 @@ export const it = {
             connection: 'Punto di collegamento alla rete',
             zevOperated: 'Gestito dalla ZEV',
             seconds: '{{count}} s',
+            connect: 'Collega',
+            holderConnects: 'lo collega il partecipante',
+            flow: {
+                produced: '{{value}} prodotti',
+                consumed: '{{value}} consumati',
+                fed: '{{value}} immessi',
+                fromGrid: '{{value}} dalla rete',
+                toGrid: '{{value}} nella rete',
+            },
         },
     },
     forecast: {

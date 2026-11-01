@@ -3,7 +3,7 @@ import { fetchLiveCurveOrNull, fetchLiveEnabled, fetchLiveSnapshotOrNull } from 
 import { queryKeys } from './api/queryKeys'
 import { BUSINESS_TIME_ZONE, businessDayStartMs, nextIsoDate, todayBusinessIso } from './dates'
 import { formatNumber } from './numbers'
-import type { LiveCurveBucket, LiveSnapshot, LiveTier } from '../types/api'
+import type { LiveCurveBucket, LivePoint, LiveSnapshot, LiveTier } from '../types/api'
 
 export const LIVE_SNAPSHOT_INTERVAL_MS = 15_000
 export const LIVE_CURVE_INTERVAL_MS = 60_000
@@ -64,6 +64,25 @@ export function kwFigure(watts: number): string {
 /** A power in W as `1.2 kW` (no-break space). */
 export function formatKw(watts: number): string {
     return Number.isFinite(watts) ? `${kwFigure(watts)}\u00a0kW` : '–'
+}
+
+/** How a meter's power reads in words; `live.points.flow.<key>` has the text. */
+export type LivePointFlow = 'produced' | 'consumed' | 'fed' | 'fromGrid' | 'toGrid'
+
+/**
+ * A point's power with its direction in words. A meter counts positive when it draws and negative when it
+ * feeds out, which on a plant or the grid connection reads as a minus where people expect a direction.
+ * `null` for a power that rounds to zero: it has no direction.
+ */
+export function livePointFlow(point: Pick<LivePoint, 'target' | 'meter_type' | 'meter_power_w'>): { flow: LivePointFlow; watts: number } | null {
+    const power = point.meter_power_w
+    if (power === null || Math.round(power / 100) === 0) return null
+    const drawing = power > 0
+    let flow: LivePointFlow
+    if (point.target === 'connection_point') flow = drawing ? 'fromGrid' : 'toGrid'
+    else if (drawing) flow = 'consumed'
+    else flow = point.meter_type === 'production' ? 'produced' : 'fed'
+    return { flow, watts: Math.abs(power) }
 }
 
 const clockFormatter = new Intl.DateTimeFormat('en-GB', {

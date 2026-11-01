@@ -180,11 +180,11 @@ export function BuildingFormModal({ isOpen, zevId, building, isPending, onClose,
                     <legend className="muted" style={{ padding: 0, marginBottom: '0.25rem' }}>{t('pages.meteringPoints.buildings.location')}</legend>
                     <label>
                         <span>{t('pages.meteringPoints.buildings.latitude')}</span>
-                        <input inputMode="decimal" value={latitudeText} onChange={(event) => setLatitudeText(event.target.value)} placeholder="47.37691" />
+                        <input inputMode="decimal" value={latitudeText} onChange={(event) => setLatitudeText(event.target.value)} />
                     </label>
                     <label>
                         <span>{t('pages.meteringPoints.buildings.longitude')}</span>
-                        <input inputMode="decimal" value={longitudeText} onChange={(event) => setLongitudeText(event.target.value)} placeholder="8.54169" />
+                        <input inputMode="decimal" value={longitudeText} onChange={(event) => setLongitudeText(event.target.value)} />
                     </label>
                     <div className="grid-span-full actions-row actions-row-wrap">
                         <button

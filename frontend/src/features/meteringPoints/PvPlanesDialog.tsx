@@ -8,7 +8,7 @@ import { queryKeys } from '../../lib/api/queryKeys'
 import { createPvPlane, deletePvPlane, fetchPvPlanes, updatePvPlane } from '../../lib/api/zev'
 import { azimuthLabelKey, planeFieldProblems, planeInput, type PlaneDraft, PLANE_LIMITS } from '../../lib/pvPlanes'
 import { useToast } from '../../lib/toast'
-import type { MeteringPoint, PvPlane } from '../../types/api'
+import type { Building, MeteringPoint, PvPlane } from '../../types/api'
 
 const emptyDraft = (): PlaneDraft => ({ label: '', kwp: '', tilt: '30', azimuth: '0' })
 
@@ -16,8 +16,18 @@ function draftOf(plane: PvPlane): PlaneDraft {
     return { label: plane.label, kwp: plane.peak_power_kwp, tilt: String(plane.tilt_deg), azimuth: String(plane.azimuth_deg) }
 }
 
+interface Props {
+    point: MeteringPoint
+    canWrite: boolean
+    /** The plant's building, once known: the forecast also needs its location, which is only asked for while it is missing. */
+    building?: Building
+    /** Leave the dialog for the building's own form, where the location is set. */
+    onEditBuilding?: (building: Building) => void
+    onClose: () => void
+}
+
 /** What the forecast needs from a plant: its roof planes (size, tilt, direction). The building's location is set on the building. */
-export function PvPlanesDialog({ point, canWrite, onClose }: { point: MeteringPoint; canWrite: boolean; onClose: () => void }) {
+export function PvPlanesDialog({ point, canWrite, building, onEditBuilding, onClose }: Props) {
     const { t } = useTranslation()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
@@ -147,7 +157,16 @@ export function PvPlanesDialog({ point, canWrite, onClose }: { point: MeteringPo
                         {full && <small className="muted">{t('pages.meteringPoints.planes.max', { count: PLANE_LIMITS.maxPerPoint })}</small>}
                     </div>
                 )}
-                <p className="muted m-0">{t('pages.meteringPoints.planes.locationHint')}</p>
+                {building && (!building.latitude || !building.longitude) && (
+                    <div className="actions-row actions-row-wrap">
+                        <p className="muted m-0">{t('pages.meteringPoints.planes.locationHint')}</p>
+                        {canWrite && onEditBuilding && (
+                            <button type="button" className="button button-secondary button-compact" onClick={() => onEditBuilding(building)}>
+                                {t('pages.meteringPoints.planes.editBuilding')}
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
         </FormModal>
     )

@@ -378,59 +378,65 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
                             {t('supplementary.live.revoke')}
                         </button>
                     )}
-                    {!disconnected && (
-                        <button
-                            type="button"
-                            className={small}
-                            disabled={busy}
-                            onClick={() =>
-                                confirm({
-                                    title: t('supplementary.confirm.disconnectTitle'),
-                                    message: t(hasHistory ? 'supplementary.confirm.disconnectMessage' : source.provides_live ? 'supplementary.live.confirm.disconnectMessage' : 'supplementary.forecast.confirm.disconnectMessage'),
-                                    confirmText: t('supplementary.actions.disconnect'),
-                                    isDangerous: false,
-                                    onConfirm: () => disconnect.mutate(),
-                                })
-                            }
-                        >
-                            {t('supplementary.actions.disconnect')}
-                        </button>
-                    )}
-                    {source.provides_history && (
+                </div>
+            )}
+            {canManage && (
+                <Disclosure summary={t('supplementary.source.endTitle')} defaultOpen={disconnected}>
+                    <div className="actions-row actions-row-wrap">
+                        {!disconnected && (
+                            <button
+                                type="button"
+                                className={small}
+                                disabled={busy}
+                                onClick={() =>
+                                    confirm({
+                                        title: t('supplementary.confirm.disconnectTitle'),
+                                        message: t(hasHistory ? 'supplementary.confirm.disconnectMessage' : source.provides_live ? 'supplementary.live.confirm.disconnectMessage' : 'supplementary.forecast.confirm.disconnectMessage'),
+                                        confirmText: t('supplementary.actions.disconnect'),
+                                        isDangerous: false,
+                                        onConfirm: () => disconnect.mutate(),
+                                    })
+                                }
+                            >
+                                {t('supplementary.actions.disconnect')}
+                            </button>
+                        )}
+                        {source.provides_history && (
+                            <button
+                                type="button"
+                                className="button button-danger button-compact"
+                                disabled={busy}
+                                onClick={() =>
+                                    confirm({
+                                        title: t('supplementary.confirm.deleteDataTitle'),
+                                        message: t('supplementary.confirm.deleteDataMessage'),
+                                        confirmText: t('supplementary.actions.deleteData'),
+                                        isDangerous: true,
+                                        onConfirm: () => purge.mutate(),
+                                    })
+                                }
+                            >
+                                {t('supplementary.actions.deleteData')}
+                            </button>
+                        )}
                         <button
                             type="button"
                             className="button button-danger button-compact"
                             disabled={busy}
                             onClick={() =>
                                 confirm({
-                                    title: t('supplementary.confirm.deleteDataTitle'),
-                                    message: t('supplementary.confirm.deleteDataMessage'),
-                                    confirmText: t('supplementary.actions.deleteData'),
+                                    title: t('supplementary.confirm.removeTitle'),
+                                    message: t(hasHistory ? 'supplementary.confirm.removeMessage' : source.provides_live ? 'supplementary.live.confirm.removeMessage' : 'supplementary.forecast.confirm.removeMessage'),
+                                    confirmText: t('supplementary.actions.remove'),
                                     isDangerous: true,
-                                    onConfirm: () => purge.mutate(),
+                                    onConfirm: () => remove.mutate(),
                                 })
                             }
                         >
-                            {t('supplementary.actions.deleteData')}
+                            {t('supplementary.actions.remove')}
                         </button>
-                    )}
-                    <button
-                        type="button"
-                        className="button button-danger button-compact"
-                        disabled={busy}
-                        onClick={() =>
-                            confirm({
-                                title: t('supplementary.confirm.removeTitle'),
-                                message: t(hasHistory ? 'supplementary.confirm.removeMessage' : source.provides_live ? 'supplementary.live.confirm.removeMessage' : 'supplementary.forecast.confirm.removeMessage'),
-                                confirmText: t('supplementary.actions.remove'),
-                                isDangerous: true,
-                                onConfirm: () => remove.mutate(),
-                            })
-                        }
-                    >
-                        {t('supplementary.actions.remove')}
-                    </button>
-                </div>
+                    </div>
+                </Disclosure>
             )}
         </div>
     )

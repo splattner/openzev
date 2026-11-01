@@ -1,7 +1,7 @@
 import { act, createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MyMeteringPointsPage } from '../src/pages/MyMeteringPointsPage'
-import type { EligibleMeteringPoint, MeteringPoint } from '../src/types/api'
+import type { EligibleMeteringPoint, MeteringPoint, SupplementarySource } from '../src/types/api'
 import { queryKeys } from '../src/lib/api/queryKeys'
 import { renderWithProviders } from './helpers/render'
 import { waitForCondition } from './helpers/waitForCondition'
@@ -92,16 +92,48 @@ describe('MyMeteringPointsPage', () => {
     })
 
     it('tells the participant who to ask to flag a meter', async () => {
+        // A meter that can only have live data and nothing connected: no own system behind it yet.
+        api.fetchEligibleOrNull.mockResolvedValue([{ ...eligible('1'), eligible_capabilities: ['live'] }])
         const { container } = await mount()
 
         expect(container.textContent).toContain('pages.myMeteringPoints.flagHint')
+    })
+
+    it('describes the energy data of a meter with a history', async () => {
+        const { container } = await mount()
+
         expect(container.textContent).toContain('supplementary.section.description')
     })
 
-    it('shows the connections overview with the feature on and hides it with the feature off', async () => {
-        const on = await mount()
-        expect(on.container.textContent).toContain('pages.myMeteringPoints.connections.title')
-        expect(on.container.textContent).toContain('pages.myMeteringPoints.connections.empty')
+    it('stops telling the participant to ask for a flag once an own system is flagged or connected', async () => {
+        api.fetchEligibleOrNull.mockResolvedValue([{ ...eligible('1'), eligible_capabilities: ['history', 'live'] }])
+        const flagged = await mount()
+        expect(flagged.container.textContent).not.toContain('pages.myMeteringPoints.flagHint')
+
+        api.fetchEligibleOrNull.mockResolvedValue([{ ...eligible('1'), eligible_capabilities: ['live'] }])
+        api.listSupplementarySources.mockResolvedValue([{
+            id: 's1', zev: 'zev-1', target: 'metering_point', held_by: 'participant', metering_point: '1', metering_point_meter_id: 'CH-1',
+            provides_history: false, provides_live: true, provides_forecast: false, provider: 'push', enabled: true, status: 'ok',
+        } as SupplementarySource])
+        const connected = await mount()
+        // The hint is there until the source list has answered.
+        await waitForCondition(() => !connected.container.textContent?.includes('pages.myMeteringPoints.flagHint'), 'the hint to go once a source is connected')
+    })
+
+    it('shows the connections overview from two connections on, and never with the feature off', async () => {
+        const source = (id: string, meter: string): SupplementarySource => ({
+            id, zev: 'zev-1', target: 'metering_point', held_by: 'participant', metering_point: meter, metering_point_meter_id: `CH-${meter}`,
+            participant: 'p-1', provides_history: true, provides_live: false, provides_forecast: false, provider: 'push', label: '', enabled: true, status: 'ok',
+        } as SupplementarySource)
+        api.fetchEligibleOrNull.mockResolvedValue([eligible('1'), eligible('3')])
+
+        api.listSupplementarySources.mockResolvedValue([source('s1', '1')])
+        const single = await mount()
+        expect(single.container.textContent).not.toContain('pages.myMeteringPoints.connections.title')
+
+        api.listSupplementarySources.mockResolvedValue([source('s1', '1'), source('s3', '3')])
+        const two = await mount()
+        expect(two.container.textContent).toContain('pages.myMeteringPoints.connections.title')
 
         api.fetchEligibleOrNull.mockResolvedValue(null)
         const off = await mount()

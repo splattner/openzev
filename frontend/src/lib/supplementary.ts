@@ -64,6 +64,28 @@ export function statusTone(status: SupplementaryStatus | null | undefined): Stat
     }
 }
 
+/** What is wrong with one capability of a source, for text next to it; `muted` is a note, not a problem. */
+export interface CapabilityProblem {
+    tone: 'error' | 'warning' | 'muted'
+    labelKey: string
+}
+
+/**
+ * The one thing to say about a capability of a source, or `null` while it simply works (UI patterns §10.1:
+ * the normal state is undecorated). A source switched off or needing a new key is the whole source's problem.
+ */
+export function capabilityProblem(source: SupplementarySource, capability: 'history' | 'live' | 'forecast'): CapabilityProblem | null {
+    if (!source.enabled) return { tone: 'muted', labelKey: 'supplementary.status.disabled' }
+    if (source.status === 'reconnect_required') return { tone: 'error', labelKey: 'supplementary.status.reconnect_required' }
+    if (source.status === 'error') return { tone: 'warning', labelKey: 'supplementary.status.error' }
+    if (capability === 'live') {
+        if (source.live_state === 'stale') return { tone: 'warning', labelKey: 'live.state.stale' }
+        if (source.live_state === 'never') return { tone: 'muted', labelKey: 'live.state.never' }
+        return null
+    }
+    return source.status === 'pending' ? { tone: 'muted', labelKey: 'supplementary.status.pending' } : null
+}
+
 export const STATUS_BADGE_CLASS: Record<StatusTone, string> = {
     success: 'badge badge-success',
     warning: 'badge badge-warning',
