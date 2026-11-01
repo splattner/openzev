@@ -317,10 +317,10 @@ switching, X takes it back); the pane sits beside the cards from 60rem of conten
 and replaces them below; focus goes to the title and back to the control that
 opened it; the open card and button are marked; a typed and unsaved key is a
 draft the guard asks about. Focus, history and scroll handling is now repeated
-in three pages and is the candidate for a shared hook. The managers' dialogs
-(a ZEV-operated meter's **Live data**, the grid connection card) keep a dialog:
-they open from a menu or a card on a page whose list has its own filters, with no
-record of that list to place a pane against.
+in three pages, now one hook for the sources (`useSourcePane`). The managers' dialogs
+The managers' **Energy data** tab of the ZEV settings is the fourth adopter (a list of
+sources with the same pane; `useSourcePane` is the extracted hook): the community's
+sources moved there from the metering-point list, which no longer carries energy data.
 
 The metering-gaps drawer became a
 `FormModal` (`MeteringGapsModal`, size `xs`): it opens from a table row with no
@@ -441,8 +441,9 @@ what its owner can do to it (an energy source is the example), has this shape:
 - A header that names the record and one facts line (the tariff pane's shape), then
   status and facts as short blocks, one per thing it provides; a problem as
   `IssueText` or a banner, never a row of state pills, and nothing at all for what
-  works. Technical details (ids, token prefixes, endpoints) are secondary material:
-  one closed `Disclosure`.
+  works. Substantial technical details (ids, token prefixes, endpoints) are
+  secondary material in one closed `Disclosure`; short facts that fit stay
+  visible (§10.3 rule 3).
 - **Actions:** at most one visible button, the one that keeps it working right now
   (sync, or reconnect when it no longer works), and an `ActionMenu` ("⋯") with
   everything else in sections (connection, data, end). Ending it (disconnect,

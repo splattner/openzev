@@ -773,7 +773,7 @@ export const fr = {
             empty: {
                 title: 'Pas encore de source en direct',
                 manager: 'L\'énergie en direct montre ce que votre communauté produit et consomme à l\'instant, à partir de sources qui transmettent en temps réel. Connectez une source en direct à un point de mesure pour l\'afficher ici.',
-                managerAction: 'Aller aux points de mesure',
+                managerAction: 'Aller aux données énergétiques',
                 participant: 'L\'énergie en direct montre ce que votre communauté produit et consomme à l\'instant. Elle apparaît dès qu\'une source en direct est connectée, par exemple pour votre propre compteur.',
                 participantAction: 'Aller à mes points de mesure',
             },
@@ -3098,6 +3098,7 @@ export const fr = {
                 documentsEmails: 'Documents et e-mails',
                 auditLog: 'Journal d\'audit',
                 exportTransfer: 'Export / transfert',
+                energyData: 'Données énergétiques',
             },
             sections: {
                 general: 'Paramètres généraux du RCP',
@@ -4025,6 +4026,21 @@ export const fr = {
                 stopHistoryMessage: 'La source reste connectée pour vos données en direct. Aucun nouveau relevé n\'est accepté ; les relevés déjà collectés sont conservés.',
             },
         },
+        zev: {
+            off: 'Les données énergétiques ne sont pas activées sur cette instance.',
+            description: 'Sources qui transmettent des valeurs mesurées par des appareils. Les participants connectent les leurs sous « Mes points de mesure » ; ici vous connectez celles de la communauté (points de mesure sans titulaire, point de raccordement au réseau) et pouvez désactiver ou supprimer la source d\'un participant. Uniquement pour l\'affichage et les statistiques, jamais pour la facturation.',
+            descriptionReadOnly: 'Sources qui transmettent des valeurs mesurées par des appareils. Uniquement pour l\'affichage et les statistiques, jamais pour la facturation.',
+            connect: 'Connecter une source',
+            nothingToConnect: 'Il n\'y a plus rien à connecter.',
+            connectTitle: 'Connecter une source de la communauté',
+            target: 'Sur quoi la source fournit-elle des valeurs ?',
+            pickTarget: 'Choisir un point de mesure ou le point de raccordement au réseau',
+            empty: {
+                title: 'Aucune source de données énergétiques',
+                manager: 'Connectez des données en direct pour les points de mesure sans titulaire et pour le point de raccordement au réseau. Les participants connectent les leurs sous « Mes points de mesure ».',
+                other: 'Dès qu\'une source est connectée, elle apparaît ici.',
+            },
+        },
         section: {
             loadError: 'Les sources de données énergétiques n\'ont pas pu être chargées.',
             eligibilityError: 'Impossible de vérifier si les données énergétiques sont disponibles.',
@@ -4162,17 +4178,8 @@ export const fr = {
             moreErrors: '…et {{count}} autre(s).',
         },
         owner: {
-            chip: 'Données énergétiques : {{status}}',
-            chipHint: 'Ouvrir l\'état de la source de données énergétiques de ce point de mesure',
-            noSource: 'Aucune source de données énergétiques',
-            noSourceHint: 'Le participant peut en connecter une sous « Mes points de mesure ». Les données énergétiques sont facultatives.',
-            connectOwn: 'Connecter vos données énergétiques',
-            connectOwnHint: 'C\'est votre propre point de mesure : configurez ses données énergétiques sous « Mes points de mesure »',
             manageOwn: 'Gérer sous « Mes points de mesure »',
-            title: 'Source de données énergétiques de {{meter}}',
             readOnlyNote: '{{name}} a connecté cette source. Vous voyez son état, pas l\'accès, et ne pouvez pas modifier la connexion elle-même.',
-            provider: 'Source',
-            status: 'État',
             disable: 'Désactiver',
             enable: 'Activer',
             deleteDataMessage: 'Tous les relevés collectés depuis le système de {{name}} sont définitivement supprimés.',
@@ -4220,15 +4227,6 @@ export const fr = {
             revoke: 'Révoquer le jeton',
             revoked: 'Le jeton push a été révoqué.',
             lastValue: 'Dernière valeur',
-            dialogTitle: 'Données en direct de {{meter}}',
-            dialogTitleWithForecast: 'Données en direct et prévision de {{meter}}',
-            chip: {
-                fresh: 'En direct',
-                stale: 'En direct : pas récent',
-                never: 'En direct : aucune donnée',
-            },
-            chipHint: 'Fraîcheur des données en direct de ce point de mesure',
-            chipOpenHint: 'Ouvrir les données en direct de ce point de mesure',
             confirm: {
                 stopTitle: 'Arrêter les données en direct ?',
                 stopMessage: 'La source reste connectée pour vos données d\'historique. Les valeurs en direct ne sont plus reçues ni affichées.',
@@ -4240,10 +4238,7 @@ export const fr = {
             },
         },
         connection: {
-            details: 'Détails',
-            title: 'Point de raccordement au réseau',
             description: 'Communique la puissance nette au raccordement du ZEV au réseau, afin que la vue en direct puisse montrer combien le ZEV consomme.',
-            notConnected: 'Aucune source en direct n\'est encore connectée au point de raccordement au réseau.',
             connect: 'Connecter le point de raccordement',
         },
         gross: {

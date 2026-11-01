@@ -42,8 +42,7 @@ button **View meter data**, which opens the chart of the readings billing is bas
 shown and used for statistics, never for billing, so the button does not show those figures.
 
 If you are a ZEV manager and hold a metering point yourself, you connect it the
-same way as any participant: **My metering points** appears in your menu, and the
-metering point list links your own meter there.
+same way as any participant: **My metering points** appears in your menu.
 
 When you no longer hold the metering point (the assignment ends), the connection
 is switched off by itself, the key is deleted, and nothing new is collected. The
@@ -93,7 +92,7 @@ Assistant, Shelly, a script) sends the current power with a push token, as descr
 point could provide both history and live data and neither is connected yet, a single **Connect energy
 data** at the bottom of the card starts both together; with only one missing, the **Connect** in its row
 is the only button. A community manager connects live data for meters nobody holds personally and for
-the grid connection point from the metering point list (**Live data** in the row's menu).
+the grid connection point on the **Energy data** tab of the settings (below).
 
 ### What is stored
 
@@ -328,6 +327,21 @@ delete data or remove the source. The Solar Manager ID, the token and the addres
 quiet, is shown in colour. If you have typed a new Solar Manager key and not saved it, closing asks before it is lost. After you
 connect a source, it opens there by itself.
 
+## The community's sources (managers)
+
+The metering point list shows nothing about energy data. What a manager looks after is on the **Energy data** tab of
+**Settings** (it appears while the feature is on): every source of the community in one list, the grid connection point
+first, with who holds it and what it provides. Nothing is coloured while a source works; a source that has gone quiet or
+failed shows its problem in red text. Choose a source to open its details beside the list.
+
+- **Your community's own sources.** **Connect a source** connects live data for a metering point nobody holds
+  personally (a common area, a spare meter), the production forecast of such a plant, or the grid connection point. You
+  have every action there, as a participant has on their own source.
+- **A participant's source.** You see its state and can **switch it off** (or on again), **delete its data** or
+  **remove** it, each after a confirmation. The key, the push token and the connection itself stay the participant's.
+  If you hold the meter yourself, the details point you to **My metering points**.
+- **Viewers** see the list and the state, without any action.
+
 ## Disconnect, delete, remove
 
 | Action | Stops new data | Deletes data | Keeps the connection |
@@ -337,8 +351,8 @@ connect a source, it opens there by itself.
 | **Remove source** | yes | yes, all readings | no |
 
 In the source's details these three are the last section of the **⋯** menu, in red, away from
-the everyday actions, and each asks for confirmation. A ZEV manager sees the same buttons for a participant's source, except for the
-ones that touch the key. Deleting a participant or a metering point deletes their
+the everyday actions, and each asks for confirmation. A ZEV manager can switch a participant's source off or on,
+delete its data or remove it (on the **Energy data** tab below), but cannot disconnect it, test it or touch its key. Deleting a participant or a metering point deletes their
 sources and readings with them.
 
 ## Troubleshooting

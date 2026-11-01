@@ -1,4 +1,5 @@
 import { useEffect, useState, type Ref } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faEllipsis } from '@fortawesome/free-solid-svg-icons'
@@ -39,6 +40,12 @@ interface DetailsProps {
     onDirtyChange?: (dirty: boolean) => void
     /** Name the source at the top of the body, for a host whose own title does not (a dialog). */
     identity?: boolean
+    /**
+     * Somebody else's source, seen by a manager of the community: they switch it off or on, delete its data or
+     * remove it, never test it, change its key or its capabilities (the account is the participant's). `own` says
+     * the signed-in user is that participant, who manages it on My metering points instead.
+     */
+    onBehalfOf?: { name: string | null; own: boolean }
 }
 
 const NO_CAPABILITY: PointEligibility = { history: false, live: false }
@@ -48,7 +55,7 @@ const NO_CAPABILITY: PointEligibility = { history: false, live: false }
  * body of `SourceDialog`, and of a host that already is a dialog. The one-time token of a rotation
  * lives here, above everything a refetch can change, and the credential is never shown.
  */
-export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confirm, canManage, onGone, onDirtyChange, identity = false }: DetailsProps) {
+export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confirm, canManage, onGone, onDirtyChange, identity = false, onBehalfOf }: DetailsProps) {
     const { t } = useTranslation()
     const { isImpersonating } = useAuth()
     const { settings } = useAppSettings()
@@ -65,7 +72,7 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
         return () => onDirtyChange?.(false)
     }, [keyDraft, onDirtyChange])
 
-    const { test, sync, replaceKey, disconnect, purge, remove, rotate, revoke, capability, busy } = useSourceActions(source, {
+    const { test, sync, replaceKey, setEnabled, disconnect, purge, remove, rotate, revoke, capability, busy } = useSourceActions(source, {
         onToken: setToken,
         onGone,
         onKeyReplaced: () => {
@@ -100,16 +107,17 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
     const confirmCapability = (options: Omit<ConfirmOptions, 'isDangerous'>) => confirm({ ...options, isDangerous: false })
 
     // One visible action: what keeps the connection working right now. Everything else is in the menu.
-    const needsNewKey = isSolar && (disconnected || source.status === 'reconnect_required')
-    const canSync = (isSolar || isForecastSolar) && !disconnected && (hasHistory || source.provides_forecast) && source.status !== 'reconnect_required'
+    const limited = !!onBehalfOf
+    const needsNewKey = !limited && isSolar && (disconnected || source.status === 'reconnect_required')
+    const canSync = !limited && (isSolar || isForecastSolar) && !disconnected && (hasHistory || source.provides_forecast) && source.status !== 'reconnect_required'
     const blocked = busy || isImpersonating
     const section = {
         connection: t('supplementary.source.menu.connection'),
         data: t('supplementary.source.menu.data'),
         end: t('supplementary.source.menu.end'),
     }
-    const menu: ActionMenuItem[] = []
-    const item = (entry: ActionMenuItem) => menu.push(entry)
+    const fullMenu: ActionMenuItem[] = []
+    const item = (entry: ActionMenuItem) => fullMenu.push(entry)
     if ((isSolar || isForecastSolar) && !disconnected) {
         item({ key: 'test', section: section.connection, label: test.isPending ? t('supplementary.actions.testing') : t('supplementary.actions.test'), disabled: busy, onClick: () => test.mutate() })
     }
@@ -244,8 +252,38 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
         }),
     })
 
+    // Somebody else's source: the manager's own rights only (switch off or on, delete the data, remove).
+    const name = onBehalfOf?.name ?? ''
+    const limitedMenu: ActionMenuItem[] = [
+        {
+            key: 'toggle', section: section.connection, label: t(source.enabled ? 'supplementary.owner.disable' : 'supplementary.owner.enable'), disabled: busy,
+            onClick: () => setEnabled.mutate(!source.enabled),
+        },
+        ...(source.provides_history ? [{
+            key: 'delete-data', section: section.end, label: t('supplementary.actions.deleteData'), danger: true, disabled: busy,
+            onClick: () => confirm({
+                title: t('supplementary.confirm.deleteDataTitle'),
+                message: t('supplementary.owner.deleteDataMessage', { name }),
+                confirmText: t('supplementary.actions.deleteData'),
+                isDangerous: true,
+                onConfirm: () => purge.mutate(),
+            }),
+        }] : []),
+        {
+            key: 'remove', section: section.end, label: t('supplementary.actions.remove'), danger: true, disabled: busy,
+            onClick: () => confirm({
+                title: t('supplementary.confirm.removeTitle'),
+                message: t('supplementary.owner.removeMessage', { name }),
+                confirmText: t('supplementary.actions.remove'),
+                isDangerous: true,
+                onConfirm: () => remove.mutate(),
+            }),
+        },
+    ]
+    const menu = limited ? limitedMenu : fullMenu
+
     const capabilities = { history: source.provides_history, live: source.provides_live }
-    const hasTechnical = isSolar || (isPush && !!source.push_token_prefix)
+    const hasTechnical = !limited && (isSolar || (isPush && !!source.push_token_prefix))
 
     return (
         <div className="source-details">
@@ -264,6 +302,13 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
                 </div>
             )}
             {disconnected && <p className="muted m-0">{t('supplementary.disconnectedNote')}</p>}
+            {onBehalfOf && (
+                <p className="muted m-0">
+                    {onBehalfOf.own
+                        ? <Link to="/me/metering-points">{t('supplementary.owner.manageOwn')}</Link>
+                        : t('supplementary.owner.readOnlyNote', { name: onBehalfOf.name ?? '' })}
+                </p>
+            )}
 
             {canManage && (
                 <div className="actions-row actions-row-wrap">

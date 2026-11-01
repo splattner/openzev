@@ -1,17 +1,15 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { Notice } from '../components/Notice'
 import { PageHeader } from '../components/PageHeader'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { ScopeGuard } from '../components/ScopeGuard'
-import { allowNavigation, useDraftGuard } from '../components/useDraftGuard'
 import { MyConnections } from '../features/supplementary/MyConnections'
 import { MeterDataBand } from '../features/supplementary/MeterDataBand'
 import { MeteringPointDataCard } from '../features/supplementary/MeteringPointDataCard'
 import { SourcePane } from '../features/supplementary/SourceDialog'
+import { useSelectedSourceId, useSourcePane } from '../features/supplementary/useSourcePane'
 import { queryKeys } from '../lib/api/queryKeys'
 import { listSupplementarySources } from '../lib/api/supplementary'
 import { fetchMeteringPoints } from '../lib/api/zev'
@@ -19,16 +17,11 @@ import { useCommunityAccess, useScopeNote } from '../lib/communityAccess'
 import { useManagedZev } from '../lib/managedZev'
 import { selectedCommunityName } from '../lib/membership'
 import { forecastEligible, hasCapability, historyEligible, liveEligible, useEnergyDataEligibility } from '../lib/supplementary'
-import { useMinWidth } from '../lib/useMinWidth'
-import type { MeteringPoint, SupplementarySource } from '../types/api'
-
-const SOURCE_PARAM = 'source'
+import type { MeteringPoint } from '../types/api'
 
 /** Content width from which the cards and the source pane sit side by side; below it the pane takes the area. */
 const SPLIT_MIN_REM = 60
 
-/** Marks the history entry that opening a source added, so X can take it back instead of leaving a Back step. */
-const PANE_STATE = { sourcePane: true }
 
 /**
  * The participant's own metering points (`/me/metering-points`). Where one has generation behind
@@ -79,19 +72,7 @@ function MyMeteringPointsView() {
         enabled: energyData.featureOn,
     })
 
-    // The source open in the pane lives in the URL: a reload, Back or a link reopens it. Opening it from the
-    // cards adds one history step; switching to another source while it is open replaces it (§6.2).
-    const [searchParams, setSearchParams] = useSearchParams()
-    const location = useLocation()
-    const navigate = useNavigate()
-    const selectedSourceId = searchParams.get(SOURCE_PARAM)
-    const [splitRef, fitsTwoPanes] = useMinWidth<HTMLDivElement>(SPLIT_MIN_REM)
-    const paneTitleRef = useRef<HTMLHeadingElement>(null)
-    // Focus follows the pane: to its title when it opens, back to the control that opened it when it closes.
-    const focusRequest = useRef<{ kind: 'pane' } | { kind: 'control'; id: string } | null>(null)
-    const listScroll = useRef<number | null>(null)
-    const bypassGuard = useRef(false)
-    const [paneDirty, setPaneDirty] = useState(false)
+    const selectedSourceId = useSelectedSourceId()
 
     // With the live flag on the list holds every held meter: a point is set up here only for a
     // capability it has (history behind the meter, live anywhere active); the rest stays plain.
@@ -109,65 +90,10 @@ function MyMeteringPointsView() {
         (source) => source.id === selectedSourceId && source.held_by === 'participant' && !!source.metering_point && heldById.has(source.metering_point),
     )
     const selectedPoint = selectedSource?.metering_point ? heldById.get(selectedSource.metering_point) : undefined
-    const paneOpen = !!selectedSource
-    const listHidden = paneOpen && !fitsTwoPanes
-
-    const guard = useDraftGuard({ dirty: paneDirty, confirm, bypass: bypassGuard })
-
-    function openSource(source: SupplementarySource) {
-        const fromList = !selectedSourceId
-        const apply = () => {
-            if (fromList) {
-                focusRequest.current = { kind: 'pane' }
-                if (!fitsTwoPanes) listScroll.current = window.scrollY
-            }
-            allowNavigation(bypassGuard, () => setSearchParams((previous) => {
-                const next = new URLSearchParams(previous)
-                next.set(SOURCE_PARAM, source.id)
-                return next
-            }, { replace: !fromList, state: fromList ? PANE_STATE : location.state }))
-        }
-        if (source.id === selectedSourceId) return
-        guard.run(apply)
-    }
-
-    // X takes back the step opening added; a pane reached by a link has no step of ours behind it.
-    function closePane() {
-        guard.run(() => {
-            if (selectedSourceId) focusRequest.current = { kind: 'control', id: selectedSourceId }
-            if (location.state?.sourcePane) {
-                navigate(-1)
-                return
-            }
-            setSearchParams((previous) => {
-                const next = new URLSearchParams(previous)
-                next.delete(SOURCE_PARAM)
-                return next
-            }, { replace: true })
-        })
-    }
-
-    useEffect(() => {
-        const request = focusRequest.current
-        if (!request) return
-        if (request.kind === 'pane' && paneOpen) {
-            // Beside the cards the pane is already in view; only one that replaces them needs scrolling to.
-            paneTitleRef.current?.focus({ preventScroll: fitsTwoPanes })
-        } else if (request.kind === 'control' && !paneOpen) {
-            document.querySelector<HTMLElement>(`[data-source-open="${CSS.escape(request.id)}"]`)?.focus()
-        } else {
-            return
-        }
-        focusRequest.current = null
-    }, [paneOpen, fitsTwoPanes])
-
-    // The cards come back where the user left them.
-    useLayoutEffect(() => {
-        if (!listHidden && listScroll.current !== null) {
-            window.scrollTo(0, listScroll.current)
-            listScroll.current = null
-        }
-    }, [listHidden])
+    // The source open beside the cards (SPEC-2026-10-ui-patterns §6.2); its id lives in the URL.
+    const { splitRef, fitsTwoPanes, listHidden, paneTitleRef, setPaneDirty, openSource, closePane } = useSourcePane({
+        splitMinRem: SPLIT_MIN_REM, confirm, selectedSourceId, paneOpen: !!selectedSource,
+    })
 
     const loading = energyData.isLoading || (isParticipantScope && pointsQuery.isLoading)
     if (loading) return <PageSkeleton variant="cardList" />
@@ -198,7 +124,7 @@ function MyMeteringPointsView() {
                 ref={splitRef}
                 className="detail-split"
                 data-layout={fitsTwoPanes ? 'wide' : 'narrow'}
-                data-pane={paneOpen ? 'open' : 'closed'}
+                data-pane={selectedSource ? 'open' : 'closed'}
             >
                 <div className="detail-split-list page-stack" hidden={listHidden}>
                     {sourcesQuery.isError && <div className="error-banner" role="alert">{t('supplementary.section.loadError')}</div>}

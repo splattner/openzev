@@ -142,8 +142,9 @@ own system). Rule (`showMyEnergyEntry` in `lib/myEnergy.ts`):
 shown when `/live/enabled/` answers `true`, **or** the energy data feature is on (`/supplementary/sources/eligible/`
 answers `200`) and the user has community-wide access (manager, viewer, admin) or holds a meter an own
 system can be connected to (`historyEligible`); never for a former participant. Live setup sits on
-`/me/metering-points` (holders) and `/metering/points` (managers); the connection point and PV planes on
-the metering-point and ZEV settings screens (§7).
+`/me/metering-points` (holders) and, for the community's own sources, the **Energy data** tab of the ZEV
+settings (`/zev-settings/energy`, managers; §7.3); PV planes are on the metering-point list, building coordinates
+on the building form. The metering-point list itself says nothing about live or history data.
 
 **Feature flag:** new `FeatureFlag.LIVE_ENERGY_DATA_ENABLED` (`"live_energy_data_enabled"`, env
 override `FEATURE_LIVE_ENERGY_DATA_ENABLED`, default **off**). Effective only while
@@ -731,11 +732,10 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
   meter), *from the grid* / *to the grid* (grid connection point); a power that rounds to `0.0` has no direction. A
   point without a source (`source_id` null, a metering point) gets a note beside its state: a point with a personal
   holder says "the participant connects it" (muted); a point nobody holds gives a manager (`canManage`) a
-  **Connect** link to `/metering/points?search=<meter id>` and a viewer nothing. From 640 px down the columns give way to one small
+  **Connect** link to the Energy data tab of the ZEV settings (`/zev-settings/energy`) and a viewer nothing. From 640 px down the columns give way to one small
   card per point (`.live-points-list`), so the kW is never behind a horizontal scroll. The state is text
   (`LiveStateBadge`): a current value is plain, a source gone quiet is an `IssueText` warning and a point with no data a
-  muted note; no coloured pill (UI patterns §10.1). `LiveStateChip` on the metering-point rows is a `badge-tag`
-  while values come in and an `IssueText` while stale.
+  muted note; no coloured pill (UI patterns §10.1).
 - `ProductionForecastChart.tsx` (`features/live/`, the body of the **Tomorrow** tab, §7.1 structure; it replaces the separate forecast card of the first cut): the title "Expected
   production" with "as of hh:mm", the next peak window in bold ("Highest production expected today 10:00-14:00",
   "tomorrow" or the date), hourly bars in kW (hours already past lighter) with the min/max band as an area only where the
@@ -761,7 +761,7 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
      polls only while mounted and asks for the snapshot only once `/live/enabled/` answered `true`.
      Failure -> error `Notice` (`pages.live.loadFailed`); live off -> a muted line
      `pages.live.disabled`; loading -> `PageSkeleton`; snapshot `null` -> `Notice` `pages.live.unavailable`;
-     `coverage.live_sources === 0` -> `EmptyState` `pages.live.empty.*` linking to `/metering/points`
+     `coverage.live_sources === 0` -> `EmptyState` `pages.live.empty.*` linking to `/zev-settings/energy`
      (`isZevScope`) or `/me/metering-points`. None of these hides the views below.
   3. *Range tabs* `AppTabs` (Today | Tomorrow | 7 days | Period, `keepMounted={false}`), the choice in the URL as
      `?range=tomorrow|week|period` (absent = `today`, `parseMyEnergyRange`; tab changes push history entries). The
@@ -865,9 +865,10 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   saved is a draft: closing the pane, opening another source or leaving the page asks first (`useDraftGuard`, fed by
   `SourceDetails`' `onDirtyChange`). Connecting stays a dialog: after it closes the new source opens in the pane
   (`SupplementarySourceModal`'s `onConnected`). That is a deliberate exception to rule F: the connect flow is a short
-  task that creates the record, with its own steps (what, how, consent, one-time token). The managers' **Live data**
-  dialog and the grid connection card on the metering-point page still open the source in a `SourceDialog`
-  (same body), because they open from a menu or a card of a list that has its own filters, not from a record of it.
+  task that creates the record, with its own steps (what, how, consent, one-time token). The managers' Energy data
+  tab (§7.3) uses the same pane and hook (`useSourcePane`, `useSelectedSourceId`: the `?source=` selection, history step,
+  focus, scroll and the draft guard); `SourceDialog` (a `FormModal` around the same body) is left for hosts that have
+  no list to place a pane against.
 - **`SourceDialog`** (`features/supplementary/SourceDialog.tsx`; `SourceDetails` is its body, shared with the pane)
   holds everything about one source, laid out as a manage surface (UI patterns §9): the pane's header (a `tone="brand"`
   `DetailPane`) names the source ("Solar Manager · Roof") with a facts line (the meter and what it provides); the dialog
@@ -922,27 +923,32 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   consent box is ticked, with `modal.needsConsent` saying so.
 - **`/me/metering-points`**: per held point with a capability exactly one `MeteringPointDataCard`; a
   point with no capability stays a plain card.
-- **`/metering/points`** (`features/meteringPoints/LiveSetup.tsx`; all of it only while
-  `useLiveEnabled` is true): `LiveStateChip` on every row with a non-null `live_state` (in the id line,
-  so both the table and the narrow layout show it; plain text for viewers); for a manager, a **Live
-  data** entry in the point menu and on the chip for points in `fetchZevEligibleSources(zevId)` with the
-  `live` capability (queried only with write scope). Container: a **dialog** (`FormModal`), like the
-  existing source status panel on the same row. `PointLiveDialog` is one dialog whose content follows
-  the user's own choices (`rows`, `source`, `connect`), never the source list: a point without a live
-  source starts in the connect flow (`holder="zev"`, live only, drawn in the dialog's own `FormModal`),
-  one with a source starts on its single **Live (now)** row (`CapabilityRows`, no history row), whose
-  source button shows `SourceDetails` with a Back button; so the token screen survives the refetch and
-  no dialog opens over a dialog (only confirmations). `ConnectionPointCard` ("Grid connection point")
-  sits above the toolbar and keeps its own card: a manager sees it while `connection_point.available`
-  or a source exists (so never in a vZEV), with Connect or the live source's state, last value and a
-  **Details** button that opens `SourceDialog`; a viewer sees it read-only (state only, no buttons) only
-  when a source exists.
+- **`/metering/points`** shows nothing of live or history data: no live chip on the rows, no "Energy data" badge in the
+  expanded row, no **Live data** menu entry and no grid-connection card (they moved to the Energy data tab, §7.3). What
+  stays is the meter itself: the **Roof planes** entry of a producing point while `useLiveEnabled` is true (the forecast
+  needs the plant's planes, which belong to the meter and its building) and the generation-behind-the-meter flag the
+  manager sets, shown as plain text next to the meter id (a classification, UI patterns §10.1).
+- **7.3 The Energy data tab of the ZEV settings** (`features/supplementary/ZevEnergySources.tsx`; the tab `energy` of
+  `/zev-settings/:tab`, shown while the energy data feature is on, and outside the settings form: no save bar). It is where
+  a manager looks after the community's sources, and what the metering-point list used to carry. A short description, then
+  every source of the selected community in one list (`source-rows`: the grid connection point first, then the meters by
+  id; each row the meter id, the holder or "ZEV-operated" and what it provides as plain text with a problem as
+  `IssueText` next to the capability it concerns, no pills) and, beside it, the source in a `SourcePane`
+  (`useSourcePane`: `?source=<id>`, from 56rem of content, focus and draft handling as on My metering points). Managers get a primary
+  **Connect a source** (live flag on; disabled with "There is nothing left to connect." when `zevEligibleByPoint` and the
+  connection point offer nothing): `ZevConnectDialog` asks what the source reports on (the grid connection point, or a meter
+  nobody holds personally with the capabilities it can still get: live, forecast), then runs the existing flows
+  (`SupplementarySourceModal` with `holder="connection-point"` or `"zev"`, `ForecastConnectDialog`), and the new source
+  opens in the pane (`onConnected`). A source the community holds shows every action of its owner. A participant's source
+  is **somebody else's** (`SourceDetails`' `onBehalfOf`): the manager's own rights only, in the menu: **Switch off** or **Switch
+  on** (`PATCH {enabled}`), **Delete data** (history) and **Remove source**, never test, sync, key, token or capabilities; the
+  pane says who connected it, and for a manager who holds the meter themselves it links to My metering points. A
+  viewer sees the list and the pane without any action. The connection point is no longer a card of its own.
 - **Eligibility semantics.** With the live flag on, `/sources/eligible/` lists every held point, so
   history logic uses `historyEligible` (capability `history`, or no `eligible_capabilities` field while
   the flag is off) and `useEnergyDataEligibility` exposes `historyEligible` and `liveEligible`;
   `canConnect` means history. The "show your real self-sufficiency" call to action
-  (`ParticipantDashboardBody`, `ManagementDashboardBody`) and the "connect your energy data" badge
-  (`SupplementarySourceStatus`) use history only. The manager's **My metering points** nav entry shows
+  (`ParticipantDashboardBody`, `ManagementDashboardBody`) uses history only. The manager's **My metering points** nav entry shows
   for any held meter with a capability (`hasCapability`), live included.
 - Every source mutation calls `invalidateSourceQueries`: `queryKeys.live.all`, the source list,
   `supplementaryEligible()`, `supplementaryZevEligibleAll()` (prefix of
@@ -957,8 +963,7 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   between that connection (default; consent checkbox, `PATCH {provides_forecast: true, consent: true}` instead of a new source) and
   forecast.solar. It creates `{provider: forecast_solar, provides_forecast: true, provides_history: false,
   provides_live: false, held_by, target: metering_point, consent: false}`. A holder's card hosts it directly; the
-  manager's **Live data** dialog of a ZEV-operated point shows `Live` and `Forecast` rows (title "Live data and forecast of
-  <meter>") and opens it with `holder="zev"`. **My connections** shows a Forecast chip (with its own status only when the source has no history) and passes the meter's forecast
+  manager's **Connect a source** dialog (§7.3) shows `Live` and `Forecast` rows for the meter chosen and opens it with `holder="zev"`. **My connections** shows a Forecast chip (with its own status only when the source has no history) and passes the meter's forecast
   eligibility to the source dialog. `SourceDialog` shows the forecast capability and its last update, **Refresh
   forecast** (`sync`) and **Test** for a forecast.solar source, and for a Solar Manager source **Also use the Solar
   Manager forecast** (consent confirmation, `PATCH {provides_forecast: true, consent: true}`) and **Stop forecast**; stopping
@@ -1242,18 +1247,18 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
   only at `exact`, the inconsistent hint, a producer's split, the connection point part, points table rows, empty curve) and `tests/live-helpers.test.ts` (16 tests: `formatKw`,
   `formatClock`, `showLiveCard` hidden for `null` or no live source, `liveCardState`, polling stops on
   `null`, curve rows with gaps, the day axis incl. the 25-hour day).
-- PR 3b added `tests/live-setup.test.ts` (18 tests: live modal payloads and consent per holder,
-  field errors, push panel endpoints, `PointLiveDialog` (connect first, token survives the refetch, a
-  live row only, details and Back), `ConnectionPointCard` visibility for manager, vZEV, flag off and
-  viewer and its source dialog), `tests/metering-point-data-card.test.ts` (46 tests: one card with
+- PR 3b added `tests/live-setup.test.ts` (13 tests: live modal payloads and consent per holder, field errors, push
+  panel endpoints; the former `PointLiveDialog` and `ConnectionPointCard` cases moved to
+  `tests/zev-energy-sources.test.ts`, 11 tests: the community's list, the connect dialog, a participant's source seen by a
+  manager, the viewer), `tests/source-pane.test.ts` (3, with the real menu), `tests/metering-point-data-card.test.ts` (46 tests: one card with
   both sources, rows per eligible capability, a shared push source in both rows opening one dialog,
   per-row Connect preselecting, the connect flow's providers per capability, one `POST` for both
   capabilities, "use my existing push source" as a `PATCH` with consent, the token screens surviving a
   refetch, impersonation, the source dialog's actions and capability switches, CSV import),
   `tests/energy-data-eligibility.test.ts` (4), eligibility helper tests in
   `tests/supplementary-helpers.test.ts`, one-card-per-point cases in
-  `tests/my-metering-points-page.test.ts`, `tests/metering-points-list.test.ts` (chip, menu entry,
-  viewer) and `tests/layout-nav.test.ts`.
+  `tests/my-metering-points-page.test.ts`, `tests/metering-points-list.test.ts` (no live or
+  history data on the list) and `tests/layout-nav.test.ts`.
 - My energy system (PR 3b): `tests/my-energy.test.ts` (24 tests: range parsing, civil-day arithmetic,
   `showMyEnergyEntry`, `ownHistoryFromSeries`, `todayRows` precedence and gaps, and `MyEnergyView`: feature
   off asks for nothing, participant's Today from the own-series endpoint with live off, the curve's own

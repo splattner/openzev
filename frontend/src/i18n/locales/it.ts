@@ -773,7 +773,7 @@ export const it = {
             empty: {
                 title: 'Ancora nessuna fonte live',
                 manager: 'L\'energia live mostra cosa la tua comunità produce e consuma in questo momento, da fonti che trasmettono in tempo reale. Collega una fonte live a un punto di misura per vederla qui.',
-                managerAction: 'Vai ai punti di misura',
+                managerAction: 'Vai ai dati energetici',
                 participant: 'L\'energia live mostra cosa la tua comunità produce e consuma in questo momento. Compare non appena è collegata una fonte live, ad esempio per il tuo contatore.',
                 participantAction: 'Vai ai miei punti di misura',
             },
@@ -3098,6 +3098,7 @@ export const it = {
                 documentsEmails: 'Documenti ed e-mail',
                 auditLog: 'Log di audit',
                 exportTransfer: 'Esportazione / trasferimento',
+                energyData: 'Dati energetici',
             },
             sections: {
                 general: 'Impostazioni generali RCP',
@@ -4025,6 +4026,21 @@ export const it = {
                 stopHistoryMessage: 'La fonte resta collegata per i tuoi dati in tempo reale. Non vengono più accettate nuove letture; quelle già raccolte vengono conservate.',
             },
         },
+        zev: {
+            off: 'I dati energetici non sono attivati su questa istanza.',
+            description: 'Fonti che trasmettono valori misurati da dispositivi. I partecipanti collegano le proprie sotto «I miei punti di misura»; qui collegate quelle della comunità (punti di misura senza titolare, punto di collegamento alla rete) e potete disattivare o rimuovere la fonte di un partecipante. Solo per la visualizzazione e le statistiche, mai per la fatturazione.',
+            descriptionReadOnly: 'Fonti che trasmettono valori misurati da dispositivi. Solo per la visualizzazione e le statistiche, mai per la fatturazione.',
+            connect: 'Collega una fonte',
+            nothingToConnect: 'Non c\'è più nulla da collegare.',
+            connectTitle: 'Collega una fonte della comunità',
+            target: 'Su cosa fornisce valori la fonte?',
+            pickTarget: 'Scegliere un punto di misura o il punto di collegamento alla rete',
+            empty: {
+                title: 'Nessuna fonte di dati energetici',
+                manager: 'Collegate dati in tempo reale per i punti di misura senza titolare e per il punto di collegamento alla rete. I partecipanti collegano i propri sotto «I miei punti di misura».',
+                other: 'Appena una fonte è collegata, compare qui.',
+            },
+        },
         section: {
             loadError: 'Impossibile caricare le fonti di dati energetici.',
             eligibilityError: 'Impossibile verificare se i dati energetici sono disponibili.',
@@ -4162,17 +4178,8 @@ export const it = {
             moreErrors: '…e altre {{count}}.',
         },
         owner: {
-            chip: 'Dati energetici: {{status}}',
-            chipHint: 'Apri lo stato della fonte di dati energetici di questo punto di misura',
-            noSource: 'Nessuna fonte di dati energetici',
-            noSourceHint: 'Il partecipante può collegarne una in «I miei punti di misura». I dati energetici sono facoltativi.',
-            connectOwn: 'Collegamento dei dati energetici',
-            connectOwnHint: 'È il suo punto di misura: configuri i dati energetici in «I miei punti di misura»',
             manageOwn: 'Gestione in «I miei punti di misura»',
-            title: 'Fonte di dati energetici di {{meter}}',
             readOnlyNote: '{{name}} ha collegato questa fonte. Vedete lo stato, non l\'accesso, e non potete modificare il collegamento stesso.',
-            provider: 'Fonte',
-            status: 'Stato',
             disable: 'Disattiva',
             enable: 'Attiva',
             deleteDataMessage: 'Tutte le letture raccolte dal sistema di {{name}} vengono eliminate definitivamente.',
@@ -4220,15 +4227,6 @@ export const it = {
             revoke: 'Revoca token',
             revoked: 'Il token push è stato revocato.',
             lastValue: 'Ultimo valore',
-            dialogTitle: 'Dati in tempo reale di {{meter}}',
-            dialogTitleWithForecast: 'Dati in tempo reale e previsione di {{meter}}',
-            chip: {
-                fresh: 'In tempo reale',
-                stale: 'In tempo reale: non recente',
-                never: 'In tempo reale: nessun dato',
-            },
-            chipHint: 'Attualità dei dati in tempo reale di questo punto di misura',
-            chipOpenHint: 'Apri i dati in tempo reale di questo punto di misura',
             confirm: {
                 stopTitle: 'Interrompere i dati in tempo reale?',
                 stopMessage: 'La fonte resta collegata per i tuoi dati storici. I valori in tempo reale non vengono più ricevuti né mostrati.',
@@ -4240,10 +4238,7 @@ export const it = {
             },
         },
         connection: {
-            details: 'Dettagli',
-            title: 'Punto di allacciamento alla rete',
             description: 'Comunica la potenza netta all\'allacciamento dello ZEV alla rete, così la vista in tempo reale può mostrare quanto consuma lo ZEV.',
-            notConnected: 'Al punto di allacciamento alla rete non è ancora collegata una fonte in tempo reale.',
             connect: 'Collega il punto di allacciamento',
         },
         gross: {

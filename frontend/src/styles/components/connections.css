@@ -178,3 +178,61 @@
     flex-basis: 100%;
   }
 }
+
+/* ── The community's sources: one row each, the source beside them ───────── */
+
+.source-rows {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.source-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.source-row:hover {
+  background: var(--surface-sunken);
+}
+
+.source-row[aria-current='true'] {
+  border-color: var(--interactive);
+}
+
+.source-row-main {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.source-row-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
+/* On a phone the button sits under the text instead of squeezing it. */
+.energy-sources-intro {
+  flex: 1 1 24rem;
+}
+
+.energy-sources-connect {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: end;
+}

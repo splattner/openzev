@@ -67,6 +67,12 @@ export function useSourceActions(source: SupplementarySource, { onToken, onGone,
         onError,
         onSettled: refresh,
     })
+    /** Switch the whole source on or off (a manager does it on somebody else's source; the credential is untouched). */
+    const setEnabled = useMutation({
+        mutationFn: (enabled: boolean) => updateSupplementarySource(source.id, { enabled }),
+        onError,
+        onSettled: refresh,
+    })
     const disconnect = useMutation({
         mutationFn: () => disconnectSupplementarySource(source.id),
         onSuccess: () => pushToast(t('supplementary.actions.disconnected'), 'success'),
@@ -116,6 +122,6 @@ export function useSourceActions(source: SupplementarySource, { onToken, onGone,
         onSettled: refresh,
     })
 
-    const busy = [test, sync, replaceKey, disconnect, purge, remove, rotate, revoke, capability].some((mutation) => mutation.isPending)
-    return { test, sync, replaceKey, disconnect, purge, remove, rotate, revoke, capability, busy }
+    const busy = [test, sync, replaceKey, setEnabled, disconnect, purge, remove, rotate, revoke, capability].some((mutation) => mutation.isPending)
+    return { test, sync, replaceKey, setEnabled, disconnect, purge, remove, rotate, revoke, capability, busy }
 }

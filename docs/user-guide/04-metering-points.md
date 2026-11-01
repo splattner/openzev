@@ -171,9 +171,9 @@ To show the real self-sufficiency of such a participant, they can connect the
 system behind their meter (Solar Manager, or their own data by push or file).
 The figures are used for statistics only, never for billing, and are shown as
 reported by the participant's own system. See
-[Your Own Energy Data](20-energy-data.md). A flagged metering point then also
-shows the connection's status next to the badge; you open it to see the status
-and, as a manager, to switch it off, delete its data or remove it. You never see
+[Your Own Energy Data](20-energy-data.md). The connections themselves are not
+shown on the metering point list: you see them, and as a manager can switch one off,
+delete its data or remove it, on the **Energy data** tab of the settings. You never see
 or enter the participant's key.
 
 ## Assignment Validity Periods

@@ -40,7 +40,7 @@ export function LiveEnergyView({ zevId }: { zevId: string | undefined }) {
                 descriptionKey={isZevScope ? 'pages.live.empty.manager' : 'pages.live.empty.participant'}
                 actions={[{
                     labelKey: isZevScope ? 'pages.live.empty.managerAction' : 'pages.live.empty.participantAction',
-                    to: isZevScope ? '/metering/points' : '/me/metering-points',
+                    to: isZevScope ? '/zev-settings/energy' : '/me/metering-points',
                 }]}
             />
         )

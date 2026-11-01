@@ -238,7 +238,7 @@ describe('LivePointsTable', () => {
         const held = point({ metering_point_id: 'm2', meter_id: 'CH-2', source_id: null, live_state: 'never', meter_power_w: null, age_s: null })
         const manager = await renderWithProviders(createElement(LivePointsTable, { points: [open, held] }), cleanups)
         const link = manager.container.querySelector('table a')
-        expect(link?.getAttribute('href')).toBe('/metering/points?search=CH-9')
+        expect(link?.getAttribute('href')).toBe('/zev-settings/energy')
         expect(manager.container.querySelectorAll('table a')).toHaveLength(1)
         expect(manager.container.querySelector('table')?.textContent).toContain('live.points.holderConnects')
 

@@ -37,17 +37,19 @@ import { PageHeader } from '../components/PageHeader'
 import { ScopeGuard } from '../components/ScopeGuard'
 import { usePageNavigation } from '../lib/usePageNavigation'
 import { AliasNavigate } from '../components/RouteAliases'
+import { ZevEnergySources } from '../features/supplementary/ZevEnergySources'
+import { useEnergyDataEligibility } from '../lib/supplementary'
 
 /**
  * ZEV settings hub (nav-regroup phase 3, spec §5): one draft feeds the three
  * editing tabs and a single sticky save bar persists the whole form (one PATCH).
  */
 
-const TABS: ZevSettingsTab[] = ['general', 'people', 'billing', 'documents', 'audit', 'export']
+const TABS: ZevSettingsTab[] = ['general', 'people', 'billing', 'documents', 'energy', 'audit', 'export']
 // Tabs merged into People & access (#761); old links keep working.
 const MERGED_INTO_PEOPLE = new Set(['parties', 'access'])
 // Tabs that save on their own: the sticky bar saves the draft without submitting a form there.
-const OUTSIDE_THE_FORM = new Set<ZevSettingsTab>(['people', 'audit', 'export'])
+const OUTSIDE_THE_FORM = new Set<ZevSettingsTab>(['people', 'energy', 'audit', 'export'])
 
 type ZevDraft = {
     zevId: string | null
@@ -85,13 +87,14 @@ export function ZevSettingsTabRoute() {
 function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
     const { t } = useTranslation()
     const scopeNote = useScopeNote()
-    const { navigateTab } = usePageNavigation()
+    const { navigateTab, updateParams } = usePageNavigation()
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
     const { user } = useAuth()
     const { settings } = useAppSettings()
     const { selectedZev, selectedZevId } = useManagedZev()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
+    const energyData = useEnergyDataEligibility()
 
     const [draft, setDraft] = useState<ZevDraft>(() => {
         const initial = getDefaultZevForm()
@@ -313,7 +316,8 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
     }
 
     function handleTabChange(value: string | null) {
-        navigateTab(`/zev-settings/${value ?? 'general'}`)
+        // The source open beside the energy data list belongs to that tab.
+        updateParams((params) => { params.delete('source') }, { pathname: `/zev-settings/${value ?? 'general'}` })
     }
 
     function updateForm(patch: Partial<ZevInput>) {
@@ -382,6 +386,8 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                     <AppTabs.Tab value="people">{t('pages.zevSettings.tabs.people')}</AppTabs.Tab>
                     <AppTabs.Tab value="billing">{t('pages.zevSettings.tabs.billingPayment')}</AppTabs.Tab>
                     <AppTabs.Tab value="documents">{t('pages.zevSettings.tabs.documentsEmails')}</AppTabs.Tab>
+                    {/* Only while the energy data feature is on (or the link names the tab). */}
+                    {(energyData.featureOn || tab === 'energy') && <AppTabs.Tab value="energy">{t('pages.zevSettings.tabs.energyData')}</AppTabs.Tab>}
                     <AppTabs.Tab value="audit">{t('pages.zevSettings.tabs.auditLog')}</AppTabs.Tab>
                     <AppTabs.Tab value="export">{t('pages.zevSettings.tabs.exportTransfer')}</AppTabs.Tab>
                 </AppTabs.List>
@@ -452,6 +458,10 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                     <ZevPeopleSection zevId={selectedZevId} canManage={canWriteSelectedCommunity} />
                 </AppTabs.Panel>
 
+
+                <AppTabs.Panel value="energy">
+                    <ZevEnergySources zevId={selectedZevId} canManage={canWriteSelectedCommunity} />
+                </AppTabs.Panel>
 
                 <AppTabs.Panel value="audit">
                     {/* Owner-scoped audit log as a tab of its ZEV (spec §5): the

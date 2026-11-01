@@ -773,7 +773,7 @@ export const de = {
             empty: {
                 title: 'Noch keine Live-Datenquelle',
                 manager: 'Live-Energie zeigt, was Ihre Gemeinschaft im Moment produziert und verbraucht, aus Quellen, die in Echtzeit melden. Verbinden Sie eine Live-Quelle mit einem Messpunkt, damit die Werte hier erscheinen.',
-                managerAction: 'Zu den Messpunkten',
+                managerAction: 'Zu den Energiedaten',
                 participant: 'Live-Energie zeigt, was Ihre Gemeinschaft im Moment produziert und verbraucht. Die Werte erscheinen, sobald eine Live-Quelle verbunden ist, zum Beispiel für Ihren eigenen Zähler.',
                 participantAction: 'Zu meinen Messpunkten',
             },
@@ -3098,6 +3098,7 @@ export const de = {
                 documentsEmails: 'Dokumente & E-Mails',
                 auditLog: 'Audit-Log',
                 exportTransfer: 'Export / Transfer',
+                energyData: 'Energiedaten',
             },
             sections: {
                 general: 'Allgemeine ZEV-Einstellungen',
@@ -4025,6 +4026,21 @@ export const de = {
                 stopHistoryMessage: 'Die Quelle bleibt für Ihre Live-Daten verbunden. Neue Messwerte werden nicht mehr angenommen; bereits gesammelte Messwerte bleiben erhalten.',
             },
         },
+        zev: {
+            off: 'Energiedaten sind auf dieser Instanz nicht aktiviert.',
+            description: 'Quellen, die Messwerte aus Geräten melden. Teilnehmer verbinden ihre eigenen unter «Meine Messpunkte»; hier verbinden Sie die der Gemeinschaft (Messpunkte ohne Inhaber, den Netzanschlusspunkt) und können die Quelle eines Teilnehmers ausschalten oder entfernen. Nur Anzeige und Statistik, nie Abrechnung.',
+            descriptionReadOnly: 'Quellen, die Messwerte aus Geräten melden. Nur Anzeige und Statistik, nie Abrechnung.',
+            connect: 'Quelle verbinden',
+            nothingToConnect: 'Es gibt nichts mehr zu verbinden.',
+            connectTitle: 'Quelle der Gemeinschaft verbinden',
+            target: 'Wofür liefert die Quelle Werte?',
+            pickTarget: 'Messpunkt oder Netzanschlusspunkt wählen',
+            empty: {
+                title: 'Noch keine Energiedatenquelle',
+                manager: 'Verbinden Sie Live-Daten für Messpunkte ohne Inhaber und für den Netzanschlusspunkt. Teilnehmer verbinden ihre eigenen unter «Meine Messpunkte».',
+                other: 'Sobald eine Quelle verbunden ist, erscheint sie hier.',
+            },
+        },
         section: {
             loadError: 'Die Energiedatenquellen konnten nicht geladen werden.',
             eligibilityError: 'Es konnte nicht geprüft werden, ob Energiedaten verfügbar sind.',
@@ -4162,17 +4178,8 @@ export const de = {
             moreErrors: '…und {{count}} weitere.',
         },
         owner: {
-            chip: 'Energiedaten: {{status}}',
-            chipHint: 'Status der Energiedatenquelle dieses Messpunkts öffnen',
-            noSource: 'Keine Energiedatenquelle',
-            noSourceHint: 'Die Teilnehmerin oder der Teilnehmer kann unter «Meine Messpunkte» eine verbinden. Energiedaten sind freiwillig.',
-            connectOwn: 'Energiedaten verbinden',
-            connectOwnHint: 'Das ist Ihr eigener Messpunkt: Die Energiedaten richten Sie unter «Meine Messpunkte» ein',
             manageOwn: 'Unter «Meine Messpunkte» verwalten',
-            title: 'Energiedatenquelle von {{meter}}',
             readOnlyNote: '{{name}} hat diese Quelle verbunden. Sie sehen den Status, nicht den Zugang, und können die Verbindung selbst nicht ändern.',
-            provider: 'Quelle',
-            status: 'Status',
             disable: 'Ausschalten',
             enable: 'Einschalten',
             deleteDataMessage: 'Alle vom System von {{name}} gesammelten Messwerte werden endgültig gelöscht.',
@@ -4220,15 +4227,6 @@ export const de = {
             revoke: 'Token widerrufen',
             revoked: 'Der Push-Token wurde widerrufen.',
             lastValue: 'Letzter Wert',
-            dialogTitle: 'Live-Daten von {{meter}}',
-            dialogTitleWithForecast: 'Live-Daten und Prognose von {{meter}}',
-            chip: {
-                fresh: 'Live',
-                stale: 'Live: nicht aktuell',
-                never: 'Live: keine Daten',
-            },
-            chipHint: 'Aktualität der Live-Daten dieses Messpunkts',
-            chipOpenHint: 'Live-Daten dieses Messpunkts öffnen',
             confirm: {
                 stopTitle: 'Live-Daten beenden?',
                 stopMessage: 'Die Quelle bleibt für Ihre Verlaufsdaten verbunden. Live-Werte werden nicht mehr empfangen oder angezeigt.',
@@ -4240,10 +4238,7 @@ export const de = {
             },
         },
         connection: {
-            details: 'Details',
-            title: 'Netzanschlusspunkt',
             description: 'Meldet die Nettoleistung am Netzanschluss des ZEV, damit die Live-Ansicht zeigen kann, wie viel der ZEV verbraucht.',
-            notConnected: 'Mit dem Netzanschlusspunkt ist noch keine Live-Quelle verbunden.',
             connect: 'Netzanschlusspunkt verbinden',
         },
         gross: {

@@ -10,7 +10,6 @@ import {
   faPlus,
   faRightLeft,
   faSolarPanel,
-  faTowerBroadcast,
   faTrash,
   faUserPlus,
   type IconDefinition,
@@ -18,15 +17,11 @@ import {
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
-import { BehindMeterBadge } from '../../components/BehindMeterBadge'
 import { IssueText } from '../../components/IssueText'
 import { formatDateTime, formatShortDate } from '../../lib/appSettings'
 import { formatBusinessIsoDate } from '../../lib/dates'
 import { formatNumber } from '../../lib/numbers'
-import { statusTone } from '../../lib/supplementary'
 import type { AppSettings, MeteringPoint, MeteringPointAssignment } from '../../types/api'
-import { LiveStateChip } from './LiveStateChip'
-import { SupplementarySourceStatus } from './SupplementarySourceStatus'
 import {
   assignmentStateBadgeClass,
   assignmentStateSortOrder,
@@ -73,8 +68,6 @@ type MeteringPointRowProps = {
   onOpenEditAssignment: (assignment: MeteringPointAssignment) => void
   onDeleteMeteringPoint: (id: string) => void
   onDeleteAssignment: (id: string) => void
-  /** A manager can set up live data on this point (nobody holds it personally); opens its live dialog. */
-  onOpenLive?: (point: MeteringPoint) => void
   /** The roof planes of a producing point, for the production forecast. */
   onOpenPlanes?: (point: MeteringPoint) => void
 }
@@ -108,7 +101,6 @@ export function MeteringPointRow({
   onOpenEditAssignment,
   onDeleteMeteringPoint,
   onDeleteAssignment,
-  onOpenLive,
   onOpenPlanes,
 }: MeteringPointRowProps) {
   const { t } = useTranslation()
@@ -131,9 +123,6 @@ export function MeteringPointRow({
   const typeLabel = t(`pages.meteringPoints.meterTypes.${point.meter_type}`)
   const location = point.location_description?.trim() ?? ''
   const lastReadingDate = point.last_reading_at ? formatShortDate(formatBusinessIsoDate(new Date(point.last_reading_at)), settings) : null
-  // A source in trouble is worth a mark on the row; a healthy or pending one sits in the details.
-  const sourceTone = statusTone(point.supplementary_source_status)
-  const sourceNeedsAttention = sourceTone === 'warning' || sourceTone === 'danger'
   const needsAttention = meteringPointNeedsAttention(point, health, holderLess)
   const showDataIssue = needsAttention && health !== 'green' && health !== 'unknown'
   const dataIssueLabel = t(health === 'no_data' ? 'pages.meteringPoints.health.noReadings' : `pages.meteringPoints.health.${health}`)
@@ -192,13 +181,6 @@ export function MeteringPointRow({
         onClick: () => confirmRemoveAssignment(current[0]),
       })
     }
-    if (onOpenLive) pointMenuItems.push({
-      key: 'live',
-      section: pointSection,
-      label: t('pages.meteringPoints.liveData'),
-      icon: <FontAwesomeIcon icon={faTowerBroadcast} fixedWidth />,
-      onClick: () => onOpenLive(point),
-    })
     if (onOpenPlanes) pointMenuItems.push({
       key: 'planes',
       section: pointSection,
@@ -319,13 +301,8 @@ export function MeteringPointRow({
               <span className="muted">{t('pages.meteringPoints.secondaryId', { id: point.secondary_meter_id })}</span>
             )}
             {!point.is_active && <span className="badge badge-neutral">{t('pages.meteringPoints.inactive')}</span>}
-            {point.has_behind_meter_generation && <BehindMeterBadge />}
-            {isManagedScope && point.live_state && (
-              <LiveStateChip state={point.live_state} onClick={onOpenLive ? () => onOpenLive(point) : undefined} />
-            )}
-            {isManagedScope && sourceNeedsAttention && (
-              <SupplementarySourceStatus point={point} canManage={!readOnly} confirm={confirm} />
-            )}
+            {/* The flag the manager sets, as plain text: a classification is not a pill (UI patterns §10.1). */}
+            {point.has_behind_meter_generation && <span className="muted">{t('behindMeter.badge')}</span>}
           </div>
           {location && <span className="muted metering-point-subtitle">{location}</span>}
         </td>
@@ -494,11 +471,6 @@ export function MeteringPointRow({
                   </dd>
                 </div>
               </dl>
-              {isManagedScope && !sourceNeedsAttention && (
-                <div className="metering-detail-source">
-                  <SupplementarySourceStatus point={point} canManage={!readOnly} confirm={confirm} />
-                </div>
-              )}
             </section>
           </div>
           </td>

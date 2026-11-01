@@ -782,7 +782,7 @@ export const en = {
             empty: {
                 title: 'No live data source yet',
                 manager: 'Live energy shows what your community produces and uses right now, from sources that report in real time. Connect a live source to a metering point to see it here.',
-                managerAction: 'Go to metering points',
+                managerAction: 'Go to energy data',
                 participant: 'Live energy shows what your community produces and uses right now. It appears as soon as a live source is connected, for example for your own meter.',
                 participantAction: 'Go to my metering points',
             },
@@ -3109,6 +3109,7 @@ export const en = {
                 documentsEmails: 'Documents & emails',
                 auditLog: 'Audit log',
                 exportTransfer: 'Export / transfer',
+                energyData: 'Energy data',
             },
             sections: {
                 general: 'General ZEV Settings',
@@ -4036,6 +4037,21 @@ export const en = {
                 stopHistoryMessage: 'The source stays connected for your live data. No new readings are accepted; the readings already collected are kept.',
             },
         },
+        zev: {
+            off: 'Energy data is not enabled on this instance.',
+            description: 'Sources that report readings from devices. Participants connect their own on My metering points; here you connect the community\'s (metering points nobody holds, the grid connection point) and can switch off or remove a participant\'s source. Only shown and used for statistics, never for billing.',
+            descriptionReadOnly: 'Sources that report readings from devices. Only shown and used for statistics, never for billing.',
+            connect: 'Connect a source',
+            nothingToConnect: 'There is nothing left to connect.',
+            connectTitle: 'Connect a source for the community',
+            target: 'What does the source report on?',
+            pickTarget: 'Choose a metering point or the grid connection point',
+            empty: {
+                title: 'No energy data source yet',
+                manager: 'Connect live data for metering points nobody holds and for the grid connection point. Participants connect their own on My metering points.',
+                other: 'Once a source is connected it appears here.',
+            },
+        },
         section: {
             loadError: 'The energy data sources could not be loaded.',
             eligibilityError: 'Could not check whether energy data is available.',
@@ -4173,17 +4189,8 @@ export const en = {
             moreErrors: '…and {{count}} more.',
         },
         owner: {
-            chip: 'Energy data: {{status}}',
-            chipHint: 'Open the status of this metering point\'s energy data source',
-            noSource: 'No energy data source',
-            noSourceHint: 'The participant can connect one under "My metering points". Energy data is optional.',
-            connectOwn: 'Connect your energy data',
-            connectOwnHint: 'This is your own meter: set up its energy data under \'My metering points\'',
             manageOwn: 'Manage on My metering points',
-            title: 'Energy data source of {{meter}}',
             readOnlyNote: '{{name}} connected this source. You see its status, not the credential, and cannot change the connection itself.',
-            provider: 'Source',
-            status: 'Status',
             disable: 'Switch off',
             enable: 'Switch on',
             deleteDataMessage: 'All readings collected from {{name}}\'s system are deleted for good.',
@@ -4231,15 +4238,6 @@ export const en = {
             revoke: 'Revoke token',
             revoked: 'The push token was revoked.',
             lastValue: 'Last value',
-            dialogTitle: 'Live data of {{meter}}',
-            dialogTitleWithForecast: 'Live data and forecast of {{meter}}',
-            chip: {
-                fresh: 'Live',
-                stale: 'Live: not recent',
-                never: 'Live: no data',
-            },
-            chipHint: 'Freshness of this metering point\'s live data',
-            chipOpenHint: 'Open the live data of this metering point',
             confirm: {
                 stopTitle: 'Stop live data?',
                 stopMessage: 'The source stays connected for your history data. Live values are no longer received or shown.',
@@ -4251,10 +4249,7 @@ export const en = {
             },
         },
         connection: {
-            details: 'Details',
-            title: 'Grid connection point',
             description: 'Reports the net power at the ZEV\'s connection to the grid, so the live view can show how much the ZEV consumes.',
-            notConnected: 'No live source is connected to the grid connection point yet.',
             connect: 'Connect grid connection point',
         },
         gross: {

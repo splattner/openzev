@@ -16,6 +16,8 @@ interface Props {
     /** The visible sources: a holder's Solar Manager connection on this meter can provide the forecast too. */
     sources?: SupplementarySource[]
     onClose: () => void
+    /** Called once the forecast source exists, so the host can open it. */
+    onConnected?: (source: SupplementarySource) => void
     /** A host that already is a dialog draws the flow in its own frame instead of opening a second one. */
     frame?: (title: string, body: ReactNode) => ReactNode
 }
@@ -40,7 +42,7 @@ function firstProblem(error: unknown): string | undefined {
  * rounded to about a kilometre, leave the instance. A plant without planes or location is refused
  * by the server with a message that says what to add first.
  */
-export function ForecastConnectDialog({ holder, point, sources, onClose, frame }: Props) {
+export function ForecastConnectDialog({ holder, point, sources, onClose, onConnected, frame }: Props) {
     const { t } = useTranslation()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
@@ -74,10 +76,11 @@ export function ForecastConnectDialog({ holder, point, sources, onClose, frame }
                 zev: holder === 'zev' ? point.zev : undefined,
                 consent: false,
             }),
-        onSuccess: () => {
+        onSuccess: (saved) => {
             pushToast(t(useExisting ? 'supplementary.forecast.alsoUseDone' : 'supplementary.forecast.connected'), 'success')
             invalidateSourceQueries(queryClient)
             onClose()
+            onConnected?.(saved)
         },
         onError: (failure) => {
             const problem = firstProblem(failure)

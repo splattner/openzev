@@ -36,7 +36,7 @@ function ConnectNote({ point }: { point: LivePoint }) {
     return (
         <>
             {' · '}
-            <Link to={`/metering/points?search=${encodeURIComponent(point.meter_id)}`}>{t('live.points.connect')}</Link>
+            <Link to="/zev-settings/energy">{t('live.points.connect')}</Link>
         </>
     )
 }

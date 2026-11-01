@@ -67,7 +67,7 @@ or without this data.
 | Reconciliation | Source vs official meter: deviation, timestamp-shift detection |
 | API | Source CRUD and actions, push ingest, CSV import, additive `gross_energy` blocks on existing payloads |
 | Statistics | Participant dashboard, owner dashboard, annual report, annual statement PDF, MCP `consumption_summary` |
-| Frontend | "My metering points" page with the energy data setup (participant), source status and "no source" marker on the metering-point list (owner), gross cards and rates, i18n (de/fr/it/en) |
+| Frontend | "My metering points" page with the energy data setup (participant), the community's sources and a manager's rights over a participant's in the Energy data tab of the ZEV settings (owner), gross cards and rates, i18n (de/fr/it/en) |
 | Operations | Feature flag, system-health entry, system check, backup registry + manifest fingerprint, audit events |
 | Transfer archive | Sources (without secrets) and readings (last phase) |
 | Docs | User guide, baseline specs (see §11), `.env.example`, Helm values |
@@ -127,7 +127,7 @@ Data-management actions stay available
 
 **Frontend routes:** the participant UI lives on `/me/metering-points` ("My metering points", §7.1;
 shell roles `participant`, plus managers and viewers who are participants themselves, who reach it
-from their own call to action); the owner view lives on `/metering/points`. It was an Account tab
+from their own call to action); the manager's view of the community's sources is the **Energy data** tab of the ZEV settings (`/zev-settings/energy`, SPEC-2026-live-energy-data §7.3); the metering-point list carries nothing of it. It was an Account tab
 until [#944](https://github.com/splattner/openzev/issues/944); `/account?tab=energy-data` now lands
 on Profile like any unknown tab.
 
@@ -682,22 +682,16 @@ admin gets `[]` unless linked to a participant), the flagged meters they hold pe
 - `accountTabs.ts` no longer has an `'energy-data'` tab; `resolveAccountTab` takes only
   `mustChangePassword`.
 
-### 7.2 Owner: metering-point list
+### 7.2 Owner: the Energy data tab
 
-**File:** `frontend/src/features/meteringPoints/MeteringPointsList.tsx`; new
-`SupplementarySourceStatus.tsx` (a button-styled badge, `badge-button` in `styles/components/badge.css`, and the panel).
-
-Flagged metering points show a status chip from `supplementary_source_status`: on the row when the
-source is in trouble (`error`, `reconnect_required`), otherwise in the row's expanded Measurement card
-(`MeteringPointRow`); a flagged one with no
-source shows a quiet neutral "No energy data source" marker instead (only while the feature is on,
-known from `useEnergyDataEligibility`, never a warning: the data is optional). On a meter the
-signed-in manager holds themselves the marker is a link to "My metering points" (**Connect your energy
-data**) and the panel of a connected source links there instead of the read-only note: the credential
-is theirs to manage. An owner can
-open a read-only panel (status, last sync, coverage, reconciliation) with **Disable**,
-**Delete data** and **Remove source** (manager actions only). No credential field is shown to
-an owner.
+**Files:** `frontend/src/features/supplementary/ZevEnergySources.tsx`, `ZevConnectDialog.tsx` and the tab in
+`frontend/src/pages/ZevSettingsPage.tsx` (SPEC-2026-live-energy-data §7.3). It replaces the status chip, the "no energy data
+source" marker and the read-only panel the metering-point list used to carry (`SupplementarySourceStatus`): that list
+shows no energy data at all. The tab lists every source of the community with a problem only as text. Opening a
+participant's source shows its state (status, last sync, coverage, reconciliation) with **Switch off**/**Switch on**, **Delete
+data** and **Remove source** (manager actions only, confirmed); no credential, test, sync or key. A manager who holds the
+meter themselves is pointed to "My metering points", where the credential is theirs to manage. A viewer sees the list and the
+state without actions.
 
 ### 7.3 Statistics surfaces
 
@@ -1031,7 +1025,7 @@ CI runs `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-he
   field; a push source ends on a one-time token screen; the card per status (ok, reconnect required,
   disconnected, push); test, sync (cooldown), replace key, disconnect, delete data, remove and
   rotate, the destructive ones behind a confirmation; CSV check, import and row errors.
-- **`tests/supplementary-owner-status.test.ts`** (12): no chip without a source, a quiet marker on a flagged
+- **`tests/zev-energy-sources.test.ts`** (11, replacing the former `supplementary-owner-status.test.ts`): the list, the connect dialog and the limited manager pane; the former tests were (12): no chip without a source, a quiet marker on a flagged
   meter without one while the feature is on and nothing without generation or with the feature off; the chip as a
   button with its tone; the panel shows status and comparison but no credential field; a manager
   can switch off, delete data and remove behind confirmations; a viewer has no actions; the
