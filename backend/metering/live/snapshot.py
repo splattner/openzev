@@ -47,8 +47,12 @@ BASIS_CONNECTION_POINT = "connection_point"
 
 
 def watts(value: Decimal | None) -> float | None:
-    """A power as a JSON number with one decimal (half up), ``None`` stays ``None``."""
-    return None if value is None else float(value.quantize(TENTH, rounding=ROUND_HALF_UP))
+    """A power as a JSON number with one decimal (half up), ``None`` stays ``None``.
+
+    A power that rounds to zero is ``0.0``, never ``-0.0``: a draw that cancels out to a tiny negative
+    must not reach the screen as "-0.0 kW".
+    """
+    return None if value is None else float(value.quantize(TENTH, rounding=ROUND_HALF_UP)) or 0.0
 
 
 def iso(moment: datetime | None) -> str | None:

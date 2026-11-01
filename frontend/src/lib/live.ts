@@ -56,7 +56,9 @@ export function useLiveCurve(zevId: string | undefined, enabled: boolean, partic
 
 /** A power in W as kW with one decimal, without the unit (for a figure that carries its own). */
 export function kwFigure(watts: number): string {
-    return formatNumber(watts / 1000, { maxDecimals: 1, minDecimals: 1 })
+    const kw = watts / 1000
+    // A power that rounds to zero reads `0.0`, never `-0.0` (Intl prints a negative zero with its sign).
+    return formatNumber(Math.round(kw * 10) === 0 ? 0 : kw, { maxDecimals: 1, minDecimals: 1 })
 }
 
 /** A power in W as `1.2 kW` (no-break space). */
