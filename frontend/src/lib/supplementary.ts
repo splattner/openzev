@@ -107,20 +107,25 @@ export function liveEligible(point: Pick<EligibleMeteringPoint, 'eligible_capabi
     return !!point.eligible_capabilities?.includes('live')
 }
 
+/** Whether a forecast can be connected on a held producing metering point (only while the live flag is on). */
+export function forecastEligible(point: Pick<EligibleMeteringPoint, 'eligible_capabilities'>): boolean {
+    return !!point.eligible_capabilities?.includes('forecast')
+}
+
 /** Whether the point offers at least one capability to set up. */
 export function hasCapability(point: Pick<EligibleMeteringPoint, 'eligible_capabilities'>): boolean {
     return historyEligible(point) || liveEligible(point)
 }
 
-type SourceLike = Pick<SupplementarySource, 'metering_point' | 'target' | 'zev' | 'provides_history' | 'provides_live'>
+type SourceLike = Pick<SupplementarySource, 'metering_point' | 'target' | 'zev' | 'provides_history' | 'provides_live' | 'provides_forecast'>
 
 /** The source that provides `capability` on a metering point; sources are unique per capability and point. */
 export function sourceFor<T extends SourceLike>(
     sources: T[] | undefined,
     meteringPointId: string,
-    capability: Extract<SourceCapability, 'history' | 'live'>,
+    capability: SourceCapability,
 ): T | undefined {
-    return sources?.find((source) => source.metering_point === meteringPointId && (capability === 'history' ? source.provides_history : source.provides_live))
+    return sources?.find((source) => source.metering_point === meteringPointId && source[`provides_${capability}`])
 }
 
 /** The ZEV's grid connection point source, if any. */

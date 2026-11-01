@@ -75,6 +75,8 @@ type MeteringPointRowProps = {
   onDeleteAssignment: (id: string) => void
   /** A manager can set up live data on this point (nobody holds it personally); opens its live dialog. */
   onOpenLive?: (point: MeteringPoint) => void
+  /** The roof planes of a producing point, for the production forecast. */
+  onOpenPlanes?: (point: MeteringPoint) => void
 }
 
 /**
@@ -107,6 +109,7 @@ export function MeteringPointRow({
   onDeleteMeteringPoint,
   onDeleteAssignment,
   onOpenLive,
+  onOpenPlanes,
 }: MeteringPointRowProps) {
   const { t } = useTranslation()
   const actionsId = `metering-point-actions-${point.id}`
@@ -195,6 +198,13 @@ export function MeteringPointRow({
       label: t('pages.meteringPoints.liveData'),
       icon: <FontAwesomeIcon icon={faTowerBroadcast} fixedWidth />,
       onClick: () => onOpenLive(point),
+    })
+    if (onOpenPlanes) pointMenuItems.push({
+      key: 'planes',
+      section: pointSection,
+      label: t('pages.meteringPoints.planes.menu'),
+      icon: <FontAwesomeIcon icon={faSolarPanel} fixedWidth />,
+      onClick: () => onOpenPlanes(point),
     })
     pointMenuItems.push({
       key: 'edit',

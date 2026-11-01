@@ -6,7 +6,7 @@ import type { SupplementarySource } from '../../types/api'
 import { LiveStateBadge } from './LiveStateBadge'
 import { SourceStatusBadge } from './SourceStatusBadge'
 
-export type RowCapability = 'history' | 'live'
+export type RowCapability = 'history' | 'live' | 'forecast'
 
 interface Props {
     meteringPointId: string
@@ -64,6 +64,17 @@ export function CapabilityRows({ meteringPointId, capabilities, sources, canMana
                                                     : t('supplementary.card.noData')}
                                             </small>
                                         </>
+                                    ) : capability === 'forecast' ? (
+                                        <>
+                                            <SourceStatusBadge status={source.enabled ? source.status : 'disabled'} />
+                                            {source.provider === 'forecast_solar' && (
+                                                <small className="muted">
+                                                    {source.last_success_at
+                                                        ? t('supplementary.forecast.updatedAt', { date: formatDateTime(source.last_success_at, settings) })
+                                                        : t('supplementary.card.noData')}
+                                                </small>
+                                            )}
+                                        </>
                                     ) : (
                                         <>
                                             {source.status === 'reconnect_required' && <SourceStatusBadge status="reconnect_required" />}
@@ -91,6 +102,7 @@ export function CapabilityRows({ meteringPointId, capabilities, sources, canMana
                             )}
                         </div>
                         {!source && zevHeld && capability === 'live' && <small className="muted" style={{ flexBasis: '100%' }}>{t('supplementary.live.zevNotConnected')}</small>}
+                        {!source && zevHeld && capability === 'forecast' && <small className="muted" style={{ flexBasis: '100%' }}>{t('supplementary.forecast.zevNotConnected')}</small>}
                     </li>
                 )
             })}

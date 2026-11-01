@@ -29,6 +29,7 @@ export const queryKeys = {
     access: (zevId: string, includeEnded = false) => ['zev', 'access', zevId, includeEnded] as const,
     parties: (zevId: string) => ['zev', 'parties', zevId] as const,
     buildings: (zevId: string) => ['zev', 'buildings', zevId] as const,
+    pvPlanes: (meteringPointId: string) => ['zev', 'pv-planes', meteringPointId] as const,
     partyRoles: (zevId: string, includeEnded = false) => ['zev', 'partyRoles', zevId, includeEnded] as const,
   },
   tariffs: {
@@ -113,6 +114,7 @@ export const queryKeys = {
     enabled: () => ['live', 'enabled'] as const,
     snapshot: (zevId: string) => ['live', 'snapshot', zevId] as const,
     curve: (zevId: string, date: string, participantId = '') => ['live', 'curve', zevId, date, participantId] as const,
+    forecast: (zevId: string) => ['live', 'forecast', zevId] as const,
     ownSeries: (zevId: string, participantId: string, from: string, to: string, bucket: string) =>
       ['live', 'own-series', zevId, participantId, from, to, bucket] as const,
   },

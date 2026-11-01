@@ -662,6 +662,9 @@ export interface Building {
     city: string
     egid: number | null
     notes: string
+    /** Where the plant is, for the production forecast (decimal degrees as strings; null: not set). */
+    latitude: string | null
+    longitude: string | null
     metering_point_count: number
     /** Cached OSM outline of the building, for the participants map (null: not located). */
     building_footprint: BuildingFootprint | null
@@ -674,7 +677,29 @@ export interface Building {
 export type BuildingInput = Pick<
     Building,
     'zev' | 'name' | 'address_line1' | 'address_line2' | 'postal_code' | 'city' | 'egid' | 'notes'
->
+> & Partial<Pick<Building, 'latitude' | 'longitude'>>
+
+/** One roof plane of the plant behind a producing metering point (SPEC-2026-live-energy-data §4.3). */
+export interface PvPlane {
+    id: string
+    metering_point: string
+    label: string
+    /** kWp, a decimal string. */
+    peak_power_kwp: string
+    /** 0 flat, 90 vertical. */
+    tilt_deg: number
+    /** 0 south, -90 east, 90 west, +-180 north. */
+    azimuth_deg: number
+    created_at: string
+    updated_at: string
+}
+
+export interface PvPlaneInput {
+    label: string
+    peak_power_kwp: string
+    tilt_deg: number
+    azimuth_deg: number
+}
 
 export interface Participant {
     id: string
@@ -774,7 +799,7 @@ export interface GrossEnergy {
     }>
 }
 
-export type SupplementaryProvider = 'solar_manager' | 'push'
+export type SupplementaryProvider = 'solar_manager' | 'push' | 'forecast_solar'
 export type SupplementaryStatus = 'pending' | 'ok' | 'error' | 'reconnect_required' | 'disabled'
 export type SourceTarget = 'metering_point' | 'connection_point'
 export type SourceHolder = 'participant' | 'zev'
@@ -2859,4 +2884,34 @@ export interface MeteringReadingsDeletionResult {
     deleted_count: number
     deleted_readings: number
     deleted_quarantined_readings: number
+}
+
+/** One hour of expected production (UTC start). The band is only there when every plant behind the sum gives one. */
+export interface ForecastHour {
+    start: string
+    power_w: number
+    min_w: number | null
+    max_w: number | null
+}
+
+/** The hours around a civil day's highest production: production only, never a claim that power is spare. */
+export interface ForecastPeakWindow {
+    date: string
+    from: string
+    to: string
+    peak_w: number
+}
+
+export interface ProductionForecast {
+    zev_id: string
+    horizon_h: number
+    /** False when a producing metering point has no forecast: the sum covers only some plants. */
+    complete: boolean
+    plants: number
+    plants_with_forecast: number
+    fetched_at: string | null
+    hours: ForecastHour[]
+    peak_windows: ForecastPeakWindow[]
+    /** Managers, viewers and admins only. */
+    per_plant?: { metering_point_id: string; meter_id: string; hours: ForecastHour[] }[]
 }

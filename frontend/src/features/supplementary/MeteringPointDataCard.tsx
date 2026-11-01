@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BehindMeterBadge } from '../../components/BehindMeterBadge'
 import { useAuth } from '../../lib/auth'
-import { historyEligible, liveEligible, sourceFor } from '../../lib/supplementary'
+import { forecastEligible, historyEligible, liveEligible, sourceFor } from '../../lib/supplementary'
 import type { EligibleMeteringPoint, SupplementarySource } from '../../types/api'
-import { CapabilityRows, type RowCapability } from './CapabilityRows'
+import { CapabilityRows } from './CapabilityRows'
+import { ForecastConnectDialog } from './ForecastConnectDialog'
 import { MeteringDataLink } from './MeteringDataLink'
 import { SourceDialog, type ConfirmOptions } from './SourceDialog'
-import { SupplementarySourceModal } from './SupplementarySourceModal'
+import { SupplementarySourceModal, type ConnectCapability } from './SupplementarySourceModal'
 
 interface Props {
     point: EligibleMeteringPoint
@@ -28,18 +29,21 @@ interface Props {
 export function MeteringPointDataCard({ point, sources, sourcesUnavailable, onRetrySources, confirm }: Props) {
     const { t } = useTranslation()
     const { isImpersonating } = useAuth()
-    const [connecting, setConnecting] = useState<RowCapability[] | null>(null)
+    const [connecting, setConnecting] = useState<ConnectCapability[] | null>(null)
     // The dialogs are rendered next to the card and decided by their own state, never by what the source
     // list says: creating a source changes the rows while a push source's one-time token is on screen.
     const [openSourceId, setOpenSourceId] = useState<string | null>(null)
 
-    const eligible = { history: historyEligible(point), live: liveEligible(point) }
-    const capabilities = (['history', 'live'] as const).filter((capability) => eligible[capability])
+    const eligible = { history: historyEligible(point), live: liveEligible(point), forecast: forecastEligible(point) }
+    const capabilities = (['history', 'live', 'forecast'] as const).filter((capability) => eligible[capability])
     const unconnected = capabilities.filter((capability) => !sourceFor(sources, point.metering_point, capability))
+    // Forecast is connected on its own (forecast.solar needs no credentials); the others share one flow.
+    const connectable = unconnected.filter((capability): capability is ConnectCapability => capability !== 'forecast')
+    const [connectingForecast, setConnectingForecast] = useState(false)
     const historySource = sourceFor(sources, point.metering_point, 'history')
     // A Solar Manager key the vendor refused is the whole source's problem, history or live only.
-    const reconnectSource = [historySource, sourceFor(sources, point.metering_point, 'live')].find((source) => source?.status === 'reconnect_required')
-    const knowsSource = !!(point.source || point.sources?.history || point.sources?.live)
+    const reconnectSource = [historySource, sourceFor(sources, point.metering_point, 'live'), sourceFor(sources, point.metering_point, 'forecast')].find((source) => source?.status === 'reconnect_required')
+    const knowsSource = !!(point.source || point.sources?.history || point.sources?.live || point.sources?.forecast)
     // Eligibility says a source exists but its details are not here yet: offering Connect would be wrong.
     const unavailable = knowsSource && !sources ? sourcesUnavailable : undefined
     const openSource = sources?.find((source) => source.id === openSourceId)
@@ -88,16 +92,16 @@ export function MeteringPointDataCard({ point, sources, sourcesUnavailable, onRe
                             capabilities={capabilities}
                             sources={sources}
                             onOpenSource={(source) => setOpenSourceId(source.id)}
-                            onConnect={(capability) => setConnecting([capability])}
+                            onConnect={(capability) => (capability === 'forecast' ? setConnectingForecast(true) : setConnecting([capability]))}
                         />
-                        {unconnected.length > 0 && (
+                        {connectable.length > 0 && (
                             <div className="actions-row actions-row-wrap">
                                 <button
                                     type="button"
                                     className="button button-primary"
                                     disabled={isImpersonating}
                                     title={isImpersonating ? t('account.impersonationRestrictions') : undefined}
-                                    onClick={() => setConnecting(unconnected)}
+                                    onClick={() => setConnecting(connectable)}
                                 >
                                     {t('supplementary.card.connect')}
                                 </button>
@@ -109,12 +113,13 @@ export function MeteringPointDataCard({ point, sources, sourcesUnavailable, onRe
             {connecting && (
                 <SupplementarySourceModal
                     point={point}
-                    available={unconnected}
+                    available={connectable}
                     initial={connecting}
                     sources={sources}
                     onClose={() => setConnecting(null)}
                 />
             )}
+            {connectingForecast && <ForecastConnectDialog holder="participant" point={point} onClose={() => setConnectingForecast(false)} />}
             {openSource && (
                 <SourceDialog
                     subject={point.meter_id}

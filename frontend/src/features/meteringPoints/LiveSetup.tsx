@@ -8,12 +8,13 @@ import { fetchZevEligibleSources, listSupplementarySources } from '../../lib/api
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { useAuth } from '../../lib/auth'
 import { useLiveEnabled } from '../../lib/live'
-import { connectionPointSource, sourceFor } from '../../lib/supplementary'
+import { connectionPointSource } from '../../lib/supplementary'
 import type { MeteringPoint, SupplementarySource } from '../../types/api'
 import { CapabilityRows } from '../supplementary/CapabilityRows'
 import { LiveStateBadge } from '../supplementary/LiveStateBadge'
 import { SourceDetails, SourceDialog, type ConfirmOptions } from '../supplementary/SourceDialog'
 import { SupplementarySourceModal } from '../supplementary/SupplementarySourceModal'
+import { ForecastConnectDialog } from '../supplementary/ForecastConnectDialog'
 
 type Confirm = (options: ConfirmOptions) => void
 
@@ -60,10 +61,13 @@ export function PointLiveDialog({ point, setup, confirm, onClose }: { point: Met
     const { t } = useTranslation()
     // Decided once, when the dialog opens.
     const [startsConnecting] = useState(() => !setup.zevEligibleByPoint.get(point.id)?.sources.live)
-    const [view, setView] = useState<'rows' | 'source' | 'connect'>(startsConnecting ? 'connect' : 'rows')
+    const [view, setView] = useState<'rows' | 'source' | 'connect' | 'connect-forecast'>(startsConnecting ? 'connect' : 'rows')
+    const [openedId, setOpenedId] = useState<string | null>(null)
     const { sourcesQuery } = setup
     const sources = sourcesQuery.data
-    const liveSource = sourceFor(sources, point.id, 'live')
+    // A producing plant can also have a forecast.
+    const withForecast = !!setup.zevEligibleByPoint.get(point.id)?.eligible_capabilities?.includes('forecast')
+    const openedSource = sources?.find((source) => source.id === openedId)
 
     if (view === 'connect') {
         return (
@@ -75,31 +79,44 @@ export function PointLiveDialog({ point, setup, confirm, onClose }: { point: Met
             />
         )
     }
+    if (view === 'connect-forecast') {
+        return (
+            <ForecastConnectDialog
+                holder="zev"
+                point={{ metering_point: point.id, meter_id: point.meter_id, zev: point.zev }}
+                onClose={() => setView('rows')}
+            />
+        )
+    }
+    const rowsTitle = withForecast ? 'supplementary.live.dialogTitleWithForecast' : 'supplementary.live.dialogTitle'
     return (
-        <FormModal isOpen size="md" title={t(view === 'source' ? 'supplementary.source.title' : 'supplementary.live.dialogTitle', { meter: point.meter_id, subject: point.meter_id })} onClose={onClose}>
+        <FormModal isOpen size="md" title={t(view === 'source' ? 'supplementary.source.title' : rowsTitle, { meter: point.meter_id, subject: point.meter_id })} onClose={onClose}>
             {!sources ? (
                 sourcesQuery.isError ? (
                     <Notice tone="error" onRetry={() => void sourcesQuery.refetch()}>{t('supplementary.section.loadError')}</Notice>
                 ) : (
                     <p className="muted m-0">{t('common.loading')}</p>
                 )
-            ) : view === 'source' && liveSource ? (
+            ) : view === 'source' && openedSource ? (
                 <div style={{ display: 'grid', gap: '1rem' }}>
                     <div>
                         <button type="button" className="button button-ghost button-compact" onClick={() => setView('rows')}>
                             {t('supplementary.modal.back')}
                         </button>
                     </div>
-                    <SourceDetails source={liveSource} sources={sources} confirm={confirm} canManage onGone={onClose} />
+                    <SourceDetails source={openedSource} sources={sources} confirm={confirm} canManage onGone={onClose} />
                 </div>
             ) : (
                 <CapabilityRows
                     meteringPointId={point.id}
-                    capabilities={['live']}
+                    capabilities={withForecast ? ['live', 'forecast'] : ['live']}
                     sources={sources}
                     zevHeld
-                    onOpenSource={() => setView('source')}
-                    onConnect={() => setView('connect')}
+                    onOpenSource={(source) => {
+                        setOpenedId(source.id)
+                        setView('source')
+                    }}
+                    onConnect={(capability) => setView(capability === 'forecast' ? 'connect-forecast' : 'connect')}
                 />
             )}
         </FormModal>

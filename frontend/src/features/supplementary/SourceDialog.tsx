@@ -19,6 +19,7 @@ export type { ConfirmOptions } from './useSourceActions'
 export interface PointEligibility {
     history: boolean
     live: boolean
+    forecast?: boolean
 }
 
 interface DetailsProps {
@@ -62,6 +63,7 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
 
     const isSolar = source.provider === 'solar_manager'
     const isPush = source.provider === 'push'
+    const isForecastSolar = source.provider === 'forecast_solar'
     const disconnected = !source.enabled
     const hasHistory = source.provides_history
     const blockedTitle = isImpersonating ? t('account.impersonationRestrictions') : undefined
@@ -74,9 +76,15 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
     const canAddHistory =
         !disconnected && eligible.history && !source.provides_history && source.held_by === 'participant' &&
         !!source.metering_point && !sourceFor(sources, source.metering_point, 'history')
-    // A source must keep one capability: stopping one is only offered while the other remains.
-    const canStopLive = source.provides_live && source.provides_history
-    const canStopHistory = source.provides_history && source.provides_live
+    // Solar Manager also reads the installation's own forecast with the stored key.
+    const canAddForecast =
+        !disconnected && isSolar && !!eligible.forecast && !source.provides_forecast && !!source.metering_point &&
+        !sourceFor(sources, source.metering_point, 'forecast')
+    // A source must keep one capability: stopping one is only offered while the others remain.
+    const capabilityCount = [source.provides_history, source.provides_live, source.provides_forecast].filter(Boolean).length
+    const canStopLive = source.provides_live && capabilityCount > 1
+    const canStopHistory = source.provides_history && capabilityCount > 1
+    const canStopForecast = source.provides_forecast && capabilityCount > 1
 
     const confirmCapability = (options: Omit<ConfirmOptions, 'isDangerous'>) => confirm({ ...options, isDangerous: false })
 
@@ -108,8 +116,9 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
                 <dd className="m-0 actions-row actions-row-wrap">
                     {source.provides_history && <span className="badge badge-neutral">{t('supplementary.capability.history')}</span>}
                     {source.provides_live && <span className="badge badge-neutral">{t('supplementary.capability.live')}</span>}
+                    {source.provides_forecast && <span className="badge badge-neutral">{t('supplementary.capability.forecast')}</span>}
                 </dd>
-                {(source.provides_history || isSolar) && (
+                {(source.provides_history || isSolar || isForecastSolar) && (
                     <>
                         <dt className="muted">{t('supplementary.source.status')}</dt>
                         <dd className="m-0"><SourceStatusBadge status={source.status} /></dd>
@@ -121,6 +130,12 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
                         <dd className="m-0">{source.live_state ? <LiveStateBadge state={source.live_state} /> : '—'}</dd>
                         <dt className="muted">{t('supplementary.live.lastValue')}</dt>
                         <dd className="m-0">{dateTime(source.live_last_seen_at)}</dd>
+                    </>
+                )}
+                {source.provides_forecast && (source.provider === 'forecast_solar' || !source.provides_history) && (
+                    <>
+                        <dt className="muted">{t('supplementary.forecast.lastUpdate')}</dt>
+                        <dd className="m-0">{dateTime(source.last_success_at)}</dd>
                     </>
                 )}
                 {isSolar && (
@@ -199,14 +214,14 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
 
             {canManage && (
                 <div className="actions-row actions-row-wrap">
-                    {isSolar && !disconnected && (
+                    {(isSolar || isForecastSolar) && !disconnected && (
                         <>
                             <button type="button" className={small} disabled={busy} onClick={() => test.mutate()}>
                                 {test.isPending ? t('supplementary.actions.testing') : t('supplementary.actions.test')}
                             </button>
-                            {hasHistory && (
+                            {(hasHistory || source.provides_forecast) && (
                                 <button type="button" className={small} disabled={busy || source.status === 'reconnect_required'} onClick={() => sync.mutate()}>
-                                    {t('supplementary.actions.sync')}
+                                    {t(hasHistory ? 'supplementary.actions.sync' : 'supplementary.forecast.refresh')}
                                 </button>
                             )}
                         </>
@@ -255,6 +270,41 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
                             }
                         >
                             {t('supplementary.source.alsoHistory')}
+                        </button>
+                    )}
+                    {canAddForecast && (
+                        <button
+                            type="button"
+                            className={small}
+                            disabled={busy || isImpersonating}
+                            title={blockedTitle}
+                            onClick={() =>
+                                confirmCapability({
+                                    title: t('supplementary.forecast.confirm.alsoTitle'),
+                                    message: t('supplementary.forecast.confirm.alsoMessage'),
+                                    confirmText: t('supplementary.forecast.alsoUse'),
+                                    onConfirm: () => capability.mutate({ provides_forecast: true, consent: true }),
+                                })
+                            }
+                        >
+                            {t('supplementary.forecast.alsoUse')}
+                        </button>
+                    )}
+                    {canStopForecast && (
+                        <button
+                            type="button"
+                            className={small}
+                            disabled={busy}
+                            onClick={() =>
+                                confirmCapability({
+                                    title: t('supplementary.forecast.confirm.stopTitle'),
+                                    message: t('supplementary.forecast.confirm.stopMessage'),
+                                    confirmText: t('supplementary.forecast.stop'),
+                                    onConfirm: () => capability.mutate({ provides_forecast: false }),
+                                })
+                            }
+                        >
+                            {t('supplementary.forecast.stop')}
                         </button>
                     )}
                     {canStopLive && (
@@ -336,7 +386,7 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
                             onClick={() =>
                                 confirm({
                                     title: t('supplementary.confirm.disconnectTitle'),
-                                    message: t(hasHistory ? 'supplementary.confirm.disconnectMessage' : 'supplementary.live.confirm.disconnectMessage'),
+                                    message: t(hasHistory ? 'supplementary.confirm.disconnectMessage' : source.provides_live ? 'supplementary.live.confirm.disconnectMessage' : 'supplementary.forecast.confirm.disconnectMessage'),
                                     confirmText: t('supplementary.actions.disconnect'),
                                     isDangerous: false,
                                     onConfirm: () => disconnect.mutate(),
@@ -371,7 +421,7 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
                         onClick={() =>
                             confirm({
                                 title: t('supplementary.confirm.removeTitle'),
-                                message: t(hasHistory ? 'supplementary.confirm.removeMessage' : 'supplementary.live.confirm.removeMessage'),
+                                message: t(hasHistory ? 'supplementary.confirm.removeMessage' : source.provides_live ? 'supplementary.live.confirm.removeMessage' : 'supplementary.forecast.confirm.removeMessage'),
                                 confirmText: t('supplementary.actions.remove'),
                                 isDangerous: true,
                                 onConfirm: () => remove.mutate(),

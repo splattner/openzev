@@ -1,0 +1,181 @@
+import { AxiosError } from 'axios'
+import { act, createElement } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ProductionForecastChart, ProductionForecastSection } from '../src/features/live/ProductionForecastChart'
+import { PvPlanesDialog } from '../src/features/meteringPoints/PvPlanesDialog'
+import { ForecastConnectDialog } from '../src/features/supplementary/ForecastConnectDialog'
+import type { MeteringPoint, ProductionForecast, PvPlane } from '../src/types/api'
+import { renderWithProviders, setInputValue } from './helpers/render'
+import { waitForCondition } from './helpers/waitForCondition'
+
+vi.mock('react-i18next', () => ({
+    useTranslation: () => ({ t: (key: string, options?: Record<string, unknown>) => (options ? `${key}${JSON.stringify(options)}` : key) }),
+}))
+// The chart library measures the DOM, which a test renderer does not have.
+vi.mock('recharts', () => {
+    const passthrough = ({ children }: { children?: unknown }) => children ?? null
+    return {
+        ResponsiveContainer: passthrough, ComposedChart: ({ data }: { data: unknown[] }) => `chart:${data.length}`,
+        Area: () => null, Bar: () => null, CartesianGrid: () => null, Tooltip: () => null, XAxis: () => null, YAxis: () => null,
+    }
+})
+const pushToast = vi.fn()
+vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast }) }))
+
+const live = vi.hoisted(() => ({ fetchProductionForecastOrNull: vi.fn() }))
+vi.mock('../src/lib/api/live', async (importOriginal) => ({ ...(await importOriginal<typeof import('../src/lib/api/live')>()), ...live }))
+const supplementary = vi.hoisted(() => ({ createSupplementarySource: vi.fn() }))
+vi.mock('../src/lib/api/supplementary', async (importOriginal) => ({ ...(await importOriginal<typeof import('../src/lib/api/supplementary')>()), ...supplementary }))
+const zev = vi.hoisted(() => ({ fetchPvPlanes: vi.fn(), createPvPlane: vi.fn(), updatePvPlane: vi.fn(), deletePvPlane: vi.fn() }))
+vi.mock('../src/lib/api/zev', async (importOriginal) => ({ ...(await importOriginal<typeof import('../src/lib/api/zev')>()), ...zev }))
+
+const apiError = (data: Record<string, unknown>) =>
+    new AxiosError('Bad Request', '400', undefined, undefined, { status: 400, data, statusText: 'Bad Request', headers: {}, config: {} as never })
+
+const forecast = (overrides: Partial<ProductionForecast> = {}): ProductionForecast => ({
+    zev_id: 'z1', horizon_h: 72, complete: true, plants: 2, plants_with_forecast: 2, fetched_at: '2026-06-01T08:00:00Z',
+    hours: [
+        { start: '2026-06-01T10:00:00Z', power_w: 6400, min_w: 5000, max_w: 7000 },
+        { start: '2026-06-01T11:00:00Z', power_w: 7400, min_w: null, max_w: null },
+    ],
+    peak_windows: [{ date: '2099-01-01', from: '2099-01-01T09:00:00Z', to: '2099-01-01T13:00:00Z', peak_w: 7900 }],
+    ...overrides,
+})
+
+const cleanups: Array<() => void> = []
+beforeEach(() => vi.clearAllMocks())
+afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
+
+const buttons = (root: ParentNode) => Array.from(root.querySelectorAll<HTMLButtonElement>('button'))
+const buttonWith = (root: ParentNode, label: string) => buttons(root).find((b) => b.textContent?.includes(label))
+const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]')
+
+describe('ProductionForecastChart', () => {
+    it('says when the plants are expected to produce most, and never that power is spare', async () => {
+        const { container } = await renderWithProviders(createElement(ProductionForecastChart, { forecast: forecast() }), cleanups)
+        expect(container.textContent).toContain('forecast.title')
+        expect(container.textContent).toContain('forecast.peak.date')
+        expect(container.textContent).toContain('chart:2')
+        expect(container.textContent).toContain('forecast.hint')
+        expect(container.textContent).not.toContain('forecast.partial')
+    })
+
+    it('says how many plants the sum covers when it is partial', async () => {
+        const { container } = await renderWithProviders(
+            createElement(ProductionForecastChart, { forecast: forecast({ complete: false, plants_with_forecast: 1 }) }), cleanups,
+        )
+        expect(container.textContent).toContain('forecast.partial{"count":1,"total":2}')
+    })
+})
+
+describe('ProductionForecastSection', () => {
+    it('renders nothing while the forecast is off, empty or not asked for', async () => {
+        for (const answer of [null, forecast({ plants_with_forecast: 0, hours: [] })]) {
+            live.fetchProductionForecastOrNull.mockResolvedValue(answer)
+            const { container } = await renderWithProviders(createElement(ProductionForecastSection, { zevId: 'z1', enabled: true }), cleanups)
+            await act(async () => { await Promise.resolve() })
+            expect(container.querySelector('section')).toBeNull()
+        }
+        live.fetchProductionForecastOrNull.mockClear()
+        await renderWithProviders(createElement(ProductionForecastSection, { zevId: 'z1', enabled: false }), cleanups)
+        expect(live.fetchProductionForecastOrNull).not.toHaveBeenCalled()
+    })
+
+    it('shows the chart once there is a forecast', async () => {
+        live.fetchProductionForecastOrNull.mockResolvedValue(forecast())
+        const { container } = await renderWithProviders(createElement(ProductionForecastSection, { zevId: 'z1', enabled: true }), cleanups)
+        await waitForCondition(() => container.textContent?.includes('forecast.title') === true, 'the forecast chart')
+    })
+})
+
+describe('ForecastConnectDialog', () => {
+    const point = { metering_point: 'mp-1', meter_id: 'CH-100', zev: 'zev-1' }
+
+    it('connects forecast.solar to a ZEV-operated plant without consent, credentials or a token', async () => {
+        supplementary.createSupplementarySource.mockResolvedValue({})
+        const onClose = vi.fn()
+        await renderWithProviders(createElement(ForecastConnectDialog, { holder: 'zev', point, onClose }), cleanups)
+        expect(dialog()!.textContent).toContain('supplementary.forecast.needsManager')
+        expect(dialog()!.textContent).not.toContain('supplementary.forecast.solarManagerHint')
+        await act(async () => { buttonWith(dialog()!, 'supplementary.forecast.connect')!.click() })
+
+        expect(supplementary.createSupplementarySource).toHaveBeenCalledWith({
+            provider: 'forecast_solar', metering_point: 'mp-1', provides_history: false, provides_live: false, provides_forecast: true,
+            target: 'metering_point', held_by: 'zev', zev: 'zev-1', consent: false,
+        })
+        await waitForCondition(() => onClose.mock.calls.length > 0, 'the dialog to close')
+        expect(pushToast).toHaveBeenCalledWith('supplementary.forecast.connected', 'success')
+    })
+
+    it('connects for a holder as a participant-held source and points to Solar Manager', async () => {
+        supplementary.createSupplementarySource.mockResolvedValue({})
+        await renderWithProviders(createElement(ForecastConnectDialog, { holder: 'participant', point, onClose: vi.fn() }), cleanups)
+        expect(dialog()!.textContent).toContain('supplementary.forecast.solarManagerHint')
+        await act(async () => { buttonWith(dialog()!, 'supplementary.forecast.connect')!.click() })
+        expect(supplementary.createSupplementarySource.mock.calls[0][0]).toMatchObject({ held_by: 'participant', zev: undefined })
+    })
+
+    it('shows what the server says is missing and stays open', async () => {
+        supplementary.createSupplementarySource.mockRejectedValue(apiError({ provides_forecast: ['Add the roof planes of this plant first.'] }))
+        const onClose = vi.fn()
+        await renderWithProviders(createElement(ForecastConnectDialog, { holder: 'zev', point, onClose }), cleanups)
+        await act(async () => { buttonWith(dialog()!, 'supplementary.forecast.connect')!.click() })
+        await waitForCondition(() => dialog()!.textContent?.includes('Add the roof planes of this plant first.') === true, 'the server message')
+        expect(onClose).not.toHaveBeenCalled()
+    })
+})
+
+describe('PvPlanesDialog', () => {
+    const point = { id: 'mp-1', meter_id: 'CH-100', meter_type: 'production' } as MeteringPoint
+    const plane = (overrides: Partial<PvPlane> = {}): PvPlane => ({
+        id: 'pl-1', metering_point: 'mp-1', label: 'South', peak_power_kwp: '8.50', tilt_deg: 30, azimuth_deg: 0,
+        created_at: '', updated_at: '', ...overrides,
+    })
+
+    it('lists the planes with their direction', async () => {
+        zev.fetchPvPlanes.mockResolvedValue([plane(), plane({ id: 'pl-2', label: 'West', azimuth_deg: 90 })])
+        await renderWithProviders(createElement(PvPlanesDialog, { point, canWrite: true, onClose: vi.fn() }), cleanups)
+        await waitForCondition(() => dialog()!.textContent?.includes('South') === true, 'the planes')
+        expect(dialog()!.textContent).toContain('"direction":"pages.meteringPoints.planes.direction.west"')
+    })
+
+    it('adds a plane from the form', async () => {
+        zev.fetchPvPlanes.mockResolvedValue([])
+        zev.createPvPlane.mockResolvedValue(plane())
+        await renderWithProviders(createElement(PvPlanesDialog, { point, canWrite: true, onClose: vi.fn() }), cleanups)
+        await waitForCondition(() => dialog()!.textContent?.includes('pages.meteringPoints.planes.empty') === true, 'the empty state')
+        await act(async () => { buttonWith(dialog()!, 'pages.meteringPoints.planes.add')!.click() })
+        const inputs = Array.from(dialog()!.querySelectorAll<HTMLInputElement>('input'))
+        await act(async () => {
+            setInputValue(inputs[0], 'South roof')
+            setInputValue(inputs[1], '8.5')
+            setInputValue(inputs[2], '25')
+            setInputValue(inputs[3], '-10')
+        })
+        await act(async () => { dialog()!.querySelector('form')!.requestSubmit() })
+
+        expect(zev.createPvPlane).toHaveBeenCalledWith('mp-1', { label: 'South roof', peak_power_kwp: '8.50', tilt_deg: 25, azimuth_deg: -10 })
+    })
+
+    it('refuses an impossible value before asking the server', async () => {
+        zev.fetchPvPlanes.mockResolvedValue([])
+        await renderWithProviders(createElement(PvPlanesDialog, { point, canWrite: true, onClose: vi.fn() }), cleanups)
+        await waitForCondition(() => dialog()!.textContent?.includes('pages.meteringPoints.planes.empty') === true, 'the empty state')
+        await act(async () => { buttonWith(dialog()!, 'pages.meteringPoints.planes.add')!.click() })
+        const inputs = Array.from(dialog()!.querySelectorAll<HTMLInputElement>('input'))
+        await act(async () => { setInputValue(inputs[1], '8'); setInputValue(inputs[2], '120') })
+        // The browser's own range check would stop a real submit first; the handler must hold on its own.
+        await act(async () => { dialog()!.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
+        expect(zev.createPvPlane).not.toHaveBeenCalled()
+        expect(dialog()!.textContent).toContain('pages.meteringPoints.planes.invalid')
+    })
+
+    it('is read-only for someone who cannot write', async () => {
+        zev.fetchPvPlanes.mockResolvedValue([plane()])
+        await renderWithProviders(createElement(PvPlanesDialog, { point, canWrite: false, onClose: vi.fn() }), cleanups)
+        await waitForCondition(() => dialog()!.textContent?.includes('South') === true, 'the planes')
+        expect(buttonWith(dialog()!, 'pages.meteringPoints.planes.add')).toBeUndefined()
+        expect(buttonWith(dialog()!, 'common.edit')).toBeUndefined()
+        expect(buttonWith(dialog()!, 'common.delete')).toBeUndefined()
+    })
+})

@@ -16,6 +16,7 @@ import { groupMeteringPointsByBuilding } from '../features/meteringPoints/useMet
 import { MeteringPointsToolbar } from '../features/meteringPoints/MeteringPointsToolbar'
 import { useMeteringPointActions } from '../features/meteringPoints/useMeteringPointActions'
 import { ConnectionPointCard, PointLiveDialog, useLiveSetup } from '../features/meteringPoints/LiveSetup'
+import { PvPlanesDialog } from '../features/meteringPoints/PvPlanesDialog'
 import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
@@ -58,6 +59,7 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
     const readOnly = !canWrite
     const liveSetup = useLiveSetup({ zevId: selectedZevId || undefined, canWrite, isManagedScope })
     const [livePoint, setLivePoint] = useState<MeteringPoint | null>(null)
+    const [planesPoint, setPlanesPoint] = useState<MeteringPoint | null>(null)
 
     const {
         meteringPointsQuery,
@@ -308,6 +310,7 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                         onDeleteAssignment={(id) => deleteAssignMutation.mutate({ id, scope })}
                         liveSetupPointIds={canWrite ? new Set(liveSetup.zevEligibleByPoint.keys()) : undefined}
                         onOpenLive={setLivePoint}
+                        onOpenPlanes={liveSetup.liveOn ? setPlanesPoint : undefined}
                     />
                 )}
 
@@ -328,6 +331,7 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                     }}
                 />
 
+                {planesPoint && <PvPlanesDialog point={planesPoint} canWrite={canWrite} onClose={() => setPlanesPoint(null)} />}
                 {livePoint && <PointLiveDialog point={livePoint} setup={liveSetup} confirm={confirm} onClose={() => setLivePoint(null)} />}
 
                 {dialog && (
