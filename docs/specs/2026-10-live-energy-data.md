@@ -704,20 +704,28 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
   - `none`: "No live production data right now"; the coverage line below says how far live data
     reaches. The forecast is its own card below (`ProductionForecastChart`), shown from any plant that has one, also with no live source at all.
   - `production`: "The ZEV produces **x kW** right now" and the note "We don't know how much the other
-    participants are using at the moment, so part of it may already be in use." Own consumption if
-    `own.complete`.
-  - `exact`: production, consumption, **spare now**, local share, and the own split ("of your
-    1.2 kW, 1.2 kW is local and 0.0 kW comes from the grid"); a producer's own production with
-    `to_zev`/`to_grid`; with `split_withheld_reason = "inconsistent"` a hint instead of the split. The
-    split is never shown below `exact`; a value the payload leaves `null` is never shown.
+    participants are using at the moment, so part of it may already be in use."
+  - Own figures lead, ahead of the ZEV totals, as tiles of their own in a grid above them (a viewer's own
+    consumption and, for a producer, own production; UI review of #1032, a participant came for their own number):
+    **Your consumption** `x kW` with the hint "of which y kW local, z kW from the grid" (only at `exact`; below it the
+    tile has no hint) and **Your production** `x kW` with "y kW to the ZEV, z kW to the grid" (only at `exact`).
+    The consumption tile needs `own.complete`; with `split_withheld_reason = "inconsistent"` the tile shows the
+    figure and a muted hint under the grid says the split cannot be shown right now.
+  - `exact`: production, consumption, **spare now**, local share. The split is never shown below `exact`; a value
+    the payload leaves `null` is never shown. A power that rounds to zero is `0.0`, never `-0.0` (`snapshot.watts`
+    and `kwFigure` both normalise a negative zero).
   - Always: "as of hh:mm:ss" (when `as_of` is set), a "Live, indicative" badge, and **one** coverage
     line: "Live data from X of Y metering points", then " · Grid connection point: <state>" when
     `coverage.connection_point` is not `null`. X and Y count **distinct** active metering points
     (a bidirectional one counts once), taken from `coverage.points_fresh` / `coverage.points`
     (`liveCardState().reporting`), for every viewer. The per-role counts (`producing_*`, `consuming_*`)
     are not shown: merging them would count a bidirectional point twice.
-- `LivePointsTable.tsx` (meter or "Grid connection point", holder or "ZEV-operated", kW, age, state
-  badge) for a snapshot that carries `points` (manager, viewer, admin).
+- `LivePointsTable.tsx` (meter or "Grid connection point", holder or "ZEV-operated", kW, age, state)
+  for a snapshot that carries `points` (manager, viewer, admin). From 640 px down the columns give way to one small
+  card per point (`.live-points-list`), so the kW is never behind a horizontal scroll. The state is text
+  (`LiveStateBadge`): a current value is plain, a source gone quiet is an `IssueText` warning and a point with no data a
+  muted note; no coloured pill (UI patterns §10.1). `LiveStateChip` on the metering-point rows is a `badge-tag`
+  while values come in and an `IssueText` while stale.
 - `ProductionForecastChart.tsx` (`features/live/`, the body of the **Tomorrow** tab, §7.1 structure; it replaces the separate forecast card of the first cut): the title "Expected
   production" with "as of hh:mm", the next peak window in bold ("Highest production expected today 10:00-14:00",
   "tomorrow" or the date), hourly bars in kW (hours already past lighter) with the min/max band as an area only where the
@@ -888,7 +896,8 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   <time>". Its **Connect** opens `ForecastConnectDialog` instead of the shared connect flow (forecast.solar needs no
   credential or consent): what the forecast is, what leaves the instance (location rounded to a kilometre and the planes'
   size, tilt and direction), that a manager must have entered the planes and the building's location (the server's refusal
-  says what is missing and is shown in the dialog), and for a holder whose meter has a working Solar Manager connection (enabled, key stored, no forecast yet) a choice
+  "Add the roof planes ..." is replaced by a translated text, `setupMissingManager` or `setupMissingParticipant`, that says
+  who adds what; any other refusal is shown as the server words it), and for a holder whose meter has a working Solar Manager connection (enabled, key stored, no forecast yet) a choice
   between that connection (default; consent checkbox, `PATCH {provides_forecast: true, consent: true}` instead of a new source) and
   forecast.solar. It creates `{provider: forecast_solar, provides_forecast: true, provides_history: false,
   provides_live: false, held_by, target: metering_point, consent: false}`. A holder's card hosts it directly; the
@@ -901,7 +910,9 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
 - **Roof planes** (`features/meteringPoints/PvPlanesDialog.tsx`): the metering-point menu of a producing or bidirectional point
   has **Roof planes** while the live view is on (managers; viewers read). One dialog lists the planes ("8.50 kWp, tilt 25°,
   facing south") with Edit and Delete and a form for name, peak power (kWp), tilt and direction (degrees, 0 south, 90 west,
-  -90 east, 180 north); `planeInput` checks the same ranges as the server before asking it (`lib/pvPlanes.ts`).
+  -90 east, 180 north); `planeInput` checks the same ranges as the server before asking it (`lib/pvPlanes.ts`). The form is
+  `noValidate`: after the first save a message by the field (`planeFieldProblems`, `planes.errors.kwp|tilt|azimuth`) names
+  what is missing or out of range, so the browser's own tooltip never appears. Cancel comes before Save.
 - **Building form** (`BuildingFormModal`): latitude and longitude (decimal degrees, comma accepted, both or neither,
   `coordinateInput`) with **Locate from address** (`locateBuilding`, enabled once street and city are filled; it fills the two
   fields and saves nothing).
