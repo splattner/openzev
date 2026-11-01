@@ -87,6 +87,7 @@ building actions on the metering points page follow the page's existing manage c
 | `city` | `CharField(100)` | `""` | blank |
 | `egid` | `PositiveIntegerField` | `null` | blank; `MaxValueValidator(999_999_999)` (GWR EGIDs have at most 9 digits) |
 | `notes` | `TextField` | `""` | blank |
+| `latitude` / `longitude` | `DecimalField(8,5)` | `null` | blank; within ±90 / ±180. Where the plant is, for the production forecast ([live energy data](2026-10-live-energy-data.md) §4.3); sent to forecast.solar rounded to two decimals |
 | `created_at`, `updated_at` | `DateTimeField` | auto | |
 
 `Meta.ordering = ["name", "id"]`.
@@ -183,7 +184,7 @@ Landowner rows keep `building = NULL` (nothing records the link today).
 `{"zev_id": …}`.
 
 **`BuildingSerializer`** fields: `id`, `zev`, `name`, `address_line1`, `address_line2`,
-`postal_code`, `city`, `egid`, `notes`, `metering_point_count`, `created_at`, `updated_at`
+`postal_code`, `city`, `egid`, `notes`, `latitude`, `longitude`, `metering_point_count`, `created_at`, `updated_at`
 (read-only: `id`, `metering_point_count`, `created_at`, `updated_at`). `metering_point_count`
 from a queryset annotation, falling back to a live count. `zev` is not changeable on update
 (`"A building cannot move to another ZEV."`). `egid` duplicate within the ZEV →
@@ -244,12 +245,14 @@ export interface Building {
     city: string
     egid: number | null
     notes: string
+    latitude: string | null
+    longitude: string | null
     metering_point_count: number
     created_at: string
     updated_at: string
 }
 export type BuildingInput = Pick<Building, 'zev' | 'name' | 'address_line1' | 'address_line2'
-    | 'postal_code' | 'city' | 'egid' | 'notes'>
+    | 'postal_code' | 'city' | 'egid' | 'notes'> & Partial<Pick<Building, 'latitude' | 'longitude'>>
 ```
 
 `MeteringPoint` gains `building: string`, `building_name: string`; `MeteringPointInput` gains
@@ -351,7 +354,8 @@ All new strings in `de`, `en`, `fr`, `it` (`pages.zevSettings.tabs.buildings`,
 - `FORMAT_VERSION = 6`, `SUPPORTED_FORMAT_VERSIONS = {1, 2, 3, 4, 5, 6}`.
 - `BUILDINGS_FILE = "buildings.json"`, written with the `metering_points` section:
   `[{"id": <archive id>, **BUILDING_FIELDS}]`, `BUILDING_FIELDS = ("name", "address_line1",
-  "address_line2", "postal_code", "city", "egid", "notes")`.
+  "address_line2", "postal_code", "city", "egid", "notes", "latitude", "longitude")` (the last two absent in older archives).
+  The building form has latitude and longitude with a stateless **Locate from address** (`POST /zev/buildings/locate/`).
 - Each metering-point entry and each party-role entry carries `"building_id"` (archive id; null
   on a role without one). It sits beside the field lists like `party_id`, not in
   `METERING_POINT_FIELDS` / `PARTY_ROLE_FIELDS`: the schema parity test excludes the `building`

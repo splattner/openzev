@@ -153,7 +153,7 @@ the second table below; everything else on this page describes the **history** c
 | `id` | `UUIDField` pk | `uuid4` | |
 | `metering_point` | `ForeignKey(zev.MeteringPoint, CASCADE, null=True)` | `None` | `related_name="supplementary_sources"` (was a `OneToOneField` named `supplementary_source`; `MeteringPoint.history_source()` / `live_source()` return the one with that capability). Null exactly for the grid connection point |
 | `participant` | `ForeignKey(zev.Participant, CASCADE, null=True)` | — | `related_name="supplementary_sources"`. The consenting holder; ingestion is clipped to their personal assignment windows. Null exactly when `held_by = zev` |
-| `provider` | `CharField(20)` | — | `SupplementaryProvider`: `solar_manager`, `push` ("push or file") |
+| `provider` | `CharField(20)` | — | `SupplementaryProvider`: `solar_manager`, `push` ("push or file"), `forecast_solar` (a forecast-only source, no credential; see the [live energy data spec](2026-10-live-energy-data.md) §4.1, §6.3) |
 | `label` | `CharField(100)` | `""` | Free text, e.g. "Solar Manager at home" |
 | `external_id` | `CharField(64)` | `""` | Solar Manager `smId`; validated `^[A-Za-z0-9]{3,24}$`; required for `solar_manager`, empty for `push` |
 | `credential_encrypted` | `BinaryField` | `b""` | Fernet ciphertext under `INTEGRATION_ENCRYPTION_KEYS` of `{"refresh_token": "..."}`. Never serialized. `solar_manager` only |
@@ -742,7 +742,7 @@ an owner.
 **File:** `frontend/src/types/api.ts`
 
 ```typescript
-export type SupplementaryProvider = 'solar_manager' | 'push'
+export type SupplementaryProvider = 'solar_manager' | 'push' | 'forecast_solar'
 export type SupplementaryStatus = 'pending' | 'ok' | 'error' | 'reconnect_required' | 'disabled'
 
 export interface SupplementaryReconciliation {

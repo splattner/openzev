@@ -282,3 +282,70 @@ def test_system_health_supplementary_probe_reports_live_sources_without_degradin
     assert probe["live_flag_enabled"] is True
     assert (probe["live_sources"], probe["live_fresh"]) == (3, 1)
     assert probe["status"] == "ok"  # devices going offline is not the platform's fault
+
+
+def _forecast_source(zev, fetched_ago, **extra):
+    from decimal import Decimal
+
+    from django.utils import timezone
+
+    from metering.models import ProductionForecastPoint, SupplementarySource
+    from testing import factories
+
+    point = factories.MeteringPointFactory(zev=zev, meter_type="production")
+    source = SupplementarySource.objects.create(
+        zev=zev, metering_point=point, held_by="zev", provider="forecast_solar", provides_history=False,
+        provides_forecast=True, **extra,
+    )
+    if fetched_ago is not None:
+        ProductionForecastPoint.objects.create(
+            source=source, metering_point=point, timestamp=timezone.now(), power_w=Decimal(1),
+            fetched_at=timezone.now() - fetched_ago,
+        )
+    return source
+
+
+def test_system_health_supplementary_probe_reports_forecast_sources_and_degrades_when_most_are_stale(admin_client):
+    from datetime import timedelta
+
+    from cryptography.fernet import Fernet
+    from django.core.cache import cache
+
+    from accounts.models import FeatureFlag
+    from metering.live import store
+    from testing import factories
+
+    cache.clear()
+    _flag(True)
+    FeatureFlag.objects.update_or_create(name=FeatureFlag.LIVE_ENERGY_DATA_ENABLED, defaults={"enabled": True})
+    zev = factories.ZevFactory()
+    _forecast_source(zev, timedelta(minutes=30))
+    store.take_forecast_solar_calls(2)
+
+    with override_settings(INTEGRATION_ENCRYPTION_KEYS=[Fernet.generate_key().decode()]):
+        probe = admin_client.get(URL).json()["supplementary"]
+    assert (probe["forecast_sources"], probe["forecast_stale"], probe["forecast_solar_calls_last_hour"]) == (1, 0, 2)
+    assert probe["status"] == "ok"
+
+    # Two of three sources have not been fetched for more than three refresh intervals: more than half.
+    _forecast_source(zev, timedelta(hours=10))
+    _forecast_source(zev, timedelta(hours=10))
+    with override_settings(INTEGRATION_ENCRYPTION_KEYS=[Fernet.generate_key().decode()]):
+        probe = admin_client.get(URL).json()["supplementary"]
+    assert (probe["forecast_sources"], probe["forecast_stale"]) == (3, 2)
+    assert probe["status"] == "degraded"
+
+
+def test_a_source_that_needs_a_new_key_is_not_counted_as_a_stale_forecast(admin_client):
+    from datetime import timedelta
+
+    from cryptography.fernet import Fernet
+
+    from testing import factories
+
+    _flag(True)
+    _forecast_source(factories.ZevFactory(), timedelta(hours=10), status="reconnect_required")
+    with override_settings(INTEGRATION_ENCRYPTION_KEYS=[Fernet.generate_key().decode()]):
+        probe = admin_client.get(URL).json()["supplementary"]
+    assert (probe["forecast_sources"], probe["forecast_stale"]) == (0, 0)
+    assert probe["status"] == "ok"

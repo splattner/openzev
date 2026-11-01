@@ -167,3 +167,21 @@ class EligibleForecastTests(ForecastSourceTestCase):
         rows = {r["metering_point"]: r for r in body["metering_points"]}
         self.assertEqual(rows[str(self.plant.pk)]["eligible_capabilities"], ["live", "forecast"])
         self.assertEqual(rows[str(self.unheld.pk)]["eligible_capabilities"], ["live"])
+
+
+class DisconnectForecastTests(ForecastSourceTestCase):
+    def test_a_disconnected_source_drops_out_of_the_forecast(self):
+        source_id = self.post(self.manager, self.plant, held_by="zev", **FORECAST).json()["id"]
+        source = SupplementarySource.objects.get(pk=source_id)
+        ProductionForecastPoint.objects.create(
+            source=source, metering_point=self.plant, timestamp=source.created_at.replace(minute=0, second=0, microsecond=0),
+            power_w=Decimal(100), fetched_at=source.created_at,
+        )
+        url = f"/api/v1/metering/live/zevs/{self.zev.pk}/forecast/"
+        before = client_for(self.manager).get(url).json()
+        self.assertEqual(before["plants_with_forecast"], 1)
+
+        response = client_for(self.manager).post(f"{SOURCES_URL}{source_id}/disconnect/")
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertFalse(response.json()["enabled"])
+        self.assertEqual(client_for(self.manager).get(url).json()["plants_with_forecast"], 0)

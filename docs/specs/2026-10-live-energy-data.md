@@ -261,9 +261,14 @@ all fields, `id`/timestamps read-only. Included in backups and the transfer arch
 
 **`zev.Building` gains** `latitude` (`DecimalField(8,5, null)`) and `longitude`
 (`DecimalField(8,5, null)`), editable by managers, with a "Locate from address" action that fills
-them from `zev.geocoding.geocode_building_footprint` (centroid). Requests to forecast.solar send the
+them from `zev.geocoding.geocode_building_footprint` (centroid, `footprint_centroid`). Requests to forecast.solar send the
 coordinates rounded to **2 decimals** (~1 km); the precise values never leave the instance.
-`BuildingSerializer` gains both fields.
+`BuildingSerializer` gains both fields (writable like the rest of the building, and so tracked by the
+`building.update` audit event). "Locate from address" is the stateless `POST /zev/buildings/locate/`
+(manager, `{address_line1, postal_code, city}` → `{latitude, longitude}`, the mean of the corners of the
+building's mapped outline from `geocode_building_footprint`): it saves nothing, the form saves the values like any
+other field, and it answers `400` when the address does not resolve to a mapped building and `429` for a
+second lookup by the same user within two seconds (Nominatim's usage policy).
 
 ### 4.4 Live samples (cache, not a model)
 
@@ -304,10 +309,11 @@ totals.
 | `LIVE_LAST_SEEN_RESOLUTION_S` | `env.int` | `30` | `live_last_seen_at` write resolution |
 | `LIVE_MAX_ABS_POWER_W` | `env.int` | `5000000` | Plausibility cap for any value |
 | `FORECAST_REFRESH_INTERVAL_S` | `env.int` | `3600` | Beat period of `refresh_production_forecasts` |
-| `FORECAST_HORIZON_H` | `env.int` | `72` | Hours stored and shown |
+| `FORECAST_HORIZON_H` | `env.int` | `72` | Upper cap on the hours stored from the current hour on. The providers reach less: forecast.solar's public tier today and tomorrow, Solar Manager three days |
 | `FORECAST_SOLAR_BASE_URL` | `env` | `https://api.forecast.solar` | Fixed host; overridable only for test stubs |
 | `FORECAST_SOLAR_API_KEY` | `env` | `""` | Optional paid key (higher limits, more planes) |
-| `FORECAST_SOLAR_MAX_CALLS_PER_HOUR` | `env.int` | `10` | Instance-wide budget; the public tier is limited per calling IP |
+| `FORECAST_SOLAR_MAX_CALLS_PER_HOUR` | `env.int` | `10` | Instance-wide budget over a **rolling** hour (the public tier allows 12 per calling IP); every roof plane is one call |
+| `FORECAST_SOLAR_MIN_REFRESH_S` | `env.int` | `10800` | A forecast.solar source is refreshed at most this often (a manual refresh skips it, the budget still applies) |
 | `PV_PLANES_MAX_PER_METERING_POINT` | `env.int` | `4` | |
 | `DEFAULT_THROTTLE_RATES["live_push"]` | rate | `900/hour` | Per push token (one sample per 4 s on average), on top of the 5-second floor |
 | `DEFAULT_THROTTLE_RATES["live_read"]` | rate | `720/hour` | Per user/API key on the live read endpoints (one every 5 s) |
@@ -354,12 +360,30 @@ Source management stays on `/supplementary/sources/` (supplementary spec §5) wi
   (`check_live`); with both capabilities it checks history and then live; a push source without history
   still answers `400 "This source does not provide history."`. `/sync/` and `/reconciliation/` still need
   `provides_history`.
-- `POST /sources/{id}/sync/` on a forecast source queues a forecast refresh (same 5-minute floor).
+- `POST /sources/{id}/sync/` on a forecast source queues a forecast refresh (same 5-minute floor; it skips the
+  forecast.solar minimum interval, not the call budget). `POST /sources/{id}/test/` on a `forecast_solar`
+  source fetches and stores the forecast now (`400` with the safe message when it fails or when the hourly call budget is used
+  up); on a Solar Manager source with a forecast it reads the forecast once with the stored key (`check_forecast`).
+- **Forecast sources.** `provider = forecast_solar` is a forecast-only source: `provides_forecast` defaults to
+  `true`, `provides_history` to `false`, any other capability answers `400 {"provider": [...]}`, it takes no
+  credential, id or consent and returns no token, and it is created like any other source: by the holder of
+  a producing metering point (participant-held) or by a manager on one nobody holds (`held_by = zev`). Creating
+  it (or adding `provides_forecast` to a forecast.solar source) needs the plant's roof planes and the building's
+  coordinates (`400 {"provides_forecast": ["Add the roof planes ... first."]}`) and a producing, active metering
+  point (`400` on `metering_point` otherwise). A push source cannot provide a forecast (`400`). A Solar Manager
+  source gains `provides_forecast` by `PATCH` with the holder's consent and the stored key, and loses it with
+  `{provides_forecast: false}`, which also deletes its forecast points. The forecast needs the live flag
+  (`400 {"provides_forecast": ["Live energy data is not enabled."]}` otherwise). Creating or enabling a forecast
+  source queues a refresh. `GET /sources/eligible/` and `zev-eligible/` list `forecast` in
+  `eligible_capabilities` of an active producing or bidirectional point. A ZEV-held forecast source is
+  disconnected, like any ZEV-held source, once somebody holds the meter personally (§6.5).
 
 PV planes: `GET/POST /api/v1/zev/metering-points/{id}/pv-planes/`,
-`PATCH/DELETE /api/v1/zev/metering-points/{id}/pv-planes/{plane_id}/` (managers and admins write;
-anyone who can read the metering point reads). Audited `pv_plane.create/update/delete`
-(category `METERING`).
+`GET/PATCH/DELETE /api/v1/zev/metering-points/{id}/pv-planes/{plane_id}/` (managers and admins write;
+anyone who can read the metering point reads: `PvPlaneViewSet`, scoped through the metering point). The
+metering point is the URL's whatever the body says, cannot be changed afterwards, must be a producing or bidirectional
+meter, and a point has at most `PV_PLANES_MAX_PER_METERING_POINT` planes (`400` on `metering_point`). Audited
+`pv_plane.create/update/delete` (category `METERING`, target `zev.PvPlane`).
 
 ### 5.1 Live ingest
 
@@ -532,8 +556,10 @@ an unknown `bucket` is `400`. Display only: nothing is written, and nothing here
   "peak_windows": [ { "date": "2026-10-30", "from": "2026-10-30T10:00:00Z", "to": "2026-10-30T14:00:00Z", "peak_w": 7900.0 } ] }
 ```
 
-- Sum over producing points with a forecast source; `min_w`/`max_w` only when every summed point has
-  them. `complete` is false when a producing point has no forecast; the UI then says "Forecast for 1
+- Sum over the active producing points (`production`, `bidirectional`) that have an enabled forecast source;
+  `hours` start with the current civil day (Europe/Zurich), so the hours already past can be drawn, up to
+  `FORECAST_HORIZON_H` ahead. `min_w`/`max_w` only when every summed point has
+  them. `plants` counts the active producing points and `plants_with_forecast` those with stored hours. `complete` is false when a producing point has no forecast; the UI then says "Forecast for 1
   of 2 plants".
 - `peak_windows`: per civil day, the longest contiguous run of hours with `power_w >= 50 %` of that
   day's maximum (ties: the earliest). Production only; never a surplus claim.
@@ -598,16 +624,33 @@ source `reconnect_required` (like a sync, audited once as `supplementary_source.
   `{t, pW, pWmin, pWmax}` (W). Points are averaged into UTC hours. The interval of `t` (start or
   instant) is verified against a real response before PR 5 merges, as the history timestamps were.
 - **forecast.solar:** per plane `GET {FORECAST_SOLAR_BASE_URL}[/{api_key}]/estimate/watts/{lat}/{lon}/{tilt}/{azimuth}/{kwp}`
-  with coordinates rounded to 2 decimals; the per-plane series are summed. Its `result` maps local
-  timestamps (timezone in `message.info.timezone`) to W; they are converted to UTC and averaged into
-  hours. An instance-wide counter (`live:v1:forecast_solar:calls:{hour}`) enforces
-  `FORECAST_SOLAR_MAX_CALLS_PER_HOUR`; a source that does not fit is refreshed on the next tick, oldest
-  first. A plant whose planes exceed what the public tier accepts gets `error` with a safe message
-  naming `FORECAST_SOLAR_API_KEY`. `429` is honoured with its `Retry-After`. Fixed host, no redirects,
-  20 s timeout, 1 MiB cap. The free tier's current limits and terms of use are checked and recorded
-  here before PR 5 merges.
-- Each refresh replaces the source's points from now on and deletes points older than 24 h, in one
-  transaction; status handling (`ok`/`error`/`reconnect_required`, `last_*`) as for history syncs.
+  with coordinates rounded to 2 decimals; the per-plane series are summed after being averaged into hours.
+  `result.watts` maps local timestamps (timezone in `message.info.timezone`) to the mean power **since the previous key**, so a key
+  marks the end of the interval it covers: it is converted to UTC and belongs to the hour before it.
+  *Limits and terms, checked 2026-11-01 (doc.forecast.solar/account_models):* the public tier needs no registration
+  or key and is "free for life" with no non-commercial clause stated; it answers **one plane per call**,
+  **12 calls per rolling 60 minutes per calling IP**, **today and tomorrow** only and one-hour resolution (a key lifts these:
+  60 to 1200 calls an hour, 1 to 4 planes per call, 3 to 6 days). A plane is therefore one call, and
+  the shipped design follows from that, not from the first draft (hourly refresh, 72 hours):
+  - a forecast.solar source is refreshed at most every `FORECAST_SOLAR_MIN_REFRESH_S` (3 hours), forecasts moving slowly;
+  - an instance-wide **rolling-hour** call list (`live:v1:forecast_solar:calls`) enforces
+    `FORECAST_SOLAR_MAX_CALLS_PER_HOUR`, reserving all of a plant's calls at once or none: a source that does not
+    fit is `deferred` (nothing changes, not even its status) and tried again on the next tick, oldest first;
+  - a plant with more planes than the budget could ever allow gets `error` with a safe message naming
+    `FORECAST_SOLAR_API_KEY` and the budget setting;
+  - a `429` is honoured (`Retry-After`, else `X-Ratelimit-Reset`, at most an hour) through
+    `live:v1:forecast_solar:backoff`, which holds back every forecast.solar source;
+  - the horizon is what the tier returns (about two days); `FORECAST_HORIZON_H` only caps it.
+  Fixed host, no redirects, 20 s timeout, 1 MiB cap.
+- Each refresh replaces the source's points from the current hour on and deletes points older than 24 h, in one
+  transaction. Status handling: a source that provides **only** a forecast keeps `ok`/`error`/`reconnect_required`
+  and `last_*` like a history sync; one that also provides history or live leaves `status` and `last_error` to
+  those (a failure is logged), except that an auth failure makes the whole source `reconnect_required` and is
+  audited once as `supplementary_source.sync` with `capability: forecast`. Nothing is audited per refresh.
+  `refresh_forecast_source` is not retried: the next beat tick is the retry. Both tasks do nothing while the live flag is off.
+- **Solar Manager timestamps.** `t` of a forecast row is read as the *start* of its interval (`FORECAST_T_MARKS`
+  in `solar_manager.py`, a one-line fix), taken from the vendor's swagger (API 1.88.11) and **not yet checked against
+  a real `/data/forecast` response**. A row without `t` or `pW` is skipped; no usable row is an error.
 
 ### 6.4 Time
 
@@ -618,8 +661,8 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
 ### 6.5 Operations
 
 - **System health:** the `supplementary` probe gains `live_flag_enabled`, `live_sources`,
-  `live_fresh`, `forecast_sources`, `forecast_stale` (no success for 3 refresh intervals) and
-  `forecast_solar_calls_this_hour`. `degraded` additionally when more than half of the enabled
+  `live_fresh`, `forecast_sources`, `forecast_stale` (no points fetched for 3 refresh intervals; a source that needs a new key is not counted, and a source that was never fetched counts from its creation) and
+  `forecast_solar_calls_last_hour` (the rolling hour of §6.3). `degraded` additionally when more than half of the enabled
   forecast sources are stale. Live freshness never degrades health: devices going offline is the
   participant's matter.
 - **Audit:** `supplementary_source.create/update/delete/disconnect` carry `capabilities`, `target` and
@@ -648,14 +691,16 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
   card shows; the date is today's civil date (`todayBusinessIso`). Pure helpers: `kwFigure`, `formatKw`
   (kW, one decimal), `formatClock` (`hh:mm:ss`, Europe/Zurich), `showLiveCard` (snapshot non-null and
   `coverage.live_sources > 0`), `liveCardState` (what the card may say per tier), `liveCurveRows`,
-  `liveDayAxis`. `useProductionForecast(zevId)` (every 15 min) comes with PR 5.
+  `liveDayAxis`. `useProductionForecast(zevId, enabled)` (`lib/forecast.ts`: `queryKeys.live.forecast(zevId)`, every 15 min, no
+  focus refetch, `404` to `null` and no polling after it) with the pure helpers `forecastRows` (kW, band `[min, max]` or `null`),
+  `hasForecast` (a plant with hours), `nextPeakWindow` (the window that is running or next), `peakDayKind` (today, tomorrow, date) and `peakRange`.
 - `frontend/src/lib/myEnergy.ts`: `MyEnergyRange` (`today`, `week`, `period`) with `parseMyEnergyRange`,
   `shiftIsoDate`/`lastDaysRange`, `showMyEnergyEntry` (the nav rule, §3), `useOwnSeries(params, enabled)`
   (`queryKeys.live.ownSeries(zevId, participantId, from, to, bucket)`, so a source change invalidates it
   with `queryKeys.live.all`), `ownHistoryFromSeries` and `todayRows` (the history/live merge, §5.3).
 - `frontend/src/features/live/LiveEnergyCard.tsx`:
   - `none`: "No live production data right now"; the coverage line below says how far live data
-    reaches. The forecast peak comes with PR 5.
+    reaches. The forecast is its own card below (`ProductionForecastChart`), shown from any plant that has one, also with no live source at all.
   - `production`: "The ZEV produces **x kW** right now" and the note "We don't know how much the other
     participants are using at the moment, so part of it may already be in use." Own consumption if
     `own.complete`.
@@ -670,9 +715,14 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
     (`liveCardState().reporting`), for every viewer. The per-role counts (`producing_*`, `consuming_*`)
     are not shown: merging them would count a bidirectional point twice.
 - `LivePointsTable.tsx` (meter or "Grid connection point", holder or "ZEV-operated", kW, age, state
-  badge) for a snapshot that carries `points` (manager, viewer, admin). `ProductionForecastChart.tsx`
-  (hourly bars, min/max band, "Highest production expected 10:00-14:00") follows with PR 5. Chart colours
-  come from `chartTokens`.
+  badge) for a snapshot that carries `points` (manager, viewer, admin).
+- `ProductionForecastChart.tsx` (`features/live/`, rendered by `LiveEnergyView` after the card and the table, whatever the live
+  state; `ProductionForecastSection` asks for the forecast and renders nothing without one): the title "Expected
+  production" with "as of hh:mm", the next peak window in bold ("Highest production expected today 10:00-14:00",
+  "tomorrow" or the date), hourly bars in kW (hours already past lighter) with the min/max band as an area only where the
+  forecast gives one, an x axis with a tick every three hours (six beyond a day and a half) whose midnight tick names the
+  day, "Forecast for 1 of 2 plants" when the sum is partial, and the hint that it is an estimate and never a claim that power
+  is spare. Chart colours come from `chartTokens`.
 - Placement: its own page, `pages/MyEnergyPage.tsx` at `/my-energy` (alias `/live`; `PageHeader` with the
   community switch, scope note, title "My energy system", `ScopeGuard`). The page owns the billing period
   (`useBillingPeriodParams`, like `DashboardPage`) and renders `features/myEnergy/MyEnergyView.tsx`. The
@@ -724,7 +774,7 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
 
 ### 7.2 Setup
 
-Shipped in PR 3b; Solar Manager live arrived with PR 4 (the forecast is not offered yet).
+Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 5 (below).
 
 - **My connections** (`features/supplementary/MyConnections.tsx`): a card at the top of
   `/me/metering-points`, shown only while the feature is on and the source list has loaded. It lists
@@ -743,7 +793,7 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 (the forecast is not offe
   section and the source card of the first PR 3b cut): header with meter id, community, the
   behind-the-meter badge (when `historyEligible`) and **View metering data**; below it `CapabilityRows`,
   one row per capability the point is eligible for (`historyEligible` / `liveEligible`; an entry without
-  `eligible_capabilities` is history only; never a forecast row): **History (15 min)** and **Live
+  `eligible_capabilities` is history only; a **Forecast** row for a producing point): **History (15 min)** and **Live
   (now)**. A row shows the source that provides the capability as a button (`provider · label`) that
   opens the source dialog, with its status (history: `SourceStatusBadge` and "up to <synced through>";
   live: `LiveStateBadge` and "last value <time>"); a push source providing both is in both rows and
@@ -821,7 +871,26 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 (the forecast is not offe
 - Every source mutation calls `invalidateSourceQueries`: `queryKeys.live.all`, the source list,
   `supplementaryEligible()`, `supplementaryZevEligibleAll()` (prefix of
   `supplementaryZevEligible(zevId)`), the dashboard summary and `['metering','points']`.
-- Building form: latitude/longitude with "Locate from address" and the PV planes editor (PR 5).
+- **Forecast setup (PR 5).** The capability rows gain **Forecast** (`RowCapability`, `sourceFor(..., 'forecast')`,
+  `forecastEligible`) for a producing point: the source as a button with its status badge and, for forecast.solar, "updated
+  <time>". Its **Connect** opens `ForecastConnectDialog` instead of the shared connect flow (forecast.solar needs no
+  credential or consent): what the forecast is, what leaves the instance (location rounded to a kilometre and the planes'
+  size, tilt and direction), that a manager must have entered the planes and the building's location (the server's refusal
+  says what is missing and is shown in the dialog), and for a holder that a connected Solar Manager can provide its own
+  forecast instead. It creates `{provider: forecast_solar, provides_forecast: true, provides_history: false,
+  provides_live: false, held_by, target: metering_point, consent: false}`. A holder's card hosts it directly; the
+  manager's **Live data** dialog of a ZEV-operated point shows `Live` and `Forecast` rows (title "Live data and forecast of
+  <meter>") and opens it with `holder="zev"`. `SourceDialog` shows the forecast capability and its last update, **Refresh
+  forecast** (`sync`) and **Test** for a forecast.solar source, and for a Solar Manager source **Also use the Solar
+  Manager forecast** (consent confirmation, `PATCH {provides_forecast: true, consent: true}`) and **Stop forecast**; stopping
+  any capability is offered while another remains.
+- **Roof planes** (`features/meteringPoints/PvPlanesDialog.tsx`): the metering-point menu of a producing or bidirectional point
+  has **Roof planes** while the live view is on (managers; viewers read). One dialog lists the planes ("8.50 kWp, tilt 25°,
+  facing south") with Edit and Delete and a form for name, peak power (kWp), tilt and direction (degrees, 0 south, 90 west,
+  -90 east, 180 north); `planeInput` checks the same ranges as the server before asking it (`lib/pvPlanes.ts`).
+- **Building form** (`BuildingFormModal`): latitude and longitude (decimal degrees, comma accepted, both or neither,
+  `coordinateInput`) with **Locate from address** (`locateBuilding`, enabled once street and city are filled; it fills the two
+  fields and saves nothing).
 
 ### TypeScript types
 
@@ -936,7 +1005,8 @@ gains `latitude`/`longitude` (`string | null`).
 | `fetchOwnSeries({zevId, dateFrom, dateTo, bucket, participantId?})` | GET | `/metering/supplementary/zevs/{id}/own-series/` |
 | `fetchLiveEnabled()` | GET | `/metering/live/enabled/` |
 | `fetchLiveSnapshotOrNull(zevId)` / `fetchLiveCurveOrNull(zevId, date?, participantId?)` | GET | the same, `404` mapped to `null` |
-| `fetchProductionForecast(zevId)` | GET | `/metering/live/zevs/{id}/forecast/` |
+| `fetchProductionForecastOrNull(zevId)` | GET | `/metering/live/zevs/{id}/forecast/`, `404` mapped to `null` |
+| `locateBuilding({address_line1, postal_code, city})` | POST | `/zev/buildings/locate/` |
 | `fetchZevEligibleSources(zevId)` | GET | `/metering/supplementary/sources/zev-eligible/` |
 | `fetchPvPlanes(mpId)` / `createPvPlane` / `updatePvPlane` / `deletePvPlane` | GET/POST/PATCH/DELETE | `/zev/metering-points/{id}/pv-planes/` |
 
@@ -951,7 +1021,7 @@ list.
 | Live household values reveal presence | High | Other participants never see per-point values; consent text names managers/viewers; holder change disconnects ZEV-held sources (§3) |
 | `C = P + N` differs from the metered sum (unmetered loads, timing) | Low | Labelled indicative; the split's contract violation withholds the own split instead of clamping |
 | One producer offline hides everything | Medium | Managers see which point is missing; forecast still shown |
-| forecast.solar limits/terms change | Medium | Budgeted calls, optional key, provider interface allows adding Open-Meteo later; limits re-checked before PR 5 |
+| forecast.solar limits/terms change | Medium | Budgeted calls over a rolling hour, a 3-hour minimum refresh, optional key, provider interface allows adding Open-Meteo later; limits re-checked for PR 5 (2026-11-01, §6.3) |
 | Solar Manager rate limits (undocumented) | Medium | Demand-driven polling, cached bearer token, `Retry-After` back-off |
 | Push floods | Medium | 5-second floor per source, per-token throttle, no DB write per sample |
 | Cache without persistence loses the curve | Low | Accepted (ADR 0044); W002 for non-Redis caches |
@@ -1020,10 +1090,28 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
   outsider `404`/`403`; former participant refused.
 - `metering/live/test_curve.py` — **`CurveTests`**: per-bucket tiers; civil-day boundaries incl. DST;
   retention limit on `date`.
-- `metering/live/test_forecast.py` — **`ForecastSolarTests`** (stubbed host): URL with rounded
-  coordinates; plane sum; timezone conversion; hourly averaging; budget enforcement; `429`.
-  **`SolarManagerForecastTests`**: mapping of `pW/pWmin/pWmax`; replace-future semantics; 24 h cleanup.
-  **`ForecastPayloadTests`**: `complete`, `peak_windows` rule incl. ties, min/max only when all present.
+- `metering/live/test_forecast.py` (PR 5: 43 tests) — **`HourBucketTests`** (5: hourly means, an end-marked key
+  belongs to the hour before, negative power reads as zero, the band only when every value has one, planes add up and
+  the band needs every plane), **`PeakWindowTests`** (3: longest run at half of the top, ties go to the earliest,
+  one window per Swiss day and none for a dark day), **`MapWattsTests`** (3: local keys to UTC, an unreadable
+  answer or timezone, unreadable values skipped), **`SolarManagerForecastMapTests`** (2),
+  **`ForecastSolarProviderTests`** (8, stubbed host: one call per plane with rounded coordinates and the summed
+  result, the key in the path, missing planes or coordinates without a call, the budget defers instead of calling, more
+  planes than the budget can allow, `429` backs every source off, a server error carries no vendor text, the
+  rolling hour), **`SolarManagerForecastFetchTests`** (2: stored key, bearer token reused), **`RefreshTests`**
+  (11: future points replaced and old ones dropped, the horizon cap, forecast-only status ok and error, a source
+  with other capabilities keeps its status, auth failure, the minimum interval and `force`, deferred changes
+  nothing, flag off, disabled source, the beat's order and skips) and **`ForecastApiTests`** (9: manager sees
+  the sum, the windows and every plant, a participant no plants, a viewer plants, `404`s, an incomplete sum, a
+  disabled source drops out, the band only when every plant has one, `forecast_next_peak` in `me`).
+- `metering/test_supplementary_forecast.py` (PR 5: 16 tests) — **`CreateForecastSolarTests`** (10: a manager connects a
+  ZEV-operated plant without consent or token and a refresh is queued, a holder connects theirs, planes and
+  coordinates first, only a producing meter, one forecast per point, forecast only, no key or id, a held meter is
+  refused to a manager (`403`), the live flag, a push source never), **`SourceActionTests`** (3: `sync` and its
+  cooldown, `test`, switching a Solar Manager forecast on with consent and off deleting its points),
+  **`EligibleForecastTests`** (2) and **`DisconnectForecastTests`** (1). The two cases of
+  `test_supplementary_capabilities.py` and `test_supplementary_solar_manager.py` that expected a refused forecast were
+  rewritten, and `EligibleTests` lists `forecast` for a producer.
 - `metering/test_supplementary_solar_manager.py` (PR 4: 48 tests) — **`MapStreamTests`** (11: `iW − eW`
   incl. negative export; optional `pW`/`cW`; missing or unreadable `iW`/`eW` is no sample; abnormal values;
   timestamp fallbacks), **`ClientStreamTests`** (4), **`SolarManagerLiveTests`** (15: bearer cache avoids a
@@ -1038,11 +1126,16 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
   audited once, `429` back-off capped at 900 s, transient errors leave `last_error` alone).
 - `metering/live/test_checks.py` — **`LivePullIntervalCheckTests`** (3): `metering.W003`.
 - `metering/live/test_me.py` — **`LiveMeTests`**: JWT and read-only API key; several ZEVs; throttle.
-- `zev/test_pv_planes.py` — **`PvPlaneTests`**: validation ranges; max 4; manager-only write; audit.
-- `zev/test_building_coordinates.py` — locate action; rounding sent to forecast.solar.
+- `zev/test_pv_planes.py` (PR 5: 16 tests) — **`PvPlaneApiTests`** (9: create, change and delete with their audit events,
+  who reads, who does not write, the URL decides the point, producing meters only, a plane cannot move, at most four,
+  bounds, another ZEV's manager), **`BuildingCoordinatesTests`** (5: set and clear with the `building.update` event, bounds,
+  locate returns the outline's centre without saving, its refusals, managers only and rate limited) and
+  **`FootprintCentroidTests`** (2). `zev/test_transfer.py` gained two tests (planes and coordinates survive a
+  round trip; an archive without them still imports) and `zev/test_meter_identity_migration.py` now uses the historical
+  models, since the real ones read columns added after the state it migrates to.
 - `metering/test_supplementary_isolation.py` — extended: nothing under `allocation/`, `tariffs/` or the
   invoice modules imports `metering.live`.
-- `accounts/test_system_health.py` — new probe keys.
+- `accounts/test_system_health.py` — new probe keys (PR 5 adds two tests: forecast counts, staleness above half degrades, a source needing a key is not stale).
 - `mcp_server/tests` — **`LiveEnergyToolTests`**: scoping, participant vs manager shape.
 
 ### Frontend
@@ -1053,6 +1146,11 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
   link for managers and participants, card and points table with sources) and six cases in
   `tests/layout-nav.test.ts` (Live entry only with the flag for admin, manager, viewer and participant;
   its place; none for a former participant).
+- PR 5 landed `tests/forecast-helpers.test.ts` (12 tests: rows and bands, `hasForecast`, the peak window that is next, today and
+  tomorrow in Zurich time, the range in local clock times, `planeInput` ranges, `azimuthLabelKey` for the eight directions,
+  `coordinateInput`, `sourceFor` and `forecastEligible`) and `tests/forecast-ui.test.ts` (11 tests: the chart's text, a partial sum, the
+  section renders nothing without a forecast, `ForecastConnectDialog` for a manager, a holder and a refusal, `PvPlanesDialog`
+  lists, adds, refuses an impossible value and is read-only).
 - PR 3a landed `tests/live-energy-card.test.ts` (12 tests: the three tiers' texts, the single
   coverage line (a bidirectional point counted once, for participants and managers alike), "as of", own split
   only at `exact`, the inconsistent hint, a producer's split, the connection point part, points table rows, empty curve) and `tests/live-helpers.test.ts` (16 tests: `formatKw`,
@@ -1151,6 +1249,23 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
    a stored key is refused; a negative `pW`/`cW` is dropped rather than clamped.
 6. **PR 5 — forecast.** `PvPlane`, building coordinates, `ProductionForecastPoint`, both providers,
    forecast endpoint and chart.
+
+   *Rollout (PR 5).* Everything is behind the live flag. `provides_forecast` is accepted (the "not available
+   yet" refusal is gone) with the `forecast_solar` provider; `forecast` joins `eligible_capabilities`; migrations
+   `zev.0048` (building coordinates, `PvPlane`) and `metering.0013` (`ProductionForecastPoint`, the provider choice).
+   New endpoints: `GET /live/zevs/{id}/forecast/`, the nested `pv-planes` routes and `POST /zev/buildings/locate/`; `forecast_next_peak`
+   in `me` is now filled. Beat entry `refresh-production-forecasts`, tasks `refresh_production_forecasts` and
+   `refresh_forecast_source`, the settings of §4.5 and the health keys of §6.5. Decisions the plan did not settle: forecast.solar's
+   real public limits (one plane per call, 12 calls per rolling hour, two days) changed the refresh cadence and the
+   horizon (§6.3); a forecast.solar source needs no consent and carries no personal data, yet follows the usual holder
+   rules (a ZEV-held one is disconnected once somebody holds the meter personally); the forecast keeps its own status
+   only when it is the source's only capability; "Locate from address" saves nothing and is its own endpoint so the
+   building form can use it before the building exists; roof planes are written by managers only, so a participant
+   whose plant has none asks one. The system-health probe's history staleness now counts only sources that provide history.
+   **Still open before merge:** the Solar Manager `/data/forecast` shape and timestamps follow the swagger and have not
+   been checked against a real response; forecast.solar's real response has not been fetched from this instance
+   (the mapping follows its documentation and is tested against a stand-in); the forecast cards were looked at in the dev stack with
+   pre-filled hours at 1440 and 400 px, the connect dialogs only through tests.
 7. **PR 6 — automation and docs.** MCP `live_energy`, user-guide chapter with the Home Assistant
    (`rest_command` + automation, `rest` sensor reading `/live/me/`) and Shelly (Gen2+ script) recipes,
    screenshots.
