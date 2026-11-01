@@ -827,6 +827,28 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#live-data-from-solar-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live data from Solar Manager
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#live-data-from-your-own-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live data from your own system
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#what-is-stored" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -894,10 +916,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#your-dashboard" class="md-nav__link">
+  <a href="#my-energy-system" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Your dashboard
+        My energy system
       
     </span>
   </a>
@@ -932,10 +954,43 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#production-forecast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Production forecast
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#does-it-match-the-meter" class="md-nav__link">
     <span class="md-ellipsis">
       
         Does it match the meter?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-a-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open a source
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-communitys-sources-managers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The community's sources (managers)
       
     </span>
   </a>
@@ -1613,6 +1668,28 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#live-data-from-solar-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live data from Solar Manager
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#live-data-from-your-own-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live data from your own system
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#what-is-stored" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1680,10 +1757,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#your-dashboard" class="md-nav__link">
+  <a href="#my-energy-system" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Your dashboard
+        My energy system
       
     </span>
   </a>
@@ -1718,10 +1795,43 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#production-forecast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Production forecast
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#does-it-match-the-meter" class="md-nav__link">
     <span class="md-ellipsis">
       
         Does it match the meter?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-a-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open a source
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-communitys-sources-managers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The community's sources (managers)
       
     </span>
   </a>
@@ -1847,11 +1957,12 @@ must be marked <strong>Generation behind the meter</strong>, and you must hold i
 </tr>
 </tbody>
 </table>
-<p>Each metering point on that page has a <strong>View metering data</strong> button that opens
-the chart of its readings.</p>
+<p>Each metering point on that page has two parts. <strong>Grid operator's meter</strong> holds the
+button <strong>View meter data</strong>, which opens the chart of the readings billing is based on.
+<strong>Your own energy data</strong> holds what you connect here (history, live, forecast), which is only
+shown and used for statistics, never for billing, so the button does not show those figures.</p>
 <p>If you are a ZEV manager and hold a metering point yourself, you connect it the
-same way as any participant: <strong>My metering points</strong> appears in your menu, and the
-metering point list links your own meter there.</p>
+same way as any participant: <strong>My metering points</strong> appears in your menu.</p>
 <p>When you no longer hold the metering point (the assignment ends), the connection
 is switched off by itself, the key is deleted, and nothing new is collected. The
 data already collected is kept until you or a manager deletes it.</p>
@@ -1876,13 +1987,31 @@ re-reads the last two days to pick up late corrections.</p>
 OpenZEV keeps the fresh one. If the connection ever shows <strong>Reconnect needed</strong>,
 the key no longer works (for example because you revoked it): choose
 <strong>Reconnect</strong> and enter a new key.</p>
+<h3 id="live-data-from-solar-manager">Live data from Solar Manager<a class="headerlink" href="#live-data-from-solar-manager" title="Permanent link">&para;</a></h3>
+<p>The same Solar Manager connection can also supply <strong>live data</strong>: choose <em>Live data</em> (alone or
+together with history) when you connect, or use <strong>Also send live data with this source</strong> on a
+connection you already have; the stored key is reused, you only confirm the live consent. OpenZEV
+then reads the <strong>current power</strong> from your Solar Manager account, but <strong>only while someone has the
+live page of the ZEV open</strong> (about every 30 seconds, and it stops shortly after the last person
+leaves), so an unwatched ZEV costs your account no requests. Live values are shown and never stored
+as history. If Solar Manager limits requests, OpenZEV waits and tries again by itself. Live data from
+a ZEV-operated meter or the grid connection point still comes from a push source: a Solar Manager key
+is your personal credential, so a manager cannot connect one on your behalf.</p>
+<h3 id="live-data-from-your-own-system">Live data from your own system<a class="headerlink" href="#live-data-from-your-own-system" title="Permanent link">&para;</a></h3>
+<p>A meter that only reports its current power needs no history: on <strong>My metering points</strong> its row says
+<em>Live (now)</em> and <em>Not connected</em>, with its own <strong>Connect</strong>. Choose <strong>Own system</strong> and your system (Home
+Assistant, Shelly, a script) sends the current power with a push token, as described below. Where a
+point could provide both history and live data and neither is connected yet, a single <strong>Connect energy
+data</strong> at the bottom of the card starts both together; with only one missing, the <strong>Connect</strong> in its row
+is the only button. A community manager connects live data for meters nobody holds personally and for
+the grid connection point on the <strong>Energy data</strong> tab of the settings (below).</p>
 <h3 id="what-is-stored">What is stored<a class="headerlink" href="#what-is-stored" title="Permanent link">&para;</a></h3>
 <p>Four values per quarter hour: <strong>consumption</strong>, <strong>production</strong>, <strong>grid import</strong>
 and <strong>grid export</strong>, in kWh. Nothing else from your Solar Manager account is
 read. Only the time you held the metering point is stored.</p>
 <h2 id="send-the-data-yourself-push-or-file">Send the data yourself (push or file)<a class="headerlink" href="#send-the-data-yourself-push-or-file" title="Permanent link">&para;</a></h2>
 <p>If you do not use Solar Manager — for instance with Home Assistant, n8n or a
-script — choose <strong>Push / file</strong> when you connect. You get a <strong>push token</strong>
+script — choose <strong>Own system / file</strong> when you connect. You get a <strong>push token</strong>
 shown <strong>once</strong>; copy it right away. OpenZEV stores only a hash, so if you lose
 it you issue a new one (<strong>New push token</strong>), which stops the old one at once.
 The token also appears under <strong>Account → Tokens &amp; keys</strong> with when it was issued and last
@@ -1957,9 +2086,35 @@ columns are:</p>
 <strong>Check file</strong> first: it reports the problems row by row and imports nothing.
 <strong>Import</strong> stores the file only if <strong>every</strong> row is valid.</p>
 <h2 id="what-you-see">What you see<a class="headerlink" href="#what-you-see" title="Permanent link">&para;</a></h2>
-<h3 id="your-dashboard">Your dashboard<a class="headerlink" href="#your-dashboard" title="Permanent link">&para;</a></h3>
-<p><img alt="Participant dashboard with own-system figures" src="../screenshots/24-energy-data-dashboard.png" /></p>
-<p>With a connected source, your dashboard shows a card <strong>Your own system</strong> with
+<h3 id="my-energy-system">My energy system<a class="headerlink" href="#my-energy-system" title="Permanent link">&para;</a></h3>
+<p>Everything your own devices report lives on the page <strong>My energy system</strong> in the
+sidebar. For managers and viewers the same page is called <strong>Live energy</strong>: they see the
+whole community there and pick a participant for the own-system views. Your dashboard (<strong>Energy balance</strong> for managers) keeps the grid operator's
+official figures and only points to this page, with a link that opens the same period.</p>
+<p><strong>Right now</strong> is at the top: what your community produces and uses at this moment,
+marked <em>Live, indicative</em> and never used for billing. If you have a live source, your own
+consumption and production come first, with how much of it was local and how much came from or
+went to the grid; the ZEV's <strong>Production</strong>, <strong>Consumption</strong>, <strong>Spare now</strong> and <strong>Local share</strong> follow.
+A line says how many metering points report live data. Nothing is estimated: a meter that does not
+report is simply missing. Without any live source the card says so and links to where to connect one.</p>
+<p>Managers and viewers also get <strong>Live values per metering point</strong>: a table (a small card per
+point on a phone) with each point's power, how old the value is and its state. A power reads
+in words (<em>6.2 kW produced</em>, <em>2.0 kW to the grid</em>), not with the meter's minus sign. The table is closed
+once every point reports, and open while some do not; for a point of the community with no source it
+offers <strong>Connect</strong>, and for one a participant holds it says the participant connects it.</p>
+<p>Below it the views are chosen with the tabs <strong>Today</strong>, <strong>Tomorrow</strong> (when there is a
+forecast for it), <strong>7 days</strong> and <strong>Period</strong> (the billing period, with the usual period selector).
+A participant who cannot have a history (no plant behind their meter) sees only <strong>Today</strong>. Managers and
+viewers pick the participant whose system they want to see; a manager who is a participant with a
+connected source starts on themselves.</p>
+<p><strong>Today</strong> draws your own consumption (and production, if you have a PV system) in one
+line: from your source's <strong>history</strong> up to its last synchronisation (solid line), and
+from <strong>live</strong> values after that (dashed line). A marker shows where history hands over
+to live. Where neither has a value, the line has a gap; nothing is estimated. The ZEV's
+totals in the same chart are live only. With a production forecast, its expected production is drawn
+dashed and the highest expected production of the day is named above the chart. <strong>7 days</strong> and
+<strong>Period</strong> show the card described below.</p>
+<p>With a connected source, the card <strong>Your own system</strong> shows
 production, consumption, self-consumption, grid import and export, your
 <strong>self-sufficiency</strong> and <strong>self-consumption</strong> rates, and a chart. It always says
 the figures are <strong>reported by your own system</strong>, not read from the meter, and
@@ -1991,10 +2146,9 @@ self-sufficiency. The energy sums are still shown.</p>
   table, marked with an info icon. The <strong>Consumption</strong> and <strong>Production/Export</strong>
   columns keep the meter value and add the own system's figure under it
   (<strong>Own system: x kWh</strong>, also marked with an info icon, and only with enough data).
-  Selecting a participant shows the full card and draws their own-system line in the
-  24-hour profile. A manager who is also a participant with a connected source sees their own
-  <strong>Your own system</strong> card there while nobody, or they themselves, are selected
-  (not while another participant is); their own row is marked <strong>You</strong>. Without a source, the same place offers to connect one.
+  Selecting a participant draws their own-system line in the 24-hour profile; the full
+  card is on <strong>Live energy</strong> (<strong>My energy system</strong> for a participant), which the dashboard links to. A manager who is also a
+  participant has their own row marked <strong>You</strong>.
   Selecting a row in the table again clears the selection.</li>
 <li>The <strong>annual report</strong> shows it per participant.</li>
 <li>The <strong>annual statement</strong> PDF shows your self-sufficiency for every month with
@@ -2003,6 +2157,26 @@ self-sufficiency. The energy sums are still shown.</p>
 <li>The <a href="../19-ai-assistants/">AI assistant tools</a> report it as
   <code>gross_self_sufficiency_pct</code> and <code>gross_self_consumption_pct</code>.</li>
 </ul>
+<h2 id="production-forecast">Production forecast<a class="headerlink" href="#production-forecast" title="Permanent link">&para;</a></h2>
+<p>OpenZEV can show <strong>when your community's plants are expected to produce most</strong>, today and tomorrow. It is
+an estimate from the weather and the plants' setup, never a measurement, and it says when production is
+expected, not that power will be spare. It is never used for billing.</p>
+<p>A forecast needs three things, set up in three places:</p>
+<ol>
+<li><strong>Roof planes</strong> of the plant: size (kWp), tilt and direction. In the metering point list, open the
+   menu of the producing metering point and choose <strong>Roof planes</strong>; a plant on an east and a west roof has
+   two. Direction is 0 for south, 90 for west, -90 for east and 180 for north.</li>
+<li><strong>The building's location</strong>, in the building's settings (latitude and longitude; <strong>Locate from
+   address</strong> fills them in, and sends the address to OpenStreetMap's Nominatim service to do so). The
+   roof planes dialog tells you while the location is still missing, with a button to the building.</li>
+<li><strong>A forecast source</strong> on the producing metering point: <strong>Connect forecast</strong> uses the free public
+   service forecast.solar, with nothing to sign in to. Only the location, rounded to about one kilometre,
+   and the roof planes' size, tilt and direction are sent. If the plant already has a Solar Manager
+   connection, its own forecast can be switched on instead (<strong>Also use the Solar Manager forecast</strong>).</li>
+</ol>
+<p>Managers connect the forecast for ZEV-operated plants; a participant connects it for a meter they hold,
+and a manager enters the roof planes and the location. Once connected the forecast is fetched every
+hour. <strong>Tomorrow</strong> appears on that page as soon as there is a forecast for it.</p>
 <h2 id="does-it-match-the-meter">Does it match the meter?<a class="headerlink" href="#does-it-match-the-meter" title="Permanent link">&para;</a></h2>
 <p><img alt="Source status with the meter comparison" src="../screenshots/24-energy-data-status.png" /></p>
 <p>After every sync OpenZEV compares your export and import with the grid
@@ -2017,6 +2191,32 @@ meter always wins and nothing is corrected. The result shows on the source:</p>
   were mixed up.</li>
 <li><strong>Not enough to compare</strong> — there are fewer than two days present in both, for
   example because the meter data has not been imported yet.</li>
+</ul>
+<h2 id="open-a-source">Open a source<a class="headerlink" href="#open-a-source" title="Permanent link">&para;</a></h2>
+<p>On <strong>My metering points</strong>, choosing a source on a meter's card (or <strong>Open</strong> in <strong>My connections</strong>, which
+appears once you have two or more connections) opens its details <strong>beside the cards</strong>; on a narrow screen
+they take the place of the cards until you close them with the X or the browser's Back button. The card
+whose source is open is outlined. The address keeps the choice, so a reload or a shared link opens the same
+source. The details show one block per thing the source provides (history, live, forecast), the
+one button you need most (<strong>Sync now</strong>, or <strong>Reconnect</strong> when the key no longer works) and a <strong>⋯</strong> menu with the
+rest: test the connection, replace the key, send a new push token, switch a kind of data on or off, disconnect,
+delete data or remove the source. The Solar Manager ID, the token and the addresses to send data to are under
+<strong>Technical details</strong>. Nothing is coloured while a source works; only a problem, such as a source that has gone
+quiet, is shown in colour. If you have typed a new Solar Manager key and not saved it, closing asks before it is lost. After you
+connect a source, it opens there by itself.</p>
+<h2 id="the-communitys-sources-managers">The community's sources (managers)<a class="headerlink" href="#the-communitys-sources-managers" title="Permanent link">&para;</a></h2>
+<p>The metering point list shows nothing about energy data. What a manager looks after is on the <strong>Energy data</strong> tab of
+<strong>Settings</strong> (it appears while the feature is on): every source of the community in one list, the grid connection point
+first, with who holds it and what it provides. Nothing is coloured while a source works; a source that has gone quiet or
+failed shows its problem in red text. Choose a source to open its details beside the list.</p>
+<ul>
+<li><strong>Your community's own sources.</strong> <strong>Connect a source</strong> connects live data for a metering point nobody holds
+  personally (a common area, a spare meter), the production forecast of such a plant, or the grid connection point. You
+  have every action there, as a participant has on their own source.</li>
+<li><strong>A participant's source.</strong> You see its state and can <strong>switch it off</strong> (or on again), <strong>delete its data</strong> or
+  <strong>remove</strong> it, each after a confirmation. The key, the push token and the connection itself stay the participant's.
+  If you hold the meter yourself, the details point you to <strong>My metering points</strong>.</li>
+<li><strong>Viewers</strong> see the list and the state, without any action.</li>
 </ul>
 <h2 id="disconnect-delete-remove">Disconnect, delete, remove<a class="headerlink" href="#disconnect-delete-remove" title="Permanent link">&para;</a></h2>
 <table>
@@ -2049,8 +2249,9 @@ meter always wins and nothing is corrected. The result shows on the source:</p>
 </tr>
 </tbody>
 </table>
-<p>A ZEV manager sees the same buttons for a participant's source, except for the
-ones that touch the key. Deleting a participant or a metering point deletes their
+<p>In the source's details these three are the last section of the <strong>⋯</strong> menu, in red, away from
+the everyday actions, and each asks for confirmation. A ZEV manager can switch a participant's source off or on,
+delete its data or remove it (on the <strong>Energy data</strong> tab below), but cannot disconnect it, test it or touch its key. Deleting a participant or a metering point deletes their
 sources and readings with them.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <p><strong>There is no Connect button on my metering point.</strong> The feature is off, you do
@@ -2059,6 +2260,10 @@ count), or it is not marked <em>Generation behind the meter</em>. Only a ZEV man
 set that mark, so ask them; <strong>My metering points</strong> says so too.</p>
 <p><strong>"Not accepted" when connecting.</strong> The key or the Solar Manager ID is wrong. The
 ID is the one of your installation, not your login name.</p>
+<p><strong>Live data from Solar Manager shows "no data".</strong> Values are only fetched while someone has the live
+page open, so open it and wait half a minute. If the connection shows <strong>Reconnect needed</strong>, the key no
+longer works for history and live alike: choose <strong>Reconnect</strong> and enter a new key. <strong>Test</strong> reads one
+current-power value to check the connection.</p>
 <p><strong>The server says the key cannot be stored.</strong> The platform administrator has not
 set up the encryption key for integrations (<code>INTEGRATION_ENCRYPTION_KEYS</code>). Push
 and file import still work without it.</p>
