@@ -102,6 +102,8 @@ export const queryKeys = {
       ['metering', 'quality-status', dateFrom, dateTo, zevId ?? 'all', meteringPointId ?? 'all'] as const,
     supplementarySources: () => ['metering', 'supplementary-sources'] as const,
     supplementaryEligible: () => ['metering', 'supplementary-eligible'] as const,
+    supplementaryZevEligibleAll: () => ['metering', 'supplementary-zev-eligible'] as const,
+    supplementaryZevEligible: (zevId: string) => ['metering', 'supplementary-zev-eligible', zevId] as const,
     supplementaryReconciliation: (sourceId: string) => ['metering', 'supplementary-reconciliation', sourceId] as const,
     hourlyProfile: (dateFrom: string, dateTo: string, zevId?: string, participantId?: string) =>
       ['metering', 'hourly-profile', dateFrom, dateTo, zevId ?? 'all', participantId ?? 'all'] as const,
@@ -110,6 +112,8 @@ export const queryKeys = {
     all: ['live'] as const,
     enabled: () => ['live', 'enabled'] as const,
     snapshot: (zevId: string) => ['live', 'snapshot', zevId] as const,
-    curve: (zevId: string, date: string) => ['live', 'curve', zevId, date] as const,
+    curve: (zevId: string, date: string, participantId = '') => ['live', 'curve', zevId, date, participantId] as const,
+    ownSeries: (zevId: string, participantId: string, from: string, to: string, bucket: string) =>
+      ['live', 'own-series', zevId, participantId, from, to, bucket] as const,
   },
 }

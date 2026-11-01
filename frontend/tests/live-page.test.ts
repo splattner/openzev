@@ -33,7 +33,7 @@ const snapshot = (liveSources: number, overrides: Partial<LiveSnapshot> = {}): L
     surplus_w: 3000,
     grid_import_w: 0,
     local_share_pct: 100,
-    coverage: { producing_points: 1, producing_fresh: 1, consuming_points: 6, consuming_fresh: 1, connection_point: 'fresh', live_sources: liveSources },
+    coverage: { producing_points: 1, producing_fresh: 1, consuming_points: 6, consuming_fresh: 1, connection_point: 'fresh', live_sources: liveSources, points: 7, points_fresh: 2 },
     own: null,
     max_age_s: 60,
     ...overrides,
@@ -91,7 +91,7 @@ describe('LiveEnergyView', () => {
         expect(api.fetchLiveCurveOrNull).not.toHaveBeenCalled()
     })
 
-    it('shows the card, and the points table for a manager, when live sources exist', async () => {
+    it('shows the card, and the points table for a manager, when live sources exist, without the curve', async () => {
         api.fetchLiveSnapshotOrNull.mockResolvedValue(snapshot(2, {
             points: [{
                 metering_point_id: 'm1', target: 'metering_point', meter_id: 'CH-1', meter_type: 'consumption',
@@ -103,6 +103,6 @@ describe('LiveEnergyView', () => {
         expect(container.textContent).toContain('live.title')
         expect(container.textContent).toContain('CH-1')
         expect(container.querySelector('.empty-state')).toBeNull()
-        expect(api.fetchLiveCurveOrNull).toHaveBeenCalled()
+        expect(api.fetchLiveCurveOrNull).not.toHaveBeenCalled() // the curve belongs to the Today view now
     })
 })

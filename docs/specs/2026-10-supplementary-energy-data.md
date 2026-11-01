@@ -597,19 +597,38 @@ gets the same sidebar entry (from `useEnergyDataEligibility`, so only while the 
 their dashboard call to action and a link on their own meter in the metering-point list (§7.2). The
 backend already treats them as the owner of their source (`permissions.role_for` checks ownership
 before the manager role), so connecting, replacing the key and the rest work as for any participant. **Files:** `frontend/src/pages/MyMeteringPointsPage.tsx`;
-`features/supplementary/MeteringPointEnergyData.tsx`, `SupplementarySourceModal.tsx`,
-`SupplementarySourceCard.tsx`, `SourceStatusBadge`, `ReconciliationSummary`, `PushTokenPanel`,
-`CsvImport`.
+`features/supplementary/MeteringPointDataCard.tsx`, `CapabilityRows.tsx`, `SourceDialog.tsx`,
+`useSourceActions.ts`, `SupplementarySourceModal.tsx`, `SourceStatusBadge`, `ReconciliationSummary`,
+`PushTokenPanel`, `CsvImport`.
 
 **What it lists.** In the participant shell, the metering points of the selected community that
 `GET /zev/metering-points/` returns to the participant. In a management shell that list is the whole
 community's, so there the page shows only the meters the user holds with generation behind them
 (the `eligible` list) and an empty state otherwise. Per metering point:
 
-- Flagged and held personally today (an `eligible` entry of the selected community): the energy
-  data card, `MeteringPointEnergyData`. Without a source an explanation and **Connect**; with one
-  the card: status chip, last sync, covered range, reconciliation state, and actions **Test**,
-  **Sync now**, **Replace key**, **Disconnect** (keeps data), **Delete data**, **Remove source**.
+- Held personally today (an `eligible` entry of the selected community): **one card per meter**,
+  `MeteringPointDataCard`: meter id, community, the behind-the-meter badge and **View metering data**
+  in the header, then a row per capability the point is eligible for (live data adds a **Live (now)**
+  row next to **History (15 min)**; SPEC-2026-live-energy-data §7.2). The history row shows the source
+  (provider and name, a button that opens the source dialog), its status chip and the date it is synced
+  through; an unconnected row says "Not connected" with a **Connect** for that capability, and one
+  primary **Connect energy data** opens the single connect flow while something is unconnected.
+  Reconnect-required and error banners of the history source stay on the card.
+- **Source dialog** (`SourceDialog`, a `FormModal`): everything about one source. Status, last sync,
+  covered range, reconciliation state, and actions **Test**, **Sync now**, **Replace key** (Solar
+  Manager), **New push token**, **Revoke token**, **Import CSV** (push), **Disconnect** (keeps data),
+  **Delete data**, **Remove source**; the push endpoints in a disclosure. Confirmations are the only
+  thing opened over it, and a rotated token stays on screen across refetches.
+- **Connect flow** (`SupplementarySourceModal`): what (history, live; skipped when only one is open),
+  how (Solar Manager for history only, a new push source, or the meter's existing push source, which
+  takes the missing capability with a `PATCH` and consent and no new token), consent for what was chosen,
+  and for a new push source one-time token screen. Without the live flag only history is offered.
+- **My connections** (`MyConnections`), a card above the meter cards while the feature is on and the
+  source list has loaded: the participant-held sources on the meters the user holds in the selected
+  community, one row each (provider and label, the meter id(s) it feeds, a History and/or Live chip with
+  its status badge, and **Open** for the source dialog), or a muted empty line. UI only: a source
+  still feeds exactly one metering point (`SupplementarySource.metering_point`); account-level
+  connections are a future idea (SPEC-2026-live-energy-data §12). Details: that spec §7.2.
 - Any other meter: a plain card (meter id, location, active, type, the behind-the-meter badge). A
   flagged one the user does not hold personally says only the holder can connect energy data.
 - Every card, plain or energy data, has a **View metering data** button (`MeteringDataLink`) to
@@ -617,11 +636,12 @@ community's, so there the page shows only the meters the user holds with generat
   backend scopes the readings to the time they hold the meter, so no new access is granted.
 - A failed eligibility check (anything but the `404` that means "off") shows an error with a retry
   instead of an empty or feature-off page (`useEnergyDataEligibility` exposes `isError` and `refetch`).
-  While the source list is loading or failed, a meter whose eligible entry names a `source` shows a
-  loading or error state with a retry rather than **Connect**; the **View metering data** button sits
-  in the connected card's header, not its action row.
-- The connect modal is rendered next to the card, never inside it, so a push source's one-time token
-  stays on screen when the refreshed source list swaps the "not connected" card for the connected one.
+  While the source list is loading or failed, a meter whose eligible entry names a source shows a
+  loading or error state with a retry rather than rows and **Connect**; **View metering data** stays in
+  the card header.
+- The connect flow and the source dialog are rendered next to the card, never inside it, and kept open
+  by their own state, so a push source's one-time token stays on screen when the refreshed source list
+  changes the rows behind it.
 - A closing hint, shown only while the feature is on and only to a participant, says who flags a
   meter: the community's manager (§14). Participants cannot set the flag.
 - While the feature is off (`eligible` answers `404`) the page is a plain meter list: no energy data
@@ -635,13 +655,18 @@ admin gets `[]` unless linked to a participant), the flagged meters they hold pe
 
 - Query: `useQuery({ queryKey: queryKeys.metering.supplementarySources(), queryFn: listSupplementarySources })`,
   joined to the eligible list by metering point.
-- Modal (create): provider choice; consent checkbox with the data-use text (what is stored: four
+- Connect flow (create): provider choice; consent checkbox with the data-use text (what is stored: four
   values per quarter hour; who can see it: you, and the ZEV's managers see status and your
   figures; what it is *not* used for: billing); for Solar Manager `smId` and API key fields (key
   is write-only, input type `password`, never echoed), with a link to where to create the key;
   for Push/File a one-time token display with a copy button, the endpoint URL, the CSV column
   list, and the Home Assistant recipe link.
-- Mutations invalidate `metering.supplementarySources` and the dashboard queries.
+- Mutations invalidate `metering.supplementarySources` and the dashboard queries (through
+  `invalidateSourceQueries`, which also refreshes the live queries and eligibility).
+- **Eligibility with the live flag on.** `eligible` then lists every held point, not only behind-meter
+  ones. The history card, `canConnect`, the dashboards' call to action and the "connect your energy
+  data" badge use `historyEligible` (capability `history`, or no `eligible_capabilities` field while
+  the flag is off); live setup is in SPEC-2026-live-energy-data §7.2.
 - `accountTabs.ts` no longer has an `'energy-data'` tab; `resolveAccountTab` takes only
   `mustChangePassword`.
 
@@ -664,17 +689,23 @@ an owner.
 
 ### 7.3 Statistics surfaces
 
-- `ParticipantDashboardBody.tsx`: a net-metered participant with `gross_energy` sees
+- **The own-system card moved** to "My energy system" (`/my-energy`, SPEC-2026-live-energy-data §7.1):
   `components/dashboard/GrossEnergyCard.tsx` (production, consumption, import, export, self-consumption,
-  the two rates, coverage and "based on data from … to …", a production-vs-export timeline) in
-  place of the `—` hint; without a source they see a call to action linking to "My metering points"
-  (only shown while `canConnect`: feature on and a flagged meter held). Rates are labelled "reported by your own system".
-  `ManagementDashboardBody` shows the same card for the selected participant
-  (`selected_gross_energy`), and, as a block under the ZEV figures, the manager's own
-  (`own_gross_energy`, or the call to action when they hold an unconnected flagged meter in this
-  community). The block (and the call to action) shows while nobody or the manager themselves is selected and
-  is hidden while another participant is, whose card replaces it. The own row is marked "You" in
-  the table and the dropdown. Selecting oneself shows the block once. Selecting the selected table row again clears the selection.
+  the two rates, coverage and "based on data from … to …", a production-vs-export timeline, labelled
+  "reported by your own system") and `GrossEnergyCallToAction` (a link to "My metering points", only for
+  a user who `canConnect`: feature on and a flagged meter held) are rendered there, on the 7 days and
+  Period views, from the new `GET /metering/supplementary/zevs/{zev_id}/own-series/` (live spec §5.3a:
+  `gross_energy` over a civil range, bucket `quarter`, `hour` or `day`, gated on this feature's flag,
+  same visibility as the dashboards: a participant reads their own, a manager, viewer or admin any
+  participant of the ZEV). The dashboards keep the `gross_energy`, `selected_gross_energy` and
+  `own_gross_energy` payload fields (the net-metered rates, MCP and the annual report read them).
+- `ParticipantDashboardBody.tsx` and `ManagementDashboardBody` show `components/dashboard/OwnSystemNote.tsx`
+  instead of the card: a muted line and a link to `/my-energy?range=period` (with the dashboard's period,
+  and `participant=` for a selected participant). It shows exactly where the card or the call to action
+  used to: a participant with behind-meter generation who has `gross_energy` or `canConnect`; a manager
+  while nobody or themselves is selected and `own_gross_energy` is present or they hold an unconnected
+  flagged meter; a selected participant other than themselves with `selected_gross_energy`. The own
+  row is marked "You" in the table and the dropdown. Selecting the selected table row again clears the selection.
 - `components/dashboard/ParticipantTableCard.tsx`: the per-participant rate cell of a net-metered
   participant is `NetMeteredRate` (shared with the annual report): the gross rate with an info
   marker when `gross_energy` is present, else `—` as today (with the withheld reason as a tooltip).
@@ -983,7 +1014,7 @@ CI runs `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-he
   a dash and the reason for low coverage and no data while the energy is still shown; the
   participant's name for an owner; the call to action links to "My metering points"; `NetMeteredRate` with a
   rate, without a source and withheld.
-- **`tests/metering-point-energy-data.test.ts`** (23): connect offered for the meter; the modal's write-only
+- **`tests/metering-point-energy-data.test.ts`** (23; since replaced by `tests/metering-point-data-card.test.ts`): connect offered for the meter; the modal's write-only
   key field, consent gate and consent text; the create payload; a vendor rejection next to the key
   field; a push source ends on a one-time token screen; the card per status (ok, reconnect required,
   disconnected, push); test, sync (cooldown), replace key, disconnect, delete data, remove and
@@ -1000,7 +1031,7 @@ CI runs `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-he
   not hold; the hint on who flags a meter; nothing about energy data while the feature is off; only
   the selected community's meters; a manager sees only their own flagged meters and no community
   list; the empty state per audience.
-- **`tests/metering-point-energy-data.test.ts`** (26): impersonation disables source connection and token rotation while preserving CSV import; the metering data link; a push source's one-time token surviving the refreshed source list; a meter whose source details are loading or failed offering a retry, not Connect. The page test also covers the link on plain meters, a manager not seeing the community list or its error left in the shared cache, and a failed eligibility check with retry.
+- **`tests/metering-point-data-card.test.ts`** (was `metering-point-energy-data.test.ts`): impersonation disables source connection and token rotation while preserving CSV import; the metering data link; a push source's one-time token surviving the refreshed source list; a meter whose source details are loading or failed offering a retry, not Connect. The page test also covers the link on plain meters, a manager not seeing the community list or its error left in the shared cache, and a failed eligibility check with retry.
 - **`tests/layout-nav.test.ts`** (+2) and **`tests/supplementary-owner-status.test.ts`** (+2): the sidebar entry for a
   manager or viewer who holds a flagged meter, and not otherwise; the marker link and panel link on one's own meter.
 - **`tests/system-settings-tabs.test.ts`** (+3): the Functions hint that a flag follows the default, the environment-controlled note with a disabled switch, and the cache invalidation after a toggle. **`tests/route-guard-matrix.test.ts`**: `/me/metering-points` for every role.
@@ -1164,7 +1195,7 @@ model.
 ## 13. Follow-up: a manager's own figures (after PR 6)
 
 `own_gross_energy` on the owner dashboard (7 backend tests, `OwnBlockTests`) and the
-"Your own system" block in `ManagementDashboardBody` (shown while nobody or oneself is selected), with the "You" marker and the call to action;
+"Your own system" block in `ManagementDashboardBody` (shown while nobody or oneself is selected), with the "You" marker and the call to action (the block itself now lives on My energy system; the dashboard keeps a note with a link, §7.3);
 the "Per participant" table now clears its selection on a second click and exposes it as
 `aria-pressed` (`tests/dashboard-behavior.test.ts`, 8 tests). `GrossEnergyCard` uses `useId` for its
 heading, because two of them can be on one page.

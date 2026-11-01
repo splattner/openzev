@@ -29,14 +29,7 @@ export function LiveEnergyCard({ snapshot }: { snapshot: LiveSnapshot }) {
             </div>
 
             {state.tier === 'none' && (
-                <>
-                    <p>{t('live.none')}</p>
-                    {state.detailed && (
-                        <p className="muted">
-                            {t('live.noneReason', { fresh: coverage.producing_fresh, total: coverage.producing_points })}
-                        </p>
-                    )}
-                </>
+                <p>{t('live.none')}</p>
             )}
 
             {state.tier === 'production' && state.showProduction && snapshot.production_w !== null && (
@@ -86,7 +79,7 @@ export function LiveEnergyCard({ snapshot }: { snapshot: LiveSnapshot }) {
             )}
 
             <p className="muted">
-                {t('live.coverage', { fresh: coverage.consuming_fresh, total: coverage.consuming_points })}
+                {t('live.coverage', state.reporting)}
                 {connectionState && ` · ${t('live.connectionPoint', { state: t(`live.state.${connectionState}`) })}`}
             </p>
         </section>

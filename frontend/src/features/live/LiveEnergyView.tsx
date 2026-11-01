@@ -3,14 +3,15 @@ import { EmptyState } from '../../components/EmptyState'
 import { Notice } from '../../components/Notice'
 import { PageSkeleton } from '../../components/PageSkeleton'
 import { useCommunityAccess } from '../../lib/communityAccess'
-import { liveCardState, useLiveCurve, useLiveEnabled, useLiveEnergy } from '../../lib/live'
-import { LiveCurveChart } from './LiveCurveChart'
+import { liveCardState, useLiveEnabled, useLiveEnergy } from '../../lib/live'
 import { LiveEnergyCard } from './LiveEnergyCard'
 import { LivePointsTable } from './LivePointsTable'
 
 /**
- * The body of the live page: "now" for one ZEV. Polling (the snapshot every 15 s, the curve every
- * minute) happens only while this is mounted, and only once the instance has the feature on.
+ * The "Right now" part of My energy system: the live card and, for managers, viewers and admins, the
+ * per-point table. Polling (the snapshot every 15 s) happens only while this is mounted, and only once
+ * the instance has the feature on. Without live data it says so compactly and points to the setup; the
+ * rest of the page (own history) does not depend on it.
  */
 export function LiveEnergyView({ zevId }: { zevId: string | undefined }) {
     const { t } = useTranslation()
@@ -20,7 +21,6 @@ export function LiveEnergyView({ zevId }: { zevId: string | undefined }) {
     const snapshotQuery = useLiveEnergy(enabled ? zevId : undefined)
     const snapshot = snapshotQuery.data
     const state = liveCardState(snapshot)
-    const curve = useLiveCurve(zevId, !!state).data
 
     if (enabledQuery.isError || snapshotQuery.isError) {
         const failed = enabledQuery.isError ? enabledQuery : snapshotQuery
@@ -30,7 +30,7 @@ export function LiveEnergyView({ zevId }: { zevId: string | undefined }) {
             </Notice>
         )
     }
-    if (enabledQuery.data === false) return <Notice tone="warning">{t('pages.live.disabled')}</Notice>
+    if (enabledQuery.data === false) return <p className="muted">{t('pages.live.disabled')}</p>
     if (enabledQuery.isPending || !zevId || snapshot === undefined) return <PageSkeleton variant="kpiRow" />
     if (snapshot === null) return <Notice tone="warning">{t('pages.live.unavailable')}</Notice>
     if (!state) {
@@ -48,7 +48,6 @@ export function LiveEnergyView({ zevId }: { zevId: string | undefined }) {
     return (
         <>
             <LiveEnergyCard snapshot={snapshot} />
-            {curve && <LiveCurveChart curve={curve} />}
             {snapshot.points && snapshot.points.length > 0 && <LivePointsTable points={snapshot.points} />}
         </>
     )

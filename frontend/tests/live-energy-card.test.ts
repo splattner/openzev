@@ -1,8 +1,8 @@
 import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { LiveCurveChart } from '../src/features/live/LiveCurveChart'
 import { LiveEnergyCard } from '../src/features/live/LiveEnergyCard'
 import { LivePointsTable } from '../src/features/live/LivePointsTable'
+import { TodayChart } from '../src/features/myEnergy/TodayChart'
 import type { LiveOwn, LivePoint, LiveSnapshot } from '../src/types/api'
 import { renderWithProviders } from './helpers/render'
 
@@ -40,7 +40,7 @@ const exact = (overrides: Partial<LiveSnapshot> = {}): LiveSnapshot => ({
     surplus_w: 3000,
     grid_import_w: 0,
     local_share_pct: 100,
-    coverage: { producing_points: 1, producing_fresh: 1, consuming_points: 6, consuming_fresh: 1, connection_point: 'fresh', live_sources: 2 },
+    coverage: { producing_points: 1, producing_fresh: 1, consuming_points: 6, consuming_fresh: 1, connection_point: 'fresh', live_sources: 2, points: 7, points_fresh: 2 },
     own: own(),
     max_age_s: 60,
     ...overrides,
@@ -76,10 +76,15 @@ describe('LiveEnergyCard', () => {
         expect(out).not.toContain('live.zevProduces')
     })
 
-    it('gives a manager the reason when production is not covered', async () => {
-        const out = await text(none({ coverage: { ...none().coverage, producing_points: 2, producing_fresh: 1 }, points: [] }))
+    it('says the distinct point coverage once, for participants and managers alike', async () => {
+        // A vZEV of three bidirectional meters: per role the payload says 1 of 3 twice; the distinct count is said once.
+        const coverage = { ...none().coverage, producing_points: 3, producing_fresh: 1, consuming_points: 3, consuming_fresh: 1, points: 3, points_fresh: 1 }
+        const out = await text(none({ coverage }))
 
-        expect(out).toContain('live.noneReason|{"fresh":1,"total":2}')
+        expect(out).toContain('live.none')
+        expect(out).toContain('live.coverage|{"fresh":1,"total":3}')
+        expect(out.match(/live\.coverage/g)).toHaveLength(1)
+        expect(out).toContain('live.connectionPoint')
     })
 
     it('shows only the production and the note at tier production', async () => {
@@ -132,7 +137,7 @@ describe('LiveEnergyCard', () => {
 
         expect(out).toContain('live.asOf|{"time":"12:02:10"}')
         expect(out).toContain('live.badge')
-        expect(out).toContain('live.coverage|{"fresh":1,"total":6}')
+        expect(out).toContain('live.coverage|{"fresh":2,"total":7}')
         expect(out).toContain('live.connectionPoint')
         expect(out).toContain('live.state.fresh')
     })
@@ -185,11 +190,22 @@ describe('LivePointsTable', () => {
     })
 })
 
-describe('LiveCurveChart', () => {
-    it('says so when the day has no live values yet', async () => {
-        const curve = { date: '2026-10-30', bucket_s: 300, buckets: [{ start: '2026-10-30T07:00:00Z', tier: 'none' as const }] }
-        const { container } = await renderWithProviders(createElement(LiveCurveChart, { curve }), cleanups)
+describe('TodayChart', () => {
+    it('says so when the day has no values yet', async () => {
+        const { container } = await renderWithProviders(
+            createElement(TodayChart, { date: '2026-10-30', rows: [], through: null, hasLive: true }),
+            cleanups,
+        )
 
-        expect(container.textContent).toContain('live.curve.empty')
+        expect(container.textContent).toContain('myEnergy.today.empty')
+    })
+
+    it('says there is no own data today when only the history was asked for', async () => {
+        const { container } = await renderWithProviders(
+            createElement(TodayChart, { date: '2026-10-30', rows: [], through: null, hasLive: false }),
+            cleanups,
+        )
+
+        expect(container.textContent).toContain('myEnergy.today.emptyHistory')
     })
 })

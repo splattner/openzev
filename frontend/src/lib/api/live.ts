@@ -1,4 +1,4 @@
-import type { LiveCurve, LiveSnapshot } from '../../types/api'
+import type { LiveCurve, LiveSnapshot, OwnSeries } from '../../types/api'
 import { api } from './client'
 
 const BASE = '/metering/live/zevs/'
@@ -9,9 +9,10 @@ export async function fetchLiveSnapshot(zevId: string): Promise<LiveSnapshot> {
   return data
 }
 
-/** The buckets of a civil day (`YYYY-MM-DD`, default today). */
-export async function fetchLiveCurve(zevId: string, date?: string): Promise<LiveCurve> {
-  const { data } = await api.get<LiveCurve>(`${BASE}${zevId}/curve/`, { params: date ? { date } : undefined })
+/** The buckets of a civil day (`YYYY-MM-DD`, default today); a manager, viewer or admin may name whose own values. */
+export async function fetchLiveCurve(zevId: string, date?: string, participantId?: string): Promise<LiveCurve> {
+  const params = { ...(date ? { date } : {}), ...(participantId ? { participant_id: participantId } : {}) }
+  const { data } = await api.get<LiveCurve>(`${BASE}${zevId}/curve/`, { params })
   return data
 }
 
@@ -27,8 +28,25 @@ export function fetchLiveSnapshotOrNull(zevId: string): Promise<LiveSnapshot | n
   return notFoundToNull(fetchLiveSnapshot(zevId))
 }
 
-export function fetchLiveCurveOrNull(zevId: string, date?: string): Promise<LiveCurve | null> {
-  return notFoundToNull(fetchLiveCurve(zevId, date))
+export function fetchLiveCurveOrNull(zevId: string, date?: string, participantId?: string): Promise<LiveCurve | null> {
+  return notFoundToNull(fetchLiveCurve(zevId, date, participantId))
+}
+
+export interface OwnSeriesParams {
+  zevId: string
+  dateFrom: string
+  dateTo: string
+  bucket: OwnSeries['bucket']
+  /** Manager, viewer or admin: whose system. Omitted, it is the signed-in user's own. */
+  participantId?: string
+}
+
+/** The own-system series of a civil range. Answers 404 while the energy data feature is off. */
+export async function fetchOwnSeries({ zevId, dateFrom, dateTo, bucket, participantId }: OwnSeriesParams): Promise<OwnSeries> {
+  const { data } = await api.get<OwnSeries>(`/metering/supplementary/zevs/${zevId}/own-series/`, {
+    params: { date_from: dateFrom, date_to: dateTo, bucket, ...(participantId ? { participant_id: participantId } : {}) },
+  })
+  return data
 }
 
 /** Whether the live view is effective on this instance. Unlike the rest, this answers 200 while it is off. */

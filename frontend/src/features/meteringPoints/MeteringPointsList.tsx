@@ -32,6 +32,9 @@ type MeteringPointsListProps = {
   onOpenEditAssignment: (assignment: MeteringPointAssignment) => void
   onDeleteMeteringPoint: (id: string) => void
   onDeleteAssignment: (id: string) => void
+  /** Opens the live dialog of a point a manager can set live data up on; `undefined` where there is none. */
+  liveSetupPointIds?: Set<string>
+  onOpenLive?: (point: MeteringPoint) => void
 }
 
 export function MeteringPointsList({
@@ -57,6 +60,8 @@ export function MeteringPointsList({
   onOpenEditAssignment,
   onDeleteMeteringPoint,
   onDeleteAssignment,
+  liveSetupPointIds,
+  onOpenLive,
 }: MeteringPointsListProps) {
   const { t } = useTranslation()
   const todayIso = todayBusinessIso()
@@ -92,6 +97,7 @@ export function MeteringPointsList({
       onOpenEditAssignment={onOpenEditAssignment}
       onDeleteMeteringPoint={onDeleteMeteringPoint}
       onDeleteAssignment={onDeleteAssignment}
+      onOpenLive={onOpenLive && liveSetupPointIds?.has(point.id) ? onOpenLive : undefined}
     />
   )
 

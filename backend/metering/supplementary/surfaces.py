@@ -37,11 +37,14 @@ def window_for(date_from: date | None, date_to: date | None) -> Window:
 def bucket_key_for(bucket: str) -> Callable[[datetime], str]:
     """Maps an interval start to the label the dashboards use for the same bucket (ADR 0026).
 
-    Day and month buckets are civil, truncated in the business timezone; hour buckets
-    are UTC. The labels are ``isoformat()`` strings, identical to ``Trunc*(...).isoformat()``,
-    so a chart can lay this timeline over its own.
+    Day and month buckets are civil, truncated in the business timezone; hour and quarter-hour
+    buckets are UTC (``quarter`` is the 15-minute interval start itself, for the own-system page).
+    The labels are ``isoformat()`` strings, identical to ``Trunc*(...).isoformat()``, so a chart can
+    lay this timeline over its own.
     """
     zone = business_tz()
+    if bucket == "quarter":
+        return lambda ts: ts.astimezone(dt_timezone.utc).isoformat()
     if bucket == "hour":
         return lambda ts: ts.astimezone(dt_timezone.utc).replace(minute=0, second=0, microsecond=0).isoformat()
     if bucket == "month":

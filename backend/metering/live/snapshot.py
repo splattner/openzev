@@ -179,6 +179,14 @@ class Topology:
             if (holder := self.holders.get(point.pk)) is not None and holder.user_id == user.pk
         ]
 
+    def points_of(self, participant_ids: Iterable) -> list[MeteringPoint]:
+        """Active points these participants hold personally today (a manager looking at somebody else's)."""
+        wanted = set(participant_ids)
+        return [
+            point for point in self.points
+            if (holder := self.holders.get(point.pk)) is not None and holder.pk in wanted
+        ]
+
 
 def load_topology(zev: Zev, *, today: date | None = None) -> Topology:
     points = list(MeteringPoint.objects.filter(zev=zev, is_active=True).order_by("meter_id"))
@@ -261,6 +269,9 @@ def zev_snapshot(zev: Zev, *, now: datetime | None = None, viewer, topology: Top
                 live_state(topology.connection, connection_sample, now) if topology.connection is not None else None
             ),
             "live_sources": topology.live_sources,
+            # Distinct metering points: a bidirectional one is in both counts above but once here.
+            "points": len(topology.points),
+            "points_fresh": sum(1 for point in topology.points if fresh[point.pk] is not None),
         },
         "own": own,
         "max_age_s": settings.LIVE_MAX_AGE_S,

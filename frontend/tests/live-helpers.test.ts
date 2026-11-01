@@ -21,7 +21,7 @@ const snapshot = (overrides: Partial<LiveSnapshot> = {}, liveSources = 2): LiveS
     surplus_w: 3000,
     grid_import_w: 0,
     local_share_pct: 100,
-    coverage: { producing_points: 1, producing_fresh: 1, consuming_points: 2, consuming_fresh: 2, connection_point: null, live_sources: liveSources },
+    coverage: { producing_points: 1, producing_fresh: 1, consuming_points: 2, consuming_fresh: 2, connection_point: null, live_sources: liveSources, points: 3, points_fresh: 3 },
     own: null,
     max_age_s: 60,
     ...overrides,
@@ -100,15 +100,15 @@ describe('liveCurveRows', () => {
     ])
 
     it('converts W to kW', () => {
-        expect(rows[0]).toEqual({ ts: Date.parse('2026-10-30T08:00:00Z'), production: 8, consumption: 5, own: 1.2 })
+        expect(rows[0]).toEqual({ ts: Date.parse('2026-10-30T08:00:00Z'), production: 8, consumption: 5, own: 1.2, ownProduction: null })
     })
 
     it('leaves a none bucket as a gap in every series', () => {
-        expect(rows[1]).toEqual({ ts: Date.parse('2026-10-30T08:05:00Z'), production: null, consumption: null, own: null })
+        expect(rows[1]).toEqual({ ts: Date.parse('2026-10-30T08:05:00Z'), production: null, consumption: null, own: null, ownProduction: null })
     })
 
     it('has no consumption below exact and no own value that was not sent', () => {
-        expect(rows[2]).toEqual({ ts: Date.parse('2026-10-30T08:10:00Z'), production: 7.5, consumption: null, own: null })
+        expect(rows[2]).toEqual({ ts: Date.parse('2026-10-30T08:10:00Z'), production: 7.5, consumption: null, own: null, ownProduction: null })
     })
 
     it('never drops the production of a production bucket even if consumption was sent', () => {

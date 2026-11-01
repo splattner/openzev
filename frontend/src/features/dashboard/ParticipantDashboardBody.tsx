@@ -15,7 +15,7 @@ import { Notice } from '../../components/Notice'
 import { StatCard } from '../../components/StatCard'
 import { PeriodSelector } from '../../components/PeriodSelector'
 import { ConsumptionSplitCard } from '../../components/dashboard/ConsumptionSplitCard'
-import { GrossEnergyCallToAction, GrossEnergyCard } from '../../components/dashboard/GrossEnergyCard'
+import { OwnSystemNote } from '../../components/dashboard/OwnSystemNote'
 import { EnergyFlowCard } from '../../components/dashboard/EnergyFlowCard'
 import { HourlyProfileSection } from '../../components/dashboard/HourlyProfileSection'
 import { ParticipantInvoicesCard } from '../../components/dashboard/ParticipantInvoicesCard'
@@ -142,16 +142,9 @@ export function ParticipantDashboardBody({ interval, period, onPeriodChange, per
                         />
                     </section>
                     {summary.zev_has_behind_meter_generation && <p className="muted">{t('behindMeter.zevNote')}</p>}
-                    {summary.has_behind_meter_generation && summary.gross_energy && (
-                        <GrossEnergyCard
-                            gross={summary.gross_energy}
-                            whose="own"
-                            formatBucketLabel={formatBucketLabel}
-                            formatBucketTooltipLabel={formatBucketTooltipLabel}
-                        />
-                    )}
-                    {summary.has_behind_meter_generation && !summary.gross_energy && energyData.canConnect && (
-                        <GrossEnergyCallToAction />
+                    {/* The own system's figures are on My energy system; this note stands where they used to be. */}
+                    {summary.has_behind_meter_generation && (summary.gross_energy || energyData.canConnect) && (
+                        <OwnSystemNote period={period} />
                     )}
                     {summary.zev_participant_stats.length > 0 && summary.current_participant_id && (
                         <EnergyFlowCard

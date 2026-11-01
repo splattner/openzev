@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 from .views import MeterReadingViewSet, QuarantinedReadingViewSet, ImportLogViewSet, ImportView
 from .live.views import LiveCurveView, LiveIngestView, LiveMeView, LiveSnapshotView, live_enabled
-from .supplementary.views import SupplementaryIngestView, SupplementarySourceViewSet
+from .supplementary.views import OwnSeriesView, SupplementaryIngestView, SupplementarySourceViewSet
 
 router = DefaultRouter()
 router.register("readings", MeterReadingViewSet, basename="meterreading")
@@ -13,6 +13,7 @@ router.register("supplementary/sources", SupplementarySourceViewSet, basename="s
 
 urlpatterns = [
     path("supplementary/ingest/", SupplementaryIngestView.as_view(), name="supplementary-ingest"),
+    path("supplementary/zevs/<uuid:zev_id>/own-series/", OwnSeriesView.as_view(), name="supplementary-own-series"),
     path("live/ingest/", LiveIngestView.as_view(), name="live-ingest"),
     path("live/enabled/", live_enabled, name="live-enabled"),
     path("live/me/", LiveMeView.as_view(), name="live-me"),

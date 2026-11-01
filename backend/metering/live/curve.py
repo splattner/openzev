@@ -15,6 +15,7 @@ from allocation.validity import period_end_exclusive_dt, period_start_dt
 from zev import access
 from zev.models import Zev
 
+from ..supplementary import own_series
 from . import store
 from .snapshot import (
     TIER_EXACT,
@@ -32,7 +33,14 @@ def earliest_day_start(now: datetime) -> datetime:
     return now - timedelta(hours=settings.LIVE_CURVE_RETENTION_H)
 
 
-def zev_curve(zev: Zev, day: date, *, now: datetime, viewer) -> dict:
+def zev_curve(zev: Zev, day: date, *, now: datetime, viewer, participant_id=None) -> dict:
+    """The day's buckets, plus the viewer's own history of that day for the hand-over (SPEC §5.3).
+
+    ``participant_id`` (manager, viewer, admin) makes "own" mean that participant: the ``own_*`` values
+    of the buckets and the history. The view has already checked who may ask. History and live are
+    never merged here: ``own_history`` is stored data, the ``own_*`` bucket values are live, and the
+    page decides where one hands over to the other (history up to ``own_history_through``).
+    """
     topology = load_topology(zev, today=day)
     start, end = period_start_dt(day), min(period_end_exclusive_dt(day), now)
     detailed = access.can_view(viewer, zev)
@@ -44,7 +52,8 @@ def zev_curve(zev: Zev, day: date, *, now: datetime, viewer) -> dict:
         if point.pk in topology.sources
     }
     connection = buckets.get(str(topology.connection.pk), {}) if topology.connection is not None else {}
-    own_points = topology.own_points(viewer)
+    history_ids = own_series.participant_ids_for(viewer, zev, participant_id)
+    own_points = topology.points_of(history_ids) if participant_id else topology.own_points(viewer)
     has_own = any(point.pk in topology.sources for point in own_points)
 
     width = settings.LIVE_CURVE_BUCKET_S
@@ -53,7 +62,14 @@ def zev_curve(zev: Zev, day: date, *, now: datetime, viewer) -> dict:
     while epoch < end.timestamp():
         rows.append(_bucket(topology, epoch, by_point, connection, own_points, detailed, has_own))
         epoch += width
-    return {"date": day.isoformat(), "bucket_s": width, "buckets": rows}
+    through = own_series.history_through(history_ids)
+    return {
+        "date": day.isoformat(),
+        "bucket_s": width,
+        "buckets": rows,
+        "own_history": own_series.own_history_of_day(history_ids, day),
+        "own_history_through": iso(through),
+    }
 
 
 def _bucket(topology, epoch, by_point, connection, own_points, detailed, has_own) -> dict:
@@ -79,6 +95,7 @@ def _bucket(topology, epoch, by_point, connection, own_points, detailed, has_own
         complete = all(power[point.pk] is not None for point in own_points)
         consumption, production = own_sums(own_points, power) if complete else (None, None)
         row["own_consumption_w"] = watts(consumption)
+        row["own_production_w"] = watts(production)
         row["own_local_w"] = own_split(consumption, production, totals)["local_w"] if complete else None
     if detailed:
         row["points"] = [

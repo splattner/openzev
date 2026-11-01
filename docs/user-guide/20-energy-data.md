@@ -168,11 +168,24 @@ Semicolons and decimal commas (as in a Swiss Excel export) are accepted. Choose
 
 ## What you see
 
-### Your dashboard
+### My energy system
 
-![Participant dashboard with own-system figures](screenshots/24-energy-data-dashboard.png)
+Everything your own devices report lives on the page **My energy system** in the
+sidebar. Your dashboard (**Energy balance** for managers) keeps the grid operator's
+official figures and only points to this page, with a link that opens the same period.
+The page has three views, chosen with the tabs **Today**, **7 days** and **Period**
+(the billing period, with the usual period selector). Managers and viewers pick the
+participant whose system they want to see; a manager who is a participant with a
+connected source starts on themselves.
 
-With a connected source, your dashboard shows a card **Your own system** with
+**Today** draws your own consumption (and production, if you have a PV system) in one
+line: from your source's **history** up to its last synchronisation (solid line), and
+from **live** values after that (dashed line). A marker shows where history hands over
+to live. Where neither has a value, the line has a gap; nothing is estimated. The ZEV's
+totals in the same chart are live only. **7 days** and **Period** show the card
+described below.
+
+With a connected source, the card **Your own system** shows
 production, consumption, self-consumption, grid import and export, your
 **self-sufficiency** and **self-consumption** rates, and a chart. It always says
 the figures are **reported by your own system**, not read from the meter, and
@@ -209,10 +222,9 @@ self-sufficiency. The energy sums are still shown.
   table, marked with an info icon. The **Consumption** and **Production/Export**
   columns keep the meter value and add the own system's figure under it
   (**Own system: x kWh**, also marked with an info icon, and only with enough data).
-  Selecting a participant shows the full card and draws their own-system line in the
-  24-hour profile. A manager who is also a participant with a connected source sees their own
-  **Your own system** card there while nobody, or they themselves, are selected
-  (not while another participant is); their own row is marked **You**. Without a source, the same place offers to connect one.
+  Selecting a participant draws their own-system line in the 24-hour profile; the full
+  card is on **My energy system**, which the dashboard links to. A manager who is also a
+  participant has their own row marked **You**.
   Selecting a row in the table again clears the selection.
 - The **annual report** shows it per participant.
 - The **annual statement** PDF shows your self-sufficiency for every month with
