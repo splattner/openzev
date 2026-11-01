@@ -60,7 +60,7 @@ from tariffs.dynamic.models import DynamicTariffSource, FetchStatus
 from tariffs.dynamic.protocol import V2_PRODUCT_REQUIRED
 from tariffs.models import BillingMode, PeriodType, Tariff, TariffPeriod
 from zev.models import (
-    PARTY_FACADE_FIELDS, SINGLE_HOLDER_ROLES, Building, MeteringPoint, MeteringPointAssignment, Participant, Party,
+    PARTY_FACADE_FIELDS, SINGLE_HOLDER_ROLES, Building, MeteringPoint, MeteringPointAssignment, Participant, Party, PvPlane,
     VatMode, Zev, ZevPartyRole,
 )
 
@@ -85,6 +85,7 @@ from .schema import (
     METERING_POINT_FIELDS,
     LEGACY_PARTICIPANT_FIELDS,
     PARTICIPANT_FIELDS,
+    PV_PLANE_FIELDS,
     PARTIES_FILE,
     PARTY_FIELDS,
     PARTY_ROLE_FIELDS,
@@ -549,6 +550,9 @@ def _import_metering_points(archive, zev, participants_by_archive_id, collector,
             continue
         points_by_meter_id[point.meter_id] = point
 
+        for plane_position, raw_plane in enumerate(raw.get("pv_planes") or [], start=1):
+            _import_pv_plane(point, raw_plane, collector, label=f"{label} plane #{plane_position}", position=position)
+
         for assignment_position, raw_assignment in enumerate(raw.get("assignments") or [], start=1):
             if _import_assignment(
                 point,
@@ -561,6 +565,19 @@ def _import_metering_points(archive, zev, participants_by_archive_id, collector,
                 assignment_count += 1
 
     return points_by_meter_id, assignment_count
+
+
+def _import_pv_plane(point, raw, collector, *, label, position):
+    """Import one roof plane of a producing point; a bad one is reported, not fatal."""
+    if not isinstance(raw, dict):
+        raise ArchiveError(f"PV plane {label} is not a JSON object.")
+    plane = PvPlane(metering_point=point, **_pick(raw, PV_PLANE_FIELDS, position, SECTION_METERING_POINTS))
+    try:
+        with transaction.atomic():
+            plane.full_clean(exclude=["metering_point"])
+            plane.save()
+    except (DjangoValidationError, ValueError, TypeError) as exc:
+        collector.add(SECTION_METERING_POINTS, position, label, exc)
 
 
 def _import_assignment(point, raw, participants_by_archive_id, collector, *, label, position):

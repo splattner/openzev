@@ -674,6 +674,15 @@ class Building(models.Model):
         help_text="Federal building ID (EGID)",
     )
     notes = models.TextField(blank=True)
+    latitude = models.DecimalField(
+        max_digits=8, decimal_places=5, null=True, blank=True,
+        validators=[MinValueValidator(Decimal("-90")), MaxValueValidator(Decimal("90"))],
+        help_text="Where the plant is, for the production forecast. Sent rounded to two decimals.",
+    )
+    longitude = models.DecimalField(
+        max_digits=8, decimal_places=5, null=True, blank=True,
+        validators=[MinValueValidator(Decimal("-180")), MaxValueValidator(Decimal("180"))],
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1213,3 +1222,46 @@ class ZevPartyRole(models.Model):
             for user in sorted(party_accounts(party), key=lambda user: user.pk):
                 protect_account_login(user)
         super().save(*args, **kwargs)
+
+
+class PvPlane(models.Model):
+    """One roof plane of the plant behind a producing metering point (SPEC-2026-live-energy-data §4.3).
+
+    A plant on an east and a west roof has two. The production forecast sums one estimate per plane.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    metering_point = models.ForeignKey(MeteringPoint, on_delete=models.CASCADE, related_name="pv_planes")
+    label = models.CharField(max_length=100, blank=True, default="")
+    peak_power_kwp = models.DecimalField(
+        max_digits=7, decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01")), MaxValueValidator(Decimal("10000"))],
+    )
+    tilt_deg = models.PositiveSmallIntegerField(
+        validators=[MaxValueValidator(90)], help_text="0 is flat, 90 is vertical."
+    )
+    azimuth_deg = models.SmallIntegerField(
+        validators=[MinValueValidator(-180), MaxValueValidator(180)],
+        help_text="0 is south, -90 east, 90 west, +-180 north.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"{self.label or 'Plane'} ({self.peak_power_kwp} kWp)"
+
+    def clean(self):
+        errors = {}
+        if self.metering_point_id:
+            if self.metering_point.meter_type not in (MeteringPointType.PRODUCTION, MeteringPointType.BIDIRECTIONAL):
+                errors["metering_point"] = "Only a producing metering point has PV planes."
+            others = PvPlane.objects.filter(metering_point_id=self.metering_point_id).exclude(pk=self.pk)
+            if others.count() >= settings.PV_PLANES_MAX_PER_METERING_POINT:
+                errors["metering_point"] = (
+                    f"A metering point has at most {settings.PV_PLANES_MAX_PER_METERING_POINT} PV planes."
+                )
+        if errors:
+            raise ValidationError(errors)

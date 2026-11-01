@@ -29,6 +29,7 @@ from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCa
 from testing.helpers import authenticate as auth, make_user, create_managed_zev
 from zev.models import (
     Building,
+    PvPlane,
     MeteringPoint,
     MeteringPointAssignment,
     MeteringPointType,
@@ -1672,6 +1673,31 @@ class BuildingTransferTests(TestCase):
                    key=lambda row: row[0]),
             [("Eins", "Haus B"), ("Zwei", None)],
         )
+
+    def test_coordinates_and_pv_planes_survive_a_round_trip(self):
+        self.house_a.latitude, self.house_a.longitude = Decimal("47.37691"), Decimal("8.54169")
+        self.house_a.save()
+        self.point_a.meter_type = "production"
+        self.point_a.save()
+        PvPlane.objects.create(metering_point=self.point_a, label="South", peak_power_kwp=Decimal("8.50"), tilt_deg=30, azimuth_deg=-10)
+        PvPlane.objects.create(metering_point=self.point_a, label="West", peak_power_kwp=Decimal("4"), tilt_deg=15, azimuth_deg=90)
+
+        result = self._import(export_and_clear(self.zev, ["zev", "participants", "metering_points"]))
+
+        copy = Zev.objects.get(pk=result["zev_id"])
+        self.assertEqual(
+            copy.buildings.values_list("latitude", "longitude").get(name="Haus A"), (Decimal("47.37691"), Decimal("8.54169"))
+        )
+        self.assertEqual(
+            sorted(PvPlane.objects.filter(metering_point__zev=copy).values_list("label", "peak_power_kwp", "tilt_deg", "azimuth_deg")),
+            [("South", Decimal("8.50"), 30, -10), ("West", Decimal("4.00"), 15, 90)],
+        )
+
+    def test_an_archive_without_planes_or_coordinates_still_imports(self):
+        result = self._import(export_and_clear(self.zev, ["zev", "participants", "metering_points"]))
+        copy = Zev.objects.get(pk=result["zev_id"])
+        self.assertIsNone(copy.buildings.get(name="Haus A").latitude)
+        self.assertFalse(PvPlane.objects.filter(metering_point__zev=copy).exists())
 
     def test_a_format_5_archive_applies_the_participant_address_rule(self):
         raw = as_format_version(export_and_clear(self.zev), 5)

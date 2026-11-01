@@ -12,6 +12,7 @@ from .views import (
     ZevPartyRoleViewSet,
     MeteringPointViewSet,
     MeteringPointAssignmentViewSet,
+    PvPlaneViewSet,
 )
 
 router = DefaultRouter()
@@ -24,6 +25,16 @@ router.register("metering-points", MeteringPointViewSet, basename="meteringpoint
 router.register("metering-point-assignments", MeteringPointAssignmentViewSet, basename="meteringpointassignment")
 
 urlpatterns = [
+    path(
+        "metering-points/<uuid:metering_point_id>/pv-planes/",
+        PvPlaneViewSet.as_view({"get": "list", "post": "create"}),
+        name="pv-plane-list",
+    ),
+    path(
+        "metering-points/<uuid:metering_point_id>/pv-planes/<uuid:pk>/",
+        PvPlaneViewSet.as_view({"get": "retrieve", "patch": "partial_update", "delete": "destroy"}),
+        name="pv-plane-detail",
+    ),
     path("grid-operators/", GridOperatorListView.as_view(), name="grid-operator-list"),
     path("grid-operators/suggest/", GridOperatorSuggestionView.as_view(), name="grid-operator-suggest"),
     path("zevs/<uuid:zev_id>/access/", ZevAccessListView.as_view(), name="zev-access-list"),

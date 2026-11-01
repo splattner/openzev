@@ -139,6 +139,25 @@ def geocode_building_footprint(address_line1: str, postal_code: str, city: str) 
     return geometry
 
 
+def footprint_centroid(geometry: dict) -> tuple[float, float] | None:
+    """``(latitude, longitude)`` of a footprint's first outer ring (the mean of its corners), or ``None``.
+
+    A building is small, so the mean of the corners of its outline is within metres of the true centroid, and a
+    forecast only uses two decimals of it anyway.
+    """
+    try:
+        rings = geometry["coordinates"]
+        ring = rings[0] if geometry.get("type") == "Polygon" else rings[0][0]
+        corners = ring[:-1] if len(ring) > 1 and ring[0] == ring[-1] else ring
+        longitude = sum(float(c[0]) for c in corners) / len(corners)
+        latitude = sum(float(c[1]) for c in corners) / len(corners)
+    except (KeyError, IndexError, TypeError, ValueError, ZeroDivisionError):
+        return None
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+        return None
+    return round(latitude, 5), round(longitude, 5)
+
+
 def warm_geocode_cache(address_line1: str, postal_code: str, city: str) -> None:
     """Populate the cache for this address if it isn't already cached (hit or miss).
 

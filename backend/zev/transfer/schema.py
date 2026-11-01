@@ -215,6 +215,18 @@ BUILDING_FIELDS = (
     "city",
     "egid",
     "notes",
+    # The plant's location for the production forecast; absent in older archives.
+    "latitude",
+    "longitude",
+)
+
+# A roof plane of a producing metering point, nested under it as ``pv_planes`` (SPEC-2026-live-energy-data §4.3).
+# Absent in older archives.
+PV_PLANE_FIELDS = (
+    "label",
+    "peak_power_kwp",
+    "tilt_deg",
+    "azimuth_deg",
 )
 
 # A participant from format 5 on: the billing relationship, plus the archive
