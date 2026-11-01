@@ -276,6 +276,8 @@ tests), keys versioned `live:v1:`. A `LiveSample` is
 | `live:v1:src:{source_id}:latest` | the sample (JSON) | `LIVE_MAX_AGE_S` |
 | `live:v1:src:{source_id}:b:{bucket_epoch}` | `{n, sum_meter_w, sum_production_w, n_production, sum_consumption_w, n_consumption}` | `LIVE_CURVE_RETENTION_H` |
 | `live:v1:src:{source_id}:last_push` | `received_at` (rate floor) | `LIVE_MIN_PUSH_INTERVAL_S` |
+| `live:v1:src:{source_id}:last_pull` | `1` (`cache.add` slot of `poll_live_sources`) | 80 % of `LIVE_PULL_INTERVAL_S` |
+| `live:v1:src:{source_id}:backoff` | `1` (set on a `429`) | `Retry-After`, at least `LIVE_PULL_INTERVAL_S`, at most 15 min |
 | `live:v1:watch:zev:{zev_id}` | `1` | `LIVE_WATCH_TTL_S` |
 | `live:v1:sm-access:{source_id}` | Solar Manager bearer token, Fernet-encrypted under `INTEGRATION_ENCRYPTION_KEYS` | 50 min |
 
@@ -298,7 +300,7 @@ totals.
 | `LIVE_CURVE_BUCKET_S` | `env.int` | `300` | Curve resolution |
 | `LIVE_CURVE_RETENTION_H` | `env.int` | `48` | Bucket lifetime |
 | `LIVE_WATCH_TTL_S` | `env.int` | `120` | How long a viewed ZEV keeps its pull sources polled |
-| `LIVE_PULL_INTERVAL_S` | `env.int` | `30` | Beat period of `poll_live_sources`, and the minimum interval per pulled source |
+| `LIVE_PULL_INTERVAL_S` | `env.int` | `30` | Beat period of `poll_live_sources`, and the pace of a pulled source (a source is claimed for 80 % of it, `store.PULL_FLOOR_SHARE`, so a slightly early tick still pulls). Keep it below `LIVE_MAX_AGE_S`: `metering.W003` warns otherwise |
 | `LIVE_LAST_SEEN_RESOLUTION_S` | `env.int` | `30` | `live_last_seen_at` write resolution |
 | `LIVE_MAX_ABS_POWER_W` | `env.int` | `5000000` | Plausibility cap for any value |
 | `FORECAST_REFRESH_INTERVAL_S` | `env.int` | `3600` | Beat period of `refresh_production_forecasts` |
@@ -320,8 +322,8 @@ New endpoints under `/api/v1/metering/live/` (registered in `metering/urls.py`, 
 |---|---|---|---|
 | `/live/enabled/` | GET | `IsAuthenticated` | `{"enabled": bool}`: the live flag is effective (`live_feature_enabled()`, the condition `LiveFeatureMixin` uses). Never `404`, so the nav and the page can ask; `401` when anonymous. Function view `live_enabled`, mirrors `/feasibility/enabled/` |
 | `/live/ingest/` | POST | `SupplementaryPushAuthentication`, `IsPushSource`, `LivePushThrottle` | One sample for the token's source (§5.1). `202 {"accepted": true}` |
-| `/live/zevs/{zev_id}/` | GET | `LiveEnergyPermission` | ZEV snapshot (§5.2), narrowed by role. From PR 4 on it also marks the ZEV as watched (`live:v1:watch:zev`) |
-| `/live/zevs/{zev_id}/curve/` | GET | `LiveEnergyPermission` | `?date=YYYY-MM-DD` (civil date, default today, at most `LIVE_CURVE_RETENTION_H` back), `participant_id` (optional, §5.3): 5-minute buckets plus the viewer's own history of the day (§5.3) |
+| `/live/zevs/{zev_id}/` | GET | `LiveEnergyPermission` | ZEV snapshot (§5.2), narrowed by role. It also marks the ZEV as watched (`store.mark_watched`, `live:v1:watch:zev`, PR 4) |
+| `/live/zevs/{zev_id}/curve/` | GET | `LiveEnergyPermission` | `?date=YYYY-MM-DD` (civil date, default today, at most `LIVE_CURVE_RETENTION_H` back), `participant_id` (optional, §5.3): 5-minute buckets plus the viewer's own history of the day (§5.3). Marks the ZEV as watched too (PR 4) |
 | `/live/zevs/{zev_id}/forecast/` | GET | `LiveEnergyPermission` | Hourly ZEV production forecast for `FORECAST_HORIZON_H` (§5.4) |
 | `/live/me/` | GET | authenticated (JWT or personal API key) | Compact snapshot for each ZEV the caller is a current participant of (§5.5), made for Home Assistant `rest` sensors and n8n |
 
@@ -334,8 +336,13 @@ Source management stays on `/supplementary/sources/` (supplementary spec §5) wi
   `provides_forecast` (defaults: `metering_point`, `participant`, `true`, `false`, `false`).
   `provider = forecast_solar` needs neither credential nor consent and returns no token. A
   `push` source with only `provides_live` returns its `push_token` once, as today. A Solar Manager
-  source with only live/forecast is verified with one `/data/stream` call instead of a history
-  interval. Capability conflicts (a second live source on the metering point) answer
+  source with only live is verified with one `/data/stream` call (`verify_live`) instead of a history
+  interval; one with history (alone or with live) as before. A Solar Manager source is participant-held
+  on a metering point only: `held_by = zev` and `target = connection_point` answer
+  `400 {"provider": ["A Solar Manager key is personal. ..."]}` (the key is a personal credential, ADR 0031).
+  `PATCH {provides_live: true, consent: true}` on a Solar Manager history source adds live with the stored
+  key (refused with a field error when the source holds no key); `PATCH {provides_history: true, ...}`
+  on a live-only one queues a sync. Capability conflicts (a second live source on the metering point) answer
   `400 {"provides_live": ["This metering point already has a live data source."]}`.
 - `GET /sources/eligible/` adds, per held metering point, `eligible_capabilities`
   (`["history", "live", "forecast"]` subset) and the ids of existing sources per capability, and is no
@@ -343,7 +350,10 @@ Source management stays on `/supplementary/sources/` (supplementary spec §5) wi
 - New `GET /sources/zev-eligible/?zev_id=` (manager, admin): metering points of the ZEV with no
   personal holder today, their eligible capabilities and sources, and whether the connection point
   can be added (`zev_type = zev`, none yet).
-- `POST /sources/{id}/test/` for a live-only Solar Manager source fetches one `/data/stream` sample.
+- `POST /sources/{id}/test/` for a live-only Solar Manager source fetches one `/data/stream` sample
+  (`check_live`); with both capabilities it checks history and then live; a push source without history
+  still answers `400 "This source does not provide history."`. `/sync/` and `/reconciliation/` still need
+  `provides_history`.
 - `POST /sources/{id}/sync/` on a forecast source queues a forecast refresh (same 5-minute floor).
 
 PV planes: `GET/POST /api/v1/zev/metering-points/{id}/pv-planes/`,
@@ -541,21 +551,43 @@ Flat keys so a Home Assistant `rest` sensor can read them with `value_template` 
 ### 6.1 Solar Manager live (`metering/supplementary/solar_manager.py`)
 
 - `SolarManagerProvider.fetch_live(source) -> LiveSample` calls `GET /v3/users/{smId}/data/stream`
-  (API v1.88.11). Mapping: `t` → `timestamp`; `meter_power_w = iW − eW`; `production_w = pW`;
-  `consumption_w = cW`. Battery and device fields are ignored. A missing `iW` or `eW` is no sample.
+  (`SolarManagerClient.stream`, API v1.88.11, same HTTP hardening as `range`). The pure mapper
+  `map_stream(payload, source_id, now)`: `t` → `timestamp` (aware UTC; missing, naive or unreadable → now;
+  in the future → now); `meter_power_w = iW − eW`; `production_w = pW`; `consumption_w = cW`, each to one
+  decimal. Battery and device fields are ignored. A missing or non-numeric `iW` or `eW` is no sample
+  (`ProviderError`, never a zero); a missing `pW`/`cW` is `None`, a negative one is left out; a value that
+  is not finite or beyond `LIVE_MAX_ABS_POWER_W` rejects the whole payload.
+- `verify_live(external_id, credential)` and `check_live(source)` do the same with one stream sample, for
+  creating, replacing the key of and testing a live-only source; the `Provider` protocol lists them next to
+  `fetch_live`.
 - Bearer tokens are cached in `live:v1:sm-access:{source_id}` (encrypted, 50 min) so a 30-second poll
   does not rotate the refresh token each time; the refresh runs under the existing `select_for_update`
-  lock when the cache is empty.
+  lock when the cache is empty (the rotated key is persisted before the bearer token is used). A cached
+  token the vendor refuses is dropped and one fresh exchange is tried before the failure counts as an auth
+  failure; an unreadable cache entry is dropped. The entry is deleted when the source is disconnected
+  (`SupplementarySource.clear_credential`, which the orphan sweep uses too), deleted, or its key replaced.
 - Error mapping and HTTP hardening as in the supplementary spec §6.2. An auth failure sets
   `reconnect_required` for the whole source (all capabilities).
 
 ### 6.2 `poll_live_sources` (beat, `LIVE_PULL_INTERVAL_S`)
 
-When the live flag is effective: for every ZEV with a `live:v1:watch:zev` key, every enabled
-`solar_manager` source with `provides_live` that is not `reconnect_required` and has not been pulled
-within `LIVE_PULL_INTERVAL_S` gets `pull_live_source.delay(id)` (`max_retries=0`; the next tick is the
-retry). Pulls only while someone looks, so an unviewed ZEV costs no vendor calls. `429` sets a
-`live:v1:src:{id}:backoff` key for its `Retry-After` (max 15 min).
+`LiveSnapshotView` and `LiveCurveView` mark the ZEV watched (`store.mark_watched`, `live:v1:watch:zev:{id}`
+for `LIVE_WATCH_TTL_S`); `/live/me/` does not. When the live flag is effective, `poll_live_sources` queues
+`pull_live_source.delay(id)` for every enabled `solar_manager` source with `provides_live` that is not
+`reconnect_required`, whose ZEV is not disabled and is watched, that is not in back-off and whose pull slot
+(`store.claim_pull_slot`, 80 % of `LIVE_PULL_INTERVAL_S`) is free. A broker error on one source is logged
+and does not stop the others. Pulls only while someone looks, so an unviewed ZEV costs no vendor calls.
+
+`pull_live_source(source_id)` (`max_retries=0`; the next tick is the retry) re-checks the flag, `enabled`,
+`provides_live`, `reconnect_required`, the ZEV and the holder (`live.source_state.holder_gone`, shared with
+the push endpoint, as is `touch_last_seen`), calls `fetch_live`, `store.put_sample` and touches
+`live_last_seen_at` at coarse resolution. A live-only source whose status is `pending` or `error` becomes
+`ok` with the first sample (it has no sync to settle it). Outcomes: `ProviderAuthError` marks the whole
+source `reconnect_required` (like a sync, audited once as `supplementary_source.sync` with
+`capability: live`, since the next ticks skip it); `ProviderRateLimited` sets
+`live:v1:src:{id}:backoff` for `min(max(Retry-After, LIVE_PULL_INTERVAL_S), 900)` seconds; any other
+`ProviderError` is logged at warning level and is a missed sample that simply expires, never touching
+`last_error`, which belongs to the history sync. No audit event per poll.
 
 ### 6.3 Forecast (`metering/live/forecast.py`, task in `metering/tasks.py`)
 
@@ -598,7 +630,8 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
 - **Deletion:** ZEV, metering point and participant cascades as today; cache keys expire by TTL.
 - **System check:** `metering.W002` when `FEATURE_LIVE_ENERGY_DATA_ENABLED` is forced on in the
   environment while the cache backend is not Redis/Valkey (`LocMemCache` would split live data per
-  process).
+  process). `metering.W003` when `LIVE_PULL_INTERVAL_S >= LIVE_MAX_AGE_S` (a pulled value would expire before
+  the next pull).
 
 ## 7. Frontend
 
@@ -691,7 +724,7 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
 
 ### 7.2 Setup
 
-Shipped in PR 3b. Live is push only until PR 4 and the forecast is not offered yet.
+Shipped in PR 3b; Solar Manager live arrived with PR 4 (the forecast is not offered yet).
 
 - **My connections** (`features/supplementary/MyConnections.tsx`): a card at the top of
   `/me/metering-points`, shown only while the feature is on and the source list has loaded. It lists
@@ -744,7 +777,7 @@ Shipped in PR 3b. Live is push only until PR 4 and the forecast is not offered y
   (preselected), the visible `sources` and an optional `frame` (so a host that is already a dialog draws
   the flow in its own dialog). Step **What**: a checkbox per available capability (skipped when only
   one is available; a ZEV-held point and the connection point offer live only). Step **How**: provider
-  radios filtered by the choice (Solar Manager only while live is not chosen, push always); when the
+  radios (Solar Manager and push for any choice; a ZEV-operated meter and the connection point are push only, because a Solar Manager key is personal; the Solar Manager hint says whether it syncs history hourly, reads live while the page is open, or both: `solarHintKey`); when the
   point already has an enabled participant-held push source, **Use my existing push source** comes
   first and adds the missing capabilities to it with one `PATCH {provides_*: true, consent: true}`
   (no new token; the screen then shows the token prefix and the endpoints). Otherwise one source with
@@ -756,7 +789,11 @@ Shipped in PR 3b. Live is push only until PR 4 and the forecast is not offered y
   ZEV-held modes keep the ZEV-held confirmation (the connection point adds its net-power line). Field
   errors of `external_id`, `api_key`, `consent` and `provider` show at their input; `provides_live`,
   `provides_history`, `held_by`, `target`, `zev` and `metering_point` go to the form banner. A new push
-  source ends on the one-time token screen with all applicable endpoints.
+  source ends on the one-time token screen with all applicable endpoints; a Solar Manager source has no
+  token screen (a toast, `liveConnectedPull` for live only). The dialog offers **Also send live data** and
+  **Also provide history** for a Solar Manager source as for a push one (the stored key is reused), hides
+  Sync and the endpoints for a live-only one, and the card shows the reconnect banner for a live-only
+  Solar Manager source too.
 - **`/me/metering-points`**: per held point with a capability exactly one `MeteringPointDataCard`; a
   point with no capability stays a plain card.
 - **`/metering/points`** (`features/meteringPoints/LiveSetup.tsx`; all of it only while
@@ -987,10 +1024,19 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
   coordinates; plane sum; timezone conversion; hourly averaging; budget enforcement; `429`.
   **`SolarManagerForecastTests`**: mapping of `pW/pWmin/pWmax`; replace-future semantics; 24 h cleanup.
   **`ForecastPayloadTests`**: `complete`, `peak_windows` rule incl. ties, min/max only when all present.
-- `metering/test_supplementary_solar_manager.py` — **`SolarManagerLiveTests`**: stream mapping
-  `iW − eW`; bearer cache avoids a refresh per poll; auth failure → `reconnect_required`.
-- `metering/live/test_polling.py` — **`PollLiveSourcesTests`**: only watched ZEVs; interval floor;
-  back-off on `429`.
+- `metering/test_supplementary_solar_manager.py` (PR 4: 48 tests) — **`MapStreamTests`** (11: `iW − eW`
+  incl. negative export; optional `pW`/`cW`; missing or unreadable `iW`/`eW` is no sample; abnormal values;
+  timestamp fallbacks), **`ClientStreamTests`** (4), **`SolarManagerLiveTests`** (15: bearer cache avoids a
+  refresh per poll and survives rotation; stale cached token costs one re-exchange; a refused fresh token is an
+  auth failure after one retry; `verify_live`, `check_live`) and **`SolarManagerLiveSourceApiTests`** (18:
+  live-only creation verified with the stream, both capabilities, adding live or history to an existing
+  source, key replacement, disconnect/delete/orphan sweep clear the cached token, the test action).
+- `metering/live/test_polling.py` (PR 4: 29 tests) — **`PollLiveSourcesTests`** (11: only watched ZEVs; only
+  enabled live `solar_manager` sources; skips `reconnect_required` and a disabled ZEV; interval floor;
+  back-off; flag off; broker error), **`WatchTests`** (4: snapshot and curve mark the ZEV watched) and
+  **`PullLiveSourceTests`** (14: sample stored and reaches the snapshot, auth failure → `reconnect_required`
+  audited once, `429` back-off capped at 900 s, transient errors leave `last_error` alone).
+- `metering/live/test_checks.py` — **`LivePullIntervalCheckTests`** (3): `metering.W003`.
 - `metering/live/test_me.py` — **`LiveMeTests`**: JWT and read-only API key; several ZEVs; throttle.
 - `zev/test_pv_planes.py` — **`PvPlaneTests`**: validation ranges; max 4; manager-only write; audit.
 - `zev/test_building_coordinates.py` — locate action; rounding sent to forecast.solar.
@@ -1091,6 +1137,18 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
      Everything is behind the live flag; live is push only and the forecast is not offered. It also fixes
      history logic that took the flag-on eligible list for behind-meter points (`historyEligible`).
 5. **PR 4 — Solar Manager live.** Stream pull, bearer cache, demand-driven polling.
+
+   *Rollout (PR 4).* A Solar Manager source may now be live-only, history-only or both (the refusals
+   "Live data is only available for push sources" and "A Solar Manager source provides history" are gone;
+   the forecast refusal stays). Beat entry `poll-live-sources` (`LIVE_PULL_INTERVAL_S`), tasks
+   `poll_live_sources` and `pull_live_source`, settings `LIVE_WATCH_TTL_S` and `LIVE_PULL_INTERVAL_S`,
+   system check `metering.W003`. The snapshot and curve endpoints mark the ZEV watched. A Solar Manager
+   source is participant-held on a metering point only: `held_by = zev` and the grid connection point stay
+   push only because the key is a personal credential (`400` on `provider`). The source modal offers Solar
+   Manager for live. Decisions the plan did not settle: the pull slot is 80 % of the interval (a tick that
+   comes a moment early must still pull); a live-only source's status becomes `ok` with its first sample;
+   `test` on a source with both capabilities checks history and then live; adding live to a source without
+   a stored key is refused; a negative `pW`/`cW` is dropped rather than clamped.
 6. **PR 5 — forecast.** `PvPlane`, building coordinates, `ProductionForecastPoint`, both providers,
    forecast endpoint and chart.
 7. **PR 6 — automation and docs.** MCP `live_energy`, user-guide chapter with the Home Assistant

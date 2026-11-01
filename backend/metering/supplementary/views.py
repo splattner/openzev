@@ -37,6 +37,7 @@ from zev.scoping import ZevScopedQuerySetMixin
 
 from accounts.permissions import NotWhileImpersonating
 
+from ..live import store as live_store
 from ..live.permissions import readable_zev
 from ..models import SourceTarget, SupplementaryProvider, SupplementarySource, SupplementaryStatus
 from ..tasks import queue_sync, source_audit_metadata, sync_supplementary_source
@@ -168,6 +169,7 @@ class SupplementarySourceViewSet(
         serializer.is_valid(raise_exception=True)
         before = build_instance_snapshot(source, TRACKED_FIELDS)
         was_enabled = source.enabled
+        had_history = source.provides_history
         with transaction.atomic():
             source = serializer.save()
             changes = build_diff(before, build_instance_snapshot(source, TRACKED_FIELDS), TRACKED_FIELDS)
@@ -175,8 +177,11 @@ class SupplementarySourceViewSet(
                 request, "update", source, f"Updated energy data source for {source.display_name}.",
                 changes=changes, metadata={"credential_changed": bool(getattr(serializer, "credential_changed", False))},
             )
-            if source.enabled and (getattr(serializer, "credential_changed", False) or not was_enabled):
-                # A fresh key, or a source switched back on: pick up where it left off now, not at the next tick.
+            if source.enabled and (
+                getattr(serializer, "credential_changed", False) or not was_enabled
+                or (source.provides_history and not had_history)
+            ):
+                # A fresh key, a source switched back on, or history added to it: start now, not at the next tick.
                 queue_sync(source)
         return Response(self.get_serializer(source).data)
 
@@ -195,6 +200,7 @@ class SupplementarySourceViewSet(
                 request, "delete", source, f"Deleted the energy data source for {display} and its {readings} reading(s).",
                 metadata={"zev_id": zev_id, "readings_deleted": readings, "provider": source.provider},
             )
+            live_store.drop_sm_access(source.pk)
             source.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -369,15 +375,20 @@ class SupplementarySourceViewSet(
 
     @action(detail=True, methods=["post"])
     def test(self, request, pk=None):
-        """Exchange the stored key and read an hour of data. Never echoes a credential or a vendor response."""
+        """Exchange the stored key and read an hour of data, or one live sample. Never echoes a credential or a vendor response."""
         source = self.get_object()
         self._refuse_if_zev_disabled(source)
-        self._require_history(source)
+        pulls_live = source.provides_live and source.provider != SupplementaryProvider.PUSH
+        if not (source.provides_history or pulls_live):
+            self._require_history(source)
         provider = self._pull_provider(source)
         if not source.enabled:
             raise ValidationError({"detail": "This source is disconnected."})
         try:
-            provider.check(source)
+            if source.provides_history:
+                provider.check(source)
+            if pulls_live:
+                provider.check_live(source)
         except ProviderAuthError as exc:
             sync_service.record_failure(source, SupplementaryStatus.RECONNECT_REQUIRED, str(exc))
             raise ValidationError({"detail": str(exc)}) from None

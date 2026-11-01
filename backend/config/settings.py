@@ -312,8 +312,14 @@ LIVE_CURVE_RETENTION_H = env.int("LIVE_CURVE_RETENTION_H", default=48)
 # ``live_last_seen_at`` is written at most this often. Keep it well below LIVE_MAX_AGE_S, or a
 # source pushing every 10 s shows as stale between two writes.
 LIVE_LAST_SEEN_RESOLUTION_S = env.int("LIVE_LAST_SEEN_RESOLUTION_S", default=30)
-# Plausibility cap for any pushed value (5 MW).
+# Plausibility cap for any pushed or pulled value (5 MW).
 LIVE_MAX_ABS_POWER_W = env.int("LIVE_MAX_ABS_POWER_W", default=5_000_000)
+# Pull sources (Solar Manager) are polled only while somebody has the live view open: a snapshot or
+# curve request marks the ZEV as watched for this long (SPEC-2026-live-energy-data §4.5, §6.2).
+LIVE_WATCH_TTL_S = env.int("LIVE_WATCH_TTL_S", default=120)
+# Beat period of poll_live_sources, and the pace of a pulled source. Keep it below LIVE_MAX_AGE_S,
+# or a value is already stale when the next one arrives (metering.W003 warns).
+LIVE_PULL_INTERVAL_S = env.int("LIVE_PULL_INTERVAL_S", default=30)
 # A rate is shown only when at least this share of the expected 15-minute
 # intervals carries data; below it the rate is withheld rather than misleading.
 SUPPLEMENTARY_MIN_COVERAGE = env.float("SUPPLEMENTARY_MIN_COVERAGE", default=0.95)
@@ -416,6 +422,11 @@ CELERY_BEAT_SCHEDULE = {
     "refresh-supplementary-sources": {
         "task": "metering.tasks.refresh_supplementary_sources",
         "schedule": float(SUPPLEMENTARY_SYNC_INTERVAL_S),
+    },
+    # Demand-driven: only ZEVs with the live view open are polled (SPEC-2026-live-energy-data §6.2).
+    "poll-live-sources": {
+        "task": "metering.tasks.poll_live_sources",
+        "schedule": float(LIVE_PULL_INTERVAL_S),
     },
     # The consent boundary: a source stops when its participant stops holding the meter.
     "disable-orphaned-supplementary-sources": {

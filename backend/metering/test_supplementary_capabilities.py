@@ -1,6 +1,6 @@
 """Generalised energy data sources: capabilities, ZEV-held sources, grid connection point.
 
-SPEC-2026-live-energy-data §3, §4.1, §5 (PR 1: no live ingest yet, forecast and Solar Manager live refused).
+SPEC-2026-live-energy-data §3, §4.1, §5 (forecast refused; a Solar Manager key is personal, so ZEV-held and connection point sources are push only).
 """
 
 import importlib
@@ -336,25 +336,27 @@ class SourceCreationRightsTests(CapabilityTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("provides_forecast", response.json())
 
-    def test_live_is_push_only_for_now(self):
-        response = client_for(self.holder_user).post(
+    def test_a_solar_manager_key_is_personal_so_zev_held_sources_stay_push_only(self):
+        response = client_for(self.manager).post(
             SOURCES_URL,
-            {"metering_point": str(self.point.pk), "provider": "solar_manager", "external_id": "ABC123",
-             "api_key": "k", "consent": True, "provides_live": True},
+            {"metering_point": str(self.unheld.pk), "provider": "solar_manager", "external_id": "ABC123",
+             "api_key": "k", "consent": True, "held_by": "zev", **LIVE_ONLY},
             format="json",
         )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("provides_live", response.json())
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("personal", response.json()["provider"][0])
+        self.assertEqual(SupplementarySource.objects.count(), 0)
 
-    def test_a_solar_manager_source_keeps_history(self):
-        response = client_for(self.holder_user).post(
+    def test_the_connection_point_stays_push_only(self):
+        response = client_for(self.manager).post(
             SOURCES_URL,
-            {"metering_point": str(self.point.pk), "provider": "solar_manager", "external_id": "ABC123",
-             "api_key": "k", "consent": True, "provides_history": False},
+            {"target": "connection_point", "held_by": "zev", "zev": str(self.physical_zev().pk),
+             "provider": "solar_manager", "external_id": "ABC123", "api_key": "k", "consent": True, **LIVE_ONLY},
             format="json",
         )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("provides_history", response.json())
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("provider", response.json())
+        self.assertEqual(SupplementarySource.objects.count(), 0)
 
     def test_everything_new_is_refused_while_the_live_flag_is_off(self):
         enable_live(False)

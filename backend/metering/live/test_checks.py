@@ -1,4 +1,4 @@
-"""``metering.W002``: live data forced on while the cache is per process (SPEC-2026-live-energy-data §6.5)."""
+"""``metering.W002`` (live data forced on while the cache is per process, SPEC-2026-live-energy-data §6.5) and ``metering.W003`` (pull interval vs. maximum age)."""
 
 import os
 from unittest import mock
@@ -33,3 +33,18 @@ class LiveCacheCheckTests(SimpleTestCase):
 
         self.assertEqual([warning.id for warning in result], ["metering.W002"])
         self.assertIn("locmem", result[0].msg)
+
+
+class LivePullIntervalCheckTests(SimpleTestCase):
+    def test_silent_with_the_defaults(self):
+        self.assertEqual(checks.live_pull_interval_is_fresh(None), [])
+
+    def test_warns_when_the_interval_reaches_the_maximum_age(self):
+        for interval in (60, 120):
+            with override_settings(LIVE_PULL_INTERVAL_S=interval, LIVE_MAX_AGE_S=60):
+                result = checks.live_pull_interval_is_fresh(None)
+            self.assertEqual([warning.id for warning in result], ["metering.W003"], interval)
+
+    def test_silent_just_below_the_maximum_age(self):
+        with override_settings(LIVE_PULL_INTERVAL_S=59, LIVE_MAX_AGE_S=60):
+            self.assertEqual(checks.live_pull_interval_is_fresh(None), [])

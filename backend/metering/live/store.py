@@ -62,6 +62,22 @@ def _floor_key(source_id) -> str:
     return f"{PREFIX}src:{source_id}:last_push"
 
 
+def _watch_key(zev_id) -> str:
+    return f"{PREFIX}watch:zev:{zev_id}"
+
+
+def _pull_floor_key(source_id) -> str:
+    return f"{PREFIX}src:{source_id}:last_pull"
+
+
+def _backoff_key(source_id) -> str:
+    return f"{PREFIX}src:{source_id}:backoff"
+
+
+def _sm_access_key(source_id) -> str:
+    return f"{PREFIX}sm-access:{source_id}"
+
+
 def bucket_epoch(moment: datetime) -> int:
     width = settings.LIVE_CURVE_BUCKET_S
     return int(moment.timestamp()) // width * width
@@ -177,3 +193,51 @@ def buckets_many(source_ids, start: datetime, end: datetime) -> dict[str, dict[i
 
 def bucket_width() -> timedelta:
     return timedelta(seconds=settings.LIVE_CURVE_BUCKET_S)
+
+
+# ---- demand-driven pulling (SPEC §4.4, §6.2) ----
+
+#: A pulled source is claimed for this share of the pull interval. The beat period *is* the
+#: interval, so a floor of exactly the interval would sometimes still be held when the next tick
+#: arrives a moment early, and the source would then be polled every second tick.
+PULL_FLOOR_SHARE = 0.8
+
+
+def mark_watched(zev_id) -> None:
+    """Somebody is looking at this ZEV's live view: its pull sources are polled for ``LIVE_WATCH_TTL_S``."""
+    cache.set(_watch_key(zev_id), 1, timeout=settings.LIVE_WATCH_TTL_S)
+
+
+def is_watched(zev_id) -> bool:
+    return cache.get(_watch_key(zev_id)) is not None
+
+
+def claim_pull_slot(source_id) -> bool:
+    """Take the source's pull slot; ``False`` when it was pulled (or queued) within the interval.
+
+    ``cache.add`` is atomic, so two overlapping beat ticks cannot both queue the same source.
+    """
+    window = max(int(settings.LIVE_PULL_INTERVAL_S * PULL_FLOOR_SHARE), 1)
+    return bool(cache.add(_pull_floor_key(source_id), 1, timeout=window))
+
+
+def set_backoff(source_id, seconds: int) -> None:
+    """Leave the vendor alone for ``seconds`` (a ``429`` with its ``Retry-After``)."""
+    cache.set(_backoff_key(source_id), 1, timeout=max(int(seconds), 1))
+
+
+def in_backoff(source_id) -> bool:
+    return cache.get(_backoff_key(source_id)) is not None
+
+
+def get_sm_access(source_id) -> str | None:
+    """The encrypted Solar Manager bearer token cached for ``source_id`` (the caller decrypts it)."""
+    return cache.get(_sm_access_key(source_id))
+
+
+def set_sm_access(source_id, encrypted: str, ttl_s: int) -> None:
+    cache.set(_sm_access_key(source_id), encrypted, timeout=ttl_s)
+
+
+def drop_sm_access(source_id) -> None:
+    cache.delete(_sm_access_key(source_id))

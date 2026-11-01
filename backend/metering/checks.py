@@ -57,3 +57,22 @@ def live_cache_is_shared(app_configs, **kwargs):
             id="metering.W002",
         )
     ]
+
+
+@register(Tags.compatibility)
+def live_pull_interval_is_fresh(app_configs, **kwargs):
+    """Warn when a pulled live value would already be stale when the next one arrives.
+
+    A sample is fresh for ``LIVE_MAX_AGE_S``. Pulling no faster than that leaves gaps in the live
+    view even while the vendor answers every call.
+    """
+    if settings.LIVE_PULL_INTERVAL_S < settings.LIVE_MAX_AGE_S:
+        return []
+    return [
+        Warning(
+            f"LIVE_PULL_INTERVAL_S ({settings.LIVE_PULL_INTERVAL_S}) is not below LIVE_MAX_AGE_S "
+            f"({settings.LIVE_MAX_AGE_S}). Pulled live values would expire before the next pull.",
+            hint="Keep the pull interval well under the maximum age, for example 30 and 60.",
+            id="metering.W003",
+        )
+    ]

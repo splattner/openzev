@@ -71,6 +71,18 @@ OpenZEV keeps the fresh one. If the connection ever shows **Reconnect needed**,
 the key no longer works (for example because you revoked it): choose
 **Reconnect** and enter a new key.
 
+### Live data from Solar Manager
+
+The same Solar Manager connection can also supply **live data**: choose *Live data* (alone or
+together with history) when you connect, or use **Also send live data with this source** on a
+connection you already have; the stored key is reused, you only confirm the live consent. OpenZEV
+then reads the **current power** from your Solar Manager account, but **only while someone has the
+live page of the ZEV open** (about every 30 seconds, and it stops shortly after the last person
+leaves), so an unwatched ZEV costs your account no requests. Live values are shown and never stored
+as history. If Solar Manager limits requests, OpenZEV waits and tries again by itself. Live data from
+a ZEV-operated meter or the grid connection point still comes from a push source: a Solar Manager key
+is your personal credential, so a manager cannot connect one on your behalf.
+
 ### What is stored
 
 Four values per quarter hour: **consumption**, **production**, **grid import**
@@ -271,6 +283,11 @@ set that mark, so ask them; **My metering points** says so too.
 
 **"Not accepted" when connecting.** The key or the Solar Manager ID is wrong. The
 ID is the one of your installation, not your login name.
+
+**Live data from Solar Manager shows "no data".** Values are only fetched while someone has the live
+page open, so open it and wait half a minute. If the connection shows **Reconnect needed**, the key no
+longer works for history and live alike: choose **Reconnect** and enter a new key. **Test** reads one
+current-power value to check the connection.
 
 **The server says the key cannot be stored.** The platform administrator has not
 set up the encryption key for integrations (`INTEGRATION_ENCRYPTION_KEYS`). Push

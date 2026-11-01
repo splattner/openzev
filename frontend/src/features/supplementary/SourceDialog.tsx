@@ -68,10 +68,11 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
     const dateTime = (value: string | null) => (value ? formatDateTime(value, settings) : t('supplementary.never'))
     const small = 'button button-secondary button-compact'
 
+    // Both providers take the other capability on the same connection; Solar Manager reuses its stored key.
     const canAddLive =
-        isPush && !disconnected && eligible.live && !source.provides_live && !!source.metering_point && !sourceFor(sources, source.metering_point, 'live')
+        !disconnected && eligible.live && !source.provides_live && !!source.metering_point && !sourceFor(sources, source.metering_point, 'live')
     const canAddHistory =
-        isPush && !disconnected && eligible.history && !source.provides_history && source.held_by === 'participant' &&
+        !disconnected && eligible.history && !source.provides_history && source.held_by === 'participant' &&
         !!source.metering_point && !sourceFor(sources, source.metering_point, 'history')
     // A source must keep one capability: stopping one is only offered while the other remains.
     const canStopLive = source.provides_live && source.provides_history
@@ -108,7 +109,7 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
                     {source.provides_history && <span className="badge badge-neutral">{t('supplementary.capability.history')}</span>}
                     {source.provides_live && <span className="badge badge-neutral">{t('supplementary.capability.live')}</span>}
                 </dd>
-                {source.provides_history && (
+                {(source.provides_history || isSolar) && (
                     <>
                         <dt className="muted">{t('supplementary.source.status')}</dt>
                         <dd className="m-0"><SourceStatusBadge status={source.status} /></dd>
@@ -203,9 +204,11 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
                             <button type="button" className={small} disabled={busy} onClick={() => test.mutate()}>
                                 {test.isPending ? t('supplementary.actions.testing') : t('supplementary.actions.test')}
                             </button>
-                            <button type="button" className={small} disabled={busy || source.status === 'reconnect_required'} onClick={() => sync.mutate()}>
-                                {t('supplementary.actions.sync')}
-                            </button>
+                            {hasHistory && (
+                                <button type="button" className={small} disabled={busy || source.status === 'reconnect_required'} onClick={() => sync.mutate()}>
+                                    {t('supplementary.actions.sync')}
+                                </button>
+                            )}
                         </>
                     )}
                     {isSolar && (

@@ -21,47 +21,18 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from allocation.validity import active_on, civil_date, period_end_exclusive_dt
+from allocation.validity import civil_date, period_end_exclusive_dt
 from zev import access
-from zev.models import AllocationMode, MeteringPointAssignment, Zev
+from zev.models import Zev
 
-from ..models import SourceHolder, SourceTarget, SupplementarySource
 from ..supplementary.authentication import IsPushSource, SupplementaryPushAuthentication
-from ..supplementary.permissions import live_feature_enabled, personally_held_today
+from ..supplementary.permissions import live_feature_enabled
 from . import store
 from .curve import earliest_day_start, zev_curve
 from .permissions import LiveEnergyPermission, LiveFeatureMixin, LivePushThrottle, LiveReadThrottle
 from .serializers import LiveIngestResultSerializer, LiveIngestSerializer
 from .snapshot import zev_snapshot
-
-
-def _holder_gone(source: SupplementarySource, today: date) -> bool:
-    """Has the person this source was consented by lost the right to its meter (SPEC §5.1)?
-
-    A participant-held source needs its participant to hold the metering point personally today. A
-    ZEV-held one stops when somebody does: a household's live value must not keep flowing to the
-    manager without its consent. The connection point has no holder to lose.
-    """
-    if source.target == SourceTarget.CONNECTION_POINT:
-        return False
-    if source.held_by == SourceHolder.ZEV:
-        return personally_held_today(source.metering_point, today)
-    return not active_on(
-        MeteringPointAssignment.objects.filter(
-            metering_point_id=source.metering_point_id,
-            participant_id=source.participant_id,
-            allocation_mode=AllocationMode.PERSONAL,
-        ),
-        today,
-    ).exists()
-
-
-def _touch_last_seen(source: SupplementarySource, now) -> None:
-    last = source.live_last_seen_at
-    if last is not None and (now - last).total_seconds() < settings.LIVE_LAST_SEEN_RESOLUTION_S:
-        return
-    SupplementarySource.objects.filter(pk=source.pk).update(live_last_seen_at=now)
-    source.live_last_seen_at = now
+from .source_state import holder_gone, touch_last_seen
 
 
 class LiveIngestView(LiveFeatureMixin, APIView):
@@ -78,7 +49,7 @@ class LiveIngestView(LiveFeatureMixin, APIView):
         if not source.provides_live:
             raise PermissionDenied("This source does not provide live data.")
         now = timezone.now()
-        if _holder_gone(source, civil_date(now)):
+        if holder_gone(source, civil_date(now)):
             raise PermissionDenied("This source's metering point is no longer held by its owner.")
 
         serializer = LiveIngestSerializer(data=request.data)
@@ -100,7 +71,7 @@ class LiveIngestView(LiveFeatureMixin, APIView):
                 consumption_w=data.get("consumption_w"),
             )
         )
-        _touch_last_seen(source, now)
+        touch_last_seen(source, now)
         return Response({"accepted": True}, status=status.HTTP_202_ACCEPTED)
 
 
@@ -115,6 +86,7 @@ class LiveSnapshotView(LiveReadView):
 
     @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request, zev_id):
+        store.mark_watched(self.zev.pk)
         return Response(zev_snapshot(self.zev, now=timezone.now(), viewer=request.user))
 
 
@@ -132,6 +104,7 @@ class LiveCurveView(LiveReadView):
         responses={200: OpenApiTypes.OBJECT},
     )
     def get(self, request, zev_id):
+        store.mark_watched(self.zev.pk)
         now = timezone.now()
         raw = request.query_params.get("date")
         if raw:

@@ -59,6 +59,12 @@ const source = (overrides: Partial<SupplementarySource> = {}): SupplementarySour
 const push = (overrides: Partial<SupplementarySource> = {}) => source({ provider: 'push', external_id: '', has_credential: false, push_token_prefix: 'abcd', ...overrides })
 const liveOnly = (overrides: Partial<SupplementarySource> = {}) =>
     push({ id: 'src-live', provides_history: false, provides_live: true, live_state: 'fresh', live_last_seen_at: '2026-07-03T10:00:00Z', ...overrides })
+/** A Solar Manager source that only provides live data (pulled while somebody has the live page open). */
+const solarLive = (overrides: Partial<SupplementarySource> = {}) =>
+    source({
+        id: 'src-solar-live', provides_history: false, provides_live: true, live_state: 'fresh', live_last_seen_at: '2026-07-03T10:00:00Z',
+        last_sync_at: null, last_success_at: null, synced_through: null, covers_from: null, reconciliation: {}, ...overrides,
+    })
 const both = (overrides: Partial<SupplementarySource> = {}) => push({ provides_live: true, live_state: 'stale', ...overrides })
 
 const cleanups: Array<() => void> = []
@@ -231,6 +237,8 @@ describe('a source that eligibility knows about but whose details are missing', 
 describe('connect flow', () => {
     const checkboxes = (modal: HTMLElement) => Array.from(modal.querySelectorAll<HTMLInputElement>('input[name="supplementary-capability"]'))
     const radios = (modal: HTMLElement) => Array.from(modal.querySelectorAll<HTMLInputElement>('input[type="radio"]'))
+    /** Solar Manager is the first choice; pick the push provider (the last radio). */
+    const choosePush = async (modal: HTMLElement) => click(radios(modal).at(-1)!)
     const submit = () => buttonWith(dialog()!, 'supplementary.modal.connect')
 
     it('preselects what a row\'s Connect is for, and everything left for the primary Connect', async () => {
@@ -256,27 +264,30 @@ describe('connect flow', () => {
         expect(dialog()!.textContent).not.toContain('supplementary.consent.stored')
     })
 
-    it('filters the providers by what is chosen: Solar Manager only for history', async () => {
+    it('offers Solar Manager and push for whatever is chosen, with the hint of what Solar Manager then does', async () => {
         const { container } = await mount()
         await click(primaryConnect(container))
         const modal = dialog()!
 
-        // history + live: push only
+        // history + live
         await click(buttonWith(modal, 'supplementary.modal.next'))
-        expect(radios(dialog()!)).toHaveLength(1)
-        expect(dialog()!.textContent).not.toContain('supplementary.provider.solar_manager')
-        // history only: Solar Manager and push
+        expect(radios(dialog()!)).toHaveLength(2)
+        expect(dialog()!.textContent).toContain('supplementary.provider.solar_manager')
+        expect(dialog()!.textContent).toContain('supplementary.modal.providerHint.solar_manager_both')
+        // history only
         await click(buttonWith(dialog()!, 'supplementary.modal.back'))
         await click(checkboxes(dialog()!)[1])
         await click(buttonWith(dialog()!, 'supplementary.modal.next'))
         expect(radios(dialog()!)).toHaveLength(2)
-        expect(dialog()!.textContent).toContain('supplementary.provider.solar_manager')
-        // live only: push only
+        expect(dialog()!.textContent).toContain('supplementary.modal.providerHint.solar_manager')
+        expect(dialog()!.textContent).not.toContain('solar_manager_')
+        // live only
         await click(buttonWith(dialog()!, 'supplementary.modal.back'))
         await click(checkboxes(dialog()!)[1])
         await click(checkboxes(dialog()!)[0])
         await click(buttonWith(dialog()!, 'supplementary.modal.next'))
-        expect(radios(dialog()!)).toHaveLength(1)
+        expect(radios(dialog()!)).toHaveLength(2)
+        expect(dialog()!.textContent).toContain('supplementary.provider.solar_manager')
     })
 
     it('cannot go on without choosing something', async () => {
@@ -295,6 +306,7 @@ describe('connect flow', () => {
         await click(primaryConnect(container))
         await click(buttonWith(dialog()!, 'supplementary.modal.next'))
         const modal = dialog()!
+        await choosePush(modal)
         for (const key of ['stored', 'visible', 'notBilling', 'revoke', 'liveVisible', 'liveNotBilling', 'liveRevoke']) {
             expect(modal.textContent).toContain(`supplementary.consent.${key}`)
         }
@@ -342,9 +354,9 @@ describe('connect flow', () => {
         await click(primaryConnect(container))
         const modal = dialog()!
 
-        expect(radios(modal).map((r) => r.checked)).toEqual([true, false])
+        expect(radios(modal).map((r) => r.checked)).toEqual([true, false, false])
         expect(modal.textContent).toContain('supplementary.modal.existingPush')
-        expect(modal.textContent).not.toContain('supplementary.provider.solar_manager')
+        expect(modal.textContent).toContain('supplementary.provider.solar_manager')
         expect(modal.querySelector('input[type="text"]')).toBeNull()
         await click(modal.querySelector<HTMLInputElement>('input[type="checkbox"]')!)
         await act(async () => { submit().click() })
@@ -363,7 +375,8 @@ describe('connect flow', () => {
         await click(primaryConnect(container))
 
         expect(dialog()!.textContent).not.toContain('supplementary.modal.existingPush')
-        expect(radios(dialog()!)).toHaveLength(1)
+        // Solar Manager and a new push source: the Solar Manager key is a different source, not the existing one.
+        expect(radios(dialog()!)).toHaveLength(2)
     })
 
     it('keeps the key write-only and the submit disabled until consent, id and key are given', async () => {
@@ -419,15 +432,16 @@ describe('connect flow', () => {
     it('shows a refused capability as a banner and a consent error next to the checkbox', async () => {
         api.createSupplementarySource.mockRejectedValue({
             isAxiosError: true,
-            response: { status: 400, data: { provides_live: ['Live data is only available for push sources.'], consent: ['Consent is required.'] } },
+            response: { status: 400, data: { provides_live: ['Live data is not enabled.'], consent: ['Consent is required.'] } },
         })
         const { container } = await mount([], consumptionOnly)
         await click(primaryConnect(container))
+        await choosePush(dialog()!)
         await click(dialog()!.querySelector<HTMLInputElement>('input[type="checkbox"]')!)
         await act(async () => { submit().click() })
         await waitForCondition(() => (dialog()?.textContent ?? '').includes('Consent is required.'), 'the errors')
 
-        expect(dialog()!.querySelector('[role="alert"]')!.textContent).toContain('only available for push sources')
+        expect(dialog()!.querySelector('[role="alert"]')!.textContent).toContain('Live data is not enabled.')
         expect(dialog()!.querySelector('.field-error')!.textContent).toBe('Consent is required.')
     })
 })
@@ -629,11 +643,29 @@ describe('source dialog', () => {
         expect(api.updateSupplementarySource).toHaveBeenCalledWith('src-1', { provides_live: true, consent: true })
     })
 
-    it('does not offer live data on a Solar Manager source', async () => {
+    it('adds live data to a Solar Manager history source with its stored key, after the live consent', async () => {
+        api.updateSupplementarySource.mockResolvedValue(source({ provides_live: true }))
         const { container } = await mount([source()])
         const modal = await openSource(container)
 
-        expect(buttons(modal).some((b) => b.textContent?.includes('supplementary.live.alsoSend'))).toBe(false)
+        await click(buttonWith(modal, 'supplementary.live.alsoSend'))
+        await click(buttonWith(dialog()!, 'supplementary.live.alsoSend'))
+        await waitForCondition(() => api.updateSupplementarySource.mock.calls.length === 1, 'the update')
+
+        // No key and no id: the stored credential is reused.
+        expect(api.updateSupplementarySource).toHaveBeenCalledWith('src-1', { provides_live: true, consent: true })
+    })
+
+    it('adds history to a live-only Solar Manager source on a point that qualifies', async () => {
+        api.updateSupplementarySource.mockResolvedValue(source({ provides_live: true }))
+        const { container } = await mount([solarLive()])
+        const modal = await openSource(container, 'live')
+
+        await click(buttonWith(modal, 'supplementary.source.alsoHistory'))
+        await click(buttonWith(dialog()!, 'supplementary.source.alsoHistory'))
+        await waitForCondition(() => api.updateSupplementarySource.mock.calls.length === 1, 'the update')
+
+        expect(api.updateSupplementarySource).toHaveBeenCalledWith('src-solar-live', { provides_history: true, consent: true })
     })
 
     it('does not offer live data on a point that is not live-eligible', async () => {
@@ -685,6 +717,50 @@ describe('source dialog', () => {
         const modal = await openSource(container, 'live')
 
         expect(buttons(modal).some((b) => b.textContent?.includes('supplementary.source.alsoHistory'))).toBe(false)
+    })
+})
+
+describe('a live-only Solar Manager source', () => {
+    it('shows its live state in the live row and no history row content', async () => {
+        const { container } = await mount([solarLive()])
+
+        expect(row(container, 'live').textContent).toContain('supplementary.provider.solar_manager')
+        expect(row(container, 'live').textContent).toContain('live.state.fresh')
+        expect(row(container, 'history').textContent).toContain('supplementary.card.notConnected')
+    })
+
+    it('offers test and replace key but no sync, endpoints or token actions, and never a credential', async () => {
+        const { container } = await mount([solarLive()])
+        const modal = await openSource(container, 'live')
+
+        expect(buttonWith(modal, 'supplementary.actions.test')).toBeDefined()
+        expect(buttonWith(modal, 'supplementary.actions.replaceKey')).toBeDefined()
+        expect(buttonWith(modal, 'supplementary.actions.disconnect')).toBeDefined()
+        for (const action of ['sync', 'rotate', 'importCsv', 'deleteData']) {
+            expect(buttons(modal).some((b) => b.textContent?.includes(`supplementary.actions.${action}`)), action).toBe(false)
+        }
+        expect(modal.textContent).toContain('supplementary.source.status')
+        expect(modal.textContent).toContain('ABC123')
+        expect(modal.querySelector('[data-testid="live-endpoint"]')).toBeNull()
+        expect(modal.querySelector('input[type="password"]')).toBeNull()
+    })
+
+    it('says on the card that the key stopped working, from the live source too', async () => {
+        const { container } = await mount([solarLive({ status: 'reconnect_required', last_error: 'Solar Manager did not accept this API key.' })])
+
+        expect(container.querySelector('article > [role="alert"]')!.textContent).toContain('did not accept this API key')
+        expect(row(container, 'live').textContent).toContain('supplementary.status.reconnect_required')
+    })
+
+    it('tests the connection', async () => {
+        api.testSupplementarySource.mockResolvedValue({ ok: true })
+        const { container } = await mount([solarLive()])
+        const modal = await openSource(container, 'live')
+
+        await click(buttonWith(modal, 'supplementary.actions.test'))
+        await waitForCondition(() => api.testSupplementarySource.mock.calls.length === 1, 'the test')
+
+        expect(api.testSupplementarySource).toHaveBeenCalledWith('src-solar-live')
     })
 })
 

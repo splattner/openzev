@@ -472,6 +472,15 @@ Source of truth: `https://cloud.solar-manager.ch/swagger.json` (API v1.88.11, re
   is not accepted (`ProviderAuthError`). A row missing any of the four flows is skipped (a gap,
   never a zero); a negative value within 5 Wh is sensor noise and reads as 0, a larger one is left
   for ingest validation to reject.
+- **Live stream (live energy data spec §6.1, from PR 4):** `GET /v3/users/{smId}/data/stream` reads the
+  current power for the live view; only `t`, `iW`, `eW`, `pW` and `cW` are read, mapped by
+  `map_stream` (`meter_power_w = iW - eW`). The bearer token of a live pull is cached encrypted for
+  50 minutes (`live:v1:sm-access:{source_id}`) so a 30-second poll does not rotate the refresh token;
+  a refused cached token costs one fresh exchange. A source may provide history, live or both; a live-only
+  source is verified with one stream call (`verify_live`) and tested with `check_live`. History sync,
+  `POST /sources/{id}/sync/` and reconciliation still require `provides_history`. A Solar Manager source
+  is always participant-held on a metering point (a ZEV-held source or the grid connection point is push
+  only, because the key is the participant's personal credential).
 - **HTTP:** `urllib` as in `tariffs/importers/remote.py`; one fixed host
   (`SOLAR_MANAGER_BASE_URL`), redirects refused, a 20 s timeout, a 2 MiB response-size cap, and the
   `smId` validated against `^[A-Za-z0-9]{3,24}$` before it enters a URL. No user-supplied host.

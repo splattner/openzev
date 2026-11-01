@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from uuid import uuid4
 
 from celery import shared_task
+from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
@@ -20,8 +21,13 @@ from django.utils import timezone
 from audit.models import AuditActionCategory, AuditEventSource, AuditEventStatus
 from audit.services import record_audit_event
 
+from allocation.validity import civil_date
+
+from .live import store as live_store
+from .live.source_state import holder_gone, touch_last_seen
 from .models import SourceHolder, SourceTarget, SupplementaryProvider, SupplementarySource, SupplementaryStatus
 from .supplementary import permissions, sync
+from .supplementary.providers import PROVIDERS
 from .supplementary.providers import ProviderAuthError, ProviderError, ProviderRateLimited
 from .supplementary.stats import personal_windows
 
@@ -140,6 +146,110 @@ def refresh_supplementary_sources() -> dict:
     for source_id in ids:
         sync_supplementary_source.delay(str(source_id))
     return {"queued": len(ids)}
+
+
+#: A back-off is at least one pull interval, and never longer than this, whatever the vendor asks.
+LIVE_BACKOFF_MAX_S = 15 * 60
+
+
+def pull_live_source_impl(source_id) -> dict:
+    """Pull one current-power sample for a Solar Manager source (SPEC-2026-live-energy-data §6.2).
+
+    Never raises for vendor trouble and writes nothing per sample but the cache and, at coarse
+    resolution, ``live_last_seen_at``. An auth failure is final for the whole source
+    (``reconnect_required``, audited once because the next ticks skip it); a ``429`` backs the source
+    off; anything else is a missed sample that simply expires, and does not touch ``last_error``, which
+    belongs to the history sync.
+    """
+    if not permissions.live_feature_enabled():
+        return {"source_id": str(source_id), "skipped": "feature_off"}
+    source = (
+        SupplementarySource.objects.select_related("metering_point", "zev", "participant")
+        .filter(pk=source_id, provider=SupplementaryProvider.SOLAR_MANAGER)
+        .first()
+    )
+    if source is None:
+        return {"source_id": str(source_id), "skipped": "missing"}
+    result = {"source_id": str(source.pk)}
+    now = timezone.now()
+    provider = PROVIDERS.get(source.provider)
+    if provider is None:
+        return {**result, "skipped": "no_provider"}
+    if not source.enabled or not source.provides_live:
+        return {**result, "skipped": "disabled"}
+    if source.status == SupplementaryStatus.RECONNECT_REQUIRED:
+        return {**result, "skipped": "reconnect_required"}
+    if source.zev.disabled_at is not None:
+        return {**result, "skipped": "zev_disabled"}
+    if holder_gone(source, civil_date(now)):
+        return {**result, "skipped": "holder_gone"}
+
+    try:
+        sample = provider.fetch_live(source)
+    except ProviderAuthError as exc:
+        sync.record_failure(source, SupplementaryStatus.RECONNECT_REQUIRED, str(exc), now=now)
+        _audit_best_effort(
+            source, "sync", f"Live data needs a new key: {exc}", status=AuditEventStatus.FAILED,
+            metadata={"zev_id": str(source.zev_id), "provider": source.provider, "capability": "live",
+                      "outcome": "reconnect_required"},
+        )
+        return {**result, "error": "reconnect_required"}
+    except ProviderRateLimited as exc:
+        wait = min(max(exc.retry_after, settings.LIVE_PULL_INTERVAL_S), LIVE_BACKOFF_MAX_S)
+        live_store.set_backoff(source.pk, wait)
+        logger.warning("Solar Manager is limiting live pulls for source %s; backing off %s s", source.pk, wait)
+        return {**result, "error": "rate_limited", "backoff_s": wait}
+    except ProviderError as exc:
+        logger.warning("Live pull failed for source %s: %s", source.pk, exc)
+        return {**result, "error": "unavailable"}
+
+    live_store.put_sample(sample)
+    touch_last_seen(source, now)
+    if not source.provides_history and source.status in (SupplementaryStatus.PENDING, SupplementaryStatus.ERROR):
+        # A live-only source has no sync to settle its status: a reading arriving is what "ok" means.
+        SupplementarySource.objects.filter(pk=source.pk, enabled=True, status=source.status).update(
+            status=SupplementaryStatus.OK, last_error="", updated_at=now
+        )
+    return {**result, "stored": True}
+
+
+@shared_task(max_retries=0)
+def pull_live_source(source_id):
+    """Pull one live sample. No retries: the next beat tick is the retry, and a late sample is worthless."""
+    return pull_live_source_impl(source_id)
+
+
+@shared_task
+def poll_live_sources() -> dict:
+    """Queue a live pull for every watched Solar Manager source that is due (beat, ``LIVE_PULL_INTERVAL_S``).
+
+    Demand-driven: a ZEV nobody has the live view open for (``store.is_watched``) costs no vendor
+    calls.
+    """
+    if not permissions.live_feature_enabled():
+        return {"queued": 0, "skipped": "feature_off"}
+    candidates = (
+        SupplementarySource.objects.filter(
+            provider=SupplementaryProvider.SOLAR_MANAGER, enabled=True, provides_live=True,
+            zev__disabled_at__isnull=True,
+        )
+        .exclude(status=SupplementaryStatus.RECONNECT_REQUIRED)
+        .values_list("pk", "zev_id")
+    )
+    watched: dict = {}
+    queued = 0
+    for source_id, zev_id in candidates:
+        if zev_id not in watched:
+            watched[zev_id] = live_store.is_watched(zev_id)
+        if not watched[zev_id] or live_store.in_backoff(source_id) or not live_store.claim_pull_slot(source_id):
+            continue
+        try:
+            pull_live_source.delay(str(source_id))
+        except Exception:  # a broker outage must not stop the other sources
+            logger.exception("Could not queue a live pull for supplementary source %s", source_id)
+            continue
+        queued += 1
+    return {"queued": queued}
 
 
 def queue_sync(source, *, backfill: bool = False) -> None:

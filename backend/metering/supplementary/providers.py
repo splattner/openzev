@@ -12,7 +12,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Iterator, NamedTuple, Protocol
+from typing import TYPE_CHECKING, Iterator, NamedTuple, Protocol
+
+if TYPE_CHECKING:
+    from ..live.store import LiveSample
 
 
 class ProviderError(Exception):
@@ -55,6 +58,18 @@ class Provider(Protocol):
         """Exchange the stored credential and read one hour, persisting a rotated token.
 
         Raises the same errors as ``fetch``. Used by the "test connection" action.
+        """
+
+    def verify_live(self, external_id: str, credential: str) -> str:
+        """``verify`` for a source that only provides live data: one current-power reading instead of a history hour."""
+
+    def check_live(self, source) -> None:
+        """``check`` for live data: read one current-power sample with the stored credential."""
+
+    def fetch_live(self, source) -> "LiveSample":
+        """One current-power sample (``metering.live.store.LiveSample``) for a source that provides live data.
+
+        Errors are the same as for ``fetch``.
         """
 
     def fetch(self, source, start: datetime, end: datetime) -> Iterator[list[Point]]:

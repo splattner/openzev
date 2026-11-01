@@ -109,7 +109,9 @@ class StubSolarManager:
 
     Refresh tokens rotate: only the current one is accepted, and each exchange issues the next.
     Set ``range_response`` to a callable ``(request_number) -> (status, headers, body_bytes) | None``
-    to misbehave on a range request; ``None`` answers normally.
+    to misbehave on a range request; ``None`` answers normally. ``stream_response`` does the same for
+    ``/data/stream`` (numbered over stream requests only), and ``stream_payload`` is what it answers
+    otherwise: a dict, or a callable ``() -> dict``.
     """
 
     def __init__(self, token: str = "key-1"):
@@ -118,6 +120,9 @@ class StubSolarManager:
         self.exchanges = 0
         self.refresh_status = None
         self.range_response = None
+        self.stream_response = None
+        self.stream_payload = {"t": None, "iW": 400, "eW": 100, "pW": 900, "cW": 1200, "bW": 50, "soc": 80}
+        self.stream_requests: list[dict] = []
         self.extra_rows = lambda start, end: []
         self.refresh_requests: list[dict] = []
         self.range_requests: list[dict] = []
@@ -162,8 +167,23 @@ class StubSolarManager:
 
             def do_GET(self):  # noqa: N802
                 url = urlparse(self.path)
+                if not url.path.startswith("/v3/"):  # a stray probe of the port is not a vendor request
+                    return self._send(404)
                 query = {key: values[0] for key, values in parse_qs(url.query).items()}
                 bearer = self.headers.get("Authorization", "").removeprefix("Bearer ")
+                if url.path.endswith("/data/stream"):
+                    vendor.stream_requests.append({"path": url.path, "query": query, "bearer": bearer})
+                    if bearer not in vendor.access_tokens:
+                        return self._json(401, {"message": "unauthorized"})
+                    if vendor.stream_response:
+                        custom = vendor.stream_response(len(vendor.stream_requests))
+                        if custom is not None:
+                            status, headers, body = custom
+                            return self._send(status, body, headers)
+                    payload = vendor.stream_payload() if callable(vendor.stream_payload) else dict(vendor.stream_payload)
+                    if payload.get("t") is None:
+                        payload["t"] = datetime.now(dt_timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                    return self._json(200, payload)
                 vendor.range_requests.append({"path": url.path, "query": query, "bearer": bearer})
                 number = len(vendor.range_requests)
                 if bearer not in vendor.access_tokens:
