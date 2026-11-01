@@ -4329,6 +4329,7 @@ export const en = {
         rangeLabel: 'Time range',
         tabs: {
             today: 'Today',
+            tomorrow: 'Tomorrow',
             week: '7 days',
             period: 'Period',
         },
@@ -4343,8 +4344,13 @@ export const en = {
             note: 'The ZEV\'s live totals are kept for 48 hours only, so this view shows your own system. The official figures are on the page',
             noteLink: 'Energy balance',
         },
+        tomorrow: {
+            title: 'Tomorrow: expected production',
+        },
         today: {
             title: 'Today',
+            forecast: 'Expected production',
+            forecastHint: 'Dashed: the production forecast, an estimate. Where the lines differ, what happened is what the devices reported.',
             empty: 'No values yet today.',
             emptyHistory: 'No data from your own system yet today.',
             zevProduction: 'ZEV production (live)',

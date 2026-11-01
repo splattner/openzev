@@ -693,7 +693,7 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
   card shows; the date is today's civil date (`todayBusinessIso`). Pure helpers: `kwFigure`, `formatKw`
   (kW, one decimal), `formatClock` (`hh:mm:ss`, Europe/Zurich), `showLiveCard` (snapshot non-null and
   `coverage.live_sources > 0`), `liveCardState` (what the card may say per tier), `liveCurveRows`,
-  `liveDayAxis`. `useProductionForecast(zevId, enabled)` (`lib/forecast.ts`: `queryKeys.live.forecast(zevId)`, every 15 min, no
+  `liveDayAxis`. `useProductionForecast(zevId, enabled)` (`lib/forecast.ts`, plus `forecastForDay`, `hoursOfDay`, `hasExpectedProduction`, `tomorrowBusinessIso`: `queryKeys.live.forecast(zevId)`, every 15 min, no
   focus refetch, `404` to `null` and no polling after it) with the pure helpers `forecastRows` (kW, band `[min, max]` or `null`),
   `hasForecast` (a plant with hours), `nextPeakWindow` (the window that is running or next), `peakDayKind` (today, tomorrow, date) and `peakRange`.
 - `frontend/src/lib/myEnergy.ts`: `MyEnergyRange` (`today`, `week`, `period`) with `parseMyEnergyRange`,
@@ -718,12 +718,11 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
     are not shown: merging them would count a bidirectional point twice.
 - `LivePointsTable.tsx` (meter or "Grid connection point", holder or "ZEV-operated", kW, age, state
   badge) for a snapshot that carries `points` (manager, viewer, admin).
-- `ProductionForecastChart.tsx` (`features/live/`, rendered by `LiveEnergyView` after the card and the table, whatever the live
-  state; `ProductionForecastSection` asks for the forecast and renders nothing without one): the title "Expected
+- `ProductionForecastChart.tsx` (`features/live/`, the body of the **Tomorrow** tab, §7.1 structure; it replaces the separate forecast card of the first cut): the title "Expected
   production" with "as of hh:mm", the next peak window in bold ("Highest production expected today 10:00-14:00",
   "tomorrow" or the date), hourly bars in kW (hours already past lighter) with the min/max band as an area only where the
-  forecast gives one, an x axis with a tick every three hours (six beyond a day and a half) whose midnight tick names the
-  day, "Forecast for 1 of 2 plants" when the sum is partial, and the hint that it is an estimate and never a claim that power
+  forecast gives one, an x axis with a tick every three hours (six beyond a day and a half), whose midnight tick names the
+  day only on a chart that spans more than one, "Forecast for 1 of 2 plants" when the sum is partial, and the hint that it is an estimate and never a claim that power
   is spare. Chart colours come from `chartTokens`.
 - Placement: its own page, `pages/MyEnergyPage.tsx` at `/my-energy` (alias `/live`; `PageHeader` with the
   community switch, scope note, title "My energy system", `ScopeGuard`). The page owns the billing period
@@ -743,10 +742,12 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
      `pages.live.disabled`; loading -> `PageSkeleton`; snapshot `null` -> `Notice` `pages.live.unavailable`;
      `coverage.live_sources === 0` -> `EmptyState` `pages.live.empty.*` linking to `/metering/points`
      (`isZevScope`) or `/me/metering-points`. None of these hides the views below.
-  3. *Range tabs* `AppTabs` (Today | 7 days | Period, `keepMounted={false}`), the choice in the URL as
-     `?range=week|period` (absent = `today`, `parseMyEnergyRange`; tab changes push history entries). A
+  3. *Range tabs* `AppTabs` (Today | Tomorrow | 7 days | Period, `keepMounted={false}`), the choice in the URL as
+     `?range=tomorrow|week|period` (absent = `today`, `parseMyEnergyRange`; tab changes push history entries). The
+     **Tomorrow** tab exists only while the ZEV forecast has an hour above zero for tomorrow's civil day
+     (`hasExpectedProduction`); without one, `?range=tomorrow` falls back to Today. A
      `filter-bar` under the tabs holds the `PeriodSelector` on the Period tab and, for managers, viewers
-     and admins, the participant picker.
+     and admins, the participant picker (not on Tomorrow, which is not about a participant).
   4. *Participant picker* (`isZevScope` only): the ZEV's current participants (`fetchParticipants`,
      filtered to the ZEV and `valid_to` open or not past), the manager's own marked "(You)". `?participant=`
      in the URL, validated against that list. Default: the participant of a history-eligible point of the
@@ -762,7 +763,16 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
      dashed reference line at `own_history_through` labelled "History to live", and a hint saying which
      part is which and that ZEV totals are live only. Gaps are `null`, `connectNulls={false}`. Nothing at
      all -> `myEnergy.today.empty`/`emptyHistory`; the hint `myEnergy.today.historyOnly` appears without
-     a live curve.
+     a live curve and with an own history.
+     **Forecast overlay.** While the live view is on, `useProductionForecast(zevId)` (enabled only once the energy data
+     feature is on) feeds `todayRows(..., {date, hours})`, which draws each of today's forecast hours flat across its
+     5-minute steps (`forecast`, `forecastBand`; hours already past included, so the plan can be read against what
+     happened). `TodayChart` shows it as a dashed `stepAfter` area "Expected production" with the min/max band behind it
+     where there is one, names today's next peak window above the chart and adds the hint `myEnergy.today.forecastHint`. The
+     chart appears whenever there is live data, an own history **or** a forecast, so a ZEV with only a forecast still
+     sees it here.
+  5b. *Tomorrow* (`ProductionForecastChart` with `forecastForDay(forecast, tomorrow)`, title "Tomorrow: expected
+     production"): the forecast alone, no live or own data and no participant.
   6. *7 days* (`SeriesPanel`): `useOwnSeries` for the last 7 civil days (`lastDaysRange(today, 7)`) in
      `hour` buckets, shown with `GrossEnergyCard` (totals, rates, chart) and the note "ZEV live totals are
      kept for 48 hours only; the official figures are on Energy balance" with a link to `/dashboard`.
@@ -1152,9 +1162,10 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
   its place; none for a former participant).
 - PR 5 landed `tests/forecast-helpers.test.ts` (12 tests: rows and bands, `hasForecast`, the peak window that is next, today and
   tomorrow in Zurich time, the range in local clock times, `planeInput` ranges, `azimuthLabelKey` for the eight directions,
-  `coordinateInput`, `sourceFor` and `forecastEligible`) and `tests/forecast-ui.test.ts` (11 tests: the chart's text, a partial sum, the
-  section renders nothing without a forecast, `ForecastConnectDialog` for a manager, a holder and a refusal, `PvPlanesDialog`
-  lists, adds, refuses an impossible value and is read-only).
+  `coordinateInput`, `sourceFor` and `forecastEligible`) and `tests/forecast-ui.test.ts` (the chart's text, a partial sum, `ForecastConnectDialog` for a manager, a holder, a refusal and the
+  existing Solar Manager connection, `PvPlanesDialog` lists, adds, refuses an impossible value and is read-only). `tests/my-energy.test.ts`
+  gained the forecast rows of `todayRows`, the forecast in Today without live data, the Tomorrow tab (shown, absent without
+  tomorrow hours or on a dark day) and no request while live data is off.
 - PR 3a landed `tests/live-energy-card.test.ts` (12 tests: the three tiers' texts, the single
   coverage line (a bidirectional point counted once, for participants and managers alike), "as of", own split
   only at `exact`, the inconsistent hint, a producer's split, the connection point part, points table rows, empty curve) and `tests/live-helpers.test.ts` (16 tests: `formatKw`,

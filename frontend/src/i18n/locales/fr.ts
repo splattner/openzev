@@ -4318,6 +4318,7 @@ export const fr = {
         rangeLabel: 'Période affichée',
         tabs: {
             today: 'Aujourd\'hui',
+            tomorrow: 'Demain',
             week: '7 jours',
             period: 'Période',
         },
@@ -4332,8 +4333,13 @@ export const fr = {
             note: 'Les totaux en direct de la ZEV ne sont conservés que 48 heures ; cette vue montre donc votre propre installation. Les chiffres officiels se trouvent sur la page',
             noteLink: 'Bilan énergétique',
         },
+        tomorrow: {
+            title: 'Demain : production attendue',
+        },
         today: {
             title: 'Aujourd\'hui',
+            forecast: 'Production attendue',
+            forecastHint: 'En pointillés : la prévision de production, une estimation. Lorsque les lignes diffèrent, ce qui compte est ce que les appareils ont mesuré.',
             empty: 'Pas encore de valeurs aujourd\'hui.',
             emptyHistory: 'Pas encore de données de votre propre installation aujourd\'hui.',
             zevProduction: 'Production de la ZEV (en direct)',

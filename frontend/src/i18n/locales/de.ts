@@ -4318,6 +4318,7 @@ export const de = {
         rangeLabel: 'Zeitraum',
         tabs: {
             today: 'Heute',
+            tomorrow: 'Morgen',
             week: '7 Tage',
             period: 'Periode',
         },
@@ -4332,8 +4333,13 @@ export const de = {
             note: 'Die Live-Summen der ZEV werden nur 48 Stunden aufbewahrt, deshalb zeigt diese Ansicht Ihre eigene Anlage. Die offiziellen Zahlen finden Sie auf der Seite',
             noteLink: 'Energiebilanz',
         },
+        tomorrow: {
+            title: 'Morgen: erwartete Produktion',
+        },
         today: {
             title: 'Heute',
+            forecast: 'Erwartete Produktion',
+            forecastHint: 'Gestrichelt: die Produktionsprognose, eine Schätzung. Wo die Linien abweichen, gilt, was die Geräte gemeldet haben.',
             empty: 'Heute noch keine Werte.',
             emptyHistory: 'Heute noch keine Daten Ihrer eigenen Anlage.',
             zevProduction: 'ZEV-Produktion (live)',

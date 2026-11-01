@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { fetchProductionForecastOrNull } from './api/live'
 import { queryKeys } from './api/queryKeys'
-import { formatBusinessIsoDate } from './dates'
+import { formatBusinessIsoDate, todayBusinessIso } from './dates'
 import { formatClockMinutes } from './live'
+import { shiftIsoDate } from './myEnergy'
 import type { ForecastHour, ForecastPeakWindow, ProductionForecast } from '../types/api'
 
 export const FORECAST_INTERVAL_MS = 15 * 60_000
@@ -64,4 +65,29 @@ export function peakDayKind(window: ForecastPeakWindow, now: Date = new Date()):
 /** `10:00–14:00` of a window in the business timezone. */
 export function peakRange(window: ForecastPeakWindow): string {
     return `${formatClockMinutes(window.from)}–${formatClockMinutes(window.to)}`
+}
+
+/** The civil day after today in the business time zone, `YYYY-MM-DD`. */
+export function tomorrowBusinessIso(): string {
+    return shiftIsoDate(todayBusinessIso(), 1)
+}
+
+/** The hours of one civil day (Europe/Zurich). */
+export function hoursOfDay(hours: ForecastHour[], isoDate: string): ForecastHour[] {
+    return hours.filter((hour) => formatBusinessIsoDate(new Date(hour.start)) === isoDate)
+}
+
+/** The forecast narrowed to one civil day: its hours and its peak window; the plants' own series are left out. */
+export function forecastForDay(forecast: ProductionForecast, isoDate: string): ProductionForecast {
+    return {
+        ...forecast,
+        hours: hoursOfDay(forecast.hours, isoDate),
+        peak_windows: forecast.peak_windows.filter((window) => window.date === isoDate),
+        per_plant: undefined,
+    }
+}
+
+/** Whether a civil day has any expected production to show (an all-dark day has none). */
+export function hasExpectedProduction(forecast: ProductionForecast | null | undefined, isoDate: string): boolean {
+    return hasForecast(forecast) && hoursOfDay(forecast.hours, isoDate).some((hour) => hour.power_w > 0)
 }

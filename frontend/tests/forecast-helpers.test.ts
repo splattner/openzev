@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { forecastRows, hasForecast, nextPeakWindow, peakDayKind, peakRange } from '../src/lib/forecast'
+import { forecastForDay, forecastRows, hasExpectedProduction, hasForecast, hoursOfDay, nextPeakWindow, peakDayKind, peakRange } from '../src/lib/forecast'
 import { azimuthLabelKey, coordinateInput, planeInput } from '../src/lib/pvPlanes'
 import { forecastEligible, sourceFor } from '../src/lib/supplementary'
 import type { ForecastPeakWindow, ProductionForecast, SupplementarySource } from '../src/types/api'
@@ -40,6 +40,40 @@ describe('hasForecast', () => {
         expect(hasForecast(forecast({ hours: [] }))).toBe(false)
         expect(hasForecast(null)).toBe(false)
         expect(hasForecast(undefined)).toBe(false)
+    })
+})
+
+describe('one civil day of a forecast', () => {
+    // 22:00 UTC on 31 May is midnight in Zurich (summer time), so these two hours are on different civil days.
+    const hours = [
+        { start: '2026-05-31T21:00:00Z', power_w: 0, min_w: null, max_w: null },
+        { start: '2026-05-31T22:00:00Z', power_w: 100, min_w: null, max_w: null },
+        { start: '2026-06-01T10:00:00Z', power_w: 6400, min_w: 5000, max_w: 7000 },
+    ]
+    const full = forecast({
+        hours,
+        peak_windows: [window('2026-06-01', '2026-06-01T08:00:00Z', '2026-06-01T12:00:00Z'), window('2026-06-02', '2026-06-02T08:00:00Z', '2026-06-02T12:00:00Z')],
+        per_plant: [{ metering_point_id: 'mp', meter_id: 'CH-1', hours }],
+    })
+
+    it('splits hours at Zurich midnight, not UTC midnight', () => {
+        expect(hoursOfDay(hours, '2026-05-31').map((hour) => hour.start)).toEqual(['2026-05-31T21:00:00Z'])
+        expect(hoursOfDay(hours, '2026-06-01').map((hour) => hour.start)).toEqual(['2026-05-31T22:00:00Z', '2026-06-01T10:00:00Z'])
+    })
+
+    it('narrows the hours and the peak window and drops the per-plant series', () => {
+        const day = forecastForDay(full, '2026-06-01')
+        expect(day.hours).toHaveLength(2)
+        expect(day.peak_windows.map((w) => w.date)).toEqual(['2026-06-01'])
+        expect(day.per_plant).toBeUndefined()
+        expect(day.plants_with_forecast).toBe(1)
+    })
+
+    it('has expected production only when some hour of the day is above zero', () => {
+        expect(hasExpectedProduction(full, '2026-06-01')).toBe(true)
+        expect(hasExpectedProduction(full, '2026-05-31')).toBe(false)
+        expect(hasExpectedProduction(full, '2026-06-03')).toBe(false)
+        expect(hasExpectedProduction(null, '2026-06-01')).toBe(false)
     })
 })
 

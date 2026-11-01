@@ -1,7 +1,7 @@
 import { AxiosError } from 'axios'
 import { act, createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ProductionForecastChart, ProductionForecastSection } from '../src/features/live/ProductionForecastChart'
+import { ProductionForecastChart } from '../src/features/live/ProductionForecastChart'
 import { PvPlanesDialog } from '../src/features/meteringPoints/PvPlanesDialog'
 import { ForecastConnectDialog } from '../src/features/supplementary/ForecastConnectDialog'
 import type { MeteringPoint, ProductionForecast, PvPlane, SupplementarySource } from '../src/types/api'
@@ -22,8 +22,6 @@ vi.mock('recharts', () => {
 const pushToast = vi.fn()
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast }) }))
 
-const live = vi.hoisted(() => ({ fetchProductionForecastOrNull: vi.fn() }))
-vi.mock('../src/lib/api/live', async (importOriginal) => ({ ...(await importOriginal<typeof import('../src/lib/api/live')>()), ...live }))
 const supplementary = vi.hoisted(() => ({ createSupplementarySource: vi.fn(), updateSupplementarySource: vi.fn() }))
 vi.mock('../src/lib/api/supplementary', async (importOriginal) => ({ ...(await importOriginal<typeof import('../src/lib/api/supplementary')>()), ...supplementary }))
 const zev = vi.hoisted(() => ({ fetchPvPlanes: vi.fn(), createPvPlane: vi.fn(), updatePvPlane: vi.fn(), deletePvPlane: vi.fn() }))
@@ -65,26 +63,6 @@ describe('ProductionForecastChart', () => {
             createElement(ProductionForecastChart, { forecast: forecast({ complete: false, plants_with_forecast: 1 }) }), cleanups,
         )
         expect(container.textContent).toContain('forecast.partial{"count":1,"total":2}')
-    })
-})
-
-describe('ProductionForecastSection', () => {
-    it('renders nothing while the forecast is off, empty or not asked for', async () => {
-        for (const answer of [null, forecast({ plants_with_forecast: 0, hours: [] })]) {
-            live.fetchProductionForecastOrNull.mockResolvedValue(answer)
-            const { container } = await renderWithProviders(createElement(ProductionForecastSection, { zevId: 'z1', enabled: true }), cleanups)
-            await act(async () => { await Promise.resolve() })
-            expect(container.querySelector('section')).toBeNull()
-        }
-        live.fetchProductionForecastOrNull.mockClear()
-        await renderWithProviders(createElement(ProductionForecastSection, { zevId: 'z1', enabled: false }), cleanups)
-        expect(live.fetchProductionForecastOrNull).not.toHaveBeenCalled()
-    })
-
-    it('shows the chart once there is a forecast', async () => {
-        live.fetchProductionForecastOrNull.mockResolvedValue(forecast())
-        const { container } = await renderWithProviders(createElement(ProductionForecastSection, { zevId: 'z1', enabled: true }), cleanups)
-        await waitForCondition(() => container.textContent?.includes('forecast.title') === true, 'the forecast chart')
     })
 })
 

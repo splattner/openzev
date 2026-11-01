@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Area, Bar, CartesianGrid, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { AXIS_COLOR, CHART_LOCAL, CHART_GRIDLINE } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
-import { forecastRows, hasForecast, nextPeakWindow, peakDayKind, peakRange, useProductionForecast } from '../../lib/forecast'
+import { forecastRows, nextPeakWindow, peakDayKind, peakRange } from '../../lib/forecast'
 import { formatClockMinutes, kwFigure } from '../../lib/live'
 import type { ProductionForecast } from '../../types/api'
 
@@ -12,8 +12,8 @@ const dayFormatter = new Intl.DateTimeFormat(undefined, { timeZone: 'Europe/Zuri
 const localHour = (ts: number) => Number(formatClockMinutes(ts).slice(0, 2))
 
 /** `Mon 3.11.` for a day's start; a tick at midnight names the day, the others the time. */
-function tickLabel(ts: number): string {
-    return localHour(ts) === 0 ? dayFormatter.format(new Date(ts)) : formatClockMinutes(ts)
+function tickLabel(ts: number, namesDays: boolean): string {
+    return namesDays && localHour(ts) === 0 ? dayFormatter.format(new Date(ts)) : formatClockMinutes(ts)
 }
 
 /**
@@ -21,13 +21,15 @@ function tickLabel(ts: number): string {
  * Production only: it says when the plants are expected to produce most, never that power will be
  * spare. A band is drawn only where the forecast gives one.
  */
-export function ProductionForecastChart({ forecast }: { forecast: ProductionForecast }) {
+export function ProductionForecastChart({ forecast, title }: { forecast: ProductionForecast; title?: string }) {
     const { t } = useTranslation()
     const titleId = useId()
     const rows = forecastRows(forecast.hours)
     const hasBand = rows.some((row) => row.band)
     // A tick every three hours (six beyond a day and a half, so a phone fits them), and midnight names the day.
     const step = rows.length > 36 ? 6 : 3
+    // One day needs no day name (the title says which), and the long label would collide with its neighbour on a phone.
+    const namesDays = rows.length > 24
     const ticks = rows.filter((row) => localHour(row.ts) % step === 0).map((row) => row.ts)
     const now = new Date()
     const next = nextPeakWindow(forecast.peak_windows, now)
@@ -36,7 +38,7 @@ export function ProductionForecastChart({ forecast }: { forecast: ProductionFore
     return (
         <section className="card chart-card" aria-labelledby={titleId}>
             <div className="card-header">
-                <h3 id={titleId}>{t('forecast.title')}</h3>
+                <h3 id={titleId}>{title ?? t('forecast.title')}</h3>
                 {forecast.fetched_at && <span className="muted">{t('forecast.fetchedAt', { time: formatClockMinutes(forecast.fetched_at) })}</span>}
             </div>
             {next && (
@@ -49,7 +51,7 @@ export function ProductionForecastChart({ forecast }: { forecast: ProductionFore
             <ResponsiveContainer width="100%" height={260}>
                 <ComposedChart data={rows} margin={{ top: 8, right: 20, bottom: 4, left: 0 }}>
                     <CartesianGrid stroke={CHART_GRIDLINE} strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="ts" ticks={ticks} interval={0} tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} tickFormatter={tickLabel} />
+                    <XAxis dataKey="ts" ticks={ticks} interval={0} tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} tickFormatter={(ts: number) => tickLabel(ts, namesDays)} />
                     <YAxis tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit=" kW" width={56} />
                     <Tooltip
                         contentStyle={CHART_TOOLTIP_STYLE}
@@ -79,11 +81,3 @@ export function ProductionForecastChart({ forecast }: { forecast: ProductionFore
         </section>
     )
 }
-
-/** The forecast of a ZEV when there is one; nothing otherwise (a ZEV without a forecast source has no empty state of its own). */
-export function ProductionForecastSection({ zevId, enabled }: { zevId: string | undefined; enabled: boolean }) {
-    const query = useProductionForecast(zevId, enabled)
-    if (!hasForecast(query.data)) return null
-    return <ProductionForecastChart forecast={query.data} />
-}
-

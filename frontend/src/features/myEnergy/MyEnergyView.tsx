@@ -12,6 +12,7 @@ import { queryKeys } from '../../lib/api/queryKeys'
 import { useAuth } from '../../lib/auth'
 import { useCommunityAccess } from '../../lib/communityAccess'
 import { todayBusinessIso } from '../../lib/dates'
+import { forecastForDay, hasExpectedProduction, hasForecast, tomorrowBusinessIso, useProductionForecast } from '../../lib/forecast'
 import { liveCardState, useLiveCurve, useLiveEnergy, useLiveEnabled } from '../../lib/live'
 import { useManagedZev } from '../../lib/managedZev'
 import {
@@ -24,9 +25,11 @@ import {
     useOwnSeries,
 } from '../../lib/myEnergy'
 import { useEnergyDataEligibility } from '../../lib/supplementary'
+import type { ProductionForecast } from '../../types/api'
 import { usePageNavigation } from '../../lib/usePageNavigation'
 import { type DashboardBodyProps, useBucketLabelFormatters } from '../dashboard/dashboardShared'
 import { LiveEnergyView } from '../live/LiveEnergyView'
+import { ProductionForecastChart } from '../live/ProductionForecastChart'
 import { TodayChart } from './TodayChart'
 
 /** Who the own-system views are about, and whether that is the signed-in user. */
@@ -41,7 +44,8 @@ interface Subject {
 
 /**
  * My energy system (SPEC-2026-live-energy-data §7): what comes from devices, live and the own history of
- * a participant, never billing input (ADR 0030). "Right now" on top, then Today, 7 days and Period.
+ * a participant, never billing input (ADR 0030). "Right now" on top, then Today (with the production forecast),
+ * Tomorrow (the forecast alone, when there is one), 7 days and Period.
  */
 export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: DashboardBodyProps) {
     const { t } = useTranslation()
@@ -50,7 +54,15 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
     const { isZevScope } = useCommunityAccess()
     const energyData = useEnergyDataEligibility()
     const { searchParams, updateParams } = usePageNavigation()
-    const range = parseMyEnergyRange(searchParams.get('range'))
+    // Nothing is asked while the energy data feature is off.
+    const liveEnabled = useLiveEnabled({ enabled: energyData.featureOn }).data === true
+    const forecastQuery = useProductionForecast(selectedZevId || undefined, liveEnabled)
+    const forecast = hasForecast(forecastQuery.data) ? forecastQuery.data : null
+    // Tomorrow is only offered while the forecast has something to say about it.
+    const tomorrow = tomorrowBusinessIso()
+    const hasTomorrow = hasExpectedProduction(forecast, tomorrow)
+    const requestedRange = parseMyEnergyRange(searchParams.get('range'))
+    const range: MyEnergyRange = requestedRange === 'tomorrow' && !hasTomorrow ? MY_ENERGY_DEFAULT_RANGE : requestedRange
 
     const participantsQuery = useQuery({
         queryKey: queryKeys.zev.participants(selectedZevId || undefined),
@@ -117,6 +129,7 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
             <AppTabs value={range} onChange={(value) => setRange(parseMyEnergyRange(value))} keepMounted={false}>
                 <AppTabs.List aria-label={t('myEnergy.rangeLabel')}>
                     <AppTabs.Tab value="today">{t('myEnergy.tabs.today')}</AppTabs.Tab>
+                    {hasTomorrow && <AppTabs.Tab value="tomorrow">{t('myEnergy.tabs.tomorrow')}</AppTabs.Tab>}
                     <AppTabs.Tab value="week">{t('myEnergy.tabs.week')}</AppTabs.Tab>
                     <AppTabs.Tab value="period">{t('myEnergy.tabs.period')}</AppTabs.Tab>
                 </AppTabs.List>
@@ -125,7 +138,7 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
                     {range === 'period' && interval && (
                         <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={onPeriodChange} />
                     )}
-                    {isZevScope && (
+                    {isZevScope && range !== 'tomorrow' && (
                         <div className="filter-bar-fields">
                             <label>
                                 <span>{t('pages.dashboard.participant')}</span>
@@ -144,8 +157,13 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
                 </section>
 
                 <AppTabs.Panel value="today">
-                    <TodayPanel zevId={selectedZevId || undefined} subject={subject} canConnect={canConnect} />
+                    <TodayPanel zevId={selectedZevId || undefined} subject={subject} canConnect={canConnect} forecast={forecast} />
                 </AppTabs.Panel>
+                {hasTomorrow && forecast && (
+                    <AppTabs.Panel value="tomorrow">
+                        <ProductionForecastChart forecast={forecastForDay(forecast, tomorrow)} title={t('myEnergy.tomorrow.title')} />
+                    </AppTabs.Panel>
+                )}
                 <AppTabs.Panel value="week">
                     <SeriesPanel
                         zevId={selectedZevId || undefined}
@@ -188,7 +206,12 @@ function NoOwnSystem({ subject, canConnect }: { subject: Subject; canConnect: bo
  * Today: the live curve (when the live view has data) with the own line merged from history and live,
  * or the history alone through the own-series endpoint when there is no live curve.
  */
-function TodayPanel({ zevId, subject, canConnect }: { zevId: string | undefined; subject: Subject; canConnect: boolean }) {
+function TodayPanel({ zevId, subject, canConnect, forecast }: {
+    zevId: string | undefined
+    subject: Subject
+    canConnect: boolean
+    forecast: ProductionForecast | null
+}) {
     const { t } = useTranslation()
     const date = todayBusinessIso()
     const enabledQuery = useLiveEnabled()
@@ -209,14 +232,19 @@ function TodayPanel({ zevId, subject, canConnect }: { zevId: string | undefined;
         () => curve ? { rows: curve.own_history, through: curve.own_history_through } : ownHistoryFromSeries(seriesQuery.data),
         [curve, seriesQuery.data],
     )
-    const rows = useMemo(() => todayRows(curve, history.rows, history.through), [curve, history])
+    const rows = useMemo(
+        () => todayRows(curve, history.rows, history.through, forecast ? { date, hours: forecast.hours } : undefined),
+        [curve, history, forecast, date],
+    )
     const hasOwn = history.rows.length > 0
 
     if (!curveSettled || seriesQuery.isLoading) return <PageSkeleton variant="kpiRow" />
     return (
         <>
             {seriesQuery.isError && <Notice tone="error">{t('myEnergy.loadFailed')}</Notice>}
-            {(liveShown || hasOwn) && <TodayChart date={date} rows={rows} through={history.through} hasLive={!!curve} />}
+            {(liveShown || hasOwn || rows.some((row) => row.forecast !== null)) && (
+                <TodayChart date={date} rows={rows} through={history.through} hasLive={!!curve} peakWindows={forecast?.peak_windows} />
+            )}
             {!hasOwn && !seriesQuery.isError && <NoOwnSystem subject={subject} canConnect={canConnect} />}
         </>
     )

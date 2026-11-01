@@ -6,7 +6,6 @@ import { useCommunityAccess } from '../../lib/communityAccess'
 import { liveCardState, useLiveEnabled, useLiveEnergy } from '../../lib/live'
 import { LiveEnergyCard } from './LiveEnergyCard'
 import { LivePointsTable } from './LivePointsTable'
-import { ProductionForecastSection } from './ProductionForecastChart'
 
 /**
  * The "Right now" part of My energy system: the live card and, for managers, viewers and admins, the
@@ -36,7 +35,6 @@ export function LiveEnergyView({ zevId }: { zevId: string | undefined }) {
     if (snapshot === null) return <Notice tone="warning">{t('pages.live.unavailable')}</Notice>
     if (!state) {
         return (
-            <>
             <EmptyState
                 titleKey="pages.live.empty.title"
                 descriptionKey={isZevScope ? 'pages.live.empty.manager' : 'pages.live.empty.participant'}
@@ -45,15 +43,12 @@ export function LiveEnergyView({ zevId }: { zevId: string | undefined }) {
                     to: isZevScope ? '/metering/points' : '/me/metering-points',
                 }]}
             />
-            <ProductionForecastSection zevId={zevId} enabled={enabled} />
-            </>
         )
     }
     return (
         <>
             <LiveEnergyCard snapshot={snapshot} />
             {snapshot.points && snapshot.points.length > 0 && <LivePointsTable points={snapshot.points} />}
-            <ProductionForecastSection zevId={zevId} enabled={enabled} />
         </>
     )
 }
