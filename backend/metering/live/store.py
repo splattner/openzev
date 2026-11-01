@@ -18,6 +18,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.core.cache import cache
+from django.utils import timezone
 
 PREFIX = "live:v1:"
 _GET_MANY_CHUNK = 1000
@@ -241,3 +242,44 @@ def set_sm_access(source_id, encrypted: str, ttl_s: int) -> None:
 
 def drop_sm_access(source_id) -> None:
     cache.delete(_sm_access_key(source_id))
+
+
+# ---- forecast.solar call budget (SPEC-2026-live-energy-data §6.3) ----
+
+FORECAST_SOLAR_WINDOW_S = 3600
+
+
+def _fs_calls_key() -> str:
+    return f"{PREFIX}forecast_solar:calls"
+
+
+def _fs_backoff_key() -> str:
+    return f"{PREFIX}forecast_solar:backoff"
+
+
+def forecast_solar_calls_last_hour(now: datetime | None = None) -> int:
+    """Calls made to forecast.solar in the last hour: the public tier counts a rolling 60 minutes per IP."""
+    now = now or timezone.now()
+    cutoff = now.timestamp() - FORECAST_SOLAR_WINDOW_S
+    return sum(1 for stamp in cache.get(_fs_calls_key(), []) if stamp > cutoff)
+
+
+def take_forecast_solar_calls(n: int, now: datetime | None = None) -> bool:
+    """Reserve ``n`` calls if they fit ``FORECAST_SOLAR_MAX_CALLS_PER_HOUR``; ``False`` (nothing reserved) otherwise.
+
+    Read-modify-write on one key: the beat fans sources out one at a time and the budget is a courtesy to the
+    vendor, so a lost update costs at most a call over the line, which the vendor's own ``429`` then catches.
+    """
+    now = now or timezone.now()
+    cutoff = now.timestamp() - FORECAST_SOLAR_WINDOW_S
+    calls = [stamp for stamp in cache.get(_fs_calls_key(), []) if stamp > cutoff]
+    if len(calls) + n > settings.FORECAST_SOLAR_MAX_CALLS_PER_HOUR or cache.get(_fs_backoff_key()) is not None:
+        return False
+    calls.extend([now.timestamp()] * n)
+    cache.set(_fs_calls_key(), calls, timeout=FORECAST_SOLAR_WINDOW_S + 60)
+    return True
+
+
+def set_forecast_solar_backoff(seconds: int) -> None:
+    """The vendor answered ``429``: no source calls it for ``seconds`` (at most an hour)."""
+    cache.set(_fs_backoff_key(), 1, timeout=max(min(int(seconds), FORECAST_SOLAR_WINDOW_S), 60))

@@ -34,6 +34,10 @@ class ProviderRateLimited(ProviderError):
         self.retry_after = retry_after
 
 
+class ForecastDeferred(Exception):
+    """Not an error: the call budget of a shared vendor is spent, so this refresh waits for the next tick."""
+
+
 class Point(NamedTuple):
     """One interval as a provider reports it: an aware UTC interval *start* and four flows in kWh."""
 

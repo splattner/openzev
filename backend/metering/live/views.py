@@ -29,6 +29,7 @@ from ..supplementary.authentication import IsPushSource, SupplementaryPushAuthen
 from ..supplementary.permissions import live_feature_enabled
 from . import store
 from .curve import earliest_day_start, zev_curve
+from .forecast import next_peak, zev_forecast
 from .permissions import LiveEnergyPermission, LiveFeatureMixin, LivePushThrottle, LiveReadThrottle
 from .serializers import LiveIngestResultSerializer, LiveIngestSerializer
 from .snapshot import zev_snapshot
@@ -128,6 +129,14 @@ class LiveCurveView(LiveReadView):
         return Response(zev_curve(self.zev, day, now=now, viewer=request.user, participant_id=participant_id))
 
 
+class LiveForecastView(LiveReadView):
+    """``GET /api/v1/metering/live/zevs/{zev_id}/forecast/``: the ZEV's expected production, hour by hour."""
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request, zev_id):
+        return Response(zev_forecast(self.zev, now=timezone.now(), viewer=request.user))
+
+
 class LiveMeView(LiveFeatureMixin, APIView):
     """``GET /api/v1/metering/live/me/``: a compact snapshot per ZEV the caller participates in.
 
@@ -158,7 +167,7 @@ class LiveMeView(LiveFeatureMixin, APIView):
                     "local_share_pct": snapshot["local_share_pct"],
                     "own_consumption_w": own.get("consumption_w"),
                     "own_local_w": own.get("local_w"),
-                    "forecast_next_peak": None,  # arrives with the forecast (SPEC §10, PR 5)
+                    "forecast_next_peak": next_peak(zev, now=now),
                 }
             )
         return Response({"zevs": entries})

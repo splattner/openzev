@@ -27,6 +27,7 @@ from rest_framework.views import APIView
 from django.conf import settings
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 
+from allocation.read_model import PRODUCTION_METER_TYPES
 from allocation.validity import active_on, period_end_exclusive_dt, period_start_dt
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, build_instance_snapshot, record_audit_event
@@ -40,7 +41,10 @@ from accounts.permissions import NotWhileImpersonating
 from ..live import store as live_store
 from ..live.permissions import readable_zev
 from ..models import SourceTarget, SupplementaryProvider, SupplementarySource, SupplementaryStatus
-from ..tasks import queue_sync, source_audit_metadata, sync_supplementary_source
+from ..tasks import (
+    queue_forecast_refresh, queue_sync, refresh_forecast_source, refresh_forecast_source_impl, source_audit_metadata,
+    sync_supplementary_source,
+)
 from . import ingest as ingest_service
 from . import reconcile as reconcile_service
 from . import sync as sync_service
@@ -153,6 +157,7 @@ class SupplementarySourceViewSet(
                 },
             )
         queue_sync(source, backfill=True)
+        queue_forecast_refresh(source)
         data = self.get_serializer(source).data
         push_token = getattr(serializer, "push_token", None)
         body = {**data, **({"push_token": push_token} if push_token else {})}
@@ -170,6 +175,7 @@ class SupplementarySourceViewSet(
         before = build_instance_snapshot(source, TRACKED_FIELDS)
         was_enabled = source.enabled
         had_history = source.provides_history
+        had_forecast = source.provides_forecast
         with transaction.atomic():
             source = serializer.save()
             changes = build_diff(before, build_instance_snapshot(source, TRACKED_FIELDS), TRACKED_FIELDS)
@@ -183,6 +189,12 @@ class SupplementarySourceViewSet(
             ):
                 # A fresh key, a source switched back on, or history added to it: start now, not at the next tick.
                 queue_sync(source)
+            if had_forecast and not source.provides_forecast:
+                source.forecast_points.all().delete()
+            elif source.enabled and source.provides_forecast and (
+                not had_forecast or not was_enabled or getattr(serializer, "credential_changed", False)
+            ):
+                queue_forecast_refresh(source, force=True)
         return Response(self.get_serializer(source).data)
 
     def update(self, request, *args, **kwargs):
@@ -208,12 +220,14 @@ class SupplementarySourceViewSet(
 
     @staticmethod
     def _capabilities_of(point, *, held_by_participant: bool) -> list[str]:
-        """What a metering point can offer in this release: history behind the meter, live anywhere active."""
+        """What a metering point can offer: history behind the meter, live anywhere active, a forecast for a producer."""
         capabilities = []
         if held_by_participant and point.has_behind_meter_generation:
             capabilities.append("history")
         if point.is_active:
             capabilities.append("live")
+            if point.meter_type in PRODUCTION_METER_TYPES:
+                capabilities.append("forecast")
         return capabilities
 
     @staticmethod
@@ -375,11 +389,14 @@ class SupplementarySourceViewSet(
 
     @action(detail=True, methods=["post"])
     def test(self, request, pk=None):
-        """Exchange the stored key and read an hour of data, or one live sample. Never echoes a credential or a vendor response."""
+        """Exchange the stored key and read an hour of data, one live sample or the forecast. Never echoes a credential or a vendor response."""
         source = self.get_object()
         self._refuse_if_zev_disabled(source)
         pulls_live = source.provides_live and source.provider != SupplementaryProvider.PUSH
-        if not (source.provides_history or pulls_live):
+        if source.provider == SupplementaryProvider.FORECAST_SOLAR:
+            return self._test_forecast_solar(source)
+        pulls_forecast = source.provides_forecast
+        if not (source.provides_history or pulls_live or pulls_forecast):
             self._require_history(source)
         provider = self._pull_provider(source)
         if not source.enabled:
@@ -389,6 +406,8 @@ class SupplementarySourceViewSet(
                 provider.check(source)
             if pulls_live:
                 provider.check_live(source)
+            if pulls_forecast:
+                provider.check_forecast(source)
         except ProviderAuthError as exc:
             sync_service.record_failure(source, SupplementaryStatus.RECONNECT_REQUIRED, str(exc))
             raise ValidationError({"detail": str(exc)}) from None
@@ -396,13 +415,29 @@ class SupplementarySourceViewSet(
             raise ValidationError({"detail": str(exc)}) from None
         return Response({"ok": True})
 
+    @staticmethod
+    def _test_forecast_solar(source):
+        """forecast.solar has no key to test: fetch and store the forecast now (it uses the hourly call budget)."""
+        if not source.enabled:
+            raise ValidationError({"detail": "This source is disconnected."})
+        result = refresh_forecast_source_impl(source.pk, force=True)
+        if result.get("skipped") == "budget":
+            raise ValidationError({"detail": "forecast.solar's hourly call budget is used up. Try again later."})
+        if result.get("error"):
+            source.refresh_from_db(fields=["last_error"])
+            raise ValidationError({"detail": source.last_error or "The forecast could not be fetched."})
+        return Response({"ok": True})
+
     @action(detail=True, methods=["post"])
     def sync(self, request, pk=None):
-        """Queue a sync now. At most one request per source every five minutes."""
+        """Queue a sync (history) or a forecast refresh now. At most one request per source every five minutes."""
         source = self.get_object()
         self._refuse_if_zev_disabled(source)
-        self._require_history(source)
-        self._pull_provider(source)
+        if not source.provides_history:
+            if not source.provides_forecast:
+                self._require_history(source)
+        else:
+            self._pull_provider(source)
         if not source.enabled:
             raise ValidationError({"detail": "This source is disconnected."})
         if source.status == SupplementaryStatus.RECONNECT_REQUIRED:
@@ -412,7 +447,10 @@ class SupplementarySourceViewSet(
                                 status=status.HTTP_429_TOO_MANY_REQUESTS)
             response["Retry-After"] = str(SYNC_COOLDOWN_S)
             return response
-        sync_supplementary_source.delay(str(source.pk))
+        if source.provides_history:
+            sync_supplementary_source.delay(str(source.pk))
+        if source.provides_forecast:
+            refresh_forecast_source.delay(str(source.pk), force=True)
         return Response({"queued": True}, status=status.HTTP_202_ACCEPTED)
 
     @action(detail=True, methods=["get"])
