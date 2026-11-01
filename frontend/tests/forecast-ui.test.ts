@@ -93,13 +93,25 @@ describe('ForecastConnectDialog', () => {
         expect(supplementary.createSupplementarySource.mock.calls[0][0]).toMatchObject({ held_by: 'participant', zev: undefined })
     })
 
-    it('shows what the server says is missing and stays open', async () => {
-        supplementary.createSupplementarySource.mockRejectedValue(apiError({ provides_forecast: ['Add the roof planes of this plant first.'] }))
+    it('says in its own language who adds the missing roof planes, and stays open', async () => {
+        supplementary.createSupplementarySource.mockRejectedValue(apiError({ provides_forecast: ["Add the roof planes of this plant and the building's coordinates first."] }))
         const onClose = vi.fn()
         await renderWithProviders(createElement(ForecastConnectDialog, { holder: 'zev', point, onClose }), cleanups)
         await act(async () => { buttonWith(dialog()!, 'supplementary.forecast.connect')!.click() })
-        await waitForCondition(() => dialog()!.textContent?.includes('Add the roof planes of this plant first.') === true, 'the server message')
+        await waitForCondition(() => dialog()!.textContent?.includes('supplementary.forecast.setupMissingManager') === true, 'the translated refusal')
+        expect(dialog()!.textContent).not.toContain('Add the roof planes')
         expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it('tells a participant to ask the management, and shows any other refusal as the server words it', async () => {
+        supplementary.createSupplementarySource.mockRejectedValueOnce(apiError({ provides_forecast: ["Add the roof planes of this plant and the building's coordinates first."] }))
+        await renderWithProviders(createElement(ForecastConnectDialog, { holder: 'participant', point, onClose: vi.fn() }), cleanups)
+        await act(async () => { buttonWith(dialog()!, 'supplementary.forecast.connect')!.click() })
+        await waitForCondition(() => dialog()!.textContent?.includes('supplementary.forecast.setupMissingParticipant') === true, 'the participant text')
+
+        supplementary.createSupplementarySource.mockRejectedValueOnce(apiError({ provides_forecast: ['Live energy data is not enabled.'] }))
+        await act(async () => { buttonWith(dialog()!, 'supplementary.forecast.connect')!.click() })
+        await waitForCondition(() => dialog()!.textContent?.includes('Live energy data is not enabled.') === true, 'the server message')
     })
 })
 
@@ -186,10 +198,11 @@ describe('PvPlanesDialog', () => {
         await act(async () => { buttonWith(dialog()!, 'pages.meteringPoints.planes.add')!.click() })
         const inputs = Array.from(dialog()!.querySelectorAll<HTMLInputElement>('input'))
         await act(async () => { setInputValue(inputs[1], '8'); setInputValue(inputs[2], '120') })
-        // The browser's own range check would stop a real submit first; the handler must hold on its own.
+        // The form does not use the browser's own check (its tooltip is in the browser's language): the handler holds on its own.
         await act(async () => { dialog()!.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
         expect(zev.createPvPlane).not.toHaveBeenCalled()
-        expect(dialog()!.textContent).toContain('pages.meteringPoints.planes.invalid')
+        expect(dialog()!.textContent).toContain('pages.meteringPoints.planes.errors.tilt')
+        expect(dialog()!.textContent).not.toContain('pages.meteringPoints.planes.errors.kwp')
     })
 
     it('is read-only for someone who cannot write', async () => {

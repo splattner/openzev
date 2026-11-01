@@ -20,6 +20,9 @@ interface Props {
     frame?: (title: string, body: ReactNode) => ReactNode
 }
 
+/** What the server says when the plant has no roof planes or its building no location (SPEC-2026-live-energy-data §5). */
+const SETUP_MISSING = /^Add the roof planes/
+
 /** The first message under any of the keys the API may put a forecast problem on. */
 function firstProblem(error: unknown): string | undefined {
     const body = apiErrorPayload(error)
@@ -76,15 +79,21 @@ export function ForecastConnectDialog({ holder, point, sources, onClose, frame }
             invalidateSourceQueries(queryClient)
             onClose()
         },
-        onError: (failure) => setError(firstProblem(failure) ?? formatApiError(failure, t('common.error'))),
+        onError: (failure) => {
+            const problem = firstProblem(failure)
+            // The server's answer is English; this refusal has a translated text that says who adds what.
+            setError(problem && SETUP_MISSING.test(problem)
+                ? t(holder === 'zev' ? 'supplementary.forecast.setupMissingManager' : 'supplementary.forecast.setupMissingParticipant')
+                : problem ?? formatApiError(failure, t('common.error')))
+        },
     })
 
     const title = t('supplementary.forecast.connectTitle', { meter: point.meter_id })
     const body = (
-        <div style={{ display: 'grid', gap: '1rem' }}>
+        <div className="dialog-stack">
             {existing && (
-                <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: '0.5rem' }}>
-                    <legend className="muted" style={{ padding: 0 }}>{t('supplementary.forecast.source')}</legend>
+                <fieldset className="dialog-fieldset">
+                    <legend className="muted">{t('supplementary.forecast.source')}</legend>
                     <label className="actions-row">
                         <input type="radio" name="forecast-source" checked={choice === 'solar_manager'} onChange={() => setChoice('solar_manager')} />
                         <span>{t('supplementary.forecast.choiceSolarManager')}</span>
@@ -113,10 +122,10 @@ export function ForecastConnectDialog({ holder, point, sources, onClose, frame }
             )}
             {error && <div className="error-banner" role="alert">{error}</div>}
             <div className="actions-row actions-row-wrap">
+                <FormModalCancelButton onCancel={onClose} disabled={connect.isPending} />
                 <button type="button" className="button button-primary" disabled={connect.isPending || (useExisting && !consent)} onClick={() => connect.mutate()}>
                     {connect.isPending ? t('common.saving') : t('supplementary.forecast.connect')}
                 </button>
-                <FormModalCancelButton onCancel={onClose} disabled={connect.isPending} />
             </div>
         </div>
     )

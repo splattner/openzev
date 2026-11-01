@@ -2348,7 +2348,11 @@ export const fr = {
                 deleted: 'Pan de toit supprimé.',
                 saveFailed: 'Le pan de toit n\'a pas pu être enregistré.',
                 loadFailed: 'Les pans de toit n\'ont pas pu être chargés.',
-                invalid: 'Vérifiez les valeurs : 0.01 à 10000 kWc, inclinaison 0 à 90°, orientation -180 à 180°.',
+                errors: {
+                    kwp: 'Saisissez une puissance de crête de 0.01 à {{max}} kWc.',
+                    tilt: 'Saisissez une inclinaison entière de 0 à 90.',
+                    azimuth: 'Saisissez une orientation entière de -180 à 180.',
+                },
                 locationHint: 'La prévision a aussi besoin de l\'emplacement du bâtiment : il se saisit dans les paramètres du bâtiment.',
                 direction: {
                     south: 'sud',
@@ -4180,6 +4184,8 @@ export const fr = {
             privacy: 'Seuls l\'emplacement arrondi à environ un kilomètre ainsi que la taille, l\'inclinaison et l\'orientation des pans de toit sont envoyés. Rien sur les personnes ni la consommation.',
             needsManager: 'Elle nécessite les pans de toit de cette installation (Pans de toit dans le menu du point de mesure) et l\'emplacement du bâtiment (paramètres du bâtiment).',
             needsParticipant: 'Elle nécessite les pans de toit de cette installation et l\'emplacement de son bâtiment. Un gestionnaire de la communauté les saisit ; demandez-lui si la connexion échoue.',
+            setupMissingManager: "Les pans de toit de cette installation et l'emplacement du bâtiment manquent encore. Saisissez-les d'abord (Pans de toit dans le menu du point de mesure, emplacement dans les paramètres du bâtiment).",
+            setupMissingParticipant: "Les pans de toit de cette installation et l'emplacement du bâtiment manquent encore. Demandez à la gestion de votre communauté de les saisir.",
             solarManagerHint: 'Connecté à Solar Manager ? Ouvrez cette connexion et activez plutôt sa prévision.',
             connect: 'Connecter la prévision',
             connected: 'La prévision est connectée. Elle sera récupérée d\'ici quelques minutes.',

@@ -115,3 +115,38 @@ input.recurrence-chip-input {
   gap: 0.15rem;
 }
 
+
+/* Dialog bodies made of a few blocks: a stack, a plain list of rows, a fieldset without its frame. */
+
+.dialog-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.dialog-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dialog-fieldset {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.dialog-fieldset > legend {
+  padding: 0;
+}
+
+.actions-row-between {
+  justify-content: space-between;
+}
+
+.form-grid-start {
+  align-items: start;
+}

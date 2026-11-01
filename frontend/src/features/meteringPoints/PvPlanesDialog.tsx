@@ -6,7 +6,7 @@ import { Notice } from '../../components/Notice'
 import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { createPvPlane, deletePvPlane, fetchPvPlanes, updatePvPlane } from '../../lib/api/zev'
-import { azimuthLabelKey, planeInput, type PlaneDraft, PLANE_LIMITS } from '../../lib/pvPlanes'
+import { azimuthLabelKey, planeFieldProblems, planeInput, type PlaneDraft, PLANE_LIMITS } from '../../lib/pvPlanes'
 import { useToast } from '../../lib/toast'
 import type { MeteringPoint, PvPlane } from '../../types/api'
 
@@ -24,6 +24,8 @@ export function PvPlanesDialog({ point, canWrite, onClose }: { point: MeteringPo
     const [editing, setEditing] = useState<string | 'new' | null>(null)
     const [draft, setDraft] = useState<PlaneDraft>(emptyDraft())
     const [error, setError] = useState<string | null>(null)
+    // Messages by the field appear after the first attempt to save, not while the form is still being filled in.
+    const [submitted, setSubmitted] = useState(false)
 
     const planes = useQuery({ queryKey: queryKeys.zev.pvPlanes(point.id), queryFn: () => fetchPvPlanes(point.id) })
     const refresh = () => {
@@ -56,32 +58,32 @@ export function PvPlanesDialog({ point, canWrite, onClose }: { point: MeteringPo
     function open(id: string | 'new', values: PlaneDraft) {
         setEditing(id)
         setDraft(values)
+        setSubmitted(false)
         setError(null)
     }
     function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
         if (!editing) return
-        if (!planeInput(draft)) {
-            setError(t('pages.meteringPoints.planes.invalid'))
-            return
-        }
+        setSubmitted(true)
+        if (!planeInput(draft)) return
         save.mutate({ id: editing, draft })
     }
     const set = (field: keyof PlaneDraft, value: string) => setDraft((previous) => ({ ...previous, [field]: value }))
+    const problems = submitted ? planeFieldProblems(draft) : {}
     const rows = planes.data ?? []
     const full = rows.length >= PLANE_LIMITS.maxPerPoint
 
     return (
         <FormModal isOpen size="md" title={t('pages.meteringPoints.planes.title', { meter: point.meter_id })} onClose={onClose}>
-            <div style={{ display: 'grid', gap: '1rem' }}>
+            <div className="dialog-stack">
                 <p className="muted m-0">{t('pages.meteringPoints.planes.intro')}</p>
                 {planes.isError && <Notice tone="error" onRetry={() => void planes.refetch()}>{t('pages.meteringPoints.planes.loadFailed')}</Notice>}
                 {planes.isPending && <p className="muted m-0">{t('common.loading')}</p>}
                 {planes.data && rows.length === 0 && editing !== 'new' && <p className="m-0">{t('pages.meteringPoints.planes.empty')}</p>}
                 {rows.length > 0 && (
-                    <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: '0.5rem' }}>
+                    <ul className="dialog-list">
                         {rows.map((plane) => (
-                            <li key={plane.id} className="actions-row actions-row-wrap" style={{ justifyContent: 'space-between' }}>
+                            <li key={plane.id} className="actions-row actions-row-wrap actions-row-between">
                                 <span>
                                     <strong>{plane.label || t('pages.meteringPoints.planes.unnamed')}</strong>
                                     {' · '}
@@ -104,32 +106,35 @@ export function PvPlanesDialog({ point, canWrite, onClose }: { point: MeteringPo
                     </ul>
                 )}
                 {canWrite && editing && (
-                    <form className="form-grid" style={{ alignItems: 'start' }} onSubmit={submit}>
+                    <form className="form-grid form-grid-start" noValidate onSubmit={submit}>
                         <label className="grid-span-full">
                             <span>{t('pages.meteringPoints.planes.label')}</span>
                             <input value={draft.label} maxLength={100} onChange={(event) => set('label', event.target.value)} placeholder={t('pages.meteringPoints.planes.labelPlaceholder')} />
                         </label>
                         <label>
                             <span>{t('pages.meteringPoints.planes.kwp')}</span>
-                            <input type="number" inputMode="decimal" min={0.01} max={PLANE_LIMITS.maxKwp} step="0.01" value={draft.kwp} onChange={(event) => set('kwp', event.target.value)} required />
+                            <input type="number" inputMode="decimal" min={0.01} max={PLANE_LIMITS.maxKwp} step="0.01" value={draft.kwp} onChange={(event) => set('kwp', event.target.value)} required aria-invalid={problems.kwp || undefined} />
+                            {problems.kwp && <span className="field-error" role="alert">{t('pages.meteringPoints.planes.errors.kwp', { max: PLANE_LIMITS.maxKwp })}</span>}
                         </label>
                         <label>
                             <span>{t('pages.meteringPoints.planes.tilt')}</span>
-                            <input type="number" inputMode="numeric" min={0} max={90} step="1" value={draft.tilt} onChange={(event) => set('tilt', event.target.value)} required />
+                            <input type="number" inputMode="numeric" min={0} max={90} step="1" value={draft.tilt} onChange={(event) => set('tilt', event.target.value)} required aria-invalid={problems.tilt || undefined} />
+                            {problems.tilt && <span className="field-error" role="alert">{t('pages.meteringPoints.planes.errors.tilt')}</span>}
                             <small className="muted">{t('pages.meteringPoints.planes.tiltHint')}</small>
                         </label>
                         <label className="grid-span-full">
                             <span>{t('pages.meteringPoints.planes.azimuth')}</span>
-                            <input type="number" inputMode="numeric" min={-180} max={180} step="1" value={draft.azimuth} onChange={(event) => set('azimuth', event.target.value)} required />
+                            <input type="number" inputMode="numeric" min={-180} max={180} step="1" value={draft.azimuth} onChange={(event) => set('azimuth', event.target.value)} required aria-invalid={problems.azimuth || undefined} />
+                            {problems.azimuth && <span className="field-error" role="alert">{t('pages.meteringPoints.planes.errors.azimuth')}</span>}
                             <small className="muted">{t('pages.meteringPoints.planes.azimuthHint')}</small>
                         </label>
                         {error && <div className="error-banner grid-span-full" role="alert">{error}</div>}
                         <div className="actions-row actions-row-wrap grid-span-full">
-                            <button type="submit" className="button button-primary" disabled={save.isPending}>
-                                {save.isPending ? t('common.saving') : t('common.save')}
-                            </button>
                             <button type="button" className="button button-secondary" onClick={() => setEditing(null)}>
                                 {t('common.cancel')}
+                            </button>
+                            <button type="submit" className="button button-primary" disabled={save.isPending}>
+                                {save.isPending ? t('common.saving') : t('common.save')}
                             </button>
                         </div>
                     </form>

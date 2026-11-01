@@ -2348,7 +2348,11 @@ export const it = {
                 deleted: 'Falda eliminata.',
                 saveFailed: 'Impossibile salvare la falda.',
                 loadFailed: 'Impossibile caricare le falde.',
-                invalid: 'Controllate i valori: da 0.01 a 10000 kWp, inclinazione da 0 a 90°, orientamento da -180 a 180°.',
+                errors: {
+                    kwp: 'Inserite una potenza di picco da 0.01 a {{max}} kWp.',
+                    tilt: "Inserite un'inclinazione intera da 0 a 90.",
+                    azimuth: 'Inserite un orientamento intero da -180 a 180.',
+                },
                 locationHint: 'La previsione richiede anche la posizione dell\'edificio: si inserisce nelle impostazioni dell\'edificio.',
                 direction: {
                     south: 'sud',
@@ -4180,6 +4184,8 @@ export const it = {
             privacy: 'Vengono inviati solo la posizione arrotondata a circa un chilometro e dimensione, inclinazione e orientamento delle falde. Nulla su persone o consumi.',
             needsManager: 'Servono le falde di questo impianto (Falde del tetto nel menu del punto di misura) e la posizione dell\'edificio (impostazioni dell\'edificio).',
             needsParticipant: 'Servono le falde di questo impianto e la posizione del suo edificio. Le inserisce un gestore della comunità; chiedete a lui se il collegamento non riesce.',
+            setupMissingManager: "Mancano ancora le falde del tetto di questo impianto e la posizione dell'edificio. Inseritele prima (Falde del tetto nel menu del punto di misura, posizione nelle impostazioni dell'edificio).",
+            setupMissingParticipant: "Mancano ancora le falde del tetto di questo impianto e la posizione dell'edificio. Chiedete alla gestione della vostra comunità di inserirle.",
             solarManagerHint: 'Collegato a Solar Manager? Aprite quel collegamento e attivate invece la sua previsione.',
             connect: 'Collega la previsione',
             connected: 'La previsione è collegata. Verrà caricata entro pochi minuti.',

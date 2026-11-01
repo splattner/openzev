@@ -2348,7 +2348,11 @@ export const de = {
                 deleted: 'Dachfläche gelöscht.',
                 saveFailed: 'Die Dachfläche konnte nicht gespeichert werden.',
                 loadFailed: 'Die Dachflächen konnten nicht geladen werden.',
-                invalid: 'Werte prüfen: 0.01 bis 10000 kWp, Neigung 0 bis 90°, Ausrichtung -180 bis 180°.',
+                errors: {
+                    kwp: 'Spitzenleistung von 0.01 bis {{max}} kWp eingeben.',
+                    tilt: 'Neigung als ganze Zahl von 0 bis 90 eingeben.',
+                    azimuth: 'Ausrichtung als ganze Zahl von -180 bis 180 eingeben.',
+                },
                 locationHint: 'Die Prognose braucht auch den Standort des Gebäudes: Er wird in den Einstellungen des Gebäudes erfasst.',
                 direction: {
                     south: 'Süd',
@@ -4180,6 +4184,8 @@ export const de = {
             privacy: 'Gesendet werden nur der auf etwa einen Kilometer gerundete Standort sowie Grösse, Neigung und Ausrichtung der Dachflächen. Nichts über Personen oder Verbrauch.',
             needsManager: 'Dafür braucht es die Dachflächen dieser Anlage (Dachflächen im Menü des Messpunkts) und den Standort des Gebäudes (Gebäudeeinstellungen).',
             needsParticipant: 'Dafür braucht es die Dachflächen dieser Anlage und den Standort ihres Gebäudes. Diese erfasst eine Verwaltung der Gemeinschaft; fragen Sie nach, falls das Verbinden scheitert.',
+            setupMissingManager: "Die Dachflächen dieser Anlage und der Standort des Gebäudes fehlen noch. Erfassen Sie sie zuerst (Dachflächen im Menü des Messpunkts, Standort in den Gebäudeeinstellungen).",
+            setupMissingParticipant: "Die Dachflächen dieser Anlage und der Standort des Gebäudes fehlen noch. Bitten Sie die Verwaltung Ihrer Gemeinschaft, sie zu erfassen.",
             solarManagerHint: 'Mit Solar Manager verbunden? Öffnen Sie diese Verbindung und schalten Sie stattdessen deren Prognose ein.',
             connect: 'Prognose verbinden',
             connected: 'Die Prognose ist verbunden. Sie wird innerhalb weniger Minuten geladen.',

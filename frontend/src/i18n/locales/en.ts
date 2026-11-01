@@ -2359,7 +2359,11 @@ export const en = {
                 deleted: 'Roof plane deleted.',
                 saveFailed: 'The roof plane could not be saved.',
                 loadFailed: 'The roof planes could not be loaded.',
-                invalid: 'Check the values: 0.01 to 10000 kWp, tilt 0 to 90°, direction -180 to 180°.',
+                errors: {
+                    kwp: 'Enter a peak power from 0.01 to {{max}} kWp.',
+                    tilt: 'Enter a tilt as a whole number from 0 to 90.',
+                    azimuth: 'Enter a direction as a whole number from -180 to 180.',
+                },
                 locationHint: 'The forecast also needs the location of the building: set it in the building\'s settings.',
                 direction: {
                     south: 'south',
@@ -4191,6 +4195,8 @@ export const en = {
             privacy: 'Only the location rounded to about one kilometre and the size, tilt and direction of the roof planes are sent. Nothing about people or consumption.',
             needsManager: 'It needs the roof planes of this plant (Roof planes in the metering point menu) and the location of the building (building settings).',
             needsParticipant: 'It needs the roof planes of this plant and the location of its building. A manager of the community enters them; ask them if connecting fails.',
+            setupMissingManager: "The roof planes of this plant and the building's location are missing. Add them first (Roof planes in the metering point menu, location in the building settings).",
+            setupMissingParticipant: "The roof planes of this plant and the building's location are missing. Ask your community's management to add them.",
             solarManagerHint: 'Connected to Solar Manager? Open that connection and switch on its forecast instead.',
             connect: 'Connect forecast',
             connected: 'The forecast is connected. It is fetched within a few minutes.',
