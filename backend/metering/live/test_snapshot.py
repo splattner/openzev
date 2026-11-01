@@ -8,6 +8,7 @@ from django.utils import timezone
 from allocation.split import split_consumption, split_production
 from metering.live import snapshot
 from metering.live.testing import LiveTestCase, client_for, snapshot_url
+from metering.models import SourceHolder, SupplementarySource
 from zev.models import (
     AllocationMode,
     MeteringPointAssignment,
@@ -139,7 +140,7 @@ class SnapshotTierTests(SnapshotCase):
         self.assertEqual(
             shot["coverage"],
             {"producing_points": 1, "producing_fresh": 1, "consuming_points": 3, "consuming_fresh": 1,
-             "connection_point": None},
+             "connection_point": None, "live_sources": 2},
         )
 
     def test_exact_when_every_point_reports(self):
@@ -264,6 +265,25 @@ class SnapshotTierTests(SnapshotCase):
         shot = self.snap()
 
         self.assertEqual((shot["tier"], shot["coverage"]["consuming_points"]), ("exact", 2))
+
+    def test_live_sources_counts_enabled_live_sources_with_the_connection_point(self):
+        self.assertEqual(self.snap()["coverage"]["live_sources"], 0)
+        self.wire(pv=-8000, flat1=1000, connection=-3000)
+
+        self.assertEqual(self.snap()["coverage"]["live_sources"], 3)
+
+    def test_live_sources_leaves_out_disabled_inactive_and_non_live_sources(self):
+        sources = self.wire(pv=-8000, flat1=1000, flat2=500, connection=-3000)
+        sources["flat1"].enabled = False
+        sources["flat1"].save()
+        self.flat2.is_active = False
+        self.flat2.save()
+        SupplementarySource.objects.create(
+            zev=self.zev, metering_point=self.flat3, held_by=SourceHolder.PARTICIPANT, participant=self.quiet,
+            provider="push", provides_history=True, provides_live=False,
+        )
+
+        self.assertEqual(self.snap()["coverage"]["live_sources"], 2)  # the PV point and the connection point
 
     def test_numbers_are_rounded_to_one_decimal(self):
         self.wire(pv="-8000.04", flat1="1000.05", flat2=0, flat3=0)

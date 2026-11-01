@@ -1698,6 +1698,7 @@ reaches every ZEV-scope route and sees its pages read-only
 |---|---|---|
 | `/` | any authenticated | `HomePage`: `OverviewPage` in ZEV scope, `DashboardPage` for current participants, `/me/invoices` redirect for former participants, `GuestHomePage` for shell role `none` (linking explanation + secondary account link) |
 | `/dashboard` | ZEV scope, `participant` | `DashboardPage` (manager title/navigation: Energy balance; participant root remains `/`) |
+| `/live` | ZEV scope, `participant` | `LivePage`: live energy of the selected community (SPEC-2026-live-energy-data §7.1); shows a notice while the live flag is off |
 | `/account` | any authenticated | `AccountProfilePage` — tabs `profile` (default) · `security` (password, linked accounts, two-factor) · `api-keys`, chosen by `?tab=`; a forced password change and an OAuth link return open `security` (`resolveAccountTab`) |
 | `/admin` | `admin` | `AdminOverviewHubPage` (tabs = routes; default tab `overview`) |
 | `/admin/overview` · `/admin/zevs` · `/admin/invoices` · `/admin/dynamic-sources` · `/admin/audit` · `/admin/health` | `admin` | `AdminOverviewHubPage tab=…` (KPIs · ZEVs table · all invoices · dynamic price sources · platform audit log · System health) |
@@ -1787,8 +1788,10 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 | Section | Condition |
 |---|---|
 | Overview (`/`), Energy balance (`/dashboard`), Metering (`/metering/chart`, active on `/metering/chart` + `/metering/quality` + `/metering/imports`), Billing (`/billing/invoices`, active on `/billing/*`), Reports | `isZevScope` (shell role `admin`, `manager` or `viewer`; the `/reports` route itself also allows participants) |
+| Live (`/live`, right after Energy balance) | `isZevScope` + `live_energy_data_enabled` effective (`GET /metering/live/enabled/`) |
 | Account (`/account`) | shell role `none` (only nav entry; landing page explains the unlinked state) |
 | Dashboard (`/`) | shell role `participant` |
+| Live (`/live`, right after Dashboard) | shell role `participant` (not `former`) + live flag effective |
 | My invoices (`/me/invoices`) | shell role `participant` or `former` (a former participant sees only this entry) |
 | Annual statement (`/me/statement`) | shell role `participant` (consumption is available on the participant dashboard) |
 | My metering points (`/me/metering-points`) | shell role `participant` (not `former`); for a participant it also lights on `/metering/chart` and `/metering/points`, which they reach from it (they have no Metering hub entry); also `admin`, `manager` or `viewer` who personally hold a flagged metering point in the selected community while the energy data feature is on |
