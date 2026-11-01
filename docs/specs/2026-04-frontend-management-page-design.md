@@ -6,6 +6,7 @@
 - Type: Change
 - Owners: Core maintainers
 - Created: 2026-04-05
+- Updated: 2026-11-01
 - Target Release: Ongoing baseline
 - Related Issues: n/a
 - Related ADRs: n/a
@@ -30,7 +31,11 @@ allowing page-specific structure such as tables, card lists, category sections,
 or period selectors where the data shape requires it.
 
 This spec is the reference spec for future CRUD and management-page cleanup work
-in the frontend.
+in the frontend. The accepted `2026-10-ui-patterns-and-component-catalog` §10.3
+is the canonical usability contract for new and changed UI and supersedes the
+former blanket icon-and-label requirement. Acceptance does not claim that every
+existing screen has migrated; its phase 9 tracks that audit. Feature descriptions
+below continue to record shipped behaviour until their implementation changes.
 
 ## 2. Scope
 
@@ -40,7 +45,7 @@ in the frontend.
 |---|---|
 | Page shell | Page header, summary toolbar, filters, card/table containers |
 | Action hierarchy | Primary, secondary, overflow, destructive, modal footer actions |
-| Icon treatment | Font Awesome icon + label buttons, fixed-width icon alignment |
+| Icon treatment | Font Awesome action icons; icon-only for self-explanatory actions, visible labels for ambiguous actions; fixed-width alignment |
 | Page grouping patterns | When to use sections, nested cards, tables (`DataTable`), or tabs |
 | Shared primitives | `PageHeader`, `Notice`, `PageState`, `ScopeGuard`, `Toolbar`, `ActionMenu`, `ConfirmDialog`, `FormModal`, `BillingPeriodSelector`, `StatCard` |
 | I18n constraints | User-facing text in locale files only; translated labels must not encode visual symbols |
@@ -334,10 +339,14 @@ scroll the table instead of squeezing its dates into tall rows.
 ### 4.3 Icon contract
 
 - Use `FontAwesomeIcon` from `@fortawesome/react-fontawesome`.
-- Action buttons that are visible in the main UI should use **icon + text**, not icon-only buttons.
-  Exceptions are stepping chevrons beside a labelled control and billing
-  overflow-menu triggers explicitly opting into `iconOnly`. Both retain
-  translated accessible names and tooltips. Other callers remain labelled.
+- Follow UI patterns §10.3 rules 5 and 7: self-explanatory actions (such as the
+  edit pencil) use icon-only controls; ambiguous or task-specific actions keep
+  visible text. Icon-only controls retain translated accessible names, tooltips
+  on hover and keyboard focus, visible focus and adequate target sizes.
+- Main-content icons belong on action controls or replace repetitive text;
+  information encoded as icons has a nearby visible legend. Do not add
+  decorative icons to headings or ordinary prose. Sidebar navigation is outside
+  this restriction.
 - Use `fixedWidth` on action icons to align labels vertically.
 - Do not embed symbols such as `+` in translated button labels when the button already renders an icon.
 - Destructive actions use the trash icon; edit uses pen; create/add uses plus; import/export use upload/download; cancel/close uses x-mark; approval/save uses check when a stronger visual cue is useful.
@@ -596,7 +605,9 @@ These pages define the current management-page reference set.
 - Summary stats must wrap rather than overflow.
 - Card headers and row action groups must wrap on narrow screens.
 - Multi-column detail grids must collapse cleanly to a single column where necessary.
-- Buttons remain labelled on mobile; do not collapse primary CRUD flows to icon-only actions.
+- Apply the same icon-label rule on mobile as on desktop (UI patterns §10.3
+  rule 5): obvious icons need no visible label; ambiguous actions keep theirs.
+  Do not remove a necessary label merely to fit a narrow screen.
 
 ## 8. Risks and mitigations
 
@@ -661,7 +672,8 @@ These pages define the current management-page reference set.
 ### Acceptance criteria
 
 - [x] Management pages use a documented default shell: header, summary/actions, filters when needed, main content, modals.
-- [x] Visible CRUD actions use icon + text buttons with consistent semantics.
+- [ ] New and changed actions follow UI patterns §10.3 rules 5 and 7; migration
+  of remaining icon-and-label controls is tracked in its phase 9.
 - [x] The tariff page uses category sections instead of tabs for the four tariff categories.
 - [x] The tariff list is a rate card: a line per price band with when it applies, a bare price under a "Price (CHF)" header and its unit; badges beside the name mark only problems.
 - [x] New page work can reference this spec to choose between sections, tabs, tables, and cards without inventing a new pattern.

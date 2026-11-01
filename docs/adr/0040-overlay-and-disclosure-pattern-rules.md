@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-15
-- Updated: 2026-10-28
+- Updated: 2026-11-01
 - Related specs: `2026-10-ui-patterns-and-component-catalog` (reference), `2026-10-tariff-split-view` (pilot), `2026-04-frontend-management-page-design` (reference), `2026-08-ui-redesign-pdf-style` (baseline)
 - Related ADRs: 0032 (one visual language), 0014 (print-parity design system)
 
@@ -52,7 +52,11 @@ Consistency is a goal in itself, not only a code-quality concern.
    the import wizard are decided against these criteria in the rollout.
 7. **Show only information that helps.** A label or count earns its place by
    helping its audience understand, compare or act. Concrete problems are
-   actionable text; routine state is not decorated.
+   actionable text; routine state is not decorated. The accepted reference
+   spec §10.3 makes this principle concrete in twelve usability rules, including
+   icon-only controls for self-explanatory actions, visible short information,
+   terminology consistency and no ineffective controls. The reference spec owns
+   the detailed rules; acceptance is not a claim that all screens already comply.
 8. **Share behaviour once it has two consumers.** Extract a component when
    repeated behaviour or configuration has real consumers (the detail pane
    once the tariff pilot and a second list use it; `AppTabs`; `Disclosure`).
