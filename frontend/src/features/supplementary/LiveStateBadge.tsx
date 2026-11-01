@@ -1,9 +1,14 @@
 import { useTranslation } from 'react-i18next'
-import { LIVE_STATE_BADGE_CLASS } from '../../lib/supplementary'
+import { IssueText } from '../../components/IssueText'
 import type { LiveState } from '../../types/api'
 
-/** The freshness of a live source as a badge: live, not recent, or no data yet. */
+/**
+ * The freshness of a live source as text (UI patterns §10.1): a value that is current is plain, a source
+ * that has gone quiet is a problem to look at, and one that has not reported yet is a muted note.
+ */
 export function LiveStateBadge({ state }: { state: LiveState }) {
     const { t } = useTranslation()
-    return <span className={LIVE_STATE_BADGE_CLASS[state]}>{t(`live.state.${state}`)}</span>
+    const label = t(`live.state.${state}`)
+    if (state === 'stale') return <IssueText tone="warning">{label}</IssueText>
+    return <span className={state === 'never' ? 'muted' : undefined}>{label}</span>
 }

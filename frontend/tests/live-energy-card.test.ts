@@ -189,8 +189,19 @@ describe('LivePointsTable', () => {
         expect(out).toContain('live.points.seconds|{"count":7}')
         expect(out).toContain('live.points.connection')
         expect(out).toContain('live.points.zevOperated')
-        expect(container.querySelector('.badge-success')).not.toBeNull()
-        expect(container.querySelector('.badge-warning')).not.toBeNull()
+        // A current value is plain text, never a coloured pill; only a source gone quiet is flagged (UI patterns §10.1).
+        expect(container.querySelector('.badge')).toBeNull()
+        expect(container.querySelectorAll('.issue-text--warning')).toHaveLength(2)
+        expect(out).toContain('live.state.fresh')
+    })
+
+    it('also lists each point as a small card for a phone, with the value in it', async () => {
+        const { container } = await renderWithProviders(createElement(LivePointsTable, { points: [point({})] }), cleanups)
+
+        const card = container.querySelector('.live-points-list li')
+        expect(card?.textContent).toContain('CH-1')
+        expect(card?.textContent).toContain('1.2\u00a0kW')
+        expect(card?.textContent).toContain('live.points.seconds|{"count":7}')
     })
 })
 

@@ -63,7 +63,8 @@ describe('MyConnections', () => {
         expect(row.textContent).toContain('supplementary.capability.history')
         expect(row.textContent).toContain('supplementary.capability.live')
         expect(row.textContent).toContain('live.state.fresh')
-        expect(row.querySelectorAll('.badge')).toHaveLength(4)
+        // Two capability chips and the history status; the live state is plain text, not a pill.
+        expect(row.querySelectorAll('.badge')).toHaveLength(3)
     })
 
     it('leaves the live chip out of a history-only source', async () => {
@@ -99,7 +100,7 @@ describe('MyConnections', () => {
         const both = await mount([source({ provides_forecast: true })])
         const row = both.container.querySelector('li[data-source]')!
         expect(row.textContent).toContain('supplementary.capability.forecast')
-        expect(row.querySelectorAll('.badge')).toHaveLength(5)
+        expect(row.querySelectorAll('.badge')).toHaveLength(4)
         cleanups.splice(0).forEach((cleanup) => cleanup())
 
         const only = await mount([source({ provides_history: false, provides_live: false, live_state: null, provides_forecast: true, provider: 'forecast_solar' })])

@@ -5,7 +5,6 @@ import { fetchEligibleOrNull } from './api/supplementary'
 import type {
     EligibleMeteringPoint,
     GrossEnergy,
-    LiveState,
     SourceCapability,
     SupplementarySource,
     SupplementaryStatus,
@@ -85,13 +84,6 @@ export function liveIngestUrl(origin: string = typeof window === 'undefined' ? '
 
 /** The sample a live push client posts: power at the meter, >0 drawn in through it, <0 fed out. */
 export const LIVE_EXAMPLE_PAYLOAD = '{"meter_power_w": 1250, "production_w": 0, "consumption_w": 1250}'
-
-/** Badge class per live state; one place for the live page, the metering-point lists and the setup cards. */
-export const LIVE_STATE_BADGE_CLASS: Record<LiveState, string> = {
-    fresh: 'badge badge-success',
-    stale: 'badge badge-warning',
-    never: 'badge badge-neutral',
-}
 
 /**
  * Whether history can be connected on a held metering point. With the live flag off the list only

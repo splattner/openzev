@@ -56,19 +56,19 @@ export function MyConnections({ sources, held, confirm }: Props) {
                                 <div className="actions-row actions-row-wrap">
                                     {source.provides_history && (
                                         <>
-                                            <span className="badge badge-neutral">{t('supplementary.capability.history')}</span>
+                                            <span className="badge badge-tag">{t('supplementary.capability.history')}</span>
                                             <SourceStatusBadge status={source.enabled ? source.status : 'disabled'} />
                                         </>
                                     )}
                                     {source.provides_live && (
                                         <>
-                                            <span className="badge badge-neutral">{t('supplementary.capability.live')}</span>
+                                            <span className="badge badge-tag">{t('supplementary.capability.live')}</span>
                                             {source.live_state ? <LiveStateBadge state={source.live_state} /> : null}
                                         </>
                                     )}
                                     {source.provides_forecast && (
                                         <>
-                                            <span className="badge badge-neutral">{t('supplementary.capability.forecast')}</span>
+                                            <span className="badge badge-tag">{t('supplementary.capability.forecast')}</span>
                                             {/* One status per source: the history chip already carries it. */}
                                             {!source.provides_history && <SourceStatusBadge status={source.enabled ? source.status : 'disabled'} />}
                                         </>

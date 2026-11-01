@@ -11,7 +11,7 @@ export function LivePointsTable({ points }: { points: LivePoint[] }) {
     return (
         <section className="card" aria-labelledby={titleId}>
             <h3 id={titleId}>{t('live.points.title')}</h3>
-            <div className="table-scroll">
+            <div className="table-scroll live-points-wide">
                 <table className="participant-table live-points-table">
                     <thead>
                         <tr>
@@ -35,6 +35,24 @@ export function LivePointsTable({ points }: { points: LivePoint[] }) {
                     </tbody>
                 </table>
             </div>
+            {/* On a phone the columns would hide the one thing the table is for (the kW), so each point is a small card. */}
+            <ul className="live-points-list">
+                {points.map((point) => (
+                    <li key={point.source_id ?? point.metering_point_id ?? point.target}>
+                        <div className="live-points-list-head">
+                            <strong>{point.target === 'connection_point' ? t('live.points.connection') : point.meter_id}</strong>
+                            <LiveStateBadge state={point.live_state} />
+                        </div>
+                        <span className="muted">{point.participant_name ?? t('live.points.zevOperated')}</span>
+                        {point.meter_power_w !== null && (
+                            <span>
+                                {formatKw(point.meter_power_w)}
+                                {point.age_s !== null && ` · ${t('live.points.seconds', { count: point.age_s })}`}
+                            </span>
+                        )}
+                    </li>
+                ))}
+            </ul>
         </section>
     )
 }

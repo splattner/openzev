@@ -74,6 +74,41 @@
   max-width: none;
 }
 
+/* The phone layout of the live points: one small card per point instead of five columns. */
+
+.live-points-list {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.live-points-list li {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.65rem 0;
+  border-top: 1px solid var(--border-default);
+}
+
+.live-points-list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .live-points-wide {
+    display: none;
+  }
+
+  .live-points-list {
+    display: block;
+  }
+}
+
 .participant-table th.numeric,
 .participant-table td.numeric {
   text-align: right;

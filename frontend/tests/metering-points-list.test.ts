@@ -425,10 +425,17 @@ describe('MeteringPointsList', () => {
     })
 
     it('marks a point with a live source with a quiet live chip, and nothing on one without', () => {
-        const view = render({ points: [point('m1', { live_state: 'stale' }), point('m2')], groups: null })
+        const view = render({ points: [point('m1', { live_state: 'fresh' }), point('m2')], groups: null })
         const chips = Array.from(view.querySelectorAll('.metering-point-id .badge')).map((node) => node.textContent)
-        expect(chips).toEqual(['supplementary.live.chip.stale'])
+        expect(chips).toEqual(['supplementary.live.chip.fresh'])
+        expect(view.querySelector('.metering-point-id .badge')?.classList.contains('badge-tag')).toBe(true)
         expect(view.querySelector('.metering-point-id button.badge')).toBeNull()
+    })
+
+    it('flags a live source that went quiet as an issue, not as a pill', () => {
+        const view = render({ points: [point('m1', { live_state: 'stale' })], groups: null })
+        expect(view.querySelector('.metering-point-id .issue-text--warning')?.textContent).toBe('supplementary.live.chip.stale')
+        expect(view.querySelector('.metering-point-id .badge')).toBeNull()
     })
 
     const menuLabels = async (view: HTMLElement) => {
