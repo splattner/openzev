@@ -876,11 +876,13 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   <time>". Its **Connect** opens `ForecastConnectDialog` instead of the shared connect flow (forecast.solar needs no
   credential or consent): what the forecast is, what leaves the instance (location rounded to a kilometre and the planes'
   size, tilt and direction), that a manager must have entered the planes and the building's location (the server's refusal
-  says what is missing and is shown in the dialog), and for a holder that a connected Solar Manager can provide its own
-  forecast instead. It creates `{provider: forecast_solar, provides_forecast: true, provides_history: false,
+  says what is missing and is shown in the dialog), and for a holder whose meter has a working Solar Manager connection (enabled, key stored, no forecast yet) a choice
+  between that connection (default; consent checkbox, `PATCH {provides_forecast: true, consent: true}` instead of a new source) and
+  forecast.solar. It creates `{provider: forecast_solar, provides_forecast: true, provides_history: false,
   provides_live: false, held_by, target: metering_point, consent: false}`. A holder's card hosts it directly; the
   manager's **Live data** dialog of a ZEV-operated point shows `Live` and `Forecast` rows (title "Live data and forecast of
-  <meter>") and opens it with `holder="zev"`. `SourceDialog` shows the forecast capability and its last update, **Refresh
+  <meter>") and opens it with `holder="zev"`. **My connections** shows a Forecast chip (with its own status only when the source has no history) and passes the meter's forecast
+  eligibility to the source dialog. `SourceDialog` shows the forecast capability and its last update, **Refresh
   forecast** (`sync`) and **Test** for a forecast.solar source, and for a Solar Manager source **Also use the Solar
   Manager forecast** (consent confirmation, `PATCH {provides_forecast: true, consent: true}`) and **Stop forecast**; stopping
   any capability is offered while another remains.

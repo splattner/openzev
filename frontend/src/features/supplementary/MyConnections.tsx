@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { historyEligible, liveEligible } from '../../lib/supplementary'
+import { forecastEligible, historyEligible, liveEligible } from '../../lib/supplementary'
 import type { EligibleMeteringPoint, SupplementarySource } from '../../types/api'
 import { LiveStateBadge } from './LiveStateBadge'
 import { SourceDialog, type ConfirmOptions } from './SourceDialog'
@@ -66,6 +66,13 @@ export function MyConnections({ sources, held, confirm }: Props) {
                                             {source.live_state ? <LiveStateBadge state={source.live_state} /> : null}
                                         </>
                                     )}
+                                    {source.provides_forecast && (
+                                        <>
+                                            <span className="badge badge-neutral">{t('supplementary.capability.forecast')}</span>
+                                            {/* One status per source: the history chip already carries it. */}
+                                            {!source.provides_history && <SourceStatusBadge status={source.enabled ? source.status : 'disabled'} />}
+                                        </>
+                                    )}
                                     <button
                                         type="button"
                                         className="button button-secondary button-compact"
@@ -85,7 +92,7 @@ export function MyConnections({ sources, held, confirm }: Props) {
                     subject={fedMeters(openSource).join(', ')}
                     source={openSource}
                     sources={sources}
-                    eligible={openPoint ? { history: historyEligible(openPoint), live: liveEligible(openPoint) } : undefined}
+                    eligible={openPoint ? { history: historyEligible(openPoint), live: liveEligible(openPoint), forecast: forecastEligible(openPoint) } : undefined}
                     confirm={confirm}
                     canManage
                     onClose={() => setOpenSourceId(null)}

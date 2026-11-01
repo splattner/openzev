@@ -4172,6 +4172,10 @@ export const fr = {
         },
         forecast: {
             connectTitle: 'Prévision de production pour {{meter}}',
+            source: 'Prévision de',
+            choiceSolarManager: 'Ma connexion Solar Manager (utilise la clé enregistrée)',
+            choiceForecastSolar: 'forecast.solar (gratuit, sans connexion)',
+            consentAgree: 'J\'accepte que ma prévision Solar Manager soit lue avec la clé enregistrée et affichée à la communauté comme prévision de production.',
             intro: 'La prévision vient de forecast.solar, un service public gratuit. Elle est calculée à partir des pans de toit de cette installation et de l\'emplacement de son bâtiment.',
             privacy: 'Seuls l\'emplacement arrondi à environ un kilomètre ainsi que la taille, l\'inclinaison et l\'orientation des pans de toit sont envoyés. Rien sur les personnes ni la consommation.',
             needsManager: 'Elle nécessite les pans de toit de cette installation (Pans de toit dans le menu du point de mesure) et l\'emplacement du bâtiment (paramètres du bâtiment).',

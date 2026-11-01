@@ -4172,6 +4172,10 @@ export const it = {
         },
         forecast: {
             connectTitle: 'Previsione di produzione per {{meter}}',
+            source: 'Previsione da',
+            choiceSolarManager: 'Il mio collegamento Solar Manager (usa la chiave memorizzata)',
+            choiceForecastSolar: 'forecast.solar (gratuito, senza accesso)',
+            consentAgree: 'Accetto che la previsione di Solar Manager venga letta con la chiave memorizzata e mostrata alla comunità come previsione di produzione.',
             intro: 'La previsione proviene da forecast.solar, un servizio pubblico gratuito. Viene calcolata dalle falde del tetto di questo impianto e dalla posizione del suo edificio.',
             privacy: 'Vengono inviati solo la posizione arrotondata a circa un chilometro e dimensione, inclinazione e orientamento delle falde. Nulla su persone o consumi.',
             needsManager: 'Servono le falde di questo impianto (Falde del tetto nel menu del punto di misura) e la posizione dell\'edificio (impostazioni dell\'edificio).',

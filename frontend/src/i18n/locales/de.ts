@@ -4172,6 +4172,10 @@ export const de = {
         },
         forecast: {
             connectTitle: 'Produktionsprognose für {{meter}}',
+            source: 'Prognose von',
+            choiceSolarManager: 'Meine Solar-Manager-Verbindung (nutzt den gespeicherten Schlüssel)',
+            choiceForecastSolar: 'forecast.solar (kostenlos, ohne Anmeldung)',
+            consentAgree: 'Ich bin einverstanden, dass meine Solar-Manager-Prognose mit dem gespeicherten Schlüssel gelesen und der Gemeinschaft als Produktionsprognose angezeigt wird.',
             intro: 'Die Prognose kommt von forecast.solar, einem kostenlosen öffentlichen Dienst. Sie wird aus den Dachflächen dieser Anlage und dem Standort ihres Gebäudes berechnet.',
             privacy: 'Gesendet werden nur der auf etwa einen Kilometer gerundete Standort sowie Grösse, Neigung und Ausrichtung der Dachflächen. Nichts über Personen oder Verbrauch.',
             needsManager: 'Dafür braucht es die Dachflächen dieser Anlage (Dachflächen im Menü des Messpunkts) und den Standort des Gebäudes (Gebäudeeinstellungen).',

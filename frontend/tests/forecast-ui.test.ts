@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProductionForecastChart, ProductionForecastSection } from '../src/features/live/ProductionForecastChart'
 import { PvPlanesDialog } from '../src/features/meteringPoints/PvPlanesDialog'
 import { ForecastConnectDialog } from '../src/features/supplementary/ForecastConnectDialog'
-import type { MeteringPoint, ProductionForecast, PvPlane } from '../src/types/api'
+import type { MeteringPoint, ProductionForecast, PvPlane, SupplementarySource } from '../src/types/api'
 import { renderWithProviders, setInputValue } from './helpers/render'
 import { waitForCondition } from './helpers/waitForCondition'
 
@@ -24,7 +24,7 @@ vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast }) }))
 
 const live = vi.hoisted(() => ({ fetchProductionForecastOrNull: vi.fn() }))
 vi.mock('../src/lib/api/live', async (importOriginal) => ({ ...(await importOriginal<typeof import('../src/lib/api/live')>()), ...live }))
-const supplementary = vi.hoisted(() => ({ createSupplementarySource: vi.fn() }))
+const supplementary = vi.hoisted(() => ({ createSupplementarySource: vi.fn(), updateSupplementarySource: vi.fn() }))
 vi.mock('../src/lib/api/supplementary', async (importOriginal) => ({ ...(await importOriginal<typeof import('../src/lib/api/supplementary')>()), ...supplementary }))
 const zev = vi.hoisted(() => ({ fetchPvPlanes: vi.fn(), createPvPlane: vi.fn(), updatePvPlane: vi.fn(), deletePvPlane: vi.fn() }))
 vi.mock('../src/lib/api/zev', async (importOriginal) => ({ ...(await importOriginal<typeof import('../src/lib/api/zev')>()), ...zev }))
@@ -122,6 +122,50 @@ describe('ForecastConnectDialog', () => {
         await act(async () => { buttonWith(dialog()!, 'supplementary.forecast.connect')!.click() })
         await waitForCondition(() => dialog()!.textContent?.includes('Add the roof planes of this plant first.') === true, 'the server message')
         expect(onClose).not.toHaveBeenCalled()
+    })
+})
+
+describe('ForecastConnectDialog with a Solar Manager connection', () => {
+    const point = { metering_point: 'mp-1', meter_id: 'CH-100', zev: 'zev-1' }
+    const solarManager = (overrides: Partial<SupplementarySource> = {}) =>
+        ({
+            id: 'sm-1', metering_point: 'mp-1', provider: 'solar_manager', held_by: 'participant', enabled: true, has_credential: true,
+            status: 'ok', provides_forecast: false, ...overrides,
+        }) as SupplementarySource
+    const open = (sources: SupplementarySource[]) =>
+        renderWithProviders(createElement(ForecastConnectDialog, { holder: 'participant', point, sources, onClose: vi.fn() }), cleanups)
+    const radios = () => Array.from(dialog()!.querySelectorAll<HTMLInputElement>('input[type="radio"]'))
+
+    it('offers the existing connection first and switches its forecast on with consent, without a new source', async () => {
+        supplementary.updateSupplementarySource.mockResolvedValue({})
+        await open([solarManager()])
+        expect(radios()).toHaveLength(2)
+        expect(radios()[0].checked).toBe(true)
+        const connect = buttonWith(dialog()!, 'supplementary.forecast.connect')!
+        expect(connect.disabled).toBe(true)
+        await act(async () => { dialog()!.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click() })
+        await act(async () => { connect.click() })
+
+        expect(supplementary.updateSupplementarySource).toHaveBeenCalledWith('sm-1', { provides_forecast: true, consent: true })
+        expect(supplementary.createSupplementarySource).not.toHaveBeenCalled()
+    })
+
+    it('still lets the holder pick forecast.solar instead', async () => {
+        supplementary.createSupplementarySource.mockResolvedValue({})
+        await open([solarManager()])
+        await act(async () => { radios()[1].click() })
+        expect(dialog()!.querySelector('input[type="checkbox"]')).toBeNull()
+        await act(async () => { buttonWith(dialog()!, 'supplementary.forecast.connect')!.click() })
+        expect(supplementary.createSupplementarySource).toHaveBeenCalledOnce()
+        expect(supplementary.updateSupplementarySource).not.toHaveBeenCalled()
+    })
+
+    it('offers nothing extra when the connection cannot read a forecast', async () => {
+        for (const broken of [{ enabled: false }, { has_credential: false }, { status: 'reconnect_required' as const }, { provides_forecast: true }, { provider: 'push' as const }]) {
+            await open([solarManager(broken)])
+            expect(radios(), JSON.stringify(broken)).toHaveLength(0)
+            cleanups.splice(0).forEach((cleanup) => cleanup())
+        }
     })
 })
 

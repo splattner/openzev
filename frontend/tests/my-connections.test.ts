@@ -15,12 +15,12 @@ vi.mock('../src/lib/appSettings', async (importOriginal) => {
 })
 // The dialog has its own tests; here only that it opens for the right source.
 vi.mock('../src/features/supplementary/SourceDialog', () => ({
-    SourceDialog: ({ source, subject }: { source: SupplementarySource; subject: string }) =>
-        createElement('div', { 'data-testid': 'dialog' }, `${source.id}:${subject}`),
+    SourceDialog: ({ source, subject, eligible }: { source: SupplementarySource; subject: string; eligible?: Record<string, boolean> }) =>
+        createElement('div', { 'data-testid': 'dialog', 'data-eligible': JSON.stringify(eligible) }, `${source.id}:${subject}`),
 }))
 
 const held: EligibleMeteringPoint[] = [
-    { metering_point: 'mp-1', meter_id: 'CH-100', zev: 'zev-1', zev_name: 'Sonnenhof', participant: 'p-1', source: null, eligible_capabilities: ['history', 'live'] },
+    { metering_point: 'mp-1', meter_id: 'CH-100', zev: 'zev-1', zev_name: 'Sonnenhof', participant: 'p-1', source: null, eligible_capabilities: ['history', 'live', 'forecast'] },
 ]
 
 const source = (overrides: Partial<SupplementarySource> = {}): SupplementarySource => ({
@@ -83,6 +83,27 @@ describe('MyConnections', () => {
         })
 
         expect(container.querySelector('[data-testid="dialog"]')!.textContent).toBe('src-1:CH-100')
+    })
+
+    it('passes what the meter can still offer, forecast included, to the source dialog', async () => {
+        const { container } = await mount([source({ provider: 'solar_manager' })])
+        await act(async () => {
+            container.querySelector<HTMLButtonElement>('li[data-source] button')!.click()
+        })
+        expect(JSON.parse(container.querySelector('[data-testid="dialog"]')!.getAttribute('data-eligible')!)).toEqual({
+            history: true, live: true, forecast: true,
+        })
+    })
+
+    it('shows a forecast chip, with its own status only when the source has no history', async () => {
+        const both = await mount([source({ provides_forecast: true })])
+        const row = both.container.querySelector('li[data-source]')!
+        expect(row.textContent).toContain('supplementary.capability.forecast')
+        expect(row.querySelectorAll('.badge')).toHaveLength(5)
+        cleanups.splice(0).forEach((cleanup) => cleanup())
+
+        const only = await mount([source({ provides_history: false, provides_live: false, live_state: null, provides_forecast: true, provider: 'forecast_solar' })])
+        expect(only.container.querySelector('li[data-source]')!.querySelectorAll('.badge')).toHaveLength(2)
     })
 
     it('explains where connections appear while there are none', async () => {

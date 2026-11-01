@@ -4183,6 +4183,10 @@ export const en = {
         },
         forecast: {
             connectTitle: 'Production forecast for {{meter}}',
+            source: 'Forecast from',
+            choiceSolarManager: 'My Solar Manager connection (uses the stored key)',
+            choiceForecastSolar: 'forecast.solar (free, no sign-in)',
+            consentAgree: 'I agree that my Solar Manager forecast is read with the stored key and shown to the community as production forecast.',
             intro: 'The forecast comes from forecast.solar, a free public service. It is calculated from the roof planes of this plant and the location of its building.',
             privacy: 'Only the location rounded to about one kilometre and the size, tilt and direction of the roof planes are sent. Nothing about people or consumption.',
             needsManager: 'It needs the roof planes of this plant (Roof planes in the metering point menu) and the location of the building (building settings).',

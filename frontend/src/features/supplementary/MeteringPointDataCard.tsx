@@ -119,7 +119,7 @@ export function MeteringPointDataCard({ point, sources, sourcesUnavailable, onRe
                     onClose={() => setConnecting(null)}
                 />
             )}
-            {connectingForecast && <ForecastConnectDialog holder="participant" point={point} onClose={() => setConnectingForecast(false)} />}
+            {connectingForecast && <ForecastConnectDialog holder="participant" point={point} sources={sources} onClose={() => setConnectingForecast(false)} />}
             {openSource && (
                 <SourceDialog
                     subject={point.meter_id}
