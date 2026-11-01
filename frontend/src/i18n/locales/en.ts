@@ -790,6 +790,7 @@ export const en = {
         myMeteringPoints: {
             title: 'My metering points',
             description: 'The metering points assigned to you.',
+            descriptionEnergy: 'The metering points assigned to you. Energy data is only shown and used for statistics, never for billing.',
             loadFailed: 'Failed to load your metering points.',
             empty: {
                 title: 'No metering points',
@@ -2483,7 +2484,6 @@ export const en = {
                 addMeteringPoint: 'Add metering point',
                 emptyGroup: 'No metering points in this building yet.',
             },
-            active: 'Active',
             inactive: 'Inactive',
             moreActions: 'More',
             openEnded: 'Open-ended',
@@ -4022,11 +4022,9 @@ export const en = {
         },
         source: {
             title: 'Source of {{subject}}',
-            provider: 'Provider',
-            provides: 'Provides',
-            status: 'Status',
-            endpoints: 'Where to send the data',
-            endTitle: 'End the connection',
+            moreActions: 'More actions',
+            technical: 'Technical details',
+            menu: { connection: 'Connection', data: 'Data', end: 'End' },
             alsoHistory: 'Also provide history with this source',
             stopHistory: 'Stop history data',
             historyOn: 'History is on. Send readings with the same token to the history address.',
@@ -4038,7 +4036,6 @@ export const en = {
             },
         },
         section: {
-            description: 'Connect the system behind your meter (for example Solar Manager) so your statistics can show your real production, consumption and self-sufficiency. This data is only used for statistics and never for billing.',
             loadError: 'The energy data sources could not be loaded.',
             eligibilityError: 'Could not check whether energy data is available.',
         },
@@ -4225,7 +4222,6 @@ export const en = {
             },
         },
         live: {
-            description: 'Live data shows what a meter draws or feeds in right now. It is only shown and never used for billing.',
             zevNotConnected: 'No live data is connected to this ZEV-operated metering point yet.',
             alsoSend: 'Also send live data with this source',
             alsoSendDone: 'Live data is on. Send values with the same token to the live address.',
@@ -4233,9 +4229,7 @@ export const en = {
             stopped: 'Live data was switched off.',
             revoke: 'Revoke token',
             revoked: 'The push token was revoked.',
-            state: 'Live state',
             lastValue: 'Last value',
-            name: 'Name',
             dialogTitle: 'Live data of {{meter}}',
             dialogTitleWithForecast: 'Live data and forecast of {{meter}}',
             chip: {

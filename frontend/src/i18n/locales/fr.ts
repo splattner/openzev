@@ -781,6 +781,7 @@ export const fr = {
         myMeteringPoints: {
             title: 'Mes points de mesure',
             description: 'Les points de mesure qui vous sont attribués.',
+            descriptionEnergy: 'Les points de mesure qui vous sont attribués. Les données énergétiques servent uniquement à l\'affichage et aux statistiques, jamais à la facturation.',
             loadFailed: 'Impossible de charger vos points de mesure.',
             empty: {
                 title: 'Aucun point de mesure',
@@ -2472,7 +2473,6 @@ export const fr = {
                 addMeteringPoint: 'Ajouter un point de mesure',
                 emptyGroup: 'Pas encore de point de mesure dans ce bâtiment.',
             },
-            active: 'Actif',
             inactive: 'Inactif',
             moreActions: 'Plus',
             openEnded: 'Ouverte',
@@ -4011,11 +4011,9 @@ export const fr = {
         },
         source: {
             title: 'Source de {{subject}}',
-            provider: 'Fournisseur',
-            provides: 'Fournit',
-            status: 'État',
-            endpoints: 'Où envoyer les données',
-            endTitle: 'Mettre fin à la connexion',
+            moreActions: 'Plus d\'actions',
+            technical: 'Détails techniques',
+            menu: { connection: 'Connexion', data: 'Données', end: 'Terminer' },
             alsoHistory: 'Fournir aussi l\'historique avec cette source',
             stopHistory: 'Arrêter les données d\'historique',
             historyOn: 'L\'historique est activé. Envoyez les relevés avec le même jeton à l\'adresse de l\'historique.',
@@ -4027,7 +4025,6 @@ export const fr = {
             },
         },
         section: {
-            description: 'Connectez le système derrière votre compteur (p. ex. Solar Manager) pour que vos statistiques montrent votre production, votre consommation et votre autarcie réelles. Ces données ne servent qu\'aux statistiques et jamais à la facturation.',
             loadError: 'Les sources de données énergétiques n\'ont pas pu être chargées.',
             eligibilityError: 'Impossible de vérifier si les données énergétiques sont disponibles.',
         },
@@ -4214,7 +4211,6 @@ export const fr = {
             },
         },
         live: {
-            description: 'Les données en direct montrent ce qu\'un compteur soutire ou injecte à l\'instant. Elles sont seulement affichées et jamais utilisées pour la facturation.',
             zevNotConnected: 'Aucune donnée en direct n\'est encore connectée à ce point de mesure exploité par le ZEV.',
             alsoSend: 'Envoyer aussi des données en direct avec cette source',
             alsoSendDone: 'Les données en direct sont activées. Envoyez les valeurs avec le même jeton à l\'adresse en direct.',
@@ -4222,9 +4218,7 @@ export const fr = {
             stopped: 'Les données en direct ont été désactivées.',
             revoke: 'Révoquer le jeton',
             revoked: 'Le jeton push a été révoqué.',
-            state: 'État en direct',
             lastValue: 'Dernière valeur',
-            name: 'Nom',
             dialogTitle: 'Données en direct de {{meter}}',
             dialogTitleWithForecast: 'Données en direct et prévision de {{meter}}',
             chip: {

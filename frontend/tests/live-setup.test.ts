@@ -8,6 +8,13 @@ import type { MeteringPoint, SupplementarySource } from '../src/types/api'
 import { renderWithProviders, setInputValue } from './helpers/render'
 import { waitForCondition } from './helpers/waitForCondition'
 
+// The "more actions" menu opens a popup; here its items are laid out where they can be found. The real menu has its own test.
+vi.mock('../src/components/ActionMenu', () => ({
+    ActionMenu: ({ items, label }: { items: Array<{ key: string; label: string; disabled?: boolean; danger?: boolean; onClick: () => void }>; label: string }) =>
+        createElement('div', { role: 'group', 'aria-label': label },
+            ...items.map((entry) => createElement('button', { key: entry.key, type: 'button', disabled: entry.disabled, 'data-danger': entry.danger ? 'true' : undefined, onClick: entry.onClick }, entry.label))),
+}))
+
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({ t: (key: string, options?: Record<string, unknown>) => (options ? `${key}${JSON.stringify(options)}` : key) }),
 }))
@@ -358,7 +365,7 @@ describe('PointLiveDialog', () => {
         expect(dialog()!.textContent).not.toContain('supplementary.consent.zevHeld')
         const rows = dialog()!.querySelectorAll('li')
         expect(Array.from(rows).map((li) => li.dataset.capability)).toEqual(['live'])
-        expect(rows[0].textContent).toContain('live.state.fresh')
+        expect(rows[0].querySelector('.issue-text')).toBeNull()
     })
 
     it('shows the source\'s details and actions from its row, in the same dialog, and goes back', async () => {

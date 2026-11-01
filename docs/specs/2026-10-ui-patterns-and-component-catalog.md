@@ -438,15 +438,18 @@ padding, one-off font sizes); those stay until a class earns its place.
 A pane or dialog whose body is the status of one connection or record, followed by
 what its owner can do to it (an energy source is the example), has this shape:
 
-- Status and facts first, as a list of label and value; a problem as `IssueText`
-  or a banner, never a row of state pills.
-- **Everyday actions** in one row of `button-secondary button-compact`: the ones that
-  keep it working (test, sync, replace a key, add or stop a capability). Choices
-  that depend on the state are absent, not disabled, and a disabled one says why.
-- **Ending it** (disconnect, delete data, remove) in its own closed `Disclosure`
-  named for the end ("End the connection"), open once the record is already
-  switched off. The destructive ones are `button-danger`, always confirm through
-  `ConfirmDialog`, and never share a row with the everyday actions.
+- A header that names the record and one facts line (the tariff pane's shape), then
+  status and facts as short blocks, one per thing it provides; a problem as
+  `IssueText` or a banner, never a row of state pills, and nothing at all for what
+  works. Technical details (ids, token prefixes, endpoints) are secondary material:
+  one closed `Disclosure`.
+- **Actions:** at most one visible button, the one that keeps it working right now
+  (sync, or reconnect when it no longer works), and an `ActionMenu` ("⋯") with
+  everything else in sections (connection, data, end). Ending it (disconnect,
+  delete data, remove) is the last section, the destructive items marked `danger`;
+  every one of them confirms through `ConfirmDialog`. A foldable is for reading,
+  never a place for buttons. A choice that depends on the state is absent from the
+  menu, not disabled; while impersonating the menu says why it is disabled.
 - No footer of Cancel and Save: nothing here is a form. A sub-form (a new key) is an
   inline section with its own Save then Cancel, and counts as a draft for the
   dirty guard.

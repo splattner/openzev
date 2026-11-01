@@ -10,6 +10,13 @@ import type { EligibleMeteringPoint, SupplementarySource } from '../src/types/ap
 import { renderWithProviders, setInputValue } from './helpers/render'
 import { waitForCondition } from './helpers/waitForCondition'
 
+// The "more actions" menu opens a popup; here its items are laid out where they can be found. The real menu has its own test.
+vi.mock('../src/components/ActionMenu', () => ({
+    ActionMenu: ({ items, label }: { items: Array<{ key: string; label: string; disabled?: boolean; danger?: boolean; onClick: () => void }>; label: string }) =>
+        createElement('div', { role: 'group', 'aria-label': label },
+            ...items.map((entry) => createElement('button', { key: entry.key, type: 'button', disabled: entry.disabled, 'data-danger': entry.danger ? 'true' : undefined, onClick: entry.onClick }, entry.label))),
+}))
+
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({ t: (key: string, options?: Record<string, unknown>) => (options ? `${key}${JSON.stringify(options)}` : key) }),
 }))
@@ -133,11 +140,12 @@ describe('one card per metering point', () => {
         expect(container.querySelectorAll('article')).toHaveLength(1)
         expect(container.querySelectorAll('h3')).toHaveLength(1)
         expect(container.textContent).toContain('CH-100')
-        expect(container.textContent).toContain('Sonnenhof')
+        // The community is the page's eyebrow, not each card's line; a working source carries no status pill.
+        expect(container.textContent).not.toContain('Sonnenhof')
         expect(row(container, 'history').textContent).toContain('supplementary.provider.solar_manager')
-        expect(row(container, 'history').textContent).toContain('supplementary.status.ok')
         expect(row(container, 'live').textContent).toContain('supplementary.provider.push')
-        expect(row(container, 'live').textContent).toContain('live.state.fresh')
+        expect(container.querySelector('.badge')).toBeNull()
+        expect(container.querySelector('.issue-text')).toBeNull()
         // Everything is connected: nothing left to connect.
         expect(buttons(container).some((b) => b.textContent === 'supplementary.card.connect')).toBe(false)
     })
@@ -182,7 +190,7 @@ describe('one card per metering point', () => {
         const historyButton = row(container, 'history').querySelector('button')!
         const liveButton = row(container, 'live').querySelector('button')!
         expect(historyButton.textContent).toBe(liveButton.textContent)
-        expect(row(container, 'history').textContent).toContain('supplementary.status.ok')
+        expect(row(container, 'history').textContent).not.toContain('supplementary.status.ok')
         expect(row(container, 'live').textContent).toContain('live.state.stale')
 
         await click(historyButton)
@@ -359,7 +367,7 @@ describe('connect flow', () => {
 
         await act(async () => { submit().click() })
         await waitForCondition(() => document.querySelector('[data-testid="push-token"]') !== null, 'the token')
-        await waitForCondition(() => container.textContent?.includes('supplementary.status.ok') ?? false, 'the connected card')
+        await waitForCondition(() => container.querySelector('li[data-capability="history"] [data-source-open]') !== null, 'the connected card')
 
         expect(document.querySelector('[data-testid="push-token"]')?.textContent).toBe('ozs_abcd_secret')
         await click(buttonWith(dialog()!, 'supplementary.push.dismiss'))
@@ -472,7 +480,8 @@ describe('source dialog', () => {
 
         const text = modal.textContent ?? ''
         expect(text).toContain('supplementary.provider.solar_manager')
-        expect(text).toContain('supplementary.status.ok')
+        // A working source says nothing about being well; the id is among the technical details.
+        expect(text).not.toContain('supplementary.status.ok')
         expect(text).toContain('ABC123')
         expect(text).toContain('supplementary.card.coveredRange')
         expect(text).toContain('supplementary.reconciliation.state.ok')
@@ -495,7 +504,8 @@ describe('source dialog', () => {
 
         expect(modal.textContent).toContain('supplementary.reconnect.title')
         expect(buttonWith(modal, 'supplementary.actions.reconnect')).toBeDefined()
-        expect(buttonWith(modal, 'supplementary.actions.sync').disabled).toBe(true)
+        // A key the vendor refused cannot sync: the one visible action is to reconnect.
+        expect(buttonWith(modal, 'supplementary.actions.sync')).toBeUndefined()
     })
 
     it('shows a disconnected source as such and only offers to reconnect or clean up', async () => {
@@ -527,7 +537,7 @@ describe('source dialog', () => {
         const { container } = await mount([liveOnly()])
         const modal = await openSource(container, 'live')
 
-        expect(modal.textContent).toContain('live.state.fresh')
+        expect(modal.querySelector('.issue-text')).toBeNull()
         expect(modal.querySelector('[data-testid="live-endpoint"]')).not.toBeNull()
         expect(modal.textContent).not.toContain('supplementary.push.columns')
         for (const action of ['supplementary.actions.rotate', 'supplementary.live.revoke', 'supplementary.actions.disconnect', 'supplementary.actions.remove']) {
@@ -579,19 +589,21 @@ describe('source dialog', () => {
         expect(api.updateSupplementarySource).toHaveBeenCalledWith('src-1', { api_key: 'fresh-key', external_id: 'ABC123', enabled: true })
     })
 
-    it('keeps the ways to end a connection in their own section, away from the everyday actions', async () => {
+    it('puts the everyday action in view and everything else in the menu, destructive ones last and marked', async () => {
         const { container } = await mount([source()])
         const modal = await openSource(container)
 
-        const end = modal.querySelector<HTMLDetailsElement>('details.disclosure')!
-        expect(end.querySelector('summary')!.textContent).toBe('supplementary.source.endTitle')
-        // Closed while the source works; its buttons are the three that stop or erase it.
-        expect(end.open).toBe(false)
-        expect(Array.from(end.querySelectorAll('button')).map((b) => b.textContent)).toEqual([
-            'supplementary.actions.disconnect', 'supplementary.actions.deleteData', 'supplementary.actions.remove',
+        // One visible button beside the menu; no foldable of buttons.
+        const visible = buttons(modal).filter((b) => !modal.querySelector('[role="group"]')!.contains(b) && !b.closest('details') && b.textContent !== '✕')
+        expect(visible.map((b) => b.textContent)).toEqual(['supplementary.actions.sync'])
+        const menu = Array.from(modal.querySelectorAll<HTMLButtonElement>('[role="group"] button'))
+        expect(menu.map((b) => b.textContent)).toEqual([
+            'supplementary.actions.test', 'supplementary.actions.replaceKey', 'supplementary.actions.disconnect',
+            'supplementary.live.alsoSend',
+            'supplementary.actions.deleteData', 'supplementary.actions.remove',
         ])
-        expect(modal.querySelectorAll('.button-danger')).toHaveLength(2)
-        expect(Array.from(modal.querySelectorAll('.button-danger')).every((b) => end.contains(b))).toBe(true)
+        expect(menu.filter((b) => b.dataset.danger === 'true').map((b) => b.textContent)).toEqual(['supplementary.actions.deleteData', 'supplementary.actions.remove'])
+        expect(modal.querySelector('.button-danger')).toBeNull()
     })
 
     it('asks before disconnecting, and keeps the data', async () => {
@@ -762,7 +774,6 @@ describe('a live-only Solar Manager source', () => {
         const { container } = await mount([solarLive()])
 
         expect(row(container, 'live').textContent).toContain('supplementary.provider.solar_manager')
-        expect(row(container, 'live').textContent).toContain('live.state.fresh')
         expect(row(container, 'history').textContent).toContain('supplementary.card.notConnected')
     })
 
@@ -776,7 +787,6 @@ describe('a live-only Solar Manager source', () => {
         for (const action of ['sync', 'rotate', 'importCsv', 'deleteData']) {
             expect(buttons(modal).some((b) => b.textContent?.includes(`supplementary.actions.${action}`)), action).toBe(false)
         }
-        expect(modal.textContent).toContain('supplementary.source.status')
         expect(modal.textContent).toContain('ABC123')
         expect(modal.querySelector('[data-testid="live-endpoint"]')).toBeNull()
         expect(modal.querySelector('input[type="password"]')).toBeNull()

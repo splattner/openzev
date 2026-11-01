@@ -781,6 +781,7 @@ export const it = {
         myMeteringPoints: {
             title: 'I miei punti di misura',
             description: 'I punti di misura che le sono assegnati.',
+            descriptionEnergy: 'I punti di misura che le sono assegnati. I dati energetici servono solo per la visualizzazione e le statistiche, mai per la fatturazione.',
             loadFailed: 'Impossibile caricare i suoi punti di misura.',
             empty: {
                 title: 'Nessun punto di misura',
@@ -2472,7 +2473,6 @@ export const it = {
                 addMeteringPoint: 'Aggiungi punto di misura',
                 emptyGroup: 'Ancora nessun punto di misura in questo edificio.',
             },
-            active: 'Attivo',
             inactive: 'Inattivo',
             moreActions: 'Altro',
             openEnded: 'Senza fine',
@@ -4011,11 +4011,9 @@ export const it = {
         },
         source: {
             title: 'Fonte di {{subject}}',
-            provider: 'Fornitore',
-            provides: 'Fornisce',
-            status: 'Stato',
-            endpoints: 'Dove inviare i dati',
-            endTitle: 'Termina la connessione',
+            moreActions: 'Altre azioni',
+            technical: 'Dettagli tecnici',
+            menu: { connection: 'Connessione', data: 'Dati', end: 'Termina' },
             alsoHistory: 'Fornisci anche lo storico con questa fonte',
             stopHistory: 'Interrompi i dati storici',
             historyOn: 'Lo storico è attivo. Invia le letture con lo stesso token all\'indirizzo dello storico.',
@@ -4027,7 +4025,6 @@ export const it = {
             },
         },
         section: {
-            description: 'Collegate il sistema dietro il vostro contatore (ad es. Solar Manager) affinché le vostre statistiche mostrino produzione, consumo e autarchia reali. Questi dati servono solo alle statistiche e mai alla fatturazione.',
             loadError: 'Impossibile caricare le fonti di dati energetici.',
             eligibilityError: 'Impossibile verificare se i dati energetici sono disponibili.',
         },
@@ -4214,7 +4211,6 @@ export const it = {
             },
         },
         live: {
-            description: 'I dati in tempo reale mostrano cosa un contatore sta prelevando o immettendo in questo momento. Vengono solo mostrati e mai usati per la fatturazione.',
             zevNotConnected: 'A questo punto di misura gestito dallo ZEV non sono ancora collegati dati in tempo reale.',
             alsoSend: 'Invia dati in tempo reale anche con questa fonte',
             alsoSendDone: 'I dati in tempo reale sono attivi. Invia i valori con lo stesso token all\'indirizzo in tempo reale.',
@@ -4222,9 +4218,7 @@ export const it = {
             stopped: 'I dati in tempo reale sono stati disattivati.',
             revoke: 'Revoca token',
             revoked: 'Il token push è stato revocato.',
-            state: 'Stato in tempo reale',
             lastValue: 'Ultimo valore',
-            name: 'Nome',
             dialogTitle: 'Dati in tempo reale di {{meter}}',
             dialogTitleWithForecast: 'Dati in tempo reale e previsione di {{meter}}',
             chip: {

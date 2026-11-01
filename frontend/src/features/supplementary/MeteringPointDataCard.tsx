@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BehindMeterBadge } from '../../components/BehindMeterBadge'
 import { useAuth } from '../../lib/auth'
 import { forecastEligible, historyEligible, liveEligible, sourceFor } from '../../lib/supplementary'
 import type { EligibleMeteringPoint, SupplementarySource } from '../../types/api'
@@ -11,6 +10,8 @@ import { SupplementarySourceModal, type ConnectCapability } from './Supplementar
 
 interface Props {
     point: EligibleMeteringPoint
+    /** What the meter is (its location or name), under the meter id. */
+    description?: string
     /** The signed-in user's visible sources; `undefined` while they load or after they failed. */
     sources: SupplementarySource[] | undefined
     /** The source list is still loading or failed: a source the point is known to have cannot be shown yet. */
@@ -31,7 +32,7 @@ interface Props {
  * source is in its pane, which the page owns. The figures are only shown (live) or used for statistics (history), never
  * for billing.
  */
-export function MeteringPointDataCard({ point, sources, sourcesUnavailable, onRetrySources, onOpenSource, selectedSourceId, onConnected }: Props) {
+export function MeteringPointDataCard({ point, description, sources, sourcesUnavailable, onRetrySources, onOpenSource, selectedSourceId, onConnected }: Props) {
     const { t } = useTranslation()
     const { isImpersonating } = useAuth()
     const [connecting, setConnecting] = useState<ConnectCapability[] | null>(null)
@@ -53,15 +54,13 @@ export function MeteringPointDataCard({ point, sources, sourcesUnavailable, onRe
     return (
         <>
             <article className="card" style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'minmax(0, 1fr)' }} aria-label={point.meter_id} data-selected={selected || undefined}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-                    <div>
-                        <h3 style={{ margin: 0, overflowWrap: 'anywhere' }}>{point.meter_id}</h3>
-                        <small className="muted">{point.zev_name}</small>
+                <header className="card-header-row">
+                    <div className="card-title-block">
+                        <h3>{point.meter_id}</h3>
+                        {/* A classification is quiet text, not a pill (UI patterns §10.1). */}
+                        <small className="muted">{[description, eligible.history ? t('behindMeter.badge') : null].filter(Boolean).join(' · ')}</small>
                     </div>
-                    <div className="actions-row actions-row-wrap">
-                        {eligible.history && <BehindMeterBadge />}
-                        <MeteringDataLink meteringPointId={point.metering_point} />
-                    </div>
+                    <MeteringDataLink meteringPointId={point.metering_point} />
                 </header>
 
                 {reconnectSource && (

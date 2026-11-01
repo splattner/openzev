@@ -628,8 +628,9 @@ community's, so there the page shows only the meters the user holds with generat
   return to the cards, focus returns to the control, a typed and unsaved key is guarded); see SPEC-2026-live-energy-data §7.2. Status, last sync,
   covered range, reconciliation state, and actions **Test**, **Sync now**, **Replace key** (Solar
   Manager), **New push token**, **Revoke token**, **Import CSV** (push), **Disconnect** (keeps data),
-  **Delete data**, **Remove source** (these three in an "End the connection" disclosure); the push endpoints in a
-  disclosure. Confirmations are the only thing opened over it, and a rotated token stays on screen across refetches.
+  **Delete data**, **Remove source** (one visible action, **Sync now** or **Reconnect**, and the rest in a "⋯" menu with
+  the last section, in red, for ending it); the push endpoints, the Solar Manager id and the token facts in a closed
+  "Technical details" disclosure. Confirmations are the only thing opened over it, and a rotated token stays on screen across refetches.
 - **Connect flow** (`SupplementarySourceModal`): what (history, live; skipped when only one is open),
   how (Solar Manager for history only, a new push source, or the meter's existing push source, which
   takes the missing capability with a `PATCH` and consent and no new token), consent for what was chosen,
@@ -640,7 +641,7 @@ community's, so there the page shows only the meters the user holds with generat
   provides, a problem only when there is one, and **Open** for the source pane); shown from two sources on. UI only: a source
   still feeds exactly one metering point (`SupplementarySource.metering_point`); account-level
   connections are a future idea (SPEC-2026-live-energy-data §12). Details: that spec §7.2.
-- Any other meter: a plain card (meter id, location, active, type, the behind-the-meter badge). A
+- Any other meter: a plain card (meter id and one muted line: location, type, "surplus metering" and "inactive" as plain text, no pills). A
   flagged one the user does not hold personally says only the holder can connect energy data.
 - Every card, plain or energy data, has a **View metering data** button (`MeteringDataLink`) to
   `/metering/chart?metering_point=<id>`: the chart page was already open to participants and the

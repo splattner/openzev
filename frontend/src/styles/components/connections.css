@@ -44,3 +44,116 @@
 .card[data-selected='true'] {
   border-color: var(--interactive);
 }
+
+/* ── A metering point's capabilities, one row each ───────────────────────── */
+
+.capability-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.capability-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1rem;
+}
+
+.capability-label {
+  flex: 0 0 8rem;
+}
+
+.capability-body {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.capability-note {
+  flex-basis: 100%;
+}
+
+/* The source reads as a link to its details, not as a chip. */
+.capability-source {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--interactive);
+  font-weight: 600;
+}
+
+/* A card's header: what the meter is, and the way to its readings. */
+.card-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.card-title-block {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.card-title-block h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ── One source: its actions, a block per capability, the technical details ─ */
+
+.source-details {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.source-section {
+  display: grid;
+  gap: 0.375rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.source-section h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.source-facts {
+  display: grid;
+  grid-template-columns: 10rem minmax(0, 1fr);
+  gap: 0.25rem 1rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.source-facts dd {
+  margin: 0;
+}
+
+/* On a phone the label sits above its value instead of squeezing it. */
+@media (max-width: 40em) {
+  .source-facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .source-facts dd {
+    margin-bottom: 0.5rem;
+  }
+}
+
+.source-technical {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.source-reconciliation {
+  display: grid;
+  gap: 0.25rem;
+}

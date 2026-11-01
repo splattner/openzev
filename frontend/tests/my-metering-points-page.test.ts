@@ -118,10 +118,14 @@ describe('MyMeteringPointsPage', () => {
         expect(container.textContent).toContain('pages.myMeteringPoints.flagHint')
     })
 
-    it('describes the energy data of a meter with a history', async () => {
-        const { container } = await mount()
+    it('says in the page description, once, that energy data is never used for billing, and only while the feature is on', async () => {
+        const on = await mount()
+        expect(on.container.textContent).toContain('pages.myMeteringPoints.descriptionEnergy')
 
-        expect(container.textContent).toContain('supplementary.section.description')
+        api.fetchEligibleOrNull.mockResolvedValue(null)
+        const off = await mount()
+        expect(off.container.textContent).not.toContain('pages.myMeteringPoints.descriptionEnergy')
+        expect(off.container.textContent).toMatch(/pages\.myMeteringPoints\.description(?!Energy)/)
     })
 
     it('stops telling the participant to ask for a flag once an own system is flagged or connected', async () => {
@@ -271,20 +275,11 @@ describe('MyMeteringPointsPage with the live flag on', () => {
         expect(container.querySelector('article[aria-label="CH-2"]')).not.toBeNull()
     })
 
-    it('explains history only when some point can have it', async () => {
-        api.fetchEligibleOrNull.mockResolvedValue([withCapabilities('2', ['live'])])
-        const { container } = await mount()
-
-        expect(container.textContent).not.toContain('supplementary.section.description')
-        expect(container.textContent).toContain('supplementary.live.description')
-    })
-
     it('shows only the history card while the live flag is off', async () => {
         api.fetchEligibleOrNull.mockResolvedValue([eligible('1')])
         const { container } = await mount()
 
         expect(container.querySelectorAll('[data-testid="energy-data"]')).toHaveLength(1)
-        expect(container.textContent).not.toContain('supplementary.live.description')
     })
 })
 

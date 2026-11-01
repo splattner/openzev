@@ -833,13 +833,16 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   connected.
 
 - **One card per held metering point** (`MeteringPointDataCard`, replacing the history card, the live
-  section and the source card of the first PR 3b cut): header with meter id, community, the
-  behind-the-meter badge (when `historyEligible`) and **View metering data**; below it `CapabilityRows`,
+  section and the source card of the first PR 3b cut): header with the meter id, one muted line (what the meter is, from the participant's own metering point list, and
+  "Surplus metering" as plain text when `historyEligible`: a classification is text, not a pill, UI patterns §10.1; the
+  community is the page's eyebrow, not repeated) and a ghost **View metering data**; below it `CapabilityRows`,
   one row per capability the point is eligible for (`historyEligible` / `liveEligible`; an entry without
   `eligible_capabilities` is history only; a **Forecast** row for a producing point): **History (15 min)** and **Live
-  (now)**. A row shows the source that provides the capability as a button (`provider · label`) that
-  opens the source in the page's pane, with its status (history: `SourceStatusBadge` and "up to <synced through>";
-  live: `LiveStateBadge` and "last value <time>"); a push source providing both is in both rows and
+  (now)**. A row is the capability, the source that provides it as a `button-ghost` link (`provider · label`) that
+  opens the source in the page's pane, a problem as text only when there is one (`capabilityProblem` through
+  `CapabilityProblemText`: a stale live source or a source in error as `IssueText`, switched off or "no data" muted;
+  a source that works carries no pill and no "OK") and a muted freshness line (history "up to <synced through>", live
+  "last value <time>", forecast "updated <time>"); a push source providing both is in both rows and
   opens the same pane. An unconnected row says "Not connected" with a secondary **Connect** that opens
   the connect flow with that capability preselected. One primary **Connect energy data** shows only while **two or more**
   capabilities that share the connect flow (history, live) are unconnected (preselecting them); with one left, its own
@@ -861,14 +864,21 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   task that creates the record, with its own steps (what, how, consent, one-time token). The managers' **Live data**
   dialog and the grid connection card on the metering-point page still open the source in a `SourceDialog`
   (same body), because they open from a menu or a card of a list that has its own filters, not from a record of it.
-- **`SourceDialog`** (`features/supplementary/SourceDialog.tsx`; `SourceDetails` is its body, shared with the pane) holds
-  everything about one source: provider, name, capabilities, history status and coverage and the meter
-  comparison (history only), live state and last value (live only), Solar Manager id or push token
-  prefix, issued and last used; the push **endpoints** in a `Disclosure` (CSV endpoint and columns for
-  history, live endpoint, JSON example and sign convention for live: `PushEndpoints`); actions test,
-  sync, replace key or reconnect (Solar Manager), CSV import (push history), **New push token**
-  (shown once in `PushTokenPanel` with the endpoints of everything the source provides), **Revoke
-  token**, and the capability switches
+- **`SourceDialog`** (`features/supplementary/SourceDialog.tsx`; `SourceDetails` is its body, shared with the pane)
+  holds everything about one source, laid out as a manage surface (UI patterns §9): the pane's header (a `tone="brand"`
+  `DetailPane`) names the source ("Solar Manager · Roof") with a facts line (the meter and what it provides); the dialog
+  names it in the first line of the body. Then the banners (reconnect required, error), one **visible action** and a
+  **"⋯" menu**, an inline key form when replacing, and a bordered block per capability it provides (**History**: last
+  successful sync, covered range, the meter comparison as text; **Live**: last value; **Forecast**: last update), each
+  with its problem as text only when there is one. Technical details are one closed `Disclosure` "Technical details":
+  the Solar Manager id (plain text, not code), the push token prefix, issued and last used (the prefix stays monospace)
+  and the push **endpoints** (`PushEndpoints`: CSV endpoint and columns for history, live endpoint, JSON example and
+  sign convention for live). The visible action is **Sync now** (**Refresh forecast** for a forecast-only source) for a
+  Solar Manager or forecast.solar source that can sync, or **Reconnect** when the key no longer works or the source is
+  disconnected. The menu, in sections: *Connection* (**Test**, **Replace key**, **Import CSV**, **New push token**,
+  **Revoke token**, **Disconnect**), *Data* (the capability switches) and *End* (**Delete data**, **Remove source**, in
+  red); all of them confirm. **New push token** is shown once in `PushTokenPanel` with the endpoints of everything the
+  source provides. The capability switches
   on the same connection: **Also send live data with this source** (confirm with the live consent,
   `PATCH {provides_live: true, consent: true}`, only a push source on a live-eligible point whose live
   slot is free), **Stop live data** (`PATCH {provides_live: false}`) and, for history,
@@ -879,9 +889,7 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   opened from a card with no list beside it), with confirmations as the only thing opened over it.
   The host keeps it open by its own state (a source id), never by what the source list says, and the
   rotated token lives in the dialog above everything a refetch can change, so a refetch cannot swap the
-  token screen away. **Disconnect**, **Delete data** (history) and **Remove source** are not among the everyday
-  actions: they sit in their own `Disclosure` "End the connection" (closed while the source works, open once it is
-  disconnected), with the two destructive ones as `button-danger` (UI patterns §9).
+  token screen away. The replace-key form is inline (Cancel then Save); a key typed and not saved is the pane's draft.
 - **`SupplementarySourceModal`** is the one connect flow, taking `holder` (`participant`, `zev`,
   `connection-point`), the point, `available` (what the point offers and does not have yet), `initial`
   (preselected), the visible `sources` and an optional `frame` (so a host that is already a dialog draws

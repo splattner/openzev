@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { BehindMeterBadge } from '../components/BehindMeterBadge'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { Notice } from '../components/Notice'
 import { PageHeader } from '../components/PageHeader'
@@ -44,6 +43,8 @@ export function MyMeteringPointsPage() {
     const { t } = useTranslation()
     const { selectedZevId, selectedZev, entries } = useManagedZev()
     const scopeNote = useScopeNote()
+    // Energy data is only mentioned while the feature is on.
+    const { featureOn } = useEnergyDataEligibility()
 
     return (
         <div className="page-stack">
@@ -51,7 +52,7 @@ export function MyMeteringPointsPage() {
                 eyebrow={selectedCommunityName({ selectedZev, entries, selectedZevId })}
                 scopeNote={scopeNote}
                 title={t('pages.myMeteringPoints.title')}
-                description={t('pages.myMeteringPoints.description')}
+                description={t(featureOn ? 'pages.myMeteringPoints.descriptionEnergy' : 'pages.myMeteringPoints.description')}
             />
             <ScopeGuard>
                 <MyMeteringPointsView />
@@ -222,17 +223,11 @@ function MyMeteringPointsView() {
                         />
                     )}
 
-                    {energyData.featureOn && eligible.some(historyEligible) && (
-                        <p className="muted m-0">{t('supplementary.section.description')}</p>
-                    )}
-                    {energyData.featureOn && eligible.some(liveEligible) && (
-                        <p className="muted m-0">{t('supplementary.live.description')}</p>
-                    )}
-
                     {eligible.map((point) => (
                         <MeteringPointDataCard
                             key={point.metering_point}
                             point={point}
+                            description={ownPoints.find((own) => own.id === point.metering_point)?.location_description || undefined}
                             sources={sourcesQuery.data}
                             sourcesUnavailable={sourcesUnavailable}
                             onRetrySources={() => void sourcesQuery.refetch()}
@@ -276,25 +271,25 @@ function MyMeteringPointsView() {
 /** A meter of the participant's that has no energy data to set up. */
 function PlainMeteringPoint({ point, showEnergyDataNote }: { point: MeteringPoint; showEnergyDataNote: boolean }) {
     const { t } = useTranslation()
+    // What the meter is is quiet text (UI patterns §10.1); only a meter that is switched off is worth saying.
+    const facts = [
+        point.location_description || t('pages.meteringPoints.noLocation'),
+        t(`pages.meteringPoints.meterTypes.${point.meter_type}`),
+        point.has_behind_meter_generation ? t('behindMeter.badge') : null,
+        point.is_active ? null : t('pages.meteringPoints.inactive'),
+    ].filter(Boolean).join(' · ')
     return (
         <article className="card" style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'minmax(0, 1fr)' }} aria-label={point.meter_id}>
-            <div>
-                <h3 style={{ margin: 0, overflowWrap: 'anywhere' }}>{point.meter_id}</h3>
-                <small className="muted">{point.location_description || t('pages.meteringPoints.noLocation')}</small>
-            </div>
-            <div className="metering-point-badges">
-                <span className={point.is_active ? 'badge badge-success' : 'badge badge-danger'}>
-                    {point.is_active ? t('pages.meteringPoints.active') : t('pages.meteringPoints.inactive')}
-                </span>
-                <span className="badge badge-neutral">{t(`pages.meteringPoints.meterTypes.${point.meter_type}`)}</span>
-                {point.has_behind_meter_generation && <BehindMeterBadge />}
-            </div>
+            <header className="card-header-row">
+                <div className="card-title-block">
+                    <h3>{point.meter_id}</h3>
+                    <small className="muted">{facts}</small>
+                </div>
+                <MeteringDataLink meteringPointId={point.id} />
+            </header>
             {showEnergyDataNote && point.has_behind_meter_generation && (
                 <p className="muted m-0">{t('pages.myMeteringPoints.notHolder')}</p>
             )}
-            <div className="actions-row actions-row-wrap">
-                <MeteringDataLink meteringPointId={point.id} />
-            </div>
         </article>
     )
 }

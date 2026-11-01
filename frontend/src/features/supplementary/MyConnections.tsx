@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { IssueText } from '../../components/IssueText'
 import { capabilityProblem } from '../../lib/supplementary'
+import { CapabilityProblemText } from './CapabilityProblemText'
 import type { EligibleMeteringPoint, SupplementarySource } from '../../types/api'
 
 interface Props {
@@ -53,9 +53,7 @@ export function MyConnections({ sources, held, onOpenSource, selectedSourceId }:
                                     return (
                                         <span key={capability} className="connection-capability">
                                             <span className="badge badge-tag">{t(`supplementary.capability.${capability}`)}</span>
-                                            {problem && (problem.tone === 'muted'
-                                                ? <span className="muted">{t(problem.labelKey)}</span>
-                                                : <IssueText tone={problem.tone}>{t(problem.labelKey)}</IssueText>)}
+                                            <CapabilityProblemText problem={problem} />
                                         </span>
                                     )
                                 })}

@@ -781,6 +781,7 @@ export const de = {
         myMeteringPoints: {
             title: 'Meine Messpunkte',
             description: 'Die Messpunkte, die Ihnen zugeordnet sind.',
+            descriptionEnergy: 'Die Messpunkte, die Ihnen zugeordnet sind. Energiedaten dienen nur der Anzeige und der Statistik, nie der Abrechnung.',
             loadFailed: 'Ihre Messpunkte konnten nicht geladen werden.',
             empty: {
                 title: 'Keine Messpunkte',
@@ -2472,7 +2473,6 @@ export const de = {
                 addMeteringPoint: 'Messpunkt hinzufügen',
                 emptyGroup: 'In diesem Gebäude gibt es noch keine Messpunkte.',
             },
-            active: 'Aktiv',
             inactive: 'Inaktiv',
             moreActions: 'Mehr',
             openEnded: 'Offen',
@@ -4011,11 +4011,9 @@ export const de = {
         },
         source: {
             title: 'Quelle von {{subject}}',
-            provider: 'Anbieter',
-            provides: 'Liefert',
-            status: 'Status',
-            endpoints: 'Wohin die Daten gesendet werden',
-            endTitle: 'Verbindung beenden',
+            moreActions: 'Weitere Aktionen',
+            technical: 'Technische Angaben',
+            menu: { connection: 'Verbindung', data: 'Daten', end: 'Beenden' },
             alsoHistory: 'Mit dieser Quelle auch den Verlauf liefern',
             stopHistory: 'Verlaufsdaten beenden',
             historyOn: 'Der Verlauf ist eingeschaltet. Senden Sie die Messwerte mit demselben Token an die Verlaufsadresse.',
@@ -4027,7 +4025,6 @@ export const de = {
             },
         },
         section: {
-            description: 'Verbinden Sie das System hinter Ihrem Zähler (z. B. Solar Manager), damit Ihre Statistiken die tatsächliche Produktion, den Verbrauch und die Autarkie zeigen können. Diese Daten dienen nur der Statistik und werden nie für die Abrechnung verwendet.',
             loadError: 'Die Energiedatenquellen konnten nicht geladen werden.',
             eligibilityError: 'Es konnte nicht geprüft werden, ob Energiedaten verfügbar sind.',
         },
@@ -4214,7 +4211,6 @@ export const de = {
             },
         },
         live: {
-            description: 'Live-Daten zeigen, was ein Zähler gerade bezieht oder einspeist. Sie werden nur angezeigt und nie für die Abrechnung verwendet.',
             zevNotConnected: 'Mit diesem vom ZEV betriebenen Messpunkt sind noch keine Live-Daten verbunden.',
             alsoSend: 'Mit dieser Quelle auch Live-Daten senden',
             alsoSendDone: 'Live-Daten sind eingeschaltet. Senden Sie die Werte mit demselben Token an die Live-Adresse.',
@@ -4222,9 +4218,7 @@ export const de = {
             stopped: 'Die Live-Daten wurden ausgeschaltet.',
             revoke: 'Token widerrufen',
             revoked: 'Der Push-Token wurde widerrufen.',
-            state: 'Live-Status',
             lastValue: 'Letzter Wert',
-            name: 'Name',
             dialogTitle: 'Live-Daten von {{meter}}',
             dialogTitleWithForecast: 'Live-Daten und Prognose von {{meter}}',
             chip: {

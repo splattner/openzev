@@ -1,10 +1,9 @@
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../lib/auth'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
-import { sourceFor } from '../../lib/supplementary'
+import { capabilityProblem, sourceFor } from '../../lib/supplementary'
 import type { SupplementarySource } from '../../types/api'
-import { LiveStateBadge } from './LiveStateBadge'
-import { SourceStatusBadge } from './SourceStatusBadge'
+import { CapabilityProblemText } from './CapabilityProblemText'
 
 export type RowCapability = 'history' | 'live' | 'forecast'
 
@@ -25,8 +24,8 @@ interface Props {
 
 /**
  * What a metering point provides, one row per capability: the source that provides it as a button that
- * opens the source (a source providing both is in both rows and opens the same dialog) and how it is
- * doing, or "Not connected" with a Connect for that capability.
+ * opens the source (a source providing both is in both rows and opens the same details) and what, if
+ * anything, is wrong with it, or "Not connected" with a Connect for that capability.
  */
 export function CapabilityRows({ meteringPointId, capabilities, sources, canManage = true, onOpenSource, selectedSourceId, onConnect, zevHeld = false }: Props) {
     const { t } = useTranslation()
@@ -35,23 +34,18 @@ export function CapabilityRows({ meteringPointId, capabilities, sources, canMana
     const dateTime = (value: string | null) => (value ? formatDateTime(value, settings) : t('supplementary.never'))
 
     return (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: '0.6rem' }}>
+        <ul className="capability-list">
             {capabilities.map((capability) => {
                 const source = sourceFor(sources, meteringPointId, capability)
                 return (
-                    <li
-                        key={capability}
-                        data-capability={capability}
-                        style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem 1rem', alignItems: 'center' }}
-                    >
-                        <strong style={{ flex: '0 0 8rem' }}>{t(`supplementary.capability.${capability}`)}</strong>
-                        <div className="actions-row actions-row-wrap" style={{ minWidth: 0, flex: '1 1 14rem' }}>
+                    <li key={capability} data-capability={capability} className="capability-row">
+                        <strong className="capability-label">{t(`supplementary.capability.${capability}`)}</strong>
+                        <div className="actions-row actions-row-wrap capability-body">
                             {source ? (
                                 <>
                                     <button
                                         type="button"
-                                        className="button button-secondary button-compact"
-                                        style={{ maxWidth: '100%', overflowWrap: 'anywhere' }}
+                                        className="button button-ghost button-compact capability-source"
                                         data-source-open={source.id}
                                         aria-current={source.id === selectedSourceId ? 'true' : undefined}
                                         onClick={() => onOpenSource(source)}
@@ -59,33 +53,21 @@ export function CapabilityRows({ meteringPointId, capabilities, sources, canMana
                                         {t(`supplementary.provider.${source.provider}`)}
                                         {source.label ? ` · ${source.label}` : ''}
                                     </button>
-                                    {capability === 'history' ? (
-                                        <>
-                                            <SourceStatusBadge status={source.enabled ? source.status : 'disabled'} />
-                                            <small className="muted">
-                                                {source.synced_through
-                                                    ? t('supplementary.card.syncedThrough', { date: formatDateTime(source.synced_through, settings) })
-                                                    : t('supplementary.card.noData')}
-                                            </small>
-                                        </>
-                                    ) : capability === 'forecast' ? (
-                                        <>
-                                            <SourceStatusBadge status={source.enabled ? source.status : 'disabled'} />
-                                            {source.provider === 'forecast_solar' && (
-                                                <small className="muted">
-                                                    {source.last_success_at
+                                    <CapabilityProblemText problem={capabilityProblem(source, capability)} />
+                                    {/* A live source that has never reported says so once, as the problem text. */}
+                                    <small className="muted">
+                                        {capability === 'live' && source.live_state === 'never' ? null : capability === 'history'
+                                            ? (source.synced_through
+                                                ? t('supplementary.card.syncedThrough', { date: formatDateTime(source.synced_through, settings) })
+                                                : t('supplementary.card.noData'))
+                                            : capability === 'forecast'
+                                                ? (source.provider === 'forecast_solar'
+                                                    ? (source.last_success_at
                                                         ? t('supplementary.forecast.updatedAt', { date: formatDateTime(source.last_success_at, settings) })
-                                                        : t('supplementary.card.noData')}
-                                                </small>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <>
-                                            {source.status === 'reconnect_required' && <SourceStatusBadge status="reconnect_required" />}
-                                            {source.live_state ? <LiveStateBadge state={source.live_state} /> : null}
-                                            <small className="muted">{t('supplementary.card.lastValueAt', { date: dateTime(source.live_last_seen_at) })}</small>
-                                        </>
-                                    )}
+                                                        : t('supplementary.card.noData'))
+                                                    : null)
+                                                : t('supplementary.card.lastValueAt', { date: dateTime(source.live_last_seen_at) })}
+                                    </small>
                                 </>
                             ) : (
                                 <>
@@ -105,8 +87,8 @@ export function CapabilityRows({ meteringPointId, capabilities, sources, canMana
                                 </>
                             )}
                         </div>
-                        {!source && zevHeld && capability === 'live' && <small className="muted" style={{ flexBasis: '100%' }}>{t('supplementary.live.zevNotConnected')}</small>}
-                        {!source && zevHeld && capability === 'forecast' && <small className="muted" style={{ flexBasis: '100%' }}>{t('supplementary.forecast.zevNotConnected')}</small>}
+                        {!source && zevHeld && capability === 'live' && <small className="muted capability-note">{t('supplementary.live.zevNotConnected')}</small>}
+                        {!source && zevHeld && capability === 'forecast' && <small className="muted capability-note">{t('supplementary.forecast.zevNotConnected')}</small>}
                     </li>
                 )
             })}

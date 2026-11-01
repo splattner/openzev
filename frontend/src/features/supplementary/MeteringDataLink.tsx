@@ -8,7 +8,7 @@ export function MeteringDataLink({ meteringPointId }: { meteringPointId: string 
     const { t } = useTranslation()
     return (
         <Link
-            className="button button-secondary button-compact"
+            className="button button-ghost button-compact"
             style={{ textDecoration: 'none' }}
             to={`/metering/chart?metering_point=${meteringPointId}`}
         >

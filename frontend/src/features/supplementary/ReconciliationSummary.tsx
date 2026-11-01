@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { IssueText } from '../../components/IssueText'
 import { formatPercent } from '../../lib/numbers'
 import type { SupplementaryReconciliation } from '../../types/api'
 
@@ -12,12 +13,11 @@ export function ReconciliationSummary({ reconciliation }: { reconciliation: Supp
     if (!state) return <span className="muted">{t('supplementary.reconciliation.never')}</span>
 
     const shift = reconciliation?.best_shift_intervals ?? 0
-    const badge = state === 'ok' ? 'badge badge-success' : state === 'warn' ? 'badge badge-warning' : 'badge badge-neutral'
+    // Text, not a pill (UI patterns §10.1): a match is plain, a difference is the one thing worth colouring.
+    const label = t(`supplementary.reconciliation.state.${state}`)
     return (
-        <span style={{ display: 'grid', gap: '0.25rem' }}>
-            <span>
-                <span className={badge}>{t(`supplementary.reconciliation.state.${state}`)}</span>
-            </span>
+        <span className="source-reconciliation">
+            {state === 'warn' ? <IssueText tone="warning">{label}</IssueText> : <span className={state === 'insufficient' ? 'muted' : undefined}>{label}</span>}
             {state !== 'insufficient' && (
                 <small className="muted">
                     {t('supplementary.reconciliation.deviation', {

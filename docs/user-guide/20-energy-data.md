@@ -318,7 +318,12 @@ On **My metering points**, choosing a source on a meter's card (or **Open** in *
 appears once you have two or more connections) opens its details **beside the cards**; on a narrow screen
 they take the place of the cards until you close them with the X or the browser's Back button. The card
 whose source is open is outlined. The address keeps the choice, so a reload or a shared link opens the same
-source. If you have typed a new Solar Manager key and not saved it, closing asks before it is lost. After you
+source. The details show one block per thing the source provides (history, live, forecast), the
+one button you need most (**Sync now**, or **Reconnect** when the key no longer works) and a **⋯** menu with the
+rest: test the connection, replace the key, send a new push token, switch a kind of data on or off, disconnect,
+delete data or remove the source. The Solar Manager ID, the token and the addresses to send data to are under
+**Technical details**. Nothing is coloured while a source works; only a problem, such as a source that has gone
+quiet, is shown in colour. If you have typed a new Solar Manager key and not saved it, closing asks before it is lost. After you
 connect a source, it opens there by itself.
 
 ## Disconnect, delete, remove
@@ -329,8 +334,8 @@ connect a source, it opens there by itself.
 | **Delete data** | no | yes, all readings | yes |
 | **Remove source** | yes | yes, all readings | no |
 
-In the source's details these three sit in their own section, **End the connection**, away from
-the everyday actions. A ZEV manager sees the same buttons for a participant's source, except for the
+In the source's details these three are the last section of the **⋯** menu, in red, away from
+the everyday actions, and each asks for confirmation. A ZEV manager sees the same buttons for a participant's source, except for the
 ones that touch the key. Deleting a participant or a metering point deletes their
 sources and readings with them.
 
