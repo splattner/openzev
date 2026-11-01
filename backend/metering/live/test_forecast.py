@@ -265,6 +265,7 @@ class RefreshTests(ForecastCase):
         self.source.refresh_from_db()
         self.assertEqual((result["error"], self.source.status, self.source.last_error), ("provider", SupplementaryStatus.ERROR, "It broke."))
 
+    @override_settings(INTEGRATION_ENCRYPTION_KEYS=[INTEGRATION_KEY])
     def test_a_source_with_other_capabilities_keeps_its_own_status(self):
         sm = SupplementarySource(
             zev=self.zev, metering_point=self.flat1, participant=self.p1, provider="solar_manager", external_id="ABC123",
