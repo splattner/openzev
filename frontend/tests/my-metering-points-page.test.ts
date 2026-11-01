@@ -152,7 +152,8 @@ describe('MyMeteringPointsPage', () => {
 
         api.listSupplementarySources.mockResolvedValue([heldSource('s1', '1'), heldSource('s3', '3')])
         const two = await mount()
-        expect(two.container.textContent).toContain('pages.myMeteringPoints.connections.title')
+        // The meters appear before the source list has answered, so the overview is waited for.
+        await waitForCondition(() => two.container.textContent?.includes('pages.myMeteringPoints.connections.title') === true, 'the connections overview')
 
         api.fetchEligibleOrNull.mockResolvedValue(null)
         const off = await mount()
