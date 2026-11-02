@@ -72,8 +72,9 @@ export function Layout() {
     // to look at (community-wide access, or a held meter an own system can be connected to); a former
     // participant has no such page.
     const liveEnabledQuery = useLiveEnabled({ enabled: isZevScope || shellRole === 'participant' })
+    const liveEnabled = liveEnabledQuery.data === true
     const showMyEnergy = showMyEnergyEntry({
-        liveEnabled: liveEnabledQuery.data === true,
+        liveEnabled,
         energyDataOn: energyData.featureOn,
         isZevScope,
         holdsHistoryMeter: energyData.historyEligible.length > 0,
@@ -295,7 +296,7 @@ export function Layout() {
                             <>
                                 <SidebarLink to="/" label={t('nav.overview')} icon={<DashboardIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/dashboard" label={t('nav.energyBalance')} icon={<EnergyIcon />} collapsed={isNavigationCollapsed} />
-                                {showMyEnergy && <SidebarLink to="/my-energy" label={t('nav.liveEnergy')} icon={<LiveIcon />} collapsed={isNavigationCollapsed} />}
+                                {liveEnabled && <SidebarLink to="/my-energy" label={t('nav.liveEnergy')} icon={<LiveIcon />} collapsed={isNavigationCollapsed} />}
                                 <SidebarLink to="/metering/chart" label={t('nav.metering')} icon={<ChartIcon />} active={meteringActive} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/billing/invoices" label={t('nav.billing')} icon={<InvoiceIcon />} active={billingActive} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/reports" label={t('nav.reports')} icon={<ReportsIcon />} collapsed={isNavigationCollapsed} />
