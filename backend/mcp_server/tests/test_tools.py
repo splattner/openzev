@@ -287,6 +287,115 @@ class TestExplainInvoice:
         assert result["previous"] is None
         assert result["change"] is None
 
+    def test_by_type_kwh_comes_from_invoice_totals_not_line_sums(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        invoice = InvoiceFactory(
+            zev=zev, participant=ParticipantFactory(zev=zev),
+            period_start=date(2026, 2, 1), period_end=date(2026, 2, 28),
+            total_local_kwh=Decimal("300.0000"), total_grid_kwh=Decimal("1000.0000"),
+        )
+        # Energy, grid use and levies bill the same 1,000 kWh on separate lines.
+        for description in ("Energy", "Grid use", "Levy A", "Levy B", "Levy C"):
+            InvoiceItemFactory(
+                invoice=invoice, item_type="grid_energy", description=description,
+                quantity_kwh=Decimal("1000.0000"), total_chf=Decimal("10.00"),
+            )
+        InvoiceItemFactory(
+            invoice=invoice, item_type="local_energy", quantity_kwh=Decimal("300.0000"), total_chf=Decimal("60.00"),
+        )
+        for description in ("Meter fee", "Admin fee", "Base fee"):
+            InvoiceItemFactory(
+                invoice=invoice, item_type="fee", description=description, unit="month",
+                quantity_kwh=Decimal("3.0000"), total_chf=Decimal("2.00"),
+            )
+
+        result = _structured(call_tool(owner_mcp_client, "explain_invoice", {"invoice_id": str(invoice.id)}))
+        assert result["by_type"]["grid_energy"] == {"kwh": 1000.0, "amount_chf": "50.00"}
+        assert result["by_type"]["local_energy"] == {"kwh": 300.0, "amount_chf": "60.00"}
+        assert result["by_type"]["fee"] == {"amount_chf": "6.00"}
+        assert result["by_type"]["grid_energy"]["kwh"] == result["energy"]["grid_kwh"]
+        assert result["by_type"]["local_energy"]["kwh"] == result["energy"]["local_kwh"]
+
+    def test_fee_lines_carry_their_unit_and_no_kwh_quantity(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        invoice = InvoiceFactory(zev=zev, participant=ParticipantFactory(zev=zev))
+        InvoiceItemFactory(invoice=invoice, item_type="local_energy", quantity_kwh=Decimal("80.0000"))
+        InvoiceItemFactory(
+            invoice=invoice, item_type="fee", description="Meter fee", unit="month",
+            quantity_kwh=Decimal("3.0000"), total_chf=Decimal("6.00"),
+        )
+
+        lines = {
+            line["type"]: line
+            for line in _structured(call_tool(owner_mcp_client, "explain_invoice", {"invoice_id": str(invoice.id)}))["lines"]
+        }
+        assert (lines["local_energy"]["quantity"], lines["local_energy"]["unit"]) == (80.0, "kWh")
+        assert lines["local_energy"]["quantity_kwh"] == 80.0
+        assert (lines["fee"]["quantity"], lines["fee"]["unit"]) == (3.0, "month")
+        assert "quantity_kwh" not in lines["fee"]
+
+    def test_producer_invoice_counts_feed_in_once_and_keeps_local_sale_apart(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        invoice = InvoiceFactory(
+            zev=zev, participant=ParticipantFactory(zev=zev),
+            period_start=date(2026, 2, 1), period_end=date(2026, 2, 28),
+            total_local_kwh=Decimal("50.0000"), total_local_sold_kwh=Decimal("200.0000"),
+            total_grid_kwh=Decimal("0.0000"), total_feed_in_kwh=Decimal("4000.0000"),
+        )
+        # Feed-in and HKN are two lines over the same 4,000 kWh.
+        InvoiceItemFactory(
+            invoice=invoice, item_type="feed_in", description="Feed-in",
+            quantity_kwh=Decimal("4000.0000"), total_chf=Decimal("-200.00"),
+        )
+        InvoiceItemFactory(
+            invoice=invoice, item_type="feed_in", description="HKN",
+            quantity_kwh=Decimal("4000.0000"), total_chf=Decimal("-40.00"),
+        )
+        # A purchase and a credit for the local sale land on the same type.
+        InvoiceItemFactory(
+            invoice=invoice, item_type="local_energy", description="Local purchase",
+            quantity_kwh=Decimal("50.0000"), total_chf=Decimal("10.00"),
+        )
+        InvoiceItemFactory(
+            invoice=invoice, item_type="local_energy", description="Local sale",
+            quantity_kwh=Decimal("200.0000"), total_chf=Decimal("-40.00"),
+        )
+
+        by_type = _structured(
+            call_tool(owner_mcp_client, "explain_invoice", {"invoice_id": str(invoice.id)})
+        )["by_type"]
+        assert by_type["feed_in"] == {"kwh": 4000.0, "amount_chf": "-240.00"}
+        assert by_type["local_energy"] == {"kwh": 50.0, "sold_kwh": 200.0, "amount_chf": "-30.00"}
+
+    def test_change_by_type_kwh_delta_uses_totals_and_skips_fees(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        participant = ParticipantFactory(zev=zev)
+        previous = InvoiceFactory(
+            zev=zev, participant=participant, status=InvoiceStatus.SENT,
+            period_start=date(2026, 1, 1), period_end=date(2026, 1, 31),
+            total_grid_kwh=Decimal("800.0000"),
+        )
+        current = InvoiceFactory(
+            zev=zev, participant=participant,
+            period_start=date(2026, 2, 1), period_end=date(2026, 2, 28),
+            total_grid_kwh=Decimal("1000.0000"),
+        )
+        for invoice, fee in ((previous, "4.00"), (current, "6.00")):
+            for description in ("Energy", "Grid use", "Levy"):
+                InvoiceItemFactory(
+                    invoice=invoice, item_type="grid_energy", description=description,
+                    quantity_kwh=invoice.total_grid_kwh, total_chf=Decimal("10.00"),
+                )
+            InvoiceItemFactory(
+                invoice=invoice, item_type="fee", unit="month", quantity_kwh=Decimal("1.0000"), total_chf=Decimal(fee),
+            )
+
+        change = _structured(
+            call_tool(owner_mcp_client, "explain_invoice", {"invoice_id": str(current.id)})
+        )["change"]["by_type"]
+        assert change["grid_energy"] == {"kwh_delta": 200.0, "amount_delta_chf": "0.00"}
+        assert change["fee"] == {"amount_delta_chf": "2.00"}
+
     def test_names_the_credit_applied_and_the_credit_notes_issued(self, owner_mcp_client, owner_user):
         zev = ZevFactory(owner=owner_user)
         participant = ParticipantFactory(zev=zev)
