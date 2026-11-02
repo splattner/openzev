@@ -839,6 +839,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#rounding-to-5-rappen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rounding to 5 Rappen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#price-bands-on-the-invoice" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1968,6 +1979,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#rounding-to-5-rappen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rounding to 5 Rappen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#price-bands-on-the-invoice" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2412,6 +2434,11 @@ address, after which the new login belongs to that party.</p>
 <td>Swiss UID — shown only when VAT treatment is <em>VAT-registered</em></td>
 <td>If registered</td>
 </tr>
+<tr>
+<td><strong>Rounding of amounts</strong></td>
+<td>Round what participants pay to 5 Rappen (see <a href="#rounding-to-5-rappen">below</a>)</td>
+<td>No</td>
+</tr>
 </tbody>
 </table>
 <p>The QR-Rechnung creditor address is the address of the ZEV's responsible
@@ -2489,6 +2516,21 @@ active rate, prices are billed unchanged.</p>
 </li>
 </ul>
 <p>If no VAT rate is active for an invoice period, VAT defaults to <strong>0%</strong> in every mode.</p>
+<h3 id="rounding-to-5-rappen">Rounding to 5 Rappen<a class="headerlink" href="#rounding-to-5-rappen" title="Permanent link">&para;</a></h3>
+<p>Switzerland has no coin below 5 Rappen. Set <strong>Rounding of amounts</strong> to
+<em>Round to 5 Rappen</em> and the amounts participants pay are rounded to the
+nearest CHF 0.05:</p>
+<ul>
+<li>the <strong>invoice total</strong>,</li>
+<li>the <strong>amount due</strong> after a credit note was set against the invoice, and</li>
+<li>every <strong>credit note</strong>.</li>
+</ul>
+<p>A net payout to a producer (a negative total) is rounded the same way.</p>
+<p>Line items and VAT stay exactly as calculated. The difference (at most
+CHF 0.02) appears as its own <strong>Rounding</strong> line on the invoice and credit note,
+so VAT is never calculated on it. The QR payment slip and payments use the
+rounded amount. The setting is off by default, and changing it only affects
+invoices and credit notes created afterwards.</p>
 <h3 id="price-bands-on-the-invoice">Price bands on the invoice<a class="headerlink" href="#price-bands-on-the-invoice" title="Permanent link">&para;</a></h3>
 <p>A tariff can carry several price bands — peak and off-peak, a weekend rate, a
 different winter price. By default such a tariff appears on the invoice as
