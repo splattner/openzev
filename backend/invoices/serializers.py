@@ -126,7 +126,7 @@ class CreditSerializer(serializers.ModelSerializer):
         fields = [
             "id", "credit_number", "zev", "participant", "participant_name", "kind",
             "source_invoice", "source_invoice_number", "reason", "amount_chf", "vat_mode",
-            "vat_rate", "vat_chf", "embedded_vat_chf", "remaining_chf", "refunded_chf",
+            "vat_rate", "vat_chf", "embedded_vat_chf", "rounding_chf", "remaining_chf", "refunded_chf",
             "refunded_on", "refund_note", "status", "applications", "pdf_url",
             "pdf_status", "created_by_name", "created_at",
         ]
@@ -204,8 +204,10 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             "vat_base_chf",
             "vat_chf",
             "embedded_vat_chf",
+            "rounding_chf",
             "total_chf",
             "credit_applied_chf",
+            "due_rounding_chf",
             "period_start",
             "period_end",
             "zev",

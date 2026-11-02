@@ -61,7 +61,9 @@ def build_credit_context(credit) -> dict:
         # A non-registered issuer shows no VAT figure, so only a registered
         # credit gets the net / VAT / total breakdown.
         "show_vat": registered,
-        "net_chf": credit.amount_chf - credit.vat_chf,
+        # Before the 5-Rappen rounding, which is printed as its own line.
+        "net_chf": credit.amount_chf - credit.rounding_chf - credit.vat_chf,
+        "exact_chf": credit.amount_chf - credit.rounding_chf,
         "vat_rate_percent": Decimal(credit.vat_rate or 0) * 100,
         **template_parties(parties, credit.issuer or {}, credit.recipient or {}),
         "formatted_dates": {

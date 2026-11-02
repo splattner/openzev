@@ -634,7 +634,8 @@ def generate_annual_statement_pdf(
         kind=CreditKind.ADJUSTMENT, source_invoice__in=year_invoices_qs,
     ).select_related("source_invoice").order_by("created_at")
     for credit in credits:
-        net = credit.amount_chf - credit.vat_chf
+        # Net of VAT and of the 5-Rappen rounding, like an invoice's subtotal.
+        net = credit.amount_chf - credit.rounding_chf - credit.vat_chf
         invoice_rows.append({
             "invoice_number": credit.credit_number,
             "period_start_formatted": _format_date_value(credit.source_invoice.period_start, date_pattern),

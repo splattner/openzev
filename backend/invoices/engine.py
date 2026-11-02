@@ -44,6 +44,7 @@ from .band_labels import band_description, translations_for as band_translations
 from .document_parties import build_issuer, build_recipient
 from .charges import CHARGE_SORT_ORDER, ChargeLine, charge_lines_by_participant, pass_through_total
 from .models import Invoice, InvoiceItem, InvoiceStatus
+from .rounding import rounding_difference, rounding_step
 from .workflow import apply_open_credits
 from metering.locks import lock_billing_inputs
 from .reading_impact import settle_regeneration
@@ -1956,7 +1957,10 @@ def generate_invoice(
     vat_base_chf = subtotal - producer_credit_chf - pass_through_chf
     vat_rate = _resolve_vat_rate(zev, period_end)
     vat_chf = (vat_base_chf * vat_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    total_chf = subtotal + vat_chf
+    # Rounding to 5 Rappen is applied to the payable total only: lines and VAT
+    # stay as calculated and the difference is kept apart (invoices.rounding).
+    rounding_chf = rounding_difference(subtotal + vat_chf, rounding_step(zev))
+    total_chf = subtotal + vat_chf + rounding_chf
 
     # ─── 8. Create invoice ────────────────────────────────────────────────
     invoice_number = zev.next_invoice_number()
@@ -1983,6 +1987,7 @@ def generate_invoice(
         pass_through_chf=pass_through_chf if zev.vat_mode == VatMode.REGISTERED else Decimal("0"),
         vat_chf=vat_chf,
         embedded_vat_chf=embedded_vat_chf if zev.vat_mode == VatMode.INCLUSIVE else None,
+        rounding_chf=rounding_chf,
         total_chf=total_chf,
         due_date=timezone.localdate() + timedelta(days=zev.payment_term_days),
         issuer=generation_context.issuer(zev),

@@ -16,8 +16,11 @@ def _invoice_block(data: dict) -> dict:
         "status": data.get("status"),
         "subtotal_chf": chf(data.get("subtotal_chf")),
         "vat_chf": chf(data.get("vat_chf")),
+        # 5-Rappen rounding inside the total, and of the amount due after credit.
+        "rounding_chf": chf(data.get("rounding_chf")),
         "total_chf": chf(data.get("total_chf")),
         "credit_applied_chf": chf(data.get("credit_applied_chf")),
+        "due_rounding_chf": chf(data.get("due_rounding_chf")),
         "amount_due_chf": chf(data.get("amount_due_chf")),
         "paid_chf": chf(data.get("paid_chf")),
         "outstanding_chf": chf(data.get("outstanding_chf")),

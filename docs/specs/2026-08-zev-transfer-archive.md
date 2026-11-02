@@ -275,9 +275,9 @@ paid invoice with a non-zero total one `backfill` payment of `total_chf`, dated 
 `sent_at` or else the period end (`_import_payments`) — the same rule as migration
 `invoices/0023`.
 Each invoice also nests its `credits` (#388 phase 2; `CREDIT_FIELDS = credit_number, kind, reason,
-amount_chf, vat_mode, vat_rate, vat_chf, embedded_vat_chf, issuer, recipient, created_at`; the
+amount_chf, vat_mode, vat_rate, vat_chf, embedded_vat_chf, rounding_chf, issuer, recipient, created_at`; the
 participant and source invoice are the enclosing invoice's, `created_by` does not travel), and
-`ZEV_FIELDS` carries `credit_note_prefix` and `credit_note_counter`. All optional with no
+`ZEV_FIELDS` carries `credit_note_prefix`, `credit_note_counter` and `invoice_rounding`, and `INVOICE_FIELDS` carries `rounding_chf` and `due_rounding_chf` (5-Rappen rounding). All optional with no
 format-version bump: an older archive has no credits and keeps the defaults. The importer
 (`_import_credits`) recreates the credits with `pdf_status = none` and pushes `credit_note_counter`
 past the highest imported credit number; the counts gain a `credits` sub-count of the invoices

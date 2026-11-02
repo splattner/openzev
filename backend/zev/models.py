@@ -62,6 +62,20 @@ class VatMode(models.TextChoices):
     INCLUSIVE = "inclusive", "Not registered — upstream VAT folded into prices"
 
 
+class InvoiceRounding(models.TextChoices):
+    """How the amount a participant pays is rounded.
+
+    - ``NONE``: amounts are exact to the Rappen.
+    - ``FIVE_RAPPEN``: the invoice total, the amount due after credit and each
+      credit note are rounded to the nearest 0.05 CHF, the smallest coin in
+      Switzerland. The difference is stored and printed as its own line, so the
+      line items and the VAT stay as calculated. See ``invoices.rounding``.
+    """
+
+    NONE = "none", "No rounding (exact to the Rappen)"
+    FIVE_RAPPEN = "five_rappen", "Round to 5 Rappen"
+
+
 class Zev(models.Model):
     """Represents a ZEV or vZEV community."""
 
@@ -127,6 +141,15 @@ class Zev(models.Model):
         help_text="How VAT is applied when billing participants.",
     )
     vat_number = models.CharField(max_length=50, blank=True)
+    # Off by default: it changes every amount participants are asked to pay, so
+    # it is an operator's decision. Invoices already issued keep their figures
+    # (the rounding is stored on each document).
+    invoice_rounding = models.CharField(
+        max_length=20,
+        choices=InvoiceRounding.choices,
+        default=InvoiceRounding.NONE,
+        help_text="Round the invoice total, the amount due and credit notes to 5 Rappen",
+    )
     # Prints a QR on the invoice that opens that invoice without a login. Off
     # by default and no migration opts anyone in: it changes a document
     # participants receive and exposes figures without authentication, which is

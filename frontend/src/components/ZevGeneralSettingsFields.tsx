@@ -358,6 +358,20 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
                             is always visible next to its fix. */}
                         {form.vat_mode !== 'registered' && inlineError('vat_number')}
                     </label>
+                    <label data-zev-field="invoice_rounding" className="grid-span-full">
+                        <span>{t('pages.zevSettings.fields.invoiceRounding')}</span>
+                        <select
+                            value={form.invoice_rounding ?? 'none'}
+                            disabled={readOnly}
+                            onChange={(event) => onChange({ invoice_rounding: event.target.value as ZevInput['invoice_rounding'] })}
+                            {...describeInvalid('invoice_rounding')}
+                        >
+                            <option value="none">{t('pages.zevSettings.fields.invoiceRoundingNone')}</option>
+                            <option value="five_rappen">{t('pages.zevSettings.fields.invoiceRoundingFiveRappen')}</option>
+                        </select>
+                        <small className="muted">{t('pages.zevSettings.fields.invoiceRoundingHint')}</small>
+                        {inlineError('invoice_rounding')}
+                    </label>
                     {form.vat_mode === 'registered' && (
                         <label data-zev-field="vat_number" className="grid-span-full">
                             <span>{t('pages.zevSettings.fields.vatNumber')}</span>

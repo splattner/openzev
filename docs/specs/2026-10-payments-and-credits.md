@@ -112,7 +112,7 @@ visible to the participant from creation, because a credit note is issued the mo
 |---|---|---|---|---|
 | `approved_at` | 1 | `DateTimeField(null=True, blank=True)` | `None` | Stamped by `approve_invoice` and by the batch approval. Never cleared. Read-only in the serializer. |
 | `credit_applied_chf` | 3 | `DecimalField(10, 2)` | `0` | What the engine set against the invoice at generation. **Frozen as issued**: releasing the applications on a cancellation does not change it, so a cancelled invoice keeps showing what it said. |
-| `amount_due_chf` | 3 | derived property, no column | — | `max(total_chf - credit_applied_chf, 0)` when `total_chf > 0`, otherwise `total_chf`. Derived because many code paths write `total_chf` directly and a stored column would drift. No data migration. |
+| `amount_due_chf` | 3 | derived property, no column | — | `max(total_chf - credit_applied_chf, 0) + due_rounding_chf` when `total_chf > 0`, otherwise `total_chf`. `due_rounding_chf` (`DecimalField(10, 2)`, default `0`) is the 5-Rappen rounding of what remains after credit, set by `apply_open_credits` and frozen as issued. Derived because many code paths write `total_chf` directly and a stored column would drift. No data migration. |
 
 Serializer additions: `approved_at`, `paid_chf` (sum of payments), `outstanding_chf` (amount due
 minus `paid_chf`. Before phase 3 the amount due is `total_chf`), and, on the detail serializer, a
@@ -211,7 +211,8 @@ civil date of the newest successful `AuditEvent` with `action_type = "invoice.ma
 | `kind` | `CharField(20)`, choices `reversal` \| `adjustment` | — | Full reversal or partial credit |
 | `source_invoice` | `ForeignKey(Invoice, PROTECT, null=True, related_name="credits")` | — | Required in v1. Nullable for later goodwill credits. |
 | `reason` | `TextField` | — | Required, printed on the credit note |
-| `amount_chf` | `DecimalField(10, 2)` | — | Gross, `> 0` (check constraint) |
+| `amount_chf` | `DecimalField(10, 2)` | — | Gross, `> 0` (check constraint). Includes `rounding_chf` |
+| `rounding_chf` | `DecimalField(10, 2)` | `0` | The 5-Rappen rounding (`Zev.invoice_rounding`) added to the exact credited amount. The VAT split and the creditable cap use `amount_chf − rounding_chf` (tariffs spec §5.1) |
 | `vat_mode` | `CharField(20)` | — | The source invoice's VAT mode. `Invoice` doesn't store it, so it is worked out from the invoice: `embedded_vat_chf` set → `inclusive`, `vat_base_chf` set or `vat_chf ≠ 0` → `registered`, otherwise `not_registered`. Not `Zev.vat_mode`, which may have changed since. |
 | `vat_rate` | `DecimalField(5, 4)` | — | Copied from `source_invoice.vat_rate` |
 | `vat_chf` | `DecimalField(10, 2)` | `0` | VAT contained in `amount_chf`, see below |
