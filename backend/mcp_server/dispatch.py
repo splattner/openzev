@@ -68,8 +68,22 @@ def _build_request(outer_request, path: str, params: dict | None) -> HttpRequest
 
     # Copy just enough META for downstream code (audit IP/user-agent
     # capture, absolute URL building) to behave the same as a real request,
-    # without carrying over the outer request's body/content-type.
-    for key in ("REMOTE_ADDR", "HTTP_USER_AGENT", "HTTP_X_REQUEST_ID", "SERVER_NAME", "SERVER_PORT", "wsgi.url_scheme"):
+    # without carrying over the outer request's body/content-type. The Host
+    # and forwarded headers matter: without ``HTTP_HOST`` Django falls back to
+    # ``SERVER_NAME`` (the WSGI server's name behind a proxy), which is not in
+    # ``ALLOWED_HOSTS``, so ``build_absolute_uri`` raises ``DisallowedHost``.
+    for key in (
+        "REMOTE_ADDR",
+        "HTTP_USER_AGENT",
+        "HTTP_X_REQUEST_ID",
+        "HTTP_HOST",
+        "HTTP_X_FORWARDED_HOST",
+        "HTTP_X_FORWARDED_PROTO",
+        "HTTP_X_FORWARDED_PORT",
+        "SERVER_NAME",
+        "SERVER_PORT",
+        "wsgi.url_scheme",
+    ):
         value = outer.META.get(key)
         if value is not None:
             request.META[key] = value
