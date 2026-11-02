@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.28.0](https://github.com/splattner/openzev/compare/v1.27.0...v1.28.0) (2026-11-02)
+
+
+### Features
+
+* **live:** live energy page with snapshot card, today's curve and per-point table ([#1154](https://github.com/splattner/openzev/issues/1154)) ([24d3004](https://github.com/splattner/openzev/commit/24d3004fdc102667abde2fdee15af75ec075a04d))
+* **live:** live source setup and the My energy system page ([#1155](https://github.com/splattner/openzev/issues/1155)) ([78dfd45](https://github.com/splattner/openzev/commit/78dfd452b119a64c2bb9d76892b29803ac336def))
+* **live:** production forecast ([#1158](https://github.com/splattner/openzev/issues/1158)) ([af86971](https://github.com/splattner/openzev/commit/af869715dff702407235c360ab33de6678356753))
+* **live:** Solar Manager live pull ([#1156](https://github.com/splattner/openzev/issues/1156)) ([250fc9e](https://github.com/splattner/openzev/commit/250fc9e779cdf63ab52cdb14a58db0d22e8fccd4))
+* **metering:** generalise energy data sources with capabilities ([#1151](https://github.com/splattner/openzev/issues/1151)) ([7f3f5d5](https://github.com/splattner/openzev/commit/7f3f5d557382c782b360255e24e0bcd5b5a437a4))
+* **metering:** live push endpoint and ZEV snapshot ([#1153](https://github.com/splattner/openzev/issues/1153)) ([5fbd65c](https://github.com/splattner/openzev/commit/5fbd65c3c9c8932332579c960140b3c04d3899d0))
+
+
+### Bug Fixes
+
+* **billing:** take percentage tariffs of the grid price with VAT in inclusive mode ([#1175](https://github.com/splattner/openzev/issues/1175)) ([357756a](https://github.com/splattner/openzev/commit/357756af06aa02f8cd7465e20c50268d5a374dbc)), closes [#1173](https://github.com/splattner/openzev/issues/1173)
+* **energy:** clarify source setup guidance and remove the duplicate action ([#1166](https://github.com/splattner/openzev/issues/1166)) ([399b0c3](https://github.com/splattner/openzev/commit/399b0c39819c96b7cc883b6b813e7d0d35e0a184)), closes [#1164](https://github.com/splattner/openzev/issues/1164)
+* **live:** give the forecast test that stores a credential an encryption key ([#1167](https://github.com/splattner/openzev/issues/1167)) ([a7199f8](https://github.com/splattner/openzev/commit/a7199f8adcbcd3a1258a40fee6356e952aa401d6))
+* **live:** show own figures at any tier, treat declared-idle meters as non-producing, put the tiles on the page ([#1171](https://github.com/splattner/openzev/issues/1171)) ([03c8eb5](https://github.com/splattner/openzev/commit/03c8eb5a492c381d68a3843b0060570b61df04cb))
+* **live:** UI review findings for the My energy page ([#1165](https://github.com/splattner/openzev/issues/1165)) ([fe2a7b0](https://github.com/splattner/openzev/commit/fe2a7b0b05c7688a19c0081d88453f4aeaf31703))
+* **mcp:** pass the outer Host and forwarded headers to tool sub-requests ([#1174](https://github.com/splattner/openzev/issues/1174)) ([1340bdf](https://github.com/splattner/openzev/commit/1340bdfdf23323368dc3b93680d25d1f53c850c0)), closes [#1172](https://github.com/splattner/openzev/issues/1172)
+
 ## [1.27.0](https://github.com/splattner/openzev/compare/v1.26.0...v1.27.0) (2026-10-30)
 
 
