@@ -654,8 +654,12 @@ community's, so there the page shows only the meters the user holds with generat
 - The connect flow is rendered next to the card, never inside it, and kept open by its own state; the source pane is
   kept open by the id in the URL and holds the one-time token of a rotation in its own state, so a push source's token
   stays on screen when the refreshed source list changes the rows behind it.
-- A closing hint, shown only while the feature is on and only to a participant, says who flags a
-  meter: the community's manager (§14). Participants cannot set the flag.
+- A closing hint, shown only while the feature is on and only to a participant without a flagged meter or a connection, says who flags a
+  meter: the community's manager (§14). Participants cannot set the flag. It is about the **history** only
+  (`pages.myMeteringPoints.flagHint`: "the history of your own system (production, self-sufficiency) can be connected once the
+  management has marked the meter *Generation behind the meter*"), and while a held meter offers live data it adds
+  `flagHintLive` ("you can already connect live data above without this mark"), so it never reads as a prerequisite of the Live
+  **Connect** buttons shown above it (UI patterns §10.3 rules 1 and 9).
 - While the feature is off (`eligible` answers `404`) the page is a plain meter list: no energy data
   card, no hint, no "ask your admin" text, and the sources are not requested.
 

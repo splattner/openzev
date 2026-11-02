@@ -24,17 +24,30 @@ data**. While it is off none of what follows is visible.
 
 ## Who can connect what
 
-Only the **participant who personally holds** the metering point can connect a
-source for it. It is their account and their household, so a ZEV manager cannot
-connect it for them, cannot see the key and cannot change it. The metering point
-must be marked **Generation behind the meter**, and you must hold it yourself
-(not through a shared community allocation).
+What you can connect depends on the **kind of data** and on **who holds the metering point**.
 
-| | You (holder) | ZEV manager | ZEV viewer | Other participants |
+| Kind of data | The meter must be | Who connects it |
+|---|---|---|
+| **History** (15-minute values, for production and self-sufficiency) | held by you personally **and** marked **Generation behind the meter** | the holder |
+| **Live** (values right now) | any meter you hold personally: a plain consumption meter or an EV charger as well | the holder |
+| **Forecast** (expected production) | a producing or bidirectional meter whose plant has roof planes and a building location (see [Production forecast](#production-forecast)) | the holder |
+
+Only the **participant who personally holds** the metering point can connect a source for it. It is their account
+and their household, so a ZEV manager cannot connect it for them, cannot see the key and cannot change it. You must
+hold the meter yourself, not through a shared community allocation. Only the **history** needs the mark **Generation
+behind the meter**, which only a manager can set; live data does not, so a meter without the mark still offers
+**Connect** for live data.
+
+**Community-operated sources** are different: a metering point nobody holds personally (a common area, a spare meter),
+the community's **grid connection point** and the forecast of such a plant belong to the community. A **manager** connects
+those on the **Energy data** tab of **Settings** (see [The community's sources](#the-communitys-sources-managers)).
+
+| | Holder (own source) | ZEV manager | ZEV viewer | Other participants |
 |---|---|---|---|---|
-| Connect, test, sync, replace the key, import | yes | no | no | no |
-| See the status and your figures | yes | yes | yes (read-only) | no |
-| Switch off, disconnect, delete data, remove | yes | yes | no | no |
+| Connect, test, sync, replace the key, import, on a **personally held** meter | yes | no | no | no |
+| Connect, test, replace the key, on a **community-operated** meter or the grid connection point | n/a | yes | no | no |
+| See the status and figures | yes | yes | yes (read-only) | no |
+| Switch off, disconnect, delete data, remove a **participant's** source | yes | switch off or on, delete data, remove (never disconnect, test or touch the key) | no | no |
 
 Each metering point on that page has two parts. **Grid operator's meter** holds the
 button **View meter data**, which opens the chart of the readings billing is based on.
@@ -42,7 +55,9 @@ button **View meter data**, which opens the chart of the readings billing is bas
 shown and used for statistics, never for billing, so the button does not show those figures.
 
 If you are a ZEV manager and hold a metering point yourself, you connect it the
-same way as any participant: **My metering points** appears in your menu.
+same way as any participant: **My metering points** appears in your menu. A manager who
+connects their own plant's forecast is told where to enter the roof planes and the building's
+location (a button leads to the metering points); a participant is told to ask their manager.
 
 When you no longer hold the metering point (the assignment ends), the connection
 is switched off by itself, the key is deleted, and nothing new is collected. The
@@ -54,8 +69,8 @@ data already collected is kept until you or a manager deletes it.
 
 1. Create an **API key** in your Solar Manager account.
 2. In OpenZEV open **My metering points** in the menu. The metering points that
-   are marked *Generation behind the meter* and that you hold yourself carry the
-   energy data setup.
+   you hold yourself carry the energy data setup. For **history**, the meter must also be
+   marked *Generation behind the meter*; for live data and the forecast it does not need that mark.
 3. Choose **Connect** on the metering point.
 4. Pick **Solar Manager**, enter your **Solar Manager ID** (3 to 24 letters or
    digits) and the **API key**, and read what you agree to.
@@ -338,7 +353,7 @@ connect a source, it opens there by itself.
 The metering point list shows nothing about energy data. What a manager looks after is on the **Energy data** tab of
 **Settings** (it appears while the feature is on): every source of the community in one list, the grid connection point
 first, with who holds it and what it provides. Nothing is coloured while a source works; a source that has gone quiet or
-failed shows its problem in red text. Choose a source to open its details beside the list.
+failed shows its problem in red text. Choose a source to open its details beside the list. Until the first source exists the tab shows a single explanation with one **Connect a source** button; the introduction and the button in the toolbar come with the first source.
 
 - **Your community's own sources.** **Connect a source** connects live data for a metering point nobody holds
   personally (a common area, a spare meter), the production forecast of such a plant, or the grid connection point. You
@@ -363,10 +378,12 @@ sources and readings with them.
 
 ## Troubleshooting
 
-**There is no Connect button on my metering point.** The feature is off, you do
+**There is no Connect button on my metering point.** The feature is off, or you do
 not personally hold the metering point (a shared community allocation does not
-count), or it is not marked *Generation behind the meter*. Only a ZEV manager can
-set that mark, so ask them; **My metering points** says so too.
+count). For **live** data that is all it takes. For **history** (production and self-sufficiency)
+the meter must also be marked *Generation behind the meter*; only a ZEV manager can
+set that mark, so ask them (**My metering points** says so too, below the meters). A meter nobody
+holds personally is connected by a manager on the **Energy data** tab of **Settings**, not by a participant.
 
 **"Not accepted" when connecting.** The key or the Solar Manager ID is wrong. The
 ID is the one of your installation, not your login name.

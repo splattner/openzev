@@ -116,6 +116,16 @@ describe('MyMeteringPointsPage', () => {
         const { container } = await mount()
 
         expect(container.textContent).toContain('pages.myMeteringPoints.flagHint')
+        // The flag is for the history; the live connection offered above does not need it, and the hint says so.
+        expect(container.textContent).toContain('pages.myMeteringPoints.flagHintLive')
+    })
+
+    it('does not point to a live connection above when the meter offers none', async () => {
+        api.fetchEligibleOrNull.mockResolvedValue([{ ...eligible('1'), eligible_capabilities: ['forecast'] }])
+        const { container } = await mount()
+
+        expect(container.textContent).toContain('pages.myMeteringPoints.flagHint')
+        expect(container.textContent).not.toContain('pages.myMeteringPoints.flagHintLive')
     })
 
     it('gives a meter without energy data the same meter-data band, and no own-data section', async () => {
