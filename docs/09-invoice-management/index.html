@@ -2325,8 +2325,8 @@ charge was added or changed, and warns about a charge nobody can be billed for
 (no member on its date). It stays out of the list for periods without charges.</p>
 <h2 id="participant-view-my-invoices">Participant View: My Invoices<a class="headerlink" href="#participant-view-my-invoices" title="Permanent link">&para;</a></h2>
 <p>Participants open <strong>My invoices</strong> (<code>/me/invoices</code>) in the sidebar to see the
-invoices issued to them — invoice number, period, total, status, and a link to
-the details. An invoice appears here once it has been sent: drafts and
+invoices issued to them — invoice number, period, total, whether payment is
+<strong>due</strong>, <strong>overdue</strong> or <strong>paid</strong>, and a link to the details. An invoice appears here once it has been sent: drafts and
 approved invoices that haven't gone out yet stay with the operator, and the
 participant's annual statement counts only sent invoices too. A sent invoice
 that is cancelled later stays listed, marked as cancelled. The PDF button
@@ -2637,8 +2637,10 @@ without internal import evidence or management actions.</p>
 <h3 id="invoice-detail-page">Invoice Detail Page<a class="headerlink" href="#invoice-detail-page" title="Permanent link">&para;</a></h3>
 <p><img alt="Invoice detail page" src="../screenshots/08b-invoice-detail.png" /></p>
 <p>The page header names the invoice and, next to the recipient and the billing
-period, its current <strong>status</strong> — the same status pill the invoice document
-prints. Below it, two rows of figure tiles summarise the invoice the way its
+period, its current <strong>status</strong> as a quiet label (a participant sees whether
+payment is due, overdue or paid instead). The invoice PDF itself no longer prints
+a status line; only a draft or cancelled document carries a plain <strong>Draft</strong> or
+<strong>Cancelled</strong> marking. Below it, two rows of figure tiles summarise the invoice the way its
 PDF does:</p>
 <ul>
 <li><strong>Total CHF</strong> (the dark tile) — the final invoiced amount.</li>
@@ -2763,7 +2765,7 @@ as paid</strong> and books only what is still open.</p>
 stay unavailable while either action is saving, even if you close the payment dialog.</p>
 <p><img alt="Record payment dialog" src="../screenshots/08h-record-payment-dialog.png" /></p>
 <p>A payment short of the total leaves the invoice <strong>Partly paid</strong>: its status
-pill says so, and the payment step in the period table shows it as under way.
+label says so, and the payment step in the period table shows it as under way.
 Once the payments cover the total, the invoice becomes <code>Paid</code>. <strong>Mark rest as
 paid</strong> records whatever is still outstanding in one go.</p>
 <p><img alt="Payments card of a partly paid invoice" src="../screenshots/08f-invoice-payments.png" /></p>
