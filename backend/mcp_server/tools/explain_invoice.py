@@ -49,29 +49,55 @@ def _invoice_block(data: dict) -> dict:
 
 
 def _lines(data: dict) -> list[dict]:
-    return [
-        {
+    lines = []
+    for item in data.get("items", []):
+        unit = item.get("unit") or "kWh"
+        line = {
             "type": item.get("item_type"),
             "description": item.get("description", ""),
-            "quantity_kwh": kwh(item.get("quantity_kwh")),
+            # The quantity is in ``unit``: kWh for energy lines, months for
+            # fee lines. ``quantity_kwh`` is only set when it really is kWh.
+            "quantity": kwh(item.get("quantity_kwh")),
+            "unit": unit,
             "unit_price": item.get("unit_price_chf"),
             "amount_chf": chf(item.get("total_chf")),
         }
-        for item in data.get("items", [])
-    ]
+        if unit == "kWh":
+            line["quantity_kwh"] = line["quantity"]
+        lines.append(line)
+    return lines
+
+
+# Energy per item type comes from the invoice totals, never from adding up the
+# lines: energy, grid use and each levy are separate lines over the same kWh,
+# and fee lines carry months. Types not listed here (fee, credit, other) have
+# no kWh figure.
+_TYPE_KWH_TOTAL = {
+    "local_energy": "total_local_kwh",
+    "grid_energy": "total_grid_kwh",
+    "feed_in": "total_feed_in_kwh",
+}
 
 
 def _by_type(data: dict) -> dict:
-    by_type: dict[str, dict] = {}
+    amounts: dict[str, float] = {}
     for item in data.get("items", []):
         item_type = item.get("item_type") or "other"
-        bucket = by_type.setdefault(item_type, {"kwh": 0.0, "amount_chf": 0.0})
-        bucket["kwh"] += float(item.get("quantity_kwh") or 0)
-        bucket["amount_chf"] += float(item.get("total_chf") or 0)
-    return {
-        item_type: {"kwh": round(vals["kwh"], 3), "amount_chf": f"{vals['amount_chf']:.2f}"}
-        for item_type, vals in by_type.items()
-    }
+        amounts[item_type] = amounts.get(item_type, 0.0) + float(item.get("total_chf") or 0)
+    by_type: dict[str, dict] = {}
+    for item_type, amount in amounts.items():
+        entry: dict = {"amount_chf": f"{amount:.2f}"}
+        total_field = _TYPE_KWH_TOTAL.get(item_type)
+        if total_field:
+            entry["kwh"] = round(float(data.get(total_field) or 0), 3)
+            if item_type == "local_energy":
+                # A producer's sale inside the ZEV is credited on the same
+                # type; keep its kWh apart from what the participant bought.
+                sold = float(data.get("total_local_sold_kwh") or 0)
+                if sold:
+                    entry["sold_kwh"] = round(sold, 3)
+        by_type[item_type] = entry
+    return by_type
 
 
 def _energy(data: dict) -> dict:
@@ -180,12 +206,13 @@ class ExplainInvoiceTool(Tool):
         prev_by_type = _by_type(previous)
         by_type_change = {}
         for item_type in set(cur_by_type) | set(prev_by_type):
-            cur = cur_by_type.get(item_type, {"kwh": 0.0, "amount_chf": "0.00"})
-            prev = prev_by_type.get(item_type, {"kwh": 0.0, "amount_chf": "0.00"})
-            by_type_change[item_type] = {
-                "kwh_delta": round(cur["kwh"] - prev["kwh"], 3),
-                "amount_delta_chf": f"{float(cur['amount_chf']) - float(prev['amount_chf']):.2f}",
-            }
+            cur = cur_by_type.get(item_type, {"amount_chf": "0.00"})
+            prev = prev_by_type.get(item_type, {"amount_chf": "0.00"})
+            delta = {"amount_delta_chf": f"{float(cur['amount_chf']) - float(prev['amount_chf']):.2f}"}
+            for key in ("kwh", "sold_kwh"):
+                if key in cur or key in prev:
+                    delta[f"{key}_delta"] = round(cur.get(key, 0.0) - prev.get(key, 0.0), 3)
+            by_type_change[item_type] = delta
 
         def _days(inv: dict) -> int | None:
             start, end = inv.get("period_start"), inv.get("period_end")
