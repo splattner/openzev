@@ -790,9 +790,10 @@ whatever happened. A per-address mail cooldown (15 minutes, the cache slot `regi
 `password-reset-mail:<sha256(lowercased address)>`) is taken **before** the account is looked up, so it
 behaves the same for every address; an unreachable cache gives the neutral answer and no mail. The address
 is matched case-insensitively against the unique `User.email`. A link is sent only when
-`password_reset.can_reset(user)` holds: active, has an address and a **usable password**. Participant-only
-accounts without a password, OAuth-only accounts and inactive (pending signup or invitation) accounts get
-the neutral answer and nothing else. A participant who has chosen a password can be reset like anyone
+`password_reset.can_reset(user)` holds: active, has an address and either a **usable password** or no
+password but `zev.services.requires_independent_login` (a manager, admin or accepted invitee who left before
+choosing a password). Participant-only accounts without a password, other OAuth-only accounts and inactive
+(pending signup or invitation, resend the invitation instead) accounts get the neutral answer and nothing else. A participant who has chosen a password can be reset like anyone
 else. A mail failure is logged, releases the cooldown and returns the same answer. A sent link is audited
 `password.reset_requested` (no actor: the requester is unauthenticated).
 
