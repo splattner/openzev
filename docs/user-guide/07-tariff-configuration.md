@@ -493,6 +493,12 @@ A percentage tariff derives its price from other active tariffs rather than spec
 
 Instead of setting a price, you set a **percentage** (0–100%). During billing, OpenZEV looks up the sum of all active **grid energy tariff** rates at each timestamp and multiplies by the percentage to calculate the effective per-kWh price.
 
+If the community folds VAT into its prices (VAT treatment **inclusive**), the
+percentage is taken of the grid price **with** VAT — what a participant would
+otherwise pay — so 65% of a CHF 0.2000/kWh net grid price bills CHF 0.1405/kWh,
+not CHF 0.1300/kWh. The local line itself gets no VAT added, and the invoice
+line shows the base with VAT (for example "65% von CHF 0.2162/kWh").
+
 **Configuration:**
 - **Billing Mode** — Select `Percentage of energy tariffs`
 - **Energy Type** — `Local Energy`, `Grid Energy`, or `Feed-in` (determines which energy stream the tariff applies to)

@@ -501,8 +501,16 @@ class TariffResolver:
     """
 
     def __init__(
-        self, tariffs: Iterable[Tariff], generation_context: "InvoiceGenerationContext | None" = None,
+        self,
+        tariffs: Iterable[Tariff],
+        generation_context: "InvoiceGenerationContext | None" = None,
+        *,
+        input_vat_rate: Decimal = Decimal("0"),
     ):
+        # Non-zero only for a ZEV on VatMode.INCLUSIVE: the grid prices a
+        # percentage tariff is a share of are billed to participants with VAT
+        # folded in, so the share is taken of that grossed price.
+        self.input_vat_rate = input_vat_rate
         self._energy: dict[str, list[Tariff]] = {}
         self._percentage: dict[str, list[Tariff]] = {}
         for tariff in tariffs:
@@ -1587,11 +1595,22 @@ def _price_energy(acc, tariffs, energy_type, quantity, ts, day, *, sign, bucket=
     # A dynamic grid tariff flows into the percentage base through the same
     # funnel a direct energy line uses, so a levy charged as a % of the grid
     # rate follows the fetched series for free.
-    grid_base = sum(
-        tariffs.price_at(t, ts)[0]
-        for t in tariffs.energy(EnergyType.GRID, day)
-    )
+    vat_factor = Decimal("1") + tariffs.input_vat_rate
+    net_base = Decimal("0")
+    gross_base = Decimal("0")
+    for t in tariffs.energy(EnergyType.GRID, day):
+        price = tariffs.price_at(t, ts)[0]
+        net_base += price
+        # The same classifier the engine grosses lines with, so the base is
+        # exactly what a participant would otherwise be billed.
+        gross_base += price * vat_factor if _tariff_bears_input_vat(t) else price
     for tariff, pct, period in pct_prices:
+        # A percentage line that itself bears input VAT is grossed afterwards
+        # in _build_item_payloads, so its base stays net here (grossing both
+        # would apply the VAT twice). The usual line (local energy) is never
+        # grossed, so it takes the grossed base. Credits (sign=-1) take the
+        # same base, so a producer's credit and the charges still net to zero.
+        grid_base = net_base if _tariff_bears_input_vat(tariff) else gross_base
         effective_price = grid_base * (pct / Decimal("100"))
         acc.add(
             tariff=tariff,
@@ -1685,7 +1704,10 @@ def generate_invoice(
     # A previous participant may have rolled back, or maintenance may have run
     # between invoices. Never reuse prices after releasing their source locks.
     generation_context._dynamic_series_cache.clear()
-    tariffs = TariffResolver(tariffs_list, generation_context)
+    # INCLUSIVE folds non-recoverable VAT into the line totals; the other
+    # modes leave prices untouched here (REGISTERED adds a line below).
+    gross_rate = _active_vat_rate(period_end) if zev.vat_mode == VatMode.INCLUSIVE else Decimal("0")
+    tariffs = TariffResolver(tariffs_list, generation_context, input_vat_rate=gross_rate)
     # ─── 7. Per-reading HT/NT-aware pricing with timestamp allocation ─────
     local_kwh_acc = Decimal("0")
     grid_kwh_acc = Decimal("0")
@@ -1916,9 +1938,6 @@ def generate_invoice(
     local_kwh = local_kwh_acc.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
     grid_kwh = grid_kwh_acc.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
-    # INCLUSIVE folds non-recoverable VAT into the line totals; the other
-    # modes leave prices untouched here (REGISTERED adds a line below).
-    gross_rate = _active_vat_rate(period_end) if zev.vat_mode == VatMode.INCLUSIVE else Decimal("0")
     item_payloads, subtotal, embedded_vat_chf = _build_item_payloads(
         items_accumulator, gross_rate=gross_rate
     )

@@ -20,9 +20,10 @@ from django.db.models.functions import Least
 from allocation.validity import active_on
 from allocation.split import local_pool_kwh
 from metering.models import MeterReading, ReadingDirection
+from invoices.engine import _active_vat_rate, _tariff_bears_input_vat
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory
 from tariffs.periods import average_percentage
-from zev.models import MeteringPointAssignment, MeteringPointType, Participant, Zev
+from zev.models import MeteringPointAssignment, MeteringPointType, Participant, VatMode, Zev
 
 from . import defaults
 
@@ -58,14 +59,28 @@ def _representative_price(tariff: Tariff) -> Decimal | None:
     return period.price_chf_per_kwh if period else None
 
 
+def _grid_vat_rate(zev: Zev, today: dt.date) -> Decimal:
+    """The VAT folded into a participant's grid prices: non-zero only for a
+    ZEV on ``VatMode.INCLUSIVE``, the one mode whose invoices bill the grid
+    lines with VAT included (the engine grosses the same lines)."""
+    return _active_vat_rate(today) if zev.vat_mode == VatMode.INCLUSIVE else Decimal("0")
+
+
 def _flat_energy_price_sum(
-    zev: Zev, *, energy_type: str, today: dt.date, categories: list[str] | None = None
+    zev: Zev,
+    *,
+    energy_type: str,
+    today: dt.date,
+    categories: list[str] | None = None,
+    vat_rate: Decimal = Decimal("0"),
 ) -> Decimal | None:
     """Sum of representative per-kWh prices across every currently-active flat
     (billing_mode=ENERGY) tariff of the given energy type. With ``categories``
     it restricts to those tariff categories (energy-only); without, it spans
     all of them (energy + grid fees + levies), matching the invoice engine's
-    ``grid_base_price_sum``. None when no such tariff exists at all."""
+    ``grid_base_price_sum``. With ``vat_rate`` each tariff the engine would
+    gross is multiplied by ``1 + vat_rate``. None when no such tariff exists
+    at all."""
     qs = active_on(
         Tariff.objects.filter(
             zev=zev,
@@ -82,7 +97,7 @@ def _flat_energy_price_sum(
     for tariff in qs:
         price = _representative_price(tariff)
         if price is not None:
-            total += price
+            total += price * (1 + vat_rate) if _tariff_bears_input_vat(tariff) else price
             found = True
     return total if found else None
 
@@ -116,7 +131,9 @@ def _all_in_retail_price(zev: Zev, today: dt.date) -> Decimal | None:
     percentage-of-energy GRID tariff applied to that base — exactly how the
     invoice engine bills grid consumption. None when there's no flat GRID
     energy tariff to anchor it."""
-    base = _flat_energy_price_sum(zev, energy_type=EnergyType.GRID, today=today)
+    base = _flat_energy_price_sum(
+        zev, energy_type=EnergyType.GRID, today=today, vat_rate=_grid_vat_rate(zev, today)
+    )
     if base is None:
         return None
     total_pct = _percentage_of_energy_sum(zev, energy_type=EnergyType.GRID, today=today)
@@ -147,7 +164,11 @@ def _internal_energy_price(zev: Zev, today: dt.date) -> Decimal | None:
         zev, energy_type=EnergyType.LOCAL, today=today, categories=[TariffCategory.ENERGY]
     )
     if local_pct > 0:
-        grid_base = _flat_energy_price_sum(zev, energy_type=EnergyType.GRID, today=today)
+        # With VAT folded in for an inclusive ZEV: the share is of what the
+        # participant would otherwise pay, as on the invoice.
+        grid_base = _flat_energy_price_sum(
+            zev, energy_type=EnergyType.GRID, today=today, vat_rate=_grid_vat_rate(zev, today)
+        )
         if grid_base is not None:
             total += grid_base * local_pct / Decimal("100")
             found = True

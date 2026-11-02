@@ -13,6 +13,9 @@
 
 ---
 
+> **Base under `vat_mode = inclusive` (#1173):** the grid base below is the price
+> with VAT folded in; see `2026-03-tariffs-and-billing-engine.md` §4.8.
+
 ## 1. Problem and outcome
 
 A `percentage_of_energy` tariff stores one `Tariff.percentage`, and the engine
