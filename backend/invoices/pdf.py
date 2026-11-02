@@ -349,6 +349,8 @@ def _build_template_context(
     # Each credit line and the amount-due line add a row to the totals block.
     if credit_application_rows:
         content_mm += _TABLE_ROW_MM * (len(credit_application_rows) + 1)
+    # The 5-Rappen rounding lines of the totals block (ZEV setting, normally absent).
+    content_mm += _TABLE_ROW_MM * (bool(invoice.rounding_chf) + bool(invoice.due_rounding_chf))
 
     # Producer credits (#957) and pass-through charges (#924) sit outside the
     # VAT base and are listed after the VAT; None when there are none or the

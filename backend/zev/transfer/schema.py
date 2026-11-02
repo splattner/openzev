@@ -172,6 +172,8 @@ ZEV_FIELDS = (
     "bank_name",
     "vat_mode",
     "vat_number",
+    # Optional: an older archive keeps the default (no rounding).
+    "invoice_rounding",
     "itemize_tariff_bands",
     "notes",
     "email_subject_template",
@@ -402,9 +404,13 @@ INVOICE_FIELDS = (
     "pass_through_chf",
     "vat_chf",
     "embedded_vat_chf",
+    # Optional: the 5-Rappen rounding inside the total and of the amount due
+    # after credit; an older archive has none.
+    "rounding_chf",
     "total_chf",
     # Optional (#388): the credit applied; an older archive has none.
     "credit_applied_chf",
+    "due_rounding_chf",
     "sent_at",
     # Optional (#388): an archive written before it existed infers it on
     # import from status and ``sent_at``.
@@ -438,6 +444,8 @@ CREDIT_FIELDS = (
     "vat_rate",
     "vat_chf",
     "embedded_vat_chf",
+    # Optional: the 5-Rappen rounding inside ``amount_chf``.
+    "rounding_chf",
     # Optional: an archive from before refunds imports a credit nobody paid out.
     "refunded_chf",
     "refunded_on",

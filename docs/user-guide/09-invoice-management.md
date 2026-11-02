@@ -374,6 +374,10 @@ PDF does:
   does not equal the subtotal times the rate; the invoice PDF below lists the
   producer credit after the VAT.
 
+When the ZEV rounds to 5 Rappen ([setup](02-zev-setup.md#rounding-to-5-rappen)),
+the total tile notes the rounding it contains, for example *incl. rounding
+CHF -0.01*.
+
 **Payments** (managers and viewers) — what has been received for the invoice:
 the amount received and still outstanding, and one row per payment with its
 date, amount, note and who recorded it. On a sent invoice, managers see

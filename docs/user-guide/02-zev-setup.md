@@ -242,6 +242,7 @@ address, after which the new login belongs to that party.
 | **Bank IBAN** | Account participants pay into; without it invoices carry no payment details or QR payment slip | No |
 | **VAT treatment** | How VAT is applied when billing participants (see [below](#vat-configuration)) | No |
 | **VAT number** | Swiss UID — shown only when VAT treatment is *VAT-registered* | If registered |
+| **Rounding of amounts** | Round what participants pay to 5 Rappen (see [below](#rounding-to-5-rappen)) | No |
 
 The QR-Rechnung creditor address is the address of the ZEV's responsible
 person, taken from their participant record.
@@ -305,6 +306,24 @@ Choose how often invoices are generated:
   active rate, prices are billed unchanged.
 
 If no VAT rate is active for an invoice period, VAT defaults to **0%** in every mode.
+
+### Rounding to 5 Rappen
+
+Switzerland has no coin below 5 Rappen. Set **Rounding of amounts** to
+*Round to 5 Rappen* and the amounts participants pay are rounded to the
+nearest CHF 0.05:
+
+- the **invoice total**,
+- the **amount due** after a credit note was set against the invoice, and
+- every **credit note**.
+
+A net payout to a producer (a negative total) is rounded the same way.
+
+Line items and VAT stay exactly as calculated. The difference (at most
+CHF 0.02) appears as its own **Rounding** line on the invoice and credit note,
+so VAT is never calculated on it. The QR payment slip and payments use the
+rounded amount. The setting is off by default, and changing it only affects
+invoices and credit notes created afterwards.
 
 ### Price bands on the invoice
 

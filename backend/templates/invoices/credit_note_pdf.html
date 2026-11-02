@@ -155,6 +155,18 @@
                     <td class="numeric">CHF {{ credit.vat_chf|floatformat:2 }}</td>
                 </tr>
                 {% endif %}
+                {% if credit.rounding_chf %}
+                {% if not show_vat %}
+                <tr>
+                    <td>{{ tr.amount }}</td>
+                    <td class="numeric">CHF {{ exact_chf|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td>{{ tr.rounding }}</td>
+                    <td class="numeric">CHF {{ credit.rounding_chf|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
                 <tr class="grand-total">
                     <td>{{ tr.total }}</td>
                     <td class="numeric">CHF {{ credit.amount_chf|floatformat:2 }}</td>

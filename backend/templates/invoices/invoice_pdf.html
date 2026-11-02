@@ -662,6 +662,12 @@
                             <td class="numeric">CHF {{ producer_credit_chf|floatformat:2 }}</td>
                         </tr>
                         {% endif %}
+                        {% if invoice.rounding_chf %}
+                        <tr>
+                            <td>{{ tr.rounding }}</td>
+                            <td class="numeric">CHF {{ invoice.rounding_chf|floatformat:2 }}</td>
+                        </tr>
+                        {% endif %}
                         <tr class="grand-total">
                             <td>{{ tr.total }}</td>
                             <td class="numeric">CHF {{ invoice.total_chf|floatformat:2 }}</td>
@@ -673,6 +679,12 @@
                         </tr>
                         {% endfor %}
                         {% if credit_application_rows %}
+                        {% if invoice.due_rounding_chf %}
+                        <tr>
+                            <td>{{ tr.rounding }}</td>
+                            <td class="numeric">CHF {{ invoice.due_rounding_chf|floatformat:2 }}</td>
+                        </tr>
+                        {% endif %}
                         <tr class="grand-total">
                             <td>{{ tr.amount_due }}</td>
                             <td class="numeric">CHF {{ invoice.amount_due_chf|floatformat:2 }}</td>

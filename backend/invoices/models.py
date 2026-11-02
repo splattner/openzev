@@ -123,6 +123,14 @@ class Invoice(models.Model):
     embedded_vat_chf = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
+    # Rounding of the payable figures to 5 Rappen (``Zev.invoice_rounding``).
+    # ``rounding_chf`` is what was added to ``subtotal_chf + vat_chf`` to reach
+    # ``total_chf``; it is outside the VAT base. ``due_rounding_chf`` is what was
+    # added to ``total_chf - credit_applied_chf`` to reach the amount due. Both
+    # are frozen as issued, so changing the ZEV setting later changes nothing
+    # already generated. Zero when the ZEV does not round.
+    rounding_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    due_rounding_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     # Open credit notes set against this invoice at generation, after VAT (#388).
     # Frozen as issued: releasing the applications on a cancellation leaves it,
@@ -169,9 +177,11 @@ class Invoice(models.Model):
     @property
     def amount_due_chf(self):
         """What the participant is asked to pay: the total less the credit
-        applied, never below zero. A payout (total <= 0) is not reduced."""
+        applied, never below zero, plus the rounding of that difference
+        (``due_rounding_chf``, zero unless the ZEV rounds). A payout
+        (total <= 0) is not reduced."""
         if self.total_chf > 0:
-            return max(self.total_chf - self.credit_applied_chf, Decimal("0"))
+            return max(self.total_chf - self.credit_applied_chf, Decimal("0")) + self.due_rounding_chf
         return self.total_chf
 
 
@@ -285,8 +295,12 @@ class Credit(models.Model):
         Invoice, on_delete=models.PROTECT, null=True, blank=True, related_name="credits"
     )
     reason = models.TextField()
-    # Gross.
+    # Gross, including ``rounding_chf``.
     amount_chf = models.DecimalField(max_digits=10, decimal_places=2)
+    # What rounding to 5 Rappen added to the credited amount (``Zev.invoice_rounding``
+    # at issue). The VAT and the creditable cap are worked out on
+    # ``amount_chf - rounding_chf``. Zero when the ZEV does not round.
+    rounding_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     vat_mode = models.CharField(max_length=20, choices=VatMode.choices)
     vat_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0)
     # The VAT contained in ``amount_chf`` (registered mode).

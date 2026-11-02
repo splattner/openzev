@@ -42,4 +42,10 @@ describe('zev form mapping', () => {
     expect(mapZevToForm(zev()).postal_code).toBe('')
     expect(getDefaultZevForm().postal_code).toBe('')
   })
+
+  it('carries the 5-Rappen rounding through, defaulting to none', () => {
+    expect(mapZevToForm(zev({ invoice_rounding: 'five_rappen' })).invoice_rounding).toBe('five_rappen')
+    expect(mapZevToForm(zev()).invoice_rounding).toBe('none')
+    expect(getDefaultZevForm().invoice_rounding).toBe('none')
+  })
 })

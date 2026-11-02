@@ -1253,7 +1253,8 @@ as free. Specified in `2026-10-payments-and-credits.md` §4.7.
 | `subtotal_chf` | 2 decimal places | `ROUND_HALF_UP` |
 | `vat_base_chf` | exact: `subtotal_chf` minus the producer-credit groups | (already rounded) |
 | `vat_chf` | 2 decimal places | `ROUND_HALF_UP` |
-| `total_chf` | exact: `subtotal_chf + vat_chf` | (already rounded) |
+| `rounding_chf` | the difference to the nearest CHF 0.05 of `subtotal_chf + vat_chf`; `0` unless the ZEV rounds (§5.1) | `ROUND_HALF_UP` to a multiple of 0.05 |
+| `total_chf` | exact: `subtotal_chf + vat_chf + rounding_chf` | (already rounded) |
 
 `unit_price` is back-calculated: `total / quantity` (rounded to 5 dp).  This avoids per-reading rounding drift.
 
@@ -1267,6 +1268,35 @@ the lines that lost the most in their own rounding (ties broken by magnitude,
 then position, so the distribution is deterministic). A tariff therefore costs
 the same whether or not its bands are itemised, and the lines still sum to
 `subtotal_chf`.
+
+### 5.1 Rounding to 5 Rappen (`Zev.invoice_rounding`)
+
+A ZEV can round what participants are asked to pay to the nearest CHF 0.05, the smallest coin
+in Switzerland. `Zev.invoice_rounding` is `none` (default) or `five_rappen`. Rounding touches
+the payable figures only, never the line items, the subtotal or the VAT: the difference is stored
+beside them and printed as its own "Rundung" line, so the VAT base is unchanged.
+
+| Figure | Rounded | Stored as |
+|---|---|---|
+| Invoice total | `subtotal_chf + vat_chf` | `Invoice.rounding_chf`, included in `total_chf` |
+| Amount due after credit | `total_chf − credit_applied_chf`, when credit was applied | `Invoice.due_rounding_chf`, added by `amount_due_chf` |
+| Credit note | the credited amount (reversal: what was received; adjustment: what was entered) | `Credit.rounding_chf`, included in `Credit.amount_chf` |
+
+`invoices.rounding.round_to_step` rounds half away from zero, so a producer payout (negative
+total) rounds symmetrically. Cent amounts never tie on 0.05: x.x1 and x.x2 go down, x.x3 and x.x4 up,
+x.x6 and x.x7 down, x.x8 and x.x9 up.
+
+- The values are written at generation (engine step 7, `apply_open_credits`) and by `correct_invoice`,
+  and frozen as issued. Changing the setting never alters an issued document. Invoices from before
+  the setting have `0`.
+- A credit note's VAT split and the creditable cap work on the exact amount (`amount_chf −
+  rounding_chf`): `credited_chf` sums the exact amounts, so rounding never eats into what can still
+  be credited. An adjustment that rounds to CHF 0.00 is refused; a reversal of less than that issues
+  no credit note.
+- The payment limit, `outstanding_chf`, the QR-bill amount and the "paid" comparison all use the
+  rounded `amount_due_chf`.
+- Reports show `total_chf` as billed, so on a rounding ZEV `subtotal + VAT` and `total` differ by
+  the rounding in the annual statement table.
 
 The centime a line gains or gives up lands on its `total_chf` only. Its
 `unit_price_chf` stays derived from the unrounded total, so an itemised line

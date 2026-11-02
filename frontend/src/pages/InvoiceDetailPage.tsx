@@ -139,6 +139,15 @@ export function InvoiceDetailPage() {
         }
     }
 
+    // What sits behind the headline total: the 5-Rappen rounding it contains
+    // and, when credit was set against it, what is left to pay.
+    const totalHint = [
+        Number(inv.rounding_chf ?? 0) !== 0
+            ? t('pages.invoiceDetail.roundingHint', { amount: formatChf(Number(inv.rounding_chf)) })
+            : null,
+        hasCreditApplied(inv) ? t('pages.invoiceDetail.amountDueHint', { amount: formatChf(amountDueChf(inv)) }) : null,
+    ].filter(Boolean).join(' · ') || undefined
+
     return (
         <div className="page-stack">
             <PageHeader
@@ -185,7 +194,7 @@ export function InvoiceDetailPage() {
                         label={t('pages.invoiceDetail.total')}
                         value={formatChfAmount(Number(inv.total_chf))}
                         currency="CHF"
-                        hint={hasCreditApplied(inv) ? t('pages.invoiceDetail.amountDueHint', { amount: formatChf(amountDueChf(inv)) }) : undefined}
+                        hint={totalHint}
                     />
                     <StatCard label={t('pages.invoiceDetail.subtotal')} value={inv.subtotal_chf != null ? formatChfAmount(Number(inv.subtotal_chf)) : null} currency="CHF" />
                     <StatCard label={t('pages.invoiceDetail.vat')} value={inv.vat_chf != null ? formatChfAmount(Number(inv.vat_chf)) : null} currency="CHF" />

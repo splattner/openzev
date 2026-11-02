@@ -3,7 +3,6 @@
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase
-from testing.helpers import create_managed_zev, make_user
 
 
 BEFORE = [("zev", "0046_meteringpoint_secondary_meter_id")]
@@ -18,7 +17,7 @@ class MeterIdentityMigrationTests(TransactionTestCase):
         apps = executor.loader.project_state(BEFORE).apps
         self.Building = apps.get_model("zev", "Building")
         self.Point = apps.get_model("zev", "MeteringPoint")
-        self.zev = create_managed_zev(name="Migration ZEV", owner=make_user("migration-owner"))
+        self.zev = apps.get_model("zev", "Zev").objects.create(name="Migration ZEV")
 
     def tearDown(self):
         self.Point.objects.all().delete()

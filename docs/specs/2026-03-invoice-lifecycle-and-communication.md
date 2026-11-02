@@ -70,8 +70,10 @@ lifecycle from scratch.
 | `vat_rate` | `Decimal(5,4)` | VAT fraction (e.g. `0.0810`) |
 | `vat_base_chf` | `Decimal(10,2)` (nullable) | What `vat_chf` was charged on, under `vat_mode = registered`: `subtotal_chf` without the producer-credit lines (see tariffs spec §4.8). Null under the other VAT modes and on invoices issued before the field existed, whose VAT base is `subtotal_chf` |
 | `vat_chf` | `Decimal(10,2)` | `(vat_base_chf ?? subtotal_chf) × vat_rate` |
-| `total_chf` | `Decimal(10,2)` | `subtotal_chf + vat_chf` (producer credits stay in the subtotal, so they are still settled against the invoice) |
-| `credit_applied_chf` | `Decimal(10,2)` | Credit notes the engine set against the invoice at generation, after VAT (default `0`). Frozen as issued: cancelling the invoice releases the applications but leaves it. The amount due is the derived model property `amount_due_chf` = `max(total_chf − credit_applied_chf, 0)` when `total_chf > 0`, else `total_chf`; it is not stored (`2026-10-payments-and-credits.md` §4.7) |
+| `rounding_chf` | `Decimal(10,2)` | 5-Rappen rounding of the payable total (`Zev.invoice_rounding`, default `0`): what was added to `subtotal_chf + vat_chf` to reach `total_chf`. Outside the VAT base. Frozen as issued (tariffs spec §5.1) |
+| `total_chf` | `Decimal(10,2)` | `subtotal_chf + vat_chf + rounding_chf` (producer credits stay in the subtotal, so they are still settled against the invoice) |
+| `credit_applied_chf` | `Decimal(10,2)` | Credit notes the engine set against the invoice at generation, after VAT (default `0`). Frozen as issued: cancelling the invoice releases the applications but leaves it. The amount due is the derived model property `amount_due_chf` = `max(total_chf − credit_applied_chf, 0) + due_rounding_chf` when `total_chf > 0`, else `total_chf`; it is not stored (`2026-10-payments-and-credits.md` §4.7) |
+| `due_rounding_chf` | `Decimal(10,2)` | 5-Rappen rounding of what is left to pay after credit (default `0`; only non-zero when credit was applied and the ZEV rounds). Set by `apply_open_credits`, frozen as issued |
 | `pdf_file` | `FileField` | Uploaded PDF path (`invoices/pdf/`) |
 | `sent_at` | `DateTimeField` (nullable) | Timestamp of most recent email send |
 | `approved_at` | `DateTimeField` (nullable) | Stamped by `approve_invoice` and by `approve-all`; never cleared, not even on cancellation. An invoice with it set — or, for rows written without the workflow, with status `approved`/`sent`/`paid` (`invoices.models.issued()`) — is *issued* and is never deleted by regeneration or by a non-admin (§4.4, §4.5, ADR 0037). Backfilled by migration `invoices/0023` from the newest `invoice.approve` audit event, else `sent_at`, else `updated_at` for approved/sent/paid rows |
@@ -1235,6 +1237,7 @@ Two shapes, split by cost. `InvoiceListSerializer` returns all invoice fields pl
   pages from a `paid_sum` `Subquery` annotation, on detail shapes from the
   prefetched `payments`.
 - `credit_applied_chf` (a model column) and `amount_due_chf` (read-only, the derived property) as 2-decimal strings.
+- `rounding_chf` and `due_rounding_chf` (model columns, read-only) as 2-decimal strings: the 5-Rappen rounding inside `total_chf` and of the amount due after credit.
 - `outstanding_chf`: `amount_due_chf − paid_chf`, or `"0.00"` for a cancelled invoice.
 
 `InvoiceSerializer` subclasses it and adds the nested read-only relations:

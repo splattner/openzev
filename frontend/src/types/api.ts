@@ -269,6 +269,8 @@ export interface Zev {
     bank_name?: string
     vat_mode?: 'not_registered' | 'registered' | 'inclusive'
     vat_number?: string
+    /** Rounds the invoice total, the amount due and credit notes to 5 Rappen. */
+    invoice_rounding?: 'none' | 'five_rappen'
     itemize_tariff_bands?: boolean
     participant_invoice_access?: boolean
     notes?: string
@@ -300,6 +302,8 @@ export interface ZevInput {
     bank_name?: string
     vat_mode?: 'not_registered' | 'registered' | 'inclusive'
     vat_number?: string
+    /** Rounds the invoice total, the amount due and credit notes to 5 Rappen. */
+    invoice_rounding?: 'none' | 'five_rappen'
     itemize_tariff_bands?: boolean
     participant_invoice_access?: boolean
     notes?: string
@@ -1423,9 +1427,13 @@ export interface Invoice {
     vat_rate?: string
     vat_base_chf?: string | null
     vat_chf?: string
+    /** 5-Rappen rounding inside `total_chf` (ZEV setting); `"0.00"` when the ZEV does not round. */
+    rounding_chf?: string
     total_chf: string
     /** Credit notes set against this invoice at generation (#388); frozen as issued. */
     credit_applied_chf?: string
+    /** 5-Rappen rounding of the amount due after credit. */
+    due_rounding_chf?: string
     /** `max(total - credit applied, 0)` for an invoice that collects money; the total otherwise. */
     amount_due_chf?: string
     total_local_kwh?: string
@@ -1528,6 +1536,8 @@ export interface Credit {
     vat_rate: string
     vat_chf: string
     embedded_vat_chf: string | null
+    /** 5-Rappen rounding inside `amount_chf`. */
+    rounding_chf: string
     /** Amount less the active applications and what was refunded. */
     remaining_chf: string
     refunded_chf: string

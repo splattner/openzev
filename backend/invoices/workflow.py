@@ -50,7 +50,7 @@ completed in the caller, not held across it.
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import F, Sum
 from django.utils import timezone
 
 from zev.models import VatMode
@@ -58,6 +58,7 @@ from zev.models import VatMode
 from .models import (
     Credit, CreditApplication, CreditKind, Invoice, InvoicePdfStatus, InvoiceStatus, Payment,
 )
+from .rounding import rounding_difference, rounding_step
 
 
 class InvoiceWorkflowError(Exception):
@@ -232,7 +233,11 @@ def apply_open_credits(invoice: Invoice) -> Decimal:
         to_cover -= amount
     if applied:
         invoice.credit_applied_chf = applied
-        invoice.save(update_fields=["credit_applied_chf"])
+        # The amount left to pay is rounded like the total (``Zev.invoice_rounding``):
+        # a credit of CHF 12.33 against 87.45 leaves 75.12, asked for as 75.10.
+        remainder = invoice.total_chf - applied
+        invoice.due_rounding_chf = rounding_difference(remainder, rounding_step(invoice.zev)) if remainder > 0 else Decimal("0")
+        invoice.save(update_fields=["credit_applied_chf", "due_rounding_chf"])
     return applied
 
 
@@ -411,9 +416,11 @@ def credit_vat_split(source: Invoice, amount: Decimal) -> dict:
 
 
 def credited_chf(invoice_pk) -> Decimal:
-    """Sum of the credit notes issued for an invoice."""
+    """Sum of the credit notes issued for an invoice, before their rounding:
+    what was corrected, so the 5-Rappen rounding of a credit note never eats
+    into what is still creditable."""
     return Credit.objects.filter(source_invoice_id=invoice_pk).aggregate(
-        total=Sum("amount_chf")
+        total=Sum(F("amount_chf") - F("rounding_chf"))
     )["total"] or Decimal("0")
 
 
@@ -475,12 +482,23 @@ def correct_invoice(
                 raise InvoiceWorkflowError(f"The credit exceeds the creditable amount of CHF {creditable:.2f}.")
             amount = amount_chf
 
+        # The credit note is rounded like an invoice (``Zev.invoice_rounding``).
+        # The cap above and the VAT split work on the exact ``amount``; only the
+        # note's payable figure carries the rounding.
+        rounding = rounding_difference(amount, rounding_step(locked.zev)) if amount > 0 else Decimal("0")
+        if amount > 0 and amount + rounding <= 0:
+            if kind == CreditKind.ADJUSTMENT:
+                raise InvoiceWorkflowError("The credit rounds to CHF 0.00. Enter at least CHF 0.03.")
+            # Less than the smallest coin was received: nothing worth paying back.
+            amount, rounding = Decimal("0"), Decimal("0")
+
         credit = None
         if amount > 0:
             credit = Credit.objects.create(
                 credit_number=locked.zev.next_credit_note_number(),
                 zev=locked.zev, participant=locked.participant, kind=kind, source_invoice=locked,
-                reason=reason, amount_chf=amount, issuer=locked.issuer, recipient=locked.recipient,
+                reason=reason, amount_chf=amount + rounding, rounding_chf=rounding,
+                issuer=locked.issuer, recipient=locked.recipient,
                 pdf_status=InvoicePdfStatus.PENDING, created_by=user,
                 **credit_vat_split(locked, amount),
             )
