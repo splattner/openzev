@@ -100,6 +100,8 @@ def _serialize(invoice) -> dict:
         # The one field that can change after the paper was printed, which is
         # the point: "have I paid this?" is the reader's second question.
         "is_paid": invoice.status == InvoiceStatus.PAID,
+        # On the paper already; lets the page tell "payment due" from "overdue".
+        "due_date": invoice.due_date.isoformat() if invoice.due_date else None,
         "total_chf": str(invoice.total_chf),
         # What is still to pay after any credit note was set against it; the
         # QR on the paper asks for this amount.

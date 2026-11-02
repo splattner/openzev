@@ -215,6 +215,7 @@ depends on.
   "period_end": "2026-03-31",
   "status": "paid",
   "is_paid": true,
+  "due_date": "2026-04-30",
   "total_chf": "238.87",
   "currency": "CHF",
   "energy_summary": {
@@ -261,6 +262,10 @@ condition that suppresses the insights page and the QR (§6).
 `is_paid` is derived from `status`, not stored twice. It is the one field that
 can change after the paper was printed, and showing it is the point: "have I
 paid this?" is the second question a reader has, after "what is it for?".
+`due_date` (ISO date or `null`) is on the paper already; the page uses it, with
+`status` and `is_paid`, to show **Payment due**, **Overdue** or **Paid**
+(`paymentState` in `features/invoices/invoiceStatus.ts`) and **Cancelled** for a
+cancelled invoice, never the workflow status (audience-specific labels).
 
 The response deliberately carries **no participant email, address, or bank
 detail** — only what is already printed on the pages the reader is holding, plus
@@ -504,6 +509,7 @@ export interface PublicInvoice {
   period_end: string
   status: string
   is_paid: boolean
+  due_date: string | null
   total_chf: string
   currency: string
   energy_summary: {

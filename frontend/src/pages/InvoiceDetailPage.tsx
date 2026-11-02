@@ -26,7 +26,7 @@ import { usePdfObjectUrl } from '../lib/usePdfObjectUrl'
 import { PageHeader } from '../components/PageHeader'
 import { Notice } from '../components/Notice'
 import { StatCard } from '../components/StatCard'
-import { InvoiceStatusBadge } from '../components/InvoicePresentation'
+import { InvoicePaymentState, InvoiceStatusBadge } from '../components/InvoicePresentation'
 import { formatChf, formatChfAmount, formatKwh } from '../lib/numbers'
 
 export function InvoiceDetailPage() {
@@ -158,7 +158,9 @@ export function InvoiceDetailPage() {
                     // The document's own header: status pill, recipient, period.
                     <span className="invoice-detail-meta">
                         <span className="visually-hidden">{t('pages.invoiceDetail.status')}: </span>
-                        <InvoiceStatusBadge status={inv.status} paidChf={inv.paid_chf} />
+                        {isParticipant
+                            ? <InvoicePaymentState invoice={inv} />
+                            : <InvoiceStatusBadge status={inv.status} paidChf={inv.paid_chf} />}
                         <span>{`${inv.participant_name} · ${formatShortDate(inv.period_start, settings)} → ${formatShortDate(inv.period_end, settings)}`}</span>
                         {inv.replaced_by ? (
                             <span>

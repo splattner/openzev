@@ -16,6 +16,21 @@
             padding: 12mm 16mm;
         }
 
+        /* Draft / cancelled marking: plain and unmissable, no capsule.  An
+           ordinary issued invoice carries none. */
+        .document-marking {
+            margin-top: 2mm;
+            font-size: 13pt;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            text-align: right;
+            color: var(--ink);
+        }
+        .document-marking-cancelled {
+            text-decoration: line-through;
+        }
+
         /* ══ 3. Summary band ═════════════════════════════════════ */
         .invoice-summary {
             display: flex;
@@ -519,7 +534,7 @@
                 <div>
                     <div class="document-label">{{ tr.invoice_label }}</div>
                     <div class="document-number">{{ invoice_number_prefix }}<strong>{{ invoice_number_suffix }}</strong></div>
-                    <div class="document-status">{{ tr.status }}: {{ status_display }}</div>
+                    {% if document_marking %}<div class="document-marking document-marking-{{ document_marking.kind }}">{{ document_marking.label }}</div>{% endif %}
                 </div>
             </header>
 

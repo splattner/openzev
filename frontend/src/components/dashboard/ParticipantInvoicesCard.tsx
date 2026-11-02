@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import type { Invoice } from '../../types/api'
-import { InvoiceLink, InvoicePdfCell, InvoiceRowActions, InvoiceStatusBadge, InvoiceTotal } from '../InvoicePresentation'
+import { InvoiceLink, InvoicePdfCell, InvoiceRowActions, InvoicePaymentState, InvoiceTotal } from '../InvoicePresentation'
 import { Notice } from '../Notice'
 import { PageSkeleton } from '../PageSkeleton'
 
@@ -55,7 +55,7 @@ export function ParticipantInvoicesCard({ invoices, isError, isRetrying, onRetry
                                         {formatShortDate(invoice.period_end, settings)}
                                     </td>
                                     <td className="numeric"><InvoiceTotal invoice={invoice} /></td>
-                                    <td><InvoiceStatusBadge status={invoice.status} paidChf={invoice.paid_chf} /></td>
+                                    <td><InvoicePaymentState invoice={invoice} /></td>
                                     <td>
                                         <InvoiceRowActions>
                                             <InvoiceLink className="button button-secondary" invoice={invoice} from="/">

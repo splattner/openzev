@@ -2596,6 +2596,8 @@ export interface PublicInvoice {
     period_end: string
     status: string
     is_paid: boolean
+    /** On the paper already; tells "payment due" from "overdue". */
+    due_date: string | null
     total_chf: string
     credit_applied_chf: string
     amount_due_chf: string

@@ -19,6 +19,7 @@ from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType
 
 from .models import Invoice, InvoiceItem, InvoiceStatus
 from .pdf import (
+    TEMPLATE_NAME,
     _build_qr_svg,
     _build_template_context,
     _count_qr_slips,
@@ -1535,6 +1536,49 @@ class StatusTranslationTests(TestCase):
         self.assertNotEqual(ctx["status_display"], "Sent",
                             "status_display should be translated, not English")
         self.assertEqual(ctx["status_display"], "Versendet")
+
+    def _invoice(self, status, language="de"):
+        owner = User.objects.create_user(
+            username=f"marking_owner_{status}_{language}", password="pass1234", role=UserRole.USER,
+        )
+        zev = create_managed_zev(
+            name="Marking ZEV", owner=owner, zev_type="vzev", start_date=date(2026, 1, 1),
+            billing_interval="monthly", invoice_prefix="M", invoice_language=language,
+        )
+        participant = Participant.objects.create(
+            zev=zev, first_name="Alice", last_name="Muster", email="alice@example.com",
+            address_line1="Musterweg 3", postal_code="3000", city="Bern", valid_from=date(2026, 1, 1),
+        )
+        return Invoice.objects.create(
+            invoice_number="M-00001", zev=zev, participant=participant,
+            period_start=date(2025, 1, 1), period_end=date(2025, 3, 31), status=status,
+        )
+
+    def test_ordinary_issued_invoice_has_no_marking_or_status_line(self):
+        for status in ("approved", "sent", "paid"):
+            with self.subTest(status=status):
+                invoice = self._invoice(status)
+                ctx = _build_template_context(invoice)
+                self.assertIsNone(ctx["document_marking"])
+                html = _render_template(TEMPLATE_NAME, ctx)
+                self.assertNotIn('class="document-status"', html)
+                self.assertNotIn('class="document-marking', html)
+                self.assertNotIn("Status:", html)
+
+    def test_draft_and_cancelled_documents_carry_a_plain_marking(self):
+        expected = {
+            ("draft", "de"): "Entwurf", ("cancelled", "de"): "Storniert",
+            ("draft", "fr"): "Brouillon", ("cancelled", "fr"): "Annulée",
+            ("draft", "it"): "Bozza", ("cancelled", "it"): "Annullata",
+            ("draft", "en"): "Draft", ("cancelled", "en"): "Cancelled",
+        }
+        for (status, language), label in expected.items():
+            with self.subTest(status=status, language=language):
+                invoice = self._invoice(status, language)
+                ctx = _build_template_context(invoice)
+                self.assertEqual(ctx["document_marking"], {"kind": status, "label": label})
+                html = _render_template(TEMPLATE_NAME, ctx)
+                self.assertIn(f'document-marking document-marking-{status}">{label}<', html)
 
 
 
