@@ -61,6 +61,23 @@ class PasswordResetRequestTests(PasswordResetBase):
         self.assertEqual(password_reset.resolve_token(_token_from_mail(mail.outbox[0])), self.user)
         self.assertTrue(AuditEvent.objects.filter(action_type="password.reset_requested").exists())
 
+    def test_sends_a_link_to_an_independent_account_that_never_set_a_password(self):
+        # An invitee who accepted the link but left before choosing a password.
+        invitee = User.objects.create_user(username="invitee", email="invitee@example.com", is_active=True)
+        invitee.set_unusable_password()
+        invitee.independent_login_required = True
+        invitee.save(update_fields=["password", "independent_login_required"])
+
+        response = self.request_reset(invitee.email)
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(len(mail.outbox), 1)
+        token = _token_from_mail(mail.outbox[0])
+        self.assertEqual(self.confirm(token).status_code, 200)
+        invitee.refresh_from_db()
+        self.assertTrue(invitee.has_usable_password())
+        self.assertTrue(invitee.check_password(NEW_PASSWORD))
+
     def test_address_is_matched_case_insensitively(self):
         self.request_reset(self.user.email.upper())
 

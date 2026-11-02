@@ -551,7 +551,8 @@ access under **ZEV settings → People & access**.
 **Possible causes:**
 - The onboarding link was never used, has expired, or was revoked
 - User account deactivated
-- Password forgotten — accounts with a password can request a reset link with
+- Password forgotten or never set — managers and admins (also those who accepted
+  an invitation but did not choose a password) can request a reset link with
   **Forgot your password?** on the sign-in page. Participant-only accounts can
   also recover through a sign-in link in Account → Security within 15 minutes.
 
@@ -565,7 +566,7 @@ access under **ZEV settings → People & access**.
    entering the old one. After the deadline, request a fresh sign-in link.
    An account without a password shows the initial password setup instead.
    Copying a link alone does not change the password.
-3. **Account with a password:** choose **Forgot your password?** on the sign-in
+3. **Account with a password, or a manager/admin who never set one:** choose **Forgot your password?** on the sign-in
    page and follow the emailed link (requires working
    [email delivery](10-email-configuration.md)). This proves ownership of the
    account's mailbox and establishes a password for independent access.

@@ -26,13 +26,22 @@ class PasswordResetError(Exception):
 
 
 def can_reset(user: User | None) -> bool:
-    """Whether a link may be sent: an active account that has a password to lose.
+    """Whether a link may be sent: an active account with an address that signs in on its own.
 
-    Participants without a password sign in by emailed link, OAuth-only accounts
-    through their provider, and inactive accounts are pending a signup or an
-    invitation: a reset link would be a second, unintended way in for each.
+    That is an account with a password to lose, and one that has none yet but
+    must sign in independently: a manager or admin who accepted an invitation
+    and left before choosing a password would otherwise be locked out. The link
+    only proves control of the mailbox, as the invitation did.
+
+    Still refused: participants without a password (they sign in by emailed
+    link, and a reset would be a second, unintended way in) and inactive
+    accounts, which are pending a signup or an invitation (resend that instead).
     """
-    return user is not None and user.is_active and bool(user.email) and user.has_usable_password()
+    from zev.services import requires_independent_login
+
+    if user is None or not user.is_active or not user.email:
+        return False
+    return user.has_usable_password() or requires_independent_login(user)
 
 
 def _state_fingerprint(user: User) -> str:
