@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.29.0](https://github.com/splattner/openzev/compare/v1.28.1...v1.29.0) (2026-11-02)
+
+
+### Features
+
+* **invoices:** audience-specific invoice status labels (UI patterns phase 8) ([#1187](https://github.com/splattner/openzev/issues/1187)) ([0fbd064](https://github.com/splattner/openzev/commit/0fbd064950d2c2ffebceaf119355975c5d720bb5)), closes [#1069](https://github.com/splattner/openzev/issues/1069)
+
+
+### Bug Fixes
+
+* **auth:** let accounts without a password reset it by email ([#1183](https://github.com/splattner/openzev/issues/1183)) ([60c24c0](https://github.com/splattner/openzev/commit/60c24c06e5b4319e70099d902fc041366431cb87))
+* **live:** keep the forecast API test hours on one civil day ([#1185](https://github.com/splattner/openzev/issues/1185)) ([87d40b7](https://github.com/splattner/openzev/commit/87d40b772b58eb8742f27c235720fe388ce13859))
+* **nav:** hide the Live energy link while the live feature is disabled ([#1182](https://github.com/splattner/openzev/issues/1182)) ([526b318](https://github.com/splattner/openzev/commit/526b318c7cd1cfccd0e3892509aafb8a57290e6a))
+
 ## [1.28.1](https://github.com/splattner/openzev/compare/v1.28.0...v1.28.1) (2026-11-02)
 
 
