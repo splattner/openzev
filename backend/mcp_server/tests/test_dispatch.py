@@ -125,3 +125,24 @@ def test_malformed_page_raises_tool_error(owner_user, data, failed_page):
         with pytest.raises(ToolError, match="Expected a paginated response") as error:
             ctx.get_all("/api/v1/audit/events/", allowed_url_names=frozenset({"audit-event-list"}))
     assert error.value.status == "failed"
+
+
+class TestHostPropagation:
+    def test_subrequest_resolves_the_outer_host_and_scheme(self):
+        from mcp_server.dispatch import _build_request
+
+        outer = HttpRequest()
+        outer.META.update(
+            SERVER_NAME="wsgi-internal",
+            HTTP_HOST="testserver",
+            HTTP_X_FORWARDED_HOST="zev.example.ch",
+            HTTP_X_FORWARDED_PROTO="https",
+            HTTP_X_FORWARDED_PORT="443",
+        )
+
+        request = _build_request(outer, "/api/v1/invoices/invoices/", {})
+
+        assert request.get_host() == "testserver"
+        for key in ("HTTP_X_FORWARDED_HOST", "HTTP_X_FORWARDED_PROTO", "HTTP_X_FORWARDED_PORT"):
+            assert request.META[key] == outer.META[key]
+        assert request.build_absolute_uri("/x/") == "http://testserver/x/"

@@ -229,6 +229,36 @@ class TestFindInvoices:
         assert result["truncated"] is True
 
 
+class TestInvoicesWithPdf:
+    """An invoice with a generated PDF makes ``InvoiceSerializer`` build an
+    absolute URL, which needs the outer request's ``HTTP_HOST`` — behind a
+    proxy ``SERVER_NAME`` is the WSGI server's name and not an allowed host."""
+
+    @staticmethod
+    def _proxied(client):
+        # ``testserver`` is allowed in the test settings; ``wsgi-internal`` is not.
+        client.defaults.update(SERVER_NAME="wsgi-internal", HTTP_HOST="testserver")
+        return client
+
+    def test_find_invoices_succeeds_with_a_pdf(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        InvoiceFactory(zev=zev, participant=ParticipantFactory(zev=zev), pdf_file="invoices/a.pdf")
+
+        response = call_tool(self._proxied(owner_mcp_client), "find_invoices", {"zev_id": str(zev.id)})
+
+        assert not _is_error(response)
+        assert len(_structured(response)["invoices"]) == 1
+
+    def test_explain_invoice_succeeds_with_a_pdf(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        invoice = InvoiceFactory(zev=zev, participant=ParticipantFactory(zev=zev), pdf_file="invoices/a.pdf")
+
+        response = call_tool(self._proxied(owner_mcp_client), "explain_invoice", {"invoice_id": str(invoice.id)})
+
+        assert not _is_error(response)
+        assert _structured(response)["invoice"]["id"] == str(invoice.id)
+
+
 class TestExplainInvoice:
     def test_breaks_down_lines_and_by_type(self, owner_mcp_client, owner_user):
         zev = ZevFactory(owner=owner_user)
