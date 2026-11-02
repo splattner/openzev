@@ -3119,6 +3119,11 @@ DNS rebinding, so also restrict outbound traffic at the network level (see the
 <h3 id="percentage-of-energy-tariff">Percentage of Energy Tariff<a class="headerlink" href="#percentage-of-energy-tariff" title="Permanent link">&para;</a></h3>
 <p>A percentage tariff derives its price from other active tariffs rather than specifying a fixed CHF/kWh rate.</p>
 <p>Instead of setting a price, you set a <strong>percentage</strong> (0–100%). During billing, OpenZEV looks up the sum of all active <strong>grid energy tariff</strong> rates at each timestamp and multiplies by the percentage to calculate the effective per-kWh price.</p>
+<p>If the community folds VAT into its prices (VAT treatment <strong>inclusive</strong>), the
+percentage is taken of the grid price <strong>with</strong> VAT — what a participant would
+otherwise pay — so 65% of a CHF 0.2000/kWh net grid price bills CHF 0.1405/kWh,
+not CHF 0.1300/kWh. The local line itself gets no VAT added, and the invoice
+line shows the base with VAT (for example "65% von CHF 0.2162/kWh").</p>
 <p><strong>Configuration:</strong></p>
 <ul>
 <li><strong>Billing Mode</strong> — Select <code>Percentage of energy tariffs</code></li>
