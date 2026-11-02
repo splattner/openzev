@@ -74,6 +74,12 @@
   max-width: none;
 }
 
+/* The summary names the table like a heading would; what is missing follows in the muted summary colour. */
+
+.live-points-disclosure > summary strong {
+  color: var(--text-primary);
+}
+
 /* The phone layout of the live points: one small card per point instead of five columns. */
 
 .live-points-list {

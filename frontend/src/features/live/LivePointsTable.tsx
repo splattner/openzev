@@ -36,24 +36,30 @@ function ConnectNote({ point }: { point: LivePoint }) {
     return (
         <>
             {' · '}
-            <Link to="/zev-settings/energy">{t('live.points.connect')}</Link>
+            <Link className="text-link" to="/zev-settings/energy">{t('live.points.connect')}</Link>
         </>
     )
 }
 
 /**
  * Each live source's latest value, for whoever manages or may view the ZEV (the snapshot carries `points` only
- * for them). It supports the card above it, so it is a disclosure, open while some points still report nothing.
+ * for them). It supports the card above it, so it is a disclosure, closed; the summary says how many metering points
+ * have no current value, counted as the card counts (the grid connection point is not one of them).
  */
 export function LivePointsTable({ points }: { points: LivePoint[] }) {
     const { t } = useTranslation()
     const power = usePointPower()
-    const live = points.filter((point) => point.live_state === 'fresh').length
+    const quiet = points.filter((point) => point.target === 'metering_point' && point.live_state !== 'fresh').length
     return (
         <section className="card">
             <Disclosure
-                defaultOpen={live < points.length}
-                summary={<span>{t('live.points.summary', { live, total: points.length })}</span>}
+                className="live-points-disclosure"
+                summary={(
+                    <span>
+                        <strong>{t('live.points.summary')}</strong>
+                        {quiet > 0 && <span className="muted">{` · ${t('live.points.quiet', { missing: quiet })}`}</span>}
+                    </span>
+                )}
             >
                 <div className="table-scroll live-points-wide">
                     <table className="participant-table live-points-table">

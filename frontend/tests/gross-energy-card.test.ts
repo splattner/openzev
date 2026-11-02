@@ -53,6 +53,14 @@ describe('GrossEnergyCard', () => {
         expect(text).not.toContain('supplementary.withheld')
     })
 
+    it('names a vendor, but not the "own system / file" provider the sentence already says', async () => {
+        const { container } = await renderWithProviders(card(gross({ source_provider: 'push' })), cleanups)
+
+        const text = container.textContent ?? ''
+        expect(text).toContain('supplementary.gross.reportedOwnGeneric')
+        expect(text).not.toContain('supplementary.provider.push')
+    })
+
     it('shows a dash and the reason instead of a low rate when coverage is too thin', async () => {
         const { container } = await renderWithProviders(
             card(gross({ rates_withheld_reason: 'low_coverage', self_sufficiency_rate: null, self_consumption_rate: null })),

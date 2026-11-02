@@ -203,27 +203,33 @@ marked *Live, indicative* and never used for billing. If you have a live source,
 consumption and production come first, with how much of it was local and how much came from or
 went to the grid; the ZEV's **Production**, **Consumption**, **Spare now** and **Local share** follow.
 A line says how many metering points report live data. Nothing is estimated: a meter that does not
-report is simply missing. Without any live source the card says so and links to where to connect one.
+report is simply missing. If your own source has stopped reporting, a warning under **Right now** says so and
+links to **My metering points**, where you can look at the connection. Without any live source the page
+says so: a manager or a participant gets a button to connect one, a viewer is told that the community's
+management can.
 
 Managers and viewers also get **Live values per metering point**: a table (a small card per
 point on a phone) with each point's power, how old the value is and its state. A power reads
-in words (*6.2 kW produced*, *2.0 kW to the grid*), not with the meter's minus sign. The table is closed
-once every point reports, and open while some do not; for a point of the community with no source it
+in words (*6.2 kW produced*, *2.0 kW to the grid*), not with the meter's minus sign. The table is closed;
+its title says how many metering points have no current value. For a point of the community with no source it
 offers **Connect**, and for one a participant holds it says the participant connects it.
 
 Below it the views are chosen with the tabs **Today**, **Tomorrow** (when there is a
 forecast for it), **7 days** and **Period** (the billing period, with the usual period selector).
 A participant who cannot have a history (no plant behind their meter) sees only **Today**. Managers and
-viewers pick the participant whose system they want to see; a manager who is a participant with a
-connected source starts on themselves.
+viewers pick the participant whose system they want to see, above the tabs; a manager who is a participant with a
+connected source starts on themselves. Where the community has no source that could provide a history, live
+values or a forecast, there are no tabs and no picker, only the note on how to connect one. When a manager looks at
+somebody else, the chart and the notes speak of the person rather than of "you".
 
 **Today** draws your own consumption (and production, if you have a PV system) in one
 line: from your source's **history** up to its last synchronisation (solid line), and
 from **live** values after that (dashed line). A marker shows where history hands over
 to live. Where neither has a value, the line has a gap; nothing is estimated. The ZEV's
 totals in the same chart are live only. With a production forecast, its expected production is drawn
-dashed and the highest expected production of the day is named above the chart. **7 days** and
-**Period** show the card described below.
+dashed, the highest expected production of the day is named above the chart, and a line under it says the forecast is an
+estimate and that what the devices reported counts. **How to read the chart** opens how the lines join and what a gap means.
+**7 days** and **Period** show the card described below.
 
 With a connected source, the card **Your own system** shows
 production, consumption, self-consumption, grid import and export, your

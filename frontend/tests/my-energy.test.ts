@@ -38,7 +38,7 @@ const live = vi.hoisted(() => ({
     fetchProductionForecastOrNull: vi.fn(),
 }))
 vi.mock('../src/lib/api/live', () => live)
-const eligibleApi = vi.hoisted(() => ({ fetchEligibleOrNull: vi.fn() }))
+const eligibleApi = vi.hoisted(() => ({ fetchEligibleOrNull: vi.fn(), listSupplementarySources: vi.fn() }))
 vi.mock('../src/lib/api/supplementary', () => eligibleApi)
 const zevApi = vi.hoisted(() => ({ fetchParticipants: vi.fn() }))
 vi.mock('../src/lib/api/zev', () => zevApi)
@@ -196,6 +196,7 @@ beforeEach(() => {
     live.fetchOwnSeries.mockResolvedValue(series())
     live.fetchProductionForecastOrNull.mockResolvedValue(null)
     eligibleApi.fetchEligibleOrNull.mockResolvedValue([point('s1')])
+    eligibleApi.listSupplementarySources.mockResolvedValue([])
     zevApi.fetchParticipants.mockResolvedValue([
         { id: 'p-me', zev: 'z1', display_name: 'Me', valid_to: null },
         { id: 'p-other', zev: 'z1', display_name: 'Other', valid_to: null },
@@ -222,8 +223,8 @@ describe('MyEnergyView', () => {
         expect(live.fetchOwnSeries).toHaveBeenCalledWith({
             zevId: 'z1', dateFrom: todayBusinessIso(), dateTo: todayBusinessIso(), bucket: 'quarter', participantId: undefined,
         })
-        expect(container.textContent).toContain('myEnergy.today.title')
-        expect(container.textContent).toContain('myEnergy.today.historyOnly')
+        expect(container.querySelector('.chart-card')).not.toBeNull()
+        expect(container.textContent).toContain('myEnergy.today.ownHistoryOnly')
         expect(container.querySelector('.empty-state')).toBeNull()
     })
 
@@ -240,7 +241,7 @@ describe('MyEnergyView', () => {
         expect(live.fetchLiveCurveOrNull).toHaveBeenCalledWith('z1', todayBusinessIso(), undefined)
         expect(live.fetchOwnSeries).not.toHaveBeenCalled()
         expect(container.textContent).toContain('live.title')
-        expect(container.textContent).not.toContain('myEnergy.today.historyOnly')
+        expect(container.textContent).not.toContain('myEnergy.today.ownHistoryOnly')
     })
 
     it('falls back to the history alone when the live curve is not available', async () => {
@@ -269,7 +270,7 @@ describe('MyEnergyView', () => {
         expect(container.textContent).not.toContain('supplementary.gross.ctaTitle')
         expect(container.textContent).not.toContain('myEnergy.noOwnSystem')
         expect(container.querySelectorAll('[role="tab"]')).toHaveLength(0)
-        expect(container.textContent).not.toContain('myEnergy.today.title')
+        expect(container.querySelector('.chart-card')).toBeNull()
     })
 
     it('shows the last seven civil days in hourly buckets on the 7 days tab, with the pointer to Energy balance', async () => {
@@ -301,21 +302,73 @@ describe('MyEnergyView', () => {
             mockUser.mockReturnValue({ memberships: [{ zev: 'z1', participants: [] }] })
         })
 
+        const historySource = (participant = 'p-other') =>
+            ({ id: 's1', zev: 'z1', target: 'metering_point', participant, provides_history: true, provides_live: false })
+
         it('asks nobody\'s figures until a participant is picked, and lists only current participants of the ZEV', async () => {
             eligibleApi.fetchEligibleOrNull.mockResolvedValue([])
+            eligibleApi.listSupplementarySources.mockResolvedValue([historySource()])
             const { container } = await render()
 
-            expect(container.textContent).toContain('myEnergy.pickParticipantPrompt')
-            // The prompt is the picker's helper, in the same bar.
-            expect(container.querySelector('.filter-bar .filter-bar-note')?.textContent).toBe('myEnergy.pickParticipantPrompt')
             expect(live.fetchOwnSeries).not.toHaveBeenCalled()
             const options = Array.from(container.querySelectorAll('select option')).map((option) => option.textContent)
             expect(options).toEqual(['myEnergy.pickParticipant', 'Me', 'Other'])
         })
 
+        it('puts the participant picker before the tabs it steers, and does not repeat its placeholder as a helper', async () => {
+            eligibleApi.listSupplementarySources.mockResolvedValue([historySource()])
+            const { container } = await render()
+
+            const picker = container.querySelector('select')!
+            const tabs = container.querySelector('[role="tablist"]')!
+            expect(picker.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+            expect(container.querySelector('.filter-bar-note')).toBeNull()
+        })
+
+        it('offers no tabs and no picker where no source can provide a history, live data or a forecast', async () => {
+            eligibleApi.fetchEligibleOrNull.mockResolvedValue([])
+            live.fetchLiveEnabled.mockResolvedValue(true)
+            live.fetchLiveSnapshotOrNull.mockResolvedValue(snapshot(0))
+            eligibleApi.listSupplementarySources.mockResolvedValue([{ ...historySource(), provides_history: false }, { ...historySource(), zev: 'z2' }])
+            const { container } = await render()
+
+            expect(container.querySelector('.empty-state')).not.toBeNull()
+            expect(container.querySelectorAll('[role="tab"]')).toHaveLength(0)
+            expect(container.querySelector('select')).toBeNull()
+        })
+
+        it('tells two participants with the same name apart by their e-mail', async () => {
+            eligibleApi.fetchEligibleOrNull.mockResolvedValue([])
+            eligibleApi.listSupplementarySources.mockResolvedValue([historySource()])
+            zevApi.fetchParticipants.mockResolvedValue([
+                { id: 'p-1', zev: 'z1', display_name: 'Ben', email: 'ben@a.test', valid_to: null },
+                { id: 'p-2', zev: 'z1', display_name: 'Ben', email: 'ben@b.test', valid_to: null },
+                { id: 'p-3', zev: 'z1', display_name: 'Anna', email: 'anna@a.test', valid_to: null },
+            ])
+            const { container } = await render()
+
+            expect(Array.from(container.querySelectorAll('select option')).map((option) => option.textContent))
+                .toEqual(['myEnergy.pickParticipant', 'Ben · ben@a.test', 'Ben · ben@b.test', 'Anna'])
+        })
+
+        it('speaks of the person, not of "you", while looking at somebody else', async () => {
+            eligibleApi.listSupplementarySources.mockResolvedValue([historySource()])
+            const { container } = await render()
+            await act(async () => {
+                const select = container.querySelector('select') as HTMLSelectElement
+                Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(select, 'p-other')
+                select.dispatchEvent(new Event('change', { bubbles: true }))
+            })
+            await clickTab(container, 1)
+
+            expect(container.textContent).toContain('myEnergy.week.notePerson')
+            expect(container.textContent).not.toContain('myEnergy.week.note|')
+        })
+
         it('starts on the manager themselves when they are a participant with an own system', async () => {
             mockUser.mockReturnValue({ memberships: [{ zev: 'z1', participants: [{ id: 'p-me', live: true }] }] })
             eligibleApi.fetchEligibleOrNull.mockResolvedValue([point('s1', 'p-me')])
+            eligibleApi.listSupplementarySources.mockResolvedValue([historySource('p-me')])
             const { container } = await render()
 
             expect(live.fetchOwnSeries).toHaveBeenCalledWith(expect.objectContaining({ participantId: 'p-me', bucket: 'quarter' }))
@@ -372,7 +425,7 @@ describe('the forecast in My energy system', () => {
         eligibleApi.fetchEligibleOrNull.mockResolvedValue([])
         const { container } = await render()
 
-        expect(container.textContent).toContain('myEnergy.today.title')
+        expect(container.querySelector('.chart-card')).not.toBeNull()
         expect(container.textContent).toContain('myEnergy.today.forecastHint')
         expect(container.textContent).toContain('forecast.peak.today')
         expect(tabLabels(container)).toEqual([])
@@ -389,7 +442,6 @@ describe('the forecast in My energy system', () => {
 
         expect(container.textContent).toContain('myEnergy.tomorrow.title')
         expect(container.textContent).toContain('forecast.hint')
-        expect(container.textContent).not.toContain('myEnergy.today.title')
         expect(live.fetchOwnSeries).not.toHaveBeenCalled()
     })
 

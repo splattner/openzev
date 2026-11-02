@@ -42,9 +42,12 @@ export function GrossEnergyCard({ gross, whose, participantName, formatBucketLab
                 {whose === 'participant' && participantName ? ` — ${participantName}` : ''}
             </h3>
             <p className="muted">
-                {t(whose === 'own' ? 'supplementary.gross.reportedOwn' : 'supplementary.gross.reportedParticipant', {
-                    provider: gross.source_provider ? t(`supplementary.provider.${gross.source_provider}`) : '',
-                })}
+                {/* A vendor is named; "own system / file" is what the sentence already says. */}
+                {gross.source_provider && gross.source_provider !== 'push'
+                    ? t(whose === 'own' ? 'supplementary.gross.reportedOwn' : 'supplementary.gross.reportedParticipant', {
+                        provider: t(`supplementary.provider.${gross.source_provider}`),
+                    })
+                    : t(whose === 'own' ? 'supplementary.gross.reportedOwnGeneric' : 'supplementary.gross.reportedParticipantGeneric')}
             </p>
             {gross.covered_from && gross.covered_to && (
                 <p className="muted">

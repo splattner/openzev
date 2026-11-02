@@ -591,7 +591,9 @@ record the rule and the reason, rather than silently departing from it.
     recognisability in forced-colour modes.
 12. **No redundant text.** State each fact or instruction once within a screen's
     working context. Do not repeat a heading as a badge, the same status in
-    multiple blocks, or helper text that only restates the label. Reference the
+    multiple blocks, or helper text that only restates the label. A tab panel
+    does not repeat its tab label as a heading, and a placeholder and a helper
+    text do not say the same thing. Reference the
     existing information or combine the presentation instead. Repeated labels
     needed to identify separate records, accessible names and destructive-action
     confirmations are not redundant: keep the context needed to act safely.
