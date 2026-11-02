@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.28.1](https://github.com/splattner/openzev/compare/v1.28.0...v1.28.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **invoices:** round payable amounts to 5 Rappen, per-ZEV setting ([#1181](https://github.com/splattner/openzev/issues/1181)) ([10b3e59](https://github.com/splattner/openzev/commit/10b3e59b339243351b0f3280bf4e767e259277a2))
+* **mcp:** explain_invoice by_type kWh from invoice totals, lines carry their unit ([#1179](https://github.com/splattner/openzev/issues/1179)) ([cbb30d8](https://github.com/splattner/openzev/commit/cbb30d82f92cc8f32fdf2d6f1b2d80300c6a5c06)), closes [#1178](https://github.com/splattner/openzev/issues/1178)
+
 ## [1.28.0](https://github.com/splattner/openzev/compare/v1.27.0...v1.28.0) (2026-11-02)
 
 
