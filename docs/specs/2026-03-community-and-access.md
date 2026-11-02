@@ -1789,7 +1789,7 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 | Section | Condition |
 |---|---|
 | Overview (`/`), Energy balance (`/dashboard`), Metering (`/metering/chart`, active on `/metering/chart` + `/metering/quality` + `/metering/imports`), Billing (`/billing/invoices`, active on `/billing/*`), Reports | `isZevScope` (shell role `admin`, `manager` or `viewer`; the `/reports` route itself also allows participants) |
-| My energy system (`/my-energy`, right after Energy balance) | `isZevScope` + (`live_energy_data_enabled` effective (`GET /metering/live/enabled/`), or the energy data feature on (`/metering/supplementary/sources/eligible/` answers `200`)); `showMyEnergyEntry` |
+| Live energy (`/my-energy`, right after Energy balance) | `isZevScope` + `live_energy_data_enabled` effective (`GET /metering/live/enabled/`) |
 | Account (`/account`) | shell role `none` (only nav entry; landing page explains the unlinked state) |
 | Dashboard (`/`) | shell role `participant` |
 | My energy system (`/my-energy`, right after Dashboard) | shell role `participant` (not `former`) + (live flag effective, or the energy data feature on and a held meter an own system can be connected to) |

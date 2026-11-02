@@ -265,13 +265,13 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         off.unmount()
     })
 
-    it('without the live flag the entry stays while the feature is on: for community-wide access, and for a participant who holds a flagged meter', async () => {
+    it('without the live flag the Live energy entry is gone for community-wide access, while a participant who holds a flagged meter keeps My energy system', async () => {
         mockLiveEnabled.mockResolvedValue(false)
         mockEligible.mockResolvedValue([])
         for (const persona of ['admin', 'manager', 'viewer'] as const) {
             mockSession(persona)
             const page = await renderLayout()
-            expect(page.hasHref('/my-energy')).toBe(true)
+            expect(page.hasHref('/my-energy')).toBe(false)
             page.unmount()
         }
 

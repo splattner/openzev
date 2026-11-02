@@ -141,7 +141,9 @@ same page, named for what each role sees on it (a manager or viewer sees the who
 own system). Rule (`showMyEnergyEntry` in `lib/myEnergy.ts`):
 shown when `/live/enabled/` answers `true`, **or** the energy data feature is on (`/supplementary/sources/eligible/`
 answers `200`) and the user has community-wide access (manager, viewer, admin) or holds a meter an own
-system can be connected to (`historyEligible`); never for a former participant. Live setup sits on
+system can be connected to (`historyEligible`); never for a former participant. The managers' and viewers' entry,
+named "Live energy", is shown **only** while `/live/enabled/` answers `true`: with the flag off it would promise live data
+the page does not have (the participant's "My energy system" entry keeps the rule above). Live setup sits on
 `/me/metering-points` (holders) and, for the community's own sources, the **Energy data** tab of the ZEV
 settings (`/zev-settings/energy`, managers; §7.3); PV planes are on the metering-point list, building coordinates
 on the building form. The metering-point list itself says nothing about live or history data.
