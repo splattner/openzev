@@ -1091,7 +1091,8 @@ The invoice PDF template receives:
 | `invoice_number_prefix` | Invoice number up to and including the last hyphen (e.g. `"INV-2026-"`); the full number when it contains no hyphen |
 | `invoice_number_suffix` | Portion after the last hyphen (e.g. `"001"`), bolded in the template; empty when there is no hyphen |
 | `tr` | Translation dictionary for the ZEV's `invoice_language`; `notes_question` is pre-formatted with `DEFAULT_FROM_EMAIL` |
-| `status_display` | Localized status label from `tr["status_values"]`; falls back to the raw status value |
+| `status_display` | Localized status label from `tr["status_values"]`; falls back to the raw status value. Kept for custom templates written against it; the default template no longer prints it (see `document_marking`) |
+| `document_marking` | `{"kind": "draft" \| "cancelled", "label": <tr["marking_draft"] \| tr["marking_cancelled"]>}` for a draft or cancelled invoice, otherwise `None`. The default template prints it as a plain, prominent `.document-marking` line in the header and prints **no status line** for an ordinary issued invoice (approved, sent, paid): internal approval and delivery states belong in the staff UI and current payment state on the participant screen, and a stored PDF cannot claim live payment state. Applies to PDFs rendered from now on; stored PDFs are not regenerated. Customised templates in the database are untouched (SPEC-2026-10-invoice-labels) |
 | `formatted_dates` | `invoice_date`, `period_start`, `period_end`, `due_date` formatted per `AppSettings.date_format_short` |
 
 Custom templates must use `vat_rate_percent` for the VAT label or be reset to
@@ -1476,7 +1477,7 @@ visibility, restored access, and strict selection with a second membership.
 | `InvoicePdfRenderingTests` | Full WeasyPrint rendering: short invoice → 2 pages, long invoice → 3 pages, savings + many items → 3 pages, all four languages render without error; recipient address-line rendering, escaping and frozen-copy preservation; long-recipient wrapping and QR fallback; inline QR and separate payment slip geometry (106 mm height, bottom-aligned with page bottom) via PDF content-stream inspection; no QR clip rect on the insights page. Regression coverage for the render-time guard: wrapping multi-line descriptions that overflow the inline height estimate still produce exactly one slip (`_count_qr_slips`), and a long dedicated-payment invoice keeps a single bottom-aligned slip on its payment page; a realistic EVU-style invoice with ~5 Abgaben across all four cost categories (energy, grid fees, levies, metering) paginates to ≥3 pages with exactly one slip |
 | `TranslationParityTests` | §8.3: all four locales have identical, non-empty translation keys and identical `status_values` keys |
 | `PaletteConsistencyTests` | Chart color constants in `pdf_charts.py` match the CSS variables in the default template |
-| `StatusTranslationTests` | §8.2: `status_display` is localized from `tr["status_values"]` in the template context |
+| `StatusTranslationTests` | §8.2: `status_display` is localized from `tr["status_values"]` in the template context; an approved, sent or paid invoice has `document_marking` `None` and the default template renders no status line; a draft or cancelled invoice renders the localized marking in all four languages |
 | `InvoicePdfVatLabelTests` | §8.2: percent conversion, zero-rate omission, and sample preview rendering; the totals block lists the producer credit after the VAT when `vat_base_chf` differs from the subtotal, and keeps the plain layout when it is null or equal |
 
 ### Frontend

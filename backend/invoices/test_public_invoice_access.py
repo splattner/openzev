@@ -6,6 +6,7 @@ only the invoice the reader is holding — so the suite spends most of its effor
 asserting the response stays that narrow and that every failure is
 indistinguishable from every other.
 """
+from datetime import date
 from decimal import Decimal
 
 from django.test import TestCase
@@ -148,6 +149,12 @@ class PublicInvoicePayloadTests(PublicInvoiceTestCase):
         self.invoice.save()
 
         self.assertTrue(self._get().json()["is_paid"])
+
+    def test_carries_the_due_date_so_the_page_can_tell_due_from_overdue(self):
+        self.invoice.due_date = date(2026, 3, 15)
+        self.invoice.save()
+
+        self.assertEqual(self._get().json()["due_date"], "2026-03-15")
 
     def test_carries_the_consumption_figures(self):
         summary = self._get().json()["energy_summary"]

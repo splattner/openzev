@@ -161,6 +161,7 @@ def build_sample_invoice_context() -> dict:
         },
         "tr": tr,
         "status_display": tr["status_values"]["draft"],
+        "document_marking": {"kind": "draft", "label": tr["marking_draft"]},
         "formatted_dates": {
             "invoice_date": "15.01.2026",
             "period_start": "01.01.2026",

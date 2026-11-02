@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 import { groupItemsByCategory } from '../features/publicInvoice/grouping'
+import { paymentState } from '../features/invoices/invoiceStatus'
 import {
     fetchPublicInvoice,
     fetchPublicInvoiceCharts,
@@ -110,6 +111,9 @@ export function PublicInvoicePage() {
         )
     }
 
+    // Payment information only: the recipient never sees workflow status.
+    const paymentLabel = data.status === 'cancelled' ? 'cancelled' : (paymentState(data) ?? 'due')
+
     return (
         // Scoped rather than set on <html>: this page speaks the document's
         // language, the app around it does not, and a screen reader needs to
@@ -126,11 +130,11 @@ export function PublicInvoicePage() {
                     </div>
                     <div className="public-invoice-total">
                         <span
-                            className={`public-invoice-status${data.is_paid ? ' is-paid' : ''}`}
+                            className={`public-invoice-status${data.is_paid ? ' is-paid' : ''}${paymentLabel === 'overdue' ? ' is-overdue' : ''}`}
                         >
-                            {data.is_paid
-                                ? t('pages.publicInvoice.paid')
-                                : t('pages.publicInvoice.notPaid')}
+                            {paymentLabel === 'cancelled'
+                                ? t('invoice.status.cancelled')
+                                : t(`invoice.payment.${paymentLabel}`)}
                         </span>
                         <div className="public-invoice-amount">
                             <span className="public-invoice-currency">{data.currency}</span>

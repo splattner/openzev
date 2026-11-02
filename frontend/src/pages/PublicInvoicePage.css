@@ -80,6 +80,11 @@
   color: var(--brand-deep);
 }
 
+.public-invoice-status.is-overdue {
+  background: var(--status-danger);
+  color: var(--danger-700);
+}
+
 .public-invoice-kpis {
   display: flex;
   flex-wrap: wrap;

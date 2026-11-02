@@ -4,7 +4,7 @@ import { fetchInvoices, listCredits, openCreditPdf } from '../lib/api/invoices'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatChf, formatChfAmount } from '../lib/numbers'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
-import { InvoiceLink, InvoicePdfCell, InvoiceRowActions, InvoiceStatusBadge, InvoiceTotal } from '../components/InvoicePresentation'
+import { InvoiceLink, InvoicePdfCell, InvoiceRowActions, InvoicePaymentState, InvoiceTotal } from '../components/InvoicePresentation'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useAuth } from '../lib/auth'
 import { soleCommunityName, personalInvoiceFilter } from '../lib/membership'
@@ -84,7 +84,7 @@ export function MyInvoicesPage() {
                                         </td>
                                         <td className="numeric"><InvoiceTotal invoice={invoice} /></td>
                                         <td>
-                                            <InvoiceStatusBadge status={invoice.status} paidChf={invoice.paid_chf} />
+                                            <InvoicePaymentState invoice={invoice} />
                                             {invoice.needs_data_review && (
                                                 <div style={{ marginTop: '0.25rem' }}>
                                                     <IssueText tone="warning" title={t('pages.invoices.dataReview.issuedNotice', { count: invoice.open_data_impact_count ?? 0 })}>

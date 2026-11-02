@@ -398,7 +398,10 @@ def _build_template_context(
         "energy_summary": energy_summary,
         "access_qr_svg": access_qr_svg,
         "tr": tr,
+        # Kept for custom templates written against it; the default template
+        # no longer prints the workflow status (audience-specific labels).
         "status_display": tr.get("status_values", {}).get(invoice.status, invoice.status),
+        "document_marking": _document_marking(invoice, tr),
         "formatted_dates": {
             "invoice_date": _format_date_value(invoice.created_at, app_settings.date_format_short),
             "period_start": _format_date_value(invoice.period_start, app_settings.date_format_short),
@@ -406,6 +409,23 @@ def _build_template_context(
             "due_date": _format_date_value(invoice.due_date, app_settings.date_format_short),
         },
     }
+
+
+def _document_marking(invoice, tr) -> dict | None:
+    """The plain marking a draft or cancelled document carries, else ``None``.
+
+    An ordinary issued invoice carries no status: approval and delivery are
+    staff matters, and current payment state is not something a stored PDF can
+    honestly claim.  Only a document that must be read differently (not yet
+    final, or void) says so.
+    """
+    from .models import InvoiceStatus
+
+    if invoice.status == InvoiceStatus.DRAFT:
+        return {"kind": "draft", "label": tr.get("marking_draft", "Draft")}
+    if invoice.status == InvoiceStatus.CANCELLED:
+        return {"kind": "cancelled", "label": tr.get("marking_cancelled", "Cancelled")}
+    return None
 
 
 def _find_qr_clip_rect(page):

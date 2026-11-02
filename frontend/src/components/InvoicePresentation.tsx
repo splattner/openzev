@@ -8,7 +8,7 @@ import { openInvoicePdf } from '../lib/api/invoices'
 import { formatChf, formatChfAmount } from '../lib/numbers'
 import type { Invoice } from '../types/api'
 import { amountDueChf, hasCreditApplied } from '../features/invoices/invoiceCredits'
-import { invoiceStatusBadgeClass, isPartlyPaid } from '../features/invoices/invoiceStatus'
+import { INVOICE_STATUS_BADGE_CLASS, isPartlyPaid, paymentState } from '../features/invoices/invoiceStatus'
 import { IssueText } from './IssueText'
 
 export function InvoiceLink({ invoice, from, period, children, className }: {
@@ -34,7 +34,26 @@ export function InvoiceStatusBadge({ status, paidChf }: { status: Invoice['statu
     const { t } = useTranslation()
     const label = isPartlyPaid({ status, paid_chf: paidChf }) ? t('invoice.status.partlyPaid')
         : status ? t(`invoice.status.${status}`) : ''
-    return <span className={invoiceStatusBadgeClass(status)}>{label}</span>
+    return <span className={INVOICE_STATUS_BADGE_CLASS}>{label}</span>
+}
+
+/**
+ * What a participant needs to know: whether to pay, and by when. Never the
+ * workflow status. Overdue is a concrete problem and reads as issue text; the
+ * other states are plain text, nothing green.
+ */
+export function InvoicePaymentState({ invoice }: {
+    invoice: Pick<Invoice, 'status' | 'due_date' | 'paid_chf' | 'outstanding_chf' | 'total_chf' | 'amount_due_chf'>
+}) {
+    const { t } = useTranslation()
+    const state = paymentState(invoice)
+    if (state === null) {
+        return invoice.status === 'cancelled'
+            ? <span className="muted">{t('invoice.status.cancelled')}</span>
+            : <span className="muted">-</span>
+    }
+    if (state === 'overdue') return <IssueText>{t('invoice.payment.overdue')}</IssueText>
+    return <span>{t(`invoice.payment.${state}`)}</span>
 }
 
 /** `currency={false}` drops "CHF" where the column header already names it. */

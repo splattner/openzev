@@ -290,7 +290,9 @@ describe('MyInvoicesPage (participant own invoices)', () => {
         })
         // List membership never depends on PDF availability.
         expect(page.text()).toContain('RE-2026-002')
-        expect(page.text()).toContain('invoice.status.sent')
+        // A participant sees what to pay, never the workflow status.
+        expect(page.text()).toContain('invoice.payment.due')
+        expect(page.text()).not.toContain('invoice.status.sent')
         expect(page.container.querySelector('a[href="/billing/invoices/8"]')).not.toBeNull()
         expect(page.text()).not.toContain('pages.myInvoices.empty.title')
         // But the PDF button is conditional on a stored document.
