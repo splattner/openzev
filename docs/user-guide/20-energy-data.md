@@ -216,8 +216,9 @@ official figures and only points to this page, with a link that opens the same p
 **Right now** is at the top: what your community produces and uses at this moment,
 marked *Live, indicative* and never used for billing. If you have a live source, your own
 consumption and production come first, with how much of it was local and how much came from or
-went to the grid; the ZEV's **Production**, **Consumption**, **Spare now** and **Local share** follow.
-A line says how many metering points report live data. Nothing is estimated: a meter that does not
+went to the grid; the ZEV's **ZEV production**, **ZEV consumption**, **Spare now** and **Local share** follow, all as tiles
+in one row (they wrap on a narrow screen). Where the ZEV's consumption is not known, the tile says in a note behind its
+info mark that the other participants' use is unknown. Nothing is estimated: a meter that does not
 report is simply missing. If your own source has stopped reporting, a warning under **Right now** says so and
 links to **My metering points**, where you can look at the connection. Without any live source the page
 says so: a manager or a participant gets a button to connect one, a viewer is told that the community's
@@ -242,8 +243,7 @@ line: from your source's **history** up to its last synchronisation (solid line)
 from **live** values after that (dashed line). A marker shows where history hands over
 to live. Where neither has a value, the line has a gap; nothing is estimated. The ZEV's
 totals in the same chart are live only. With a production forecast, its expected production is drawn
-dashed, the highest expected production of the day is named above the chart, and a line under it says the forecast is an
-estimate and that what the devices reported counts. **How to read the chart** opens how the lines join and what a gap means.
+dashed, and the highest expected production of the day is named above the chart.
 **7 days** and **Period** show the card described below.
 
 With a connected source, the card **Your own system** shows

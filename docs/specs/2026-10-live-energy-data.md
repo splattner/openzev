@@ -419,7 +419,10 @@ Authorization: Bearer ozs_<prefix>_<secret>
 
 - *Fresh*: a source with `provides_live`, `enabled`, whose `latest` exists and
   `now − timestamp <= LIVE_MAX_AGE_S`.
-- *Producing points*: active metering points of the ZEV with `meter_type` in `PRODUCTION_METER_TYPES`.
+- *Producing points*: active metering points of the ZEV with `meter_type` in `PRODUCTION_METER_TYPES`, **except** a bidirectional point with no live source and `has_behind_meter_generation = false`
+  (`Topology.declared_idle`): the manager has declared that nothing feeds in there, so it reads 0 as a producer and does not
+  hold the tier at `none` (ADR 0044, amendment). A point with a source gone quiet, a `production` point and a point with
+  generation behind its meter are never idle. The point still counts as a consuming point and in `coverage.points`.
   *Consuming points*: `CONSUMPTION_METER_TYPES` (`allocation.read_model`). A bidirectional point is in
   both, as in billing.
 - `P = Σ max(−meter_power_w, 0)` over producing points; `C_sum = Σ max(meter_power_w, 0)` over
@@ -427,7 +430,7 @@ Authorization: Bearer ozs_<prefix>_<secret>
 - `N` = the connection-point source's `meter_power_w`.
 
 **Tier** (ADR 0044):
-- `none` when no producing point exists, or any producing point is not fresh.
+- `none` when no producing point exists, or any producing point is not fresh (declared-idle points above are not producing points).
 - `exact` when not `none` and either every consuming point is fresh (`C = C_sum`), or the ZEV is
   `zev_type = zev` and the connection-point source is fresh (`C = max(P + N, 0)`;
   `consumption_basis = "connection_point"`; if both hold, `C_sum` wins, basis `"all_points"`).
@@ -460,7 +463,7 @@ allow them):
   every viewer, and tells the frontend whether there is anything live to show (zero: hide the card).
 - `coverage.points` / `coverage.points_fresh` count **distinct** active metering points of the ZEV and
   how many of them have a fresh value. A bidirectional point is in both per-role counts but once here,
-  so these are what the card's coverage line shows. Present for every viewer.
+  so they say how many points report. The card no longer shows them (the per-point table's summary counts the quiet ones); they stay in the payload. Present for every viewer.
 - `as_of` is the **oldest** sample timestamp used. `connection_point` is `fresh`, `stale`, `never` or
   `null` (no such source, or a vZEV).
 - `production_w` is shown for tiers `production` and `exact`; `consumption_w`, `surplus_w =
@@ -704,30 +707,38 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
   (`queryKeys.live.ownSeries(zevId, participantId, from, to, bucket)`, so a source change invalidates it
   with `queryKeys.live.all`), `ownHistoryFromSeries` and `todayRows` (the history/live merge, §5.3).
 - `frontend/src/features/live/LiveEnergyCard.tsx`:
-  - `none`: "No live production data right now"; the coverage line below says how far live data
-    reaches. The forecast is its own card below (`ProductionForecastChart`), shown from any plant that has one, also with no live source at all.
-  - `production`: "The ZEV produces **x kW** right now" and the note "We don't know how much the other
-    participants are using at the moment, so part of it may already be in use."
-  - Own figures lead, ahead of the ZEV totals, as tiles of their own in a grid above them (a viewer's own
+  - **Layout.** The card is **not** a white `.card` box: like the tiles of the Energy balance it is a plain `.live-now` section
+    on the page: a heading row (`card-header` classes: "Right now" and the badge, the time on the right), then **one** `.stat-grid`
+    with all the tiles, then the muted notes. The ZEV tile is labelled **ZEV production** (`live.production`) so it is not mistaken for **Your production**.
+  - `none`: "No live production data right now". When the viewer's own tiles are shown (below), the sentence is the muted "No live data for the ZEV as a whole
+    right now, because not all metering points report" (`live.noneZev`) instead, so it does not read as if the viewer's own
+    system were silent. A vZEV of bidirectional meters of which only one has a source is tier `none` (every bidirectional
+    point is a producing point), and the holder of that one still sees their own figures. The forecast is its own card below (`ProductionForecastChart`), shown from any plant that has one, also with no live source at all.
+  - `production`: a **ZEV production** KPI tile (`StatCard`, `x kW`, the same tile as at `exact`) whose **tooltip** (`StatCard`'s `info`: an
+    info mark beside the label, shown on hover, keyboard focus and tap; `role="tooltip"`, described by `aria-describedby`) says "We don't
+    know how much the other participants are using at the moment, so part of it may already be in use" (`live.othersUnknown`). When the
+    production reads `0.0 kW` the tooltip gives way to the tile's visible hint "Nothing spare right now" (`live.nothingSpare`):
+    with no production nothing is spare whatever the others use. This is wording only; the payload still has no `surplus_w` below `exact`.
+  - Own figures lead, ahead of the ZEV totals, as the first tiles of **one** `.stat-grid` that holds the ZEV tiles too (they share a row as far as the width allows) (a viewer's own
     consumption and, for a producer, own production; UI review of #1032, a participant came for their own number):
     **Your consumption** `x kW` with the hint "of which y kW local, z kW from the grid" (only at `exact`; below it the
     tile has no hint) and **Your production** `x kW` with "y kW to the ZEV, z kW to the grid" (only at `exact`).
-    The consumption tile needs `own.complete`; with `split_withheld_reason = "inconsistent"` the tile shows the
+    Both tiles need `own.complete` and nothing else: they show at tier `none` too (`liveCardState` does not gate them on the tier).
+    When the viewer's source reports gross figures (`own.gross.consumption_w` / `production_w`, a system behind the meter), the
+    tile shows the gross figure, because the meter alone shows only the surplus and the grid draw; the hint of that tile is then
+    left out, as the split belongs to the metered power. With `split_withheld_reason = "inconsistent"` the tile shows the
     figure and a muted hint under the grid says the split cannot be shown right now.
-  - `exact`: production, consumption, **spare now**, local share. The split is never shown below `exact`; a value
+  - `exact`: ZEV production, ZEV consumption (`live.production`, `live.consumption`), **spare now**, local share. The split is never shown below `exact`; a value
     the payload leaves `null` is never shown. A power that rounds to zero is `0.0`, never `-0.0` (`snapshot.watts`
     and `kwFigure` both normalise a negative zero).
   - When `own` is set and not `complete` (the viewer holds a point that reports no fresh value, so the own tiles are
     withheld): an `IssueText` warning under the title linking to `/me/metering-points`, "Your source is not reporting
     right now" when `own.points_fresh` is `0`, else "Not all of your metering points are reporting live right now"
     (`live.ownQuiet`, `live.ownPartlyQuiet`). The payload has no per-source age, so the text names none.
-  - Always: "as of hh:mm:ss" (when `as_of` is set), a "Live, indicative" badge (the page's **one** marker that the values are
-    indicative: neither the page description nor the chart notes say it again), and **one** coverage
-    line: "Live data from X of Y metering points", then " · Grid connection point: <state>" when
-    `coverage.connection_point` is not `null`. X and Y count **distinct** active metering points
-    (a bidirectional one counts once), taken from `coverage.points_fresh` / `coverage.points`
-    (`liveCardState().reporting`), for every viewer. The per-role counts (`producing_*`, `consuming_*`)
-    are not shown: merging them would count a bidirectional point twice.
+  - Always: "as of hh:mm:ss" (when `as_of` is set) and a "Live, indicative" badge (the page's **one** marker that the values are
+    indicative: neither the page description nor the chart notes say it again). There is **no coverage line** ("Live data from X of
+    Y metering points", the grid connection point's state): it repeated what the per-point table says, and for a participant it
+    only confused. `liveCardState` no longer has `reporting`.
 - `LivePointsTable.tsx` (meter or "Grid connection point", holder or "ZEV-operated", kW, age, state)
   for a snapshot that carries `points` (manager, viewer, admin). It is a `Disclosure` inside a card, **closed**, its summary
   a bold "Live values per metering point" and, while some points have no current value, the muted "no current data: N"
@@ -800,18 +811,14 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
      dashed reference line at `own_history_through` labelled "History to live". The card has **no heading** (the
      tab says "Today", §10.3 rule 12). **Whose line it is** follows the subject: `isOwn` gives "Your consumption (history)" and
      so on (`myEnergy.today.own*`), a manager looking at somebody else gets "Person's consumption (history)"
-     (`personHistory`, `personLive`, `personProductionHistory`, `personProductionLive`, `personHint`, `personHistoryOnly`,
-     `personEmptyHistory`), never "your". Explanations: only the forecast/measurement distinction is visible (below),
-     the rest sits in a `Disclosure` "How to read the chart" (`myEnergy.today.readingHelp`): which part is history and which live,
-     that ZEV totals are live only (`ownHint`/`personHint`), what a gap means (`live.curve.hint`) and, without a live curve and
-     with an own history, `ownHistoryOnly`/`personHistoryOnly`. Gaps are `null`, `connectNulls={false}`. Nothing at
+     (`personHistory`, `personLive`, `personProductionHistory`, `personProductionLive`, `personEmptyHistory`), never "your". There is **no help text under the chart**:
+     no forecast note, no "How to read the chart" disclosure (the legend and the dashed line say it). Gaps are `null`, `connectNulls={false}`. Nothing at
      all -> `myEnergy.today.empty`/`ownEmptyHistory`/`personEmptyHistory`.
      **Forecast overlay.** While the live view is on, `useProductionForecast(zevId)` (enabled only once the energy data
      feature is on) feeds `todayRows(..., {date, hours})`, which draws each of today's forecast hours flat across its
      5-minute steps (`forecast`, `forecastBand`; hours already past included, so the plan can be read against what
      happened). `TodayChart` shows it as a dashed `stepAfter` area "Expected production" with the min/max band behind it
-     where there is one, names today's next peak window above the chart and adds the **visible** hint `myEnergy.today.forecastHint`
-     (an estimate; where the lines differ, what the devices reported counts). The
+     where there is one, names today's next peak window above the chart. The
      chart appears whenever there is live data, an own history **or** a forecast, so a ZEV with only a forecast still
      sees it here.
   5b. *Tomorrow* (`ProductionForecastChart` with `forecastForDay(forecast, tomorrow)`, title "Tomorrow: expected
@@ -1204,6 +1211,10 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
   `own_history_through` in the curve, no server-side merge and `own_production_w`, nobody else's history,
   a manager naming a participant, none without a selection, `participant_id` permissions over HTTP).
   `CurveTests`/`CurveEndpointTests` stay (17 in the file before, 23 now).
+- The declared-idle rule added to `SnapshotTierTests` `test_a_bidirectional_household_declared_without_generation_reads_zero_without_a_source`,
+  `test_such_a_household_still_consumes_so_the_consumption_stays_unknown`, `test_a_declared_idle_household_that_has_a_source_gone_quiet_is_a_gap_not_zero`,
+  `test_a_production_point_without_a_source_is_never_assumed_idle` and (the renamed) `test_a_bidirectional_household_with_generation_behind_its_meter_but_no_source_keeps_the_zev_at_none`,
+  and to `CurveTests` `test_a_declared_idle_household_without_a_source_does_not_hold_the_buckets_at_none`.
 - `metering/live/test_snapshot.py` — **`SnapshotTierTests`**: `none` without producers and with one
   producer stale; `production` with partial consumers; `exact` with all points; `exact` through the
   connection point; connection point ignored in a vZEV; `all_points` wins over the connection point;
@@ -1277,7 +1288,7 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
   gained the forecast rows of `todayRows`, the forecast in Today without live data, the Tomorrow tab (shown, absent without
   tomorrow hours or on a dark day) and no request while live data is off.
 - PR 3a landed `tests/live-energy-card.test.ts` (12 tests: the three tiers' texts, the single
-  coverage line (a bidirectional point counted once, for participants and managers alike), "as of", own split
+  coverage line (since removed), "as of", own split
   only at `exact`, the inconsistent hint, a producer's split, the connection point part, points table rows, empty curve) and `tests/live-helpers.test.ts` (16 tests: `formatKw`,
   `formatClock`, `showLiveCard` hidden for `null` or no live source, `liveCardState`, polling stops on
   `null`, curve rows with gaps, the day axis incl. the 25-hour day).

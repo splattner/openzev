@@ -128,17 +128,6 @@ export interface LiveCardState {
     /** The viewer's local/grid split: shown at `exact`, or withheld as inconsistent, never below `exact`. */
     ownSplit: 'shown' | 'inconsistent' | 'none'
     ownProductionSplit: boolean
-    /**
-     * Distinct metering points with a fresh live value, of all active ones. Counted from `points`, so
-     * a bidirectional point counts once; the participant payload has only per-role counts, which
-     * cannot be merged without double counting, so there it is `null`.
-     */
-    reporting: { fresh: number; total: number }
-}
-
-function reportingPoints(snapshot: LiveSnapshot): LiveCardState['reporting'] {
-    const { points, points_fresh } = snapshot.coverage
-    return { fresh: points_fresh, total: points }
 }
 
 /** What the live card may say for a snapshot, or `null` when the card is not shown at all. */
@@ -146,7 +135,8 @@ export function liveCardState(snapshot: LiveSnapshot | null | undefined): LiveCa
     if (!showLiveCard(snapshot)) return null
     const { tier, own } = snapshot
     const exact = tier === 'exact'
-    const ownReady = tier !== 'none' && !!own?.complete
+    // The viewer's own figures are their own meters' readings: they hold at any tier (SPEC §5.2), also when the rest of the ZEV is not covered.
+    const ownReady = !!own?.complete
     const ownConsumption = ownReady && own.consumption_w !== null
     const ownProduction = ownReady && own.production_w !== null
     let ownSplit: LiveCardState['ownSplit'] = 'none'
@@ -163,7 +153,6 @@ export function liveCardState(snapshot: LiveSnapshot | null | undefined): LiveCa
         ownProduction,
         ownSplit,
         ownProductionSplit: exact && ownProduction && own.to_zev_w !== null && own.to_grid_w !== null,
-        reporting: reportingPoints(snapshot),
     }
 }
 

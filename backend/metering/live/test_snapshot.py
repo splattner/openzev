@@ -272,10 +272,51 @@ class SnapshotTierTests(SnapshotCase):
         self.assertEqual((coverage["producing_points"], coverage["consuming_points"]), (2, 3))
         self.assertEqual((coverage["points"], coverage["points_fresh"]), (4, 2))
 
-    def test_a_bidirectional_household_without_a_source_keeps_the_zev_at_none(self):
+    def test_a_bidirectional_household_with_generation_behind_its_meter_but_no_source_keeps_the_zev_at_none(self):
+        self.flat1.meter_type = MeteringPointType.BIDIRECTIONAL
+        self.flat1.has_behind_meter_generation = True
+        self.flat1.save()
+        self.wire(pv=-1000, flat2=300, flat3=200)
+
+        self.assertEqual(self.snap()["tier"], "none")
+
+    def test_a_bidirectional_household_declared_without_generation_reads_zero_without_a_source(self):
+        # vZEV of bidirectional meters where only one household has a source: the others cannot feed in.
         self.flat1.meter_type = MeteringPointType.BIDIRECTIONAL
         self.flat1.save()
         self.wire(pv=-1000, flat2=300, flat3=200)
+
+        shot = self.snap()
+
+        self.assertEqual((shot["tier"], shot["production_w"], shot["surplus_w"]), ("production", 1000.0, None))
+        # The point is no producing point, so it is not in that count; it still counts as a metering point.
+        self.assertEqual(shot["coverage"]["producing_points"], 1)
+        self.assertEqual(shot["coverage"]["points"], 4)
+        self.assertEqual(shot["coverage"]["points_fresh"], 3)
+
+    def test_such_a_household_still_consumes_so_the_consumption_stays_unknown(self):
+        self.flat1.meter_type = MeteringPointType.BIDIRECTIONAL
+        self.flat1.save()
+        self.wire(pv=-1000, flat2=300, flat3=200)
+
+        shot = self.snap()
+
+        self.assertEqual(shot["coverage"]["consuming_points"], 3)
+        self.assertIsNone(shot["consumption_w"])
+
+    def test_a_declared_idle_household_that_has_a_source_gone_quiet_is_a_gap_not_zero(self):
+        self.flat1.meter_type = MeteringPointType.BIDIRECTIONAL
+        self.flat1.save()
+        self.wire(pv=-1000, flat2=300, flat3=200)
+        self.sample(self.live_source(self.flat1), 0, age=61)
+
+        shot = self.snap()
+
+        self.assertEqual(shot["tier"], "none")
+        self.assertEqual(shot["coverage"]["producing_fresh"], 1)
+
+    def test_a_production_point_without_a_source_is_never_assumed_idle(self):
+        self.wire(pv=None, flat1=500)
 
         self.assertEqual(self.snap()["tier"], "none")
 

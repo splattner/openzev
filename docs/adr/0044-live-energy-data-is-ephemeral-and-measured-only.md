@@ -120,3 +120,23 @@ This is a display rule, not a data rule, and it changes none of the decisions ab
 - Billing, allocation and the history-based statistics still do not read live values (ADR 0030); the
   history reaches the page through `metering.supplementary.stats.gross_energy` like every other
   statistics surface.
+
+## Amendment: a point declared without generation is not a producer
+
+"Every metering point that can produce has a fresh value" (decision 3) is read in terms of what the
+manager has declared. A **bidirectional metering point with no live source and with
+`has_behind_meter_generation` off** is not counted as a producing point: the manager has said there is no
+generation behind that meter, so nothing leaves it and its production is 0, not unknown. In a vZEV of
+bidirectional household meters of which only one household has a source, this lets the ZEV reach the
+tier `production` ("the ZEV produces 0.0 kW now") instead of staying at `none` for ever.
+
+This is a declared fact and not an estimate, so "nothing is estimated" still holds. The narrowness
+matters:
+
+- A point **with** a live source that has gone quiet is a gap, never 0: the tier drops to `none`, as before.
+- A `production` point, and a bidirectional point with generation behind its meter, are never assumed idle.
+- The point still **consumes**: it stays in the consumption side, so `C` stays unknown unless every
+  consuming point reports (or the connection point does), and the tier cannot reach `exact` through it.
+- It still counts as a metering point in the coverage line ("live data from X of Y metering points").
+
+The rule is `Topology.declared_idle` in `metering/live/snapshot.py`; the curve uses the same property.

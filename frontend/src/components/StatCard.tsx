@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 
 export type StatCardTone = 'success' | 'warning' | 'danger'
 
@@ -12,6 +12,8 @@ export type StatCardProps = {
     /** Set small before the figure (`CHF`). */
     currency?: string
     hint?: string
+    /** A note that is not needed to read the figure: a small info mark beside the label shows it on hover, focus or tap. */
+    info?: string
 } & (
     | { accent?: true; tone?: never; flat?: never }
     | { accent?: false; tone?: StatCardTone; flat?: boolean }
@@ -40,7 +42,8 @@ function statValueParts(value: string | number | null, unit?: string, currency?:
     )
 }
 
-export function StatCard({ label, value, unit, currency, hint, accent, tone, flat, onPress, pressed }: StatCardProps) {
+export function StatCard({ label, value, unit, currency, hint, info, accent, tone, flat, onPress, pressed }: StatCardProps) {
+    const infoId = useId()
     const className = [
         'stat-card',
         accent && 'stat-card--accent',
@@ -52,7 +55,15 @@ export function StatCard({ label, value, unit, currency, hint, accent, tone, fla
     const figure = statValueParts(value, unit, currency)
     const body = (
         <>
-            <span className="stat-label">{label}</span>
+            <span className="stat-label">
+                {label}
+                {info && !onPress ? (
+                    <span className="stat-info">
+                        <button type="button" className="stat-info-trigger" aria-label={label} aria-describedby={infoId}>i</button>
+                        <span role="tooltip" id={infoId} className="stat-info-bubble">{info}</span>
+                    </span>
+                ) : null}
+            </span>
             {onPress
                 ? <span className="stat-value">{figure}</span>
                 : <h3 className="stat-value">{figure}</h3>}

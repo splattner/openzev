@@ -6,6 +6,8 @@ covered (the tier):
 
 * ``none``: no producing metering point exists, or one of them has no fresh value. Nothing is
   claimed about the ZEV, because a partial production figure is not "the ZEV's production".
+  A bidirectional point with no live source and no generation behind its meter is not a producing
+  point (``Topology.declared_idle``): the manager has declared that nothing leaves it.
 * ``production``: every producing point is fresh, but the consumption is not known exactly. Only
   the production is shown, never a surplus, a split or a bound.
 * ``exact``: production is complete *and* the consumption is known, from every consuming point or
@@ -31,7 +33,7 @@ from allocation.read_model import CONSUMPTION_METER_TYPES, PRODUCTION_METER_TYPE
 from allocation.split import split_consumption, split_production
 from allocation.validity import active_on, civil_date
 from zev import access
-from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, Zev, ZevType
+from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType, Zev, ZevType
 
 from ..models import SourceTarget, SupplementarySource
 from . import store
@@ -153,9 +155,27 @@ class Topology:
     connection: SupplementarySource | None
     holders: dict[object, object]  # metering point id -> the participant holding it personally today
 
+    def declared_idle(self, point: MeteringPoint) -> bool:
+        """A bidirectional point the manager has said cannot feed in, and that has no live source.
+
+        Such a point reads 0 as producer: its meter is bidirectional, but it has no generation behind it
+        (``has_behind_meter_generation`` is off), so nothing leaves it. This is a declared fact, not an
+        estimate (ADR 0044). A point with a source that has gone quiet is not idle, it is a gap; neither
+        is a production point or one with generation behind its meter.
+        """
+        return (
+            point.meter_type == MeteringPointType.BIDIRECTIONAL
+            and not point.has_behind_meter_generation
+            and point.pk not in self.sources
+        )
+
     @property
     def producing(self) -> list[MeteringPoint]:
-        return [point for point in self.points if point.meter_type in PRODUCTION_METER_TYPES]
+        """The points whose export the ZEV's production is summed over (``declared_idle`` ones left out)."""
+        return [
+            point for point in self.points
+            if point.meter_type in PRODUCTION_METER_TYPES and not self.declared_idle(point)
+        ]
 
     @property
     def consuming(self) -> list[MeteringPoint]:
