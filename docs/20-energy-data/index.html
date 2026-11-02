@@ -1918,16 +1918,46 @@ encryption key for integrations (<code>INTEGRATION_ENCRYPTION_KEYS</code>), and 
 switched off again under <strong>Platform → Settings → Functions → Supplementary energy
 data</strong>. While it is off none of what follows is visible.</p>
 <h2 id="who-can-connect-what">Who can connect what<a class="headerlink" href="#who-can-connect-what" title="Permanent link">&para;</a></h2>
-<p>Only the <strong>participant who personally holds</strong> the metering point can connect a
-source for it. It is their account and their household, so a ZEV manager cannot
-connect it for them, cannot see the key and cannot change it. The metering point
-must be marked <strong>Generation behind the meter</strong>, and you must hold it yourself
-(not through a shared community allocation).</p>
+<p>What you can connect depends on the <strong>kind of data</strong> and on <strong>who holds the metering point</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Kind of data</th>
+<th>The meter must be</th>
+<th>Who connects it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>History</strong> (15-minute values, for production and self-sufficiency)</td>
+<td>held by you personally <strong>and</strong> marked <strong>Generation behind the meter</strong></td>
+<td>the holder</td>
+</tr>
+<tr>
+<td><strong>Live</strong> (values right now)</td>
+<td>any meter you hold personally: a plain consumption meter or an EV charger as well</td>
+<td>the holder</td>
+</tr>
+<tr>
+<td><strong>Forecast</strong> (expected production)</td>
+<td>a producing or bidirectional meter whose plant has roof planes and a building location (see <a href="#production-forecast">Production forecast</a>)</td>
+<td>the holder</td>
+</tr>
+</tbody>
+</table>
+<p>Only the <strong>participant who personally holds</strong> the metering point can connect a source for it. It is their account
+and their household, so a ZEV manager cannot connect it for them, cannot see the key and cannot change it. You must
+hold the meter yourself, not through a shared community allocation. Only the <strong>history</strong> needs the mark <strong>Generation
+behind the meter</strong>, which only a manager can set; live data does not, so a meter without the mark still offers
+<strong>Connect</strong> for live data.</p>
+<p><strong>Community-operated sources</strong> are different: a metering point nobody holds personally (a common area, a spare meter),
+the community's <strong>grid connection point</strong> and the forecast of such a plant belong to the community. A <strong>manager</strong> connects
+those on the <strong>Energy data</strong> tab of <strong>Settings</strong> (see <a href="#the-communitys-sources-managers">The community's sources</a>).</p>
 <table>
 <thead>
 <tr>
 <th></th>
-<th>You (holder)</th>
+<th>Holder (own source)</th>
 <th>ZEV manager</th>
 <th>ZEV viewer</th>
 <th>Other participants</th>
@@ -1935,23 +1965,30 @@ must be marked <strong>Generation behind the meter</strong>, and you must hold i
 </thead>
 <tbody>
 <tr>
-<td>Connect, test, sync, replace the key, import</td>
+<td>Connect, test, sync, replace the key, import, on a <strong>personally held</strong> meter</td>
 <td>yes</td>
 <td>no</td>
 <td>no</td>
 <td>no</td>
 </tr>
 <tr>
-<td>See the status and your figures</td>
+<td>Connect, test, replace the key, on a <strong>community-operated</strong> meter or the grid connection point</td>
+<td>n/a</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td>See the status and figures</td>
 <td>yes</td>
 <td>yes</td>
 <td>yes (read-only)</td>
 <td>no</td>
 </tr>
 <tr>
-<td>Switch off, disconnect, delete data, remove</td>
+<td>Switch off, disconnect, delete data, remove a <strong>participant's</strong> source</td>
 <td>yes</td>
-<td>yes</td>
+<td>switch off or on, delete data, remove (never disconnect, test or touch the key)</td>
 <td>no</td>
 <td>no</td>
 </tr>
@@ -1962,7 +1999,9 @@ button <strong>View meter data</strong>, which opens the chart of the readings b
 <strong>Your own energy data</strong> holds what you connect here (history, live, forecast), which is only
 shown and used for statistics, never for billing, so the button does not show those figures.</p>
 <p>If you are a ZEV manager and hold a metering point yourself, you connect it the
-same way as any participant: <strong>My metering points</strong> appears in your menu.</p>
+same way as any participant: <strong>My metering points</strong> appears in your menu. A manager who
+connects their own plant's forecast is told where to enter the roof planes and the building's
+location (a button leads to the metering points); a participant is told to ask their manager.</p>
 <p>When you no longer hold the metering point (the assignment ends), the connection
 is switched off by itself, the key is deleted, and nothing new is collected. The
 data already collected is kept until you or a manager deletes it.</p>
@@ -1971,8 +2010,8 @@ data already collected is kept until you or a manager deletes it.</p>
 <ol>
 <li>Create an <strong>API key</strong> in your Solar Manager account.</li>
 <li>In OpenZEV open <strong>My metering points</strong> in the menu. The metering points that
-   are marked <em>Generation behind the meter</em> and that you hold yourself carry the
-   energy data setup.</li>
+   you hold yourself carry the energy data setup. For <strong>history</strong>, the meter must also be
+   marked <em>Generation behind the meter</em>; for live data and the forecast it does not need that mark.</li>
 <li>Choose <strong>Connect</strong> on the metering point.</li>
 <li>Pick <strong>Solar Manager</strong>, enter your <strong>Solar Manager ID</strong> (3 to 24 letters or
    digits) and the <strong>API key</strong>, and read what you agree to.</li>
@@ -2214,7 +2253,7 @@ connect a source, it opens there by itself.</p>
 <p>The metering point list shows nothing about energy data. What a manager looks after is on the <strong>Energy data</strong> tab of
 <strong>Settings</strong> (it appears while the feature is on): every source of the community in one list, the grid connection point
 first, with who holds it and what it provides. Nothing is coloured while a source works; a source that has gone quiet or
-failed shows its problem in red text. Choose a source to open its details beside the list.</p>
+failed shows its problem in red text. Choose a source to open its details beside the list. Until the first source exists the tab shows a single explanation with one <strong>Connect a source</strong> button; the introduction and the button in the toolbar come with the first source.</p>
 <ul>
 <li><strong>Your community's own sources.</strong> <strong>Connect a source</strong> connects live data for a metering point nobody holds
   personally (a common area, a spare meter), the production forecast of such a plant, or the grid connection point. You
@@ -2260,10 +2299,12 @@ the everyday actions, and each asks for confirmation. A ZEV manager can switch a
 delete its data or remove it (on the <strong>Energy data</strong> tab below), but cannot disconnect it, test it or touch its key. Deleting a participant or a metering point deletes their
 sources and readings with them.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
-<p><strong>There is no Connect button on my metering point.</strong> The feature is off, you do
+<p><strong>There is no Connect button on my metering point.</strong> The feature is off, or you do
 not personally hold the metering point (a shared community allocation does not
-count), or it is not marked <em>Generation behind the meter</em>. Only a ZEV manager can
-set that mark, so ask them; <strong>My metering points</strong> says so too.</p>
+count). For <strong>live</strong> data that is all it takes. For <strong>history</strong> (production and self-sufficiency)
+the meter must also be marked <em>Generation behind the meter</em>; only a ZEV manager can
+set that mark, so ask them (<strong>My metering points</strong> says so too, below the meters). A meter nobody
+holds personally is connected by a manager on the <strong>Energy data</strong> tab of <strong>Settings</strong>, not by a participant.</p>
 <p><strong>"Not accepted" when connecting.</strong> The key or the Solar Manager ID is wrong. The
 ID is the one of your installation, not your login name.</p>
 <p><strong>Live data from Solar Manager shows "no data".</strong> Values are only fetched while someone has the live
