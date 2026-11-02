@@ -73,10 +73,10 @@ describe('liveCardState', () => {
         expect(state).toMatchObject({ showProduction: true, showExact: false, ownConsumption: true, ownSplit: 'none' })
     })
 
-    it('has nothing at tier none, not even the own figures', () => {
+    it('has no ZEV figures at tier none, but keeps the own ones (SPEC §5.2)', () => {
         const state = liveCardState(snapshot({ tier: 'none', production_w: null, own: { consumption_w: 1, local_w: null, grid_w: null, production_w: null, to_zev_w: null, to_grid_w: null, gross: { production_w: null, consumption_w: null }, complete: true, points: 1, points_fresh: 1 } }))
 
-        expect(state).toMatchObject({ showProduction: false, showExact: false, ownConsumption: false })
+        expect(state).toMatchObject({ showProduction: false, showExact: false, ownConsumption: true, ownSplit: 'none' })
     })
 
     it('marks the detailed view by the presence of the points', () => {

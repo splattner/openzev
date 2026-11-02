@@ -3,7 +3,6 @@ import { Area, CartesianGrid, ComposedChart, Legend, Line, ReferenceLine, Respon
 import {
     ANNOTATION_COLOR, AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CHART_LOCAL, FLOW_GRID_EXP, FLOW_LOCAL_CONS,
 } from '../../lib/chartTokens'
-import { Disclosure } from '../../components/Disclosure'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { nextPeakWindow, peakDayKind, peakRange } from '../../lib/forecast'
 import { formatClockMinutes, kwFigure, liveDayAxis } from '../../lib/live'
@@ -155,13 +154,6 @@ export function TodayChart({ date, rows, through, hasLive, isOwn = true, peakWin
                                 ownLine('ownLiveProduction', t(`myEnergy.today.${who}ProductionLive`), FLOW_GRID_EXP, true)}
                         </ComposedChart>
                     </ResponsiveContainer>
-                    {/* The one thing a reader must not mistake stays visible; how the lines join and what a gap means is on request. */}
-                    {hasForecast && <p className="muted">{t('myEnergy.today.forecastHint')}</p>}
-                    <Disclosure className="disclosure-sm" summary={t('myEnergy.today.readingHelp')}>
-                        <p className="muted">{t(`myEnergy.today.${who}Hint`)}</p>
-                        {hasZev && <p className="muted">{t('live.curve.hint')}</p>}
-                        {!hasLive && hasOwnHistory && <p className="muted">{t(`myEnergy.today.${who}HistoryOnly`)}</p>}
-                    </Disclosure>
                 </>
             )}
         </section>

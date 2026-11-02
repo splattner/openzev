@@ -76,24 +76,80 @@ describe('LiveEnergyCard', () => {
         expect(out).toContain('live.none')
         expect(out).not.toContain('live.noneReason')
         expect(out).not.toContain('live.asOf')
-        expect(out).not.toContain('live.zevProduces')
+        expect(out).not.toContain('live.production')
     })
 
-    it('says the distinct point coverage once, for participants and managers alike', async () => {
-        // A vZEV of three bidirectional meters: per role the payload says 1 of 3 twice; the distinct count is said once.
+    it('shows the own figures at tier none and says only that the ZEV as a whole has no data', async () => {
+        // vZEV where only the viewer's point reports: the viewer's own readings stand on their own.
+        const out = await text(none({ own: own({ consumption_w: 400, production_w: 0, local_w: null, grid_w: null }) }))
+
+        expect(out).toContain('live.ownConsumptionLabel')
+        expect(out).toContain('0.4')
+        expect(out).toContain('live.ownProductionLabel')
+        expect(out).toContain('live.noneZev')
+        expect(out.replace('live.noneZev', '')).not.toContain('live.none')
+        expect(out).not.toContain('live.ownSplitHint')
+    })
+
+    it('prefers the gross figures of a system behind the meter over the metered surplus', async () => {
+        // Metered: 3 kW fed out, nothing drawn. The system itself reports 3.4 kW produced and 0.4 kW used.
+        const out = await text(exact({ own: own({ consumption_w: 0, production_w: 3000, local_w: 0, grid_w: 0, to_zev_w: 3000, to_grid_w: 0, gross: { production_w: 3400, consumption_w: 400 } }) }))
+
+        expect(out).toContain('0.4')
+        expect(out).toContain('3.4')
+        // The split belongs to the metered power, so it is not printed beside a gross figure.
+        expect(out).not.toContain('live.ownSplitHint')
+        expect(out).not.toContain('live.ownProductionSplitHint')
+    })
+
+    it('has no coverage line: how many points report is on the per-point table', async () => {
         const coverage = { ...none().coverage, producing_points: 3, producing_fresh: 1, consuming_points: 3, consuming_fresh: 1, points: 3, points_fresh: 1 }
         const out = await text(none({ coverage }))
 
         expect(out).toContain('live.none')
-        expect(out).toContain('live.coverage|{"fresh":1,"total":3}')
-        expect(out.match(/live\.coverage/g)).toHaveLength(1)
-        expect(out).toContain('live.connectionPoint')
+        expect(out).not.toContain('live.coverage')
+        expect(out).not.toContain('live.connectionPoint')
+    })
+
+    it('says nothing is spare, not that part of it may be in use, when the ZEV produces nothing', async () => {
+        const out = await text(production({ production_w: 0 }))
+
+        expect(out).toContain('live.production')
+        expect(out).toContain('0.0')
+        expect(out).toContain('live.nothingSpare')
+        expect(out).not.toContain('live.othersUnknown')
+    })
+
+    it('puts the own and the ZEV tiles into one grid', async () => {
+        const { container } = await renderWithProviders(createElement(LiveEnergyCard, { snapshot: exact({ own: own({ production_w: 3000, to_zev_w: 3000, to_grid_w: 0 }) }) }), cleanups)
+
+        expect(container.querySelectorAll('.stat-grid')).toHaveLength(1)
+        expect(container.querySelectorAll('.stat-card')).toHaveLength(6)
+    })
+
+    it('sets the tiles on the page, not in a white box of their own', async () => {
+        const { container } = await renderWithProviders(createElement(LiveEnergyCard, { snapshot: exact() }), cleanups)
+
+        expect(container.querySelector('.card')).toBeNull()
+        expect(container.querySelector('.live-now > .stat-grid')).not.toBeNull()
+    })
+
+    it('puts the note about the others\' use into a tooltip on the ZEV production tile', async () => {
+        const { container } = await renderWithProviders(createElement(LiveEnergyCard, { snapshot: production() }), cleanups)
+
+        const tile = Array.from(container.querySelectorAll('.stat-card')).find((card) => card.textContent?.includes('live.production'))!
+        const bubble = tile.querySelector('[role="tooltip"]')!
+        expect(bubble.textContent).toBe('live.othersUnknown')
+        expect(tile.querySelector('button')!.getAttribute('aria-describedby')).toBe(bubble.id)
+        // The note is no paragraph under the tiles any more.
+        expect(Array.from(container.querySelectorAll('.live-now > p')).map((p) => p.textContent)).not.toContain('live.othersUnknown')
     })
 
     it('shows only the production and the note at tier production', async () => {
         const out = await text(production())
 
-        expect(out).toContain('live.zevProduces|{"value":"8.0\u00a0kW"}')
+        expect(out).toContain('live.production')
+        expect(out).toContain('8.0')
         expect(out).toContain('live.othersUnknown')
         expect(out).not.toContain('live.spare')
         expect(out).not.toContain('live.localShare')
@@ -139,20 +195,12 @@ describe('LiveEnergyCard', () => {
         expect(out).toContain('live.ownProductionSplitHint|{"toZev":"3.0\u00a0kW","toGrid":"1.0\u00a0kW"}')
     })
 
-    it('shows the time of the oldest value and the coverage with the connection point', async () => {
+    it('shows the time of the oldest value and the badge, and no coverage or connection point line', async () => {
         const out = await text(exact())
 
         expect(out).toContain('live.asOf|{"time":"12:02:10"}')
         expect(out).toContain('live.badge')
-        expect(out).toContain('live.coverage|{"fresh":2,"total":7}')
-        expect(out).toContain('live.connectionPoint')
-        expect(out).toContain('live.state.fresh')
-    })
-
-    it('shows no connection point line without such a source', async () => {
-        const base = exact()
-        const out = await text(exact({ coverage: { ...base.coverage, connection_point: null } }))
-
+        expect(out).not.toContain('live.coverage')
         expect(out).not.toContain('live.connectionPoint')
     })
 
@@ -307,7 +355,7 @@ describe('TodayChart', () => {
         expect(container.textContent).not.toContain('myEnergy.today.ownEmptyHistory')
     })
 
-    it('keeps the forecast distinction visible and the rest of the explanation on request, with no heading repeating the tab', async () => {
+    it('has no help text under the chart and no heading repeating the tab', async () => {
         const row = { ts: Date.parse('2026-10-30T10:00:00Z'), production: 2, consumption: 1, ownHistory: null, ownLive: null, ownHistoryProduction: null, ownLiveProduction: null, forecast: 3, forecastBand: null }
         const { container } = await renderWithProviders(
             createElement(TodayChart, { date: '2026-10-30', rows: [row], through: null, hasLive: true }),
@@ -315,11 +363,8 @@ describe('TodayChart', () => {
         )
 
         expect(container.querySelector('h3')).toBeNull()
-        const visible = Array.from(container.querySelectorAll('.chart-card > p')).map((p) => p.textContent)
-        expect(visible).toContain('myEnergy.today.forecastHint')
-        const help = container.querySelector('details')!
-        expect(help.open).toBe(false)
-        expect(help.textContent).toContain('myEnergy.today.ownHint')
-        expect(help.textContent).toContain('live.curve.hint')
+        expect(container.querySelector('.chart-card > p')).toBeNull()
+        expect(container.querySelector('details')).toBeNull()
     })
+
 })

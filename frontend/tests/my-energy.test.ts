@@ -224,7 +224,6 @@ describe('MyEnergyView', () => {
             zevId: 'z1', dateFrom: todayBusinessIso(), dateTo: todayBusinessIso(), bucket: 'quarter', participantId: undefined,
         })
         expect(container.querySelector('.chart-card')).not.toBeNull()
-        expect(container.textContent).toContain('myEnergy.today.ownHistoryOnly')
         expect(container.querySelector('.empty-state')).toBeNull()
     })
 
@@ -241,7 +240,6 @@ describe('MyEnergyView', () => {
         expect(live.fetchLiveCurveOrNull).toHaveBeenCalledWith('z1', todayBusinessIso(), undefined)
         expect(live.fetchOwnSeries).not.toHaveBeenCalled()
         expect(container.textContent).toContain('live.title')
-        expect(container.textContent).not.toContain('myEnergy.today.ownHistoryOnly')
     })
 
     it('falls back to the history alone when the live curve is not available', async () => {
@@ -426,7 +424,6 @@ describe('the forecast in My energy system', () => {
         const { container } = await render()
 
         expect(container.querySelector('.chart-card')).not.toBeNull()
-        expect(container.textContent).toContain('myEnergy.today.forecastHint')
         expect(container.textContent).toContain('forecast.peak.today')
         expect(tabLabels(container)).toEqual([])
     })

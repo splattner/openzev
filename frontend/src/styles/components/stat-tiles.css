@@ -64,6 +64,62 @@
   align-items: start;
 }
 
+/* An info mark beside the label: the note shows on hover, keyboard focus and tap, never as the only route to what
+   a figure means (UI patterns §10.3 rule 8). The bubble is as wide as the tile at least, so it stays on the screen. */
+
+.stat-card {
+  position: relative;
+}
+
+.stat-info {
+  display: inline-block;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.stat-info-trigger {
+  display: inline-grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: transparent;
+  font-size: 0.6875rem;
+  font-style: italic;
+  font-weight: 650;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: help;
+}
+
+.stat-info-bubble {
+  position: absolute;
+  top: calc(100% - 0.25rem);
+  left: 0;
+  z-index: 20;
+  display: none;
+  width: max(100%, 12rem);
+  max-width: min(16rem, 80vw);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sheet);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.stat-info:hover .stat-info-bubble,
+.stat-info:focus-within .stat-info-bubble {
+  display: block;
+}
+
 /* Toggle selection uses the interactive color; severity colors the value. */
 
 .stat-card--interactive {
@@ -85,14 +141,17 @@
 
 /* Tile grids: combine the wide modifier with the base class. */
 
+/* `auto-fill` keeps the empty columns, so a tile has the width it has in a full row and one or two tiles do not stretch
+   over the whole card. On a narrow screen the tiles still share the row, from the minimum up. */
+
 .stat-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
 }
 
 .stat-grid--wide {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
 }
 
 /* Two grids in one card (the viewer's own figures, then the ZEV totals) keep the grid's own gap between them. */
@@ -206,3 +265,18 @@
   color: var(--success-700);
 }
 
+
+/* The live figures sit on the page like any other tiles, under a plain heading: the title and badge, the time on the right. */
+
+.live-now {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.live-now > .card-header {
+  margin-bottom: 0;
+}
+
+.live-now > p {
+  margin: 0;
+}

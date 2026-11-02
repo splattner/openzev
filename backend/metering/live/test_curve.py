@@ -9,6 +9,7 @@ from allocation.validity import period_start_dt
 from metering.live import curve, store
 from metering.models import SupplementaryReading, SupplementarySource
 from metering.live.testing import LiveTestCase, client_for, curve_url
+from zev.models import MeteringPointType
 
 NOW = datetime(2026, 10, 30, 12, 0, tzinfo=dt_timezone.utc)  # 13:00 in Zurich, CET
 DAY = date(2026, 10, 30)
@@ -60,6 +61,17 @@ class CurveTests(CurveCase):
         self.assertEqual((production["tier"], production["production_w"]), ("production", 6000.0))
         self.assertNotIn("consumption_w", production)
         self.assertEqual(none, {"start": self.start(10), "tier": "none"})
+
+    def test_a_declared_idle_household_without_a_source_does_not_hold_the_buckets_at_none(self):
+        # Same rule as the snapshot: a bidirectional point with no source and no generation behind it is no producer.
+        self.sources["flat1"].delete()
+        self.flat1.meter_type = MeteringPointType.BIDIRECTIONAL
+        self.flat1.save()
+        self.put("pv", 20, -2000)
+
+        _, rows = self.rows()
+
+        self.assertEqual((rows[self.start(20)]["tier"], rows[self.start(20)]["production_w"]), ("production", 2000.0))
 
     def test_a_bucket_is_the_mean_of_its_samples(self):
         self.put("pv", 30, -8000, seconds=0)
