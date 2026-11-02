@@ -1189,6 +1189,35 @@ A tariff **bears input VAT** when its category is `grid_fees`, `levies` or
 (solar) energy and the feed-in credit do not: the ZEV pays no input VAT on its
 own production, and the feed-in credit is money paid out, not a purchased cost.
 
+**Percentage tariffs under `inclusive`** (#1173). A `percentage_of_energy` tariff
+means "x % of what the participant would otherwise pay for grid power". Under
+`inclusive` that is the grid price *with* VAT, so the percentage base is
+`Σ price × (1 + rate)` over the active grid `energy` tariffs that bear input VAT
+(the same classifier and the same `period_end` rate as the grossing above), not
+the net sum. Consequences, all in `_price_energy`:
+
+- The local line itself still gets no VAT added (local energy bears none); only
+  its base changes, and `base_rate` — the "65% von CHF 0.3084/kWh" in the line
+  description — and `effective_percentage` use that base.
+- A producer credit (`sign=-1`) takes the same base, so the credit and the
+  consumers' charges for the same kWh still net to zero.
+- A percentage tariff that itself bears input VAT (e.g. a `levies` tariff on the
+  grid price) keeps the *net* base, because `_build_item_payloads` grosses its line
+  afterwards; grossing both would apply VAT twice. The result equals the
+  percentage of the gross base.
+- A rate change inside the period is ignored, as for the grossing: the rate
+  active on `period_end` applies to the whole invoice.
+- `not_registered` and `registered` are unchanged (net base; in `registered` VAT
+  is added on top of both sides).
+- It is always the behaviour under `inclusive`, not an option. Existing
+  `inclusive` ZEVs with a percentage tariff bill about `rate` higher local prices
+  for periods generated after this change; already issued invoices store their
+  values and stay as they are. The feasibility prefill follows the same base
+  (`retail_price_chf_per_kwh` and the percentage-resolved
+  `internal_energy_price_chf_per_kwh` are grossed for an `inclusive` ZEV, at the
+  rate active today). The tariff overview and contract PDF still print the net
+  grid price as the representative base.
+
 **Installed defaults:** migration `accounts/0015_seed_vat_rates` installs the
 dated history every installation bills against — `0.0770` for
 `2018-01-01..2023-12-31`, `0.0810` open-ended from `2024-01-01` — while
@@ -1744,6 +1773,7 @@ values after refusal.
 | `TariffBearsInputVatTests` | classifier: grid energy / grid fees / levies / metering bear VAT; local energy and feed-in do not |
 | `InvoiceVatInclusiveModeTests` | `inclusive`: VAT-bearing lines grossed by `1 + rate`, `embedded_vat_chf` recorded, no VAT line; no active rate → prices unchanged; `not_registered` bills verbatim (class clears the migration-installed defaults) |
 | `ProducerCreditVatRegisteredTests` (`invoices/test_engine_vat_producer_credit.py`, 6 tests) | #957, `registered`: VAT on the ZEV's supplies (100.00 fee − 40.00 credit → VAT 8.10, total 68.10); consumer unchanged; a participant with only local producer credits owes no VAT; a producer who exports still gets negative VAT from the feed-in credit (#969); `shared_producer_credit` also kept out of the base; a negative fee line still reduces the base |
+| `PercentageBaseInclusiveVatTests`, `PercentageBaseOtherVatModesTests` (`invoices/test_engine_percentage_inclusive_vat.py`) | #1173: `inclusive` local 65 % line bills 0.14053/kWh (base 0.2162 with VAT, 28.11 on 200 kWh), no VAT added to it, producer credit nets the charge to zero, a VAT-bearing percentage levy is grossed once (2.16); `not_registered` keeps the net base (26.00; levy 2.00) |
 | `ProducerCreditVatNotRegisteredTests`, `ProducerCreditVatInclusiveTests` | no VAT base recorded, no VAT, credit nets off verbatim (inclusive: fee grossed, credit not) |
 | `InvoiceSeededVatHistoryTests` (5 tests, seeded via the real migration function) | `registered` 2023 → VAT 0.77/total 10.77 and 2024 → 0.81/10.81 on CHF 10.00 net; `inclusive` 2023/2024 gross 10.77/10.81 with embedded 0.77/0.81 and zero explicit VAT; cross-year period ending 2024 uses `0.0810` for the whole invoice; `not_registered` ignores seeds (10.00, null embedded); pre-2018 periods use the zero fallback in `registered` and `inclusive` |
 

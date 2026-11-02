@@ -5,12 +5,14 @@ from decimal import Decimal
 
 import pytest
 
+from accounts.models import VatRate
 from allocation.errors import InvalidAllocationInputError
 from allocation.split import local_pool_kwh
 from metering.models import MeterReading, ReadingDirection
 from tariffs.models import BillingMode, EnergyType, PeriodType, TariffCategory
 from testing import factories
-from zev.models import MeteringPointType
+from testing.helpers import clear_vat_rates
+from zev.models import MeteringPointType, VatMode
 
 from .defaults import DEFAULT_PARTICIPANT_CONSUMPTION_KWH
 from .prefill import build_prefill
@@ -402,3 +404,31 @@ class TestTariffPrefill:
 
         prefill = build_prefill(zev)
         assert prefill.retail_price_chf_per_kwh is None
+
+
+class TestInclusiveVatTariffPrefill:
+    """An inclusive-VAT ZEV bills its grid lines with VAT folded in (#1173)."""
+
+    def _zev(self, vat_mode):
+        clear_vat_rates()
+        VatRate.objects.create(rate=Decimal("0.0810"), valid_from=date(2020, 1, 1))
+        zev = factories.ZevFactory(vat_mode=vat_mode)
+        grid = factories.TariffFactory(zev=zev, category=TariffCategory.ENERGY, energy_type=EnergyType.GRID)
+        factories.TariffPeriodFactory(tariff=grid, price_chf_per_kwh=Decimal("0.20000"))
+        factories.percentage_tariff(
+            zev, category=TariffCategory.ENERGY, energy_type=EnergyType.LOCAL, percentage="65.00",
+        )
+        return zev
+
+    def test_inclusive_zev_takes_the_percentage_of_the_grid_price_with_vat(self):
+        prefill = build_prefill(self._zev(VatMode.INCLUSIVE))
+
+        assert prefill.retail_price_chf_per_kwh == Decimal("0.21620")
+        assert prefill.internal_energy_price_chf_per_kwh == Decimal("0.14053")
+
+    @pytest.mark.parametrize("vat_mode", [VatMode.NOT_REGISTERED, VatMode.REGISTERED])
+    def test_other_vat_modes_keep_the_price_without_vat(self, vat_mode):
+        prefill = build_prefill(self._zev(vat_mode))
+
+        assert prefill.retail_price_chf_per_kwh == Decimal("0.20000")
+        assert prefill.internal_energy_price_chf_per_kwh == Decimal("0.13000")
