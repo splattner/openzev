@@ -365,7 +365,10 @@ class ForecastApiTests(ForecastCase):
     def setUp(self):
         super().setUp()
         self.source = self.forecast_source()
-        self.points(self.source, (1, 1000), (2, 3000), (3, 3200), (4, 800))
+        # The peak window is per Swiss civil day: keep the four hours on one day, whatever time the suite runs.
+        local_hour = floor_hour(self.now).astimezone(ZoneInfo("Europe/Zurich")).hour
+        self.first = 1 if local_hour <= 19 else 24 - local_hour
+        self.points(self.source, *((self.first + i, power) for i, power in enumerate((1000, 3000, 3200, 800))))
 
     def get(self, user, **kw):
         return client_for(user).get(self.url(**kw))
@@ -404,7 +407,7 @@ class ForecastApiTests(ForecastCase):
 
     def test_the_sum_of_two_plants_carries_a_band_only_when_both_have_one(self):
         second = self._plant()
-        self.points(second, (1, 500))
+        self.points(second, (self.first, 500))
         ProductionForecastPoint.objects.filter(source=self.source).update(power_min_w=D(1), power_max_w=D(2))
         body = self.get(self.manager).json()
         self.assertEqual(body["hours"][0]["power_w"], 1500.0)
