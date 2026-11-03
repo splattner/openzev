@@ -1327,6 +1327,21 @@ one.
 
 ---
 
+### Combined price progression
+
+`GET /api/v1/tariffs/tariffs/progression/?zev_id=&energy_type=[&from=&to=]`
+(`TariffViewSet.progression`, read-only, view access to the ZEV, 404 otherwise)
+adds up every per-kWh tariff of one energy type over time with the engine's own
+rules: band resolution by `tariffs.periods.resolve_band`, a percentage tariff as
+a share of the grid bands in force at the same time (`_price_energy`), and VAT by
+`zev.vat_mode` with the input-VAT classifier of §4.8 (`registered` grosses every
+component, `inclusive` only the tariffs that bear input VAT, `not_registered`
+has no gross). It returns one line per time-of-use slot, category subtotals and
+the fixed fees listed separately; dynamic tariffs are reported, not summed. It
+uses the VAT rate in force on each day, where an invoice uses the rate on its
+`period_end`. Specified in `2026-11-tariff-progression.md`; computed in
+`invoices/tariff_progression.py`.
+
 ### Frontend tariff screen and write forms
 
 The tariff screen is an overview beside an in-flow detail pane
