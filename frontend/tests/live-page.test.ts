@@ -55,12 +55,20 @@ beforeEach(() => {
 })
 
 describe('LiveEnergyView', () => {
-    it('says so, and never asks for the snapshot, while the feature is off', async () => {
+    it('says so while the feature is off, whatever the snapshot answered', async () => {
         api.fetchLiveEnabled.mockResolvedValue(false)
+        // The snapshot is asked without waiting for the flag; while the feature is off the server answers 404.
+        api.fetchLiveSnapshotOrNull.mockResolvedValue(null)
         const { container } = await render()
 
         expect(container.textContent).toContain('pages.live.disabled')
-        expect(api.fetchLiveSnapshotOrNull).not.toHaveBeenCalled()
+    })
+
+    it('asks for the snapshot at once, without waiting for the flag', async () => {
+        api.fetchLiveEnabled.mockReturnValue(new Promise(() => {}))
+        await render()
+
+        expect(api.fetchLiveSnapshotOrNull).toHaveBeenCalledWith('z1')
     })
 
     it('says so when the server does not show the ZEV to the caller', async () => {
