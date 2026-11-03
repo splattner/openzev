@@ -2165,6 +2165,80 @@ export const de = {
             },
             allWeekdays: 'jeden Tag',
             chfPerKwh: 'CHF/kWh',
+            progression: {
+                link: 'Tarifverlauf',
+                back: 'Zurück zu den Tarifen',
+                title: 'Tarifverlauf',
+                description: 'Was eine kWh im Zeitverlauf kostet: alle kWh-Tarife eines Energietyps summiert, nach Tarifzeit.',
+                allHours: 'Alle Stunden',
+                chartTitle: 'Preis pro kWh im Zeitverlauf',
+                controls: {
+                    energyType: 'Energietyp',
+                    from: 'Von',
+                    to: 'Bis',
+                    wholeHistory: 'Ganzer Verlauf',
+                },
+                basis: {
+                    label: 'Anzeige',
+                    not_registered: {
+                        note: 'Diese Gemeinschaft ist nicht mehrwertsteuerpflichtig: Preise werden wie erfasst verrechnet, es gibt nur einen Wert.',
+                    },
+                    registered: {
+                        net: 'Exkl. MWST',
+                        gross: 'Inkl. MWST',
+                    },
+                    inclusive: {
+                        net: 'Publizierter Preis',
+                        gross: 'Verrechneter Preis (inkl. MWST)',
+                    },
+                },
+                issues: {
+                    missing: 'Für {{subject}} ist von {{from}} bis {{to}} nichts gültig: das Total ist zu tief ausgewiesen.',
+                    dynamic_partial: 'Für {{subject}} liegen von {{from}} bis {{to}} nur teilweise abgerufene Preise vor: der Durchschnitt deckt nur diese ab, das Total kann abweichen.',
+                    dynamic_no_data: 'Für {{subject}} liegen von {{from}} bis {{to}} keine abgerufenen Preise vor; der Tarif ist nicht enthalten.',
+                    dynamic_base: '{{subject}} folgt einem abgerufenen Netzpreis ohne Daten von {{from}} bis {{to}} und ist nicht enthalten.',
+                    no_bands: '{{subject}} hat keine Preisbänder und ist von {{from}} bis {{to}} nicht enthalten.',
+                },
+                composition: {
+                    title: 'Preis am {{date}}',
+                    line: 'Tarifzeit',
+                    none: 'Für diese Tarifzeit gibt es an diesem Datum keinen Preis.',
+                    caption: 'Bestandteile des Preises für {{line}}',
+                    charge: 'Bestandteil',
+                    total: 'Total',
+                    percentageOf: '{{percentage}} % von CHF {{base}}',
+                    dynamicAverage: 'Durchschnitt der abgerufenen Preise, {{coverage}} % der Stunden abgedeckt',
+                },
+                fees: {
+                    title: 'Fixe Gebühren',
+                    intro: 'Gebühren fallen nicht pro kWh an und sind deshalb nicht im Preis oben enthalten. Eine geteilte Gebühr ist der Betrag, den die ganze Gemeinschaft bezahlt.',
+                    month: 'Pro Monat',
+                    year: 'Pro Jahr',
+                    name: 'Gebühr',
+                    scope: 'Verrechnet',
+                    since: 'Seit',
+                    amount: {
+                        month: 'CHF / Monat',
+                        year: 'CHF / Jahr',
+                    },
+                    scopes: {
+                        participant: 'Pro Teilnehmer',
+                        metering_point: 'Pro Messpunkt',
+                        community: 'Von der Gemeinschaft geteilt',
+                    },
+                    split: {
+                        equal: 'gleichmässig nach Anzahl Teilnehmer',
+                        weight: 'nach Gewichtung',
+                    },
+                },
+                errors: {
+                    tooManyBands: 'In diesem Zeitraum gibt es zu viele verschiedene Tarifzeiten für die Darstellung. Wählen Sie einen kürzeren Zeitraum.',
+                },
+                empty: {
+                    title: 'Keine kWh-Tarife',
+                    description: 'Für diesen Energietyp gibt es noch keinen Tarif, also nichts zu summieren. Versuchen Sie einen anderen Energietyp.',
+                },
+            },
             priceHistory: {
                 title: 'Preisverlauf',
                 derivedNote: 'Berechnet aus den damals g\u00fcltigen Netztarifen \u2014 \u00e4ndert sich also auch, wenn diese sich \u00e4ndern.',

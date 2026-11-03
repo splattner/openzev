@@ -102,6 +102,9 @@ completion must not select or reopen anything (`useWriteScope`, reference spec Â
 - Rows have a named, keyboard-accessible control that opens the pane (the name
   button, as today); row click is an extra. The tariff overview PDF's scope
   (valid or all) stays chosen at download.
+- The page header also links to **Price progression** (`/tariffs/progression`), a
+  separate read-only page that adds up all per-kWh tariffs
+  (SPEC-2026-tariff-progression); it has no navigation item of its own.
 
 ## 5. The pane
 

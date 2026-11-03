@@ -36,6 +36,7 @@ const ParticipantOnboardingPage = lazy(async () => ({ default: (await import('..
 const PublicInvoicePage = lazy(async () => ({ default: (await import('../pages/PublicInvoicePage')).PublicInvoicePage }))
 const ParticipantsPage = lazy(async () => ({ default: (await import('../pages/ParticipantsPage')).ParticipantsPage }))
 const TariffsPage = lazy(async () => ({ default: (await import('../pages/TariffsPage')).TariffsPage }))
+const TariffProgressionPage = lazy(async () => ({ default: (await import('../pages/TariffProgressionPage')).TariffProgressionPage }))
 const ConfirmEmailChangePage = lazy(async () => ({ default: (await import('../pages/ConfirmEmailChangePage')).ConfirmEmailChangePage }))
 const ForgotPasswordPage = lazy(async () => ({ default: (await import('../pages/ForgotPasswordPage')).ForgotPasswordPage }))
 const ResetPasswordPage = lazy(async () => ({ default: (await import('../pages/ResetPasswordPage')).ResetPasswordPage }))
@@ -218,6 +219,14 @@ export function AppRoutes() {
             element={
               <ProtectedRoute allowedRoles={ZEV_SCOPE}>
                 <TariffsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="tariffs/progression"
+            element={
+              <ProtectedRoute allowedRoles={ZEV_SCOPE}>
+                <TariffProgressionPage />
               </ProtectedRoute>
             }
           />

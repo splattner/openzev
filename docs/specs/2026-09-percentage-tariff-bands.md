@@ -263,6 +263,12 @@ per band, using the same band keys and the same seasonal segmentation as
 energy tariffs. Each value is `base × band.percentage / 100`, and the note is
 `"{pct}% × {base}"`.
 
+This chart derives the base from each grid tariff's *representative* band price
+(flat, else high, else the first). The combined price progression
+(`2026-11-tariff-progression.md`) instead resolves the grid base per time-of-use
+slot on the server, so the two can differ for a multi-band grid tariff; the
+single-tariff chart was left as it is.
+
 **Version form (`TariffVersionForm.tsx`)**: percentage tariffs use the same
 per-band rows as energy tariffs (`usesPeriods` true for both), editing
 `percentage` instead of `price_chf_per_kwh`. The single percentage input and

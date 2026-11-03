@@ -2165,6 +2165,80 @@ export const fr = {
             },
             allWeekdays: 'chaque jour',
             chfPerKwh: 'CHF/kWh',
+            progression: {
+                link: 'Évolution tarifaire',
+                back: 'Retour aux tarifs',
+                title: 'Évolution tarifaire',
+                description: 'Ce que coûte un kWh au fil du temps : tous les tarifs par kWh d\'un type d\'énergie, additionnés, selon la plage horaire.',
+                allHours: 'Toutes les heures',
+                chartTitle: 'Prix par kWh au fil du temps',
+                controls: {
+                    energyType: 'Type d\'énergie',
+                    from: 'Du',
+                    to: 'Au',
+                    wholeHistory: 'Tout l\'historique',
+                },
+                basis: {
+                    label: 'Affichage',
+                    not_registered: {
+                        note: 'Cette communauté n\'est pas assujettie à la TVA : les prix sont facturés tels que saisis, il n\'y a donc qu\'une seule valeur.',
+                    },
+                    registered: {
+                        net: 'Hors TVA',
+                        gross: 'TVA incluse',
+                    },
+                    inclusive: {
+                        net: 'Prix publié',
+                        gross: 'Prix facturé (TVA incluse)',
+                    },
+                },
+                issues: {
+                    missing: 'Rien n\'est en vigueur pour {{subject}} du {{from}} au {{to}} : le total est sous-estimé.',
+                    dynamic_partial: 'Pour {{subject}}, les prix récupérés du {{from}} au {{to}} sont incomplets : la moyenne ne couvre que ceux-ci, le total peut donc différer.',
+                    dynamic_no_data: 'Aucun prix récupéré pour {{subject}} du {{from}} au {{to}} : il n\'est pas inclus.',
+                    dynamic_base: '{{subject}} suit un prix du réseau récupéré sans données du {{from}} au {{to}} et n\'est pas inclus.',
+                    no_bands: '{{subject}} n\'a aucune plage de prix et n\'est pas inclus du {{from}} au {{to}}.',
+                },
+                composition: {
+                    title: 'Prix au {{date}}',
+                    line: 'Plage horaire',
+                    none: 'Aucun prix pour cette plage horaire à cette date.',
+                    caption: 'Composantes du prix pour {{line}}',
+                    charge: 'Composante',
+                    total: 'Total',
+                    percentageOf: '{{percentage}} % de CHF {{base}}',
+                    dynamicAverage: 'Moyenne des prix récupérés, {{coverage}} % des heures couvertes',
+                },
+                fees: {
+                    title: 'Frais fixes',
+                    intro: 'Les frais ne sont pas facturés par kWh : ils ne font donc pas partie du prix ci-dessus. Des frais partagés sont le montant que toute la communauté paie.',
+                    month: 'Par mois',
+                    year: 'Par an',
+                    name: 'Frais',
+                    scope: 'Facturé',
+                    since: 'Depuis',
+                    amount: {
+                        month: 'CHF / mois',
+                        year: 'CHF / an',
+                    },
+                    scopes: {
+                        participant: 'Par participant',
+                        metering_point: 'Par point de mesure',
+                        community: 'Partagé par la communauté',
+                    },
+                    split: {
+                        equal: 'réparti à parts égales selon le nombre de participants',
+                        weight: 'réparti selon la pondération',
+                    },
+                },
+                errors: {
+                    tooManyBands: 'Il y a trop de plages horaires différentes dans cette période pour les dessiner. Choisissez une période plus courte.',
+                },
+                empty: {
+                    title: 'Aucun tarif par kWh',
+                    description: 'Il n\'y a pas encore de tarif pour ce type d\'énergie, donc rien à additionner. Essayez un autre type d\'énergie.',
+                },
+            },
             priceHistory: {
                 title: 'Historique des prix',
                 derivedNote: 'Calcul\u00e9 \u00e0 partir des tarifs r\u00e9seau en vigueur \u00e0 l\u2019\u00e9poque : il change donc aussi lorsque ceux-ci changent.',

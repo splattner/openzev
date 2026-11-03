@@ -44,6 +44,7 @@ from .serializers import (
     DynamicTariffSourceSerializer,
     DynamicTariffSourceWriteSerializer,
     TariffPeriodSerializer,
+    TariffProgressionQuerySerializer,
     TariffSerializer,
 )
 from .series import active_version, find_gaps, plan_new_version, series_key, sort_versions
@@ -287,6 +288,49 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
             })
 
         payload.sort(key=lambda series: (series['category'], series['name'].lower()))
+        return Response(payload)
+
+    @action(detail=False, methods=['get'], url_path='progression')
+    def progression(self, request):
+        """The combined per-kWh price of one energy type over time (read-only).
+
+        See ``docs/specs/2026-11-tariff-progression.md``. The ZEV is resolved
+        through the caller's view access, so one they cannot see is a 404 rather
+        than an empty answer.
+        """
+        from invoices.tariff_progression import TooManyBands, build_progression
+        from zev.models import Zev
+
+        params = request.query_params
+        query = TariffProgressionQuerySerializer(data={
+            'zev_id': params.get('zev_id'),
+            'energy_type': params.get('energy_type'),
+            **({'date_from': params['from']} if params.get('from') else {}),
+            **({'date_to': params['to']} if params.get('to') else {}),
+        })
+        if not query.is_valid():
+            errors = {{'date_from': 'from', 'date_to': 'to'}.get(key, key): value
+                      for key, value in query.errors.items()}
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+        data = query.validated_data
+
+        zev = Zev.objects.filter(pk=data['zev_id']).first()
+        if zev is None or not access.can_view(request.user, zev):
+            return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        tariffs = self.get_queryset().filter(zev=zev).prefetch_related('periods')
+        try:
+            payload = build_progression(
+                zev, tariffs, data['energy_type'],
+                date_from=data.get('date_from'), date_to=data.get('date_to'),
+                today=timezone.localdate(),
+            )
+        except TooManyBands as error:
+            return Response(
+                {'detail': f'Too many distinct bands to chart ({error}). Choose a narrower date range.',
+                 'code': 'too_many_bands'},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
         return Response(payload)
 
     @action(detail=True, methods=['post'], url_path='new-version')

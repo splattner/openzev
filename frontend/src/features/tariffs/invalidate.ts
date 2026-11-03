@@ -26,5 +26,7 @@ export function invalidateTariffQueries(queryClient: QueryClient, selectedZevId?
     return Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.series(zevId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.dynamicSources() }),
+        // The combined progression sums these tariffs, so any change reshapes it.
+        queryClient.invalidateQueries({ queryKey: ['tariffs', 'progression'] }),
     ]).then(() => undefined)
 }

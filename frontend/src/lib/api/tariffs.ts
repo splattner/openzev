@@ -9,6 +9,8 @@ import type {
   TariffInput,
   TariffPeriod,
   TariffPeriodInput,
+  TariffProgression,
+  TariffProgressionEnergyType,
   TariffSeries,
   TariffVersionInput,
   VseTariffImportPreview,
@@ -26,6 +28,29 @@ import { fetchAllPages } from './pagination'
 export async function fetchTariffSeries(zevId?: string): Promise<TariffSeries[]> {
   const { data } = await api.get<TariffSeries[]>('/tariffs/tariffs/series/', {
     params: zevId ? { zev_id: zevId } : undefined,
+  })
+  return data
+}
+
+/**
+ * The combined per-kWh price of one energy type over time (read-only): one line
+ * per band, category subtotals and net/gross by the ZEV's VAT mode. Computed by
+ * the backend with the invoice engine's band and VAT rules. Blank dates mean the
+ * whole history.
+ */
+export async function fetchTariffProgression(params: {
+  zevId: string
+  energyType: TariffProgressionEnergyType
+  from?: string
+  to?: string
+}): Promise<TariffProgression> {
+  const { data } = await api.get<TariffProgression>('/tariffs/tariffs/progression/', {
+    params: {
+      zev_id: params.zevId,
+      energy_type: params.energyType,
+      ...(params.from ? { from: params.from } : {}),
+      ...(params.to ? { to: params.to } : {}),
+    },
   })
   return data
 }

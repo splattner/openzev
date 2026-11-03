@@ -2165,6 +2165,80 @@ export const it = {
             },
             allWeekdays: 'ogni giorno',
             chfPerKwh: 'CHF/kWh',
+            progression: {
+                link: 'Andamento delle tariffe',
+                back: 'Torna alle tariffe',
+                title: 'Andamento delle tariffe',
+                description: 'Quanto costa un kWh nel tempo: tutte le tariffe per kWh di un tipo di energia, sommate, per fascia oraria.',
+                allHours: 'Tutte le ore',
+                chartTitle: 'Prezzo per kWh nel tempo',
+                controls: {
+                    energyType: 'Tipo di energia',
+                    from: 'Dal',
+                    to: 'Al',
+                    wholeHistory: 'Tutta la storia',
+                },
+                basis: {
+                    label: 'Visualizzazione',
+                    not_registered: {
+                        note: 'Questa comunità non è soggetta all\'IVA: i prezzi vengono fatturati come inseriti, quindi esiste un solo valore.',
+                    },
+                    registered: {
+                        net: 'IVA esclusa',
+                        gross: 'IVA inclusa',
+                    },
+                    inclusive: {
+                        net: 'Prezzo pubblicato',
+                        gross: 'Prezzo fatturato (IVA inclusa)',
+                    },
+                },
+                issues: {
+                    missing: 'Per {{subject}} non è in vigore nulla dal {{from}} al {{to}}: il totale è sottostimato.',
+                    dynamic_partial: 'Per {{subject}} i prezzi recuperati dal {{from}} al {{to}} sono incompleti: la media copre solo quelli, quindi il totale può differire.',
+                    dynamic_no_data: 'Nessun prezzo recuperato per {{subject}} dal {{from}} al {{to}}: non è incluso.',
+                    dynamic_base: '{{subject}} segue un prezzo di rete recuperato senza dati dal {{from}} al {{to}} e non è incluso.',
+                    no_bands: '{{subject}} non ha fasce di prezzo e non è incluso dal {{from}} al {{to}}.',
+                },
+                composition: {
+                    title: 'Prezzo al {{date}}',
+                    line: 'Fascia oraria',
+                    none: 'Nessun prezzo per questa fascia oraria in questa data.',
+                    caption: 'Componenti del prezzo per {{line}}',
+                    charge: 'Componente',
+                    total: 'Totale',
+                    percentageOf: '{{percentage}} % di CHF {{base}}',
+                    dynamicAverage: 'Media dei prezzi recuperati, {{coverage}} % delle ore coperte',
+                },
+                fees: {
+                    title: 'Costi fissi',
+                    intro: 'I costi non sono addebitati per kWh e quindi non fanno parte del prezzo sopra. Un costo condiviso è l\'importo pagato dall\'intera comunità.',
+                    month: 'Al mese',
+                    year: 'All\'anno',
+                    name: 'Costo',
+                    scope: 'Addebitato',
+                    since: 'Dal',
+                    amount: {
+                        month: 'CHF / mese',
+                        year: 'CHF / anno',
+                    },
+                    scopes: {
+                        participant: 'Per partecipante',
+                        metering_point: 'Per punto di misura',
+                        community: 'Condiviso dalla comunità',
+                    },
+                    split: {
+                        equal: 'suddiviso in parti uguali per numero di partecipanti',
+                        weight: 'suddiviso per ponderazione',
+                    },
+                },
+                errors: {
+                    tooManyBands: 'In questo periodo ci sono troppe fasce orarie diverse per essere disegnate. Scegli un periodo più breve.',
+                },
+                empty: {
+                    title: 'Nessuna tariffa per kWh',
+                    description: 'Non c\'è ancora una tariffa per questo tipo di energia, quindi nulla da sommare. Prova un altro tipo di energia.',
+                },
+            },
             priceHistory: {
                 title: 'Storico dei prezzi',
                 derivedNote: 'Calcolato dalle tariffe di rete in vigore all\u2019epoca, quindi cambia anche quando cambiano quelle.',

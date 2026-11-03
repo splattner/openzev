@@ -384,6 +384,15 @@ test.describe('User Guide Screenshots', () => {
     await screenshotFull(page, '07d-tariff-dynamic-source')
   })
 
+  // 07g — The combined price progression (SPEC-2026-tariff-progression): the stepped
+  // lines per band, what is missing from them, one day's composition and the fixed fees.
+  test('07g-tariff-progression', async ({ page }) => {
+    await navigateTo(page, '/tariffs/progression')
+    await expect(page.locator('.tariff-progression-chart svg').first(), `Progression chart missing — ${SEED_HINT}`).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('.tariff-progression-composition table')).toBeVisible()
+    await screenshotFull(page, '07g-tariff-progression')
+  })
+
   // The fetched-price history modal that once had its own shot is gone: the same
   // content renders inline in the pane 07d already captures.
 

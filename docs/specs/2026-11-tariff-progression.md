@@ -54,8 +54,9 @@ boundaries is tested in §10.
 
 ### Out of scope
 
-- **Dynamic tariffs** (stored price series, no bands): listed as *not included*
-  per period, never summed (§5.9). A daily or monthly average is a follow-up.
+- **Dynamic tariffs at finer than month granularity**, or per-reading prices: a
+  dynamic tariff is included as a monthly mean per slot (§5.4a); daily or weekly
+  means are a follow-up.
 - **Per-participant views**: no consumption assumption, no allocation of shared
   fees to a participant, no annual-cost estimate.
 - **Moving the single-tariff chart onto this endpoint.** The existing chart keeps
@@ -96,7 +97,7 @@ These answer the open questions of #1117.
 | Time of use | **One line per band.** The summed price is resolved at every time of the week and year; times with the same combination of bands are one *slot*, and each slot is a line (§5.3). | The user's choice. A flat "the price" would hide HT/NT and seasons. |
 | Net and gross | Computed in the backend with the ZEV's `vat_mode` and the `VatRate` in force on each day (§5.5). `not_registered`: one series, no gross. `registered`: gross = net + active rate. `inclusive`: the *billed* price grosses only the input-VAT-bearing tariffs, exactly as the engine does. | The three modes already differ in the engine; the view must not invent a fourth treatment. |
 | Percentage tariffs | Priced as `percentage × grid base` where the base is the sum of the grid tariffs' bands **at the same slot**. | The engine resolves the grid base per timestamp (`_price_energy`); the existing chart's representative-price shortcut is not repeated here. |
-| Dynamic tariffs | Excluded and reported (§5.9). | They have no bands and a stored series. |
+| Dynamic tariffs | Included as the duration-weighted **mean of the fetched prices in each slot, per calendar month** (§5.4a); months with missing prices are reported (§5.9). | They have no bands, but a stored price per interval; a mean over a slot is what the engine's per-reading prices average to, and the monthly cadence keeps the chart readable. |
 | Where | A routed page `/tariffs/progression`, opened from the tariffs page header (§8). | Own controls and query; keeps the pane's draft/scope logic untouched. Decided, §12 point 1. |
 
 ## 4a. Data model
@@ -117,13 +118,15 @@ imported, not copied; open point 3) and `tariffs.series.series_key`.
 For `energy_type = X` and the ZEV:
 
 - **Displayed set:** tariffs with `billing_mode` in `{energy, percentage_of_energy}`
-  and `energy_type == X`, without `dynamic_source`.
+  and `energy_type == X`, without `dynamic_source`. Dynamic tariffs of type X are
+  priced separately (§5.4a).
 - **Base set:** if the displayed set contains a `percentage_of_energy` tariff, the
   static `energy` tariffs of type `grid` are resolved too, even when `X != grid`.
   They shape the slots and the percentage base but are not listed as components
   unless `X == grid`.
-- **Dynamic tariffs** of type X, and percentage tariffs whose active grid base
-  contains a dynamic tariff, are reported under `incomplete` (§5.9).
+- **Dynamic tariffs** of type X are components with a monthly mean (§5.4a). The
+  dynamic `energy` tariffs of type `grid` also join the base of a percentage
+  tariff.
 - **Fixed fees** are collected separately (§5.8), independent of `X`.
 
 Tariffs are not filtered by name or category: `energy_type` alone decides, as in
@@ -139,7 +142,9 @@ the engine.
   are no intervals, however long the range.
 - **Breakpoints:** every `valid_from` and every `valid_to + 1 day` of every tariff
   in the displayed and base sets, plus (only when `vat_mode != not_registered`)
-  every `VatRate.valid_from` and `valid_to + 1 day`, clipped to `[from, to]`.
+  every `VatRate.valid_from` and `valid_to + 1 day`, plus the first of every
+  calendar month while a dynamic tariff that prices this view is in force,
+  clipped to `[from, to]`.
 - Consecutive breakpoints delimit **elementary intervals** `[d_i, d_{i+1} - 1]`;
   the last ends at `to`. Within an interval the set of active tariffs and the VAT
   rate are constant. Intervals are not merged when their values happen to be equal
@@ -202,6 +207,38 @@ For a slot, each displayed tariff contributes its resolved band:
 
 `net` of the slot is the exact sum of the components' `net`.
 
+### 5.4a Dynamic tariffs
+
+A dynamic tariff has a stored price per interval (`DynamicPricePoint`, UTC,
+quarter-hourly or hourly, signed) and no bands. Within an interval (never longer
+than a calendar month while it is in force) its price for a slot is the
+**duration-weighted mean** of the stored prices over the slot's cells on the Swiss
+wall clock. A stored interval counts for **every cell it overlaps**, weighted by
+the overlap, because the engine prices a reading with the stored interval that
+covers it and resolves the reading's band by its own time. So a price valid for a
+whole quarter (the BFE reference market price is stored one point per quarter or
+month) covers every day of it, and an hourly price that straddles a band edge
+counts in both bands. Stored prices are therefore loaded by overlap with the
+range, not by start: a quarter that began before the range still applies. A feed-in
+tariff's `minimum_price_chf_per_kwh` floor is applied to each stored price before
+averaging, as the engine applies it per lookup.
+
+- **Component:** `band_period_id` is `null`, `dynamic` is `true`, `coverage` is the
+  share of the slot's hours that have a stored price (0 to 1); `net`/`gross` follow
+  §5.5 with the tariff's own classification.
+- **Percentage tariffs** on a dynamic grid base take their share of the slot's
+  mean: `pct × (Σ static grid band prices + Σ dynamic grid means)`, the average of
+  the engine's `pct × base(t)` because the percentage is constant within a slot.
+- **Coverage.** A slot whose coverage is below 0.99 (not 1: a clock-change day is
+  23 or 25 hours) makes the tariff `dynamic_partial` for the interval; a slot with
+  no stored price makes it `dynamic_no_data` and leaves the component out. If every
+  slot of an interval is left without a component the interval has no slots, so a
+  line at 0.00000 never stands for a missing price.
+- **Slots** are shaped by the static bands only; a dynamic tariff alone gives one
+  all-hours line per month.
+- Stored prices are read once per request for the sources involved, streamed, and
+  summed into cells; no query per interval.
+
 ### 5.5 VAT: net and gross
 
 `gross` is `null` everywhere when `vat_mode = not_registered`. Otherwise `rate`
@@ -235,17 +272,23 @@ For each slot, components are grouped by `Tariff.category` in
 `TariffCategory` order (energy, grid_fees, levies, metering; `other` cannot be a
 tariff). A category's subtotal is the sum of its components (`net` and `gross`);
 the slot `total` is the sum of the subtotals. `expected_categories` (top level)
-is the set of categories that have at least one displayed tariff with bands
-overlapping the range; an interval's `missing_categories` is
-`expected_categories` minus the categories that have *anything* in force in it
-(a tariff reported under `incomplete` still counts as in force, so one problem is
-not marked twice). A missing category means the total is **understated**
-for that interval, so the page marks it (§8).
+lists the categories that have a tariff of the requested energy type overlapping
+the range.
+
+A category is **missing** in an interval when nothing of it is in force *and* the
+interval lies inside the category's own span: after the first of its tariffs
+starts and before the last one ends (a tariff without an end never ends). This is
+the rule `tariffs.series.find_gaps` applies to the versions of one tariff: before
+a category's first tariff or after its last has ended, it simply was not charged
+(a levy introduced later, or abolished), and flagging every earlier month would
+shade a whole history red. A tariff reported under `incomplete` still counts as
+in force, so one problem is not marked twice. A missing category means the total is
+**understated** for that interval, so the page marks it (§8).
 
 ### 5.7 Gaps
 
-A gap in one tariff's own timeline (a day with no active version) shows up as a
-missing category, or an empty interval when nothing is active, never as a
+A gap inside a category's own timeline (a day with no active version between two
+versions) shows up as a missing category, or an empty interval when nothing is active, never as a
 silently lower price. The engine bills no line for a tariff with no active
 version, so the figure is the truth, and the mark tells the user why it is low.
 
@@ -278,11 +321,13 @@ active but cannot be priced here:
 
 | `reason` | When |
 |---|---|
-| `dynamic` | the tariff has a `dynamic_source` |
-| `dynamic_base` | a percentage tariff whose active grid base contains a dynamic tariff |
+| `dynamic_partial` | a dynamic tariff whose fetched prices cover less than 0.99 of a slot's hours in the interval; its mean uses only those |
+| `dynamic_no_data` | a dynamic tariff with no fetched price in some slot of the interval; it is left out of that slot |
+| `dynamic_base` | a percentage tariff in a slot whose dynamic grid base has no fetched price; it is left out of that slot |
 | `no_bands` | the tariff has no bands |
 
-Such tariffs are left out of every sum. A non-empty `incomplete` also makes the
+A tariff reported as `dynamic_no_data`, `dynamic_base` or `no_bands` is left out of
+the sum. A non-empty `incomplete` also makes the
 total understated, so the page marks the interval like a missing category.
 
 ### 5.10 Rounding
@@ -333,7 +378,7 @@ is no response serializer.
     { "from": "2024-01-01", "to": "2024-12-31",
       "vat_rate": "0.0810",              // null when not_registered
       "missing_categories": [],
-      "incomplete": [ { "tariff_id": "uuid", "name": "Spot", "reason": "dynamic" } ],
+      "incomplete": [ { "tariff_id": "uuid", "name": "Spot", "reason": "dynamic_partial" } ],
       "slots": [
         { "line": "line-1",
           "net": "0.27300", "gross": "0.29511",       // gross null when not_registered
@@ -375,7 +420,7 @@ authentication and access lookups); everything else is in memory.
 ## 7. Async and integration behavior
 
 None. The endpoint is synchronous and read-only; no Celery task, no audit event,
-no cache. Dynamic prices are not read (§5.9).
+no cache. Fetched dynamic prices are read, not written (§5.4a).
 
 ## 8. Frontend
 
@@ -446,7 +491,7 @@ no cache. Dynamic prices are not read (§5.9).
 
 ```typescript
 export type TariffProgressionVatMode = 'not_registered' | 'registered' | 'inclusive'
-export type TariffProgressionIncompleteReason = 'dynamic' | 'dynamic_base' | 'no_bands'
+export type TariffProgressionIncompleteReason = 'dynamic_partial' | 'dynamic_no_data' | 'dynamic_base' | 'no_bands'
 
 export interface TariffProgressionRule {
     months: number[]
@@ -551,7 +596,7 @@ hard-coded text.
 
 ## 10. Test plan
 
-### Backend — `invoices/test_tariff_progression.py` (computation, 44 tests, 51 cases)
+### Backend — `invoices/test_tariff_progression.py` (computation, 61 tests, 68 cases)
 
 A fixture clears the Swiss VAT rates a migration seeds, so each test chooses its
 own. Tariffs are built with `factories.TariffFactory` and `TariffPeriodFactory`.
@@ -582,7 +627,7 @@ own. Tariffs are built with `factories.TariffFactory` and `TariffPeriodFactory`.
 | `test_the_all_hours_line_comes_first` | Ordering of §5.3 |
 | `test_too_many_bands_is_refused` | `TooManyBands` over the limit |
 
-**`TestPricing`** (7 tests, 9 cases):
+**`TestPricing`** (8 tests, 10 cases):
 
 | Test | Asserts |
 |---|---|
@@ -590,11 +635,12 @@ own. Tariffs are built with `factories.TariffFactory` and `TariffPeriodFactory`.
 | `test_components_are_listed_under_their_category` | Component fields |
 | `test_the_energy_type_filter_excludes_other_types` | Grid and local views are separate |
 | `test_feed_in_is_a_separate_view` | Feed-in only |
-| `test_a_missing_category_is_reported` | `expected_categories`, `missing_categories` |
+| `test_a_missing_category_is_reported` | A gap between two versions of a grid-fee tariff is `missing_categories`; `expected_categories` |
+| `test_a_category_that_starts_later_or_has_ended_is_not_missing` | A levy that ended and a metering tariff that started later are not flagged |
 | `test_a_tariff_without_bands_is_incomplete` | `no_bands`, left out of the sum |
 | `test_matches_the_engine_price_for_sample_timestamps` (3 cases: `not_registered`, `registered`, `inclusive`) | Per sample timestamp, the slot's price equals what `_price_energy` bills, grossed as the engine does, for grid and local views |
 
-**`TestPercentage`** (6 tests):
+**`TestPercentage`** (5 tests):
 
 | Test | Asserts |
 |---|---|
@@ -603,9 +649,32 @@ own. Tariffs are built with `factories.TariffFactory` and `TariffPeriodFactory`.
 | `test_a_zero_percent_band_contributes_nothing` | No component |
 | `test_inclusive_takes_a_share_of_the_gross_grid_base` | Net 0.15, gross 0.16215 |
 | `test_inclusive_never_grosses_a_bearing_percentage_twice` | Net base, then grossed once |
-| `test_a_dynamic_grid_base_marks_the_percentage_incomplete` | `dynamic_base`, no slots |
 
-**`TestDynamic`** (1 test): `test_a_dynamic_tariff_is_listed_but_not_summed`.
+**`TestDynamic`** (18 tests): `test_a_dynamic_tariff_is_averaged_per_month`;
+`test_months_are_breakpoints_only_while_the_tariff_is_in_force`;
+`test_the_mean_is_added_to_the_static_components`;
+`test_a_price_valid_for_a_quarter_covers_every_month_of_it` (one stored point
+for 01.04.-30.06., as a quarterly source stores it: three intervals, 0.08500 and
+coverage 1.0000 in each);
+`test_consecutive_quarterly_prices_switch_on_the_first_day_of_the_next`;
+`test_a_price_that_started_before_the_range_still_applies`;
+`test_a_quarter_not_yet_published_is_reported_as_no_data` (an unpublished next
+quarter is `dynamic_no_data`, not silently zero);
+`test_an_hourly_price_across_a_band_edge_is_split_by_overlap` (high band
+07:30-20:30 against hourly prices, compared with a brute-force average of the
+engine's `_DynamicSeries.price_at`);
+`test_the_mean_matches_the_engine_prices_in_every_slot` (seeds a month of prices
+that depend on hour and weekday and compares each slot's mean with a brute-force
+average of the engine's `_DynamicSeries.price_at` over every quarter-hour);
+`test_a_month_without_prices_is_reported_and_not_priced`;
+`test_a_month_without_prices_leaves_the_static_components_in_place`;
+`test_a_gap_in_the_fetched_prices_is_partial`;
+`test_a_month_with_a_clock_change_is_complete`;
+`test_a_feed_in_floor_applies_to_each_interval`;
+`test_a_percentage_takes_its_share_of_the_dynamic_grid_mean`;
+`test_a_percentage_follows_the_dynamic_mean_in_each_slot`;
+`test_a_percentage_is_blocked_when_the_dynamic_base_has_no_data`;
+`test_inclusive_grosses_a_dynamic_grid_tariff`.
 
 **`TestVat`** (6 tests):
 
@@ -683,7 +752,7 @@ screenshot of each.
 - [ ] A slot's price equals what the invoice engine bills per kWh at a timestamp in that slot, in all three VAT modes (parity test).
 - [ ] Summing across version and VAT-rate boundaries is covered by unit tests (`TestIntervals`, `TestVat`).
 - [ ] Fixed fees are shown separately, in their own unit, and never added into the per-kWh total.
-- [ ] Dynamic tariffs and gaps are visibly reported, never silently dropped or summed.
+- [ ] A dynamic tariff is included as a monthly mean per slot that matches the engine's prices, and missing or partial prices are visibly reported, never silently averaged away.
 - [ ] The page works for viewers read-only, at ~400px, with all four locales.
 - [ ] User guide and the baseline specs of §9 updated.
 
@@ -728,7 +797,10 @@ Where the build differs from the first draft of this spec:
 - **Default `to`** follows each tariff's own end (a scheduled future change extends
   the range), not `max(today, latest valid_from)` (§5.2).
 - **`missing_categories`** counts a tariff reported under `incomplete` as in force,
-  so one problem is not marked twice (§5.6).
+  so one problem is not marked twice, and flags a category only inside its own
+  span, as `find_gaps` does for versions (§5.6). The first draft flagged a category
+  for the whole range, which shaded the entire history of a community whose grid
+  fees begin later.
 - **Fixed fees** accept the requested range (§5.8); `amount_gross` is the net
   amount, not `null`, for a non-bearing fee under `inclusive`.
 - **Chart:** stretches are shaded, not hatched, as the existing chart shades gaps;
@@ -737,4 +809,11 @@ Where the build differs from the first draft of this spec:
 - **Guide screenshot** is `07g` (`07e` was taken), produced by the capture set; no
   separate Playwright spec.
 - **`CivilDateInput`** gained optional `ariaLabel` and `placeholder` props.
+- **A stored price counts for every cell it overlaps** (§5.4a). The first
+  implementation credited a stored interval to the cell where it starts, which
+  left a quarterly price on its first day only and every other month `dynamic_no_data`.
+  It also loaded prices by start, which skipped a quarter that began before the range.
+- **Dynamic tariffs are included** (§5.4a), not reported-only as the first draft
+  had it: an `incomplete` reason `dynamic` no longer exists, replaced by
+  `dynamic_partial` and `dynamic_no_data`.
 

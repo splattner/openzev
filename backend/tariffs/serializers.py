@@ -557,3 +557,22 @@ class DynamicSourceConfirmationSerializer(serializers.Serializer):
     reason = serializers.CharField(
         max_length=500, required=False, allow_blank=True, default="", trim_whitespace=True,
     )
+
+
+class TariffProgressionQuerySerializer(serializers.Serializer):
+    """Query of ``GET /tariffs/tariffs/progression/`` (SPEC-2026-tariff-progression §6).
+
+    ``from``/``to`` are Python keywords, so the view maps them to
+    ``date_from``/``date_to`` before validating.
+    """
+
+    zev_id = serializers.UUIDField()
+    energy_type = serializers.ChoiceField(choices=EnergyType.choices)
+    date_from = serializers.DateField(required=False)
+    date_to = serializers.DateField(required=False)
+
+    def validate(self, attrs):
+        date_from, date_to = attrs.get("date_from"), attrs.get("date_to")
+        if date_from and date_to and date_from > date_to:
+            raise serializers.ValidationError({"from": "from must be on or before to."})
+        return attrs

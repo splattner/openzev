@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { TariffOverview } from '../features/tariffs/TariffOverview'
 import { TariffDetailPane } from '../features/tariffs/TariffDetailPane'
@@ -369,13 +369,20 @@ export function TariffsPage() {
             title={t('pages.tariffs.title')}
             description={t('pages.tariffs.description')}
             actions={selectedZevId && seriesQuery.isSuccess ? (
-                <TariffActions
-                    onOpenCreateTariff={createTariff}
-                    onOpenImportModal={!readOnly ? () => setShowImportModal(true) : undefined}
-                    readOnly={readOnly}
-                    onDownloadOverview={(scope) => overviewMutation.mutate(scope)}
-                    overviewBusy={overviewMutation.isPending}
-                />
+                <>
+                    {/* A read-only view of all tariffs together, not a place to edit
+                        (SPEC-2026-tariff-progression §8.1); no navigation item. */}
+                    <Link className="button button-secondary" to="/tariffs/progression">
+                        {t('pages.tariffs.progression.link')}
+                    </Link>
+                    <TariffActions
+                        onOpenCreateTariff={createTariff}
+                        onOpenImportModal={!readOnly ? () => setShowImportModal(true) : undefined}
+                        readOnly={readOnly}
+                        onDownloadOverview={(scope) => overviewMutation.mutate(scope)}
+                        overviewBusy={overviewMutation.isPending}
+                    />
+                </>
             ) : undefined}
         />
     )

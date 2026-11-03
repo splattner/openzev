@@ -18,6 +18,10 @@ interface CivilDateInputProps {
     /** Validation message and stable id for the focusable date trigger. */
     error?: string
     errorId?: string
+    /** Names the field for assistive technology when no visible label is bound to it. */
+    ariaLabel?: string
+    /** Shown while empty, so an optional bound reads as open rather than missing. */
+    placeholder?: string
 }
 
 /**
@@ -28,7 +32,7 @@ interface CivilDateInputProps {
  * no `Date` round-trip, no timezone shift in either direction. Only the
  * visible label is formatted to the user's short date format.
  */
-export function CivilDateInput({ value, onChange, minDate, maxDate, clearable = true, inputRef, disabled = false, error, errorId }: CivilDateInputProps) {
+export function CivilDateInput({ value, onChange, minDate, maxDate, clearable = true, inputRef, disabled = false, error, errorId, ariaLabel, placeholder }: CivilDateInputProps) {
     const { settings } = useAppSettings()
     return (
         <DatePickerInput
@@ -40,6 +44,8 @@ export function CivilDateInput({ value, onChange, minDate, maxDate, clearable = 
             clearable={clearable}
             disabled={disabled}
             ref={inputRef}
+            aria-label={ariaLabel}
+            placeholder={placeholder}
             error={error}
             errorProps={errorId ? { id: errorId, className: 'field-error', role: 'alert' } : undefined}
         />
