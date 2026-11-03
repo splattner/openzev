@@ -55,11 +55,12 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
     const { isZevScope } = useCommunityAccess()
     const energyData = useEnergyDataEligibility()
     const { searchParams, updateParams } = usePageNavigation()
-    // Nothing is asked while the energy data feature is off.
-    const liveEnabled = useLiveEnabled({ enabled: energyData.featureOn }).data === true
-    const forecastQuery = useProductionForecast(selectedZevId || undefined, liveEnabled)
+    // The live requests start with the page, in parallel with the eligibility check, not after it and the
+    // flag: while the feature is off the server answers 404, which the hooks turn into `null`.
+    const liveEnabledQuery = useLiveEnabled()
+    const forecastQuery = useProductionForecast(selectedZevId || undefined)
     const forecast = hasForecast(forecastQuery.data) ? forecastQuery.data : null
-    const snapshotQuery = useLiveEnergy(liveEnabled ? selectedZevId || undefined : undefined)
+    const snapshotQuery = useLiveEnergy(selectedZevId || undefined)
     const liveShown = !!liveCardState(snapshotQuery.data)
     // Tomorrow is only offered while the forecast has something to say about it.
     const tomorrow = tomorrowBusinessIso()
@@ -123,7 +124,7 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
         ? sourcesQuery.isPending || (sourcesQuery.data ?? []).some((source) => source.zev === selectedZevId && source.provides_history)
         : energyData.historyEligible.some((point) => point.zev === selectedZevId)
     // Without a plant, a live source or a forecast there is nothing to put under the live card's own setup prompt.
-    const liveSettled = !liveEnabled || !snapshotQuery.isPending
+    const liveSettled = liveEnabledQuery.data === false || !snapshotQuery.isPending
     const hasViews = historyPossible || liveShown || !!forecast || !liveSettled
     const requestedRange = parseMyEnergyRange(searchParams.get('range'))
     const offered = requestedRange === 'today' || (requestedRange === 'tomorrow' ? hasTomorrow : historyPossible)
@@ -270,13 +271,12 @@ function TodayPanel({ zevId, subject, canConnect, hasOwnSource, historyPossible,
     const { t } = useTranslation()
     const date = todayBusinessIso()
     const enabledQuery = useLiveEnabled()
-    const enabled = enabledQuery.data === true
-    const snapshotQuery = useLiveEnergy(enabled ? zevId : undefined)
+    const snapshotQuery = useLiveEnergy(zevId)
     const liveShown = !!liveCardState(snapshotQuery.data)
     const curveQuery = useLiveCurve(zevId, liveShown, subject.participantId)
     const curve = curveQuery.data ?? null
     // Whether there is a live curve to wait for is known once the flag and the snapshot have answered.
-    const liveKnown = !enabledQuery.isPending && (!enabled || !snapshotQuery.isPending || !zevId)
+    const liveKnown = !enabledQuery.isPending && (!snapshotQuery.isPending || !zevId)
     const curveSettled = liveKnown && (!liveShown || !curveQuery.isPending)
     const seriesQuery = useOwnSeries(
         { zevId, dateFrom: date, dateTo: date, bucket: 'quarter', participantId: subject.participantId },

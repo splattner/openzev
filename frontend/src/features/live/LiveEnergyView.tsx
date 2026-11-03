@@ -9,16 +9,15 @@ import { LivePointsTable } from './LivePointsTable'
 
 /**
  * The "Right now" part of My energy system: the live card and, for managers, viewers and admins, the
- * per-point table. Polling (the snapshot every 15 s) happens only while this is mounted, and only once
- * the instance has the feature on. Without live data it says so compactly and points to the setup; the
+ * per-point table. Polling (the snapshot every 15 s) happens only while this is mounted; the first request
+ * does not wait for the flag (the server answers 404 while the feature is off). Without live data it says so compactly and points to the setup; the
  * rest of the page (own history) does not depend on it.
  */
 export function LiveEnergyView({ zevId }: { zevId: string | undefined }) {
     const { t } = useTranslation()
     const { isZevScope, canManage } = useCommunityAccess()
     const enabledQuery = useLiveEnabled()
-    const enabled = enabledQuery.data === true
-    const snapshotQuery = useLiveEnergy(enabled ? zevId : undefined)
+    const snapshotQuery = useLiveEnergy(zevId)
     const snapshot = snapshotQuery.data
     const state = liveCardState(snapshot)
 

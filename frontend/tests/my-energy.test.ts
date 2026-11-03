@@ -206,14 +206,21 @@ beforeEach(() => {
 })
 
 describe('MyEnergyView', () => {
-    it('says so, and asks for nothing, while the energy data feature is off', async () => {
+    it('says so, and asks for no history, while the energy data feature is off', async () => {
         eligibleApi.fetchEligibleOrNull.mockResolvedValue(null)
         const { container } = await render()
 
         expect(container.textContent).toContain('myEnergy.disabled')
-        expect(live.fetchLiveEnabled).not.toHaveBeenCalled()
         expect(live.fetchOwnSeries).not.toHaveBeenCalled()
-        expect(live.fetchProductionForecastOrNull).not.toHaveBeenCalled()
+    })
+
+    it('starts the live requests without waiting for the eligibility check', async () => {
+        eligibleApi.fetchEligibleOrNull.mockReturnValue(new Promise(() => {}))
+        await render()
+
+        expect(live.fetchLiveEnabled).toHaveBeenCalled()
+        expect(live.fetchLiveSnapshotOrNull).toHaveBeenCalledWith('z1')
+        expect(live.fetchProductionForecastOrNull).toHaveBeenCalledWith('z1')
     })
 
     it('shows a participant their own history for today with live off, from the own-series endpoint', async () => {
@@ -451,12 +458,6 @@ describe('the forecast in My energy system', () => {
         dark.hours = dark.hours.map((hour) => ({ ...hour, power_w: 0 }))
         live.fetchProductionForecastOrNull.mockResolvedValue(dark)
         expect(tabLabels((await render()).container)).not.toContain('myEnergy.tabs.tomorrow')
-    })
-
-    it('asks for no forecast while live data is off', async () => {
-        live.fetchLiveEnabled.mockResolvedValue(false)
-        await render()
-        expect(live.fetchProductionForecastOrNull).not.toHaveBeenCalled()
     })
 })
 
