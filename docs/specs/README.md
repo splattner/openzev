@@ -113,6 +113,7 @@ when the capability changes; do not treat them as baselines:
 - `2026-09-vse-tariff-import.md`
 - `2026-09-tariff-overview-pdf.md`
 - `2026-09-participant-invoice-access.md`
+- `2026-10-live-energy-data.md`
 
 | Change area | Completed spec to update |
 |---|---|
@@ -120,6 +121,7 @@ when the capability changes; do not treat them as baselines:
 | Grid-operator tariff import (VSE/AES) | `2026-09-vse-tariff-import.md` |
 | Tariff overview PDF | `2026-09-tariff-overview-pdf.md` |
 | Passwordless participant invoice access (QR + magic link) | `2026-09-participant-invoice-access.md` |
+| Live energy data and production forecast (live power, ZEV snapshot, forecast, automation API, MCP `live_energy`) | `2026-10-live-energy-data.md` |
 | Feasibility prefill history and physical local-pool aggregation | [2026-10-feasibility-prefill-aggregation.md](2026-10-feasibility-prefill-aggregation.md) |
 
 ## Drafts
@@ -135,9 +137,6 @@ when the capability changes; do not treat them as baselines:
 - `2026-10-supplementary-energy-data.md` (Implemented) — gross production/consumption from a participant's own
   system (Solar Manager pull, push/CSV) for metering points with generation behind the meter, statistics
   only. See [#925](https://github.com/splattner/openzev/issues/925). ADRs 0030, 0031.
-- `2026-10-live-energy-data.md` (Draft) — live power per metering point and the grid connection point,
-  the ZEV snapshot with exact-only split, production forecast, read-only automation API. See
-  [#1032](https://github.com/splattner/openzev/issues/1032). ADR 0044.
 
 ## Archived
 

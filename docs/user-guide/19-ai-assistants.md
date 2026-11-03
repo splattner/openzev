@@ -87,7 +87,7 @@ a header credential: `Authorization: Bearer ozv_3f9a1c04b7e2_kR8vN2pQ...`.
 
 ## What you can ask
 
-Once connected, the assistant has ten tools. You do not need to know their
+Once connected, the assistant has eleven tools. You do not need to know their
 names — asking a normal question is enough — but knowing what exists helps
 you phrase a better question:
 
@@ -102,6 +102,7 @@ you phrase a better question:
 | `consumption_summary` | Consumption, production and self-consumption over a date range, by month, day or hour (hour for up to a week); for the whole ZEV it also shows each participant's consumption and how much of it came from the ZEV |
 | `consumption_profile` | A participant's average day: how much they use in each hour, and how much of it comes from the ZEV's own solar |
 | `data_gaps` | Which metering points are missing readings, and where? |
+| `live_energy` | What the ZEV produces and uses right now, how much is spare, which metering points report, and when production is expected to peak (only when live energy data is switched on; indicative, never billing) |
 | `audit_query` | Who did what, and when? |
 
 Example questions:
@@ -116,6 +117,8 @@ Example questions:
 - "Which participants used the most electricity last quarter, and how much of it was solar?"
 - "When in the day does Anna Muster use the most electricity, and how much of that is covered by solar?"
 - "Which metering points have gaps in the last 30 days?"
+- "How much is ZEV Sonnenhof producing right now, and is anything spare?"
+- "When is production expected to peak tomorrow?"
 - "Who approved invoices for ZEV Sonnenhof last week?"
 
 ## Limits

@@ -103,7 +103,8 @@ is your personal credential, so a manager cannot connect one on your behalf.
 
 A meter that only reports its current power needs no history: on **My metering points** its row says
 *Live (now)* and *Not connected*, with its own **Connect**. Choose **Own system** and your system (Home
-Assistant, Shelly, a script) sends the current power with a push token, as described below. Where a
+Assistant, Shelly, a script) sends the current power with a push token, as described under
+[Send live power](#send-live-power-push). Where a
 point could provide both history and live data and neither is connected yet, a single **Connect energy
 data** at the bottom of the card starts both together; with only one missing, the **Connect** in its row
 is the only button. A community manager connects live data for meters nobody holds personally and for
@@ -203,6 +204,139 @@ timestamp,consumption_kwh,production_kwh,import_kwh,export_kwh
 Semicolons and decimal commas (as in a Swiss Excel export) are accepted. Choose
 **Check file** first: it reports the problems row by row and imports nothing.
 **Import** stores the file only if **every** row is valid.
+
+## Send live power (push)
+
+A live source reports the **current power** instead of kWh per quarter hour. Choose *Live data* and
+**Own system / file** when you connect; the push token is shown once, exactly as for the history above.
+Send one value every 10 seconds (the server accepts one every 5 seconds and answers `429` with a
+`Retry-After` header if you are faster):
+
+```bash
+curl -X POST "https://your-openzev.example.com/api/v1/metering/live/ingest/" \
+  -H "Authorization: Bearer ozs_abcd1234_yourtoken" \
+  -H "Content-Type: application/json" \
+  -d '{"meter_power_w": -3120.5}'
+```
+
+- **`meter_power_w`** (required) is the power at **your meter, in watts, signed like the meter**: positive
+  while you draw from the grid or the ZEV, **negative while you feed in**. A producing plant therefore
+  sends a negative number, a flat a positive one, and a household with PV behind its meter the net of both.
+  For the **grid connection point** it is the net power there: positive while the ZEV as a whole imports.
+- `timestamp` (optional, with a UTC offset) is when the value was measured; without it the server's
+  receive time is used. A value older than 60 seconds is rejected, and one that is not refreshed within
+  60 seconds counts as missing on the page.
+- `production_w` and `consumption_w` (optional, not negative) are your system's own gross figures, for
+  the *Your own system* view; the ZEV figures use `meter_power_w` only.
+- Values are kept only briefly, for today's curve, and **not stored as history**. They are never used for billing.
+
+### Home Assistant: send the power
+
+Use the sensor that shows the power at your meter in watts, positive for import, negative for export (the
+name below is a placeholder). The condition skips a tick while the sensor is unavailable, so a gap shows
+as a gap rather than as a zero:
+
+```yaml
+rest_command:
+  openzev_live:
+    url: "https://your-openzev.example.com/api/v1/metering/live/ingest/"
+    method: POST
+    headers:
+      Authorization: "Bearer ozs_abcd1234_yourtoken"
+      Content-Type: "application/json"
+    payload: '{"meter_power_w": {{ power }}}'
+
+automation:
+  - alias: Send live power to OpenZEV
+    trigger:
+      - platform: time_pattern
+        seconds: "/10"
+    condition:
+      - condition: template
+        value_template: "{{ states('sensor.grid_power') | is_number }}"
+    action:
+      - service: rest_command.openzev_live
+        data:
+          power: "{{ states('sensor.grid_power') | float }}"
+```
+
+### Shelly (Gen2 and newer): send the power from a script
+
+On a Shelly Pro 3EM, open **Scripts**, create a script, paste the following and enable *Run on startup*.
+It reads the total active power of the meter (positive for import, negative for export) every 10 seconds:
+
+```javascript
+let URL = "https://your-openzev.example.com/api/v1/metering/live/ingest/";
+let TOKEN = "ozs_abcd1234_yourtoken";
+
+Timer.set(10000, true, function () {
+  let em = Shelly.getComponentStatus("em:0");
+  if (!em || typeof em.total_act_power !== "number") {
+    return; // nothing to report: send nothing rather than a zero
+  }
+  Shelly.call("HTTP.Request", {
+    method: "POST",
+    url: URL,
+    headers: { "Authorization": "Bearer " + TOKEN, "Content-Type": "application/json" },
+    body: JSON.stringify({ meter_power_w: em.total_act_power }),
+    timeout: 5,
+  });
+});
+```
+
+Other devices report the same figure under another name: a Shelly EM Gen3 or Pro EM has it as
+`em1:0` with `act_power`, a Plug or Pro 1PM as `switch:0` with `apower` (a consumer, never negative).
+Check the sign once: with the plant running and nothing else on, the value must be negative. If it is
+the other way round, send `-em.total_act_power`. The Shelly needs `https` with
+a public certificate, as OpenZEV serves it.
+
+## Read it back: automations
+
+To switch a load on spare power, read the participant's own live view with a
+[personal API key](16-api-keys.md) (a **read-only** key is enough):
+
+```bash
+curl -H "Authorization: Api-Key ozv_3f9a1c04b7e2_kR8vN2pQ..." \
+     https://your-openzev.example.com/api/v1/metering/live/me/
+```
+
+```json
+{"zevs": [{
+  "zev_id": "…", "zev_name": "ZEV Sonnenhof", "tier": "exact", "as_of": "2026-11-03T11:02:10Z",
+  "production_w": 8000.0, "surplus_w": 3000.0, "local_share_pct": 100.0,
+  "own_consumption_w": 1200.0, "own_local_w": 1200.0,
+  "forecast_next_peak": {"from": "2026-11-03T10:00:00Z", "to": "2026-11-03T14:00:00Z", "peak_w": 7900.0}
+}]}
+```
+
+One entry per ZEV you take part in. `surplus_w`, `local_share_pct` and `own_local_w` are `null` unless `tier`
+is `exact`; `production_w` is `null` at tier `none`. Do not read a missing number as zero: **test the tier**.
+`forecast_next_peak` is the coming window of highest expected production, `null` without a forecast.
+A key may make 720 requests an hour; every 30 seconds is plenty.
+
+### Home Assistant: read the surplus
+
+```yaml
+rest:
+  - resource: https://your-openzev.example.com/api/v1/metering/live/me/
+    scan_interval: 30
+    headers:
+      Authorization: "Api-Key ozv_3f9a1c04b7e2_kR8vN2pQ..."
+    sensor:
+      - name: OpenZEV surplus
+        unique_id: openzev_surplus
+        value_template: "{{ value_json.zevs[0].surplus_w }}"
+        unit_of_measurement: W
+        device_class: power
+        json_attributes_path: "$.zevs[0]"
+        json_attributes: [tier, local_share_pct, production_w, own_local_w, forecast_next_peak, as_of]
+```
+
+The sensor is `unknown` while the surplus is not exact, so an automation that starts the washing machine
+or charges the car should use a `numeric_state` trigger on the sensor, for example above 2000 W for two
+minutes, and check `state_attr('sensor.openzev_surplus', 'tier') == 'exact'`. In n8n use an HTTP Request
+node with the same header. Managers and viewers can ask the same of an
+[AI assistant](19-ai-assistants.md) (tool `live_energy`).
 
 ## What you see
 
@@ -392,6 +526,10 @@ ID is the one of your installation, not your login name.
 page open, so open it and wait half a minute. If the connection shows **Reconnect needed**, the key no
 longer works for history and live alike: choose **Reconnect** and enter a new key. **Test** reads one
 current-power value to check the connection.
+
+**A push to the live endpoint answers `429`.** You send faster than every 5 seconds, or from several scripts with the
+same token. Send every 10 seconds from one place. `403` means the source is switched off or the meter is
+no longer yours; `400` with *older than 60 seconds* means the device's clock is wrong.
 
 **The server says the key cannot be stored.** The platform administrator has not
 set up the encryption key for integrations (`INTEGRATION_ENCRYPTION_KEYS`). Push

@@ -1,12 +1,12 @@
 # Feature Spec: Live energy data and production forecast
 
 - Spec ID: SPEC-2026-live-energy-data
-- Status: Draft
+- Status: Completed
 - Scope: Major
 - Type: Feature
 - Owners: Sebastian Plattner
 - Created: 2026-10-30
-- Target Release: TBD
+- Target Release: 1.28.0 (PRs 0 to 5); PR 6 in the next release
 - Related Issues: [#1032](https://github.com/splattner/openzev/issues/1032); builds on [#925](https://github.com/splattner/openzev/issues/925), [#944](https://github.com/splattner/openzev/issues/944); notifications later through [#989](https://github.com/splattner/openzev/issues/989)
 - Related ADRs: [0044](../adr/0044-live-energy-data-is-ephemeral-and-measured-only.md) (new: ephemeral, measured only, split only when exact, connection point); applies [0030](../adr/0030-supplementary-energy-data-is-not-billing-input.md), [0031](../adr/0031-integration-credentials-encrypted-under-a-dedicated-key.md), [0033](../adr/0033-energy-data-flag-follows-the-integration-key.md), [0013](../adr/0013-shared-allocation-service.md), [0026](../adr/0026-swiss-civil-time-for-billing.md), [0027](../adr/0027-per-zev-access-grants.md)
 - Related specs: [supplementary energy data](2026-10-supplementary-energy-data.md) (the source this generalises), [buildings and sites](2026-10-buildings-and-sites.md) (building coordinates), [tokens and keys](2026-10-tokens-and-keys.md) (push tokens, personal API keys)
@@ -579,6 +579,29 @@ an unknown `bucket` is `400`. Display only: nothing is written, and nothing here
 "local_share_pct", "own_consumption_w", "own_local_w", "forecast_next_peak": {"from","to","peak_w"} | null } ]}`.
 Flat keys so a Home Assistant `rest` sensor can read them with `value_template` /
 `json_attributes_path`. Throttled `live_read`. Works with a `read_only` personal API key.
+
+### 5.6 MCP tool `live_energy`
+
+`mcp_server/tools/live_energy.py` (SPEC-2026-mcp-server §6.8a), read-only, for managers, viewers and admins (the
+MCP endpoint refuses participants, so the participant's own view stays on `/live/me/`, §5.5).
+Input: `zev_id` (uuid, required), `forecast_hours` (integer 0 to 72, default 24; `0` returns the peak
+windows only). It makes two allow-listed sub-requests, `live-snapshot` (§5.2) and `live-forecast`
+(§5.4), so the live permission, the flag and the tiers are decided by those views and the tool adds
+no rule of its own. Like the page, a call marks the ZEV as watched (Solar Manager is then polled).
+
+Output, powers in **kW** (the MCP convention is kWh for energy and kW for power; three decimals):
+`zev_id`, `tier`, `note` (what the tier allows to say, in words), `as_of`, `max_age_s`,
+`consumption_basis`, `production_kw`, `consumption_kw`, `surplus_kw`, `grid_import_kw`,
+`local_share_pct` (each `null` where the tier does not allow it, exactly as in §5.2), `coverage` (as
+§5.2), `points[]` (`meter_id`, `target`, `meter_type`, `participant_name`, `held_by`, `live_state`,
+`meter_power_kw` signed like the meter, `age_s`; at most 100, then `points_truncated` and `points_total`)
+and `forecast` (`complete`, `plants`, `plants_with_forecast`, `fetched_at`, a `note` saying it is production
+only, `hours[]` of `{start, power_kw, min_kw, max_kw}` from the current UTC hour on, `peak_windows[]` of
+`{date, from, to, peak_kw}` that have not ended). Datetimes are ISO strings in UTC. The caller's `own`
+block and the snapshot's ids (`metering_point_id`, `source_id`) are left out. A `404` from either view,
+which is what a switched-off feature and a ZEV the caller may not see both answer, becomes a tool error
+("Live energy data is not available: the feature is switched off, or the ZEV was not found."); other
+failures carry the view's own message.
 
 ## 6. Async and integration behavior
 
@@ -1273,7 +1296,7 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
 - `metering/test_supplementary_isolation.py` — extended: nothing under `allocation/`, `tariffs/` or the
   invoice modules imports `metering.live`.
 - `accounts/test_system_health.py` — new probe keys (PR 5 adds two tests: forecast counts, staleness above half degrades, a source needing a key is not stale).
-- `mcp_server/tests` — **`LiveEnergyToolTests`**: scoping, participant vs manager shape.
+- `mcp_server/tests/test_live_energy.py` (PR 6: 9 tests) — **`TestLiveEnergy`**: the exact tier in kW with the points and no `own` block; the `production` tier withholds consumption, spare power and share and says why; tier `none` has no figures; the forecast keeps the current hour on and drops past ones, with ISO strings; `forecast_hours` caps the rows and `0` keeps the windows; out-of-range `forecast_hours` is `-32602`; an admin sees any ZEV; another owner's ZEV is a tool error with no figures; the flag off is a tool error.
 
 ### Frontend
 
@@ -1328,17 +1351,18 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
 
 ### Acceptance criteria
 
-- [ ] A Home Assistant automation pushing every 10 s makes the producer's value appear on every
-      participant's dashboard within one refetch interval.
-- [ ] With only the producer live, participants see production now and the "others' use unknown" note,
+- [x] A Home Assistant automation pushing every 10 s makes the producer's value appear on every
+      participant's dashboard within one refetch interval. *(by design and tests; a real Home Assistant or Shelly feed has not been run against a live instance, see §12 "Not verified")*
+- [x] With only the producer live, participants see production now and the "others' use unknown" note,
       and no spare/split figure anywhere (UI, `me`, MCP).
-- [ ] With a connection-point source in a physical ZEV, the worked example of §1 shows 3.0 kW spare.
-- [ ] A value older than 60 s is never shown as current.
-- [ ] Another participant's per-point value is not in any participant payload.
-- [ ] The forecast shows hourly production for 72 h and a peak window, from Solar Manager where
-      connected, otherwise forecast.solar.
-- [ ] Invoices generated with and without live and forecast data are identical.
-- [ ] With the live flag off, nothing live renders and all live endpoints answer `404`.
+- [x] With a connection-point source in a physical ZEV, the worked example of §1 shows 3.0 kW spare.
+- [x] A value older than 60 s is never shown as current.
+- [x] Another participant's per-point value is not in any participant payload.
+- [x] The forecast shows hourly production and a peak window per day, from Solar Manager where
+      connected, otherwise forecast.solar, for as far as the provider reaches (about two days with
+      forecast.solar's public tier, §6.3; `FORECAST_HORIZON_H` only caps it).
+- [x] Invoices generated with and without live and forecast data are identical. *(by isolation: nothing under `allocation/`, `tariffs/` or the invoice modules imports `metering.live`, `test_supplementary_isolation.py`)*
+- [x] With the live flag off, nothing live renders and all live endpoints answer `404`.
 
 ## 10. Implementation plan
 
@@ -1416,6 +1440,14 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
    (`rest_command` + automation, `rest` sensor reading `/live/me/`) and Shelly (Gen2+ script) recipes,
    screenshots.
 
+   *Rollout (PR 6).* The MCP tool `live_energy` (§5.6), registered as the eleventh tool; the energy-data
+   chapter of the user guide gains "Send live power (push)" (the live endpoint with its rules, a Home Assistant
+   `rest_command` automation, a Shelly Gen2+ script), "Read it back: automations" (`/live/me/` with a personal
+   API key, a Home Assistant `rest` sensor) and a troubleshooting entry; the AI-assistants chapter lists the tool.
+   The spec moves to Completed and joins the completed feature specs. No migration, no setting. The guide
+   screenshots were not regenerated (the dev data has no live source) and the recipes were not run against a
+   real Home Assistant or Shelly.
+
 ## 11. Documentation to update
 
 - `docs/user-guide/`: new chapter "Live energy data and forecast" (participant view, manager setup,
@@ -1425,7 +1457,7 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
 - `docs/specs/2026-10-buildings-and-sites.md`: building coordinates.
 - `docs/specs/README.md`: list this spec under Drafts, later under completed feature specs; `AGENTS.md`
   once implemented.
-- `.env.example`, Helm values: the settings of §4.5.
+- Settings of §4.5: all have working defaults; like the other feature settings they are documented in §4.5 and not listed in `.env.example` or the Helm values.
 
 ## 12. Decisions and future ideas
 
@@ -1443,6 +1475,16 @@ Decided with the issue owner on 2026-10-30 ([#1032](https://github.com/splattner
 8. **HTTP push with recipes** for Home Assistant and Shelly in v1.
 9. **No battery handling.**
 10. **The grid connection point is a live-only source on the ZEV**, not a metering point (ADR 0044).
+
+Not verified when the spec was completed (nothing here blocks the feature, which stays behind its flag and is
+described as an early version in the release notes):
+
+- Solar Manager's `/data/stream` and the meaning of `t` in `/data/forecast` (`FORECAST_T_MARKS`, a one-line fix) against a real
+  account; the stream mapping follows the vendor's swagger (1.88.11).
+- forecast.solar's real response from this instance; the mapping follows its documentation and is tested against a stand-in.
+- The Home Assistant and Shelly recipes of the user guide on real devices.
+- The forecast connect dialogs and the delete-data and remove-source confirmations in a browser (tests only).
+- The roof-planes refusal is recognised by its English text in the forecast dialog; an error code from the API would be sturdier.
 
 Future ideas (not planned):
 
