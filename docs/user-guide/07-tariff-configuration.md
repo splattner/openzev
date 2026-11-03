@@ -812,7 +812,10 @@ the tariffs.
   table says so and how much of the month's hours were covered. A month with
   only some prices is marked and averaged over what was fetched; a month with
   none is marked and left out. A percentage tariff based on a dynamic grid price
-  takes its share of that average.
+  takes its share of that average. A price that is valid for a whole period, such
+as a quarterly reference market price, applies to every month of the period. A
+period that has not been published yet (the newest quarter is published weeks
+after it ends) shows as having no fetched prices.
 - **Fixed fees are separate.** Monthly, yearly, per-metering-point and shared
   fees are not per kWh, so they are listed below with their own unit and never
   added to the price. A shared fee shows what the **whole community** pays, split

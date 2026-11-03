@@ -215,10 +215,12 @@ class _Cells:
 class _DynamicMeans:
     """Fetched prices of dynamic tariffs, as duration-weighted means over cells.
 
-    Each stored interval is assigned to the cell its start falls in on the Swiss
-    wall clock, the way the engine resolves the band of a reading by its start,
-    and counts for its whole duration. A tariff's floor (feed-in only) is applied
-    per interval, as the engine applies it per price lookup.
+    A stored interval counts for every cell it overlaps, weighted by the overlap,
+    on the Swiss wall clock: the engine prices a reading with the stored interval
+    that covers it and resolves its band by the reading's own time, so a price
+    valid for a quarter (BFE) covers every day of it, and an hourly price that
+    straddles a band edge counts in both bands. A tariff's floor (feed-in only) is
+    applied per interval, as the engine applies it per price lookup.
     """
 
     def __init__(self, tariffs, bounds, cells):
@@ -240,26 +242,48 @@ class _DynamicMeans:
             for tariff in tariffs
             for index, start in enumerate(starts)
         }
-        window_start, window_end = period_window(starts[0], self._bounds[-1][1])
+        first_day, last_day = starts[0], self._bounds[-1][1]
+        window_start, window_end = period_window(first_day, last_day)
+        # By overlap, not by start: a quarterly price began before the range it still covers.
         rows = DynamicPricePoint.objects.filter(
-            source_id__in=list(by_source), valid_from__gte=window_start, valid_from__lt=window_end,
+            source_id__in=list(by_source), valid_from__lt=window_end, valid_to__gt=window_start,
         ).values_list("source_id", "valid_from", "valid_to", "price_chf_per_kwh").iterator(chunk_size=5000)
         for source_id, valid_from, valid_to, price in rows:
-            local = wall_clock(valid_from)
-            index = bisect_right(starts, local.date()) - 1
-            if index < 0:
-                continue
-            seconds = int((valid_to - valid_from).total_seconds())
-            cell = self._cells.index(local.month, local.weekday(), self._cells.part_of(local.time()))
-            for tariff in by_source[source_id]:
-                if not active[tariff.pk, index]:
-                    continue
-                value = Decimal(price)
-                if tariff.minimum_price_chf_per_kwh is not None:
-                    value = max(value, Decimal(tariff.minimum_price_chf_per_kwh))
-                entry = self._stats[tariff.pk, index].setdefault(cell, [Decimal("0"), 0])
-                entry[0] += value * seconds
-                entry[1] += seconds
+            begin = wall_clock(valid_from).replace(tzinfo=None)
+            finish = wall_clock(valid_to).replace(tzinfo=None)
+            for day, part, seconds in self._spread(begin, finish, first_day, last_day):
+                index = bisect_right(starts, day) - 1
+                cell = self._cells.index(day.month, day.weekday(), part)
+                for tariff in by_source[source_id]:
+                    if not active[tariff.pk, index]:
+                        continue
+                    value = Decimal(price)
+                    if tariff.minimum_price_chf_per_kwh is not None:
+                        value = max(value, Decimal(tariff.minimum_price_chf_per_kwh))
+                    entry = self._stats[tariff.pk, index].setdefault(cell, [Decimal("0"), 0])
+                    entry[0] += value * seconds
+                    entry[1] += seconds
+
+    def _spread(self, begin: datetime, finish: datetime, first_day: date, last_day: date):
+        """(day, part of the day, seconds) of the wall-clock span, within the days of the request."""
+        starts = self._cells.starts
+        offsets = [start.hour * 3600 + start.minute * 60 for start in starts]
+        lengths = self._cells.part_seconds()
+        day = max(begin.date(), first_day)
+        stop = min(finish.date(), last_day)
+        while day <= stop:
+            midnight = datetime.combine(day, time(0, 0))
+            part = self._cells.part_of(begin.time()) if day == begin.date() else 0
+            while part < len(starts):
+                part_begin = midnight + timedelta(seconds=offsets[part])
+                if part_begin >= finish:
+                    break
+                part_end = part_begin + timedelta(seconds=lengths[part])
+                overlap = (min(part_end, finish) - max(part_begin, begin)).total_seconds()
+                if overlap > 0:
+                    yield day, part, int(overlap)
+                part += 1
+            day += timedelta(days=1)
 
     def _expected_seconds(self, index: int) -> dict[int, int]:
         if index not in self._expected:

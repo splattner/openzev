@@ -212,9 +212,14 @@ For a slot, each displayed tariff contributes its resolved band:
 A dynamic tariff has a stored price per interval (`DynamicPricePoint`, UTC,
 quarter-hourly or hourly, signed) and no bands. Within an interval (never longer
 than a calendar month while it is in force) its price for a slot is the
-**duration-weighted mean** of the stored prices whose start falls in the slot's
-cells on the Swiss wall clock, which is how the engine resolves the band of a
-reading (by its start) and what its per-reading prices average to. A feed-in
+**duration-weighted mean** of the stored prices over the slot's cells on the Swiss
+wall clock. A stored interval counts for **every cell it overlaps**, weighted by
+the overlap, because the engine prices a reading with the stored interval that
+covers it and resolves the reading's band by its own time. So a price valid for a
+whole quarter (the BFE reference market price is stored one point per quarter or
+month) covers every day of it, and an hourly price that straddles a band edge
+counts in both bands. Stored prices are therefore loaded by overlap with the
+range, not by start: a quarter that began before the range still applies. A feed-in
 tariff's `minimum_price_chf_per_kwh` floor is applied to each stored price before
 averaging, as the engine applies it per lookup.
 
@@ -591,7 +596,7 @@ hard-coded text.
 
 ## 10. Test plan
 
-### Backend — `invoices/test_tariff_progression.py` (computation, 56 tests, 63 cases)
+### Backend — `invoices/test_tariff_progression.py` (computation, 61 tests, 68 cases)
 
 A fixture clears the Swiss VAT rates a migration seeds, so each test chooses its
 own. Tariffs are built with `factories.TariffFactory` and `TariffPeriodFactory`.
@@ -645,9 +650,19 @@ own. Tariffs are built with `factories.TariffFactory` and `TariffPeriodFactory`.
 | `test_inclusive_takes_a_share_of_the_gross_grid_base` | Net 0.15, gross 0.16215 |
 | `test_inclusive_never_grosses_a_bearing_percentage_twice` | Net base, then grossed once |
 
-**`TestDynamic`** (13 tests): `test_a_dynamic_tariff_is_averaged_per_month`;
+**`TestDynamic`** (18 tests): `test_a_dynamic_tariff_is_averaged_per_month`;
 `test_months_are_breakpoints_only_while_the_tariff_is_in_force`;
 `test_the_mean_is_added_to_the_static_components`;
+`test_a_price_valid_for_a_quarter_covers_every_month_of_it` (one stored point
+for 01.04.-30.06., as a quarterly source stores it: three intervals, 0.08500 and
+coverage 1.0000 in each);
+`test_consecutive_quarterly_prices_switch_on_the_first_day_of_the_next`;
+`test_a_price_that_started_before_the_range_still_applies`;
+`test_a_quarter_not_yet_published_is_reported_as_no_data` (an unpublished next
+quarter is `dynamic_no_data`, not silently zero);
+`test_an_hourly_price_across_a_band_edge_is_split_by_overlap` (high band
+07:30-20:30 against hourly prices, compared with a brute-force average of the
+engine's `_DynamicSeries.price_at`);
 `test_the_mean_matches_the_engine_prices_in_every_slot` (seeds a month of prices
 that depend on hour and weekday and compares each slot's mean with a brute-force
 average of the engine's `_DynamicSeries.price_at` over every quarter-hour);
@@ -794,6 +809,10 @@ Where the build differs from the first draft of this spec:
 - **Guide screenshot** is `07g` (`07e` was taken), produced by the capture set; no
   separate Playwright spec.
 - **`CivilDateInput`** gained optional `ariaLabel` and `placeholder` props.
+- **A stored price counts for every cell it overlaps** (§5.4a). The first
+  implementation credited a stored interval to the cell where it starts, which
+  left a quarterly price on its first day only and every other month `dynamic_no_data`.
+  It also loaded prices by start, which skipped a quarter that began before the range.
 - **Dynamic tariffs are included** (§5.4a), not reported-only as the first draft
   had it: an `incomplete` reason `dynamic` no longer exists, replaced by
   `dynamic_partial` and `dynamic_no_data`.

@@ -448,18 +448,25 @@ def make_source(tariff_type="grid"):
     )
 
 
-def seed_prices(source, first, last, price):
-    """Quarter-hourly prices for the civil days ``first``..``last``; ``price(local_datetime)``."""
+def seed_prices(source, first, last, price, *, minutes=15):
+    """Prices for the civil days ``first``..``last``, one per ``minutes``; ``price(local_datetime)``."""
     start, end = period_window(first, last)
+    step = timedelta(minutes=minutes)
     points, cursor = [], start
     while cursor < end:
         local = wall_clock(cursor).replace(tzinfo=None)
         points.append(DynamicPricePoint(
-            source=source, valid_from=cursor, valid_to=cursor + timedelta(minutes=15),
+            source=source, valid_from=cursor, valid_to=cursor + step,
             price_chf_per_kwh=D(price(local)),
         ))
-        cursor += timedelta(minutes=15)
+        cursor += step
     DynamicPricePoint.objects.bulk_create(points)
+
+
+def seed_period_price(source, first, last, price):
+    """One price valid for the whole civil period ``first``..``last``, as a quarterly source stores it."""
+    start, end = period_window(first, last)
+    DynamicPricePoint.objects.create(source=source, valid_from=start, valid_to=end, price_chf_per_kwh=D(price))
 
 
 JANUARY = (date(2026, 1, 1), date(2026, 1, 31))
@@ -533,6 +540,75 @@ class TestDynamic:
             expected = (sums[slot["line"]] / counts[slot["line"]]).quantize(D("0.00001"))
             assert D(dynamic_part["net"]) == expected
             assert dynamic_part["coverage"] == "1.0000"
+
+    def test_a_price_valid_for_a_quarter_covers_every_month_of_it(self, zev):
+        _, source = make_dynamic(zev, "Einspeisung", tariff_type="feed_in", energy_type=EnergyType.FEED_IN,
+                                 category=TariffCategory.ENERGY, valid_from=date(2026, 4, 1))
+        seed_period_price(source, date(2026, 4, 1), date(2026, 6, 30), "0.0850")
+
+        result = progress(zev, "feed_in", date_from=date(2026, 4, 1), date_to=date(2026, 6, 30))
+
+        assert [(i["from"], i["to"]) for i in result["intervals"]] == [
+            ("2026-04-01", "2026-04-30"), ("2026-05-01", "2026-05-31"), ("2026-06-01", "2026-06-30"),
+        ]
+        assert totals(result) == [["0.08500"]] * 3
+        for interval in result["intervals"]:
+            assert interval["incomplete"] == []
+            assert interval["slots"][0]["categories"][0]["components"][0]["coverage"] == "1.0000"
+
+    def test_consecutive_quarterly_prices_switch_on_the_first_day_of_the_next(self, zev):
+        _, source = make_dynamic(zev, "Einspeisung", tariff_type="feed_in", energy_type=EnergyType.FEED_IN,
+                                 category=TariffCategory.ENERGY, valid_from=date(2026, 4, 1))
+        seed_period_price(source, date(2026, 4, 1), date(2026, 6, 30), "0.0850")
+        seed_period_price(source, date(2026, 7, 1), date(2026, 9, 30), "0.0910")
+
+        result = progress(zev, "feed_in", date_from=date(2026, 4, 1), date_to=date(2026, 9, 30))
+
+        assert totals(result) == [["0.08500"]] * 3 + [["0.09100"]] * 3
+        assert all(i["incomplete"] == [] for i in result["intervals"])
+
+    def test_a_price_that_started_before_the_range_still_applies(self, zev):
+        _, source = make_dynamic(zev, "Einspeisung", tariff_type="feed_in", energy_type=EnergyType.FEED_IN,
+                                 category=TariffCategory.ENERGY, valid_from=date(2026, 4, 1))
+        seed_period_price(source, date(2026, 4, 1), date(2026, 6, 30), "0.0850")
+
+        interval = progress(zev, "feed_in", date_from=date(2026, 5, 10), date_to=date(2026, 5, 20))["intervals"][0]
+
+        assert interval["incomplete"] == []
+        assert interval["slots"][0]["net"] == "0.08500"
+
+    def test_a_quarter_not_yet_published_is_reported_as_no_data(self, zev):
+        spot, source = make_dynamic(zev, "Einspeisung", tariff_type="feed_in", energy_type=EnergyType.FEED_IN,
+                                    category=TariffCategory.ENERGY, valid_from=date(2026, 7, 1))
+        seed_period_price(source, date(2026, 7, 1), date(2026, 9, 30), "0.0910")
+
+        result = progress(zev, "feed_in", date_from=date(2026, 9, 1), date_to=date(2026, 10, 31))
+
+        assert [(i["from"], i["slots"] != []) for i in result["intervals"]] == [("2026-09-01", True), ("2026-10-01", False)]
+        assert result["intervals"][1]["incomplete"] == [
+            {"tariff_id": str(spot.pk), "name": "Einspeisung", "reason": "dynamic_no_data"},
+        ]
+
+    def test_an_hourly_price_across_a_band_edge_is_split_by_overlap(self, zev):
+        # High band 07:30-20:30: each hourly price straddles an edge, so it counts in both slots.
+        make(zev, "Energie", [ht("0.30", "07:30", "20:30"), nt("0.20")])
+        spot, source = make_dynamic(zev)
+        seed_prices(source, *JANUARY, lambda moment: D("0.10") + D("0.01") * moment.hour, minutes=60)
+        result = progress(zev, date_from=JANUARY[0], date_to=JANUARY[1])
+        series = InvoiceGenerationContext.build(zev, *JANUARY).dynamic_series(source.pk)
+
+        start, end = period_window(*JANUARY)
+        sums, counts = {}, {}
+        cursor = start
+        while cursor < end:
+            line = slot_at(result, 0, wall_clock(cursor).replace(tzinfo=None))["line"]
+            sums[line] = sums.get(line, 0) + series.price_at(cursor)
+            counts[line] = counts.get(line, 0) + 1
+            cursor += timedelta(minutes=15)
+
+        for slot in result["intervals"][0]["slots"]:
+            part = next(c for cat in slot["categories"] for c in cat["components"] if c["tariff_id"] == str(spot.pk))
+            assert D(part["net"]) == (sums[slot["line"]] / counts[slot["line"]]).quantize(D("0.00001"))
 
     def test_a_month_without_prices_is_reported_and_not_priced(self, zev):
         spot, _ = make_dynamic(zev)
