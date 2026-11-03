@@ -29,8 +29,8 @@ export function ProgressionComposition({ progression, day, lineKey, lineNames, b
     const lines = progression.intervals.find((interval) => interval.from <= day && day <= interval.to)?.slots ?? []
 
     return (
-        <section className="tariff-progression-composition" aria-labelledby="tariff-progression-composition-title">
-            <div className="tariff-progression-composition-header">
+        <section className="card tariff-progression-composition" aria-labelledby="tariff-progression-composition-title">
+            <div className="card-header">
                 <h2 id="tariff-progression-composition-title">
                     {t('pages.tariffs.progression.composition.title', { date: formatShortDate(day, settings) })}
                 </h2>

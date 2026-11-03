@@ -41,14 +41,6 @@
   list-style: none;
 }
 
-.tariff-progression-composition-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem 1rem;
-}
-
 .tariff-progression-line-picker {
   display: inline-flex;
   align-items: center;
@@ -84,7 +76,7 @@
 }
 
 .tariff-progression-fees caption {
-  padding: 0.75rem 0 0.35rem;
+  padding: 0.75rem var(--sheet-pad-inline) 0.35rem;
   font-weight: 600;
   text-align: left;
 }

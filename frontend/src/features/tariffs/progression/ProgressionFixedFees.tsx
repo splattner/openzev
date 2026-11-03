@@ -21,11 +21,13 @@ export function ProgressionFixedFees({ fees, day, basis, settings }: Props) {
     const groups = groupFees(fees)
 
     return (
-        <section className="tariff-progression-fees" aria-labelledby="tariff-progression-fees-title">
-            <h2 id="tariff-progression-fees-title">{t('pages.tariffs.progression.fees.title')}</h2>
+        <section className="card tariff-progression-fees" aria-labelledby="tariff-progression-fees-title">
+            <div className="card-header">
+                <h2 id="tariff-progression-fees-title">{t('pages.tariffs.progression.fees.title')}</h2>
+            </div>
             <p className="muted">{t('pages.tariffs.progression.fees.intro')}</p>
             {(['month', 'year'] as const).map((unit) => groups[unit].length > 0 && (
-                <div className="data-table" key={unit}>
+                <div className="table-scroll" key={unit}>
                     <table>
                         <caption>{t(`pages.tariffs.progression.fees.${unit}`)}</caption>
                         <thead>

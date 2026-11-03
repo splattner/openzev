@@ -2,6 +2,7 @@ import { act, createElement, type ReactElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ProgressionComposition } from '../src/features/tariffs/progression/ProgressionComposition'
+import { ProgressionFixedFees } from '../src/features/tariffs/progression/ProgressionFixedFees'
 import {
     buildChartData,
     clampDay,
@@ -349,5 +350,58 @@ describe('ProgressionComposition', () => {
 
         expect(container.textContent).toContain('"percentage":"65"')
         expect(container.textContent).toContain('"base":"0.300"')
+    })
+})
+
+describe('ProgressionFixedFees', () => {
+    const cleanups: (() => void)[] = []
+    afterEach(() => {
+        cleanups.splice(0).forEach((cleanup) => cleanup())
+        document.body.innerHTML = ''
+    })
+
+    async function render(element: ReactElement) {
+        const container = document.createElement('div')
+        document.body.append(container)
+        const root = createRoot(container)
+        cleanups.push(() => { act(() => root.unmount()); container.remove() })
+        await act(async () => root.render(element))
+        return container
+    }
+
+    const fee = (name: string, unit: 'month' | 'year', scope: TariffProgressionFixedFee['scope'], split: 'equal' | null = null): TariffProgressionFixedFee => ({
+        name, category: 'metering', billing_mode: unit === 'month' ? 'monthly_fee' : 'yearly_fee', unit, scope, split_key: split,
+        versions: [{ tariff_id: name, valid_from: '2025-01-01', valid_to: null, amount_net: '8.50', amount_gross: '9.19', vat_rate: '0.0810' }],
+    })
+
+    it('keeps each unit in its own scrollable table inside the card, so a narrow screen scrolls instead of overflowing', async () => {
+        const container = await render(createElement(ProgressionFixedFees, {
+            fees: [fee('Grundgebühr', 'month', 'participant'), fee('Verwaltung', 'year', 'community', 'equal')],
+            day: '2025-06-01', basis: 'net', settings: DEFAULT_APP_SETTINGS,
+        }))
+
+        expect(container.querySelector('section.card')).not.toBeNull()
+        expect(container.querySelectorAll('.table-scroll table')).toHaveLength(2)
+    })
+
+    it('shows the amount on the chosen basis and the split of a shared fee', async () => {
+        const net = await render(createElement(ProgressionFixedFees, {
+            fees: [fee('Verwaltung', 'month', 'community', 'equal')], day: '2025-06-01', basis: 'net', settings: DEFAULT_APP_SETTINGS,
+        }))
+        const gross = await render(createElement(ProgressionFixedFees, {
+            fees: [fee('Verwaltung', 'month', 'community', 'equal')], day: '2025-06-01', basis: 'gross', settings: DEFAULT_APP_SETTINGS,
+        }))
+
+        expect(net.textContent).toContain('8.50')
+        expect(gross.textContent).toContain('9.19')
+        expect(net.textContent).toContain('pages.tariffs.progression.fees.split.equal')
+    })
+
+    it('renders nothing without fees', async () => {
+        const container = await render(createElement(ProgressionFixedFees, {
+            fees: [], day: '2025-06-01', basis: 'net', settings: DEFAULT_APP_SETTINGS,
+        }))
+
+        expect(container.innerHTML).toBe('')
     })
 })
