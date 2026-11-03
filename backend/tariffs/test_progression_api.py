@@ -153,7 +153,7 @@ class TestProgressionApi:
         assert component == {
             "tariff_id": str(tariff.pk), "name": "Energie", "billing_mode": "energy",
             "band_period_id": str(tariff.periods.get().pk), "net": "0.20000", "gross": None,
-            "percentage": None, "base_net": None,
+            "percentage": None, "base_net": None, "dynamic": False, "coverage": None,
         }
 
     def test_too_many_bands_is_a_422(self, owner_client, monkeypatch):

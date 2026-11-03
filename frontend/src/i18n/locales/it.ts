@@ -2194,8 +2194,9 @@ export const it = {
                 },
                 issues: {
                     missing: 'Per {{subject}} non è in vigore nulla dal {{from}} al {{to}}: il totale è sottostimato.',
-                    dynamic: '{{subject}} è calcolato da una serie di prezzi recuperata e non è incluso dal {{from}} al {{to}}.',
-                    dynamic_base: '{{subject}} segue un prezzo di rete recuperato e non è incluso dal {{from}} al {{to}}.',
+                    dynamic_partial: 'Per {{subject}} i prezzi recuperati dal {{from}} al {{to}} sono incompleti: la media copre solo quelli, quindi il totale può differire.',
+                    dynamic_no_data: 'Nessun prezzo recuperato per {{subject}} dal {{from}} al {{to}}: non è incluso.',
+                    dynamic_base: '{{subject}} segue un prezzo di rete recuperato senza dati dal {{from}} al {{to}} e non è incluso.',
                     no_bands: '{{subject}} non ha fasce di prezzo e non è incluso dal {{from}} al {{to}}.',
                 },
                 composition: {
@@ -2206,6 +2207,7 @@ export const it = {
                     charge: 'Componente',
                     total: 'Totale',
                     percentageOf: '{{percentage}} % di CHF {{base}}',
+                    dynamicAverage: 'Media dei prezzi recuperati, {{coverage}} % delle ore coperte',
                 },
                 fees: {
                     title: 'Costi fissi',

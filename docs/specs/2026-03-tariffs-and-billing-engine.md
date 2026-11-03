@@ -1337,7 +1337,9 @@ a share of the grid bands in force at the same time (`_price_energy`), and VAT b
 `zev.vat_mode` with the input-VAT classifier of §4.8 (`registered` grosses every
 component, `inclusive` only the tariffs that bear input VAT, `not_registered`
 has no gross). It returns one line per time-of-use slot, category subtotals and
-the fixed fees listed separately; dynamic tariffs are reported, not summed. It
+the fixed fees listed separately; a dynamic tariff is included as the
+duration-weighted mean of its fetched prices per slot and calendar month, with
+missing or partial months reported. It
 uses the VAT rate in force on each day, where an invoice uses the rate on its
 `period_end`. Specified in `2026-11-tariff-progression.md`; computed in
 `invoices/tariff_progression.py`.

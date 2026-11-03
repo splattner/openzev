@@ -1337,7 +1337,7 @@ export interface TariffSeries {
 /** How the ZEV treats VAT; it decides whether a progression has a gross value. */
 export type TariffProgressionVatMode = 'not_registered' | 'registered' | 'inclusive'
 export type TariffProgressionEnergyType = 'grid' | 'local' | 'feed_in'
-export type TariffProgressionIncompleteReason = 'dynamic' | 'dynamic_base' | 'no_bands'
+export type TariffProgressionIncompleteReason = 'dynamic_partial' | 'dynamic_no_data' | 'dynamic_base' | 'no_bands'
 
 /** When a line applies: months, weekdays (0 = Monday) and windows (`from > to` wraps midnight). */
 export interface TariffProgressionRule {
@@ -1350,9 +1350,14 @@ export interface TariffProgressionComponent {
     tariff_id: string
     name: string
     billing_mode: 'energy' | 'percentage_of_energy'
-    band_period_id: string
+    /** Null for a dynamic tariff, which has no bands. */
+    band_period_id: string | null
     net: string
     gross: string | null
+    /** A dynamic tariff: a duration-weighted mean of the fetched prices in this slot. */
+    dynamic: boolean
+    /** Share of the slot's hours with a fetched price (0 to 1), on a dynamic component. */
+    coverage: string | null
     /** Only on a percentage-of-energy component. */
     percentage: string | null
     base_net: string | null

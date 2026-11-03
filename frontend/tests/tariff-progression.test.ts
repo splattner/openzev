@@ -48,7 +48,7 @@ function slot(line: string, net: string, gross: string | null = null): TariffPro
             category: 'energy', net, gross,
             components: [{
                 tariff_id: `t-${line}`, name: 'Energie', billing_mode: 'energy', band_period_id: 'p',
-                net, gross, percentage: null, base_net: null,
+                net, gross, dynamic: false, coverage: null, percentage: null, base_net: null,
             }],
         }],
     }
@@ -199,7 +199,7 @@ describe('progressionIssues', () => {
     })
 
     it('keeps separate stretches apart and reports incomplete tariffs by name', () => {
-        const spot = { tariff_id: 'x', name: 'Spot', reason: 'dynamic' as const }
+        const spot = { tariff_id: 'x', name: 'Spot', reason: 'dynamic_no_data' as const }
         const issues = progressionIssues(progression({
             intervals: [
                 interval('2025-01-01', '2025-03-31', [slot('line-1', '0.1')], { incomplete: [spot] }),
@@ -209,8 +209,8 @@ describe('progressionIssues', () => {
         }))
 
         expect(issues).toEqual([
-            { kind: 'dynamic', subject: 'Spot', from: '2025-01-01', to: '2025-03-31' },
-            { kind: 'dynamic', subject: 'Spot', from: '2025-05-01', to: '2025-12-31' },
+            { kind: 'dynamic_no_data', subject: 'Spot', from: '2025-01-01', to: '2025-03-31' },
+            { kind: 'dynamic_no_data', subject: 'Spot', from: '2025-05-01', to: '2025-12-31' },
         ])
     })
 
@@ -306,6 +306,27 @@ describe('ProgressionComposition', () => {
         expect(one.querySelector('select')).toBeNull()
     })
 
+    it('labels a dynamic component as an average of fetched prices with its coverage', async () => {
+        const dynamicSlot: TariffProgressionSlot = {
+            line: 'line-1', net: '0.05940', gross: null,
+            categories: [{
+                category: 'grid_fees', net: '0.05940', gross: null,
+                components: [{
+                    tariff_id: 'd', name: 'Netznutzung dynamisch', billing_mode: 'energy', band_period_id: null,
+                    net: '0.05940', gross: null, dynamic: true, coverage: '0.6055', percentage: null, base_net: null,
+                }],
+            }],
+        }
+        const container = await render(createElement(ProgressionComposition, {
+            ...props,
+            progression: progression({ intervals: [interval('2025-01-01', '2025-12-31', [dynamicSlot])], lines: [{ key: 'line-1', rules: [allHours] }] }),
+            day: '2025-03-01', lineKey: 'line-1', basis: 'net',
+        }))
+
+        expect(container.textContent).toContain('Netznutzung dynamisch')
+        expect(container.textContent).toContain('"coverage":"61"')
+    })
+
     it('explains a percentage component by its share and base', async () => {
         const base = progression()
         const percentage = progression({
@@ -315,7 +336,7 @@ describe('ProgressionComposition', () => {
                     category: 'energy', net: '0.19500', gross: null,
                     components: [{
                         tariff_id: 'p', name: 'Lokalanteil', billing_mode: 'percentage_of_energy', band_period_id: 'b',
-                        net: '0.19500', gross: null, percentage: '65.00', base_net: '0.30000',
+                        net: '0.19500', gross: null, dynamic: false, coverage: null, percentage: '65.00', base_net: '0.30000',
                     }],
                 }],
             }])],

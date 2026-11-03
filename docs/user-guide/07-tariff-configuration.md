@@ -801,10 +801,18 @@ the tariffs.
   chosen day into **subtotals per category** and the tariffs behind them. Click
   the chart, or pick the line, to change what it shows. A percentage tariff
   states its share and the grid price it was taken of.
-- **What is missing is marked.** A stretch where a category has nothing in force,
-  or where a tariff cannot be priced here, is shaded red and named under the
-  chart, because the total there is **understated**. **Dynamic tariffs** (a
-  fetched price series) are not included: they have no bands to add up.
+- **What is missing is marked.** A stretch where a category has a gap in its own
+  history (nothing in force between two versions), or where a tariff cannot be
+  priced here, is shaded red and named under the chart, because the total there
+  is **understated**. A category that simply starts later, or was discontinued, is
+  not a gap.
+- **Dynamic tariffs are included as a monthly average.** A dynamic tariff has a
+  fetched price every 15 minutes or hour, not bands, so the progression uses the
+  **average of the fetched prices for each line, month by month**; the day's
+  table says so and how much of the month's hours were covered. A month with
+  only some prices is marked and averaged over what was fetched; a month with
+  none is marked and left out. A percentage tariff based on a dynamic grid price
+  takes its share of that average.
 - **Fixed fees are separate.** Monthly, yearly, per-metering-point and shared
   fees are not per kWh, so they are listed below with their own unit and never
   added to the price. A shared fee shows what the **whole community** pays, split

@@ -2194,8 +2194,9 @@ export const fr = {
                 },
                 issues: {
                     missing: 'Rien n\'est en vigueur pour {{subject}} du {{from}} au {{to}} : le total est sous-estimé.',
-                    dynamic: '{{subject}} est calculé à partir d\'une série de prix récupérée et n\'est pas inclus du {{from}} au {{to}}.',
-                    dynamic_base: '{{subject}} suit un prix du réseau récupéré et n\'est pas inclus du {{from}} au {{to}}.',
+                    dynamic_partial: 'Pour {{subject}}, les prix récupérés du {{from}} au {{to}} sont incomplets : la moyenne ne couvre que ceux-ci, le total peut donc différer.',
+                    dynamic_no_data: 'Aucun prix récupéré pour {{subject}} du {{from}} au {{to}} : il n\'est pas inclus.',
+                    dynamic_base: '{{subject}} suit un prix du réseau récupéré sans données du {{from}} au {{to}} et n\'est pas inclus.',
                     no_bands: '{{subject}} n\'a aucune plage de prix et n\'est pas inclus du {{from}} au {{to}}.',
                 },
                 composition: {
@@ -2206,6 +2207,7 @@ export const fr = {
                     charge: 'Composante',
                     total: 'Total',
                     percentageOf: '{{percentage}} % de CHF {{base}}',
+                    dynamicAverage: 'Moyenne des prix récupérés, {{coverage}} % des heures couvertes',
                 },
                 fees: {
                     title: 'Frais fixes',

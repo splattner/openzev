@@ -2205,8 +2205,9 @@ export const en = {
                 },
                 issues: {
                     missing: 'Nothing in force for {{subject}} from {{from}} to {{to}}: the total is understated.',
-                    dynamic: '{{subject}} is priced from a fetched series and is not included from {{from}} to {{to}}.',
-                    dynamic_base: '{{subject}} follows a fetched grid price and is not included from {{from}} to {{to}}.',
+                    dynamic_partial: '{{subject}} has fetched prices for only part of {{from}} to {{to}}: its average covers just those, so the total may be off.',
+                    dynamic_no_data: '{{subject}} has no fetched prices from {{from}} to {{to}} and is not included.',
+                    dynamic_base: '{{subject}} follows a fetched grid price that has no data from {{from}} to {{to}} and is not included.',
                     no_bands: '{{subject}} has no price bands and is not included from {{from}} to {{to}}.',
                 },
                 composition: {
@@ -2217,6 +2218,7 @@ export const en = {
                     charge: 'Charge',
                     total: 'Total',
                     percentageOf: '{{percentage}} % of CHF {{base}}',
+                    dynamicAverage: 'Average of fetched prices, {{coverage}} % of hours covered',
                 },
                 fees: {
                     title: 'Fixed fees',

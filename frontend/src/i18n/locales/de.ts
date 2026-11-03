@@ -2194,8 +2194,9 @@ export const de = {
                 },
                 issues: {
                     missing: 'Für {{subject}} ist von {{from}} bis {{to}} nichts gültig: das Total ist zu tief ausgewiesen.',
-                    dynamic: '{{subject}} wird aus einer abgerufenen Preisreihe berechnet und ist von {{from}} bis {{to}} nicht enthalten.',
-                    dynamic_base: '{{subject}} folgt einem abgerufenen Netzpreis und ist von {{from}} bis {{to}} nicht enthalten.',
+                    dynamic_partial: 'Für {{subject}} liegen von {{from}} bis {{to}} nur teilweise abgerufene Preise vor: der Durchschnitt deckt nur diese ab, das Total kann abweichen.',
+                    dynamic_no_data: 'Für {{subject}} liegen von {{from}} bis {{to}} keine abgerufenen Preise vor; der Tarif ist nicht enthalten.',
+                    dynamic_base: '{{subject}} folgt einem abgerufenen Netzpreis ohne Daten von {{from}} bis {{to}} und ist nicht enthalten.',
                     no_bands: '{{subject}} hat keine Preisbänder und ist von {{from}} bis {{to}} nicht enthalten.',
                 },
                 composition: {
@@ -2206,6 +2207,7 @@ export const de = {
                     charge: 'Bestandteil',
                     total: 'Total',
                     percentageOf: '{{percentage}} % von CHF {{base}}',
+                    dynamicAverage: 'Durchschnitt der abgerufenen Preise, {{coverage}} % der Stunden abgedeckt',
                 },
                 fees: {
                     title: 'Fixe Gebühren',

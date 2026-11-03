@@ -70,6 +70,13 @@ export function ProgressionComposition({ progression, day, lineKey, lineNames, b
                                     <tr key={component.tariff_id}>
                                         <td className="tariff-progression-component">
                                             {component.name}
+                                            {component.dynamic && component.coverage !== null && (
+                                                <span className="muted">
+                                                    {t('pages.tariffs.progression.composition.dynamicAverage', {
+                                                        coverage: formatNumber(Number(component.coverage) * 100, { maxDecimals: 0 }),
+                                                    })}
+                                                </span>
+                                            )}
                                             {component.percentage !== null && component.base_net !== null && (
                                                 <span className="muted">
                                                     {t('pages.tariffs.progression.composition.percentageOf', {

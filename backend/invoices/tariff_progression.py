@@ -14,19 +14,29 @@ cells (month, weekday, part of the day). Cells where the same combination of
 bands applies form a *slot*, and each distinct slot is a line in the chart.
 Fixed fees are returned separately and never added to the per-kWh total.
 
-Nothing here touches the database beyond the tariffs and VAT rates handed in or
-read once; the module is a pure computation over them.
+A dynamic tariff has no bands, only a stored price per interval. It is included
+as a duration-weighted mean over each slot within each interval (a calendar
+month at most), which is what the engine's per-reading prices average to; a
+percentage tariff on a dynamic grid base takes its share of that mean the same
+way. Months with missing prices are reported, never silently averaged away.
+
+Nothing here touches the database beyond the tariffs, VAT rates and fetched
+prices of the request, each read once.
 """
 from __future__ import annotations
 
 import json
+from bisect import bisect_right
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
+from typing import NamedTuple
 
 from django.utils import timezone
 
 from accounts.models import VatRate
+from allocation.validity import period_window, wall_clock
+from tariffs.dynamic.models import DynamicPricePoint
 from tariffs.models import BillingMode, EnergyType, TariffCategory
 from tariffs.periods import resolve_band
 from tariffs.series import series_key, sort_versions
@@ -37,6 +47,11 @@ from .engine import _tariff_bears_input_vat
 #: The most slots one interval may produce: 12 months times two bands, the most a
 #: single seasonal HT/NT tariff gives. Beyond it the chart would be unreadable.
 MAX_SLOTS_PER_INTERVAL = 24
+
+#: A fetched series that covers less of a slot's hours than this is reported as
+#: partial. Not 1: a day with a clock change is an hour longer or shorter than the
+#: nominal 24, so full coverage can read a little under or over.
+DYNAMIC_COVERAGE_COMPLETE = Decimal("0.99")
 
 _PRICE_STEP = Decimal("0.00001")
 _FEE_STEP = Decimal("0.01")
@@ -127,6 +142,18 @@ class _Cells:
         self._periods_of = periods_of
         self._memo: dict[tuple, object] = {}
 
+    def index(self, month: int, weekday: int, part: int) -> int:
+        """Position of a cell in ``cells`` (months outermost, parts innermost)."""
+        return ((month - 1) * 7 + weekday) * len(self.starts) + part
+
+    def part_of(self, clock: time) -> int:
+        return bisect_right(self.starts, clock) - 1
+
+    def part_seconds(self) -> list[int]:
+        """How long each part of the day lasts, in nominal seconds."""
+        edges = [start.hour * 3600 + start.minute * 60 for start in self.starts] + [24 * 3600]
+        return [edges[i + 1] - edges[i] for i in range(len(self.starts))]
+
     def band(self, tariff, index: int):
         key = (tariff.pk, index)
         try:
@@ -185,6 +212,88 @@ class _Cells:
         return rules
 
 
+class _DynamicMeans:
+    """Fetched prices of dynamic tariffs, as duration-weighted means over cells.
+
+    Each stored interval is assigned to the cell its start falls in on the Swiss
+    wall clock, the way the engine resolves the band of a reading by its start,
+    and counts for its whole duration. A tariff's floor (feed-in only) is applied
+    per interval, as the engine applies it per price lookup.
+    """
+
+    def __init__(self, tariffs, bounds, cells):
+        self._cells = cells
+        self._bounds = bounds
+        self._stats: dict[tuple, dict[int, list]] = defaultdict(dict)
+        self._expected: dict[int, dict[int, int]] = {}
+        self._load(tariffs)
+
+    def _load(self, tariffs) -> None:
+        if not tariffs or not self._bounds:
+            return
+        by_source: dict = defaultdict(list)
+        for tariff in tariffs:
+            by_source[tariff.dynamic_source_id].append(tariff)
+        starts = [start for start, _end in self._bounds]
+        active = {
+            (tariff.pk, index): _active_on(tariff, start)
+            for tariff in tariffs
+            for index, start in enumerate(starts)
+        }
+        window_start, window_end = period_window(starts[0], self._bounds[-1][1])
+        rows = DynamicPricePoint.objects.filter(
+            source_id__in=list(by_source), valid_from__gte=window_start, valid_from__lt=window_end,
+        ).values_list("source_id", "valid_from", "valid_to", "price_chf_per_kwh").iterator(chunk_size=5000)
+        for source_id, valid_from, valid_to, price in rows:
+            local = wall_clock(valid_from)
+            index = bisect_right(starts, local.date()) - 1
+            if index < 0:
+                continue
+            seconds = int((valid_to - valid_from).total_seconds())
+            cell = self._cells.index(local.month, local.weekday(), self._cells.part_of(local.time()))
+            for tariff in by_source[source_id]:
+                if not active[tariff.pk, index]:
+                    continue
+                value = Decimal(price)
+                if tariff.minimum_price_chf_per_kwh is not None:
+                    value = max(value, Decimal(tariff.minimum_price_chf_per_kwh))
+                entry = self._stats[tariff.pk, index].setdefault(cell, [Decimal("0"), 0])
+                entry[0] += value * seconds
+                entry[1] += seconds
+
+    def _expected_seconds(self, index: int) -> dict[int, int]:
+        if index not in self._expected:
+            start, end = self._bounds[index]
+            lengths = self._cells.part_seconds()
+            expected: dict[int, int] = defaultdict(int)
+            day = start
+            while day <= end:
+                for part, length in enumerate(lengths):
+                    expected[self._cells.index(day.month, day.weekday(), part)] += length
+                day += timedelta(days=1)
+            self._expected[index] = expected
+        return self._expected[index]
+
+    def mean(self, tariff, index: int, cells: list[int]) -> tuple[Decimal | None, Decimal]:
+        """(mean CHF/kWh, share of the slot's hours covered) of ``tariff`` over ``cells``.
+
+        The mean is ``None`` when nothing was fetched for them.
+        """
+        stats = self._stats.get((tariff.pk, index), {})
+        weighted, covered = Decimal("0"), 0
+        for cell in cells:
+            entry = stats.get(cell)
+            if entry:
+                weighted += entry[0]
+                covered += entry[1]
+        if not covered:
+            return None, Decimal("0")
+        expected = self._expected_seconds(index)
+        nominal = sum(expected.get(cell, 0) for cell in cells)
+        coverage = min(Decimal(covered) / Decimal(nominal), _ONE) if nominal else _ONE
+        return weighted / covered, coverage
+
+
 def _is_all_hours(rules: list[dict]) -> bool:
     return (
         len(rules) == 1
@@ -231,6 +340,25 @@ def _default_range(typed, today: date) -> tuple[date, date]:
     return start, max(start, end)
 
 
+def _month_starts(first: date, last: date):
+    """The first day of every calendar month after ``first``, up to ``last``."""
+    month = date(first.year + (first.month // 12), first.month % 12 + 1, 1)
+    while month <= last:
+        yield month
+        month = date(month.year + (month.month // 12), month.month % 12 + 1, 1)
+
+
+class _Component(NamedTuple):
+    tariff: object
+    #: The band that priced it; ``None`` for a dynamic tariff, which has none.
+    band: object | None
+    net: Decimal
+    gross: Decimal | None
+    share: Decimal | None = None
+    #: Share of the slot's hours with a fetched price, for a dynamic tariff.
+    coverage: Decimal | None = None
+
+
 def build_progression(
     zev,
     tariffs,
@@ -270,15 +398,27 @@ def build_progression(
     range_from = date_from or default_from
     range_to = date_to or max(default_to, range_from)
 
-    expected = {
-        t.category for t in displayed
-        if periods_of(t) and t.valid_from <= range_to and (t.valid_to is None or t.valid_to >= range_from)
-    }
+    def overlaps_range(tariff) -> bool:
+        return tariff.valid_from <= range_to and (tariff.valid_to is None or tariff.valid_to >= range_from)
+
+    expected = {t.category for t in displayed if periods_of(t) and overlaps_range(t)}
+    expected |= {t.category for t in dynamic_typed if overlaps_range(t)}
     expected_categories = [c for c in _CATEGORY_ORDER if c in expected]
+    # A category is only *missing* inside its own span, like a gap between the
+    # versions of one tariff (``tariffs.series.find_gaps``): before its first tariff
+    # starts, or after its last one has ended, it simply was not charged.
+    spans: dict = {}
+    for tariff in displayed + dynamic_typed:
+        first, last = spans.get(tariff.category, (tariff.valid_from, tariff.valid_to or date.max))
+        spans[tariff.category] = (
+            min(first, tariff.valid_from), max(last, tariff.valid_to or date.max),
+        )
 
     has_percentage = any(t.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY for t in displayed)
     shaping_pool = displayed + ([t for t in grid_static if t not in displayed] if has_percentage else [])
     cells = _Cells(shaping_pool, periods_of)
+    # Dynamic tariffs that price this view: its own, and the grid base of a percentage tariff.
+    dynamic_pool = dynamic_typed + [g for g in (grid_dynamic if has_percentage else []) if g not in dynamic_typed]
 
     # Breakpoints: wherever a tariff that matters starts or stops, or the VAT rate changes.
     boundaries = {range_from}
@@ -288,18 +428,27 @@ def build_progression(
             boundaries.add(tariff.valid_to + timedelta(days=1))
     if with_vat:
         boundaries |= _vat_boundaries(rates)
+    # A fetched series is averaged per calendar month while it is in force.
+    for tariff in dynamic_pool:
+        first = max(range_from, tariff.valid_from)
+        last = min(range_to, tariff.valid_to) if tariff.valid_to else range_to
+        boundaries.update(_month_starts(first, last))
     # Nothing to chart without a tariff of this type, however long the range.
     starts = sorted(day for day in boundaries if range_from <= day <= range_to) if typed else []
+    bounds = [
+        (start, starts[position + 1] - timedelta(days=1) if position + 1 < len(starts) else range_to)
+        for position, start in enumerate(starts)
+    ]
+    dynamic = _DynamicMeans(dynamic_pool, bounds, cells)
 
-    intervals = []
-    for position, start in enumerate(starts):
-        end = starts[position + 1] - timedelta(days=1) if position + 1 < len(starts) else range_to
-        intervals.append(_interval(
-            start, end, vat_mode=vat_mode, rates=rates, cells=cells, periods_of=periods_of,
-            displayed=displayed, dynamic_typed=dynamic_typed,
-            grid_static=grid_static, grid_dynamic=grid_dynamic,
-            expected_categories=expected_categories,
-        ))
+    intervals = [
+        _interval(
+            position, start, end, vat_mode=vat_mode, rates=rates, cells=cells, periods_of=periods_of,
+            displayed=displayed, dynamic_typed=dynamic_typed, grid_static=grid_static,
+            grid_dynamic=grid_dynamic, dynamic=dynamic, spans=spans,
+        )
+        for position, (start, end) in enumerate(bounds)
+    ]
 
     lines = _assign_lines(intervals)
 
@@ -319,38 +468,29 @@ def build_progression(
     }
 
 
-def _interval(start, end, *, vat_mode, rates, cells, periods_of, displayed, dynamic_typed,
-              grid_static, grid_dynamic, expected_categories) -> dict:
+def _interval(position, start, end, *, vat_mode, rates, cells, periods_of, displayed, dynamic_typed,
+              grid_static, grid_dynamic, dynamic, spans) -> dict:
     with_vat = vat_mode != VatMode.NOT_REGISTERED
     rate = _rate_on(rates, start) if with_vat else Decimal("0")
 
     active = [t for t in displayed if _active_on(t, start)]
     active_dynamic = [t for t in dynamic_typed if _active_on(t, start)]
-    incomplete = [
-        {"tariff_id": str(t.pk), "name": t.name, "reason": "dynamic"} for t in active_dynamic
-    ]
-    incomplete += [
-        {"tariff_id": str(t.pk), "name": t.name, "reason": "no_bands"}
-        for t in active if not periods_of(t)
-    ]
     priceable = [t for t in active if periods_of(t)]
     energy = [t for t in priceable if t.billing_mode == BillingMode.ENERGY]
     percentage = [t for t in priceable if t.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY]
-
-    if percentage and any(_active_on(g, start) for g in grid_dynamic):
-        # The base would follow a fetched series, which has no bands to chart.
-        incomplete += [
-            {"tariff_id": str(t.pk), "name": t.name, "reason": "dynamic_base"} for t in percentage
-        ]
-        percentage = []
-
     base = [g for g in grid_static if _active_on(g, start) and periods_of(g)] if percentage else []
+    base_dynamic = [g for g in grid_dynamic if _active_on(g, start)] if percentage else []
     present = {t.category for t in active + active_dynamic}
-    missing = [c for c in expected_categories if c not in present]
+    missing = [
+        c for c in _CATEGORY_ORDER
+        if c in spans and c not in present and spans[c][0] < start and end < spans[c][1]
+    ]
 
     shaping = list({t.pk: t for t in [*energy, *percentage, *base]}.values())
+    flags: dict = {}
+    base_blocked: set = set()
     slots = []
-    if energy or percentage:
+    if energy or percentage or active_dynamic:
         groups: dict[tuple, list[int]] = defaultdict(list)
         for index in range(len(cells.cells)):
             groups[tuple(cells.band(t, index).pk for t in shaping)].append(index)
@@ -359,8 +499,26 @@ def _interval(start, end, *, vat_mode, rates, cells, periods_of, displayed, dyna
         for indices in groups.values():
             slots.append(_slot(
                 indices, cells=cells, shaping=shaping, energy=energy, percentage=percentage,
-                base=base, vat_mode=vat_mode, rate=rate,
+                base=base, dynamic_energy=active_dynamic, base_dynamic=base_dynamic,
+                dynamic=dynamic, position=position, flags=flags, base_blocked=base_blocked,
+                vat_mode=vat_mode, rate=rate,
             ))
+        if (flags or base_blocked) and not any(slot["categories"] for slot in slots):
+            # Nothing could be priced: a line at 0.00000 would read as a real price.
+            slots = []
+
+    incomplete = [
+        {"tariff_id": str(t.pk), "name": t.name, "reason": flags[t.pk]}
+        for t in {t.pk: t for t in [*active_dynamic, *base_dynamic]}.values() if t.pk in flags
+    ]
+    incomplete += [
+        {"tariff_id": str(t.pk), "name": t.name, "reason": "no_bands"}
+        for t in active if not periods_of(t)
+    ]
+    incomplete += [
+        {"tariff_id": str(t.pk), "name": t.name, "reason": "dynamic_base"}
+        for t in percentage if t.pk in base_blocked
+    ]
 
     return {
         "from": start.isoformat(),
@@ -372,10 +530,22 @@ def _interval(start, end, *, vat_mode, rates, cells, periods_of, displayed, dyna
     }
 
 
-def _slot(indices, *, cells, shaping, energy, percentage, base, vat_mode, rate) -> dict:
+def _slot(indices, *, cells, shaping, energy, percentage, base, dynamic_energy, base_dynamic,
+          dynamic, position, flags, base_blocked, vat_mode, rate) -> dict:
     first = indices[0]
     bands = {t.pk: cells.band(t, first) for t in shaping}
     with_vat = vat_mode != VatMode.NOT_REGISTERED
+
+    # A fetched series is averaged over this slot's hours within the interval.
+    means: dict = {}
+    for tariff in {t.pk: t for t in [*dynamic_energy, *base_dynamic]}.values():
+        mean, coverage = dynamic.mean(tariff, position, indices)
+        means[tariff.pk] = (mean, coverage)
+        if mean is None:
+            flags[tariff.pk] = "dynamic_no_data"
+        elif coverage < DYNAMIC_COVERAGE_COMPLETE and flags.get(tariff.pk) != "dynamic_no_data":
+            flags[tariff.pk] = "dynamic_partial"
+    base_known = all(means[g.pk][0] is not None for g in base_dynamic)
 
     net_base = sum((_d(bands[g.pk].price_chf_per_kwh) for g in base), Decimal("0"))
     gross_base = None
@@ -385,17 +555,29 @@ def _slot(indices, *, cells, shaping, energy, percentage, base, vat_mode, rate) 
              for g in base),
             Decimal("0"),
         )
+    if base_known:
+        for grid_tariff in base_dynamic:
+            mean = means[grid_tariff.pk][0]
+            net_base += mean
+            if gross_base is not None:
+                gross_base += mean * (_ONE + rate if _tariff_bears_input_vat(grid_tariff) else _ONE)
 
     components = []
     for tariff in energy:
-        band = bands[tariff.pk]
-        net = _d(band.price_chf_per_kwh)
-        components.append((tariff, band, net, _gross(vat_mode, tariff, net, rate), None))
+        net = _d(bands[tariff.pk].price_chf_per_kwh)
+        components.append(_Component(tariff, bands[tariff.pk], net, _gross(vat_mode, tariff, net, rate)))
+    for tariff in dynamic_energy:
+        mean, coverage = means[tariff.pk]
+        if mean is not None:
+            components.append(_Component(tariff, None, mean, _gross(vat_mode, tariff, mean, rate), None, coverage))
     for tariff in percentage:
         band = bands[tariff.pk]
         share = _d(band.percentage)
         if not share:
             # A 0 % band bills nothing and, as in the engine, resolves no base.
+            continue
+        if not base_known:
+            base_blocked.add(tariff.pk)
             continue
         fraction = share / _HUNDRED
         net = net_base * fraction
@@ -403,20 +585,20 @@ def _slot(indices, *, cells, shaping, energy, percentage, base, vat_mode, rate) 
             gross = gross_base * fraction
         else:
             gross = _gross(vat_mode, tariff, net, rate)
-        components.append((tariff, band, net, gross, share))
+        components.append(_Component(tariff, band, net, gross, share))
 
     categories = []
     total_net = Decimal("0")
     total_gross = Decimal("0")
     for category in _CATEGORY_ORDER:
         rows = sorted(
-            (row for row in components if row[0].category == category),
-            key=lambda row: (row[0].name.lower(), str(row[0].pk)),
+            (row for row in components if row.tariff.category == category),
+            key=lambda row: (row.tariff.name.lower(), str(row.tariff.pk)),
         )
         if not rows:
             continue
-        sub_net = sum((row[2] for row in rows), Decimal("0"))
-        sub_gross = sum((row[3] for row in rows), Decimal("0")) if with_vat else None
+        sub_net = sum((row.net for row in rows), Decimal("0"))
+        sub_gross = sum((row.gross for row in rows), Decimal("0")) if with_vat else None
         total_net += sub_net
         if with_vat:
             total_gross += sub_gross
@@ -426,16 +608,18 @@ def _slot(indices, *, cells, shaping, energy, percentage, base, vat_mode, rate) 
             "gross": _text(sub_gross),
             "components": [
                 {
-                    "tariff_id": str(tariff.pk),
-                    "name": tariff.name,
-                    "billing_mode": tariff.billing_mode,
-                    "band_period_id": str(band.pk),
-                    "net": _text(net),
-                    "gross": _text(gross),
-                    "percentage": None if share is None else format(share, "f"),
-                    "base_net": None if share is None else _text(net_base),
+                    "tariff_id": str(row.tariff.pk),
+                    "name": row.tariff.name,
+                    "billing_mode": row.tariff.billing_mode,
+                    "band_period_id": str(row.band.pk) if row.band is not None else None,
+                    "net": _text(row.net),
+                    "gross": _text(row.gross),
+                    "percentage": None if row.share is None else format(row.share, "f"),
+                    "base_net": None if row.share is None else _text(net_base),
+                    "dynamic": row.coverage is not None,
+                    "coverage": _text(row.coverage, Decimal("0.0001")),
                 }
-                for tariff, band, net, gross, share in rows
+                for row in rows
             ],
         })
 

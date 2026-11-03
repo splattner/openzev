@@ -3,16 +3,19 @@
 The computation is checked against hand-worked numbers, and against the invoice
 engine's own pricing for sample timestamps, so the two cannot drift apart.
 """
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
 
 from accounts.models import VatRate
+from allocation.validity import period_window, wall_clock
 from invoices import tariff_progression
-from invoices.engine import ItemAccumulator, TariffResolver, _price_energy, _tariff_bears_input_vat
+from invoices.engine import (
+    InvoiceGenerationContext, ItemAccumulator, TariffResolver, _price_energy, _tariff_bears_input_vat,
+)
 from invoices.tariff_progression import TooManyBands, build_progression
-from tariffs.dynamic.models import DynamicTariffSource
+from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory
 from testing import factories
 from testing.helpers import clear_vat_rates
@@ -311,13 +314,24 @@ class TestPricing:
 
     def test_a_missing_category_is_reported(self, zev):
         make(zev, "Energie", [flat("0.15")])
-        make(zev, "Netz", [flat("0.08")], category=TariffCategory.GRID_FEES, valid_to=date(2025, 6, 30))
+        make(zev, "Netz", [flat("0.08")], category=TariffCategory.GRID_FEES, valid_to=date(2025, 3, 31))
+        make(zev, "Netz", [flat("0.08")], category=TariffCategory.GRID_FEES, valid_from=date(2025, 7, 1))
 
         result = progress(zev)
 
         assert result["expected_categories"] == ["energy", "grid_fees"]
-        assert [i["missing_categories"] for i in result["intervals"]] == [[], ["grid_fees"]]
-        assert totals(result) == [["0.23000"], ["0.15000"]]
+        assert [i["missing_categories"] for i in result["intervals"]] == [[], ["grid_fees"], []]
+        assert totals(result) == [["0.23000"], ["0.15000"], ["0.23000"]]
+
+    def test_a_category_that_starts_later_or_has_ended_is_not_missing(self, zev):
+        make(zev, "Energie", [flat("0.15")])
+        make(zev, "Altlast", [flat("0.01")], category=TariffCategory.LEVIES, valid_to=date(2025, 3, 31))
+        make(zev, "Neu", [flat("0.02")], category=TariffCategory.METERING, valid_from=date(2025, 7, 1))
+
+        result = progress(zev)
+
+        assert [i["missing_categories"] for i in result["intervals"]] == [[], [], []]
+        assert totals(result) == [["0.16000"], ["0.15000"], ["0.17000"]]
 
     def test_a_tariff_without_bands_is_incomplete(self, zev):
         make(zev, "Energie", [flat("0.15")])
@@ -426,36 +440,189 @@ class TestPercentage:
         # grid 0.30 -> 0.3243; levy 50 % of the net base 0.30 -> 0.15 -> 0.16215.
         assert slot["gross"] == "0.48645"
 
-    def test_a_dynamic_grid_base_marks_the_percentage_incomplete(self, zev):
-        source = DynamicTariffSource.objects.create(
-            label="vario", url="https://api.tariffs.groupe-e.ch/v2/tariffs", api_version="v1_0_5",
-            tariff_type="grid", tariff_name="vario",
-        )
-        make(zev, "Spot", [], dynamic_source=source)
-        percentage_tariff = make_percentage(zev, "Lokalanteil", "50")
 
-        interval = progress(zev, "local")["intervals"][0]
+def make_source(tariff_type="grid"):
+    return DynamicTariffSource.objects.create(
+        label=f"vario {tariff_type}", url="https://api.tariffs.groupe-e.ch/v2/tariffs", api_version="v1_0_5",
+        tariff_type=tariff_type, tariff_name="vario",
+    )
 
-        assert interval["incomplete"] == [
-            {"tariff_id": str(percentage_tariff.pk), "name": "Lokalanteil", "reason": "dynamic_base"},
-        ]
-        assert interval["slots"] == []
+
+def seed_prices(source, first, last, price):
+    """Quarter-hourly prices for the civil days ``first``..``last``; ``price(local_datetime)``."""
+    start, end = period_window(first, last)
+    points, cursor = [], start
+    while cursor < end:
+        local = wall_clock(cursor).replace(tzinfo=None)
+        points.append(DynamicPricePoint(
+            source=source, valid_from=cursor, valid_to=cursor + timedelta(minutes=15),
+            price_chf_per_kwh=D(price(local)),
+        ))
+        cursor += timedelta(minutes=15)
+    DynamicPricePoint.objects.bulk_create(points)
+
+
+JANUARY = (date(2026, 1, 1), date(2026, 1, 31))
+
+
+def make_dynamic(zev, name="Spot", *, source=None, tariff_type="grid", **kwargs):
+    kwargs.setdefault("category", TariffCategory.GRID_FEES)
+    kwargs.setdefault("valid_from", date(2026, 1, 1))
+    source = source or make_source(tariff_type)
+    return make(zev, name, [], dynamic_source=source, **kwargs), source
 
 
 class TestDynamic:
-    def test_a_dynamic_tariff_is_listed_but_not_summed(self, zev):
-        source = DynamicTariffSource.objects.create(
-            label="vario", url="https://api.tariffs.groupe-e.ch/v2/tariffs", api_version="v1_0_5",
-            tariff_type="grid", tariff_name="vario",
-        )
-        spot = make(zev, "Spot", [], category=TariffCategory.GRID_FEES, dynamic_source=source)
+    def test_a_dynamic_tariff_is_averaged_per_month(self, zev):
+        spot, source = make_dynamic(zev)
+        seed_prices(source, date(2026, 1, 1), date(2026, 2, 28), lambda moment: "0.10")
+
+        result = progress(zev, date_from=date(2026, 1, 1), date_to=date(2026, 2, 28))
+
+        assert [(i["from"], i["to"]) for i in result["intervals"]] == [
+            ("2026-01-01", "2026-01-31"), ("2026-02-01", "2026-02-28"),
+        ]
+        assert totals(result) == [["0.10000"], ["0.10000"]]
+        component = result["intervals"][0]["slots"][0]["categories"][0]["components"][0]
+        assert (component["tariff_id"], component["dynamic"], component["coverage"]) == (str(spot.pk), True, "1.0000")
+        assert (component["band_period_id"], component["percentage"]) == (None, None)
+        assert result["intervals"][0]["incomplete"] == []
+
+    def test_months_are_breakpoints_only_while_the_tariff_is_in_force(self, zev):
+        make_dynamic(zev, valid_from=date(2026, 1, 15), valid_to=date(2026, 3, 10))
+
+        result = progress(zev)
+
+        assert [(i["from"], i["to"]) for i in result["intervals"]] == [
+            ("2026-01-15", "2026-01-31"), ("2026-02-01", "2026-02-28"), ("2026-03-01", "2026-03-10"),
+        ]
+
+    def test_the_mean_is_added_to_the_static_components(self, zev):
         make(zev, "Energie", [flat("0.15")])
+        _, source = make_dynamic(zev)
+        seed_prices(source, *JANUARY, lambda moment: "0.10")
 
-        interval = progress(zev)["intervals"][0]
+        slot = progress(zev, date_from=JANUARY[0], date_to=JANUARY[1])["intervals"][0]["slots"][0]
 
-        assert interval["incomplete"] == [{"tariff_id": str(spot.pk), "name": "Spot", "reason": "dynamic"}]
-        assert [slot["net"] for slot in interval["slots"]] == ["0.15000"]
+        assert slot["net"] == "0.25000"
+        assert [c["category"] for c in slot["categories"]] == ["energy", "grid_fees"]
+
+    def test_the_mean_matches_the_engine_prices_in_every_slot(self, zev):
+        make(zev, "Energie", [ht("0.30"), nt("0.20")])
+        spot, source = make_dynamic(zev)
+        seed_prices(source, *JANUARY, lambda moment: D("0.10") + D("0.01") * moment.hour
+                    + (D("0.005") if moment.weekday() >= 5 else 0))
+        result = progress(zev, date_from=JANUARY[0], date_to=JANUARY[1])
+        series = InvoiceGenerationContext.build(zev, *JANUARY).dynamic_series(source.pk)
+
+        start, end = period_window(*JANUARY)
+        sums, counts = {}, {}
+        cursor = start
+        while cursor < end:
+            local = wall_clock(cursor).replace(tzinfo=None)
+            line = slot_at(result, 0, local)["line"]
+            sums[line] = sums.get(line, 0) + series.price_at(cursor)
+            counts[line] = counts.get(line, 0) + 1
+            cursor += timedelta(minutes=15)
+
+        assert len(sums) == 2
+        for slot in result["intervals"][0]["slots"]:
+            dynamic_part = next(
+                c for cat in slot["categories"] for c in cat["components"] if c["tariff_id"] == str(spot.pk)
+            )
+            expected = (sums[slot["line"]] / counts[slot["line"]]).quantize(D("0.00001"))
+            assert D(dynamic_part["net"]) == expected
+            assert dynamic_part["coverage"] == "1.0000"
+
+    def test_a_month_without_prices_is_reported_and_not_priced(self, zev):
+        spot, _ = make_dynamic(zev)
+
+        interval = progress(zev, date_from=JANUARY[0], date_to=JANUARY[1])["intervals"][0]
+
+        assert interval["incomplete"] == [{"tariff_id": str(spot.pk), "name": "Spot", "reason": "dynamic_no_data"}]
+        assert interval["slots"] == []
         assert interval["missing_categories"] == []
+
+    def test_a_month_without_prices_leaves_the_static_components_in_place(self, zev):
+        make(zev, "Energie", [flat("0.15")])
+        make_dynamic(zev)
+
+        interval = progress(zev, date_from=JANUARY[0], date_to=JANUARY[1])["intervals"][0]
+
+        assert [slot["net"] for slot in interval["slots"]] == ["0.15000"]
+        assert [item["reason"] for item in interval["incomplete"]] == ["dynamic_no_data"]
+
+    def test_a_gap_in_the_fetched_prices_is_partial(self, zev):
+        spot, source = make_dynamic(zev)
+        seed_prices(source, date(2026, 1, 1), date(2026, 1, 15), lambda moment: "0.10")
+
+        interval = progress(zev, date_from=JANUARY[0], date_to=JANUARY[1])["intervals"][0]
+
+        assert interval["incomplete"] == [{"tariff_id": str(spot.pk), "name": "Spot", "reason": "dynamic_partial"}]
+        component = interval["slots"][0]["categories"][0]["components"][0]
+        assert component["net"] == "0.10000"
+        assert D(component["coverage"]) < D("0.5")
+
+    def test_a_month_with_a_clock_change_is_complete(self, zev):
+        _, source = make_dynamic(zev, valid_from=date(2026, 3, 1))
+        seed_prices(source, date(2026, 3, 1), date(2026, 3, 31), lambda moment: "0.10")
+
+        interval = progress(zev, date_from=date(2026, 3, 1), date_to=date(2026, 3, 31))["intervals"][0]
+
+        # The 23-hour day reads a little under the nominal 24, which is not a gap.
+        assert interval["incomplete"] == []
+        assert D(interval["slots"][0]["categories"][0]["components"][0]["coverage"]) > D("0.99")
+
+    def test_a_feed_in_floor_applies_to_each_interval(self, zev):
+        _, source = make_dynamic(
+            zev, "Einspeisung", tariff_type="feed_in", energy_type=EnergyType.FEED_IN,
+            category=TariffCategory.ENERGY, minimum_price_chf_per_kwh=D("0.05"),
+        )
+        seed_prices(source, *JANUARY, lambda moment: "0.02" if moment.hour < 12 else "0.10")
+
+        slot = progress(zev, "feed_in", date_from=JANUARY[0], date_to=JANUARY[1])["intervals"][0]["slots"][0]
+
+        assert slot["net"] == "0.07500"
+
+    def test_a_percentage_takes_its_share_of_the_dynamic_grid_mean(self, zev):
+        _, source = make_dynamic(zev)
+        seed_prices(source, *JANUARY, lambda moment: "0.20")
+        make_percentage(zev, "Lokalanteil", "50", valid_from=date(2026, 1, 1))
+
+        slot = progress(zev, "local", date_from=JANUARY[0], date_to=JANUARY[1])["intervals"][0]["slots"][0]
+
+        component = slot["categories"][0]["components"][0]
+        assert (slot["net"], component["base_net"], component["dynamic"]) == ("0.10000", "0.20000", False)
+
+    def test_a_percentage_follows_the_dynamic_mean_in_each_slot(self, zev):
+        make(zev, "Netzstrom", [ht("0.30"), nt("0.20")], valid_from=date(2026, 1, 1))
+        _, source = make_dynamic(zev)
+        seed_prices(source, *JANUARY, lambda moment: "0.10" if moment.hour < 12 else "0.30")
+        make_percentage(zev, "Lokalanteil", "50", valid_from=date(2026, 1, 1))
+
+        result = progress(zev, "local", date_from=JANUARY[0], date_to=JANUARY[1])
+
+        # HT is 07-20 on weekdays: 07-12 at 0.10 and 12-20 at 0.30 -> 8 of 13 hours at 0.30.
+        high = slot_at(result, 0, datetime(2026, 1, 6, 10, 0))
+        assert D(high["net"]) == ((D("0.30") + (D("0.10") * 5 + D("0.30") * 8) / 13) * D("0.5")).quantize(D("0.00001"))
+
+    def test_a_percentage_is_blocked_when_the_dynamic_base_has_no_data(self, zev):
+        make_dynamic(zev)
+        percentage_tariff = make_percentage(zev, "Lokalanteil", "50", valid_from=date(2026, 1, 1))
+
+        interval = progress(zev, "local", date_from=JANUARY[0], date_to=JANUARY[1])["intervals"][0]
+
+        assert {"tariff_id": str(percentage_tariff.pk), "name": "Lokalanteil", "reason": "dynamic_base"} in interval["incomplete"]
+        assert interval["slots"] == []
+
+    def test_inclusive_grosses_a_dynamic_grid_tariff(self, zev):
+        set_vat(zev, VatMode.INCLUSIVE)
+        _, source = make_dynamic(zev)
+        seed_prices(source, *JANUARY, lambda moment: "0.10")
+
+        slot = progress(zev, date_from=JANUARY[0], date_to=JANUARY[1])["intervals"][0]["slots"][0]
+
+        assert (slot["net"], slot["gross"]) == ("0.10000", "0.10810")
 
 
 class TestVat:
