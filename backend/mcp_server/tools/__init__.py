@@ -16,6 +16,7 @@ from .find_invoices import FindInvoicesTool
 from .import_triage import ImportTriageTool
 from .list_participants import ListParticipantsTool
 from .list_zevs import ListZevsTool
+from .live_energy import LiveEnergyTool
 from .period_readiness import PeriodReadinessTool
 
 TOOLS: dict[str, Tool] = {
@@ -30,6 +31,7 @@ TOOLS: dict[str, Tool] = {
         ConsumptionSummaryTool(),
         ConsumptionProfileTool(),
         DataGapsTool(),
+        LiveEnergyTool(),
         AuditQueryTool(),
     )
 }
