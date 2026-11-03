@@ -1181,6 +1181,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#price-progression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price Progression
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#renaming" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2359,6 +2370,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#price-progression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price Progression
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#renaming" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3432,6 +3454,54 @@ its price moved over time; open <strong>History</strong> to see the chart.</p>
   itself did not change. A note under the title says so. A tariff with a
   single flat band still shows one line, exactly as before bands existed.</li>
 </ul>
+<h3 id="price-progression">Price Progression<a class="headerlink" href="#price-progression" title="Permanent link">&para;</a></h3>
+<p>The price history above follows <strong>one</strong> tariff. To see what <strong>one kWh costs in
+total</strong> and how that moved over the years, click <strong>Price progression</strong> in the
+header of the Tariffs page. It adds up every per-kWh tariff that applies, the
+way an invoice would price a kWh, and is read-only for everyone who can open
+the tariffs.</p>
+<p><img alt="The price progression page" src="../screenshots/07g-tariff-progression.png" /></p>
+<ul>
+<li><strong>One energy type at a time.</strong> Choose grid, local or feed-in. Energy, grid
+  fees, levies and metering tariffs of that type are summed; types are never
+  mixed, and a feed-in credit is its own view.</li>
+<li><strong>One line per band.</strong> The total depends on when the energy is used, so each
+  distinct time of use (for example <em>Mon–Fri 07:00–20:00</em> and <em>all other
+  hours</em>) is its own stepped line. When a tariff changes its hours, the old
+  line ends and a new one starts.</li>
+<li><strong>Net and gross.</strong> The community's VAT setting decides what you can switch
+  between. <em>VAT-registered:</em> <strong>Excl. VAT</strong> and <strong>Incl. VAT</strong>. <em>Not registered,
+  upstream VAT folded into prices:</em> the <strong>published price</strong> and the <strong>billed
+  price</strong>, where only the tariffs that carry VAT (grid energy, grid fees,
+  levies, metering) are grossed. <em>Not registered:</em> one value, because prices are
+  billed as entered. The VAT rate in force on each day is used, so a rate change
+  shows as a step even when no tariff changed.</li>
+<li><strong>The price on a day.</strong> Under the chart, the table breaks one line down on a
+  chosen day into <strong>subtotals per category</strong> and the tariffs behind them. Click
+  the chart, or pick the line, to change what it shows. A percentage tariff
+  states its share and the grid price it was taken of.</li>
+<li><strong>What is missing is marked.</strong> A stretch where a category has a gap in its own
+  history (nothing in force between two versions), or where a tariff cannot be
+  priced here, is shaded red and named under the chart, because the total there
+  is <strong>understated</strong>. A category that simply starts later, or was discontinued, is
+  not a gap.</li>
+<li><strong>Dynamic tariffs are included as a monthly average.</strong> A dynamic tariff has a
+  fetched price every 15 minutes or hour, not bands, so the progression uses the
+  <strong>average of the fetched prices for each line, month by month</strong>; the day's
+  table says so and how much of the month's hours were covered. A month with
+  only some prices is marked and averaged over what was fetched; a month with
+  none is marked and left out. A percentage tariff based on a dynamic grid price
+  takes its share of that average. A price that is valid for a whole period, such
+as a quarterly reference market price, applies to every month of the period. A
+period that has not been published yet (the newest quarter is published weeks
+after it ends) shows as having no fetched prices.</li>
+<li><strong>Fixed fees are separate.</strong> Monthly, yearly, per-metering-point and shared
+  fees are not per kWh, so they are listed below with their own unit and never
+  added to the price. A shared fee shows what the <strong>whole community</strong> pays, split
+  by headcount or weight, not one participant's share.</li>
+</ul>
+<p>The view is kept in the address, so you can share a link to it, and a date range
+limits both the chart and the fixed fees.</p>
 <h3 id="renaming">Renaming<a class="headerlink" href="#renaming" title="Permanent link">&para;</a></h3>
 <p>Renaming is done for the <strong>whole tariff</strong>, not per version — the name is what
 holds the versions together, so renaming just one would split it into two
