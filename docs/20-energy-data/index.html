@@ -904,6 +904,73 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#send-live-power-push" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Send live power (push)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Send live power (push)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#home-assistant-send-the-power" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Home Assistant: send the power
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shelly-gen2-and-newer-send-the-power-from-a-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shelly (Gen2 and newer): send the power from a script
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#read-it-back-automations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read it back: automations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Read it back: automations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#home-assistant-read-the-surplus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Home Assistant: read the surplus
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-you-see" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1745,6 +1812,73 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#send-live-power-push" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Send live power (push)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Send live power (push)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#home-assistant-send-the-power" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Home Assistant: send the power
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shelly-gen2-and-newer-send-the-power-from-a-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shelly (Gen2 and newer): send the power from a script
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#read-it-back-automations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read it back: automations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Read it back: automations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#home-assistant-read-the-surplus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Home Assistant: read the surplus
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-you-see" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2039,7 +2173,8 @@ is your personal credential, so a manager cannot connect one on your behalf.</p>
 <h3 id="live-data-from-your-own-system">Live data from your own system<a class="headerlink" href="#live-data-from-your-own-system" title="Permanent link">&para;</a></h3>
 <p>A meter that only reports its current power needs no history: on <strong>My metering points</strong> its row says
 <em>Live (now)</em> and <em>Not connected</em>, with its own <strong>Connect</strong>. Choose <strong>Own system</strong> and your system (Home
-Assistant, Shelly, a script) sends the current power with a push token, as described below. Where a
+Assistant, Shelly, a script) sends the current power with a push token, as described under
+<a href="#send-live-power-push">Send live power</a>. Where a
 point could provide both history and live data and neither is connected yet, a single <strong>Connect energy
 data</strong> at the bottom of the card starts both together; with only one missing, the <strong>Connect</strong> in its row
 is the only button. A community manager connects live data for meters nobody holds personally and for
@@ -2124,6 +2259,118 @@ columns are:</p>
 <p>Semicolons and decimal commas (as in a Swiss Excel export) are accepted. Choose
 <strong>Check file</strong> first: it reports the problems row by row and imports nothing.
 <strong>Import</strong> stores the file only if <strong>every</strong> row is valid.</p>
+<h2 id="send-live-power-push">Send live power (push)<a class="headerlink" href="#send-live-power-push" title="Permanent link">&para;</a></h2>
+<p>A live source reports the <strong>current power</strong> instead of kWh per quarter hour. Choose <em>Live data</em> and
+<strong>Own system / file</strong> when you connect; the push token is shown once, exactly as for the history above.
+Send one value every 10 seconds (the server accepts one every 5 seconds and answers <code>429</code> with a
+<code>Retry-After</code> header if you are faster):</p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">"https://your-openzev.example.com/api/v1/metering/live/ingest/"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer ozs_abcd1234_yourtoken"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"meter_power_w": -3120.5}'</span>
+</code></pre></div>
+<ul>
+<li><strong><code>meter_power_w</code></strong> (required) is the power at <strong>your meter, in watts, signed like the meter</strong>: positive
+  while you draw from the grid or the ZEV, <strong>negative while you feed in</strong>. A producing plant therefore
+  sends a negative number, a flat a positive one, and a household with PV behind its meter the net of both.
+  For the <strong>grid connection point</strong> it is the net power there: positive while the ZEV as a whole imports.</li>
+<li><code>timestamp</code> (optional, with a UTC offset) is when the value was measured; without it the server's
+  receive time is used. A value older than 60 seconds is rejected, and one that is not refreshed within
+  60 seconds counts as missing on the page.</li>
+<li><code>production_w</code> and <code>consumption_w</code> (optional, not negative) are your system's own gross figures, for
+  the <em>Your own system</em> view; the ZEV figures use <code>meter_power_w</code> only.</li>
+<li>Values are kept only briefly, for today's curve, and <strong>not stored as history</strong>. They are never used for billing.</li>
+</ul>
+<h3 id="home-assistant-send-the-power">Home Assistant: send the power<a class="headerlink" href="#home-assistant-send-the-power" title="Permanent link">&para;</a></h3>
+<p>Use the sensor that shows the power at your meter in watts, positive for import, negative for export (the
+name below is a placeholder). The condition skips a tick while the sensor is unavailable, so a gap shows
+as a gap rather than as a zero:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">rest_command</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">openzev_live</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">"https://your-openzev.example.com/api/v1/metering/live/ingest/"</span>
+<span class="w">    </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POST</span>
+<span class="w">    </span><span class="nt">headers</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">Authorization</span><span class="p">:</span><span class="w"> </span><span class="s">"Bearer</span><span class="nv"> </span><span class="s">ozs_abcd1234_yourtoken"</span>
+<span class="w">      </span><span class="nt">Content-Type</span><span class="p">:</span><span class="w"> </span><span class="s">"application/json"</span>
+<span class="w">    </span><span class="nt">payload</span><span class="p">:</span><span class="w"> </span><span class="s">'{"meter_power_w":</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">power</span><span class="nv"> </span><span class="s">}}}'</span>
+
+<span class="nt">automation</span><span class="p">:</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Send live power to OpenZEV</span>
+<span class="w">    </span><span class="nt">trigger</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">platform</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">time_pattern</span>
+<span class="w">        </span><span class="nt">seconds</span><span class="p">:</span><span class="w"> </span><span class="s">"/10"</span>
+<span class="w">    </span><span class="nt">condition</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">template</span>
+<span class="w">        </span><span class="nt">value_template</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">states('sensor.grid_power')</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">is_number</span><span class="nv"> </span><span class="s">}}"</span>
+<span class="w">    </span><span class="nt">action</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">service</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rest_command.openzev_live</span>
+<span class="w">        </span><span class="nt">data</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">power</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">states('sensor.grid_power')</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">float</span><span class="nv"> </span><span class="s">}}"</span>
+</code></pre></div>
+<h3 id="shelly-gen2-and-newer-send-the-power-from-a-script">Shelly (Gen2 and newer): send the power from a script<a class="headerlink" href="#shelly-gen2-and-newer-send-the-power-from-a-script" title="Permanent link">&para;</a></h3>
+<p>On a Shelly Pro 3EM, open <strong>Scripts</strong>, create a script, paste the following and enable <em>Run on startup</em>.
+It reads the total active power of the meter (positive for import, negative for export) every 10 seconds:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">let</span><span class="w"> </span><span class="nx">URL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://your-openzev.example.com/api/v1/metering/live/ingest/"</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="nx">TOKEN</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ozs_abcd1234_yourtoken"</span><span class="p">;</span>
+
+<span class="nx">Timer</span><span class="p">.</span><span class="nx">set</span><span class="p">(</span><span class="mf">10000</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="nx">em</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">Shelly</span><span class="p">.</span><span class="nx">getComponentStatus</span><span class="p">(</span><span class="s2">"em:0"</span><span class="p">);</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">em</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="ow">typeof</span><span class="w"> </span><span class="nx">em</span><span class="p">.</span><span class="nx">total_act_power</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="s2">"number"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="p">;</span><span class="w"> </span><span class="c1">// nothing to report: send nothing rather than a zero</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="nx">Shelly</span><span class="p">.</span><span class="nx">call</span><span class="p">(</span><span class="s2">"HTTP.Request"</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s2">"POST"</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">url</span><span class="o">:</span><span class="w"> </span><span class="nx">URL</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s2">"Authorization"</span><span class="o">:</span><span class="w"> </span><span class="s2">"Bearer "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nx">TOKEN</span><span class="p">,</span><span class="w"> </span><span class="s2">"Content-Type"</span><span class="o">:</span><span class="w"> </span><span class="s2">"application/json"</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nx">body</span><span class="o">:</span><span class="w"> </span><span class="nb">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">({</span><span class="w"> </span><span class="nx">meter_power_w</span><span class="o">:</span><span class="w"> </span><span class="nx">em</span><span class="p">.</span><span class="nx">total_act_power</span><span class="w"> </span><span class="p">}),</span>
+<span class="w">    </span><span class="nx">timeout</span><span class="o">:</span><span class="w"> </span><span class="mf">5</span><span class="p">,</span>
+<span class="w">  </span><span class="p">});</span>
+<span class="p">});</span>
+</code></pre></div>
+<p>Other devices report the same figure under another name: a Shelly EM Gen3 or Pro EM has it as
+<code>em1:0</code> with <code>act_power</code>, a Plug or Pro 1PM as <code>switch:0</code> with <code>apower</code> (a consumer, never negative).
+Check the sign once: with the plant running and nothing else on, the value must be negative. If it is
+the other way round, send <code>-em.total_act_power</code>. The Shelly needs <code>https</code> with
+a public certificate, as OpenZEV serves it.</p>
+<h2 id="read-it-back-automations">Read it back: automations<a class="headerlink" href="#read-it-back-automations" title="Permanent link">&para;</a></h2>
+<p>To switch a load on spare power, read the participant's own live view with a
+<a href="../16-api-keys/">personal API key</a> (a <strong>read-only</strong> key is enough):</p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Api-Key ozv_3f9a1c04b7e2_kR8vN2pQ..."</span><span class="w"> </span><span class="se">\</span>
+<span class="w">     </span>https://your-openzev.example.com/api/v1/metering/live/me/
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">"zevs"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span>
+<span class="w">  </span><span class="nt">"zev_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"…"</span><span class="p">,</span><span class="w"> </span><span class="nt">"zev_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ZEV Sonnenhof"</span><span class="p">,</span><span class="w"> </span><span class="nt">"tier"</span><span class="p">:</span><span class="w"> </span><span class="s2">"exact"</span><span class="p">,</span><span class="w"> </span><span class="nt">"as_of"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-11-03T11:02:10Z"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"production_w"</span><span class="p">:</span><span class="w"> </span><span class="mf">8000.0</span><span class="p">,</span><span class="w"> </span><span class="nt">"surplus_w"</span><span class="p">:</span><span class="w"> </span><span class="mf">3000.0</span><span class="p">,</span><span class="w"> </span><span class="nt">"local_share_pct"</span><span class="p">:</span><span class="w"> </span><span class="mf">100.0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"own_consumption_w"</span><span class="p">:</span><span class="w"> </span><span class="mf">1200.0</span><span class="p">,</span><span class="w"> </span><span class="nt">"own_local_w"</span><span class="p">:</span><span class="w"> </span><span class="mf">1200.0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"forecast_next_peak"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"from"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-11-03T10:00:00Z"</span><span class="p">,</span><span class="w"> </span><span class="nt">"to"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-11-03T14:00:00Z"</span><span class="p">,</span><span class="w"> </span><span class="nt">"peak_w"</span><span class="p">:</span><span class="w"> </span><span class="mf">7900.0</span><span class="p">}</span>
+<span class="p">}]}</span>
+</code></pre></div>
+<p>One entry per ZEV you take part in. <code>surplus_w</code>, <code>local_share_pct</code> and <code>own_local_w</code> are <code>null</code> unless <code>tier</code>
+is <code>exact</code>; <code>production_w</code> is <code>null</code> at tier <code>none</code>. Do not read a missing number as zero: <strong>test the tier</strong>.
+<code>forecast_next_peak</code> is the coming window of highest expected production, <code>null</code> without a forecast.
+A key may make 720 requests an hour; every 30 seconds is plenty.</p>
+<h3 id="home-assistant-read-the-surplus">Home Assistant: read the surplus<a class="headerlink" href="#home-assistant-read-the-surplus" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">rest</span><span class="p">:</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">resource</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://your-openzev.example.com/api/v1/metering/live/me/</span>
+<span class="w">    </span><span class="nt">scan_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+<span class="w">    </span><span class="nt">headers</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">Authorization</span><span class="p">:</span><span class="w"> </span><span class="s">"Api-Key</span><span class="nv"> </span><span class="s">ozv_3f9a1c04b7e2_kR8vN2pQ..."</span>
+<span class="w">    </span><span class="nt">sensor</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">OpenZEV surplus</span>
+<span class="w">        </span><span class="nt">unique_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openzev_surplus</span>
+<span class="w">        </span><span class="nt">value_template</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">value_json.zevs[0].surplus_w</span><span class="nv"> </span><span class="s">}}"</span>
+<span class="w">        </span><span class="nt">unit_of_measurement</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">W</span>
+<span class="w">        </span><span class="nt">device_class</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">power</span>
+<span class="w">        </span><span class="nt">json_attributes_path</span><span class="p">:</span><span class="w"> </span><span class="s">"$.zevs[0]"</span>
+<span class="w">        </span><span class="nt">json_attributes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">tier</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">local_share_pct</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">production_w</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">own_local_w</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">forecast_next_peak</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">as_of</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p>The sensor is <code>unknown</code> while the surplus is not exact, so an automation that starts the washing machine
+or charges the car should use a <code>numeric_state</code> trigger on the sensor, for example above 2000 W for two
+minutes, and check <code>state_attr('sensor.openzev_surplus', 'tier') == 'exact'</code>. In n8n use an HTTP Request
+node with the same header. Managers and viewers can ask the same of an
+<a href="../19-ai-assistants/">AI assistant</a> (tool <code>live_energy</code>).</p>
 <h2 id="what-you-see">What you see<a class="headerlink" href="#what-you-see" title="Permanent link">&para;</a></h2>
 <h3 id="my-energy-system">My energy system<a class="headerlink" href="#my-energy-system" title="Permanent link">&para;</a></h3>
 <p>Everything your own devices report lives on the page <strong>My energy system</strong> in the
@@ -2311,6 +2558,9 @@ ID is the one of your installation, not your login name.</p>
 page open, so open it and wait half a minute. If the connection shows <strong>Reconnect needed</strong>, the key no
 longer works for history and live alike: choose <strong>Reconnect</strong> and enter a new key. <strong>Test</strong> reads one
 current-power value to check the connection.</p>
+<p><strong>A push to the live endpoint answers <code>429</code>.</strong> You send faster than every 5 seconds, or from several scripts with the
+same token. Send every 10 seconds from one place. <code>403</code> means the source is switched off or the meter is
+no longer yours; <code>400</code> with <em>older than 60 seconds</em> means the device's clock is wrong.</p>
 <p><strong>The server says the key cannot be stored.</strong> The platform administrator has not
 set up the encryption key for integrations (<code>INTEGRATION_ENCRYPTION_KEYS</code>). Push
 and file import still work without it.</p>

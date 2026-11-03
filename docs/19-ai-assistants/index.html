@@ -1785,7 +1785,7 @@ endpoint. A participant's key is refused with <code>403</code>.</p>
 <code>https://your-openzev.example.com/api/v1/mcp/</code>, and set <strong>Authentication</strong> to
 a header credential: <code>Authorization: Bearer ozv_3f9a1c04b7e2_kR8vN2pQ...</code>.</p>
 <h2 id="what-you-can-ask">What you can ask<a class="headerlink" href="#what-you-can-ask" title="Permanent link">&para;</a></h2>
-<p>Once connected, the assistant has ten tools. You do not need to know their
+<p>Once connected, the assistant has eleven tools. You do not need to know their
 names — asking a normal question is enough — but knowing what exists helps
 you phrase a better question:</p>
 <table>
@@ -1833,6 +1833,10 @@ you phrase a better question:</p>
 <td>Which metering points are missing readings, and where?</td>
 </tr>
 <tr>
+<td><code>live_energy</code></td>
+<td>What the ZEV produces and uses right now, how much is spare, which metering points report, and when production is expected to peak (only when live energy data is switched on; indicative, never billing)</td>
+</tr>
+<tr>
 <td><code>audit_query</code></td>
 <td>Who did what, and when?</td>
 </tr>
@@ -1850,6 +1854,8 @@ you phrase a better question:</p>
 <li>"Which participants used the most electricity last quarter, and how much of it was solar?"</li>
 <li>"When in the day does Anna Muster use the most electricity, and how much of that is covered by solar?"</li>
 <li>"Which metering points have gaps in the last 30 days?"</li>
+<li>"How much is ZEV Sonnenhof producing right now, and is anything spare?"</li>
+<li>"When is production expected to peak tomorrow?"</li>
 <li>"Who approved invoices for ZEV Sonnenhof last week?"</li>
 </ul>
 <h2 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">&para;</a></h2>
