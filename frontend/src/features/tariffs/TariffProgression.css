@@ -1,0 +1,90 @@
+/* ── Combined tariff progression ─────────────────────────────────────────── */
+
+.tariff-progression-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1.25rem;
+}
+
+.tariff-progression-controls > label,
+.tariff-progression-controls > fieldset {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.tariff-progression-basis {
+  display: flex;
+  gap: 0.25rem 1rem;
+  flex-wrap: wrap;
+}
+
+.tariff-progression-basis label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.tariff-progression-chart {
+  padding: 0.75rem 0.5rem 0.25rem;
+}
+
+.tariff-progression-notices {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tariff-progression-composition-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.tariff-progression-line-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tariff-progression-composition td.numeric,
+.tariff-progression-composition th.numeric,
+.tariff-progression-fees td.numeric,
+.tariff-progression-fees th.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tariff-progression-subtotal th,
+.tariff-progression-subtotal td {
+  font-weight: 600;
+}
+
+.tariff-progression-component {
+  padding-left: 1.5rem;
+}
+
+.tariff-progression-component > .muted,
+.tariff-progression-fees td > .muted {
+  display: block;
+  font-size: 0.8rem;
+}
+
+.tariff-progression-line-picker > span {
+  white-space: nowrap;
+}
+
+.tariff-progression-fees caption {
+  padding: 0.75rem 0 0.35rem;
+  font-weight: 600;
+  text-align: left;
+}

@@ -773,6 +773,46 @@ its price moved over time; open **History** to see the chart.
   itself did not change. A note under the title says so. A tariff with a
   single flat band still shows one line, exactly as before bands existed.
 
+### Price Progression
+
+The price history above follows **one** tariff. To see what **one kWh costs in
+total** and how that moved over the years, click **Price progression** in the
+header of the Tariffs page. It adds up every per-kWh tariff that applies, the
+way an invoice would price a kWh, and is read-only for everyone who can open
+the tariffs.
+
+![The price progression page](screenshots/07g-tariff-progression.png)
+
+- **One energy type at a time.** Choose grid, local or feed-in. Energy, grid
+  fees, levies and metering tariffs of that type are summed; types are never
+  mixed, and a feed-in credit is its own view.
+- **One line per band.** The total depends on when the energy is used, so each
+  distinct time of use (for example *Mon–Fri 07:00–20:00* and *all other
+  hours*) is its own stepped line. When a tariff changes its hours, the old
+  line ends and a new one starts.
+- **Net and gross.** The community's VAT setting decides what you can switch
+  between. *VAT-registered:* **Excl. VAT** and **Incl. VAT**. *Not registered,
+  upstream VAT folded into prices:* the **published price** and the **billed
+  price**, where only the tariffs that carry VAT (grid energy, grid fees,
+  levies, metering) are grossed. *Not registered:* one value, because prices are
+  billed as entered. The VAT rate in force on each day is used, so a rate change
+  shows as a step even when no tariff changed.
+- **The price on a day.** Under the chart, the table breaks one line down on a
+  chosen day into **subtotals per category** and the tariffs behind them. Click
+  the chart, or pick the line, to change what it shows. A percentage tariff
+  states its share and the grid price it was taken of.
+- **What is missing is marked.** A stretch where a category has nothing in force,
+  or where a tariff cannot be priced here, is shaded red and named under the
+  chart, because the total there is **understated**. **Dynamic tariffs** (a
+  fetched price series) are not included: they have no bands to add up.
+- **Fixed fees are separate.** Monthly, yearly, per-metering-point and shared
+  fees are not per kWh, so they are listed below with their own unit and never
+  added to the price. A shared fee shows what the **whole community** pays, split
+  by headcount or weight, not one participant's share.
+
+The view is kept in the address, so you can share a link to it, and a date range
+limits both the chart and the fixed fees.
+
 ### Renaming
 
 Renaming is done for the **whole tariff**, not per version — the name is what

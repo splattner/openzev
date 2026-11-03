@@ -1334,6 +1334,86 @@ export interface TariffSeries {
     versions: TariffVersion[]
 }
 
+/** How the ZEV treats VAT; it decides whether a progression has a gross value. */
+export type TariffProgressionVatMode = 'not_registered' | 'registered' | 'inclusive'
+export type TariffProgressionEnergyType = 'grid' | 'local' | 'feed_in'
+export type TariffProgressionIncompleteReason = 'dynamic' | 'dynamic_base' | 'no_bands'
+
+/** When a line applies: months, weekdays (0 = Monday) and windows (`from > to` wraps midnight). */
+export interface TariffProgressionRule {
+    months: number[]
+    weekdays: number[]
+    windows: Array<{ from: string, to: string }>
+}
+
+export interface TariffProgressionComponent {
+    tariff_id: string
+    name: string
+    billing_mode: 'energy' | 'percentage_of_energy'
+    band_period_id: string
+    net: string
+    gross: string | null
+    /** Only on a percentage-of-energy component. */
+    percentage: string | null
+    base_net: string | null
+}
+
+export interface TariffProgressionSubtotal {
+    category: Tariff['category']
+    net: string
+    gross: string | null
+    components: TariffProgressionComponent[]
+}
+
+export interface TariffProgressionSlot {
+    line: string
+    net: string
+    /** Null when the ZEV is not VAT-registered. */
+    gross: string | null
+    categories: TariffProgressionSubtotal[]
+}
+
+export interface TariffProgressionInterval {
+    from: string
+    to: string
+    vat_rate: string | null
+    /** Categories with nothing in force: the total is understated. */
+    missing_categories: Array<Tariff['category']>
+    incomplete: Array<{ tariff_id: string, name: string, reason: TariffProgressionIncompleteReason }>
+    /** Empty when nothing priceable is in force. */
+    slots: TariffProgressionSlot[]
+}
+
+export interface TariffProgressionFixedFee {
+    name: string
+    category: Tariff['category']
+    billing_mode: TariffBillingMode
+    unit: 'month' | 'year'
+    scope: 'participant' | 'metering_point' | 'community'
+    split_key: 'equal' | 'weight' | null
+    versions: Array<{
+        tariff_id: string
+        valid_from: string
+        valid_to: string | null
+        amount_net: string
+        amount_gross: string | null
+        vat_rate: string | null
+    }>
+}
+
+/** `GET /tariffs/tariffs/progression/`: the combined per-kWh price over time. */
+export interface TariffProgression {
+    zev: string
+    energy_type: TariffProgressionEnergyType
+    vat_mode: TariffProgressionVatMode
+    from: string
+    to: string
+    expected_categories: Array<Tariff['category']>
+    lines: Array<{ key: string, rules: TariffProgressionRule[] }>
+    intervals: TariffProgressionInterval[]
+    fixed_fees: TariffProgressionFixedFee[]
+}
+
 /**
  * Body for new-version / duplicate. Prices are optional: omitting them copies
  * the source version's, which is what a pure validity shift wants.

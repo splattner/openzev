@@ -2176,6 +2176,78 @@ export const en = {
             },
             allWeekdays: 'every day',
             chfPerKwh: 'CHF/kWh',
+            progression: {
+                link: 'Price progression',
+                back: 'Back to tariffs',
+                title: 'Price progression',
+                description: 'What one kWh costs over time: every per-kWh tariff of an energy type added up, by time of use.',
+                allHours: 'All hours',
+                chartTitle: 'Price per kWh over time',
+                controls: {
+                    energyType: 'Energy type',
+                    from: 'From',
+                    to: 'To',
+                    wholeHistory: 'Whole history',
+                },
+                basis: {
+                    label: 'Show',
+                    not_registered: {
+                        note: 'This community is not VAT-registered: prices are billed as entered, so there is one value.',
+                    },
+                    registered: {
+                        net: 'Excl. VAT',
+                        gross: 'Incl. VAT',
+                    },
+                    inclusive: {
+                        net: 'Published price',
+                        gross: 'Billed price (incl. VAT)',
+                    },
+                },
+                issues: {
+                    missing: 'Nothing in force for {{subject}} from {{from}} to {{to}}: the total is understated.',
+                    dynamic: '{{subject}} is priced from a fetched series and is not included from {{from}} to {{to}}.',
+                    dynamic_base: '{{subject}} follows a fetched grid price and is not included from {{from}} to {{to}}.',
+                    no_bands: '{{subject}} has no price bands and is not included from {{from}} to {{to}}.',
+                },
+                composition: {
+                    title: 'Price on {{date}}',
+                    line: 'Time of use',
+                    none: 'No price for this time of use on this date.',
+                    caption: 'Charges making up the price for {{line}}',
+                    charge: 'Charge',
+                    total: 'Total',
+                    percentageOf: '{{percentage}} % of CHF {{base}}',
+                },
+                fees: {
+                    title: 'Fixed fees',
+                    intro: 'Fees are not charged per kWh, so they are not part of the price above. A shared fee is the amount the whole community pays.',
+                    month: 'Per month',
+                    year: 'Per year',
+                    name: 'Fee',
+                    scope: 'Charged',
+                    since: 'Since',
+                    amount: {
+                        month: 'CHF / month',
+                        year: 'CHF / year',
+                    },
+                    scopes: {
+                        participant: 'Per participant',
+                        metering_point: 'Per metering point',
+                        community: 'Shared by the community',
+                    },
+                    split: {
+                        equal: 'split equally by headcount',
+                        weight: 'split by weight',
+                    },
+                },
+                errors: {
+                    tooManyBands: 'There are too many different time-of-use bands in this range to draw. Choose a shorter date range.',
+                },
+                empty: {
+                    title: 'No per-kWh tariffs',
+                    description: 'There is no tariff for this energy type yet, so there is nothing to add up. Try another energy type.',
+                },
+            },
             priceHistory: {
                 title: 'Price history',
                 derivedNote: 'Calculated from the grid tariffs in force at the time, so it also changes when those do.',

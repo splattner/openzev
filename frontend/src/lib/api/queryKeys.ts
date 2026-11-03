@@ -34,6 +34,8 @@ export const queryKeys = {
   },
   tariffs: {
     series: (zevId?: string) => ['tariffs', 'series', zevId ?? 'all'] as const,
+    progression: (zevId: string, energyType: string, from?: string, to?: string) =>
+      ['tariffs', 'progression', zevId, energyType, from ?? '', to ?? ''] as const,
     // Global, not per-ZEV: every community's tariff form reads the same list.
     dynamicSources: () => ['tariffs', 'dynamic-sources'] as const,
     dynamicPrices: (sourceId: string, dateFrom: string, dateTo: string) =>
