@@ -1,7 +1,7 @@
 # Feature Spec: Combined tariff progression (Tarifverlauf)
 
 - Spec ID: SPEC-2026-tariff-progression
-- Status: Draft
+- Status: In Progress
 - Scope: Minor
 - Type: Feature
 - Owners: Sebastian Plattner
@@ -131,10 +131,12 @@ the engine.
 
 ### 5.2 Date range and intervals
 
-- `from` defaults to the earliest `valid_from` of the displayed set; `to` to
-  `max(today, latest valid_from of the displayed set)` (an open-ended version is
-  drawn to that day, as `terminalBoundary` does in the existing chart). Both are
-  inclusive; `from > to` is a 400.
+- `from` defaults to the earliest `valid_from` of the tariffs of the requested
+  energy type; `to` to the latest end among them, where an open-ended version
+  ends at `max(today, its valid_from)` (drawn to today, as `terminalBoundary`
+  does in the existing chart, and to a scheduled change when that lies later).
+  Both are inclusive; `from > to` is a 400. Without any tariff of the type there
+  are no intervals, however long the range.
 - **Breakpoints:** every `valid_from` and every `valid_to + 1 day` of every tariff
   in the displayed and base sets, plus (only when `vat_mode != not_registered`)
   every `VatRate.valid_from` and `valid_to + 1 day`, clipped to `[from, to]`.
@@ -233,9 +235,11 @@ For each slot, components are grouped by `Tariff.category` in
 `TariffCategory` order (energy, grid_fees, levies, metering; `other` cannot be a
 tariff). A category's subtotal is the sum of its components (`net` and `gross`);
 the slot `total` is the sum of the subtotals. `expected_categories` (top level)
-is the set of categories that have at least one displayed tariff anywhere in the
-range; an interval's `missing_categories` is `expected_categories` minus the
-categories active in it. A missing category means the total is **understated**
+is the set of categories that have at least one displayed tariff with bands
+overlapping the range; an interval's `missing_categories` is
+`expected_categories` minus the categories that have *anything* in force in it
+(a tariff reported under `incomplete` still counts as in force, so one problem is
+not marked twice). A missing category means the total is **understated**
 for that interval, so the page marks it (§8).
 
 ### 5.7 Gaps
@@ -252,7 +256,8 @@ version, so the figure is the truth, and the mark tells the user why it is low.
 `per_metering_point_yearly_fee`, `shared_monthly_fee`, `shared_yearly_fee`,
 regardless of `energy_type` and of the requested type. Grouped by
 `series_key`; each version is a row, split at VAT-rate changes when
-`vat_mode != not_registered`:
+`vat_mode != not_registered`. All versions are returned, or only those
+overlapping the requested `from`/`to` when either is given:
 
 | Field | Meaning |
 |---|---|
@@ -260,7 +265,7 @@ regardless of `energy_type` and of the requested type. Grouped by
 | `scope` | `participant` (`monthly_fee`, `yearly_fee`), `metering_point` (`per_metering_point_*`), `community` (`shared_*`) |
 | `split_key` | `equal` or `weight` for `community`, else `null` |
 | `amount_net` | `fixed_price_chf` (for `community`: what the community pays, not a participant's share) |
-| `amount_gross` | by §5.5 with the same classifier (`registered`: `× (1 + rate)`; `inclusive`: only if the tariff bears input VAT; else `null`/`net`) |
+| `amount_gross` | by §5.5 with the same classifier: `registered` `× (1 + rate)`; `inclusive` `× (1 + rate)` only if the tariff bears input VAT, else equal to `amount_net`; `null` under `not_registered` |
 | `vat_rate` | the rate used for the row, `null` under `not_registered` |
 
 Fee amounts are never added to each other or to the per-kWh total, and amounts of
@@ -362,9 +367,10 @@ slot's net grid base); other components carry `null` for both.
 | 404 | ZEV not visible to the caller |
 | 422 | `{"detail": "...", "code": "too_many_bands"}` |
 
-Cost: at most four queries (ZEV, tariffs with `prefetch_related("periods")`,
-`VatRate` rows overlapping the range, and the scope lookup); everything else is in
-memory.
+Cost: a constant number of queries, independent of the number of tariffs (the
+ZEV, the tariffs with `prefetch_related("periods")`, the `VatRate` rows, plus the
+authentication and access lookups); everything else is in memory.
+`test_the_query_count_is_bounded` pins it at eight with twelve tariffs.
 
 ## 7. Async and integration behavior
 
@@ -390,7 +396,10 @@ no cache. Dynamic prices are not read (§5.9).
 ### 8.2 Page
 
 **File:** `frontend/src/pages/TariffProgressionPage.tsx`, feature code in
-`frontend/src/features/tariffs/progression/`.
+`frontend/src/features/tariffs/progression/` (`progression.ts` pure functions,
+`TariffProgressionView.tsx`, `TariffProgressionChart.tsx`,
+`ProgressionComposition.tsx`, `ProgressionFixedFees.tsx`) and
+`features/tariffs/TariffProgression.css`.
 
 - `useManagedZev` supplies `selectedZevId`; `ScopeGuard` and `useScopeNote` as on
   the tariffs page. Without a selected ZEV: the shared empty state.
@@ -401,15 +410,19 @@ no cache. Dynamic prices are not read (§5.9).
 - **Controls** (state in URL params so a view can be linked and survives reload:
   `energy`, `from`, `to`, `basis`, `date`, `line`):
   - Energy type: grid (default), local, feed-in.
-  - Date range: two date inputs, blank = whole history.
+  - Date range: two `CivilDateInput`s, placeholder "Whole history" (it gained
+    optional `ariaLabel` and `placeholder` props for this).
   - **Net / gross toggle**, shown only when `vat_mode != not_registered`. Labels
     by mode: `registered` "Excl. VAT / Incl. VAT"; `inclusive` "Published price /
     Billed price". Under `not_registered` one series, titled "Price", no toggle.
 - **Chart** (`TariffProgressionChart.tsx`): stepped lines, one per `lines[]`, built
-  by `progressionChart.ts` (same step assembly as `priceHistory.ts`: a point at
-  every interval boundary; `null` before a line's first appearance and during a
-  gap so the line breaks). Intervals with `missing_categories` or `incomplete` are
-  hatched, with a notice below listing what is missing and from when. Uses the
+  by `buildChartData` in `progression.ts` (same step assembly as `priceHistory.ts`:
+  a point at every interval boundary and one at the end; `null` before a line's
+  first appearance and during a gap so the line breaks). Intervals with
+  `missing_categories`, `incomplete` or no slots are shaded red like the existing
+  chart's gaps, with a notice below listing what is missing and from when
+  (`progressionIssues` merges consecutive intervals). Each line also has its own
+  dash pattern. Uses the
   colourblind-safe palette and tokens of `TariffPriceHistoryChart.css`; no raw
   colour literals (hex sweep). Each line is named in a direct legend from its
   rules, so colour is never the only cue. A click on the chart sets `date`.
@@ -526,7 +539,8 @@ hard-coded text.
 - `docs/user-guide/07-tariff-configuration.md`: a "Price progression" section
   (what it sums, the energy-type choice, bands as lines, net vs gross per VAT
   mode, why fixed fees are separate, what "not included" means); a screenshot
-  `07e-tariff-progression.png` added to the `npm run screenshots` set.
+  `07g-tariff-progression.png` added to the `npm run screenshots` set
+  (`07e` was taken). Done in the implementation PR.
 - `docs/specs/2026-03-tariffs-and-billing-engine.md`: the endpoint and its
   correspondence to `_price_energy` / §4.8.
 - `docs/specs/2026-10-tariff-split-view.md`: the page-header link (§4) and that
@@ -537,114 +551,130 @@ hard-coded text.
 
 ## 10. Test plan
 
-### Backend — `invoices/test_tariff_progression.py` (computation)
+### Backend — `invoices/test_tariff_progression.py` (computation, 44 tests, 51 cases)
 
-**`TestIntervals`** (6 tests):
+A fixture clears the Swiss VAT rates a migration seeds, so each test chooses its
+own. Tariffs are built with `factories.TariffFactory` and `TariffPeriodFactory`.
+
+**`TestIntervals`** (7 tests):
 
 | Test | Asserts |
 |---|---|
-| `test_sum_changes_at_each_version_boundary` | Two tariffs with offset version dates give a new interval, and a new sum, at every boundary |
-| `test_valid_to_is_inclusive` | The new interval starts the day after `valid_to` |
-| `test_open_ended_version_runs_to_today` | Default `to` is today, or the latest `valid_from` if later |
-| `test_range_clips_intervals` | `from`/`to` cut the first and last interval |
-| `test_gap_gives_empty_interval` | A day with nothing active gives `slots: []` |
+| `test_sum_changes_at_each_version_boundary` | Energy and grid-fee versions with offset dates give an interval, and a new sum, at each boundary |
+| `test_valid_to_is_inclusive` | The next interval starts the day after `valid_to` |
+| `test_open_ended_version_runs_to_today` | Default range ends today |
+| `test_range_clips_intervals` | `date_from`/`date_to` cut the first and last interval |
+| `test_gap_gives_empty_interval` | No slots, and the category is missing |
 | `test_unchanged_price_new_version_is_still_an_interval` | Intervals are not merged |
+| `test_no_tariffs_gives_an_empty_progression` | No intervals, lines or fees |
 
 **`TestSlots`** (9 tests):
 
 | Test | Asserts |
 |---|---|
-| `test_flat_tariffs_make_one_line` | One line, all months, weekdays, all day |
-| `test_ht_nt_beside_flat_fee_gives_two_lines` | Two lines; the flat tariff's price is in both |
-| `test_misaligned_windows_give_three_or_more_slots` | 06–22 beside 07–20 splits at both edges |
-| `test_seasonal_band_splits_by_months` | Winter HT/NT beside summer flat gives three lines |
-| `test_wrapping_window_is_one_window` | 20:00–07:00 reported as `{from: "20:00", to: "07:00"}` |
-| `test_same_when_in_two_intervals_shares_a_line` | Equal signature, same `line` key |
-| `test_changed_window_starts_a_new_line` | Different signature, new key, old line ends |
-| `test_line_order_is_all_hours_first` | Ordering rule of §5.3 |
-| `test_too_many_bands_is_refused` | More than 24 slots raises `TooManyBands` |
+| `test_flat_tariffs_make_one_line` | One line, every month and weekday, all day |
+| `test_ht_nt_beside_a_flat_tariff_gives_two_lines` | HT and NT slots, the flat price in both |
+| `test_wrapping_window_is_one_window` | 20:00–07:00 is one window; weekends are all day |
+| `test_misaligned_windows_split_at_both_edges` | 06–22 beside 07–20 gives three prices |
+| `test_seasonal_bands_split_by_months` | Winter HT/NT beside summer flat gives three lines |
+| `test_the_same_when_in_two_intervals_shares_a_line` | Equal signature, same key |
+| `test_a_changed_window_starts_a_new_line` | Disjoint lines before and after; four in all |
+| `test_the_all_hours_line_comes_first` | Ordering of §5.3 |
+| `test_too_many_bands_is_refused` | `TooManyBands` over the limit |
 
-**`TestPricing`** (7 tests):
+**`TestPricing`** (7 tests, 9 cases):
 
 | Test | Asserts |
 |---|---|
-| `test_category_subtotals_add_up_to_total` | Σ subtotals == total, per slot |
-| `test_category_order_is_tariff_category_order` | energy, grid_fees, levies, metering |
-| `test_energy_type_filter_excludes_other_types` | Local view never contains grid components |
-| `test_feed_in_is_a_separate_view` | Feed-in components only, never netted |
-| `test_missing_category_is_reported` | `missing_categories` lists the category with no active version |
-| `test_tariff_without_bands_is_incomplete` | `no_bands`, left out of the sum |
-| `test_matches_engine_price_for_sample_timestamps` | For a timestamp in every slot, the slot's `net` equals what `_price_energy` bills per kWh; parametrised over the three `vat_mode`s for `gross` |
+| `test_category_subtotals_add_up_to_the_total` | Subtotals in category order add up |
+| `test_components_are_listed_under_their_category` | Component fields |
+| `test_the_energy_type_filter_excludes_other_types` | Grid and local views are separate |
+| `test_feed_in_is_a_separate_view` | Feed-in only |
+| `test_a_missing_category_is_reported` | `expected_categories`, `missing_categories` |
+| `test_a_tariff_without_bands_is_incomplete` | `no_bands`, left out of the sum |
+| `test_matches_the_engine_price_for_sample_timestamps` (3 cases: `not_registered`, `registered`, `inclusive`) | Per sample timestamp, the slot's price equals what `_price_energy` bills, grossed as the engine does, for grid and local views |
 
 **`TestPercentage`** (6 tests):
 
 | Test | Asserts |
 |---|---|
-| `test_percentage_uses_grid_band_at_same_slot` | HT percentage line = pct × HT grid base |
-| `test_percentage_follows_grid_version_change` | A grid version change is a breakpoint for the local line |
-| `test_percentage_zero_band_contributes_nothing` | 0 % band, no base resolved |
-| `test_inclusive_percentage_uses_gross_base` | `gross = pct × gross_base` for a non-bearing line |
-| `test_inclusive_bearing_percentage_is_not_grossed_twice` | Net base, then `× (1 + rate)` once |
-| `test_dynamic_grid_base_marks_percentage_incomplete` | `dynamic_base` |
+| `test_a_percentage_uses_the_grid_band_at_the_same_slot` | HT and NT local prices follow the grid's bands; `percentage`, `base_net` |
+| `test_a_percentage_follows_a_grid_version_change` | A grid version change is a breakpoint |
+| `test_a_zero_percent_band_contributes_nothing` | No component |
+| `test_inclusive_takes_a_share_of_the_gross_grid_base` | Net 0.15, gross 0.16215 |
+| `test_inclusive_never_grosses_a_bearing_percentage_twice` | Net base, then grossed once |
+| `test_a_dynamic_grid_base_marks_the_percentage_incomplete` | `dynamic_base`, no slots |
+
+**`TestDynamic`** (1 test): `test_a_dynamic_tariff_is_listed_but_not_summed`.
 
 **`TestVat`** (6 tests):
 
 | Test | Asserts |
 |---|---|
-| `test_not_registered_has_no_gross` | `gross` null, `vat_rate` null, no VAT breakpoints |
-| `test_registered_grosses_every_component` | `net × (1 + rate)` |
-| `test_inclusive_grosses_only_bearing_tariffs` | Local and feed-in unchanged |
-| `test_vat_rate_change_is_a_breakpoint` | New interval, new gross, same net |
-| `test_no_active_rate_means_gross_equals_net` | Rate 0 |
-| `test_rounding_is_five_places_half_up` | §5.10 |
+| `test_not_registered_has_no_gross_and_no_vat_breakpoints` | `gross` and `vat_rate` null; one interval |
+| `test_registered_grosses_every_component` | `net × (1 + rate)` for grid and local |
+| `test_inclusive_grosses_only_the_bearing_tariffs` | Grid grossed; local and feed-in not |
+| `test_a_vat_rate_change_is_a_breakpoint` | New interval, same net, new gross |
+| `test_no_active_rate_means_gross_equals_net` | Rate `0.0000` |
+| `test_prices_round_to_five_places_half_up` | §5.10 |
 
-**`TestFixedFees`** (6 tests):
+**`TestFixedFees`** (8 tests, 13 cases):
 
 | Test | Asserts |
 |---|---|
-| `test_fees_are_listed_not_summed` | Not in any slot total |
-| `test_scope_and_unit_per_billing_mode` | All six modes map as §5.8 |
-| `test_shared_fee_reports_community_amount_and_split_key` | No per-participant division |
-| `test_fee_rows_split_at_vat_change` | One row per rate |
-| `test_fee_gross_follows_input_vat_classifier` | `inclusive`: only bearing categories |
-| `test_fees_are_independent_of_requested_energy_type` | Same list for grid and local |
+| `test_fees_are_listed_but_not_summed` | Not in any total |
+| `test_unit_and_scope_per_billing_mode` (6 cases) | All six modes |
+| `test_a_shared_fee_reports_the_community_amount_and_split_key` | `weight`, community amount |
+| `test_only_a_shared_fee_has_a_split_key` | `null` otherwise |
+| `test_fee_rows_split_at_a_vat_change` | One row per rate, gross per rate |
+| `test_fee_gross_follows_the_input_vat_classifier` | `inclusive`: metering grossed, energy not |
+| `test_fees_are_independent_of_the_requested_energy_type` | Same list for grid and local |
+| `test_fee_versions_outside_an_explicit_range_are_left_out` | §5.8 |
 
-### Backend — `tariffs/test_progression_api.py` (endpoint)
+### Backend — `tariffs/test_progression_api.py` (endpoint, 15 tests)
 
-**`TestProgressionApi`** (10 tests):
+**`TestProgressionApi`**:
 
 | Test | Asserts |
 |---|---|
 | `test_requires_authentication` | 401 |
-| `test_zev_id_required` | 400 |
-| `test_invalid_energy_type` | 400 |
-| `test_from_after_to` | 400 |
-| `test_out_of_scope_zev_is_404` | A manager of another ZEV |
-| `test_viewer_can_read` | 200 for a read-only grant |
-| `test_participant_has_no_access` | As for the tariffs list |
-| `test_response_shape` | Keys and types of §6 |
-| `test_too_many_bands_is_422` | Code `too_many_bands` |
-| `test_query_count_is_bounded` | At most four queries, independent of the number of tariffs |
+| `test_zev_id_is_required` | 400 naming `zev_id` |
+| `test_an_unknown_energy_type_is_rejected` | 400 naming `energy_type` |
+| `test_from_after_to_is_rejected` | 400 naming `from` |
+| `test_a_malformed_date_is_named_by_its_query_parameter` | 400 naming `from`, not `date_from` |
+| `test_a_zev_outside_the_callers_scope_is_a_404` | A manager of another ZEV |
+| `test_an_unknown_zev_is_a_404` | An admin, random id |
+| `test_a_viewer_can_read` | 200 for a viewer grant |
+| `test_a_user_with_no_access_is_refused` | 403 or 404 |
+| `test_an_admin_can_read_any_zev` | 200 |
+| `test_the_response_shape` | Keys and values of §6 |
+| `test_too_many_bands_is_a_422` | Code `too_many_bands` |
+| `test_only_the_requested_zevs_tariffs_are_used` | A second ZEV of the same owner is not mixed in |
+| `test_the_query_count_is_bounded` | At most eight queries with twelve tariffs |
+| `test_the_default_range_runs_to_today` | `from` earliest `valid_from`, `to` today |
 
-### Frontend — `frontend/tests/tariff-progression.test.ts` (unit)
+### Frontend — `frontend/tests/tariff-progression.test.ts` (27 tests)
 
-**`progressionChart`** (6 tests): a point at every interval boundary; `null` for a
-line before it exists and across a gap; line keys free of `.`; net/gross
-selection; hatched-interval flags from `missing_categories`/`incomplete`; line
-name from rules (all hours, weekday window, wrapping window). **`composition`**
-(3 tests): lookup by date and line, clamping outside the range, subtotal and total
-rows. **`labels`** (2 tests): net/gross label pair per `vat_mode`; no toggle for
-`not_registered`.
+| Group | Tests |
+|---|---|
+| `buildChartData` (7) | A point per boundary plus the end; `null` where a line does not exist; gross vs net; fallback to net without gross; line keys without `.`; flagged stretches (understated, empty), end exclusive; empty progression |
+| `lookups` (6) | `intervalOn`; `clampDay`; `compositionOn`; `lineOn`; `hasGross`; `valueOf` |
+| `lineLabel` (4) | All hours; weekdays with window; season with wrapping window (`Oct–Mar 20:00–07:00`); several rules |
+| `progressionIssues` (3) | Merges across consecutive intervals; keeps separate stretches apart and names tariffs; none when complete |
+| `fixed fees` (2) | `groupFees`; `feeVersionOn` |
+| `ProgressionComposition` (5) | Components under a category subtotal and a total; gross values; no price on that day; line choice only when there is one; percentage share and base |
 
-Plus a Playwright spec `tariff-progression` (opens from the tariffs header,
-switches energy type and net/gross) and the user-guide screenshot.
+The user-guide screenshot `07g` is the capture test in `screenshots/capture.spec.ts`
+(`npm run screenshots`); there is no separate Playwright spec.
 
 ### Validation
 
 Backend: `ruff check .`, `python manage.py check`, `python -m pytest -q`.
 Frontend: `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-hex.mjs`,
-`npm run test:unit`, `npm run build`. Check the page in the dev stack with demo data
-(`seed_demo`) in each of the three VAT modes, in the console and at ~400px.
+`npm run test:unit`, `npm run build`. The page was checked against a seeded demo
+backend (its ZEV is `inclusive`) at 1440px and 400px, with the console clean; the
+`registered` and `not_registered` presentations rest on the unit tests, not on a
+screenshot of each.
 
 ### Acceptance criteria
 
@@ -690,3 +720,21 @@ Open:
    If #969 changes that, this view follows.
 5. **Slot limit.** 24 is the structural maximum for one tariff, not a usability
    limit; the real figure may be lower after trying realistic data.
+
+## 13. Implementation record
+
+Where the build differs from the first draft of this spec:
+
+- **Default `to`** follows each tariff's own end (a scheduled future change extends
+  the range), not `max(today, latest valid_from)` (§5.2).
+- **`missing_categories`** counts a tariff reported under `incomplete` as in force,
+  so one problem is not marked twice (§5.6).
+- **Fixed fees** accept the requested range (§5.8); `amount_gross` is the net
+  amount, not `null`, for a non-bearing fee under `inclusive`.
+- **Chart:** stretches are shaded, not hatched, as the existing chart shades gaps;
+  each line also has a dash pattern.
+- **Query count** is a constant, pinned at eight in a test, not "four" (§6).
+- **Guide screenshot** is `07g` (`07e` was taken), produced by the capture set; no
+  separate Playwright spec.
+- **`CivilDateInput`** gained optional `ariaLabel` and `placeholder` props.
+
