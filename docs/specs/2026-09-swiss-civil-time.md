@@ -546,6 +546,16 @@ The bulk-delete response type's `timezone` becomes `'Europe/Zurich'`.
 | `test_dynamic_price_matches_offsetless_csv_reading` | CSV `2026-07-01 12:00` (Zurich) is stored at 10:00Z and priced with the 12:00+02:00 interval |
 | `test_mixed_sdat_and_csv_allocate_on_same_instant` | SDAT production at 12:00+02:00 and Zurich-read CSV consumption at 12:00 share one timestamp and the consumption is covered locally |
 
+### Backend — `metering/test_dst_days.py`
+
+11 tests on the two clock-change days, 2026-10-25 (25 h, 100 quarter-hours) and 2026-03-29 (23 h, 92), with one reading per real quarter-hour:
+
+| Class / test | Asserts |
+|---|---|
+| `HourlyProfileDstDayTests` (5) | `/hourly-profile/`: the repeated autumn 02:00 hour doubles bucket 2 (25 kWh over the day), the missing spring hour leaves bucket 2 at 0 (23 kWh); a 3-day average divides by civil days (bucket 2 = 4/3); hourly-resolution readings land in their Swiss hour; an assignment ending on the change day keeps all its slots |
+| `HourlyProfileChartDstDayTests` (2) | The invoice PDF hourly chart draws 24 bars with a double-height hour 2 on the autumn day, and no hour-2 bar on the spring day |
+| `DataQualityDstDayTests` (4) | `/data-quality-status/`: days around both changes are 100 % / green; all 100 and 92 slots belong to the one civil day (neither the first nor the last slot spills over); readings split into assigned/unassigned at local midnight of the change day |
+
 ### Backend — `metering/test_import_timezone.py`
 
 **`ImportTimezoneTests`** (18 tests): `test_csv_offsetless_default_is_zurich`,
