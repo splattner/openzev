@@ -284,6 +284,8 @@ off:
 | `PRIVACY_AUDIT_NETWORK_RETENTION_DAYS` | Days before an audit event's IP address and user agent are blanked. Default 365. |
 | `PRIVACY_EMAIL_LOG_RETENTION_DAYS` | Days before an invoice email attempt's recipient and error text are blanked. Default 730. |
 | `PRIVACY_TOKEN_GRACE_DAYS` | Days after a one-time link stopped working before it is deleted. Default 30. |
+| `PRIVACY_NOTIFICATION_READ_RETENTION_DAYS` | Days after a notification was read before it is deleted. Default 30. |
+| `PRIVACY_NOTIFICATION_UNREAD_RETENTION_DAYS` | Days after a notification arrived before an unread one is deleted. Default 180. |
 
 To see what the windows would remove before the daily job does it, or to run
 it where no scheduler is running, use `manage.py openzev_privacy_sweep

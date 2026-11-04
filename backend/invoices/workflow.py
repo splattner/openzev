@@ -53,6 +53,7 @@ from django.db import transaction
 from django.db.models import F, Sum
 from django.utils import timezone
 
+from notifications import producers as notification_producers
 from zev.models import VatMode
 
 from .models import (
@@ -164,13 +165,15 @@ def approve_invoice(invoice: Invoice) -> dict:
 
 def mark_invoice_sent(invoice: Invoice) -> dict:
     """Transition approved → sent and stamp ``sent_at``. Returns the ``before`` diff dict."""
-    return _lock_and_transition(
+    before = _lock_and_transition(
         invoice,
         allowed_from=InvoiceStatus.APPROVED,
         to_status=InvoiceStatus.SENT,
         invalid_message=lambda _current: "Only approved invoices can be marked as sent.",
         extra_fields={"sent_at": timezone.now()},
     )
+    notification_producers.notify_invoice_sent(invoice)
+    return before
 
 
 def paid_chf(invoice_pk) -> Decimal:
@@ -297,6 +300,8 @@ def record_payment(invoice: Invoice, *, amount_chf: Decimal, paid_on, note: str 
         locked.save(update_fields=["status", "updated_at"])
 
     _mirror_status(invoice, locked)
+    if locked.status == InvoiceStatus.PAID:
+        notification_producers.notify_invoice_paid(invoice)
     return {"status": before_status, "payment": payment}
 
 
@@ -327,6 +332,7 @@ def mark_invoice_paid(invoice: Invoice, *, paid_on=None, user=None) -> dict:
         locked.save(update_fields=["status", "updated_at"])
 
     _mirror_status(invoice, locked)
+    notification_producers.notify_invoice_paid(invoice)
     return {"status": before_status, "payment": payment}
 
 
@@ -563,6 +569,7 @@ def record_email_delivery(invoice: Invoice, sent_at) -> str:
     with transaction.atomic():
         locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
         previous_status = locked.status
+        first_delivery = locked.sent_at is None
         locked.sent_at = sent_at
         locked.updated_at = timezone.now()
         update_fields = ["sent_at", "updated_at"]
@@ -574,6 +581,9 @@ def record_email_delivery(invoice: Invoice, sent_at) -> str:
     invoice.status = locked.status
     invoice.sent_at = locked.sent_at
     invoice.updated_at = locked.updated_at
+    # A resend, or a delivery after the invoice was cancelled, tells the participant nothing new.
+    if first_delivery and locked.status == InvoiceStatus.SENT:
+        notification_producers.notify_invoice_sent(invoice)
     return previous_status
 
 

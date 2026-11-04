@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "privacy",
     "mcp_server",
     "analytics",
+    "notifications",
 ]
 
 MIDDLEWARE = [
@@ -501,3 +502,6 @@ PRIVACY_AUDIT_NETWORK_RETENTION_DAYS = env.int("PRIVACY_AUDIT_NETWORK_RETENTION_
 PRIVACY_EMAIL_LOG_RETENTION_DAYS = env.int("PRIVACY_EMAIL_LOG_RETENTION_DAYS", default=730)
 # Consumed, revoked or expired one-time tokens are deleted this long after they stopped working.
 PRIVACY_TOKEN_GRACE_DAYS = env.int("PRIVACY_TOKEN_GRACE_DAYS", default=30)
+# In-app notifications: read ones go this long after they were read, unread ones this long after they arrived.
+PRIVACY_NOTIFICATION_READ_RETENTION_DAYS = env.int("PRIVACY_NOTIFICATION_READ_RETENTION_DAYS", default=30)
+PRIVACY_NOTIFICATION_UNREAD_RETENTION_DAYS = env.int("PRIVACY_NOTIFICATION_UNREAD_RETENTION_DAYS", default=180)

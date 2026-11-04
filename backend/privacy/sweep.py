@@ -1,6 +1,6 @@
 """Retention for personal data that would otherwise be kept forever (SPEC-2026-10-privacy-retention-sweep).
 
-Three things are swept, each by its own window in settings, and ``0`` turns a
+Four things are swept, each by its own window in settings, and ``0`` turns a
 step off so an operator opts in to nothing they did not ask for:
 
 * **Audit network details.** ``AuditEvent.ip_address`` and ``user_agent`` are
@@ -12,6 +12,9 @@ step off so an operator opts in to nothing they did not ask for:
   ``PRIVACY_EMAIL_LOG_RETENTION_DAYS``. The row is kept, not deleted: the
   newest log per invoice drives the readiness cockpit's "delivery failed" item,
   so deleting it would quietly clear that item for a still-open invoice.
+* **Notifications.** Read in-app notifications are deleted
+  ``PRIVACY_NOTIFICATION_READ_RETENTION_DAYS`` after they were read, unread ones
+  ``PRIVACY_NOTIFICATION_UNREAD_RETENTION_DAYS`` after they arrived.
 * **Spent one-time tokens.** Verification, magic-link and onboarding tokens
   that are consumed, revoked or expired are deleted ``PRIVACY_TOKEN_GRACE_DAYS``
   after they stopped being usable. A token that can still be used is never
@@ -33,11 +36,12 @@ from accounts.models import MAGIC_LINK_LIFETIME, EmailVerificationToken, MagicLi
 from audit.models import AuditActionCategory, AuditEvent, AuditEventSource
 from audit.services import record_audit_event
 from invoices.models import EmailLog
+from notifications.models import Notification
 from zev.models import ParticipantOnboardingToken
 
 ACTION_SWEPT = "privacy.swept"
 
-STEPS = ("audit_network", "email_log", "tokens")
+STEPS = ("audit_network", "email_log", "notifications", "tokens")
 
 
 def _days(name: str) -> int:
@@ -66,6 +70,23 @@ def _email_log(now, dry_run: bool) -> int:
     if dry_run:
         return rows.count()
     return rows.update(recipient="", error_message="")
+
+
+def _notifications(now, dry_run: bool) -> int:
+    """Delete read notifications after the read window and unread ones after the unread window."""
+    expired = Q(pk__in=[])
+    read_days = _days("PRIVACY_NOTIFICATION_READ_RETENTION_DAYS")
+    if read_days:
+        expired |= Q(read_at__lt=now - timedelta(days=read_days))
+    unread_days = _days("PRIVACY_NOTIFICATION_UNREAD_RETENTION_DAYS")
+    if unread_days:
+        expired |= Q(read_at__isnull=True, created_at__lt=now - timedelta(days=unread_days))
+    if not (read_days or unread_days):
+        return 0
+    rows = Notification.objects.filter(expired)
+    if dry_run:
+        return rows.count()
+    return rows.delete()[0]
 
 
 def _spent_tokens(now, dry_run: bool) -> dict[str, int]:
@@ -106,9 +127,10 @@ def sweep(*, dry_run: bool = False, source: str = AuditEventSource.CELERY) -> di
         "dry_run": dry_run,
         "audit_network": _audit_network(now, dry_run),
         "email_log": _email_log(now, dry_run),
+        "notifications": _notifications(now, dry_run),
         "tokens": tokens,
     }
-    report["total"] = report["audit_network"] + report["email_log"] + sum(tokens.values())
+    report["total"] = report["audit_network"] + report["email_log"] + report["notifications"] + sum(tokens.values())
 
     if report["total"] and not dry_run:
         record_audit_event(
@@ -118,6 +140,6 @@ def sweep(*, dry_run: bool = False, source: str = AuditEventSource.CELERY) -> di
             target_display="Privacy retention sweep",
             summary=f"Privacy sweep scrubbed or deleted {report['total']} record(s).",
             source=source,
-            metadata={key: report[key] for key in ("audit_network", "email_log", "tokens")},
+            metadata={key: report[key] for key in STEPS},
         )
     return report

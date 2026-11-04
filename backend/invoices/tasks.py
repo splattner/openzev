@@ -7,6 +7,7 @@ from django.utils import timezone as djtimezone
 from config.safe_format import render_with_fallback
 from audit.models import AuditActionCategory, AuditEventSource, AuditEventStatus
 from audit.services import record_audit_event
+from notifications import producers as notification_producers
 
 from .email_context import build_invoice_email_context
 
@@ -427,6 +428,7 @@ def generate_zev_invoices_task(self, zev_id: str, period_start: str, period_end:
         # Creation never returned — record the abort (see
         # _record_aborted_batch_event for the policy), then re-raise.
         logger.exception("Invoice creation aborted for ZEV %s", zev.name)
+        notification_producers.notify_invoice_generation_failed(zev, period_start, period_end)
         _record_aborted_batch_event(
             action_type="invoice.generate_all",
             zev=zev,
@@ -454,6 +456,7 @@ def generate_zev_invoices_task(self, zev_id: str, period_start: str, period_end:
         # Invoices (and some PDFs) may already be saved — record the abort,
         # then re-raise.
         logger.exception("Invoice generation aborted after saving %d invoices", len(invoices))
+        notification_producers.notify_invoice_generation_failed(zev, period_start, period_end)
         _record_aborted_batch_event(
             action_type="invoice.generate_all",
             zev=zev,
@@ -493,6 +496,9 @@ def generate_zev_invoices_task(self, zev_id: str, period_start: str, period_end:
             "failures": failures,
             "pdf_failed": pdf_failed,
         },
+    )
+    notification_producers.notify_invoices_generated(
+        zev, period_start, period_end, created=len(invoices), failed=len(failures)
     )
 
 

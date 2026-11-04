@@ -1,0 +1,130 @@
+/* The shell's notification bell and its panel (SPEC-2026-11-notification-center §7). */
+
+.notification-bell {
+  position: relative;
+  justify-self: end;
+}
+
+.notification-bell-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  color: var(--text-body);
+  cursor: pointer;
+}
+
+.notification-bell-trigger:hover,
+.notification-bell-trigger[aria-expanded='true'] {
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+
+.notification-bell-trigger svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.notification-bell-badge {
+  position: absolute;
+  top: -0.375rem;
+  right: -0.375rem;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--danger-600);
+  color: var(--surface-card);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.125rem;
+  text-align: center;
+}
+
+.notification-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.35rem);
+  z-index: 1100; /* Z_POPOVER in lib/zLayers.ts */
+  width: min(24rem, calc(100vw - 2rem));
+  max-height: min(32rem, 70vh);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-overlay);
+}
+
+.notification-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.notification-panel-empty {
+  margin: 0;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.notification-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem;
+  overflow-y: auto;
+}
+
+.notification-item {
+  display: grid;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem 0.5rem 1rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-body);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+
+.notification-item:hover {
+  background: var(--surface-sunken);
+}
+
+/* Unread: a dot in the margin and heavier text, so the state is not colour alone. */
+.notification-item.is-unread {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.notification-item.is-unread::before {
+  content: '';
+  position: absolute;
+  left: 0.4rem;
+  top: 0.95rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--brand-deep);
+}
+
+.notification-item-meta {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+}

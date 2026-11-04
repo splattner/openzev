@@ -16,6 +16,8 @@ from testing.helpers import make_user
 from zev.models import ParticipantOnboardingToken
 
 DAYS = {
+    "PRIVACY_NOTIFICATION_READ_RETENTION_DAYS": 30,
+    "PRIVACY_NOTIFICATION_UNREAD_RETENTION_DAYS": 180,
     "PRIVACY_AUDIT_NETWORK_RETENTION_DAYS": 365,
     "PRIVACY_EMAIL_LOG_RETENTION_DAYS": 730,
     "PRIVACY_TOKEN_GRACE_DAYS": 30,
@@ -198,6 +200,68 @@ class TokenTests(TestCase):
 
         self.assertEqual(MagicLinkToken.objects.count(), 1)
         self.assertEqual(report["tokens"], {})
+
+
+@override_settings(**DAYS)
+class NotificationTests(TestCase):
+    def setUp(self):
+        from notifications.test_helpers import Community
+
+        self.community = Community("sw")
+
+    def note(self, *, created_days_ago, read_days_ago=None):
+        from notifications.models import Notification
+
+        row = Notification.objects.create(
+            recipient=self.community.manager, zev=self.community.zev, audience="manager", type="import.finished",
+            created_at=ago(created_days_ago), read_at=ago(read_days_ago) if read_days_ago is not None else None,
+        )
+        return row.pk
+
+    def remaining(self):
+        from notifications.models import Notification
+
+        return set(Notification.objects.values_list("pk", flat=True))
+
+    def test_read_notifications_go_after_the_read_window_and_unread_after_the_unread_window(self):
+        old_read = self.note(created_days_ago=50, read_days_ago=31)
+        fresh_read = self.note(created_days_ago=200, read_days_ago=29)
+        old_unread = self.note(created_days_ago=181)
+        fresh_unread = self.note(created_days_ago=179)
+
+        report = sweep.sweep()
+
+        self.assertEqual(self.remaining(), {fresh_read, fresh_unread})
+        self.assertNotIn(old_read, self.remaining())
+        self.assertNotIn(old_unread, self.remaining())
+        self.assertEqual(report["notifications"], 2)
+
+    def test_dry_run_counts_and_keeps_everything(self):
+        self.note(created_days_ago=181)
+
+        report = sweep.sweep(dry_run=True)
+
+        self.assertEqual(report["notifications"], 1)
+        self.assertEqual(len(self.remaining()), 1)
+
+    def test_zero_switches_a_window_off_independently(self):
+        old_read = self.note(created_days_ago=50, read_days_ago=31)
+        old_unread = self.note(created_days_ago=181)
+
+        with override_settings(PRIVACY_NOTIFICATION_READ_RETENTION_DAYS=0):
+            sweep.sweep()
+        self.assertEqual(self.remaining(), {old_read})
+
+        with override_settings(PRIVACY_NOTIFICATION_READ_RETENTION_DAYS=0, PRIVACY_NOTIFICATION_UNREAD_RETENTION_DAYS=0):
+            report = sweep.sweep()
+        self.assertEqual(report["notifications"], 0)
+        self.assertEqual(self.remaining(), {old_read})
+        self.assertNotIn(old_unread, self.remaining())
+
+    def test_a_second_sweep_finds_nothing(self):
+        self.note(created_days_ago=181)
+        sweep.sweep()
+        self.assertEqual(sweep.sweep()["notifications"], 0)
 
 
 @override_settings(**DAYS)

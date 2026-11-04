@@ -20,7 +20,7 @@ the IP address and user agent on every `AuditEvent`, the recipient address on ev
 and consumed or expired one-time tokens.
 
 **Outcome:** one sweep, run daily by Celery beat and on demand as `manage.py openzev_privacy_sweep`,
-applies three instance-wide retention windows from settings. Each step is off at `0`, idempotent,
+applies instance-wide retention windows from settings. Each step is off at `0`, idempotent,
 and reports through `--dry-run` before an operator trusts it.
 
 ## 2. Scope
@@ -32,6 +32,7 @@ and reports through `--dry-run` before an operator trusts it.
 | Audit network details | `AuditEvent.ip_address` set to `NULL` and `user_agent` to `""` once the event is older than `PRIVACY_AUDIT_NETWORK_RETENTION_DAYS` (default 365). The event row stays. |
 | Email logs | `EmailLog.recipient` and `error_message` set to `""` once the row is older than `PRIVACY_EMAIL_LOG_RETENTION_DAYS` (default 730). The row stays. |
 | One-time tokens | `EmailVerificationToken`, `MagicLinkToken` and `ParticipantOnboardingToken` deleted `PRIVACY_TOKEN_GRACE_DAYS` (default 30) after they stopped being usable. |
+| Notifications | `notifications.Notification` rows deleted `PRIVACY_NOTIFICATION_READ_RETENTION_DAYS` (default 30) after `read_at`, or `PRIVACY_NOTIFICATION_UNREAD_RETENTION_DAYS` (default 180) after `created_at` while unread. The two windows switch off independently (`0`); the step is `notifications` in the report (SPEC-2026-11-notification-center §6). |
 | Retry guard | `retry-email` refuses a log whose recipient was blanked. |
 
 ### Out of scope
@@ -70,6 +71,8 @@ No model or migration change. A new app `privacy` (in `INSTALLED_APPS`) holds co
 | `PRIVACY_AUDIT_NETWORK_RETENTION_DAYS` | `365` | Age of an `AuditEvent` (`created_at`) after which its IP and user agent are blanked. `0` = never. |
 | `PRIVACY_EMAIL_LOG_RETENTION_DAYS` | `730` | Age of an `EmailLog` (`created_at`) after which recipient and error text are blanked. `0` = never. |
 | `PRIVACY_TOKEN_GRACE_DAYS` | `30` | Days after a token stopped being usable before it is deleted. `0` = never. |
+| `PRIVACY_NOTIFICATION_READ_RETENTION_DAYS` | `30` | Days after a notification was read before it is deleted. `0` = never. |
+| `PRIVACY_NOTIFICATION_UNREAD_RETENTION_DAYS` | `180` | Days after an unread notification arrived before it is deleted. `0` = never. |
 
 ## 5. API contracts
 

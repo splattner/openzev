@@ -179,6 +179,11 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     return <AppSettingsContext.Provider value={value}>{children}</AppSettingsContext.Provider>
 }
 
+/** The settings when a provider is mounted, else null: for components that format a date but may render outside one (the shell in unit tests). */
+export function useOptionalAppSettings() {
+    return useContext(AppSettingsContext)?.settings ?? null
+}
+
 export function useAppSettings() {
     const context = useContext(AppSettingsContext)
     if (!context) {

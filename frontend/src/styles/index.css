@@ -61,6 +61,7 @@
 @import './components/app-tabs.css' layer(components);
 @import './components/disclosure.css' layer(components);
 @import './components/detail-pane.css' layer(components);
+@import './components/notification-bell.css' layer(components);
 
 @import '../components/RawMeteringTable.css' layer(pages);
 @import '../components/HeldReadingsPanel.css' layer(pages);

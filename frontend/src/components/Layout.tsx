@@ -14,6 +14,7 @@ import { fetchFeasibilityCalculatorEnabled } from '../lib/api/feasibility'
 import { queryKeys } from '../lib/api/queryKeys'
 import { apiErrorPayload } from '../lib/api/errors'
 import { LanguageSelector } from './LanguageSelector'
+import { NotificationBell } from './NotificationBell'
 import { useToast } from '../lib/toast'
 import { useRouteFocus } from '../lib/useRouteFocus'
 import pkg from '../../package.json'
@@ -456,6 +457,8 @@ export function Layout() {
                             <img src="/brand/openzev-wordmark-dark.png" alt="" />
                         </span>
                     </div>
+
+                    <NotificationBell />
 
                     {isImpersonating && impersonator && (
                         <div className="impersonation-banner" role="status">

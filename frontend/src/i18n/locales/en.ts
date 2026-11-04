@@ -4656,4 +4656,23 @@ export const en = {
         fieldTrustMissingEmailVerified: 'Allow missing email-verification claim',
         fieldTrustMissingEmailVerifiedHint: 'New accounts only. Enable only if the provider verifies email ownership but omits email_verified.',
     },
+    notifications: {
+        title: 'Notifications',
+        trigger: 'Notifications',
+        triggerUnread: 'Notifications, {{count}} unread',
+        markAllRead: 'Mark all as read',
+        empty: 'Nothing new.',
+        loadError: 'Notifications could not be loaded.',
+        unreadMarker: 'Unread:',
+        types: {
+            'invoice.sent': 'Invoice {{invoice_number}} for {{period_start}} to {{period_end}} is available.',
+            'invoice.paid': 'Payment received: invoice {{invoice_number}} is paid.',
+            'metering.data': 'New data for metering point {{meter_id}} ({{first_day}} to {{last_day}}).',
+            'import.finished': 'Import finished: {{rows_imported}} rows imported, {{rows_skipped}} skipped, {{issues}} notes.',
+            'import.failed': 'Import failed: {{rows_skipped}} rows skipped, {{issues}} notes.',
+            'invoices.generated': 'Invoices for {{period_start}} to {{period_end}} were generated: {{created}} created, {{failed}} failed.',
+            'invoices.generation_failed': 'Generating the invoices for {{period_start}} to {{period_end}} failed.',
+            unknown: 'There is a new notification.',
+        },
+    },
 } as const

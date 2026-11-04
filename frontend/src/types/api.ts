@@ -3012,3 +3012,34 @@ export interface ProductionForecast {
     /** Managers, viewers and admins only. */
     per_plant?: { metering_point_id: string; meter_id: string; hours: ForecastHour[] }[]
 }
+
+// ── Notification center (SPEC-2026-11-notification-center) ──
+export type NotificationType =
+    | 'invoice.sent'
+    | 'invoice.paid'
+    | 'metering.data'
+    | 'import.finished'
+    | 'import.failed'
+    | 'invoices.generated'
+    | 'invoices.generation_failed'
+
+export type NotificationAudience = 'manager' | 'participant'
+
+export type NotificationTargetType = 'invoice' | 'metering_point' | 'import_log' | 'period' | ''
+
+/** Ids, dates and counts only; the server never puts amounts or names in a payload. */
+export type NotificationPayload = Record<string, string | number | null>
+
+export interface Notification {
+    id: string
+    /** A `NotificationType`, or a newer server's type this build does not know. */
+    type: string
+    audience: NotificationAudience
+    zev: string
+    zev_name: string
+    payload: NotificationPayload
+    target_type: NotificationTargetType | string
+    target_id: string
+    created_at: string
+    read_at: string | null
+}
