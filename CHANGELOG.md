@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.30.0](https://github.com/splattner/openzev/compare/v1.29.0...v1.30.0) (2026-11-04)
+
+
+### Features
+
+* **live:** MCP live_energy tool, push and automation recipes, spec completed ([#1190](https://github.com/splattner/openzev/issues/1190)) ([232391c](https://github.com/splattner/openzev/commit/232391c72014e5a2adbaaf1b32ed18ec503e5303))
+* **notifications:** in-app notification center ([#989](https://github.com/splattner/openzev/issues/989)) ([#1197](https://github.com/splattner/openzev/issues/1197)) ([4ce4f6a](https://github.com/splattner/openzev/commit/4ce4f6ac47a1594236c0f37b407c35c0f09a75c6))
+* **tariffs:** combined tariff progression ([#1117](https://github.com/splattner/openzev/issues/1117)) ([#1193](https://github.com/splattner/openzev/issues/1193)) ([224c0ad](https://github.com/splattner/openzev/commit/224c0ad106843c9694a3d28f2249ea92dcc1b198))
+
+
+### Bug Fixes
+
+* **import:** read the 100-value row of the autumn DST day in a 96-value daily CSV ([#1196](https://github.com/splattner/openzev/issues/1196)) ([31039fd](https://github.com/splattner/openzev/commit/31039fd402bf9d0dea59e72836266c89fb1868df))
+
+
+### Performance Improvements
+
+* **live:** start the My energy live requests with the page ([#1189](https://github.com/splattner/openzev/issues/1189)) ([5be1b55](https://github.com/splattner/openzev/commit/5be1b550441a63f8c66a6e0c042ac0ea763d6a48))
+
 ## [1.29.0](https://github.com/splattner/openzev/compare/v1.28.1...v1.29.0) (2026-11-02)
 
 
