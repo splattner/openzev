@@ -277,8 +277,22 @@ Several steps do **not** make a page by themselves. A short two-part flow can
 stay a dialog. A step in the URL is not recovery: it retains no `File`, preview,
 entered values or upload/import job. If a flow needs recovery, specify what
 survives close, Back, reload and a later visit, and decide the storage; do not
-persist every form by default. `ZevListPage` creation and `ImportWizardModal` are
-decided against these criteria in phase 5 (§11).
+persist every form by default.
+
+**Phase 5 outcome: both wizards stay dialogs.** `ZevListPage` creation and
+`ImportWizardModal` were checked against each criterion; neither meets one.
+
+| Flow | Own URL | Recovery | Room | Outcome |
+|---|---|---|---|---|
+| ZEV creation (`ZevListPage`, 4 steps plus a done screen, `lg`) | No route and no inbound link; it is admin-only and opens from a button or the empty state. A step URL would not hold the entered values. | None needed. State is local to the page and nothing exists on the server until the final submit, a single request. The dirty guard covers the typed draft. The done screen's one-time owner credentials are shown once by design and are not persisted. | `lg` fits. Steps 1 and 2 are label/input grids; step 3 stacks metering-point cards that scroll inside the dialog. | Dialog, `lg` |
+| Import wizard (`ImportWizardModal`, `xl`) | Opens from the `/metering/imports` tab, which has its URL. Nothing links to "start an import". | None needed. The `File`s, previews and detected settings are re-derived by picking the files again. The import is one upload request, not a background job (the Celery tasks in `metering/tasks.py` cover supplementary, live and forecast sources). Finished imports are in the history list. | `xl` is the size §6.1 reserves for import review. The preview table (6 columns) scrolls in its own box. | Dialog, `xl` |
+
+Reopen the decision when a caller needs to deep-link into "start an import", or
+when a flow gains state that outlives one request (a queued import job, a
+retained file). That case needs the recovery specification this section asks
+for, and a page only if the storage or the URL calls for one. The import
+wizard's `xl` width has not been re-checked by screenshot at desktop and ~400px
+for this decision.
 
 ## 7. Shared components
 
@@ -614,7 +628,7 @@ matching user-guide chapter; regenerate guide screenshots as a set.
 | 2 | **Shared pieces:** `FormModal` `size` and universal dirty guard; `Disclosure`; `AppTabs`; the pane's shared parts once a second consumer exists | Components exist with tests; all `FormModal`s guarded |
 | 3 | **Retire overlay drawers (shipped):** audit log to the pane; metering gaps to a dialog or inline section (decided with screenshots); remove raw `Drawer` use and add the `no-restricted-imports` rule | No page or feature imports `Drawer` from Mantine |
 | 4 | **Dialog sizes:** map each explicit `maxWidth` to a size with screenshots; remove `maxWidth` from the type | `maxWidth` no longer compiles |
-| 5 | **Wizards:** decide ZEV creation and the import wizard against §6.4 | Each flow's outcome recorded; changes implemented |
+| 5 | **Wizards (decided: both stay dialogs, no code change; §6.4):** decide ZEV creation and the import wizard against §6.4 | Each flow's outcome recorded; changes implemented |
 | 6 | **Label and count sweep:** overview status decoration, decorative counts, generic pills, actionable issues, billing's narrow labels | §10.1 holds on every screen audited |
 | 7 | **Buttons and inline styles:** stray variants, missing `button` class, static `style={{}}` into CSS | Two stray forms gone; no static presentation in `style` where a class exists |
 | 8 | **Invoice labels** ([spec](2026-10-audience-specific-invoice-labels.md)) | Per that spec |
@@ -678,5 +692,5 @@ matching user-guide chapter; regenerate guide screenshots as a set.
 1. Audit-log detail: pane beside the log, as the tariff list? **Yes (phase 3):** screenshots at 1600px and 1920px, a phone and a narrow laptop width show it reads well with the secondary columns hidden; below 72rem it replaces the log.
 2. Metering gaps: dialog or inline section? It opens from the quality table with no list beside it. **Dialog (phase 3):** it keeps the modal interaction, and the content (a short list and one action) fits `xs`.
 3. Dialog size values and the pane's breakpoint: confirmed by pilot screenshots.
-4. ZEV creation and the import wizard: dialog or page, against §6.4. (Phase 5.)
+4. ZEV creation and the import wizard: dialog or page, against §6.4? **Dialog for both (phase 5):** neither needs its own URL or recovery, and `lg` and `xl` give them the room; the criteria and the conditions to reopen are in §6.4.
 5. Row click: open the pane everywhere, or only through a named control so text selection and copy keep working?
