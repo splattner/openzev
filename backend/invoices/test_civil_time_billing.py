@@ -132,6 +132,39 @@ def test_ht_nt_split_for_sdat_day():
     assert invoice.subtotal_chf == Decimal("5.60")  # 16 × 0.30 + 8 × 0.10
 
 
+@pytest.mark.parametrize(
+    ("day", "hours", "low_hours"),
+    [
+        (date(2026, 10, 25), 25, 9),  # autumn: the 02:00 hour happens twice
+        (date(2026, 3, 29), 23, 7),   # spring: the 02:00 hour does not exist
+        (date(2026, 6, 1), 24, 8),
+    ],
+)
+def test_dst_days_bill_every_real_hour_once(day, hours, low_hours):
+    """One reading per real quarter-hour: 100 / 92 / 96 slots, every hour banded once."""
+    participant = factories.ParticipantFactory(valid_from=date(2026, 1, 1))
+    meter = factories.assignment_for(participant).metering_point
+    _grid_tariff(participant.zev, [
+        (PeriodType.HIGH, time(6), time(22), "0.30000"),
+        (PeriodType.LOW, time(22), time(6), "0.10000"),
+    ])
+    start, end = period_window(day, day)
+    assert end - start == timedelta(hours=hours)
+    ts = start
+    slots = 0
+    while ts < end:
+        _reading(meter, ts, kwh="0.25")
+        ts += timedelta(minutes=15)
+        slots += 1
+    assert slots == hours * 4
+
+    invoice = generate_invoice(participant, day, day)
+
+    assert invoice.total_grid_kwh == Decimal(hours)
+    # 16 h HT at 0.30 plus the day's NT hours at 0.10, 1 kWh per hour.
+    assert invoice.subtotal_chf == Decimal("4.80") + Decimal(low_hours) * Decimal("0.10")
+
+
 def test_move_out_applies_at_local_midnight():
     leaving = factories.ParticipantFactory(valid_from=date(2026, 1, 1))
     arriving = factories.ParticipantFactory(zev=leaving.zev, valid_from=date(2026, 1, 1))
