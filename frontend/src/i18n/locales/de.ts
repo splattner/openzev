@@ -4645,4 +4645,23 @@ export const de = {
         fieldTrustMissingEmailVerified: 'Fehlende E-Mail-Verifizierungsangabe zulassen',
         fieldTrustMissingEmailVerifiedHint: 'Nur für neue Konten. Nur aktivieren, wenn der Anbieter den Besitz der E-Mail-Adresse prüft, aber email_verified nicht sendet.',
     },
+    notifications: {
+        title: 'Benachrichtigungen',
+        trigger: 'Benachrichtigungen',
+        triggerUnread: 'Benachrichtigungen, {{count}} ungelesen',
+        markAllRead: 'Alle als gelesen markieren',
+        empty: 'Nichts Neues.',
+        loadError: 'Die Benachrichtigungen konnten nicht geladen werden.',
+        unreadMarker: 'Ungelesen:',
+        types: {
+            'invoice.sent': 'Die Rechnung {{invoice_number}} für {{period_start}} bis {{period_end}} liegt vor.',
+            'invoice.paid': 'Zahlung eingegangen: Die Rechnung {{invoice_number}} ist bezahlt.',
+            'metering.data': 'Neue Daten für den Messpunkt {{meter_id}} ({{first_day}} bis {{last_day}}).',
+            'import.finished': 'Import abgeschlossen: {{rows_imported}} Zeilen importiert, {{rows_skipped}} übersprungen, {{issues}} Hinweise.',
+            'import.failed': 'Import fehlgeschlagen: {{rows_skipped}} Zeilen übersprungen, {{issues}} Hinweise.',
+            'invoices.generated': 'Die Rechnungen für {{period_start}} bis {{period_end}} wurden erstellt: {{created}} erstellt, {{failed}} fehlgeschlagen.',
+            'invoices.generation_failed': 'Das Erstellen der Rechnungen für {{period_start}} bis {{period_end}} ist fehlgeschlagen.',
+            unknown: 'Es gibt eine neue Benachrichtigung.',
+        },
+    },
 } as const

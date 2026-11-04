@@ -57,6 +57,7 @@ vi.mock('../src/lib/managedZev', () => {
 
 vi.mock('../src/lib/appSettings', () => ({
     useAppSettings: () => ({ settings: {} }),
+    useOptionalAppSettings: () => null,
     formatShortDate: (d: string) => d,
 }))
 

@@ -4645,4 +4645,23 @@ export const it = {
         fieldTrustMissingEmailVerified: 'Consenti l’assenza dell’indicazione di verifica e-mail',
         fieldTrustMissingEmailVerifiedHint: 'Solo nuovi account. Attiva solo se il provider verifica la titolarità dell’indirizzo e-mail, ma non invia email_verified.',
     },
+    notifications: {
+        title: 'Notifiche',
+        trigger: 'Notifiche',
+        triggerUnread: 'Notifiche, {{count}} non lette',
+        markAllRead: 'Segna tutto come letto',
+        empty: 'Nessuna novità.',
+        loadError: 'Impossibile caricare le notifiche.',
+        unreadMarker: 'Non letta:',
+        types: {
+            'invoice.sent': 'La fattura {{invoice_number}} per il periodo dal {{period_start}} al {{period_end}} è disponibile.',
+            'invoice.paid': 'Pagamento ricevuto: la fattura {{invoice_number}} è pagata.',
+            'metering.data': 'Nuovi dati per il punto di misura {{meter_id}} (dal {{first_day}} al {{last_day}}).',
+            'import.finished': 'Importazione terminata: {{rows_imported}} righe importate, {{rows_skipped}} saltate, {{issues}} note.',
+            'import.failed': 'Importazione non riuscita: {{rows_skipped}} righe saltate, {{issues}} note.',
+            'invoices.generated': 'Le fatture dal {{period_start}} al {{period_end}} sono state generate: {{created}} create, {{failed}} non riuscite.',
+            'invoices.generation_failed': 'La generazione delle fatture dal {{period_start}} al {{period_end}} non è riuscita.',
+            unknown: 'C\'è una nuova notifica.',
+        },
+    },
 } as const

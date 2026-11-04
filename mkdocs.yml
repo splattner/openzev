@@ -103,6 +103,7 @@ nav:
   - Getting Started:
       - Getting Started: 01-getting-started.md
       - Roles and Permissions: 11-roles-and-permissions.md
+      - Notifications: 22-notifications.md
   - Planning:
       - vZEV Feasibility Calculator: 13-feasibility-calculator.md
   - Setting Up Your ZEV:

@@ -4645,4 +4645,23 @@ export const fr = {
         fieldTrustMissingEmailVerified: 'Autoriser l’absence d’indication de vérification e-mail',
         fieldTrustMissingEmailVerifiedHint: 'Nouveaux comptes uniquement. À activer seulement si le fournisseur vérifie que l’adresse e-mail appartient à l’utilisateur, mais omet email_verified.',
     },
+    notifications: {
+        title: 'Notifications',
+        trigger: 'Notifications',
+        triggerUnread: 'Notifications, {{count}} non lues',
+        markAllRead: 'Tout marquer comme lu',
+        empty: 'Rien de nouveau.',
+        loadError: 'Les notifications n\'ont pas pu être chargées.',
+        unreadMarker: 'Non lu :',
+        types: {
+            'invoice.sent': 'La facture {{invoice_number}} pour la période du {{period_start}} au {{period_end}} est disponible.',
+            'invoice.paid': 'Paiement reçu : la facture {{invoice_number}} est payée.',
+            'metering.data': 'Nouvelles données pour le point de mesure {{meter_id}} (du {{first_day}} au {{last_day}}).',
+            'import.finished': 'Importation terminée : {{rows_imported}} lignes importées, {{rows_skipped}} ignorées, {{issues}} remarques.',
+            'import.failed': 'Échec de l\'importation : {{rows_skipped}} lignes ignorées, {{issues}} remarques.',
+            'invoices.generated': 'Les factures du {{period_start}} au {{period_end}} ont été générées : {{created}} créées, {{failed}} en échec.',
+            'invoices.generation_failed': 'La génération des factures du {{period_start}} au {{period_end}} a échoué.',
+            unknown: 'Il y a une nouvelle notification.',
+        },
+    },
 } as const

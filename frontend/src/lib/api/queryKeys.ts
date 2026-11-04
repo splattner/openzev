@@ -1,4 +1,9 @@
 export const queryKeys = {
+  notifications: {
+    all: ['notifications'] as const,
+    unreadCount: () => ['notifications', 'unread-count'] as const,
+    list: () => ['notifications', 'list'] as const,
+  },
   auth: {
     me: () => ['auth', 'me'] as const,
     appSettings: () => ['auth', 'app-settings'] as const,

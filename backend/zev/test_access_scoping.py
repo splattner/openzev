@@ -130,6 +130,9 @@ class ViewerWriteRouterWalkTests(GrantWorldMixin, TestCase):
         "export-job-create",  # an export is a read (annual statements)
         "feasibility-calculate",  # a calculator; writes nothing
         "mcp",  # every MCP tool is read-only (ADR 0025)
+        # An account marks its own notifications read; no ZEV data changes.
+        "notification-read",
+        "notification-read-all",
     }
     SKIPPED_PREFIXES = ("api/v1/auth/", "api/v1/public/", "api/v1/backups/")
 

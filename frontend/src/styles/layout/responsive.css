@@ -179,6 +179,22 @@
     margin: 0 1rem;
   }
 
+  /* In the app bar, at its right edge. */
+  .top-nav > .notification-bell {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+    margin: 0;
+  }
+
+  .notification-panel {
+    position: fixed;
+    top: 3.75rem;
+    right: 1rem;
+    left: 1rem;
+    width: auto;
+  }
+
   .mobile-bar {
     display: flex;
     align-items: center;

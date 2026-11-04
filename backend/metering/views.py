@@ -17,6 +17,8 @@ from rest_framework.response import Response
 from accounts.permissions import HasZevAccess
 from accounts.throttling import ApiKeyRateThrottle, ImportThrottle
 from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment
+from notifications import producers as notification_producers
+
 from .models import MeterReading, ImportLog, QuarantinedReading
 from .deletion import (
     OVERWRITE_PROTECTED,
@@ -984,5 +986,8 @@ class ImportView(viewsets.ViewSet):
             summary=f"Completed {source.upper()} import for {log.rows_imported} rows.",
             metadata=metadata,
         )
+
+        notification_producers.notify_metering_data(log)
+        notification_producers.notify_import_outcome(log)
 
         return Response(ImportLogSerializer(log).data, status=status.HTTP_201_CREATED)

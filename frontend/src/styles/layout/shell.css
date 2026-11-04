@@ -563,3 +563,10 @@
   min-height: 100vh;
 }
 
+
+/* The notification bell sits in the banner: on a desktop session it is the only thing there,
+   right-aligned; on a phone it joins the app bar (see responsive.css). */
+
+.top-nav > .notification-bell {
+  margin-bottom: 0.5rem;
+}
