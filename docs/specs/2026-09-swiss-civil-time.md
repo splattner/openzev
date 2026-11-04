@@ -535,12 +535,13 @@ The bulk-delete response type's `timezone` becomes `'Europe/Zurich'`.
 
 ### Backend — `invoices/test_civil_time_billing.py`
 
-5 module-level pytest tests:
+6 module-level pytest tests (one parametrized over three days, 8 cases):
 
 | Test | Asserts |
 |---|---|
 | `test_reading_before_local_midnight_bills_in_previous_month` | 2026-01-31T22:45Z (23:45 CET) is in January's invoice, 23:00Z in February's |
 | `test_ht_nt_split_for_sdat_day` | 24 hourly instants over the Swiss day 1 July bill 16 h at HT and 8 h at NT (CHF 5.60) |
+| `test_dst_days_bill_every_real_hour_once` | A quarter-hourly day of readings bills 100 slots / 25 kWh on 2026-10-25 (16 h HT + 9 h NT), 92 slots / 23 kWh on 2026-03-29 (16 h HT + 7 h NT) and 96 / 24 kWh on an ordinary day (16 h HT + 8 h NT) |
 | `test_move_out_applies_at_local_midnight` | Assignment ending 2026-06-30: 21:45Z stays with the leaver, 22:15Z goes to the next holder |
 | `test_dynamic_price_matches_offsetless_csv_reading` | CSV `2026-07-01 12:00` (Zurich) is stored at 10:00Z and priced with the 12:00+02:00 interval |
 | `test_mixed_sdat_and_csv_allocate_on_same_instant` | SDAT production at 12:00+02:00 and Zurich-read CSV consumption at 12:00 share one timestamp and the consumption is covered locally |

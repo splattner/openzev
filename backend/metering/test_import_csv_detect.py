@@ -89,6 +89,17 @@ class DetectCsvSettingsTests(TestCase):
         self.assertEqual(settings["column_map"]["energy_kwh"], "2")
         self.assert_preview_is_clean(content, settings)
 
+    def test_daily_file_with_a_100_value_dst_end_day_previews_clean(self):
+        # A headerless export: 96 values a day, 100 on the 25-hour autumn day.
+        def row(day, slots):
+            return ";".join(["M1", "1-1:1.29.0*255", "KWH", day, *["0.25"] * slots])
+
+        content = "\n".join(row(f"{day:02d}.10.2026", 100 if day == 25 else 96) for day in range(1, 31))
+        settings = self.detect(content)["settings"]
+        self.assertEqual(settings["format_profile"], "daily_15min")
+        self.assertEqual(settings["values_count"], 96)
+        self.assert_preview_is_clean(content, settings)
+
     def test_obis_direction_column_and_iso_timestamps(self):
         content = (
             "mp;ts;obis;kwh\n"

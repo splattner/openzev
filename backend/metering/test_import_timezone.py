@@ -216,6 +216,39 @@ class ImportTimezoneTests(TestCase):
         self.assertEqual(resp.data["rows_imported"], 100)
         self.assertEqual(self._timestamps()[-1], _utc(2026, 10, 25, 22, 45))
 
+    def test_daily_profile_dst_end_row_longer_than_the_declared_96_is_read_whole(self):
+        # Meter exports write 96 values a day and 100 on the 25-hour day, so the
+        # file's width (and values_count) stays 96 while that one row is longer.
+        rows = [
+            _daily_row("2026-10-24", ["1"] * 96),
+            _daily_row("2026-10-25", [str(i + 1) for i in range(100)]),
+            _daily_row("2026-10-26", ["1"] * 96),
+        ]
+        resp = self._daily(rows, 96)
+
+        self.assertEqual(resp.data["errors"], [])
+        self.assertEqual(resp.data["rows_imported"], 96 + 100 + 96)
+        dst_day = MeterReading.objects.filter(
+            timestamp__gte=_utc(2026, 10, 24, 22), timestamp__lt=_utc(2026, 10, 25, 23),
+        ).order_by("timestamp")
+        self.assertEqual(dst_day.count(), 100)
+        self.assertEqual(dst_day.last().timestamp, _utc(2026, 10, 25, 22, 45))
+        self.assertEqual(float(dst_day.last().energy_kwh), 100.0)
+
+    def test_daily_profile_dst_end_short_row_still_fails_beside_a_long_one(self):
+        # Another meter's long row must not make a 96-value row on that day pass.
+        rows = [
+            _daily_row("2026-10-25", ["1"] * 100),
+            _daily_row("2026-10-25", ["1"] * 96),
+        ]
+        resp = self._daily(rows, 96, overwrite_existing="true")
+
+        self.assertEqual(resp.data["rows_imported"], 100)
+        self.assertEqual(
+            resp.data["errors"][0]["error"],
+            "2026-10-25 has 100 intervals in Swiss time (DST end), but the row has 96 values.",
+        )
+
     def test_daily_profile_100_columns_on_an_ordinary_day_drops_trailing_empties(self):
         resp = self._daily([_daily_row("2026-06-01", ["1"] * 96 + [""] * 4)], 100)
 

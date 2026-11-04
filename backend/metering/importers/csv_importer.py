@@ -713,6 +713,26 @@ def _contiguous_day_ranges(windows):
     return ranges
 
 
+def _daily_read_count(values_count, window, interval_minutes, local, row, start_pos):
+    """``(values_count, width)`` to read this daily row with.
+
+    ``values_count`` is one number for the whole file, but the autumn DST day
+    has 100 quarter-hours where the others have 96. When the row really carries
+    the day's full length of values, read them all instead of cutting the row
+    at ``values_count`` (which would report a 96-value row the file never had).
+    A row without that many columns is left alone and fails the length check.
+    """
+    row_width = len(row)
+    if local:
+        interval = timedelta(minutes=interval_minutes)
+        length = window.end - window.start
+        if not length % interval:
+            slots = length // interval
+            if slots > values_count and row_width - start_pos >= slots:
+                return slots, row_width
+    return values_count, row_width
+
+
 def _parse_daily_values(row, start_pos, values_count, width):
     """Shared daily-slot validation for preview and import.
 
@@ -992,9 +1012,13 @@ def preview_csv(
                     # Existing-data flag runs even on invalid rows (e.g.
                     # truncated daily rows): it reflects day-level DB presence,
                     # not validation success.
+                    read_count, read_width = _daily_read_count(
+                        values_count, window, interval_minutes, reader.is_local, row, start_pos
+                    )
+                    read_width = max(read_width, table.width)
                     if direction_error is None:
                         day_directions = _daily_row_directions(
-                            row, start_pos, values_count, table.width, probe_type, explicit_direction
+                            row, start_pos, read_count, read_width, probe_type, explicit_direction
                         )
                         row_directions = sorted(day_directions)
                         if mp is not None and day_directions:
@@ -1003,7 +1027,7 @@ def preview_csv(
                                 for direction in day_directions
                                 for ts in preexisting_by_mp_dir.get((mp.id, direction), ())
                             )
-                    values, row_error = _parse_daily_values(row, start_pos, values_count, table.width)
+                    values, row_error = _parse_daily_values(row, start_pos, read_count, read_width)
                     if row_error is None and not all(v is None for v in values):
                         values, row_error = _fit_daily_values(values, window, interval_minutes, reader.is_local)
                     if row_error is not None:
@@ -1308,7 +1332,12 @@ def _import_table_rows(
                 # invalid numerics reject the whole row (atomic); existing
                 # readings are skipped per slot so gap-filling keeps working
                 # without overwrite.
-                values, row_error = _parse_daily_values(row, start_pos, values_count, table.width)
+                read_count, read_width = _daily_read_count(
+                    values_count, window, interval_minutes, reader.is_local, row, start_pos
+                )
+                values, row_error = _parse_daily_values(
+                    row, start_pos, read_count, max(read_width, table.width)
+                )
                 if row_error is None and not all(value is None for value in values):
                     values, row_error = _fit_daily_values(values, window, interval_minutes, reader.is_local)
                 if row_error is not None:

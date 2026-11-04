@@ -333,7 +333,12 @@ only for the transfer-archive importer, whose timestamps carry offsets.
   day's values, or any other surplus, is a row error
   `<date> has <L> intervals in Swiss time (DST start|DST end), but the row has <n> values.`
   Rows shorter than an ordinary day are kept (partial days). `UTC` rows pass
-  through unchanged.
+  through unchanged. `values_count` is one number for the whole file (detected
+  from the usual row, e.g. 96), so on a day longer than `values_count` slots
+  `_daily_read_count` reads the row's own columns up to the day's length when it
+  has that many — an export that writes 100 values only on the autumn DST day
+  imports without raising `values_count`; a row with fewer columns still gets
+  the error above (`n` is then what the row really carries).
 
 Details and every message: `2026-09-swiss-civil-time.md` §6.1.
 
@@ -1764,7 +1769,7 @@ and participant versus grant-based quality visibility.
 | `metering/testing.py` | Shared `upload_csv`/`preview_csv`/`detect_csv` helpers used by the import modules (the upload/preview helpers always exercise the required-`zev_id` path) |
 | `metering/test_import_csv_detect.py` | §4.3.1: delimiter, header, column, layout, interval and timestamp-format detection across standard/headerless/OBIS/daily/hourly-with-total/Excel files, each detected configuration round-tripped through the real preview endpoint (no errors, no missing meters); undetected reporting; bounded sample; 400 for missing/legacy files; role gating |
 | `metering/test_import_logs.py::ImportLogDeletionTests` | §3.3/§5.7/§8.2: deletion/rollback plus list-payload identity (`zev_name`, `imported_by_display`, `batch_id` alongside the raw IDs); bulk delete without `zev_id` covers all visible ZEVs but never foreign ones; delete/bulk-delete audit events are ZEV-scoped (one per ZEV for bulk), hidden from other owners, and never scoped from an unowned `zev_id` |
-| `metering/test_import_timezone.py::ImportTimezoneTests` (18) / `SdatTimestampTests` (2) | §4.1.1/§5.6: default Swiss zone, `UTC` option, offsets win, autumn hour per meter and direction, spring-gap skip and error, preview `rows_skipped_dst_gap`, invalid zone 400, daily rows at Swiss midnight and fitted to 92/96/100 slots, civil-day existing check; SDAT offset-less timestamps read as Zurich whatever the process `TZ` |
+| `metering/test_import_timezone.py::ImportTimezoneTests` (20) / `SdatTimestampTests` (2) | §4.1.1/§5.6: default Swiss zone, `UTC` option, offsets win, autumn hour per meter and direction, spring-gap skip and error, preview `rows_skipped_dst_gap`, invalid zone 400, daily rows at Swiss midnight and fitted to 92/96/100 slots, civil-day existing check, a 100-value row in a 96-value file read whole and a short row beside it still rejected; SDAT offset-less timestamps read as Zurich whatever the process `TZ` |
 | `metering/test_reanchor_readings.py` (12) | §7 legacy data: `reanchor_readings` list, dry run, apply, idempotency, refusals (SDAT, collisions outside the selection, spring-gap readings with energy, invoiced periods without `--allow-invoiced`), adjacent batches planned together, audit event |
 
 ### Backend (`metering/test_reading_visibility.py`)
