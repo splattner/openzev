@@ -30,7 +30,7 @@ added later, but today an import is a copy.
 2. Scroll to **Export ZEV** and click **Export ZEV**.
 3. Pick the sections you want. The **structure sections are pre-ticked** — ZEV
    settings, participants, metering points and tariffs — and readings,
-   invoices and invoice PDFs start unticked, because they are the bulk of the
+   invoices, invoice PDFs and participant documents start unticked, because they are the bulk of the
    file and can take a while to stream.
 4. Click **Download archive**.
 
@@ -59,6 +59,7 @@ You get a file named `openzev-export-<community>-<date>.zip`.
 | **Own energy data** | The energy data sources participants connected for a PV system behind their meter, and their quarter-hour values — opt-in, see below |
 | **Invoices** | Invoices, line items, and reading-correction review flags with their source evidence |
 | **Invoice PDFs** | The original rendered document for every invoice that has one — needs Invoices |
+| **Participant documents** | Everything in the participants' document inboxes — invoices, contracts, statements and operator documents, with the exact files delivered — needs Participants |
 
 ### Own energy data
 
@@ -220,6 +221,8 @@ openzev-export-demo-community-2026-08-04.zip
   supplementary_sources.json            energy data sources, if ticked
   supplementary_readings/<meter>.csv    their quarter-hour values, one file per source
   invoices/pdf/<invoice>.pdf   one file per invoice that has a rendered PDF, if ticked
+  delivered_documents.json     the participant documents, if ticked
+  delivered_documents/<id>.pdf the delivered files, one per document
 ```
 
 Readings use the same column layout the

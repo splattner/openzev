@@ -28,6 +28,14 @@ class DeliveredDocumentModelTests(TestCase):
         with self.assertRaises(IntegrityError), transaction.atomic():
             self._row(kind=DocumentKind.CONTRACT, file="", contract_issue=None)
 
+    def test_a_contract_without_an_issue_holds_its_own_file(self):
+        """A contract that arrived through a transfer archive has no ContractIssue."""
+        row = self._row(kind=DocumentKind.CONTRACT, file="inbox/z.pdf", contract_issue=None)
+        self.assertEqual(row.contract_issue_id, None)
+        issue = make_contract_issue(self.participant, self.owner)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self._row(kind=DocumentKind.INVOICE, file="inbox/w.pdf", contract_issue=issue)
+
     def test_other_kinds_require_a_file(self):
         with self.assertRaises(IntegrityError), transaction.atomic():
             self._row(file="")

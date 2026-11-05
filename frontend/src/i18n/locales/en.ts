@@ -773,6 +773,7 @@ export const en = {
             supplementary_data: 'Own energy data (statistics)',
             invoices: "Invoices",
             invoice_pdfs: "Invoice PDFs",
+            delivered_documents: "Participant documents",
         },
     },
     pages: {

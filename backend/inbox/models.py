@@ -57,7 +57,8 @@ class DeliveredDocument(models.Model):
     document_number = models.CharField(max_length=64, blank=True, default="")
     period_start = models.DateField(null=True, blank=True)
     period_end = models.DateField(null=True, blank=True)
-    # The stored copy. Empty only for a contract, whose bytes stay in ``ContractIssue.pdf``.
+    # The stored copy. Empty only for a contract held by reference, whose bytes stay in
+    # ``ContractIssue.pdf``.
     file = models.FileField(upload_to=inbox_upload_to, blank=True, max_length=255)
     file_name = models.CharField(max_length=255, blank=True, default="")
     content_type = models.CharField(max_length=100, default="application/pdf")
@@ -93,10 +94,12 @@ class DeliveredDocument(models.Model):
             models.Index(fields=["zev", "kind", "-delivered_at"], name="inbox_doc_zev_kind"),
         ]
         constraints = [
-            # A contract is a reference, everything else carries its own file.
+            # A document has exactly one body: a contract held by reference to its
+            # ``ContractIssue``, or a file of its own. A contract arriving through a
+            # transfer archive has no issue to point at, so it holds a file.
             models.CheckConstraint(
                 condition=Q(kind="contract", contract_issue__isnull=False, file="")
-                | (~Q(kind="contract") & ~Q(file="")),
+                | (Q(contract_issue__isnull=True) & ~Q(file="")),
                 name="inbox_document_has_one_body",
             ),
             models.UniqueConstraint(
@@ -135,6 +138,6 @@ class DeliveredDocument(models.Model):
 
     def open_file(self):
         """A binary file object over the delivered bytes."""
-        if self.kind == DocumentKind.CONTRACT:
+        if self.contract_issue_id is not None:
             return io.BytesIO(bytes(self.contract_issue.pdf))
         return self.file.open("rb")

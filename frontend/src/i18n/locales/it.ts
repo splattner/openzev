@@ -764,6 +764,7 @@ export const it = {
             supplementary_data: 'Dati energetici propri (statistica)',
             invoices: "Fatture",
             invoice_pdfs: "PDF delle fatture",
+            delivered_documents: "Documenti dei partecipanti",
         },
     },
     pages: {

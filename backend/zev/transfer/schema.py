@@ -10,7 +10,9 @@ what a v1 archive contains, and a field removed from the API must not silently
 break every archive already sitting on someone's disk.
 """
 
-# Version 10 preserves invoice reading-impact evidence and resolution state.
+# Version 11 adds the delivered_documents section: the participant document
+# inbox (ADR 0045), rows and files. Version 10 preserves invoice reading-impact
+# evidence and resolution state.
 # Bumped whenever the archive layout changes in a way an older importer cannot
 # read. Version 9 carries the SDAT-CH replace provenance and held
 # observations: readings rows gain the delivery-identity, quality and
@@ -28,14 +30,15 @@ break every archive already sitting on someone's disk.
 # provenance. Version 1 remains readable for static exports and legacy
 # adapter-based dynamic descriptors. An archive naming a version that is not
 # listed here is rejected outright rather than imported half-understood.
-FORMAT_VERSION = 10
-SUPPORTED_FORMAT_VERSIONS = frozenset({1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+FORMAT_VERSION = 11
+SUPPORTED_FORMAT_VERSIONS = frozenset({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11})
 
 MANIFEST_NAME = "manifest.json"
 READINGS_DIR = "readings"
 QUARANTINE_DIR = "quarantine"
 SUPPLEMENTARY_READINGS_DIR = "supplementary_readings"
 INVOICE_PDFS_DIR = "invoices/pdf"
+DELIVERED_DOCUMENTS_DIR = "delivered_documents"
 
 SECTION_ZEV = "zev"
 SECTION_PARTICIPANTS = "participants"
@@ -46,6 +49,7 @@ SECTION_READINGS = "readings"
 SECTION_SUPPLEMENTARY = "supplementary_data"
 SECTION_INVOICES = "invoices"
 SECTION_INVOICE_PDFS = "invoice_pdfs"
+SECTION_DELIVERED_DOCUMENTS = "delivered_documents"
 
 # Ordered: this is also the order in which sections are written and imported,
 # and ordering is a correctness constraint, not presentation. Participants must
@@ -62,6 +66,7 @@ SECTIONS = (
     SECTION_SUPPLEMENTARY,
     SECTION_INVOICES,
     SECTION_INVOICE_PDFS,
+    SECTION_DELIVERED_DOCUMENTS,
 )
 
 # Sections an export only includes when asked for by name. Supplementary data is
@@ -96,6 +101,10 @@ SECTION_DEPENDENCIES = {
     SECTION_SUPPLEMENTARY: (SECTION_METERING_POINTS, SECTION_PARTICIPANTS),
     SECTION_INVOICES: (SECTION_PARTICIPANTS,),
     SECTION_INVOICE_PDFS: (SECTION_INVOICES,),
+    # A document is addressed to a participant. It does not need the invoices
+    # section: an invoice document holds its own bytes, and the link to the
+    # invoice row is made only when that section travels too.
+    SECTION_DELIVERED_DOCUMENTS: (SECTION_PARTICIPANTS,),
 }
 
 # The file each section occupies inside the archive. ``readings`` is absent
@@ -108,6 +117,7 @@ SECTION_FILES = {
     SECTION_CHARGES: "charges.json",
     SECTION_INVOICES: "invoices.json",
     SECTION_SUPPLEMENTARY: "supplementary_sources.json",
+    SECTION_DELIVERED_DOCUMENTS: "delivered_documents.json",
 }
 
 # Format 5: the participants section is three files. Parties come first (a
@@ -519,6 +529,30 @@ READING_CSV_COLUMNS = (
 # Held observations share the billable column layout: same provenance,
 # same defaults for older archives.
 QUARANTINE_CSV_COLUMNS = READING_CSV_COLUMNS
+
+# Format 11: the participant document inbox. One record per delivered document;
+# the bytes travel as ``delivered_documents/<id>.pdf``, named by the document's
+# own archive id (a UUID, so there is nothing to sanitise and nothing to
+# collide). Besides these fields a record carries ``id``, ``participant_id``
+# (``null`` for a document whose participant was removed), ``invoice_number``
+# (resolved against the invoices section, when it travels) and
+# ``superseded_by_id``. Account references (``delivered_by``, ``withdrawn_by``)
+# and ``batch_id`` do not travel: delivery is history, not a way to grant or
+# find anybody. A contract is exported with its issued bytes and arrives as a
+# document that holds its own file, because ``ContractIssue`` is not in the archive.
+DELIVERED_DOCUMENT_FIELDS = (
+    "kind",
+    "title",
+    "document_number",
+    "period_start",
+    "period_end",
+    "file_name",
+    "content_type",
+    "sha256",
+    "delivered_at",
+    "superseded_at",
+    "withdrawn_at",
+)
 
 
 class ArchiveError(ValueError):

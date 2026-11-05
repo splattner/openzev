@@ -764,6 +764,7 @@ export const de = {
             supplementary_data: 'Eigene Energiedaten (Statistik)',
             invoices: "Rechnungen",
             invoice_pdfs: "Rechnungs-PDFs",
+            delivered_documents: "Teilnehmerdokumente",
         },
     },
     pages: {

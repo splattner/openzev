@@ -21,6 +21,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection, transaction
 from django.db.models import Prefetch
 
+from inbox.models import DeliveredDocument
 from invoices.models import Charge, Credit, Invoice
 from metering.models import MeterReading, QuarantinedReading, SupplementaryReading, SupplementarySource
 from tariffs.models import Tariff, TariffPeriod
@@ -36,6 +37,8 @@ from .schema import (
     PAYMENT_FIELDS,
     CREDIT_APPLICATION_FIELDS,
     CREDIT_FIELDS,
+    DELIVERED_DOCUMENT_FIELDS,
+    DELIVERED_DOCUMENTS_DIR,
     INVOICE_PDFS_DIR,
     MANIFEST_NAME,
     BUILDING_FIELDS,
@@ -51,6 +54,7 @@ from .schema import (
     READING_CSV_COLUMNS,
     READINGS_DIR,
     SECTION_CHARGES,
+    SECTION_DELIVERED_DOCUMENTS,
     SECTION_FILES,
     SECTION_INVOICE_PDFS,
     SECTION_INVOICES,
@@ -134,6 +138,13 @@ def credit_pdf_member_name(credit_number):
     safe = "".join(char if char.isalnum() or char in "-_." else "_" for char in credit_number)
     digest = hashlib.sha1(f"credit:{credit_number}".encode("utf-8")).hexdigest()[:8]
     return f"{INVOICE_PDFS_DIR}/credit-{safe or 'credit'}-{digest}.pdf"
+
+
+def delivered_document_member_name(archive_id):
+    """The ZIP member of a delivered document: named by its archive id, a UUID,
+    so unlike ``pdf_member_name`` there is nothing to sanitise and two documents
+    can never share a member. The importer recomputes it from the record's ``id``."""
+    return f"{DELIVERED_DOCUMENTS_DIR}/{archive_id}.pdf"
 
 
 def _export_zev(zev):
@@ -283,6 +294,39 @@ def _export_invoices(zev):
         # answer if original documents have to be retained.
         for invoice in Invoice.objects.filter(zev=zev).prefetch_related("items", "payments", "credits", "credit_applications__credit", "dynamic_evidence__source", "reading_impacts").order_by("period_start", "invoice_number")
     ]
+
+
+def _delivered_documents(zev):
+    return (
+        DeliveredDocument.objects.filter(zev=zev)
+        .select_related("invoice")
+        .order_by("delivered_at", "id")
+    )
+
+
+def _export_delivered_documents(zev):
+    """One record per delivered document of the ZEV, superseded and withdrawn
+    ones included: delivery is history, and a withdrawn document stays a fact.
+    Withdrawn documents travel withdrawn."""
+    return [
+        {
+            "id": str(document.id),
+            "participant_id": str(document.participant_id) if document.participant_id else None,
+            "invoice_number": document.invoice.invoice_number if document.invoice_id else None,
+            "superseded_by_id": str(document.superseded_by_id) if document.superseded_by_id else None,
+            **_fields(document, DELIVERED_DOCUMENT_FIELDS),
+        }
+        for document in _delivered_documents(zev)
+    ]
+
+
+def _write_delivered_documents(archive, zev):
+    """Copy every delivered document's bytes into the archive: the stored file,
+    or for a contract held by reference the issued PDF. Documents are immutable,
+    so these are exactly the bytes the participant received."""
+    for document in _delivered_documents(zev):
+        with document.open_file() as source:
+            archive.writestr(delivered_document_member_name(document.id), source.read())
 
 
 def _write_readings(archive, zev):
@@ -487,6 +531,12 @@ def _write_archive(zev, sections, fileobj, *, instance_name=""):
 
         if SECTION_INVOICE_PDFS in sections:
             counts[SECTION_INVOICE_PDFS] = _write_invoice_pdfs(archive, zev)
+
+        if SECTION_DELIVERED_DOCUMENTS in sections:
+            documents = _export_delivered_documents(zev)
+            counts[SECTION_DELIVERED_DOCUMENTS] = len(documents)
+            archive.writestr(SECTION_FILES[SECTION_DELIVERED_DOCUMENTS], _dump(documents))
+            _write_delivered_documents(archive, zev)
 
         # Written last so its counts are the ones actually produced.
         manifest = {

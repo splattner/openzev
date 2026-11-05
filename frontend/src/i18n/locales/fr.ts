@@ -764,6 +764,7 @@ export const fr = {
             supplementary_data: 'Données énergétiques propres (statistiques)',
             invoices: "Factures",
             invoice_pdfs: "PDF des factures",
+            delivered_documents: "Documents des participants",
         },
     },
     pages: {

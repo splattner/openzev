@@ -31,6 +31,7 @@ export const DEFAULT_SECTIONS: TransferSection[] = [
   { name: 'supplementary_data', requires: ['metering_points', 'participants'] },
   { name: 'invoices', requires: ['participants'] },
   { name: 'invoice_pdfs', requires: ['invoices'] },
+  { name: 'delivered_documents', requires: ['participants'] },
 ]
 
 /** True when every prerequisite of `section` is currently selected. */
