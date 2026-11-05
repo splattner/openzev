@@ -316,6 +316,7 @@ export function Layout() {
                                 <SidebarLink to="/" label={t('nav.dashboard')} icon={<DashboardIcon />} collapsed={isNavigationCollapsed} />
                                 {showMyEnergy && <SidebarLink to="/my-energy" label={t('nav.myEnergy')} icon={<LiveIcon />} collapsed={isNavigationCollapsed} />}
                                 <SidebarLink to="/me/invoices" label={t('nav.myInvoices')} icon={<InvoiceIcon />} collapsed={isNavigationCollapsed} />
+                                <SidebarLink to="/me/documents" label={t('nav.myDocuments')} icon={<DocumentIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/me/statement" label={t('nav.annualStatement')} icon={<ReportsIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/me/metering-points" label={t('nav.myMeteringPoints')} icon={<PlugIcon />} active={myMeteringPointsActive} collapsed={isNavigationCollapsed} />
                             </>
@@ -323,7 +324,10 @@ export function Layout() {
 
                         {/* A former participant keeps only the invoices it was sent. */}
                         {isFormerParticipant && (
-                            <SidebarLink to="/me/invoices" label={t('nav.myInvoices')} icon={<InvoiceIcon />} collapsed={isNavigationCollapsed} />
+                            <>
+                                <SidebarLink to="/me/invoices" label={t('nav.myInvoices')} icon={<InvoiceIcon />} collapsed={isNavigationCollapsed} />
+                                <SidebarLink to="/me/documents" label={t('nav.myDocuments')} icon={<DocumentIcon />} collapsed={isNavigationCollapsed} />
+                            </>
                         )}
 
                         {canManage && (
@@ -555,6 +559,10 @@ function TagIcon() {
 
 function InvoiceIcon() {
     return <IconSvg path="M7 3h8l4 4v14l-2-1-2 1-2-1-2 1-2-1-2 1V4a1 1 0 0 1 1-1Zm1 6h8m-8 4h8m-8 4h5" />
+}
+
+function DocumentIcon() {
+    return <IconSvg path="M22 12h-6l-2 3h-4l-2-3H2m3.45-6.89L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z" />
 }
 
 function CalculatorIcon() {

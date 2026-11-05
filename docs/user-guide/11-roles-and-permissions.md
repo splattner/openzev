@@ -28,7 +28,7 @@ rent a flat in another, or be a tenant in two communities.
 | **Manager** | Everything in the community: participants, metering, tariffs, invoices, settings, and giving others access |
 | **Issuer** or **representative** | The same as a manager, while the role lasts |
 | **Viewer** | Sees everything a manager sees and may download and export, but changes nothing. Pages show *Viewer (read only)* next to the community name above the title |
-| **Participant** | Own consumption, own invoices and annual statement |
+| **Participant** | Own consumption, own invoices, annual statement and delivered documents |
 | **Former participant** | Own invoices that were sent, after leaving the community |
 
 Managers and viewers get their access from the community's managers (or an
@@ -124,10 +124,11 @@ A manager is **scoped** to the ZEVs it has access to:
 Participants can set a password or recover a forgotten one in **Account → Security**;
 see [password setup and recovery](03-participant-management.md#a-participant-forgot-their-password).
 
-The participant sidebar shows **Dashboard**, **My invoices**, and **Annual statement**; own consumption charts and trends stay reachable through the direct `/metering/chart` route.
+The participant sidebar shows **Dashboard**, **My invoices**, **My documents**, and **Annual statement**; own consumption charts and trends stay reachable through the direct `/metering/chart` route.
 
 - **Dashboard:** View own energy consumption/production overview
 - **My invoices:** View and download own invoices (read-only; shows invoices even before a PDF exists)
+- **My documents:** Read and download what the community delivered to them (invoices, statements, contract, notices); a former participant keeps this access
 - **Annual statement:** View their own annual statement and tax overview
 - **Metering Data:** Direct route to own consumption charts and trends
 - **Account Profile:** Update personal information

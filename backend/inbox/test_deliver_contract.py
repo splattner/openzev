@@ -79,6 +79,41 @@ class DeliverContractTests(TestCase):
         self.assertFalse(DeliveredDocument.objects.exists())
         self.assertEqual(self._post(self.owner, newer).status_code, 201)
 
+    def test_naming_the_participant_delivers_their_latest_version(self):
+        newer = make_contract_issue(self.participant, self.owner, version=2)
+        client = APIClient()
+        authenticate(client, self.owner)
+
+        response = client.post(URL, {"participant": str(self.participant.pk)}, format="json")
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(DeliveredDocument.objects.get().contract_issue_id, newer.pk)
+
+    def test_a_participant_without_an_issued_contract_gets_a_404(self):
+        unissued = make_participant(self.zev, first="New", last="Comer")
+        client = APIClient()
+        authenticate(client, self.owner)
+
+        response = client.post(URL, {"participant": str(unissued.pk)}, format="json")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_a_manager_of_another_zev_cannot_deliver_by_participant(self):
+        stranger = make_user("inbox_ct_stranger2", UserRole.USER)
+        make_zev(stranger, "Elsewhere")
+        client = APIClient()
+        authenticate(client, stranger)
+
+        self.assertEqual(client.post(URL, {"participant": str(self.participant.pk)}, format="json").status_code, 404)
+
+    def test_exactly_one_of_issue_and_participant_is_required(self):
+        client = APIClient()
+        authenticate(client, self.owner)
+
+        self.assertEqual(client.post(URL, {}, format="json").status_code, 400)
+        both = {"contract_issue": str(self.issue.pk), "participant": str(self.participant.pk)}
+        self.assertEqual(client.post(URL, both, format="json").status_code, 400)
+
     def test_the_participant_cannot_deliver_their_own_contract(self):
         self.assertEqual(self._post(self.account).status_code, 404)
         self.assertFalse(DeliveredDocument.objects.exists())

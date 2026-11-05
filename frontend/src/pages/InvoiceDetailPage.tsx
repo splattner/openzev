@@ -93,7 +93,7 @@ export function InvoiceDetailPage() {
             ? `/billing/invoices?period_start=${origin.period_start}&period_end=${origin.period_end}`
             : null
     const backHref = isParticipant
-        ? origin?.from === '/' || origin?.from === '/me/invoices' || origin?.from === '/me/statement'
+        ? origin?.from === '/' || origin?.from === '/me/invoices' || origin?.from === '/me/statement' || origin?.from === '/me/documents'
             ? origin.from
             : '/me/invoices'
         : origin?.from === '/'

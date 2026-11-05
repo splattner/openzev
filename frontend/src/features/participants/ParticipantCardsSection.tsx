@@ -11,6 +11,7 @@ import {
     faLink,
     faLinkSlash,
     faLocationDot,
+    faPaperPlane,
     faPen,
     faPlus,
     faTrash,
@@ -50,6 +51,8 @@ type ParticipantCardsSectionProps = {
     onShowEnded?: () => void
     onStartEdit: (participant: Participant) => void
     onDownloadContract: (participant: Participant) => void
+    /** Hand the latest issued contract to the participant's document inbox. */
+    onDeliverContract: (participant: Participant) => void
     onSendOnboardingLink: (participantId: string) => void
     onCopyOnboardingLink: (participantId: string) => void
     onRevokeOnboardingLink: (participantId: string) => void
@@ -141,6 +144,7 @@ export function ParticipantCardsSection({
     onShowEnded,
     onStartEdit,
     onDownloadContract,
+    onDeliverContract,
     onSendOnboardingLink,
     onCopyOnboardingLink,
     onRevokeOnboardingLink,
@@ -255,6 +259,12 @@ export function ParticipantCardsSection({
                                     label: t('common.edit'),
                                     icon: <FontAwesomeIcon icon={faPen} fixedWidth />,
                                     onClick: () => onStartEdit(participant),
+                                })
+                                menuItems.push({
+                                    key: 'deliver-contract',
+                                    label: t('inbox.deliverContract.action'),
+                                    icon: <FontAwesomeIcon icon={faPaperPlane} fixedWidth />,
+                                    onClick: () => onDeliverContract(participant),
                                 })
                                 menuItems.push({
                                     key: 'send-onboarding-link',

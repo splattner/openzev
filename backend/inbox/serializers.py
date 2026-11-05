@@ -29,7 +29,15 @@ class DeliveredDocumentSerializer(serializers.ModelSerializer):
 
 
 class DeliverContractSerializer(serializers.Serializer):
-    contract_issue = serializers.UUIDField()
+    """A stored contract version, or a participant whose latest issued version is meant."""
+
+    contract_issue = serializers.UUIDField(required=False)
+    participant = serializers.UUIDField(required=False)
+
+    def validate(self, attrs):
+        if ("contract_issue" in attrs) == ("participant" in attrs):
+            raise serializers.ValidationError("Give exactly one of contract_issue and participant.")
+        return attrs
 
 
 class DeliveryResultSerializer(serializers.Serializer):

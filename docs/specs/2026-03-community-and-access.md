@@ -1726,7 +1726,7 @@ reaches every ZEV-scope route and sees its pages read-only
 | `/metering-data` | any authenticated | alias → `/metering/chart`, except `?tab=quality` → guarded `/metering/quality`; `tab` is always stripped, remaining params preserved |
 | `/imports` | ZEV scope | alias → `/metering/imports` (query preserved) |
 | `/tariffs` | ZEV scope | `TariffsPage` |
-| `/billing/invoices` · `/billing/emails` | ZEV scope | `BillingHubPage tab=…` (invoices · email delivery/history + retry) |
+| `/billing/invoices` · `/billing/emails` · `/billing/documents` | ZEV scope | `BillingHubPage tab=…` (invoices · email delivery/history + retry · delivered documents, the participant inbox's outbox: [participant document inbox §7.2](2026-11-participant-document-inbox.md)) |
 | `/billing/statements` | any authenticated | alias → `/reports` (the annual-statement ZIP moved there with the other yearly documents) |
 | `/billing/periods` | ZEV scope | compatibility alias → `/`, where period work lives on manager Overview |
 | `/billing/invoices?period_start&period_end` | ZEV scope | deep link from the Overview period table preselects that period |
@@ -1734,6 +1734,7 @@ reaches every ZEV-scope route and sees its pages read-only
 | `/invoices` | ZEV scope | alias → `/billing/invoices` (query preserved) |
 | `/invoices/:invoiceId` · `/billing/invoices/:invoiceId` | any authenticated | `InvoiceDetailPage` (own invoices only for participants, backend-enforced) |
 | `/me/statement` | `participant` | `ReportsPage` (participant branch; impersonating admins carry the target account's relations) |
+| `/me/documents` | `participant`, `former` | `DocumentsPage` (what was delivered to the account; read-only list over `/api/v1/inbox/documents/`, own rows only; [participant document inbox §7.1](2026-11-participant-document-inbox.md)) |
 | `/me/invoices` | `participant`, `former` | `MyInvoicesPage` (own invoices, read-only; reuses the role-scoped invoice list — no new grant, recorded exception 2) |
 | `/me/metering-points` | `participant`, `manager`, `viewer`, `admin` | `MyMeteringPointsPage` (the participant's own metering points and the energy data setup of those with generation behind the meter; a management shell shows only the flagged meters the user holds personally; see [supplementary energy data §7.1](2026-10-supplementary-energy-data.md)) |
 | `/reports` | ZEV scope, `participant` | `ReportsPage` (participants: own downloads; owners/admins: annual ZEV report, tax overview, and annual-statement ZIP) |
@@ -1795,7 +1796,8 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 | Account (`/account`) | shell role `none` (only nav entry; landing page explains the unlinked state) |
 | Dashboard (`/`) | shell role `participant` |
 | My energy system (`/my-energy`, right after Dashboard) | shell role `participant` (not `former`) + (live flag effective, or the energy data feature on and a held meter an own system can be connected to) |
-| My invoices (`/me/invoices`) | shell role `participant` or `former` (a former participant sees only this entry) |
+| My invoices (`/me/invoices`) | shell role `participant` or `former` |
+| My documents (`/me/documents`, after My invoices) | shell role `participant` or `former` (a former participant sees only these two entries: what it was sent stays readable, the inbox has no end date) |
 | Annual statement (`/me/statement`) | shell role `participant` (consumption is available on the participant dashboard) |
 | My metering points (`/me/metering-points`) | shell role `participant` (not `former`); for a participant it also lights on `/metering/chart` and `/metering/points`, which they reach from it (they have no Metering hub entry); also `admin`, `manager` or `viewer` who personally hold a flagged metering point in the selected community while the energy data feature is on |
 | Setup group (participants, metering points `/metering/points`, tariffs, ZEV settings `/zev-settings`) | `isZevScope` (audit logs live in the ZEV settings hub; no standalone entry) |

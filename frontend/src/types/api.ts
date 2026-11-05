@@ -3058,3 +3058,43 @@ export interface TariffErrorResponse {
     validation_errors: TariffValidationError[]
     [field: string]: unknown
 }
+
+// ── Participant document inbox (SPEC-2026-11-participant-document-inbox) ──
+
+export type DocumentKind =
+    | 'invoice' | 'contract' | 'annual_statement'
+    | 'financial_summary' | 'tariff_overview' | 'operator'
+
+export interface DeliveredDocument {
+    id: string
+    zev: string | null
+    zev_name: string
+    participant: string | null
+    /** The caller's own name for a participant; the addressee for a manager. */
+    participant_name: string | null
+    kind: DocumentKind
+    title: string
+    document_number: string
+    period_start: string | null
+    period_end: string | null
+    file_name: string
+    size_bytes: number | null
+    sha256: string
+    delivered_at: string
+    delivered_by_name: string | null
+    superseded_at: string | null
+    superseded_by: string | null
+    withdrawn_at: string | null
+    batch_id: string | null
+    invoice: string | null
+    /** The source invoice's raw status, so a cancelled invoice reads as cancelled. */
+    invoice_status: string | null
+    contract_issue: string | null
+}
+
+export interface DeliveryResult {
+    batch_id: string
+    delivered: number
+    without_account: number
+    documents: DeliveredDocument[]
+}

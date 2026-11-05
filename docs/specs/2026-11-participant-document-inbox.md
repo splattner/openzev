@@ -19,8 +19,8 @@
 | 1 | `inbox` app: model, `deliver()` service, scoping, read and outbox API, backups (incl. per-ZEV restore), ZEV purge, audit | — |
 | 1b | Transfer archive format 11 (`delivered_documents`) | stacked on #1206 |
 | 2 | Producers: invoice sent, explicit contract delivery, backfill command | stacked on #1207 |
-| 3 | Operator documents (upload, withdraw), issued annual statement / financial summary / tariff overview | stacked on #1208 |
-| 4 | Frontend: participant *Documents* page, manager outbox, upload and issue dialogs | — |
+| 3 | Operator documents (upload, withdraw), issued annual statement / financial summary / tariff overview | #1209, stacked on #1208 |
+| 4 | Frontend: participant *My documents* page, manager *Delivered documents* tab, upload and issue dialogs, deliver-contract action; `deliver-contract` also by participant; demo seed | stacked on #1209 |
 | 5 | Links and notifications: public invoice link and invoice email resolve to the inbox entry, `document.delivered` | — |
 | 6 | Cut-over (follow-up release): participants lose the live invoice and report endpoints | — |
 
@@ -98,7 +98,7 @@ The access rules also differ by endpoint, so every new participant-visible resou
 
 **Notifications.** The notification center (SPEC-2026-11-notification-center §3) hides participant notices once the link ends. This spec does **not** change that: a notification is an event for current members, the inbox is the durable record. The §3 bullet "Document inbox (#862). Not built" of that spec is updated to say so when phase 5 lands.
 
-**Frontend.** Participant route `/documents` inside `ProtectedRoute`; manager outbox is a tab of the existing invoices hub (§7.2). No change to role gating.
+**Frontend.** Participant route `/me/documents` (the participant pages all live under `/me/`) inside `ProtectedRoute`; manager outbox is a tab of the existing invoices hub (§7.2). No change to role gating.
 
 ## 4. Data model
 
@@ -191,7 +191,7 @@ Validation for `POST`:
 | `/api/v1/inbox/issue/annual-statement/` | POST | manager of `zev` | Body `{ zev, year, participant_ids? }`; omitted `participant_ids` = every participant with a billed invoice that year **that reached them** (`billed_invoices` and `sent_to_participant()`, because the statement is rendered with `sent_only=True` and would otherwise list nothing). Renders with the existing `generate_annual_statement_pdf(..., sent_only=True)` and stores the bytes. Re-issuing a year supersedes the earlier row |
 | `/api/v1/inbox/issue/financial-summary/` | POST | manager of `zev` | Same, for producers. `FinancialSummaryView` has no eligibility rule of its own (it renders for whoever is named), so the inbox defines one from what the summary reports: a participant with a billed invoice in the year that carries a `feed_in` item or a `local_energy` item below zero (`issuing.summary_participant_ids`) |
 | `/api/v1/inbox/issue/tariff-overview/` | POST | manager of `zev` | Body `{ zev, participant_ids? }`; delivers the tariff overview as of today (`scope=valid`) to every current participant, or to the named ones. It is rendered once and every row shares the file. Re-issuing supersedes each participant's earlier overview |
-| `/api/v1/inbox/documents/deliver-contract/` | POST | manager of `zev` | Body `{ contract_issue }`; delivers that stored version to its participant. Refuses a version that is not the participant's latest (409) so an outdated contract is not handed over. An unknown issue and one of another ZEV both answer 404; a disabled ZEV refuses a manager (400) but not an admin; delivering the same version again answers 200 with `delivered: 0`. The first delivery answers 201 |
+| `/api/v1/inbox/documents/deliver-contract/` | POST | manager of `zev` | Body `{ contract_issue }` **or** `{ participant }` (exactly one, else 400); with `participant` it means that participant's latest issued version, and a participant with no issued contract answers 404. Delivers that stored version to its participant. Refuses a version that is not the participant's latest (409) so an outdated contract is not handed over. An unknown issue and one of another ZEV both answer 404; a disabled ZEV refuses a manager (400) but not an admin; delivering the same version again answers 200 with `delivered: 0`. The first delivery answers 201 |
 
 **Contracts are delivered explicitly, not on issue.** A `ContractIssue` is minted whenever a manager downloads the contract (`issue_contract_pdf` in the participant `contract` action), including to preview or print it for signing. Delivering at that moment would put a contract into the participant's inbox before the operator has handed it over. (This refines #862, which proposed delivery "when a `ContractIssue` version is issued".)
 
@@ -263,26 +263,30 @@ Decision for this spec, to be honoured by #793:
 
 ## 7. Frontend
 
-### 7.1 Participant *Documents* page
+### 7.1 Participant *My documents* page
 
-**File:** `frontend/src/pages/DocumentsPage.tsx`
+**Files:** `frontend/src/pages/DocumentsPage.tsx`, `frontend/src/features/inbox/DocumentsList.tsx`, `documentPresentation.ts`, `DocumentsList.css`.
 
-- Route `/documents` (participant shell); *My invoices* (`MyInvoicesPage.tsx`) is kept in phases 1–5 and becomes a filtered view of this page in phase 6.
-- Query: `useQuery({ queryKey: queryKeys.inbox.list(filters), queryFn: listInboxDocuments })`.
-- A list grouped by year, a kind filter (chips), a ZEV filter shown only when the account has more than one participant row. Per row: icon by kind, title, delivered date, status badge (*Superseded*, *Cancelled* for an invoice, *Withdrawn* for managers), download action. An invoice row links to the existing invoice detail while the live path exists.
-- Container: a page with a list and download actions, no dialogs, per the catalogue in `2026-10-ui-patterns-and-component-catalog.md`. Empty state: "Nothing has been delivered to you yet."
-- The annual statement and financial summary cards on the participant *Reports* page (`ParticipantYearDocuments.tsx`) read the issued row for the chosen year, falling back to on-demand rendering until phase 6, with an explicit *Issued on …* line when delivered.
+- Route `/me/documents` (participant shell, nav entry *My documents* after *My invoices*, also for a former participant, who reads what it was sent); *My invoices* (`MyInvoicesPage.tsx`) is kept in phases 1–5 and becomes a filtered view of this page in phase 6.
+- Query: `useQuery({ queryKey: queryKeys.inbox.list('mine'), queryFn: listInboxDocuments })`, all pages. A manager who is also a participant gets outbox rows in the same response, so the page keeps only rows whose `participant` is one of the account's own participant ids (`ownParticipantIds`, the rule `personalInvoiceFilter` uses for invoices).
+- A list grouped by year (the period's year, else the delivery year; newest first), a kind filter (`FilterTabs` with counts; a kind with no document is left out), a community select shown only when the account has more than one membership. Per row: icon by kind, title, type, delivery date, size, status badge, **Download**. Status is one of *Withdrawn*, *Cancelled* (an invoice whose status is `cancelled`) and *Superseded*, in that order of precedence, from `documentStanding()`. An invoice row links to the existing invoice detail (return link `/me/documents`, whitelisted in `InvoiceDetailPage`).
+- Download fetches the PDF through the API as a blob and saves it under the row's `file_name`; nothing is served from a media URL.
+- Container: a page with a list and download actions, no dialogs, per the catalogue in `2026-10-ui-patterns-and-component-catalog.md`. Empty state: "Nothing has been delivered to you yet." Loading and error states as on *My invoices* (`PageSkeleton`, `Notice` with retry).
 - Mobile (~400px): single column, download as a full-width row action.
+- **Not in this increment:** the *Issued on …* line on the participant *Reports* page (`ParticipantYearDocuments.tsx`). It moves with phase 6, when the live report endpoints go away and the page reads the issued row instead.
 
 ### 7.2 Manager outbox and upload
 
-**Files:** `frontend/src/features/inbox/OutboxTab.tsx`, `UploadDocumentDialog.tsx`, `IssueReportsDialog.tsx`.
+**Files:** `frontend/src/features/inbox/OutboxTab.tsx`, `UploadDocumentDialog.tsx`, `IssueReportsDialog.tsx`, `AudienceFields.tsx`, `DeliveryResultNotice.tsx`, `inbox.css`.
 
-- A *Delivered documents* tab on the invoices hub for managers: the same list with participant, kind, year and withdrawn filters, a column for delivery date, and a "no account yet" badge. A manager can answer "did Anna get her statement?" from here.
-- *Upload document* (dialog; one task, a few fields): title, file, audience (everyone in the ZEV / selected participants), a *Notify by email* checkbox. The result states how many rows were created and how many recipients have no account.
-- *Issue annual statements* (dialog): year, all or selected participants, the same notify checkbox; reuses `YearPicker`.
-- Deliver contract: an action on the participant's contract versions in the existing contract UI, never automatic.
-- All user-facing text in the locale files (`frontend/src/i18n/locales`), a new `inbox` namespace in `de`, `fr`, `it` and `en`.
+- A *Delivered documents* tab on the billing hub (route `/billing/documents`, `BillingHubPage tab="documents"`, `ZEV_SCOPE`): a table of the selected community's rows (document, participant, delivered date and by whom, status, actions) filtered by participant, kind and year, withdrawn rows included and marked, a *No account yet* badge for a participant with no linked account (joined client-side from the participants list). A manager can answer "did Anna get her statement?" from here. A viewer reads the tab; the actions need `canWriteSelectedCommunity`.
+- *Upload document* (dialog, `FormModal` size md; one task, a few fields): title, PDF file (an advisory check of size and type; the server decides), audience (everyone currently in the community / selected participants, chosen from a checkbox list). On success the dialog shows the result: how many received it and how many of them have no account.
+- *Issue documents* (dialog): which document (annual statement, financial summary, tariff overview), the year (not for the tariff overview; `YearPicker` over this year and the five before, defaulting to the year just ended), all eligible or selected participants, and a note that issuing again supersedes. The same result view.
+- *Withdraw* (row action on an operator document, behind a `ConfirmDialog`).
+- *Deliver contract to inbox*: an item in the participant's action menu on the participants page (`ParticipantCardsSection`), never automatic. It posts `{ participant }` to `deliver-contract`, which delivers the participant's latest issued version (§5.3). There is no contract version list in the UI, so naming the participant is what lets the page act without knowing an issue id. An unissued contract answers 404, which the page explains ("download it first").
+- **`notify` is not in the UI yet:** the notification and the email arrive in phase 5, together with the checkbox that controls them.
+- All user-facing text in the locale files (`frontend/src/i18n/locales`), a top-level `inbox` block in `de`, `fr`, `it` and `en` (plus `nav.myDocuments` and `pages.billingHub.tabs.documents`).
+- **Demo data:** `seed_demo` clears and refills the inbox of both demo communities after the invoice PDFs are written (backfill of the sent invoices, plus a tariff overview and a notice for every current participant with an account of the main community), so the guide screenshots have something to show and a re-seed never lists a document twice.
 
 ### TypeScript types
 
@@ -415,9 +419,9 @@ All counts are planned; the final numbers replace them when each phase lands.
 
 `EmailDeliveryTests`: `test_email_delivery_delivers_attachment_bytes`, `test_stored_bytes_equal_email_attachment`, `test_resent_email_does_not_add_a_row`, `test_a_later_render_does_not_change_the_delivered_file`, `test_a_failed_delivery_does_not_break_recording_the_email`. `MarkSentTests`: `test_mark_sent_delivers_stored_pdf`, `test_mark_sent_renders_missing_pdf`, `test_mark_sent_survives_render_failure`, `test_a_sent_invoice_that_is_cancelled_stays_in_the_inbox_marked_cancelled`.
 
-### Backend — `inbox/test_deliver_contract.py` (increment 2, 12 tests)
+### Backend — `inbox/test_deliver_contract.py` (increments 2 and 4, 16 tests)
 
-By reference without a copy, the participant can open it, a participant without an account is counted, idempotent (200, `delivered: 0`), an outdated version is refused (409) while the newer one is accepted, the participant and a manager of another ZEV and an unknown id all get 404, a malformed id is 400, a disabled ZEV refuses a manager but not an admin, and an anonymous caller is refused. Issuing a contract on its own delivers nothing.
+By reference without a copy, the participant can open it, a participant without an account is counted, idempotent (200, `delivered: 0`), an outdated version is refused (409) while the newer one is accepted, the participant and a manager of another ZEV and an unknown id all get 404, a malformed id is 400, a disabled ZEV refuses a manager but not an admin, and an anonymous caller is refused. Issuing a contract on its own delivers nothing. Increment 4 adds delivery by participant: it picks the latest version, a participant with no issued contract and a manager of another ZEV get 404, and exactly one of `contract_issue` and `participant` is required (400).
 
 ### Backend — `inbox/test_issue_reports.py` (increment 3, 22 tests)
 
@@ -434,9 +438,11 @@ The statement and summary generators are mocked, so these tests pin who is eligi
 
 ### Frontend
 
-- Unit tests for the kind / year grouping helper and the upload form validation (extension and size hints are advisory; the server decides).
+- `tests/inbox-documents.test.ts` (9): the presentation helpers: the year of a document (period, else delivery), grouping newest year first, the precedence of *withdrawn* over *cancelled* over *superseded*, counts per kind, the advisory upload check (empty, oversize, not a PDF; the server decides), file size formatting, the years offered when issuing.
+- `tests/inbox-documents-page.test.ts` (4): the empty state, grouping by year with a superseded badge and only the account's own rows, an invoice linking to its detail page with a *Cancelled* badge and a download through the API, the community filter only with more than one membership.
+- Changed: `tests/billing-hub-order.test.ts` (the third tab) and `tests/layout-nav.test.ts` (*My documents* for a participant; a former participant now keeps two entries, not one).
 - `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-hex.mjs`, `npm run test:unit`, `npm run build`.
-- Screenshots of the participant page and outbox in the dev stack, including a ~400px viewport; a `ui-review` pass before phase 4 merges.
+- Screenshots (`08k-delivered-documents`, `08l-my-documents` in the guide set) and a check in a running stack, including a ~400px viewport: neither page overflows horizontally. A `ui-review` pass is still open for the PR review.
 
 ### Acceptance criteria
 

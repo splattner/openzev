@@ -26,6 +26,7 @@ const HomePage = lazy(async () => ({ default: (await import('../pages/HomePage')
 const ReportsPage = lazy(async () => ({ default: (await import('../pages/ReportsPage')).ReportsPage }))
 const InvoiceDetailPage = lazy(async () => ({ default: (await import('../pages/InvoiceDetailPage')).InvoiceDetailPage }))
 const MyMeteringPointsPage = lazy(async () => ({ default: (await import('../pages/MyMeteringPointsPage')).MyMeteringPointsPage }))
+const DocumentsPage = lazy(async () => ({ default: (await import('../pages/DocumentsPage')).DocumentsPage }))
 const MyInvoicesPage = lazy(async () => ({ default: (await import('../pages/MyInvoicesPage')).MyInvoicesPage }))
 const LoginPage = lazy(async () => ({ default: (await import('../pages/LoginPage')).LoginPage }))
 const MeteringChartPage = lazy(async () => ({ default: (await import('../pages/MeteringChartPage')).MeteringChartPage }))
@@ -256,6 +257,14 @@ export function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="billing/documents"
+            element={
+              <ProtectedRoute allowedRoles={ZEV_SCOPE}>
+                <BillingHubPage tab="documents" />
+              </ProtectedRoute>
+            }
+          />
           {/* Annual statements moved to Reports with the other yearly documents. */}
           <Route path="billing/statements" element={<AliasNavigate to="/reports" />} />
           <Route path="billing/invoices/:invoiceId" element={<InvoiceDetailPage />} />
@@ -281,6 +290,16 @@ export function AppRoutes() {
             element={
               <ProtectedRoute allowedRoles={['participant', 'former']}>
                 <MyInvoicesPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* The participant document inbox (SPEC-2026-11-participant-document-inbox §7.1): what was
+              delivered to the account. A former participant keeps reading what it was sent. */}
+          <Route
+            path="me/documents"
+            element={
+              <ProtectedRoute allowedRoles={['participant', 'former']}>
+                <DocumentsPage />
               </ProtectedRoute>
             }
           />
