@@ -219,6 +219,25 @@ unchanged replays. Its counters distinguish billable writes, held values and
 intentional skips. A multi-file upload opens one protocol; the other files
 remain available in history.
 
+### Recorded reading changes
+
+Old readings are muted and the new readings are bold for easier comparison.
+
+Open an import's **Protocol** to inspect **Reading changes**: meter, Swiss
+interval with UTC offset, direction, change kind, old/new kWh and source
+document when available. CSV logs have no SDAT delivery identity. A missing
+previous value differs from zero; promotion means a held value became billable,
+not that an invoice changed. Before/after metadata was not recorded.
+
+Pages show up to 50 events and the retained count. An incompleteness warning
+means additional events were not saved; their number is unknown and pagination
+cannot recover them. Empty historical logs do not prove there were no changes;
+confirmed unchanged imports and metadata-only histories are labelled separately.
+
+If loading fails, use **Retry**. Previously loaded history stays visible after
+a temporary refresh failure, but is hidden if the import is deleted or access
+is denied. The view is available to admins, managers and viewers.
+
 ### Held (non-billable) values
 
 Values from information-only deliveries (`C38`) and temporary values (condition `21`) are
@@ -413,7 +432,7 @@ Single and bulk deletion remove eligible import logs plus all readings still
 linked to their batches, including held SDAT-CH values, then refresh metering
 data. **Imports that replaced billable or held values cannot be deleted**,
 because their previous values cannot be restored.
-The delete action is disabled for these imports; their protocol explains why.
+Protected imports have no delete action; their protocol explains why.
 If a bulk selection includes a protected import, the entire deletion is rejected
 and nothing is removed. The bulk dialog lists the blocking protected imports
 (filename and creation time) and disables confirmation while any is included.
@@ -511,8 +530,13 @@ Individual readings and importer provenance are read-only through the API and
 Django admin. Correct quantities through an explicit CSV overwrite or a newer
 SDAT replacement delivery. A newer original delivery cannot replace existing
 values; the protocol reports those skipped originals separately from replays.
-The protocol shows localized findings and relevant identifiers; expand
-**Technical details** for the raw diagnostic.
+The SDAT protocol shows translated findings and relevant identifiers, values
+and XML error locations when recorded. Older logs may contain fewer details.
+Original diagnostic text stays in the API log; it is not appended in English
+to the translated message. Unknown finding codes have a translated fallback
+with the code. The filename and result come first; an accepted correction is a
+successful import. Reading changes appear before the reading summary, technical
+identifiers and findings.
 
 Cancellation deliveries remain unsupported. For an exceptional removal, an
 admin can delete a point's readings for a date range using **Delete data**;

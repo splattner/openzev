@@ -115,6 +115,16 @@ describe('sdatIssueParams', () => {
             .toEqual([{ key: 'feature', value: 'E11' }, { key: 'import_log_id', value: 'LOG-1' }])
     })
 
+    it('keeps the total missing count when the displayed position list is shortened', () => {
+        const params = sdatIssueParams({ code: 'missing_position', severity: 'error', message: 'Missing positions',
+            expected_positions: 100, missing_count: 80, missing: Array.from({ length: 50 }, (_, index) => index + 1) })
+        expect(params).toEqual([
+            { key: 'expected_positions', value: '100' },
+            { key: 'missing_count', value: '80' },
+            { key: 'missing', value: '1, 2, 3, 4, 5, 6, 7, 8, 9, 10 (+40)' },
+        ])
+    })
+
     it('skips empty and non-scalar params', () => {
         expect(sdatIssueParams({ code: 'x', severity: 'error', message: 'm', meter_id: '', block_id: null, missing: [] })).toEqual([])
     })

@@ -55,6 +55,21 @@
   color: var(--danger-700);
 }
 
+/* Import and invoice screens use plain feedback; other screens retain their notices. */
+.plain-feedback :is(.error-banner, .warning-banner, .info-banner) {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--text-body);
+  font: inherit;
+}
+
+.plain-feedback .error-banner {
+  color: var(--danger-700);
+}
+
 /* Success banner */
 
 .success-banner {

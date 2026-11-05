@@ -566,7 +566,6 @@ test.describe('User Guide Screenshots', () => {
       name: /open protocol|protokoll/i,
     }).click()
     await page.waitForSelector('div[role="dialog"]', { timeout: 10_000 })
-    await page.waitForSelector('div[role="dialog"] .badge', { timeout: 10_000 })
     // A taller viewport shows outcome badge, accounting and findings together;
     // at 900px the findings sit below the fold of the scrolling dialog.
     await page.setViewportSize({ width: 1440, height: 1400 })

@@ -524,6 +524,11 @@ invoice periods, so their totals are unchanged. Fetching is disabled and the
 source URL is a reserved `.invalid` host, so seeding never calls a tariff API.
 Re-seeding keeps the stored prices.
 
+The sample SDAT correction changes two actual billed readings after invoicing and
+records their before/after values. Affected invoices are flagged for review, so
+replacement invoices can show the recalculated amounts; issued originals keep
+their original totals.
+
 Re-running `seed_demo` refreshes the demo readings, invoices and Anna's PDFs, import/email logs and audit events, while retaining contract snapshots. If the seed transaction rolls back, existing invoice rows and PDFs remain unchanged. PDF generation and cleanup run after commit and are best-effort. Screenshot captures explicitly select ZEV STWEG Sonnenhof so they consistently show the same community.
 
 ### Resetting Demo Data

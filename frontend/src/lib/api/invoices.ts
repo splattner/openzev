@@ -9,6 +9,7 @@ import type {
   EmailTemplateResponse,
   EmailTemplateMutationResponse,
   Invoice,
+  InvoiceCalculation,
   InvoicePeriodOverview,
   PdfTemplateResponse,
   PdfTemplateMutationResponse,
@@ -196,6 +197,16 @@ export async function approveInvoice(invoiceId: string): Promise<Invoice> {
 
 export async function markInvoiceSent(invoiceId: string): Promise<Invoice> {
   const { data } = await api.post<Invoice>(`/invoices/invoices/${invoiceId}/mark-sent/`)
+  return data
+}
+
+export async function previewInvoiceCalculation(invoiceId: string, signal?: AbortSignal): Promise<InvoiceCalculation> {
+  const { data } = await api.post<InvoiceCalculation>(`/invoices/invoices/${invoiceId}/calculation-preview/`, {}, { signal })
+  return data
+}
+
+export async function replaceInvoice(invoiceId: string): Promise<Invoice> {
+  const { data } = await api.post<Invoice>(`/invoices/invoices/${invoiceId}/replace/`)
   return data
 }
 

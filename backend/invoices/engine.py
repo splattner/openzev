@@ -36,7 +36,7 @@ from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
 from zev.models import AllocationMode, Zev, Participant, MeteringPoint, MeteringPointAssignment, VatMode
 from tariffs.dynamic.models import DynamicPricePoint
-from tariffs.dynamic.evidence import lock_sources, record_invoice_evidence
+from tariffs.dynamic.evidence import fetch_sources, record_invoice_evidence
 from tariffs.models import BillingMode, EnergyType, SplitKey, Tariff, TariffCategory, TariffPeriod
 from tariffs.periods import resolve_band
 from metering.models import MeterReading, ReadingDirection
@@ -1653,6 +1653,8 @@ def generate_invoice(
     period_start: date,
     period_end: date,
     generation_context: InvoiceGenerationContext | None = None,
+    *,
+    preview: bool = False,
 ) -> Invoice:
     """
     Generate (or regenerate) an invoice for a participant for the given period.
@@ -1661,7 +1663,8 @@ def generate_invoice(
 
     Batch callers pass an ``InvoiceGenerationContext`` with precomputed
     ZEV-period denominators. The single-invoice path omits it and derives the
-    same values on demand.
+    same values on demand. Preview returns an unsaved invoice with the same
+    calculated amounts, without replacing overlaps or reserving a number.
     """
     # Match restore's ZEV-first order without serializing other generators (ADR 0038).
     if connection.vendor == "postgresql":
@@ -1672,14 +1675,16 @@ def generate_invoice(
             )
     # Lock even when no invoice exists, before checking or deleting overlaps.
     # Selecting only the PK avoids locking a shared party via the manager's join.
-    Participant.objects.select_for_update().values("pk").get(pk=participant.pk)
+    if not preview:
+        Participant.objects.select_for_update().values("pk").get(pk=participant.pk)
     zev = participant.zev
 
     if generation_context is not None:
         generation_context.validate_for(participant, period_start, period_end)
     # Keep previous drafts until replacement succeeds; rollback preserves their credits and flags.
-    lock_billing_inputs(zev)
-    doomed_invoice_ids = _replaceable_overlapping_invoice_ids(participant, period_start, period_end)
+    if not preview:
+        lock_billing_inputs(zev)
+    doomed_invoice_ids = [] if preview else _replaceable_overlapping_invoice_ids(participant, period_start, period_end)
     if generation_context is None:
         generation_context = InvoiceGenerationContext.build(
             zev, period_start, period_end,
@@ -1700,7 +1705,8 @@ def generate_invoice(
         if tariff.dynamic_source_id
         and _overlaps(tariff.valid_from, tariff.valid_to, period_start, period_end)
     ]
-    sources = lock_sources({tariff.dynamic_source_id for tariff in dynamic_tariffs})
+    dynamic_source_ids = {tariff.dynamic_source_id for tariff in dynamic_tariffs}
+    sources = fetch_sources(dynamic_source_ids, lock=not preview)
     sources_by_id = {source.pk: source for source in sources}
     for tariff in dynamic_tariffs:
         tariff.dynamic_source = sources_by_id[tariff.dynamic_source_id]
@@ -1966,9 +1972,7 @@ def generate_invoice(
     total_chf = subtotal + vat_chf + rounding_chf
 
     # ─── 8. Create invoice ────────────────────────────────────────────────
-    invoice_number = zev.next_invoice_number()
-    invoice = Invoice.objects.create(
-        invoice_number=invoice_number,
+    invoice_values = dict(
         zev=zev,
         participant=participant,
         period_start=period_start,
@@ -1996,6 +2000,10 @@ def generate_invoice(
         issuer=generation_context.issuer(zev),
         recipient=build_recipient(participant),
     )
+    if preview:
+        return Invoice(**invoice_values)
+    invoice_number = zev.next_invoice_number()
+    invoice = Invoice.objects.create(invoice_number=invoice_number, **invoice_values)
     # ─── 9. Create line items ─────────────────────────────────────────────
     items = []
     for payload in sorted(item_payloads, key=lambda entry: (_build_sort_order(entry["tariff"]), entry["tariff"].name.lower())):

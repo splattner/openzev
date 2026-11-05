@@ -1,11 +1,11 @@
 import { useMemo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DataTable, type ColumnDef } from '../../components/DataTable'
-import { Disclosure } from '../../components/Disclosure'
 import { FormModal } from '../../components/FormModal'
 import { HeldReadingsPanel } from '../../components/HeldReadingsPanel'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import type { ImportLog, SdatIssue } from '../../types/api'
+import { CorrectionHistory } from './CorrectionHistory'
 import {
     SDAT_COUNT_ORDER,
     importLogProtectionCode,
@@ -16,16 +16,7 @@ import {
 } from './sdatOutcome'
 
 function DetailRow({ label, children }: { label: string; children: ReactNode }) {
-    return <div><strong>{label}</strong> {children}</div>
-}
-
-const OUTCOME_BADGE: Record<SdatOutcomeKind, string> = {
-    accepted: 'badge badge-success',
-    correctionOnly: 'badge badge-success',
-    held: 'badge badge-warning',
-    unchanged: 'badge badge-neutral',
-    rejected: 'badge badge-danger',
-    legacy: 'badge badge-neutral',
+    return <><dt className="muted">{label}</dt><dd>{children}</dd></>
 }
 
 function SdatIssues({ issues }: { issues: SdatIssue[] }) {
@@ -36,8 +27,8 @@ function SdatIssues({ issues }: { issues: SdatIssue[] }) {
     )
     if (ordered.length === 0) return null
     return (
-        <div className="page-stack" style={{ gap: '0.5rem' }}>
-            <h4 style={{ marginBottom: '0.2rem' }}>{t('pages.imports.protocol.issues')}</h4>
+        <div className="page-stack sdat-issues">
+            <h4 className="sdat-issues-title">{t('pages.imports.protocol.issues')}</h4>
             {ordered.map((issue, index) => (
                 <SdatIssueRow key={`${issue.code}-${index}`} issue={issue} />
             ))}
@@ -48,36 +39,40 @@ function SdatIssues({ issues }: { issues: SdatIssue[] }) {
 function SdatIssueRow({ issue }: { issue: SdatIssue }) {
     const { t } = useTranslation()
     const params = sdatIssueParams(issue)
+    const summary = t(`pages.imports.issues.${issue.code}`, { defaultValue: t('pages.imports.issues.unknownCode', { code: issue.code }) })
+    const message = typeof issue.detail_code === 'string'
+        ? t(`pages.imports.issueDetails.${issue.detail_code}`, { defaultValue: summary })
+        : summary
     return (
-        <div className="card" style={{ padding: '0.6rem 0.8rem' }}>
+        <div className="page-stack sdat-issue">
             <div className="actions-row actions-row-wrap">
-                <span className={`badge ${issue.severity === 'error' ? 'badge-danger' : 'badge-info'}`}>
-                    {issue.severity === 'error'
-                        ? t('pages.imports.protocol.issueError')
-                        : t('pages.imports.protocol.issueInfo')}
-                </span>
-                <strong>{t(`pages.imports.issues.${issue.code}`, { defaultValue: t('pages.imports.issues.unknownCode', { code: issue.code }) })}</strong>
+                {issue.severity === 'error' && <span className="error-text">{t('pages.imports.protocol.issueError')}</span>}
+                <strong>{message}</strong>
             </div>
             {params.length > 0 && (
-                <dl className="muted" style={{ margin: '0.4rem 0 0', fontSize: '0.85rem', display: 'grid', gap: '0.15rem' }}>
+                <dl className="muted sdat-issue-params">
                     {params.map(({ key, value }) => (
-                        <div key={key} style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                            <dt style={{ fontWeight: 600 }}>{t(`pages.imports.protocol.issueParam.${key}`)}:</dt>
-                            <dd style={{ margin: 0, overflowWrap: 'anywhere' }}>
-                                {key === 'direction' ? t(`pages.imports.preview.${value === 'out' ? 'directionOut' : 'directionIn'}`) : value}
+                        <div key={key} className="sdat-issue-param">
+                            <dt className="sdat-issue-param-label">{t(`pages.imports.protocol.issueParam.${key}`)}:</dt>
+                            <dd className="sdat-issue-param-value">
+                                {key === 'direction' ? t(`pages.imports.preview.${value === 'out' ? 'directionOut' : 'directionIn'}`)
+                                    : key === 'meter_type' ? t(`pages.meteringPoints.meterTypes.${value}`, { defaultValue: value })
+                                        : value}
                             </dd>
                         </div>
                     ))}
                 </dl>
             )}
-            <Disclosure className="muted disclosure-sm mt-05" summary={t('pages.imports.protocol.technicalDetails')}>
-                <p style={{ margin: '0.4rem 0 0' }}>{issue.message}</p>
-            </Disclosure>
         </div>
     )
 }
 
-export function ImportProtocolModal({ log, onClose }: { log: ImportLog | null; onClose: () => void }) {
+export function ImportProtocolModal({ log, onClose, focusCorrections, correctionPeriod }: {
+    log: ImportLog | null
+    onClose: () => void
+    focusCorrections?: boolean
+    correctionPeriod?: { from: string; to: string }
+}) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
 
@@ -118,114 +113,104 @@ export function ImportProtocolModal({ log, onClose }: { log: ImportLog | null; o
     const hasDelivery = !!delivery && !!delivery.delivery_id
 
     return (
-        <FormModal isOpen={!!log} title={t('pages.imports.protocol.title')} onClose={onClose}>
+        <FormModal isOpen={!!log} title={t('pages.imports.protocol.title')} onClose={onClose} size="xl" dirty={false}>
             {log && (
-                <div className="page-stack" style={{ gap: '0.75rem', overflowWrap: 'anywhere' }}>
-                    <DetailRow label={t('pages.imports.protocol.created')}>{formatDateTime(log.created_at, settings)}</DetailRow>
-                    <DetailRow label={t('pages.imports.protocol.source')}>{log.source}</DetailRow>
-                    <DetailRow label={t('pages.imports.protocol.zev')}>{log.zev_name || log.zev || '-'}</DetailRow>
-                    <DetailRow label={t('pages.imports.protocol.importedBy')}>{log.imported_by_display || '-'}</DetailRow>
-                    <DetailRow label={t('pages.imports.protocol.batchId')}>{log.batch_id || '-'}</DetailRow>
-                    {log.source === 'csv' && (
-                        <DetailRow label={t('pages.imports.protocol.timestampTimezone')}>{timestampTimezoneLabel(log.timestamp_timezone)}</DetailRow>
-                    )}
-                    <DetailRow label={t('pages.imports.protocol.filename')}>{log.filename || '-'}</DetailRow>
+                <div className="page-stack plain-feedback import-protocol">
+                    <header>
+                        <h3 className="m-0">{log.filename || t('pages.imports.protocol.title')}</h3>
+                        <p className="muted">
+                            {log.zev_name || log.zev || '—'}{' · '}
+                            {formatDateTime(log.created_at, settings)}{' · '}
+                            {log.source === 'csv' || log.source === 'sdatch' ? t(`pages.imports.format.${log.source}`) : log.source}
+                        </p>
+                        {structured && (
+                            <>
+                                <p className={outcome === 'rejected' ? 'error-text' : undefined}>
+                                    <strong>{t(`pages.imports.protocol.outcome.${outcome}`)}</strong>
+                                </p>
+                                <p className="muted m-0">{t(`pages.imports.protocol.outcome.${outcome}Description`)}</p>
+                            </>
+                        )}
+                    </header>
+
+                    <CorrectionHistory key={log.id} log={log} focusOnLoad={focusCorrections} period={correctionPeriod} />
+
+                    <div className={nonzeroCounts.length > 0 || !structured ? 'grid grid-2 form-grid-start' : undefined}>
+                        {nonzeroCounts.length > 0 ? (
+                            <section className="form-section">
+                                <h4>{t('pages.imports.protocol.countsTitle')}</h4>
+                                <dl className="sdat-counts">
+                                    {nonzeroCounts.map((key) => (
+                                        <div key={key} className="sdat-count-row">
+                                            <dt>{t(`pages.imports.protocol.counts.${key}`)}</dt>
+                                            <dd className="sdat-count-value">{counts?.[key]}</dd>
+                                        </div>
+                                    ))}
+                                </dl>
+                                {(counts?.promoted ?? 0) > 0 && (
+                                    <p className="muted">{t('pages.imports.protocol.promotedNote')}</p>
+                                )}
+                            </section>
+                        ) : !structured && (
+                            <section className="form-section">
+                                <h4>{t('pages.imports.protocol.countsTitle')}</h4>
+                                <dl className="source-facts">
+                                    <DetailRow label={t('pages.imports.protocol.totalRows')}>{log.rows_total ?? '—'}</DetailRow>
+                                    <DetailRow label={t('pages.imports.protocol.importedRows')}>{log.rows_imported}</DetailRow>
+                                    <DetailRow label={t('pages.imports.protocol.skippedRows')}>{log.rows_skipped}</DetailRow>
+                                </dl>
+                            </section>
+                        )}
+                        <section className="form-section">
+                            <h4>{t('pages.imports.protocol.technicalDetails')}</h4>
+                            <dl className="source-facts">
+                                <DetailRow label={t('pages.imports.protocol.importedBy')}>{log.imported_by_display || '—'}</DetailRow>
+                                <DetailRow label={t('pages.imports.protocol.batchId')}>{log.batch_id || '—'}</DetailRow>
+                                {log.source === 'csv' && (
+                                    <DetailRow label={t('pages.imports.protocol.timestampTimezone')}>{timestampTimezoneLabel(log.timestamp_timezone)}</DetailRow>
+                                )}
+                                {hasDelivery && (
+                                    <>
+                                        <DetailRow label={t('pages.imports.protocol.delivery.deliveryId')}>{delivery.delivery_id}</DetailRow>
+                                        {delivery.creation && (
+                                            <DetailRow label={t('pages.imports.protocol.delivery.creation')}>{formatDateTime(delivery.creation, settings)}</DetailRow>
+                                        )}
+                                        {(delivery.status || delivery.reason) && (
+                                            <DetailRow label={t('pages.imports.protocol.delivery.profile')}>{[delivery.status, delivery.reason].filter(Boolean).join(' · ')}</DetailRow>
+                                        )}
+                                        {(delivery.sender_id || delivery.receiver_id) && (
+                                            <DetailRow label={t('pages.imports.protocol.delivery.parties')}>{[delivery.sender_id, delivery.receiver_id].filter(Boolean).join(' → ')}</DetailRow>
+                                        )}
+                                    </>
+                                )}
+                            </dl>
+                        </section>
+                    </div>
 
                     {structured ? (
                         <>
-                            <div className="actions-row actions-row-wrap">
-                                <span className={OUTCOME_BADGE[outcome]}>
-                                    {t(`pages.imports.protocol.outcome.${outcome}`)}
-                                </span>
-                            </div>
-                            <p className="muted m-0">
-                                {t(`pages.imports.protocol.outcome.${outcome}Description`)}
-                            </p>
-
-                            {nonzeroCounts.length > 0 && (
-                                <div>
-                                    <h4 style={{ marginBottom: '0.4rem' }}>{t('pages.imports.protocol.countsTitle')}</h4>
-                                    <dl style={{ margin: 0, display: 'grid', gap: '0.2rem' }}>
-                                        {nonzeroCounts.map((key) => (
-                                            <div key={key} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                                                <dt>{t(`pages.imports.protocol.counts.${key}`)}</dt>
-                                                <dd style={{ margin: 0, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-                                                    {counts?.[key]}
-                                                </dd>
-                                            </div>
-                                        ))}
-                                    </dl>
-                                    {(counts?.promoted ?? 0) > 0 && (
-                                        <p className="muted" style={{ margin: '0.4rem 0 0', fontSize: '0.85rem' }}>
-                                            {t('pages.imports.protocol.promotedNote')}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-
                             {(counts?.held ?? 0) > 0 && !!log.batch_id && (
                                 <HeldReadingsPanel key={log.batch_id} importBatch={log.batch_id} />
                             )}
-
-                            {hasDelivery && (
-                                <div>
-                                    <h4 style={{ marginBottom: '0.4rem' }}>{t('pages.imports.protocol.deliveryTitle')}</h4>
-                                    <dl style={{ margin: 0, display: 'grid', gap: '0.2rem', fontSize: '0.9rem' }}>
-                                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                            <dt style={{ fontWeight: 600 }}>{t('pages.imports.protocol.delivery.deliveryId')}:</dt>
-                                            <dd style={{ margin: 0, overflowWrap: 'anywhere' }}>{delivery.delivery_id}</dd>
-                                        </div>
-                                        {delivery.creation && (
-                                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                                <dt style={{ fontWeight: 600 }}>{t('pages.imports.protocol.delivery.creation')}:</dt>
-                                                <dd className="m-0">{formatDateTime(delivery.creation, settings)}</dd>
-                                            </div>
-                                        )}
-                                        {(delivery.status || delivery.reason) && (
-                                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                                <dt style={{ fontWeight: 600 }}>{t('pages.imports.protocol.delivery.profile')}:</dt>
-                                                <dd className="m-0">{[delivery.status, delivery.reason].filter(Boolean).join(' · ')}</dd>
-                                            </div>
-                                        )}
-                                        {(delivery.sender_id || delivery.receiver_id) && (
-                                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                                <dt style={{ fontWeight: 600 }}>{t('pages.imports.protocol.delivery.parties')}:</dt>
-                                                <dd className="m-0">
-                                                    {[delivery.sender_id, delivery.receiver_id].filter(Boolean).join(' → ')}
-                                                </dd>
-                                            </div>
-                                        )}
-                                    </dl>
-                                </div>
-                            )}
-
                             <SdatIssues issues={log.issues ?? []} />
                         </>
                     ) : (
                         <>
-                            <DetailRow label={t('pages.imports.protocol.totalRows')}>{log.rows_total ?? '-'}</DetailRow>
-                            <DetailRow label={t('pages.imports.protocol.importedRows')}>{log.rows_imported}</DetailRow>
-                            <DetailRow label={t('pages.imports.protocol.skippedRows')}>{log.rows_skipped}</DetailRow>
-
                             {(log.warnings ?? []).length > 0 && (
-                                <>
-                                    <h4 style={{ marginBottom: '0.4rem' }}>{t('pages.imports.protocol.warnings')}</h4>
-                                    <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
-                                        {(log.warnings ?? []).map((entry, index) => (
-                                            <li key={`warning-${index}`}>{entry.warning}</li>
-                                        ))}
-                                    </ul>
-                                </>
+                                <section className="form-section">
+                                    <h4>{t('pages.imports.protocol.warnings')}</h4>
+                                    {(log.warnings ?? []).map((entry, index) => (
+                                        <p className="m-0" key={`warning-${index}`}>{entry.warning}</p>
+                                    ))}
+                                </section>
                             )}
-
-                            <h4 style={{ marginBottom: '0.4rem' }}>{t('pages.imports.protocol.skippedReasons')}</h4>
-                            <DataTable
-                                data={log.errors ?? []}
-                                columns={columns}
-                                emptyMessage={t('pages.imports.protocol.noSkippedDetails')}
-                            />
+                            <section className="form-section">
+                                <h4>{t('pages.imports.protocol.skippedReasons')}</h4>
+                                <DataTable data={log.errors ?? []} columns={columns} emptyMessage={t('pages.imports.protocol.noSkippedDetails')} />
+                            </section>
                         </>
                     )}
+
                     {protection === 'overwrite_import_protected' && (
                         <p className="warning-banner">{t('pages.imports.delete.overwriteProtected')}</p>
                     )}

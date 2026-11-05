@@ -26,6 +26,13 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
+class InvoiceCalculationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Invoice
+        fields = ("total_chf", "total_local_kwh", "total_grid_kwh", "total_feed_in_kwh")
+        read_only_fields = fields
+
+
 class InvoiceReadingImpactSerializer(serializers.ModelSerializer):
     class Meta:
         model = InvoiceReadingImpact
