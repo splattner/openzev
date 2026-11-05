@@ -95,6 +95,7 @@ async function render(expectedRows = rows.length) {
 }
 
 async function paymentMenuItem(container: HTMLElement, rowIndex = 0) {
+    await waitForCondition(() => document.querySelectorAll('[role="menuitem"]').length === 0, 'the previous menu to close')
     const trigger = container.querySelectorAll<HTMLButtonElement>('tbody tr button[aria-haspopup="menu"]')[rowIndex]
     await act(async () => { trigger.click() })
     let item: HTMLButtonElement | undefined
