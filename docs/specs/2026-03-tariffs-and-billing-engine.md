@@ -1443,6 +1443,8 @@ Inline bands are matched by their full path, including non-field messages;
 unconsumed diagnostics remain in the notice. Root response metadata such as
 `code` is never treated as a diagnostic. Progression retains its legacy
 `too_many_bands` response code alongside one structured diagnostic.
+The progression page also uses `formatTariffError` for other request failures,
+so field-error responses do not expose the structured metadata in its notice.
 `empty` uses its path: `initial_periods` requests a band, `selections` requests a
 tariff selection, and other lists receive a generic nonempty-list message.
 Clients must not parse English message text or display metadata as diagnostics.

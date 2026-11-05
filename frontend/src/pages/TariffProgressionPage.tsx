@@ -10,8 +10,8 @@ import { PageHeader } from '../components/PageHeader'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { ScopeGuard } from '../components/ScopeGuard'
 import { TariffProgressionView } from '../features/tariffs/progression/TariffProgressionView'
+import { formatTariffError } from '../features/tariffs/errors'
 import { clampDay, hasGross, lineOn, type PriceBasis } from '../features/tariffs/progression/progression'
-import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
 import { fetchTariffProgression } from '../lib/api/tariffs'
 import { useScopeNote } from '../lib/communityAccess'
@@ -132,7 +132,7 @@ export function TariffProgressionPage() {
                     <Notice tone="error" onRetry={tooManyBands ? undefined : () => void query.refetch()} isRetrying={query.isFetching}>
                         {tooManyBands
                             ? t('pages.tariffs.progression.errors.tooManyBands')
-                            : formatApiError(query.error, t('common.error'))}
+                            : formatTariffError(query.error, t('common.error'), t)}
                     </Notice>
                 ) : progression && progression.intervals.length === 0 && progression.fixed_fees.length === 0 ? (
                     <EmptyState
