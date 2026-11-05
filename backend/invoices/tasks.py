@@ -130,9 +130,11 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
     # for the send itself failing and cause a duplicate delivery.
     try:
         email = EmailMessage(subject=subject, body=body, to=[recipient])
+        # Kept: the inbox holds these exact bytes, not whatever the file is re-rendered to later.
+        attachment = invoice.pdf_file.read()
         email.attach(
             f"invoice_{invoice.invoice_number}.pdf",
-            invoice.pdf_file.read(),
+            attachment,
             "application/pdf",
         )
         email.send()
@@ -162,7 +164,7 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
         log.sent_at = sent_at
         log.save()
 
-        previous_status = record_email_delivery(invoice, sent_at)
+        previous_status = record_email_delivery(invoice, sent_at, document=attachment)
         record_audit_event(
             action_category=AuditActionCategory.INVOICE,
             action_type="invoice.email_sent",

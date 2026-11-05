@@ -25,3 +25,16 @@ class DeliveredDocumentSerializer(serializers.ModelSerializer):
     def get_delivered_by_name(self, obj):
         user = obj.delivered_by
         return (user.get_full_name() or user.username) if user else None
+
+
+class DeliverContractSerializer(serializers.Serializer):
+    contract_issue = serializers.UUIDField()
+
+
+class DeliveryResultSerializer(serializers.Serializer):
+    """The response of every write that delivers documents (spec §5.2)."""
+
+    batch_id = serializers.UUIDField()
+    delivered = serializers.IntegerField()
+    without_account = serializers.IntegerField()
+    documents = DeliveredDocumentSerializer(many=True)

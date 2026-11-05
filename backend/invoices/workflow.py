@@ -53,6 +53,7 @@ from django.db import transaction
 from django.db.models import F, Sum
 from django.utils import timezone
 
+from inbox import producers as inbox_producers
 from notifications import producers as notification_producers
 from zev.models import VatMode
 
@@ -172,6 +173,8 @@ def mark_invoice_sent(invoice: Invoice) -> dict:
         invalid_message=lambda _current: "Only approved invoices can be marked as sent.",
         extra_fields={"sent_at": timezone.now()},
     )
+    # The invoice is the deliverable: a failure to reach the inbox never undoes the transition.
+    inbox_producers.deliver_sent_invoice(invoice, delivered_at=invoice.sent_at, render_missing=True)
     notification_producers.notify_invoice_sent(invoice)
     return before
 
@@ -552,7 +555,7 @@ def refund_credit(credit: Credit, *, refunded_on, note: str = "", user=None) -> 
     return {"amount": remaining}
 
 
-def record_email_delivery(invoice: Invoice, sent_at) -> str:
+def record_email_delivery(invoice: Invoice, sent_at, *, document: bytes | None = None) -> str:
     """Record a successful email delivery on the invoice.
 
     Stamps ``sent_at`` and auto-transitions approved → sent (other statuses
@@ -565,6 +568,10 @@ def record_email_delivery(invoice: Invoice, sent_at) -> str:
     was delivered after the invoice was independently cancelled or paid is
     still worth recording — the message really was sent — it just must not
     resurrect a status that decision already moved past (#572).
+
+    ``document`` is the exact PDF that was attached to the email. On the first
+    delivery it becomes the invoice's document in the participant's inbox,
+    whatever the invoice's status has become since: the participant has it.
     """
     with transaction.atomic():
         locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
@@ -581,6 +588,8 @@ def record_email_delivery(invoice: Invoice, sent_at) -> str:
     invoice.status = locked.status
     invoice.sent_at = locked.sent_at
     invoice.updated_at = locked.updated_at
+    if first_delivery:
+        inbox_producers.deliver_sent_invoice(invoice, body=document, delivered_at=sent_at)
     # A resend, or a delivery after the invoice was cancelled, tells the participant nothing new.
     if first_delivery and locked.status == InvoiceStatus.SENT:
         notification_producers.notify_invoice_sent(invoice)
