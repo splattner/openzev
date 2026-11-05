@@ -48,6 +48,7 @@ This directory captures key architectural decisions for OpenZEV.
 - [0042: Serialize meter identities and protect historical reading configuration](0042-meter-identity-and-history-write-boundary.md)
 - [0043: Aggregate annual-report energy in SQL](0043-annual-report-sql-aggregation.md)
 - [0044: Live energy data is ephemeral, measured only, and shows a split only when it is exact](0044-live-energy-data-is-ephemeral-and-measured-only.md)
+- [0045: Delivered documents are immutable, held as their own copy, and addressed to the participant](0045-delivered-documents-are-immutable-and-addressed-to-the-participant.md)
 
 ## Conventions
 
