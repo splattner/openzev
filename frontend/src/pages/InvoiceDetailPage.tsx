@@ -22,6 +22,7 @@ import { InvoicePaymentsCard } from '../features/invoices/InvoicePaymentsCard'
 import { InvoiceDataReviewNotice } from '../features/invoices/InvoiceDataReviewNotice'
 import { InvoiceDataReviewActions } from '../features/invoices/InvoiceDataReviewActions'
 import { InvoiceEnergyChanges } from '../features/invoices/InvoiceEnergyChanges'
+import { InvoiceWorkflowAction } from '../features/invoices/InvoiceWorkflowAction'
 import type { Invoice } from '../types/api'
 
 import { usePdfObjectUrl } from '../lib/usePdfObjectUrl'
@@ -101,8 +102,8 @@ export function InvoiceDetailPage() {
     // The invoice's own community, which may not be the selected one.
     const invoiceScopeNoteKey = scopeNoteKey(invoiceShellRole)
     const canManageAccessLink = invoiceShellRole === 'admin' || invoiceShellRole === 'manager'
-    const canReviewData = canManageAccessLink && (user?.role === 'admin'
-        || user?.memberships?.some((membership) => membership.zev === inv.zev && !membership.zev_disabled))
+    const canWriteInvoice = Boolean(canManageAccessLink && (user?.role === 'admin'
+        || user?.memberships?.some((membership) => membership.zev === inv.zev && !membership.zev_disabled)))
     const isParticipant = invoiceShellRole === 'participant' || invoiceShellRole === 'former'
     const origin = (location.state as {
         from?: string; period_start?: string; period_end?: string
@@ -241,25 +242,28 @@ export function InvoiceDetailPage() {
             </div>
 
             <InvoiceAppliedCreditsCard invoice={inv} />
+            {canWriteInvoice && !inv.needs_data_review && (
+                <InvoiceWorkflowAction key={inv.id} invoice={inv} canManage={canWriteInvoice} onChanged={handleInvoiceChanged} />
+            )}
             {inv.needs_data_review && (
-                <InvoiceDataReviewNotice invoice={inv} canAct={!!canReviewData} action={canReviewData &&
+                <InvoiceDataReviewNotice invoice={inv} canAct={!!canWriteInvoice} action={canWriteInvoice &&
                     <InvoiceDataReviewActions key={inv.id} invoice={inv} canManage onChanged={handleInvoiceChanged} />
                 } />
             )}
-            {inv.status === 'cancelled' && !inv.replaced_by && canReviewData && (
+            {inv.status === 'cancelled' && !inv.replaced_by && canWriteInvoice && (
                 <InvoiceDataReviewActions key={inv.id} invoice={inv} canManage onChanged={handleInvoiceChanged} />
             )}
 
             {/* `payments` is null for a participant, who sees the totals only. */}
             {!isParticipant && inv.payments != null && (
-                <InvoicePaymentsCard invoice={inv} canManage={canManageAccessLink} onChanged={handleInvoiceChanged} />
+                <InvoicePaymentsCard invoice={inv} canManage={canWriteInvoice} onChanged={handleInvoiceChanged} />
             )}
 
             {/* A credit note exists for the participant from the moment it is issued. */}
-            {((inv.credits ?? []).length > 0 || canCorrectInvoice(inv, canManageAccessLink)) && (
+            {((inv.credits ?? []).length > 0 || canCorrectInvoice(inv, canWriteInvoice)) && (
                 <InvoiceCreditsCard
                     invoice={inv}
-                    canManage={canManageAccessLink}
+                    canManage={canWriteInvoice}
                     onChanged={handleInvoiceChanged}
                     onCreditChanged={handleCreditChanged}
                 />
@@ -304,8 +308,8 @@ export function InvoiceDetailPage() {
                             {generateError ? <span className="text-error">{t('pdf.generateError')}</span> : t('pdf.noDocument')}
                         </p>
                         {/* PDF generation takes a manager of the invoice's ZEV (#761). */}
-                        {canManageAccessLink ? (
-                            <button className="button button-primary" type="button" disabled={generating || pdfLoading} onClick={handleGeneratePdf}>
+                        {canWriteInvoice ? (
+                            <button className="button button-secondary" type="button" disabled={generating || pdfLoading} onClick={handleGeneratePdf}>
                                 {generating ? t('common.loading') : t('pages.invoiceDetail.generatePdf')}
                             </button>
                         ) : null}

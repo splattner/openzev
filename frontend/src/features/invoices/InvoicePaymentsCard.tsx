@@ -83,7 +83,7 @@ export function InvoicePaymentsCard({
                         ) : null}
                         <button
                             type="button"
-                            className="button button-primary"
+                            className={invoice.needs_data_review ? 'button button-secondary' : 'button button-primary'}
                             disabled={markPaidMutation.isPending}
                             onClick={() => markPaidMutation.mutate()}
                         >
