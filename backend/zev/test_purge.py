@@ -103,6 +103,28 @@ class _FullyWiredZev(TestCase):
 class PurgeServiceTests(_FullyWiredZev):
     """purge_zev() called directly — the deletion/survival contract."""
 
+    def test_deletes_delivered_documents_and_their_files_once(self):
+        from django.core.files.storage import default_storage
+
+        from inbox import services
+        from inbox.models import DeliveredDocument, DocumentKind
+
+        other = Participant.objects.create(
+            zev=self.zev, first_name="Max", last_name="Purged", email="max@example.com",
+            valid_from=date(2026, 1, 1),
+        )
+        stored = services.store_file(self.zev, b"%PDF-shared")
+        for participant in (self.participant, other):
+            services.deliver(participant=participant, kind=DocumentKind.OPERATOR, title="Letter", stored=stored)
+
+        result = purge_zev(self.zev)
+
+        self.assertEqual(result.deleted_counts["delivered_documents"], 2)
+        self.assertFalse(DeliveredDocument.objects.exists())
+        self.assertFalse(default_storage.exists(stored.name))
+        # The shared file counts once, beside the invoice PDF and the export file.
+        self.assertEqual(result.media_files_deleted, 3)
+
     def test_refuses_an_active_zev(self):
         self.zev.disabled_at = None
         self.zev.save()

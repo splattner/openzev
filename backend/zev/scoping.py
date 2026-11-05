@@ -64,6 +64,9 @@ class ZevScopedQuerySetMixin:
     - ``participant_access_survives_end``: ``True`` when a participant keeps
       seeing these rows after their participant record has ended (sent
       invoices). Otherwise only current records count.
+    - ``participant_survives_disabled_zev``: ``True`` when a participant keeps
+      seeing these rows although their ZEV is disabled. Only the document inbox
+      sets it (ADR 0045): what was delivered stays readable, live data does not.
     - ``viewer_allowed_actions``: action names that use an unsafe method but
       only read (a ZIP of PDFs), so a viewer may call them.
     - ``scope_parent_path``: attribute chain from a write payload to the ZEV
@@ -79,6 +82,7 @@ class ZevScopedQuerySetMixin:
     participant_distinct: bool = False
     participant_visible: Q | None = None
     participant_access_survives_end: bool = False
+    participant_survives_disabled_zev: bool = False
     viewer_allowed_actions: frozenset[str] = frozenset()
     scope_parent_path: tuple[str, ...] | None = None
 
@@ -136,7 +140,9 @@ class ZevScopedQuerySetMixin:
         if self.participant_path is None:
             return None
         prefix = self._participant_prefix()
-        condition = Q(**{f"{prefix}user": user}) & self._not_disabled_q()
+        condition = Q(**{f"{prefix}user": user})
+        if not self.participant_survives_disabled_zev:
+            condition &= self._not_disabled_q()
         if not self.participant_access_survives_end:
             condition &= access.live_participant_q(prefix)
         if self.participant_visible is not None:

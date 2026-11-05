@@ -3850,6 +3850,7 @@ export const it = {
                     sent_invoice_deleted: 'Una fattura inviata o pagata che non è nel backup verrebbe eliminata.',
                     sent_invoice_reverted: 'Una fattura inviata o pagata verrebbe riportata a uno stato precedente.',
                     contract_issue_deleted: 'Un contratto emesso che non è nel backup verrebbe eliminato.',
+                    delivered_document_deleted: 'Un documento consegnato a un partecipante e assente dal backup verrebbe eliminato.',
                     meter_id_owned_by_other_zev: 'Un ID contatore del backup appartiene ora a un\'altra comunità.',
                     referenced_row_missing: 'Il backup fa riferimento a qualcosa che qui non esiste più.',
                     export_in_progress: 'È in corso un\'esportazione del conteggio annuale per questa comunità.',

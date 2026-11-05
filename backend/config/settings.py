@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "mcp_server",
     "analytics",
     "notifications",
+    "inbox",
 ]
 
 MIDDLEWARE = [
