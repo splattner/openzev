@@ -566,9 +566,9 @@ test.describe('User Guide Screenshots', () => {
       name: /open protocol|protokoll/i,
     }).click()
     await page.waitForSelector('div[role="dialog"]', { timeout: 10_000 })
-    // A taller viewport shows outcome badge, accounting and findings together;
-    // at 900px the findings sit below the fold of the scrolling dialog.
+    // At 900px the findings sit below the fold of the scrolling dialog.
     await page.setViewportSize({ width: 1440, height: 1400 })
+    await expect(page.locator('#correction-history table')).toBeVisible()
     await page.waitForTimeout(400)
     await screenshotViewport(page, '09b-import-protocol')
   })
