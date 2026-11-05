@@ -5,22 +5,67 @@ import uuid
 from django.db.models import Q
 from django.http import FileResponse
 from drf_spectacular.utils import OpenApiParameter, extend_schema
+from django.db import transaction
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
-from rest_framework.response import Response
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from config.http import sanitize_filename
 from invoices.models import ContractIssue
 from zev.access import can_manage
+from zev.models import Participant, Zev
 from zev.scoping import ZevScopedQuerySetMixin, assert_zev_not_disabled
 
 from .models import DeliveredDocument, DocumentKind
-from .serializers import DeliveredDocumentSerializer, DeliverContractSerializer, DeliveryResultSerializer
-from .services import deliver
+from . import issuing
+from .serializers import (
+    DeliveredDocumentSerializer,
+    DeliverContractSerializer,
+    DeliveryResultSerializer,
+    IssueSerializer,
+    IssueYearSerializer,
+    UploadDocumentSerializer,
+)
+from .services import deliver, discard_file, store_file
+from .services import withdraw as withdraw_document
 
 _TRUE = {"1", "true", "yes"}
+
+
+def manageable_zev(request, zev_id) -> Zev:
+    """The ZEV the caller may write to, else 404: the same answer for "no such ZEV" and
+    "not yours", so ids cannot be probed. A disabled ZEV refuses everyone but an admin."""
+    zev = Zev.objects.filter(pk=zev_id).first()
+    if zev is None or not can_manage(request.user, zev):
+        raise NotFound()
+    assert_zev_not_disabled(request.user, zev)
+    return zev
+
+
+def delivery_response(delivery: issuing.Delivery, context, *, created_status=status.HTTP_201_CREATED):
+    """The response of every write that delivers documents (spec §5.2)."""
+    payload = {
+        "batch_id": delivery.batch_id,
+        "delivered": delivery.created,
+        "without_account": delivery.without_account,
+        "documents": delivery.documents,
+    }
+    return Response(
+        DeliveryResultSerializer(payload, context=context).data,
+        status=created_status if delivery.created else status.HTTP_200_OK,
+    )
+
+
+def _participants_of(zev, ids, field="participant_ids"):
+    """The named participants, which must all belong to ``zev``."""
+    rows = list(Participant.objects.filter(zev=zev, pk__in=ids).select_related("zev", "user"))
+    if len(rows) != len(set(ids)):
+        raise ValidationError({field: ["Every participant must belong to this ZEV."]})
+    return rows
 
 
 class DocumentViewSet(
@@ -37,6 +82,7 @@ class DocumentViewSet(
 
     serializer_class = DeliveredDocumentSerializer
     permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
     zev_lookup = "zev"
     participant_path = "participant"
     participant_access_survives_end = True
@@ -91,6 +137,55 @@ class DocumentViewSet(
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
+
+    @extend_schema(request={"multipart/form-data": UploadDocumentSerializer}, responses={201: DeliveryResultSerializer})
+    def create(self, request, *args, **kwargs):
+        """Deliver one operator document to the whole ZEV or to chosen participants.
+
+        The file is stored once and every recipient's row points at it. Whoever
+        joins the ZEV later gets nothing: the audience is fixed at delivery.
+        """
+        serializer = UploadDocumentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        zev = manageable_zev(request, data["zev"])
+        if data["audience"] == "selected":
+            participants = _participants_of(zev, data["participant_ids"])
+        else:
+            participants = list(issuing.current_participants(zev))
+            if not participants:
+                raise ValidationError({"audience": ["This ZEV has no participants to deliver to."]})
+        upload = data["file"]
+        stored = store_file(zev, upload.read(), upload.name or "")
+        batch_id = uuid.uuid4()
+        try:
+            with transaction.atomic():
+                results = [
+                    deliver(
+                        participant=participant, kind=DocumentKind.OPERATOR, title=data["title"],
+                        stored=stored, file_name=stored.file_name,
+                        delivered_by=request.user, batch_id=batch_id,
+                    )
+                    for participant in participants
+                ]
+        except BaseException:
+            discard_file(stored.name)
+            raise
+        delivery = issuing.delivery_of(batch_id, results)
+        return delivery_response(delivery, self.get_serializer_context())
+
+    @extend_schema(request=None, responses=DeliveredDocumentSerializer)
+    @action(detail=True, methods=["post"], url_path="withdraw")
+    def withdraw(self, request, pk=None):
+        """Take an operator document back from participants. The row and file are kept."""
+        document = self.get_object()
+        if not can_manage(request.user, document.zev):
+            raise NotFound()
+        assert_zev_not_disabled(request.user, document.zev)
+        if document.kind != DocumentKind.OPERATOR:
+            raise ValidationError({"detail": "Only operator documents can be withdrawn; corrections are issued again."})
+        withdraw_document(document, request.user)
+        return Response(self.get_serializer(document).data)
 
     @extend_schema(responses={(200, "application/pdf"): bytes})
     @action(detail=True, methods=["get"], url_path="file")
@@ -157,3 +252,75 @@ class DocumentViewSet(
             DeliveryResultSerializer(payload, context=self.get_serializer_context()).data,
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+
+
+class IssueView(APIView):
+    """Base of the three issue endpoints: authorise the ZEV, pick the audience, deliver."""
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = IssueSerializer
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        zev = manageable_zev(request, data["zev"])
+        delivery = self.issue(zev, data, request.user)
+        return delivery_response(delivery, {"request": request})
+
+    def audience(self, zev, data, eligible: set):
+        """The named participants, or every eligible one; always limited to the eligible."""
+        if "participant_ids" in data:
+            participants = _participants_of(zev, data["participant_ids"])
+            ineligible = [p for p in participants if p.pk not in eligible]
+            if ineligible:
+                raise ValidationError({"participant_ids": ["Some participants have nothing to report for this year."]})
+        else:
+            participants = list(
+                Participant.objects.filter(zev=zev, pk__in=eligible).select_related("zev", "user")
+            )
+        if not participants:
+            raise ValidationError({"detail": "No participant has anything to report for this year."})
+        return participants
+
+
+class IssueAnnualStatementView(IssueView):
+    serializer_class = IssueYearSerializer
+
+    @extend_schema(request=IssueYearSerializer, responses={201: DeliveryResultSerializer})
+    def post(self, request):
+        return super().post(request)
+
+    def issue(self, zev, data, user):
+        year = data["year"]
+        participants = self.audience(zev, data, issuing.statement_participant_ids(zev, year))
+        return issuing.issue_annual_statements(zev, participants, year, user)
+
+
+class IssueFinancialSummaryView(IssueView):
+    serializer_class = IssueYearSerializer
+
+    @extend_schema(request=IssueYearSerializer, responses={201: DeliveryResultSerializer})
+    def post(self, request):
+        return super().post(request)
+
+    def issue(self, zev, data, user):
+        year = data["year"]
+        participants = self.audience(zev, data, issuing.summary_participant_ids(zev, year))
+        return issuing.issue_financial_summaries(zev, participants, year, user)
+
+
+class IssueTariffOverviewView(IssueView):
+    """The tariff overview reaches every current participant; it has no per-person content."""
+
+    @extend_schema(request=IssueSerializer, responses={201: DeliveryResultSerializer})
+    def post(self, request):
+        return super().post(request)
+
+    def issue(self, zev, data, user):
+        participants = list(issuing.current_participants(zev))
+        if "participant_ids" in data:
+            participants = _participants_of(zev, data["participant_ids"])
+        if not participants:
+            raise ValidationError({"detail": "This ZEV has no participants to deliver to."})
+        return issuing.issue_tariff_overview(zev, participants, user)

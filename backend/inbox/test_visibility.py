@@ -2,13 +2,14 @@
 
 from datetime import date, timedelta
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from inbox import services
-from inbox.models import DocumentKind
+from inbox.models import DeliveredDocument, DocumentKind
 from inbox.test_helpers import PDF, deliver_operator_document
 from invoices.test_helpers import make_invoice, make_participant, make_zev
 from testing.helpers import authenticate as auth, make_user
@@ -122,7 +123,10 @@ class InboxVisibilityTests(TestCase):
         ZevAccessGrant.objects.create(zev=self.zev, user=viewer, role=ZevAccessRole.VIEWER)
         auth(self.client, viewer)
         self.assertEqual(ids(self.client.get(DOCS)), {str(self.mine.pk), str(self.theirs.pk)})
-        self.assertEqual(self.client.post(DOCS, {}).status_code, 405)
+        upload = SimpleUploadedFile("a.pdf", b"%PDF-1.4", content_type="application/pdf")
+        response = self.client.post(DOCS, {"zev": str(self.zev.pk), "title": "Nope", "file": upload}, format="multipart")
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(DeliveredDocument.objects.filter(title="Nope").exists())
 
     def test_manager_of_another_zev_sees_nothing(self):
         stranger = make_user("inbox_vis_stranger", UserRole.USER)

@@ -19,7 +19,7 @@
 | 1 | `inbox` app: model, `deliver()` service, scoping, read and outbox API, backups (incl. per-ZEV restore), ZEV purge, audit | — |
 | 1b | Transfer archive format 11 (`delivered_documents`) | stacked on #1206 |
 | 2 | Producers: invoice sent, explicit contract delivery, backfill command | stacked on #1207 |
-| 3 | Operator documents (upload, withdraw), issued annual statement / financial summary / tariff overview | — |
+| 3 | Operator documents (upload, withdraw), issued annual statement / financial summary / tariff overview | stacked on #1208 |
 | 4 | Frontend: participant *Documents* page, manager outbox, upload and issue dialogs | — |
 | 5 | Links and notifications: public invoice link and invoice email resolve to the inbox entry, `document.delivered` | — |
 | 6 | Cut-over (follow-up release): participants lose the live invoice and report endpoints | — |
@@ -173,13 +173,13 @@ The list for a participant is a single indexed query on `participant__user`. It 
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
-| `/api/v1/inbox/documents/` | POST (`multipart/form-data`) | manager of `zev` | Deliver an operator document. Fields: `zev` (required), `title` (required, ≤200), `file` (required), `audience` (`all` \| `selected`), `participant_ids` (required when `selected`), `notify` (bool, default `true`) |
-| `/api/v1/inbox/documents/{id}/withdraw/` | POST | manager of the row's ZEV | Sets `withdrawn_at` / `withdrawn_by` on an `operator` row; any other kind → 400. Idempotent |
+| `/api/v1/inbox/documents/` | POST (`multipart/form-data`) | manager of `zev` | Deliver an operator document. Fields: `zev` (required), `title` (required, ≤200), `file` (required), `audience` (`all` \| `selected`, default `all`), `participant_ids` (required when `selected`). `notify` joins in phase 5, with the notification it controls |
+| `/api/v1/inbox/documents/{id}/withdraw/` | POST | manager of the row's ZEV | Sets `withdrawn_at` / `withdrawn_by` on an `operator` row and answers 200 with the document; any other kind → 400. Idempotent. A participant, a viewer and a manager of another ZEV get 404; a disabled ZEV refuses a manager (400) but not an admin |
 
 Validation for `POST`:
 
 - `file`: `%PDF-` magic bytes in the first 5 bytes, size ≤ `INBOX_MAX_UPLOAD_BYTES` (default `10 * 1024 * 1024`), non-empty. The filename is only a suggestion and is sanitised; the content type is set by the server, never taken from the client.
-- `audience="all"`: one row for every participant of the ZEV whose link is current **now** and who is not anonymised. A participant who joins later gets nothing (same rule as notification recipients).
+- `audience="all"`: one row for every participant of the ZEV whose link is current **now** (`live_participant_q`; anonymisation, #793, does not exist yet and will have to leave its rows out of this set). No participant to deliver to → 400 on `audience`. A participant who joins later gets nothing (same rule as notification recipients).
 - `selected`: every id must belong to `zev`; otherwise 400 naming the field, not the other ZEV.
 - The ZEV must not be disabled (`assert_zev_not_disabled`).
 - Response `201`: `{ batch_id, delivered: <n>, without_account: <m>, documents: [...] }`. `without_account` counts rows whose participant has no linked account, so the manager sees "3 of 12 will see this once an account is linked".
@@ -188,14 +188,16 @@ Validation for `POST`:
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
-| `/api/v1/inbox/issue/annual-statement/` | POST | manager of `zev` | Body `{ zev, year, participant_ids? , notify? }`; omitted `participant_ids` = every participant with billed invoices that year. Renders with the existing `generate_annual_statement_pdf(..., sent_only=True)` and stores the bytes. Re-issuing a year supersedes the earlier row |
-| `/api/v1/inbox/issue/financial-summary/` | POST | manager of `zev` | Same, for producer participants (existing eligibility rule of `FinancialSummaryView`) |
-| `/api/v1/inbox/issue/tariff-overview/` | POST | manager of `zev` | Body `{ zev, notify? }`; delivers the current tariff overview to every current participant |
+| `/api/v1/inbox/issue/annual-statement/` | POST | manager of `zev` | Body `{ zev, year, participant_ids? }`; omitted `participant_ids` = every participant with a billed invoice that year **that reached them** (`billed_invoices` and `sent_to_participant()`, because the statement is rendered with `sent_only=True` and would otherwise list nothing). Renders with the existing `generate_annual_statement_pdf(..., sent_only=True)` and stores the bytes. Re-issuing a year supersedes the earlier row |
+| `/api/v1/inbox/issue/financial-summary/` | POST | manager of `zev` | Same, for producers. `FinancialSummaryView` has no eligibility rule of its own (it renders for whoever is named), so the inbox defines one from what the summary reports: a participant with a billed invoice in the year that carries a `feed_in` item or a `local_energy` item below zero (`issuing.summary_participant_ids`) |
+| `/api/v1/inbox/issue/tariff-overview/` | POST | manager of `zev` | Body `{ zev, participant_ids? }`; delivers the tariff overview as of today (`scope=valid`) to every current participant, or to the named ones. It is rendered once and every row shares the file. Re-issuing supersedes each participant's earlier overview |
 | `/api/v1/inbox/documents/deliver-contract/` | POST | manager of `zev` | Body `{ contract_issue }`; delivers that stored version to its participant. Refuses a version that is not the participant's latest (409) so an outdated contract is not handed over. An unknown issue and one of another ZEV both answer 404; a disabled ZEV refuses a manager (400) but not an admin; delivering the same version again answers 200 with `delivered: 0`. The first delivery answers 201 |
 
 **Contracts are delivered explicitly, not on issue.** A `ContractIssue` is minted whenever a manager downloads the contract (`issue_contract_pdf` in the participant `contract` action), including to preview or print it for signing. Delivering at that moment would put a contract into the participant's inbox before the operator has handed it over. (This refines #862, which proposed delivery "when a `ContractIssue` version is issued".)
 
-Responses are the same shape as §5.2. All four are idempotent for the same (participant, kind, period): a second call supersedes.
+Responses are the same shape as §5.2 (`201` when something was delivered). Naming participants of another ZEV, or participants with nothing to report for the year, is a 400 on `participant_ids`; so is a year where nobody is eligible. The three report endpoints supersede on a second call for the same (participant, kind, period); the contract endpoint is idempotent.
+
+Everything is rendered before anything is written, in one transaction: a generator that fails delivers nothing and leaves no file behind. The calls are synchronous; a ZEV with very many participants would be better served by a task, which this spec does not yet need.
 
 ### 5.4 Links already sent out
 
@@ -392,7 +394,7 @@ All counts are planned; the final numbers replace them when each phase lands.
 | `test_participant_include_withdrawn_does_not_widen` | filters only narrow |
 | `test_superseded_row_visible_with_link` | `superseded_by`, `include_superseded` |
 | `test_manager_outbox_covers_the_zev_and_filters` | outbox, `participant_id`, `kind` |
-| `test_viewer_reads_but_cannot_write` | no write route (405) |
+| `test_viewer_reads_but_cannot_write` | a viewer reads the outbox; an upload is refused (404) and delivers nothing |
 | `test_manager_of_another_zev_sees_nothing` | 404 |
 | `test_admin_sees_all` | |
 | `test_anonymous_is_refused` | 401 |
@@ -405,9 +407,9 @@ All counts are planned; the final numbers replace them when each phase lands.
 
 `test_rows_and_files_travel_and_contracts_go_by_reference`, `test_another_zev_does_not_carry_the_documents`, `test_restoring_brings_documents_back_with_their_bytes`, `test_a_document_the_restore_would_delete_needs_force`; `test_deletes_delivered_documents_and_their_files_once` (a shared file counts once). Kept out of the shared `build_world` fixture, whose counts other backup tests pin.
 
-### Backend — `inbox/test_api_upload.py` (≈10)
+### Backend — `inbox/test_api_upload.py` (increment 3, 22 tests)
 
-`test_upload_all_creates_a_row_per_current_participant`, `test_upload_selected_rejects_participant_of_other_zev`, `test_upload_rejects_non_pdf_magic_bytes`, `test_upload_rejects_oversize`, `test_upload_rejects_empty`, `test_upload_ignores_client_content_type`, `test_upload_refused_for_disabled_zev`, `test_later_participant_gets_no_backlog`, `test_response_counts_recipients_without_account`, `test_download_headers` (attachment, nosniff, no-store).
+`UploadTests` (16): a row per current participant sharing one stored file and one batch, `selected` delivers to the chosen only, a participant of another ZEV is a field error, `selected` without participants is a field error, non-PDF magic bytes, oversize (`INBOX_MAX_UPLOAD_BYTES`), empty, the client's content type and filename are ignored, a disabled ZEV refuses a manager but not an admin, a later participant gets no backlog, recipients without an account are counted, the participant downloads exactly what was uploaded (attachment, nosniff, no-store), only a manager of the ZEV may upload (404), anonymous is refused (401), a failed batch leaves no file and no rows, one audit event per recipient. `WithdrawTests` (6): the row and file are kept, the participant loses it while a manager still lists it, withdrawing twice is harmless, a non-operator document is refused (400), a participant, a viewer and a stranger get 404, the withdrawal is audited.
 
 ### Backend — `inbox/test_producers.py` (increment 2, 9 tests)
 
@@ -417,9 +419,9 @@ All counts are planned; the final numbers replace them when each phase lands.
 
 By reference without a copy, the participant can open it, a participant without an account is counted, idempotent (200, `delivered: 0`), an outdated version is refused (409) while the newer one is accepted, the participant and a manager of another ZEV and an unknown id all get 404, a malformed id is 400, a disabled ZEV refuses a manager but not an admin, and an anonymous caller is refused. Issuing a contract on its own delivers nothing.
 
-### Backend — `inbox/test_issue_reports.py` (phase 3, planned)
+### Backend — `inbox/test_issue_reports.py` (increment 3, 22 tests)
 
-`test_issue_annual_statement_supersedes_on_reissue`, plus the same for the financial summary and the tariff overview, and the eligibility rule of each.
+The statement and summary generators are mocked, so these tests pin who is eligible and what is delivered, not the PDFs (which have their own suites); one test runs the real tariff-overview generator. `AnnualStatementTests` (11): eligibility is sent invoices of the year, the statement is rendered `sent_only`, a cancelled or unsent invoice alone is not eligible, re-issuing supersedes, another year is a separate document, named participants must belong to the ZEV and have something to report, `year` is required and bounded, only a manager may issue, a disabled ZEV refuses a manager, a failing render delivers nothing and leaves no file, recipients without an account are counted. `FinancialSummaryTests` (6): producers only (feed-in, or a credit for local energy), nobody producing is a 400, naming a consumer is refused, re-issuing supersedes, a statement and a summary of one year coexist. `TariffOverviewTests` (5): one shared file for every current participant, re-issuing supersedes per participant and keeps the old bytes, an empty ZEV is refused and leaves no file, only a manager may issue, the real generator renders a PDF.
 
 ### Backend — other
 
