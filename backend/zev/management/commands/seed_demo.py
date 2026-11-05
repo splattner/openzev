@@ -9,6 +9,7 @@ and the demo login credentials.
 
 from __future__ import annotations
 
+from collections import Counter
 from datetime import date, datetime, time, timedelta, timezone as dt_timezone
 from decimal import Decimal
 from math import exp, pi, sin
@@ -36,10 +37,10 @@ from invoices.models import (
     CreditApplication,
     EmailLog,
     Invoice,
-    InvoiceReadingImpact,
     InvoiceStatus,
     Payment,
 )
+from invoices.reading_impact import flag_import_impacts
 from invoices.pdf import save_invoice_pdf
 from invoices.workflow import correct_invoice
 from metering.models import (
@@ -1527,8 +1528,6 @@ class Command(BaseCommand):
                 "timestamp": f"{day_a}T12:15:00+00:00",
                 "direction": "in",
                 "kind": ReadingChangeKind.VALUE,
-                "old_energy": "0.3125",
-                "new_energy": "0.4375",
                 "promoted": False,
                 "source_document_id": "OBS-88",
             },
@@ -1538,12 +1537,26 @@ class Command(BaseCommand):
                 "timestamp": f"{day_b}T18:30:00+00:00",
                 "direction": "in",
                 "kind": ReadingChangeKind.VALUE,
-                "old_energy": None,
-                "new_energy": "0.2500",
                 "promoted": False,
                 "source_document_id": "OBS-113",
             },
         ]
+        # The history and replacement invoice must use the same corrected inputs.
+        for change in sdat_changes:
+            reading = MeterReading.objects.filter(
+                metering_point=anna_meter,
+                timestamp__gte=datetime.fromisoformat(change["timestamp"]),
+                timestamp__lt=period_start_dt(invoice_period_end + timedelta(days=1)),
+                direction=change["direction"],
+            ).order_by("timestamp").first()
+            if reading is None:
+                raise CommandError("No billed demo reading is available for the correction fixture.")
+            change["timestamp"] = reading.timestamp.isoformat()
+            change["old_energy"] = str(reading.energy_kwh)
+            change["new_energy"] = str(reading.energy_kwh + Decimal("1.0000"))
+            reading.energy_kwh = Decimal(change["new_energy"])
+            reading.save(update_fields=["energy_kwh"])
+
         sdat_log = ImportLog.objects.create(
             zev=zev,
             imported_by=owner,
@@ -1585,24 +1598,20 @@ class Command(BaseCommand):
             reading_changes=sdat_changes,
             errors=[],
         )
-        anna_participant = Participant.objects.get(zev=zev, user=anna_user)
-        anna_invoice = Invoice.objects.get(
-            zev=zev, participant=anna_participant, period_end=invoice_period_end
-        )
-        InvoiceReadingImpact.objects.create(
-            invoice=anna_invoice,
-            import_log=sdat_log,
-            evidence={
-                "source": "sdat-import",
-                "delivery_id": delivery["delivery_id"],
-                "creation": delivery["creation"],
-                "status": delivery["status"],
-                "reason": delivery["reason"],
-                "change_count": 2,
-                "kinds": ["value"],
-                "day_from": day_a.isoformat(),
-                "day_to": day_b.isoformat(),
-                "changes_truncated": False,
+        for change in sdat_changes:
+            MeterReading.objects.filter(
+                metering_point=anna_meter, timestamp=change["timestamp"], direction=change["direction"],
+            ).update(
+                import_source=ImportSource.SDATCH, import_batch=sdat_log.batch_id,
+                source_creation=datetime.fromisoformat(delivery["creation"]),
+                source_document_id=change["source_document_id"], source_delivery_id=delivery["delivery_id"],
+                business_reason=delivery["reason"], source_unit="KWH", source_meter_id=anna_meter.meter_id,
+            )
+        flag_import_impacts(
+            zev=zev, import_log=sdat_log, changes_truncated=False, delivery=delivery,
+            affected_slots={
+                (anna_meter.pk, civil_date(datetime.fromisoformat(change["timestamp"])), change["direction"]): Counter({"value": 1})
+                for change in sdat_changes
             },
         )
 

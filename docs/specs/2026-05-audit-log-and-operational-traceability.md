@@ -198,6 +198,11 @@ surface and stored values must match these values.
 | `template` | Email/PDF template changes |
 | `system` | Security-sensitive system actions without a business domain |
 
+Atomic invoice replacement records `invoice.replace` on the retained original,
+with the replacement ID/number in metadata, and `invoice.generate` on the new
+invoice with `replaces_invoice_id`. Known calculation/state failures record a
+failed replacement attempt after rollback; they do not record a successful replacement.
+
 **Status values:**
 
 | Value | Meaning |

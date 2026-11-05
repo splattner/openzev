@@ -65,6 +65,7 @@
 
 @import '../components/RawMeteringTable.css' layer(pages);
 @import '../components/HeldReadingsPanel.css' layer(pages);
+@import '../features/imports/ImportProtocolModal.css' layer(pages);
 @import '../features/overview/SetupGuidance.css' layer(pages);
 @import '../pages/BillingPeriodsPage.css' layer(pages);
 @import '../pages/InvoicesPage.css' layer(pages);

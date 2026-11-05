@@ -13,7 +13,7 @@ vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ user: { role: 'user', memb
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: vi.fn() }) }))
 vi.mock('../src/lib/appSettings', () => ({ useAppSettings: () => ({ settings: {} }), formatShortDate: (date: string) => date }))
 
-import { InvoicePdfCell } from '../src/components/InvoicePresentation'
+import { InvoicePdfCell, InvoiceStatusBadge } from '../src/components/InvoicePresentation'
 import { InvoicePeriodRowsTable } from '../src/features/invoices/InvoicePeriodRowsTable'
 import { MyInvoicesPage } from '../src/pages/MyInvoicesPage'
 import { AdminInvoicesContent } from '../src/pages/AdminInvoicesPage'
@@ -45,6 +45,22 @@ async function mount(body: ReactNode) {
 }
 
 describe('shared invoice presentation', () => {
+    it.each([
+        ['draft', '0.00', 'invoice.status.draft'],
+        ['approved', '0.00', 'invoice.status.approved'],
+        ['sent', '0.00', 'invoice.status.sent'],
+        ['sent', '1.00', 'invoice.status.partlyPaid'],
+        ['paid', '12.30', 'invoice.status.paid'],
+        ['cancelled', '0.00', 'invoice.status.cancelled'],
+        ['future-status', '0.00', 'invoice.status.future-status'],
+    ] as const)('preserves %s wording in the plain status label with paid amount %s', async (status, paidChf, label) => {
+        const { container } = await mount(createElement(InvoiceStatusBadge, { status, paidChf, variant: 'plain' }))
+        expect(container.textContent).toContain(label)
+        const className = status === 'cancelled' ? 'error-text' : label === 'invoice.status.partlyPaid' ? 'badge badge-info'
+            : ['draft', 'approved', 'sent', 'paid'].includes(status) ? `invoice-status-${status}` : 'muted'
+        expect(container.querySelector('span')?.className).toBe(className)
+    })
+
     it.each([
         ['pending', null, 'pages.invoices.pdfGenerating'],
         ['failed', null, 'pages.invoices.pdfFailed'],

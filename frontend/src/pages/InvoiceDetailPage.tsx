@@ -20,6 +20,8 @@ import { InvoiceCreditsCard } from '../features/invoices/InvoiceCreditsCard'
 import { amountDueChf, canCorrectInvoice, hasCreditApplied } from '../features/invoices/invoiceCredits'
 import { InvoicePaymentsCard } from '../features/invoices/InvoicePaymentsCard'
 import { InvoiceDataReviewNotice } from '../features/invoices/InvoiceDataReviewNotice'
+import { InvoiceDataReviewActions } from '../features/invoices/InvoiceDataReviewActions'
+import { InvoiceEnergyChanges } from '../features/invoices/InvoiceEnergyChanges'
 import type { Invoice } from '../types/api'
 
 import { usePdfObjectUrl } from '../lib/usePdfObjectUrl'
@@ -45,10 +47,12 @@ export function InvoiceDetailPage() {
         queryKey: queryKeys.invoices.detail(invoiceId as string),
         queryFn: () => fetchInvoice(invoiceId as string),
         enabled: !!invoiceId,
+        retry: (count, error) => count < 3 && ![401, 403, 404].includes((error as { response?: { status?: number } })?.response?.status ?? 0),
     })
 
     const [generating, setGenerating] = useState(false)
     const [generateError, setGenerateError] = useState(false)
+    const [pdfRetryAttempt, setPdfRetryAttempt] = useState(0)
 
     // Whether the invoice has a stored PDF artifact (drives the "PDF exists?" branch).
     const pdfExists = invoiceQuery.data?.pdf_url != null
@@ -56,7 +60,9 @@ export function InvoiceDetailPage() {
     // Keep the fetcher stable across renders to avoid repeated PDF requests.
     const pdfFetcher = useMemo(
         () => (invoiceId ? (signal: AbortSignal) => fetchInvoicePdfBlob(invoiceId, signal) : null),
-        [invoiceId],
+        // Retry changes the fetcher identity, as in ParticipantYearDocuments.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [invoiceId, pdfRetryAttempt],
     )
     const openPdfInNewTab = useMemo(
         () => (invoiceId ? () => fetchInvoicePdfBlob(invoiceId) : undefined),
@@ -66,10 +72,18 @@ export function InvoiceDetailPage() {
 
     const pendingHeader = <PageHeader title={t('pages.invoices.title')} />
     if (invoiceQuery.isLoading) {
-        return <div className="page-stack">{pendingHeader}<PageSkeleton variant="card" /></div>
+        return <div className="page-stack plain-feedback">{pendingHeader}<PageSkeleton variant="card" /></div>
     }
     if (invoiceQuery.isError || !invoiceQuery.data) {
-        return <div className="page-stack">{pendingHeader}<Notice tone="error" onRetry={() => void invoiceQuery.refetch()} isRetrying={invoiceQuery.isFetching}>{t('common.error')}</Notice></div>
+        const status = (invoiceQuery.error as { response?: { status?: number } } | null)?.response?.status
+        const unavailable = status === 403 || status === 404
+        return <div className="page-stack plain-feedback">
+            {pendingHeader}
+            <Notice tone="error" onRetry={unavailable ? undefined : () => void invoiceQuery.refetch()} isRetrying={invoiceQuery.isFetching}>
+                {t(unavailable ? 'pages.invoices.dataReview.unavailable' : 'common.error')}
+            </Notice>
+            {unavailable && <Link className="button button-secondary" to="/">{t('common.back')}</Link>}
+        </div>
     }
 
     const inv = invoiceQuery.data
@@ -84,7 +98,11 @@ export function InvoiceDetailPage() {
     const canReviewData = canManageAccessLink && (user?.role === 'admin'
         || user?.memberships?.some((membership) => membership.zev === inv.zev && !membership.zev_disabled))
     const isParticipant = invoiceShellRole === 'participant' || invoiceShellRole === 'former'
-    const origin = (location.state as { from?: string; period_start?: string; period_end?: string } | null)
+    const origin = (location.state as {
+        from?: string; period_start?: string; period_end?: string
+        recalculation?: { invoiceId: string; before: Pick<Invoice, 'invoice_number' | 'total_chf' | 'total_local_kwh' | 'total_grid_kwh' | 'total_feed_in_kwh'> }
+    } | null)
+    const previous = inv.status === 'draft' && origin?.recalculation?.invoiceId === inv.id ? origin.recalculation.before : null
     const isoDay = /^\d{4}-\d{2}-\d{2}$/
     const originPeriod =
         origin?.from === '/billing/invoices'
@@ -149,18 +167,17 @@ export function InvoiceDetailPage() {
     ].filter(Boolean).join(' · ') || undefined
 
     return (
-        <div className="page-stack">
+        <div className="page-stack plain-feedback">
             <PageHeader
                 eyebrow={inv.zev_name}
                 scopeNote={invoiceScopeNoteKey ? t(invoiceScopeNoteKey) : undefined}
                 title={t('pages.invoiceDetail.title', { number: inv.invoice_number })}
                 description={
-                    // The document's own header: status pill, recipient, period.
                     <span className="invoice-detail-meta">
                         <span className="visually-hidden">{t('pages.invoiceDetail.status')}: </span>
                         {isParticipant
                             ? <InvoicePaymentState invoice={inv} />
-                            : <InvoiceStatusBadge status={inv.status} paidChf={inv.paid_chf} />}
+                            : <InvoiceStatusBadge status={inv.status} paidChf={inv.paid_chf} variant="plain" />}
                         <span>{`${inv.participant_name} · ${formatShortDate(inv.period_start, settings)} → ${formatShortDate(inv.period_end, settings)}`}</span>
                         {inv.replaced_by ? (
                             <span>
@@ -188,6 +205,15 @@ export function InvoiceDetailPage() {
                 }
             />
 
+            {previous && (
+                <div role="status">
+                    <p className="m-0">{t(`pages.invoices.dataReview.${Number(previous.total_chf) === Number(inv.total_chf) ? 'recalculatedUnchanged' : 'recalculatedChanged'}`, {
+                        number: previous.invoice_number, from: formatChf(Number(previous.total_chf)), to: formatChf(Number(inv.total_chf)),
+                    })}</p>
+                    <InvoiceEnergyChanges before={previous} after={inv} />
+                </div>
+            )}
+
             {/* The figures of the invoice, as its summary tiles print them. */}
             <div className="invoice-figures">
                 <section className="stat-grid">
@@ -210,7 +236,12 @@ export function InvoiceDetailPage() {
 
             <InvoiceAppliedCreditsCard invoice={inv} />
             {inv.needs_data_review && (
-                <InvoiceDataReviewNotice invoice={inv} variant="detail" canAct={!!canReviewData} />
+                <InvoiceDataReviewNotice invoice={inv} canAct={!!canReviewData} action={canReviewData &&
+                    <InvoiceDataReviewActions key={inv.id} invoice={inv} canManage onChanged={handleInvoiceChanged} />
+                } />
+            )}
+            {inv.status === 'cancelled' && !inv.replaced_by && canReviewData && (
+                <InvoiceDataReviewActions key={inv.id} invoice={inv} canManage onChanged={handleInvoiceChanged} />
             )}
 
             {/* `payments` is null for a participant, who sees the totals only. */}
@@ -243,6 +274,9 @@ export function InvoiceDetailPage() {
                 that would drift from the issued document. Line-item detail lives
                 in the embedded PDF. */}
             <section aria-label={t('pdf.previewTitle')} className="page-stack">
+                {pdfExists && inv.needs_data_review && (
+                    <p className="muted m-0">{t(`pages.invoices.dataReview.${inv.status === 'draft' ? 'pdfPendingChanges' : 'pdfIssuedOriginal'}`)}</p>
+                )}
                 {generating ? (
                     <div className="page-stack">
                         <p className="muted" role="status" aria-live="polite">
@@ -252,7 +286,7 @@ export function InvoiceDetailPage() {
                     </div>
                 ) : pdfExists ? (
                     pdfError ? (
-                        <div className="error-banner">{t('common.error')}</div>
+                        <Notice tone="error" onRetry={() => setPdfRetryAttempt(attempt => attempt + 1)} isRetrying={pdfLoading}>{t('pdf.loadFailed')}</Notice>
                     ) : pdfLoading ? (
                         <PageSkeleton variant="card" />
                     ) : (

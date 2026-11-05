@@ -2848,12 +2848,16 @@ class SeedDemoReseedTests(SeedDemoWindow, TestCase):
 		self.assertGreater(first["invoices"], 0)
 		self.assertGreater(first["email_logs"], 0)
 		self.assertEqual(first["import_logs"], 3)
-		self.assertEqual(first["reading_impacts"], 1)
-		impact = InvoiceReadingImpact.objects.get()
+		self.assertEqual(first["reading_impacts"], 6)
+		impact = InvoiceReadingImpact.objects.get(invoice__participant__user__email="anna@openzev.local")
 		self.assertIsNone(impact.resolved_at)
 		self.assertEqual(impact.invoice.participant.user.email, "anna@openzev.local")
 		self.assertEqual(impact.import_log.result_status, "accepted")
 		self.assertEqual(impact.evidence["delivery_id"], impact.import_log.source_delivery["delivery_id"])
+		for change in impact.import_log.reading_changes:
+			reading = MeterReading.objects.get(metering_point_id=change["metering_point"], timestamp=change["timestamp"], direction=change["direction"])
+			self.assertEqual(reading.energy_kwh, Decimal(change["new_energy"]))
+			self.assertNotEqual(change["old_energy"], change["new_energy"])
 		self.assertGreater(first["audit_events"], 0)
 		self.assertEqual(first["contracts"], 0)  # PDF issuance is mocked
 

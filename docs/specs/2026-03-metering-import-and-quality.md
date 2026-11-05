@@ -144,7 +144,7 @@ Ordering: `["metering_point", "timestamp", "id"]`.
 | `warnings` | `JSONField` (default `[]`) | Informational notes, never failures: CSV overwrite reports `{row: null, warning: "Overwrote N existing readings."}` and zero-energy rows in the spring DST gap report `{row: null, warning: "Skipped N rows at <date> 02:00–02:59: that hour does not exist in Swiss time (DST start)."}` here so success toasts stay success |
 | `result_status` | `CharField(16)` | Machine-readable SDAT-CH outcome: `accepted` (billable writes committed), `held` (only quarantine writes), `unchanged` (valid file, no writes), `rejected` (no observation writes, failure log preserved); blank for CSV/manual imports |
 | `result_counts` | `JSONField` (default `{}`) | Typed SDAT-CH observation accounting: `created`, `overwritten`, `held`, `promoted`, `duplicate`, `original_existing`, `stale`, `excluded`, `rejected`, `quarantine_overwritten` (existing quarantine rows updated — replacement protection evidence), `reading_changes_truncated`. Identity: `rows_total == created+overwritten+held+duplicate+original_existing+stale+excluded` on committed files (`rejected` only on rejected files); `promoted` is informational overlap, never added on top of `created`/`overwritten` |
-| `issues` | `JSONField` (default `[]`) | Structured SDAT-CH issues: `{code, severity: error|info, message, meter_id?, block_id?, position?, ...}` with stable codes (e.g. `unsupported_unit`, `missing_position`, `equal_creation_conflict`, `source_conflict`, `reactive_excluded`); the machine-readable source behind `errors`/`warnings` prose |
+| `issues` | `JSONField` (default `[]`) | Structured SDAT-CH issues: `{code, severity: error|info, message, detail_code?, meter_id?, block_id?, position?, ...}` with stable codes (e.g. `unsupported_unit`, `missing_position`, `equal_creation_conflict`, `source_conflict`, `reactive_excluded`); the machine-readable source behind `errors`/`warnings` prose. Optional diagnostic details are specified in §8.4 |
 | `reading_changes` | `JSONField` (default `[]`) | Committed billable-slot changes for invoice-impact consumers (written by SDAT-CH and CSV imports): `{metering_point, meter_id, timestamp, direction, kind: availability|value|metadata, old_energy, new_energy, promoted, source_document_id}` (CSV sets `promoted: false` and an empty `source_document_id`). Written in the same transaction as the readings — rolled-back imports record none |
 | `source_delivery` | `JSONField` (default `{}`) | SDAT-CH delivery identity: `{delivery_id, creation, status, reason, sender_id, sender_role, receiver_id, receiver_role}` |
 | `timestamp_timezone` | `CharField(40, blank)` (default `""`) | Zone offset-less timestamps were read in: `"Europe/Zurich"` or `"UTC"` for CSV (the import setting), `"Europe/Zurich"` for SDAT-CH. `""` marks imports from before ADR 0026, which read them as UTC — the batches `reanchor_readings` operates on (spec `2026-09-swiss-civil-time.md` §6.3). Migration `0006_importlog_timestamp_timezone` |
@@ -667,6 +667,10 @@ explicit retention policy.
 
 **No preview:** SDAT-CH imports directly; the `ImportLog` (counts, errors,
 warnings incl. quarantine/promotion notes) is the protocol.
+
+**Recorded correction inspection:** the protocol displays persisted SDAT-CH and
+CSV events using the same recorder shape; see §8.4 for retrieval, display and
+retention limits.
 
 ### 4.3 Preview workflow
 
@@ -1381,6 +1385,9 @@ and missing meters still block the wizard.
 
 **List payload:** `reading_changes` is omitted and deferred from the database
 query; upload responses and detail retrieval retain the bounded evidence array.
+The import protocol therefore reads the detail when it opens (correction
+history, §8.4); CSV logs use the same event shape with `promoted: false` and no
+`source_document_id`.
 Deletion eligibility is computed directly from persisted counters.
 
 **Queryset scoping:**
@@ -1654,17 +1661,85 @@ type MeteringDashboardSummary =
 ### 8.4 Import protocol and deletion UI
 
 `ImportProtocolModal` renders SDAT-CH logs from the structured contract
-only (`frontend/src/features/imports/sdatOutcome.ts`): the outcome badge
+only (`frontend/src/features/imports/sdatOutcome.ts`): the outcome text
 from `result_status` (`accepted` / `held` / `unchanged` / `rejected`, plus
 `correctionOnly` for accepted overwrites with zero created rows), nonzero
 observation counters from `result_counts` (promotion shown as a subset with
 an explicit note, never added on top), delivery identity from
-`source_delivery`, and one row per `issues[]` entry with the localized title
-for its stable code (`pages.imports.issues.<code>`, backend message as
-display-only detail for unmapped codes) plus structured params
-(meter/block/position/document/delivery). Backend English warning prose is
-displayed at most, never parsed into state. Logs without `result_status`
+`source_delivery`, and one row per `issues[]` entry with the translated message
+for its stable code (`pages.imports.issues.<code>`) plus structured params
+(meter/block/position/document/delivery/counts). Optional `detail_code` selects
+a more specific translation (`pages.imports.issueDetails.<detail_code>`);
+unknown subtypes fall back to the general code translation. Translations include the
+supported status, reason, unit and resolution requirements. Unknown codes use
+a translated fallback naming the code. Original `issue.message` diagnostics
+remain in the API log and are neither rendered nor parsed into state. Older
+logs without structured details show the general translated finding.
+Logs without `result_status`
 (CSV/legacy) keep the row-totals/notes/skipped-reasons rendering.
+
+New diagnostics retain values previously present only in prose as optional
+JSON fields (no model migration; existing codes and original messages remain unchanged):
+
+- Header/root: `element`, `document_type`, `status`, `creation`, `root_element`, `namespace`.
+- XML/parser/schema: `xml_line`, `xml_column`, `xml_path`, `xml_error_type`, copied from lxml's last error when available; the last field is a machine code, not prose.
+- Interval/resolution/positions: `interval_start`, `interval_end`, `resolution`, `resolution_unit`, `expected_positions`, `missing_count`. The `missing` array remains capped at 50; `missing_count` retains the total.
+- Energy/limits/conflicts: `volume`, `volume_limit`, `condition`, `meter_type`, `other_block_id`, `size_bytes`, `limit_bytes`, alongside existing block/source identifiers. Volume strings preserve the supplied decimal representation; incoming conflict `creation` is an ISO timestamp.
+
+`size_bytes` uses the upload's size metadata when available; bounded-read
+overflow reports only `limit_bytes`, not a total inferred from a partial read.
+
+Diagnostic subtypes are `wrong_namespace`, `aggregated_data`, `imbalance_data`
+for `unsupported_root`; `invalid_timestamp`, `empty_interval`,
+`non_minute_interval` for `invalid_interval`; and `invalid_number`,
+`negative_volume`, `volume_out_of_range` for `invalid_volume`. Older logs are
+not backfilled. The frontend localizes field labels and known meter types,
+retaining supplied identifiers and values. It never parses English diagnostics.
+
+**Correction history** (`CorrectionHistory.tsx`): opening a protocol lazily
+fetches `GET /api/v1/metering/import-logs/{id}/`; the list still omits
+`reading_changes`. The protocol uses the named `xl` dialog size. Detail data stays fresh for one minute and shares the
+existing `metering` prefix invalidation. Pages mount at most 50 events by
+slicing the loaded array; this does not reduce database reads or JSON transfer.
+Upload-result protocol navigation preserves partial/rejected wizard drafts
+without a discard prompt; leaving the page still requires confirmation.
+
+Each event shows meter, Swiss interval timestamp with UTC offset, direction,
+kind (`availability` / `value` / `metadata`), exact old/new decimal strings in
+kWh, promotion and source document. Null old energy means no previous value;
+zero remains zero. Old energy is muted and new energy is bold. Promotion means
+a held observation became billable. The
+section states that before/after metadata was not recorded; it never infers
+historical evidence from current readings.
+The filename heads the protocol, with community, import time and source in one
+context line. Successful outcomes, including corrections and held values, are
+neutral; only rejected imports use error colouring. The history follows the
+outcome. Counts and always-visible technical facts sit side by side on wide
+screens and stack on phones; findings and current held observations follow.
+Outcome, finding and change-kind labels use plain text without decorative
+icons or badges; informational findings omit a repeated severity prefix.
+Structured diagnostic parameters remain visible with their finding.
+The history table omits sort controls for fewer than two filtered rows; protected
+imports omit their ineffective actions menu. The protocol action uses an eye
+icon with an accessible label and hover/focus tooltip.
+Import screens and dialogs render error/warning/information notices as plain
+feedback, without coloured banner backgrounds; retry actions remain usable.
+
+The retained count includes zero. Metadata-only histories say no energy-value
+changes occurred **in the retained history**. Empty, untruncated
+`result_status: unchanged` logs say no reading changes; other empty/legacy
+histories only say no detailed history was recorded. `READING_CHANGE_CAP`
+remains 10 000: `reading_changes_truncated` is boolean, so the omitted count is
+unknown. Its warning remains visible even with no events or a failed detail
+request when list data already supplies the flag. Pagination cannot recover
+discarded events; complete retention requires a separate persistence change.
+
+Initial detail failures show an unavailable message and retry. A failed
+background refresh keeps cached history with a warning and retry, except
+401/403/404 responses discard it until a successful read. Cancelled requests
+cannot purge later cached data. Retry is unavailable while fetching. Invoice
+links focus and scroll to the section after loading only if focus is still on
+the document or dialog container; an operator's control focus is preserved.
 
 When `result_counts.held > 0`, the protocol opens `HeldReadingsPanel` filtered
 to `log.batch_id`, without a disclosure toggle. It labels these as remaining
@@ -1677,7 +1752,7 @@ successful files are cleared, its protocol opens, and one rejected file does
 not undo another file's import. Deletion gating mirrors
 `metering/deletion.py::protection_code` client-side
 (`importLogProtectionCode`): both `overwrite_import_protected` and
-`quarantine_replace_protected` disable the row action, explain themselves in
+`quarantine_replace_protected` omit the row’s delete menu, explain themselves in
 the protocol, and block bulk deletion all-or-nothing before dispatch; the
 server stays authoritative. The existing upload/protocol flow is kept — no
 preview or quarantine dashboard.

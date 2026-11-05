@@ -186,12 +186,44 @@ describe('useInvoiceActions hook', () => {
         const instance = mutationInstances.find((item) => item.mutate === mutation.mutate)!
         const onError = instance.options.onError as (error: unknown) => void
         act(() => onError(error))
-        expect(pushToast).toHaveBeenLastCalledWith(
-          `pages.invoices.messages.${code === 'dynamic_price_gap' ? 'dynamicPriceGap' : 'invalidDynamicTariff'}`, 'error',
+        expect(getResult()!.tariffProblem).toBe(
+          `pages.invoices.messages.${code === 'dynamic_price_gap' ? 'dynamicPriceGap' : 'invalidDynamicTariff'}`,
         )
+        expect(pushToast).not.toHaveBeenCalled()
       }
     },
   )
+
+  it('drops tariff recovery after a scope change and ignores a late generation error', () => {
+    const { Harness, getResult } = createHarness()
+    act(() => root.render(createElement(Harness)))
+    const mutation = mutationInstances.find(item => item.mutate === getResult()!.generateMutation.mutate)!
+    const variables = { participant_id: 'participant-1', period_start: '2026-05-01', period_end: '2026-05-31' }
+    const context = (mutation.options.onMutate as (variables: unknown) => unknown)(variables)
+    const error = { isAxiosError: true, response: { data: { code: 'invalid_dynamic_tariff', tariff_name: 'Grid' } } }
+    const onError = mutation.options.onError as (error: unknown, variables: unknown, context: unknown) => void
+    act(() => onError(error, variables, context))
+    expect(getResult()!.tariffProblem).toBe('pages.invoices.messages.invalidDynamicTariff')
+    act(() => root.render(createElement(Harness, { options: { selectedZevId: 'zev-2' } })))
+    expect(getResult()!.tariffProblem).toBeNull()
+    act(() => onError(error, variables, context))
+    expect(getResult()!.tariffProblem).toBeNull()
+  })
+
+  it('prioritizes correction review in Actions and keeps ordinary workflow actions in the menu', () => {
+    const row = { participant_id: 'participant-3', invoice: { id: 'invoice-approved', status: 'approved', needs_data_review: true, paid_chf: '0.00', email_logs: [] } } as any
+    const { Harness, getResult } = createHarness([row])
+    act(() => root.render(createElement(Harness)))
+    const review = getResult()!.getPrimaryRowAction(row)
+    expect(review?.key).toBe('review-corrections')
+    act(() => review!.onClick())
+    expect(mockNavigate).toHaveBeenCalledWith('/billing/invoices/invoice-approved', {
+      state: { from: '/billing/invoices', period_start: '2026-05-01', period_end: '2026-05-31' },
+    })
+    expect(getResult()!.getRowMenuItems(row)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'send-email' }),
+    ]))
+  })
 
   it('returns row actions and batch recommendation from hook state', () => {
     const { Harness, getResult } = createHarness()
@@ -336,7 +368,7 @@ describe('useInvoiceActions hook', () => {
     act(() => root.render(createElement(Harness, { options: { canWrite: false } })))
     vi.mocked(recordPayment).mockClear()
     expect(() => (instance.options.mutationFn as (vars: typeof submitted) => unknown)(submitted))
-      .toThrow('common.scopeGuard.loadFailed')
+      .toThrow('common.error')
     expect(recordPayment).not.toHaveBeenCalled()
   })
 
@@ -485,6 +517,12 @@ describe('recommendedBatchAction ordering', () => {
     }
     return { update, submit, getResult }
   }
+
+  it.each([['11.00', 'recalculatedChanged'], ['10.00', 'recalculatedUnchanged']])('reports regeneration from a previous total of %s', (total, message) => {
+    const hook = mountInstance([{ ...noInvoice('p1'), invoice: { id: 'old', invoice_number: 'OLD', status: 'draft', total_chf: total } }])
+    hook.submit('generateMutation', { id: 'new', total_chf: '10.00' }, { participant_id: 'p1' }).accept()
+    expect(pushToast).toHaveBeenCalledWith(`pages.invoices.dataReview.${message}`, 'success')
+  })
 
   it('snapshots generation targets and starts watching them on acceptance', () => {
     const hook = mountInstance([noInvoice('p1'), blocked('p2', 'locked')])

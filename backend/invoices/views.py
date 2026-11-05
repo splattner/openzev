@@ -18,16 +18,17 @@ from allocation.errors import AllocationError
 from allocation.validity import active_during
 from zev.models import Zev, Participant
 from zev import access
-from zev.scoping import ZevScopedQuerySetMixin
+from zev.scoping import ZevScopedQuerySetMixin, assert_zev_not_disabled
 from .models import Credit, CreditStatus, Invoice, InvoicePdfStatus, InvoiceReadingImpact, InvoiceStatus, EmailLog, Payment, sent_to_participant
 from .serializers import (
-    CorrectInvoiceSerializer, CreditSerializer, InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
+    CorrectInvoiceSerializer, CreditSerializer, InvoiceCalculationSerializer, InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
     GenerateZevInvoicesSerializer, MarkPaidSerializer, PaymentSerializer,
     RecordPaymentSerializer, RefundCreditSerializer,
 )
 from . import access_tokens
 from .engine import DynamicTariffError, generate_invoice, preflight_dynamic_prices
 from .pdf import InvoicePdfSupersededError, save_invoice_pdf
+from .replacement import replace_invoice
 from .tasks import (
     generate_credit_pdf_task,
     generate_invoice_pdf_task,
@@ -122,6 +123,24 @@ def _deny_if_zev_disabled(request, invoice: Invoice, *, action_type: str, denied
         {"error": "This ZEV is disabled. Ask an admin to re-enable it first."},
         status=status.HTTP_400_BAD_REQUEST,
     )
+
+
+def _queue_generated_invoice_pdf(request, invoice):
+    """PDF failures leave a committed invoice usable and recoverable."""
+    try:
+        Invoice.objects.filter(pk=invoice.pk).update(pdf_status=InvoicePdfStatus.PENDING)
+        generate_invoice_pdf_task.delay(str(invoice.pk))
+    except Exception as exc:
+        logger.error("Could not queue PDF generation for invoice %s: %s", invoice.invoice_number, exc)
+        _record_invoice_event(
+            request=request,
+            action_type="invoice.generate_pdf",
+            summary=f"Could not queue PDF generation for invoice {_invoice_target_display(invoice)}.",
+            status=AuditEventStatus.FAILED,
+            invoice=invoice,
+            metadata={"error": str(exc)},
+        )
+        Invoice.objects.filter(pk=invoice.pk).update(pdf_status=InvoicePdfStatus.FAILED)
 
 
 class InvoiceViewSet(
@@ -430,20 +449,7 @@ class InvoiceViewSet(
         # invoice exists. The PDF is recoverable — the email task renders one
         # lazily if it is still missing, and there is a per-invoice regenerate
         # action — so the failure is recorded and the response stands.
-        try:
-            Invoice.objects.filter(pk=invoice.pk).update(pdf_status=InvoicePdfStatus.PENDING)
-            generate_invoice_pdf_task.delay(str(invoice.pk))
-        except Exception as exc:
-            logger.error("Could not queue PDF generation for invoice %s: %s", invoice.invoice_number, exc)
-            _record_invoice_event(
-                request=request,
-                action_type="invoice.generate_pdf",
-                summary=f"Could not queue PDF generation for invoice {_invoice_target_display(invoice)}.",
-                status=AuditEventStatus.FAILED,
-                invoice=invoice,
-                metadata={"error": str(exc)},
-            )
-            Invoice.objects.filter(pk=invoice.pk).update(pdf_status=InvoicePdfStatus.FAILED)
+        _queue_generated_invoice_pdf(request, invoice)
         _record_invoice_event(
             request=request,
             action_type="invoice.generate",
@@ -894,6 +900,61 @@ class InvoiceViewSet(
             denied_verb="cancellation",
             success_summary=lambda invoice: f"Cancelled invoice {_invoice_target_display(invoice)}.",
         )
+
+    @action(detail=True, methods=["post"], url_path="calculation-preview",
+            permission_classes=[IsAuthenticated, HasZevAccess])
+    def calculation_preview(self, request, pk=None):
+        """Price the source period without changing invoices or reserving a number."""
+        invoice = self.get_object()
+        assert_zev_not_disabled(request.user, invoice.zev)
+        try:
+            calculation = generate_invoice(
+                invoice.participant, invoice.period_start, invoice.period_end, preview=True,
+            )
+        except DynamicTariffError as exc:
+            return Response(exc.as_dict(), status=status.HTTP_409_CONFLICT)
+        except (ValueError, AllocationError) as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(InvoiceCalculationSerializer(calculation).data)
+
+    @action(detail=True, methods=["post"], url_path="replace",
+            permission_classes=[IsAuthenticated, HasZevAccess])
+    def replace(self, request, pk=None):
+        """Atomically cancel an unpaid issued invoice and calculate its replacement."""
+        original = self.get_object()
+        denial = _deny_if_zev_disabled(request, original, action_type="invoice.replace", denied_verb="replacement")
+        if denial is not None:
+            return denial
+        try:
+            replacement, before = replace_invoice(original)
+        except DynamicTariffError as exc:
+            _record_invoice_event(
+                request=request, action_type="invoice.replace", invoice=original,
+                summary=f"Failed to replace invoice {_invoice_target_display(original)}.",
+                status=AuditEventStatus.FAILED, metadata={"error": str(exc)},
+            )
+            return Response(exc.as_dict(), status=status.HTTP_409_CONFLICT)
+        except (InvoiceWorkflowError, ValueError) as exc:
+            _record_invoice_event(
+                request=request, action_type="invoice.replace", invoice=original,
+                summary=f"Failed to replace invoice {_invoice_target_display(original)}.",
+                status=AuditEventStatus.FAILED, metadata={"error": str(exc)},
+            )
+            message = exc.user_message if isinstance(exc, InvoiceWorkflowError) else str(exc)
+            return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
+        _queue_generated_invoice_pdf(request, replacement)
+        _record_invoice_event(
+            request=request, action_type="invoice.generate", invoice=replacement,
+            summary=f"Generated replacement invoice {_invoice_target_display(replacement)}.",
+            metadata={"replaces_invoice_id": str(original.pk)},
+        )
+        _record_invoice_event(
+            request=request, action_type="invoice.replace", invoice=original,
+            summary=f"Replaced invoice {_invoice_target_display(original)} with {_invoice_target_display(replacement)}.",
+            changes=build_diff(before, {"status": InvoiceStatus.CANCELLED}, ["status"]),
+            metadata={"replacement_id": str(replacement.pk), "replacement_number": replacement.invoice_number},
+        )
+        return Response(InvoiceSerializer(replacement, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"], url_path=r"retry-email/(?P<email_log_id>[^/.]+)",
             permission_classes=[IsAuthenticated, HasZevAccess])

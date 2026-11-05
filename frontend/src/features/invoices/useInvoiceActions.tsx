@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { formatChf } from '../../lib/numbers'
 import { useNavigate } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
@@ -101,7 +102,9 @@ export function useInvoiceActions({
         scopeKey: `${period.period_start}|${period.period_end}`,
         accountId,
         canWrite,
-    }, t('common.scopeGuard.loadFailed'))
+    }, t('common.error'))
+
+    const [tariffProblem, setTariffProblem] = useState<{ key: 'dynamicPriceGap' | 'invalidDynamicTariff'; tariff: unknown; missingAt?: string; scope: typeof scope } | null>(null)
 
     const periodOverviewInvalidationKey = useMemo(
         () => (
@@ -141,16 +144,16 @@ export function useInvoiceActions({
 
     const showGenerationError = (error: unknown, fallback: string) => {
         const gap = dynamicPriceGapPayload(error)
-        if (gap) {
-            pushToast(t('pages.invoices.messages.dynamicPriceGap', {
-                tariff: gap.tariff_name,
-                timestamp: formatDateTime(gap.missing_at, settings),
-            }), 'error')
+        const payload = apiErrorPayload(error)
+        if (gap || payload?.code === 'invalid_dynamic_tariff') {
+            setTariffProblem({
+                scope, key: gap ? 'dynamicPriceGap' : 'invalidDynamicTariff',
+                tariff: gap ? gap.tariff_name : payload?.tariff_name,
+                missingAt: gap?.missing_at,
+            })
         } else {
-            const payload = apiErrorPayload(error)
-            pushToast(payload?.code === 'invalid_dynamic_tariff'
-                ? t('pages.invoices.messages.invalidDynamicTariff', { tariff: payload.tariff_name })
-                : formatApiError(error, fallback), 'error')
+            setTariffProblem(null)
+            pushToast(formatApiError(error, fallback), 'error')
         }
     }
 
@@ -158,17 +161,26 @@ export function useInvoiceActions({
 
     const generateMutation = useMutation({
         mutationFn: generateInvoice,
-        onMutate: () => ({ scope, queryKey: periodOverviewInvalidationKey }),
-        onSuccess: (_result, variables, submitted) => {
+        onMutate: (variables) => {
+            setTariffProblem(null)
+            return { scope, queryKey: periodOverviewInvalidationKey, previous: rows.find(row => row.participant_id === variables.participant_id)?.invoice }
+        },
+        onSuccess: (result, variables, submitted) => {
             void queryClient.invalidateQueries({ queryKey: submitted?.queryKey ?? periodOverviewInvalidationKey })
             if (submitted && !isCurrent(submitted.scope)) return
-            pushToast(t('pages.invoices.messages.generated'), 'success')
+            setTariffProblem(null)
+            const previous = submitted?.previous
+            pushToast(previous ? t(`pages.invoices.dataReview.${Number(previous.total_chf) === Number(result.total_chf) ? 'recalculatedUnchanged' : 'recalculatedChanged'}`, {
+                number: previous.invoice_number, from: formatChf(Number(previous.total_chf)), to: formatChf(Number(result.total_chf)),
+            }) : t('pages.invoices.messages.generated'), 'success')
             invalidateInvoicesList()
             // The invoice is saved; its PDF is queued and arrives later.
             onPdfQueued([variables.participant_id])
             invalidateCockpit()
         },
-        onError: (error) => showGenerationError(error, t('pages.invoices.messages.generateFailed')),
+        onError: (error, _variables, submitted) => {
+            if (!submitted || isCurrent(submitted.scope)) showGenerationError(error, t('pages.invoices.messages.generateFailed'))
+        },
     })
 
     const pdfMutation = useMutation({
@@ -279,19 +291,25 @@ export function useInvoiceActions({
 
     const generateAllMutation = useMutation({
         mutationFn: () => generateInvoicesForZev(batchPayload),
-        onMutate: () => ({
-            scope,
-            queryKey: periodOverviewInvalidationKey,
-            participantIds: rows.filter(row => row.generation_eligibility?.state === 'eligible').map(row => row.participant_id),
-        }),
+        onMutate: () => {
+            setTariffProblem(null)
+            return {
+                scope,
+                queryKey: periodOverviewInvalidationKey,
+                participantIds: rows.filter(row => row.generation_eligibility?.state === 'eligible').map(row => row.participant_id),
+            }
+        },
         onSuccess: (_result, _variables, queuedWork) => {
             void queryClient.invalidateQueries({ queryKey: queuedWork?.queryKey ?? periodOverviewInvalidationKey })
             invalidateInvoicesList()
             if (queuedWork && !isCurrent(queuedWork.scope)) return
+            setTariffProblem(null)
             onPdfQueued(queuedWork?.participantIds)
             invalidateCockpit()
         },
-        onError: (error) => showGenerationError(error, t('pages.invoices.batch.generateAllFailed')),
+        onError: (error, _variables, queuedWork) => {
+            if (!queuedWork || isCurrent(queuedWork.scope)) showGenerationError(error, t('pages.invoices.batch.generateAllFailed'))
+        },
     })
 
     const approveAllMutation = useMutation({
@@ -422,7 +440,7 @@ export function useInvoiceActions({
         }
     }
 
-    function getPrimaryRowAction(row: InvoicePeriodParticipantRow): ActionMenuItem | null {
+    function getWorkflowRowAction(row: InvoicePeriodParticipantRow): ActionMenuItem | null {
         const invoice = row.invoice
 
         if (!invoice || invoice.status === 'cancelled') {
@@ -489,6 +507,16 @@ export function useInvoiceActions({
         return null
     }
 
+    function getPrimaryRowAction(row: InvoicePeriodParticipantRow): ActionMenuItem | null {
+        if (!row.invoice?.needs_data_review) return getWorkflowRowAction(row)
+        const destination = detailDestination(row.invoice.id)
+        return {
+            key: 'review-corrections',
+            label: t('pages.invoices.dataReview.review'),
+            onClick: () => navigate(destination.pathname, { state: destination.state }),
+        }
+    }
+
     function getRowMenuItems(row: InvoicePeriodParticipantRow): ActionMenuItem[] {
         const invoice = row.invoice
         if (!invoice) {
@@ -496,6 +524,10 @@ export function useInvoiceActions({
         }
 
         const items: ActionMenuItem[] = []
+        if (invoice.needs_data_review) {
+            const workflowAction = getWorkflowRowAction(row)
+            if (workflowAction) items.push({ ...workflowAction, section: t('pages.invoices.menuSections.invoice') })
+        }
 
         // Cancelled rows already offer generation or conflict review as primary.
         if (invoice.status === 'draft') {
@@ -600,6 +632,10 @@ export function useInvoiceActions({
     }
 
     return {
+        tariffProblem: tariffProblem?.scope === scope ? t(`pages.invoices.messages.${tariffProblem.key}`, {
+            tariff: tariffProblem.tariff,
+            timestamp: tariffProblem.missingAt ? formatDateTime(tariffProblem.missingAt, settings) : undefined,
+        }) : null,
         generateMutation,
         pdfMutation,
         approveMutation,

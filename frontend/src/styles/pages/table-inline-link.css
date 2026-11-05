@@ -17,3 +17,8 @@
   text-decoration: underline;
 }
 
+.plain-feedback a:not(.button) {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+

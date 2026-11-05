@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { InvoicePeriodRowsTable } from '../features/invoices/InvoicePeriodRowsTable'
 import { repeatedParties } from '../features/invoices/invoiceRowState'
 import { InvoiceBatchActions } from '../features/invoices/InvoiceBatchActions'
@@ -36,7 +37,7 @@ import { Notice } from '../components/Notice'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { ScopeGuard } from '../components/ScopeGuard'
 
-const READ_ONLY_ROW_ITEMS = new Set(['review-conflict', 'open-pdf'])
+const READ_ONLY_ROW_ITEMS = new Set(['review-conflict', 'review-corrections', 'open-pdf'])
 /** Actions that create invoices: offered for whole billing periods only. */
 const GENERATING_ITEMS = new Set(['generate', 'generate-again', 'generate-all'])
 
@@ -45,7 +46,7 @@ export function InvoicesPage() {
     const scopeNote = useScopeNote()
     const { selectedZev } = useManagedZev()
     return (
-        <div className="page-stack">
+        <div className="page-stack plain-feedback">
             <PageHeader
                 eyebrow={selectedZev?.name}
                 communitySwitch
@@ -160,6 +161,7 @@ export function InvoicesContent() {
         getPrimaryRowAction,
         getRowMenuItems,
         getRowWork,
+        tariffProblem,
     } = useInvoiceActions({
         selectedZevId,
         period,
@@ -173,6 +175,16 @@ export function InvoicesContent() {
         onRecordPaymentClick: setRecordPaymentInvoiceId,
         onPdfQueued: startPdfWatch,
     })
+
+    const tariffProblemRef = useRef<HTMLDivElement>(null)
+    useEffect(() => {
+        if (!tariffProblem) return
+        const frame = requestAnimationFrame(() => {
+            if (document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')) return
+            tariffProblemRef.current?.scrollIntoView({ block: 'center' })
+        })
+        return () => cancelAnimationFrame(frame)
+    }, [tariffProblem])
 
     // Read-only accounts keep conflict review and the PDF.
     const offered = (item: { key: string }) =>
@@ -203,7 +215,7 @@ export function InvoicesContent() {
     }
 
     const content = (
-        <div className="invoice-period-view">
+        <div className="invoice-period-view plain-feedback">
             <div className="invoice-command-bar">
                 <PeriodSelector
                     interval={interval}
@@ -243,7 +255,16 @@ export function InvoicesContent() {
                 </Notice>
             )}
 
-            {pdfWatchExpired && <Notice tone="warning">{t('pages.invoices.workUnresolved')}</Notice>}
+            {tariffProblem && (
+                <div ref={tariffProblemRef}>
+                    <Notice tone="error">
+                        <p className="m-0">{tariffProblem}</p>
+                        <Link to="/tariffs" className="button button-secondary mt-05">{t('pages.invoices.emptyState.tariffsAction')}</Link>
+                    </Notice>
+                </div>
+            )}
+
+            {pdfWatchExpired && <Notice tone="warning" onRetry={() => void periodOverviewQuery.refetch()} isRetrying={periodOverviewQuery.isFetching}>{t('pages.invoices.workUnresolved')}</Notice>}
 
             {periodOverviewQuery.isError && periodOverviewQuery.data && (
                 <Notice tone="warning" onRetry={() => void periodOverviewQuery.refetch()} isRetrying={periodOverviewQuery.isFetching}>{t('pages.invoices.failed')}</Notice>
@@ -253,7 +274,7 @@ export function InvoicesContent() {
             ) : periodOverviewQuery.isError && !periodOverviewQuery.data ? (
                 <Notice tone="error" onRetry={() => void periodOverviewQuery.refetch()} isRetrying={periodOverviewQuery.isFetching}>{t('pages.invoices.failed')}</Notice>
             ) : rows.length === 0 ? (
-                <InvoicesEmptyState />
+                <InvoicesEmptyState canManage={canWriteSelectedCommunity && !!selectedZevId} />
             ) : (
                 <>
                     <div className="list-filters">
@@ -288,7 +309,6 @@ export function InvoicesContent() {
                             getRowMenuItems={rowMenuItems}
                             getRowWork={getRowWork}
                             repeatedPartyIds={repeatedParties(rows)}
-                            canAct={canWriteSelectedCommunity}
                         />
                     )}
                 </>

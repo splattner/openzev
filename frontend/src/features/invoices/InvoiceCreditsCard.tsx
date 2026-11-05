@@ -1,16 +1,16 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faFilePdf, faHandHoldingDollar, faReceipt } from '@fortawesome/free-solid-svg-icons'
+import { faFilePdf, faHandHoldingDollar } from '@fortawesome/free-solid-svg-icons'
 import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatApiError } from '../../lib/api/errors'
-import { correctInvoice, openCreditPdf, refundCredit } from '../../lib/api/invoices'
+import { openCreditPdf, refundCredit } from '../../lib/api/invoices'
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { formatChf, formatChfAmount } from '../../lib/numbers'
 import { useToast } from '../../lib/toast'
 import type { Credit, Invoice } from '../../types/api'
-import { CorrectInvoiceModal, type CorrectInvoiceValues } from './CorrectInvoiceModal'
-import { appliedCreditChf, CREDIT_STATUS_BADGE, canAdjustInvoice, canCorrectInvoice, canRefundCredit, creditableChf } from './invoiceCredits'
+import { InvoiceCorrectionButton } from './InvoiceCorrectionButton'
+import { CREDIT_STATUS_BADGE, canCorrectInvoice, canRefundCredit } from './invoiceCredits'
 import { RefundCreditModal, type RefundCreditValues } from './RefundCreditModal'
 
 /**
@@ -34,23 +34,11 @@ export function InvoiceCreditsCard({
     const { t } = useTranslation()
     const { settings } = useAppSettings()
     const { pushToast } = useToast()
-    const [correcting, setCorrecting] = useState(false)
     const [refunding, setRefunding] = useState<Credit | null>(null)
 
     const credits = invoice.credits ?? []
-    const canCorrect = canCorrectInvoice(invoice, canManage)
-    const creditable = creditableChf(invoice)
-    const canAdjust = canAdjustInvoice(invoice, canManage)
+    const canCorrect = canCorrectInvoice(invoice, canManage) && !invoice.needs_data_review
 
-    const correctMutation = useMutation({
-        mutationFn: (values: CorrectInvoiceValues) => correctInvoice(invoice.id, values),
-        onSuccess: ({ invoice: updated }) => {
-            setCorrecting(false)
-            pushToast(t('pages.invoiceDetail.credits.corrected'), 'success')
-            onChanged(updated)
-        },
-        onError: (error) => pushToast(formatApiError(error, t('pages.invoiceDetail.credits.correctFailed')), 'error'),
-    })
     const refundMutation = useMutation({
         mutationFn: (values: RefundCreditValues) => refundCredit((refunding as Credit).id, values),
         onSuccess: () => {
@@ -73,10 +61,7 @@ export function InvoiceCreditsCard({
                 <h3 id="invoice-credits-title">{t('pages.invoiceDetail.credits.title')}</h3>
                 {canCorrect ? (
                     <div className="actions-row actions-row-wrap">
-                        <button type="button" className="button button-secondary" onClick={() => setCorrecting(true)}>
-                            <FontAwesomeIcon icon={faReceipt} fixedWidth />
-                            {t('pages.invoiceDetail.credits.correct')}
-                        </button>
+                        <InvoiceCorrectionButton invoice={invoice} canManage={canManage} onChanged={onChanged} />
                     </div>
                 ) : null}
             </div>
@@ -160,15 +145,6 @@ export function InvoiceCreditsCard({
                 </div>
             )}
 
-            <CorrectInvoiceModal
-                isOpen={correcting}
-                isPending={correctMutation.isPending}
-                creditableChf={creditable.toFixed(2)}
-                creditAppliedChf={appliedCreditChf(invoice).toFixed(2)}
-                canAdjust={canAdjust}
-                onClose={() => setCorrecting(false)}
-                onSubmit={(values) => correctMutation.mutate(values)}
-            />
             <RefundCreditModal
                 isOpen={refunding !== null}
                 isPending={refundMutation.isPending}

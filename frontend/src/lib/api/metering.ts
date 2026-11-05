@@ -19,6 +19,15 @@ export async function fetchImportLogs(): Promise<ImportLog[]> {
   return fetchAllPages<ImportLog>('/metering/import-logs/')
 }
 
+/**
+ * One import log with its recorded correction history. The list endpoint leaves
+ * `reading_changes` out, so the protocol fetches this when it opens.
+ */
+export async function fetchImportLog(id: string): Promise<ImportLog> {
+  const { data } = await api.get<ImportLog>(`/metering/import-logs/${id}/`)
+  return data
+}
+
 export async function deleteImportLog(id: string): Promise<ImportDeletionResult> {
   const { data } = await api.delete<ImportDeletionResult>(`/metering/import-logs/${id}/`)
   return data

@@ -1,0 +1,113 @@
+.import-protocol {
+  overflow-wrap: anywhere;
+}
+
+.import-protocol > header {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.import-protocol :is(h3, h4, p) {
+  margin: 0;
+}
+
+.import-protocol .held-readings {
+  padding: 0;
+  border: 0;
+}
+
+.import-protocol .held-readings-status {
+  padding: 0.5rem 0 0;
+}
+
+.correction-history {
+  scroll-margin-top: 5rem;
+}
+
+/* Contextual rules beat .import-protocol :is(h3, h4, p) { margin: 0 }. */
+.correction-history .correction-history-title {
+  margin-bottom: 0.4rem;
+}
+
+.correction-history .correction-history-note {
+  margin: 0 0 0.4rem;
+}
+
+.correction-history .correction-history-footnote {
+  margin: 0.4rem 0 0;
+}
+
+.correction-history-table {
+  white-space: nowrap;
+}
+
+.correction-history-promoted {
+  font-size: 0.8rem;
+}
+
+.correction-history-values {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.correction-history-document {
+  min-width: 12rem;
+  max-width: 18rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.correction-history-pagination {
+  margin-top: 0.4rem;
+}
+
+.import-protocol .sdat-issues {
+  gap: 0.5rem;
+}
+
+.import-protocol .sdat-issues-title {
+  margin-bottom: 0.2rem;
+}
+
+.import-protocol .sdat-issue {
+  gap: 0.4rem;
+}
+
+.import-protocol .sdat-issue-params {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0.4rem 0 0;
+}
+
+.import-protocol .sdat-issue-param {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.import-protocol .sdat-issue-param-label {
+  font-weight: 600;
+}
+
+.import-protocol .sdat-issue-param-value {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.import-protocol .sdat-counts {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.import-protocol .sdat-count-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.import-protocol .sdat-count-value {
+  flex-shrink: 0;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}

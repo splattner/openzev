@@ -96,6 +96,68 @@ FIXTURE_1_4_4 = os.path.join(
 )
 
 
+class StructuredDiagnosticTests(unittest.TestCase):
+    """Semantic diagnostics retain useful values even when called without XSD validation."""
+
+    def test_header_diagnostics_identify_missing_elements_and_invalid_values(self):
+        for element in ("ValidatedMeteredData_HeaderInformation", "InstanceDocument"):
+            with self.subTest(element=element):
+                root = etree.fromstring(build_e66([]))
+                node = root.find(f".//{sdatch_importer._qname(element)}")
+                node.getparent().remove(node)
+                with self.assertRaises(sdatch_importer._FileRejected) as caught:
+                    sdatch_importer._validate_header(sdatch_importer._ImportRun(), root)
+                self.assertEqual(caught.exception.issues[0]["element"], element)
+                self.assertEqual(caught.exception.issues[0]["code"], "invalid_header")
+
+        for arguments, code, params in (
+            ({"doctype": "E31"}, "unsupported_document_type", {"document_type": "E31"}),
+            ({"status": "7"}, "unsupported_status", {"status": "7"}),
+            ({"creation": "invalid"}, "invalid_creation", {"creation": "invalid"}),
+            ({"report_end": "2025-06-02T22:00:00Z"}, "invalid_report_period", {
+                "interval_start": "2025-06-02T22:00:00Z", "interval_end": "2025-06-02T22:00:00Z",
+            }),
+        ):
+            with self.subTest(code=code):
+                with self.assertRaises(sdatch_importer._FileRejected) as caught:
+                    sdatch_importer._validate_header(sdatch_importer._ImportRun(), etree.fromstring(build_e66([], **arguments)))
+                issue = caught.exception.issues[0]
+                self.assertEqual(issue["code"], code)
+                self.assertEqual({key: issue[key] for key in params}, params)
+
+    def test_block_diagnostics_preserve_semantic_failure_details(self):
+        ordinary = "".join(observation(position, "10") for position in range(1, 5))
+        for arguments, observations, code, params in (
+            ({"start": "invalidZ"}, ordinary, "invalid_interval", {"detail_code": "invalid_timestamp", "interval_start": "invalidZ"}),
+            ({"end": "2025-06-02T22:00:00Z"}, ordinary, "invalid_interval", {"detail_code": "empty_interval"}),
+            ({"end": "2025-06-02T23:00:01Z"}, ordinary, "invalid_interval", {"detail_code": "non_minute_interval"}),
+            ({"resolution": "60", "resolution_unit": "HUR"}, ordinary, "unsupported_resolution", {"resolution": "60", "resolution_unit": "HUR"}),
+            ({}, observation(1, "NaN") + "".join(observation(position, "10") for position in range(2, 5)),
+             "invalid_volume", {"detail_code": "invalid_number", "volume": "NaN"}),
+            ({}, observation(1, "10", "99") + "".join(observation(position, "10") for position in range(2, 5)),
+             "unknown_condition", {"condition": "99"}),
+        ):
+            with self.subTest(code=code, params=params):
+                root = etree.fromstring(build_e66([build_block(CONS_ID, observations, **arguments)]))
+                block = root.find(f".//{sdatch_importer._qname('MeteringData')}")
+                with self.assertRaises(sdatch_importer._FileRejected) as caught:
+                    sdatch_importer._parse_block(block, reason="E88", report_period=(
+                        datetime(2000, 1, 1, tzinfo=timezone.utc), datetime(2100, 1, 1, tzinfo=timezone.utc),
+                    ))
+                issue = caught.exception.issues[0]
+                self.assertEqual(issue["code"], code)
+                self.assertEqual(issue["block_id"], "DERIVED-BLOCK")
+                self.assertEqual({key: issue[key] for key in params}, params)
+
+    def test_xml_error_params_keep_zero_locations_and_drop_empty_strings(self):
+        error = unittest_mock.Mock(line=0, column=0, path="", type_name="ERR_XML")
+        exc = unittest_mock.Mock(error_log=unittest_mock.Mock(last_error=error))
+
+        self.assertEqual(sdatch_importer._xml_error_params(exc), {
+            "xml_line": 0, "xml_column": 0, "xml_error_type": "ERR_XML",
+        })
+
+
 class BatchedPersistenceTests(StrictBase):
     def test_replacement_updates_in_bounded_batches(self):
         original = build_block(CONS_ID, observation(1, "1", "21") + "".join(observation(s, "1") for s in range(2, 5)))
@@ -307,6 +369,10 @@ class StrictUnitTests(StrictBase):
                 block = build_block(CONS_ID, observation(1, volume) + "".join(observation(s, "10") for s in range(2, 5)))
                 resp = self._import(build_e66([block]))
                 self.assertRejected(resp, "invalid_volume")
+                issue = resp.data["issues"][0]
+                self.assertEqual(issue["detail_code"], "volume_out_of_range")
+                self.assertEqual(issue["volume"], volume)
+                self.assertEqual(issue["volume_limit"], str(sdatch_importer.MAX_ENERGY_KWH))
                 self.assertEqual(MeterReading.objects.count(), 0)
 
     def test_derived_kwt_unit_rejects_whole_file(self):
@@ -380,6 +446,8 @@ class StrictUnitTests(StrictBase):
         resp = self._import(build_e66([block]))
 
         self.assertRejected(resp, "invalid_volume")
+        self.assertEqual(resp.data["issues"][0]["detail_code"], "negative_volume")
+        self.assertEqual(resp.data["issues"][0]["volume"], "-5")
 
     def test_derived_bad_condition_is_schema_rejected(self):
         block = build_block(
@@ -440,6 +508,9 @@ class StrictPositionTests(StrictBase):
         self.assertLess(peak, 10 * 1024 * 1024)
         issue = next(issue for issue in resp.data["issues"] if issue["code"] == "missing_position")
         self.assertEqual(len(issue["missing"]), 50)
+        expected = int((datetime(2099, 6, 2, 23, tzinfo=timezone.utc) - TS0).total_seconds() // 900)
+        self.assertEqual(issue["expected_positions"], expected)
+        self.assertEqual(issue["missing_count"], expected - 1)
 
     def _four_slot(self, observations, **kwargs):
         return self._import(build_e66([build_block(CONS_ID, observations, **kwargs)]))
@@ -451,6 +522,8 @@ class StrictPositionTests(StrictBase):
         resp = self._four_slot(obs)
 
         self.assertRejected(resp, "invalid_position")
+        self.assertEqual(resp.data["issues"][0]["position"], "999")
+        self.assertEqual(resp.data["issues"][0]["expected_positions"], 4)
 
     def test_derived_gap_rejects_file_without_inventing_readings(self):
         obs = observation(1, "10") + observation(2, "10") + observation(3, "10") + observation(5, "10")
@@ -468,6 +541,8 @@ class StrictPositionTests(StrictBase):
 
         self.assertRejected(resp, "missing_position")
         self.assertIn("4", resp.data["errors"][0]["error"])
+        self.assertEqual(resp.data["issues"][0]["missing_count"], 1)
+        self.assertEqual(resp.data["issues"][0]["expected_positions"], 4)
 
     def test_derived_duplicate_position_rejects_file(self):
         obs = "".join(observation(s, "10") for s in range(1, 5)) + observation(2, "10")
@@ -483,6 +558,8 @@ class StrictPositionTests(StrictBase):
         resp = self._import(build_e66([first, second]))
 
         self.assertRejected(resp, "conflicting_position")
+        self.assertEqual(resp.data["issues"][0]["block_id"], "BLOCK-B")
+        self.assertEqual(resp.data["issues"][0]["other_block_id"], "BLOCK-A")
 
     def test_derived_zero_position_is_schema_rejected(self):
         obs = observation(0, "10") + "".join(observation(s, "10") for s in range(2, 5))
@@ -502,6 +579,8 @@ class StrictPositionTests(StrictBase):
         resp = self._import(build_e66([block]))
 
         self.assertRejected(resp, "unaligned_interval")
+        self.assertEqual(resp.data["issues"][0]["interval_start"], "2025-06-02T22:07:00Z")
+        self.assertEqual(resp.data["issues"][0]["interval_end"], "2025-06-02T23:07:00Z")
 
     def test_derived_indivisible_interval_rejects_file(self):
         block = build_block(
@@ -578,16 +657,24 @@ class StrictHeaderTests(StrictBase):
         resp = self._import(self._four_slot(namespace="http://example.com"))
 
         self.assertRejected(resp, "unsupported_root")
+        self.assertEqual(resp.data["issues"][0]["detail_code"], "wrong_namespace")
+        self.assertEqual(resp.data["issues"][0]["namespace"], "http://example.com")
+        self.assertEqual(resp.data["issues"][0]["root_element"], "ValidatedMeteredData_16")
 
     def test_derived_older_schema_version_is_rejected(self):
         resp = self._import(self._four_slot(root="ValidatedMeteredData_15"))
 
         self.assertRejected(resp, "unsupported_schema_version")
+        self.assertEqual(resp.data["issues"][0]["root_element"], "ValidatedMeteredData_15")
 
     def test_derived_unknown_status_is_schema_rejected(self):
         resp = self._import(self._four_slot(status="7"))
 
         self.assertRejected(resp, "schema_invalid")
+        issue = resp.data["issues"][0]
+        self.assertGreater(issue["xml_line"], 0)
+        self.assertIn("Status", issue["xml_path"])
+        self.assertTrue(issue["xml_error_type"].startswith("SCHEMAV_"))
 
     def test_derived_cancellation_names_cancellation(self):
         resp = self._import(self._four_slot(status="1"))
@@ -628,6 +715,7 @@ class StrictHeaderTests(StrictBase):
         resp = self._import(build_e66([block]))
 
         self.assertRejected(resp, "missing_interval")
+        self.assertEqual(resp.data["issues"][0]["block_id"], "DERIVED-BLOCK")
 
     def test_derived_missing_point_is_rejected(self):
         block = build_block(
@@ -814,6 +902,7 @@ class RevisionTests(StrictBase):
         self.assertEqual(conflict["incoming_delivery_id"], "DERIVED-CONFLICT")
         self.assertIn("DERIVED", conflict["stored_document_id"])
         self.assertEqual(conflict["stored_delivery_id"], "DERIVED-ORIG")
+        self.assertEqual(conflict["creation"], "2025-06-05T15:40:05+00:00")
         self.assertEqual(resp.data["reading_changes"], [])
         after = {
             (r.timestamp, r.energy_kwh)
@@ -1175,6 +1264,8 @@ class AmbiguityTests(StrictBase):
         # Both identities resolve to the same point: the slot is delivered
         # twice, which is a duplicate even though the values agree.
         self.assertRejected(resp, "duplicate_position")
+        self.assertEqual(resp.data["issues"][0]["block_id"], "BLOCK-ALIAS")
+        self.assertEqual(resp.data["issues"][0]["other_block_id"], "BLOCK-PRIMARY")
 
 
 class SecurityLimitTests(StrictBase):
@@ -1189,6 +1280,8 @@ class SecurityLimitTests(StrictBase):
                 log = sdatch_importer.import_sdatch(upload, self.zev, self.owner)
         self.assertEqual(log.result_status, "rejected")
         self.assertEqual(log.issues[0]["code"], "file_too_large")
+        self.assertNotIn("size_bytes", log.issues[0])
+        self.assertEqual(log.issues[0]["limit_bytes"], 10)
         read.assert_called_once_with(11)
 
     def _four(self, **kwargs):
@@ -1210,6 +1303,8 @@ class SecurityLimitTests(StrictBase):
             resp = self._upload("bomb.xml.gz", payload)
 
         self.assertRejected(resp, "decompressed_too_large")
+        self.assertNotIn("size_bytes", resp.data["issues"][0])
+        self.assertEqual(resp.data["issues"][0]["limit_bytes"], 100)
 
     def test_actual_size_is_enforced_without_size_hint(self):
         upload = SimpleUploadedFile("big.xml", build_e66([self._four()]), content_type="application/xml")
@@ -1568,7 +1663,10 @@ class DeliveryBoundaryTests(StrictBase):
             with self.subTest(meter=meter):
                 good = quarter_block(CONS_ID, "2025-06-02T22:00:00Z", 1, doc="GOOD")
                 bad = quarter_block(meter, "2025-06-02T22:15:00Z", 1, point=point, doc="BAD")
-                self.assertRejected(self._import(build_e66([good, bad])), "meter_direction_mismatch")
+                response = self._import(build_e66([good, bad]))
+                self.assertRejected(response, "meter_direction_mismatch")
+                expected_type = MeteringPointType.CONSUMPTION if meter == CONS_ID else MeteringPointType.PRODUCTION
+                self.assertEqual(response.data["issues"][0]["meter_type"], expected_type)
                 self.assertFalse(MeterReading.objects.exists())
 
     def test_bidirectional_readings_reach_both_billing_pools(self):

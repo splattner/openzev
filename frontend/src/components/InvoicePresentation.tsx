@@ -30,10 +30,21 @@ export function InvoiceLink({ invoice, from, period, children, className }: {
 }
 
 /** Pass `paidChf` where it is known, so a partly paid invoice says so. */
-export function InvoiceStatusBadge({ status, paidChf }: { status: Invoice['status']; paidChf?: Invoice['paid_chf'] }) {
+export function InvoiceStatusBadge({ status, paidChf, variant = 'badge' }: {
+    status: Invoice['status']
+    paidChf?: Invoice['paid_chf']
+    variant?: 'badge' | 'plain'
+}) {
     const { t } = useTranslation()
-    const label = isPartlyPaid({ status, paid_chf: paidChf }) ? t('invoice.status.partlyPaid')
+    const partlyPaid = isPartlyPaid({ status, paid_chf: paidChf })
+    const label = partlyPaid ? t('invoice.status.partlyPaid')
         : status ? t(`invoice.status.${status}`) : ''
+    if (status === 'cancelled') return <span className="error-text">{label}</span>
+    if (variant === 'plain') {
+        const className = partlyPaid ? 'badge badge-info'
+            : ['draft', 'approved', 'sent', 'paid'].includes(status) ? `invoice-status-${status}` : 'muted'
+        return <span className={className}>{label}</span>
+    }
     return <span className={INVOICE_STATUS_BADGE_CLASS}>{label}</span>
 }
 
@@ -49,7 +60,7 @@ export function InvoicePaymentState({ invoice }: {
     const state = paymentState(invoice)
     if (state === null) {
         return invoice.status === 'cancelled'
-            ? <span className="muted">{t('invoice.status.cancelled')}</span>
+            ? <span className="error-text">{t('invoice.status.cancelled')}</span>
             : <span className="muted">-</span>
     }
     if (state === 'overdue') return <IssueText>{t('invoice.payment.overdue')}</IssueText>

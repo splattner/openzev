@@ -69,6 +69,7 @@ export const queryKeys = {
     mine: () => ['invoices', 'mine'] as const,
     credits: () => ['invoices', 'credits'] as const,
     detail: (invoiceId: string) => ['invoices', 'detail', invoiceId] as const,
+    calculationPreview: (invoiceId: string) => ['invoices', 'detail', invoiceId, 'calculation-preview'] as const,
     dashboard: () => ['invoices', 'dashboard'] as const,
     periodOverview: (zevId: string, periodStart: string, periodEnd: string) =>
       ['invoices', 'period-overview', zevId, periodStart, periodEnd] as const,
@@ -91,6 +92,7 @@ export const queryKeys = {
     points: (zevId?: string) => ['metering', 'points', zevId ?? 'all'] as const,
     pointAssignments: (meteringPointId?: string) => ['metering', 'point-assignments', meteringPointId ?? 'all'] as const,
     importLogs: () => ['metering', 'import-logs'] as const,
+    importLog: (id: string) => ['metering', 'import-log', id] as const,
     chartData: (meteringPointId: string, dateFrom: string, dateTo: string, bucket: 'day' | 'hour' | 'month') =>
       ['metering', 'chart-data', meteringPointId, dateFrom, dateTo, bucket] as const,
     rawData: (meteringPointId: string, dateFrom: string, dateTo: string) =>

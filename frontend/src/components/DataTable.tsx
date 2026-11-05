@@ -87,7 +87,7 @@ export function DataTable<T>({
                         {table.getHeaderGroups().map((headerGroup) => (
                             <tr key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
-                                    const canSort = enableSorting && header.column.getCanSort()
+                                    const canSort = enableSorting && table.getFilteredRowModel().rows.length > 1 && header.column.getCanSort()
                                     const dir = header.column.getIsSorted()
                                     const ariaSort: 'ascending' | 'descending' | 'none' | undefined =
                                         canSort ? (dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none') : undefined
