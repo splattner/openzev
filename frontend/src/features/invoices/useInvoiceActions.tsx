@@ -44,7 +44,7 @@ import { getLatestEmailLog } from './emailLogs'
 import { useEmailDelivery } from './useEmailDelivery'
 import { invoiceRowCounts } from './invoiceRowFilters'
 import { canRecordPayment } from './invoiceCredits'
-import { isPartlyPaid } from './invoiceStatus'
+import { isPartlyPaid, nextInvoiceWorkflowAction } from './invoiceStatus'
 import type { RecordPaymentValues } from './RecordPaymentModal'
 import type { ActionMenuItem } from '../../components/ActionMenu'
 import type { Invoice, InvoicePeriodParticipantRow } from '../../types/api'
@@ -442,6 +442,7 @@ export function useInvoiceActions({
 
     function getWorkflowRowAction(row: InvoicePeriodParticipantRow): ActionMenuItem | null {
         const invoice = row.invoice
+        const nextAction = invoice ? nextInvoiceWorkflowAction(invoice) : null
 
         if (!invoice || invoice.status === 'cancelled') {
             const eligibility = row.generation_eligibility
@@ -472,7 +473,7 @@ export function useInvoiceActions({
             }
         }
 
-        if (invoice.status === 'draft') {
+        if (nextAction === 'approve') {
             return {
                 key: 'approve',
                 label: t('pages.invoices.approve'),
@@ -482,7 +483,7 @@ export function useInvoiceActions({
             }
         }
 
-        if (invoice.status === 'approved') {
+        if (nextAction === 'send-email') {
             return {
                 key: 'send-email',
                 label: isSending(invoice.id) ? t('pages.invoices.sending') : t('pages.invoices.sendEmail'),
@@ -492,7 +493,7 @@ export function useInvoiceActions({
             }
         }
 
-        if (invoice.status === 'sent') {
+        if (nextAction === 'mark-paid') {
             return {
                 key: 'mark-paid',
                 label: isPartlyPaid(invoice)

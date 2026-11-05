@@ -45,10 +45,13 @@ export function paymentState(
   return invoice.due_date && invoice.due_date < today ? 'overdue' : 'due'
 }
 
-/**
- * Badge CSS class for an invoice's workflow status in the staff tables: one
- * quiet neutral tag for every status, not a coloured capsule per row. The
- * distinction (draft, approved, sent, paid) is in the words.
- */
+/** Neutral staff-table tag; cancelled labels use plain red text. */
 export const INVOICE_STATUS_BADGE_CLASS = 'badge badge-tag'
+
+export function nextInvoiceWorkflowAction(invoice: { status: string }): 'approve' | 'send-email' | 'mark-paid' | null {
+  if (invoice.status === 'draft') return 'approve'
+  if (invoice.status === 'approved') return 'send-email'
+  if (invoice.status === 'sent') return 'mark-paid'
+  return null
+}
 

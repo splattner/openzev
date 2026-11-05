@@ -30,7 +30,7 @@ export function InvoiceCorrectionButton({ invoice, canManage, onChanged }: {
     if (!canCorrectInvoice(invoice, canManage)) return null
     return (
         <>
-            <button type="button" className="button button-secondary" onClick={() => setOpen(true)}>
+            <button type="button" className={invoice.needs_data_review ? 'button button-primary' : 'button button-secondary'} onClick={() => setOpen(true)}>
                 <FontAwesomeIcon icon={faReceipt} fixedWidth aria-hidden="true" />
                 {t('pages.invoiceDetail.credits.correct')}
             </button>

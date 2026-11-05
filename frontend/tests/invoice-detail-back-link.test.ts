@@ -104,6 +104,34 @@ describe('InvoiceDetailPage return link', () => {
     })
 
     it.each([
+        ['draft', 'pages.invoices.approve'], ['approved', 'pages.invoices.sendEmail'], ['sent', 'pages.invoices.markPaid'],
+    ])('offers one next action for %s and none in a disabled invoice community', async (status, label) => {
+        for (const disabled of [false, true]) {
+            mockRole('manager', disabled)
+            const inv = await fetchInvoice('1')
+            vi.mocked(fetchInvoice).mockResolvedValueOnce({ ...inv, status, payments: [], needs_data_review: false })
+            const container = await renderDetail()
+            const primary = container.querySelectorAll('button.button-primary')
+            expect(primary).toHaveLength(disabled ? 0 : 1)
+            if (!disabled) expect(primary[0].textContent).toContain(label)
+            expect(container.querySelector('.pdf-missing .button-primary')).toBeNull()
+            container.remove()
+        }
+    })
+
+    it('keeps correction resolution primary and payment secondary on a flagged sent invoice', async () => {
+        mockRole('manager')
+        const inv = await fetchInvoice('1')
+        vi.mocked(fetchInvoice).mockResolvedValueOnce({ ...inv, status: 'sent', payments: [], paid_chf: '0.00', needs_data_review: true })
+        const container = await renderDetail()
+        expect(container.querySelectorAll('button.button-primary')).toHaveLength(1)
+        expect(container.querySelector('button.button-primary')?.textContent).toContain('pages.invoices.dataReview.replace')
+        const payment = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('pages.invoices.markPaid'))
+        expect(payment?.className).toBe('button button-secondary')
+        container.remove()
+    })
+
+    it.each([
         ['draft', true, '/stored.pdf', 'pdfPendingChanges'],
         ['approved', true, '/stored.pdf', 'pdfIssuedOriginal'],
         ['sent', true, '/stored.pdf', 'pdfIssuedOriginal'],

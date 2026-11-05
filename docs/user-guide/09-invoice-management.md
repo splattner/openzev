@@ -391,6 +391,14 @@ Click the underlined invoice number in the **Participant** column to view the in
 
 ### Invoice Detail Page
 
+The detail page also offers the next invoice action: **Approve** for a draft,
+then **Send email** for an approved invoice. Only one workflow step is offered
+at a time, aligned to the right like the correction action; sent invoices keep **Mark Paid** in the payments card. While email
+is queued the send button stays busy; a failed delivery leaves it available
+again with a visible error. Open corrections take priority over these ordinary
+actions. Read-only users and managers of disabled communities receive no write
+actions; opening the PDF remains available.
+
 If a stored PDF cannot be loaded, **Retry** loads it again without regenerating
 the invoice. Read-only users receive no instruction to generate a document.
 

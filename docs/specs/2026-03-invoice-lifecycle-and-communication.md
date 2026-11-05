@@ -1677,6 +1677,20 @@ visibility, restored access, and strict selection with a second membership.
 - Billing rows keep the five progress icons; in the card layout (≤46rem) the next open or running step is also shown as visible text beside them (`InvoiceRowProgress`, `.invoice-progress-next`), since a card has room for words and no legend to decode. Problems already read as red text under the name, so they are not repeated. The PDF cell shows only a failed PDF (issue text) or a missing one (muted text), never a green "ready" mark, and the email-delivery column marks only a failed send (issue text) or a running one (info badge).
 - Template field definitions come from the backend catalogs. `frontend/src/lib/emailTemplateFields.ts` owns only `EMAIL_TEMPLATE_KEYS`/`EmailTemplateKey`, the four-key frontend route contract. `frontend/src/components/FieldReference.tsx` is shared by `ZevEmailTemplateFields`, `AdminEmailTemplatesPage`, and `AdminPdfTemplatesPage`; it renders API-provided groups (without the backend-only `sample_path`), examples, search, usage badges, and click-to-insert behavior. Insertion calculates state changes and restores the caret after controlled React updates rather than writing `element.value` directly. `frontend/tests/templates-hub.test.ts` covers the seven-tab hub and cross-category routing; `field-reference.test.ts`, `email-template-parity.test.ts`, and `dead-i18n-keys.test.ts` pin token helpers, syntax-aware counting, key/tab parity, backend description-key translations, and catalog-key reachability.
 - Annual-statement export card (admin/owner): prepare → poll → download with partial, failed and expired states. Polling stops on ZEV/year switch, and a create response that resolves after the user switched ZEV/year is discarded (the old selection's job is never shown under the new one); a failed job shows the backend's safe `error_message` when there is one; a single transient poll error is tolerated (only consecutive errors or a long wall-clock backstop end the poll); a failed download surfaces an error instead of crashing; an in-flight or completed export is restored after a reload (`AnnualStatementsExportCard`)
+- `InvoiceWorkflowAction` shares `nextInvoiceWorkflowAction` with billing:
+  draft → Approve, approved → Send email, sent → Mark paid. Detail adds the
+  first two as one right-aligned next-action button, matching correction resolution; sent invoices retain the existing
+  payment-card action. Paid/cancelled have no ordinary next action; flagged
+  invoices retain their correction resolver instead. PDF generation is secondary.
+  Effective write access belongs to the invoice's community, including its
+  disabled state, for workflow/payment/credit/PDF actions; access-link revocation
+  retains its existing role-only exception. Email delivery reuses `useEmailDelivery`
+  to refresh detail every 2.5 seconds for up to 90 seconds, with queued/disabled,
+  failed/retry and observed already-pending states. At the 90-second deadline,
+  automatic polling stops; detail offers an explicit status refresh and bounded
+  polling resume without sending another email or duplicating the inline timeout
+  message in a toast. Late feedback after permission
+  or invoice scope changes is ignored. Backend workflow guards remain authoritative.
 - Empty billing states offer setup actions only with write access and a selected
   community. Empty-state and PDF-failure descriptions remain factual for viewers
   and participants. A stored invoice PDF fetch failure offers a local retry,
