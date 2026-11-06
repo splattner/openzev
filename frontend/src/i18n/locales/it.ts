@@ -20,13 +20,14 @@ export const it = {
         overview: 'Panoramica',
         energyBalance: 'Bilancio energetico',
         setupGroup: 'Configurazione',
+        personalGroup: 'Personale',
         platformGroup: 'Piattaforma',
         platformScope: 'Amministrazione della piattaforma',
         scopedLabel: '{{scope}}: {{label}}',
         metering: 'Misure',
         billing: 'Fatturazione',
-        myInvoices: 'Le mie fatture',
         myDocuments: 'I miei documenti',
+        documents: 'Documenti',
         annualStatement: 'Conteggio annuale',
         myMeteringPoints: 'I miei punti di misura',
         myEnergy: 'Il mio sistema energetico',
@@ -190,7 +191,7 @@ export const it = {
     dashboard: {
         title: 'Pannello di controllo',
         description: 'Inizia il tuo flusso di fatturazione RCP o RCPv svizzero.',
-        participantDescription: 'Il tuo consumo, la tua quota dal RCP e le tue fatture.',
+        participantDescription: 'Il tuo consumo e la tua quota dal RCP.',
     },
     common: {
         timeHours: 'Ora',
@@ -773,12 +774,20 @@ export const it = {
     },
     inbox: {
         title: 'I miei documenti',
-        description: 'Tutto ciò che la tua comunità ti ha consegnato: fatture, conteggi, contratti e avvisi.',
+        description: 'Tutto ciò che la tua comunità ti ha consegnato: fatture con importo e stato del pagamento, note di credito, conteggi, contratti e avvisi.',
         allCommunities: 'Tutte le tue comunità',
         failed: 'Impossibile caricare i documenti.',
         empty: {
             title: 'Non ti è ancora stato consegnato nulla.',
             description: 'I documenti compaiono qui non appena la tua comunità li consegna.',
+        },
+        col: {
+            community: 'Comunità',
+            amount: 'Importo',
+        },
+        credit: {
+            remaining: 'Rimanente: {{amount}}',
+            forInvoice: 'Per la fattura',
         },
         download: 'Scarica',
         downloadLabel: 'Scarica {{title}}',
@@ -925,36 +934,6 @@ export const it = {
                 open: 'Apri',
                 openFor: 'Apri {{name}}',
                 meters: 'Punti di misura',
-            },
-        },
-        myInvoices: {
-            title: 'Le mie fatture',
-            allCommunities: 'Tutte le tue comunità',
-            description: 'Fatture emesse a tuo indirizzo. Fai clic su una fattura per vedere i dettagli o aprire il PDF.',
-            failed: 'Impossibile caricare le fatture.',
-            empty: {
-                title: 'Ancora nessuna fattura',
-                description: 'Non appena il gestore del CEE emette una fattura, appare qui.',
-            },
-            col: {
-                invoice: 'Fattura',
-                period: 'Periodo',
-                total: 'Importo',
-                status: 'Pagamento',
-                community: 'Comunità',
-                actions: 'Azioni',
-            },
-            viewDetails: 'Vedi dettagli',
-            openPdf: 'Apri la fattura {{number}} come PDF',
-            credits: {
-                title: 'Note di credito',
-                description: 'Note di credito emesse a suo favore. Il residuo viene dedotto dalla prossima fattura.',
-                number: 'Nota di credito',
-                invoice: 'Per la fattura',
-                amount: 'Importo',
-                date: 'Data',
-                remaining: 'Residuo',
-                status: 'Stato',
             },
         },
         adminCredentials: {
@@ -3593,7 +3572,6 @@ export const it = {
             description: 'Consulta produzione, consumo, autoconsumo e scambio con la rete per il periodo selezionato.',
         },
         dashboard: {
-            openInvoicePdf: 'Apri PDF per fattura {{number}}',
             participant: 'Partecipante',
             allParticipants: 'Tutti i partecipanti',
             resolution: 'Risoluzione',
@@ -3652,9 +3630,6 @@ export const it = {
                 description: 'Consumo orario medio nel periodo di fatturazione — suddiviso tra energia locale CEE e importazione dalla rete.',
                 ownSystemNote: 'La linea tratteggiata mostra il consumo secondo il sistema proprio della persona (ad es. Solar Manager), non letto dal contatore.',
             },
-            invoicesSection: 'Fatture',
-            invoicesAllCommunitiesSection: 'Fatture di tutti i RCP',
-            failedInvoices: 'Impossibile caricare le fatture.',
             cockpit: {
                 title: 'Cockpit di fatturazione',
                 failed: 'Impossibile caricare lo stato del periodo.',
@@ -3731,16 +3706,6 @@ export const it = {
                     participantExpiring: '{{name}} termina il {{validTo}} — verifica le assegnazioni dei contatori',
                 },
             },
-            noInvoices: 'Nessuna fattura disponibile.',
-            invoiceCol: {
-                invoice: 'Fattura',
-                period: 'Periodo',
-                total: 'Totale',
-                status: 'Pagamento',
-                community: 'Comunità',
-                actions: 'Azioni',
-            },
-            viewDetails: 'Vedi dettagli',
             energyFlow: {
                 title: 'Flusso energetico',
                 gridImport: 'Importazione dalla rete',
@@ -3754,12 +3719,14 @@ export const it = {
         reports: {
             title: 'Rapporti',
             description: 'Consulta le analisi energetiche e i documenti annuali disponibili.',
-            participantDescription: 'Leggi e scarica i tuoi documenti annuali.',
+            participantDescription: 'Leggi e scarica i documenti annuali che la tua comunità ha emesso per te.',
             year: 'Anno',
             downloading: 'Generazione…',
             download: 'Scarica',
             preparingDocument: 'Preparazione di {{document}} per {{year}}…',
             documentTitle: '{{document}} — {{year}}',
+            issuedOn: 'Emesso il {{date}}',
+            notIssued: 'La tua comunità non ha ancora emesso il tuo {{document}} per {{year}}. Comparirà qui, e in I miei documenti, appena disponibile.',
             documentTabs: 'Documenti annuali',
             annualStatement: {
                 title: 'Rendiconto annuale',
@@ -3837,8 +3804,10 @@ export const it = {
             tabs: {
                 invoices: 'Fatture',
                 emails: 'E-mail',
-                documents: 'Documenti consegnati',
             },
+        },
+        participantDocuments: {
+            description: 'Ciò che la comunità ha recapitato ai suoi partecipanti. Emetti qui i rendiconti annuali, i riepiloghi fiscali e la panoramica delle tariffe, oppure carica una comunicazione.',
         },
         billingPeriods: {
             failed: 'Impossibile caricare i periodi di fatturazione.',

@@ -15,7 +15,6 @@ vi.mock('../src/lib/appSettings', () => ({ useAppSettings: () => ({ settings: {}
 
 import { InvoicePdfCell } from '../src/components/InvoicePresentation'
 import { InvoicePeriodRowsTable } from '../src/features/invoices/InvoicePeriodRowsTable'
-import { MyInvoicesPage } from '../src/pages/MyInvoicesPage'
 import { AdminInvoicesContent } from '../src/pages/AdminInvoicesPage'
 
 const invoice: Invoice = {
@@ -100,51 +99,11 @@ describe('shared invoice presentation', () => {
         })
     })
 
-    it('requires ownership and sent visibility, retaining later cancellations and ignoring hidden PDF work', async () => {
-        api.list.mockResolvedValue([
-            invoice,
-            { ...invoice, id: 'paid', status: 'paid' },
-            { ...invoice, id: 'cancelled', status: 'cancelled', sent_at: '2026-03-01T12:00:00Z' },
-            { ...invoice, id: 'draft', status: 'draft', sent_at: null, pdf_status: 'pending' },
-            { ...invoice, id: 'approved', status: 'approved', sent_at: null },
-            { ...invoice, id: 'never-sent', status: 'cancelled', sent_at: null },
-            { ...invoice, id: 'other', participant: 'p2', pdf_status: 'pending' },
-        ])
-        const { container, client } = await mount(createElement(MyInvoicesPage))
-        expect(container.querySelectorAll('tbody tr')).toHaveLength(3)
-        // The public query options retain the polling predicate used by the page.
-        const query = client.getQueryCache().getAll()[0]
-        const interval = (query.options as { refetchInterval?: unknown }).refetchInterval as unknown as (entry: typeof query) => number | false
-        expect(interval(query)).toBe(false)
-    })
-
     it('shows only the load error for an initial admin invoice failure', async () => {
         api.list.mockRejectedValue(new Error('Offline'))
         const { container } = await mount(createElement(AdminInvoicesContent))
         expect(container.textContent).toContain('adminInvoices.loadError')
         expect(container.textContent).not.toContain('adminInvoices.empty')
-    })
-
-    it('keeps own invoices read-only with community labels, PDF feedback, origin and cached rows', async () => {
-        api.list.mockResolvedValue([invoice, { ...invoice, id: 'i2', invoice_number: 'INV-2', zev_name: 'Community B', pdf_url: null, pdf_status: 'failed' }])
-        const { container, client } = await mount(createElement(MyInvoicesPage))
-        expect(api.list).toHaveBeenCalledWith(undefined)
-        expect(container.querySelectorAll('tbody tr')).toHaveLength(2)
-        expect(container.textContent).toContain('Community A')
-        expect(container.textContent).toContain('Community B')
-        // Several memberships: the header names the broader scope, not one community.
-        expect(container.querySelector('.eyebrow')?.textContent).toBe('pages.myInvoices.allCommunities')
-        expect(container.textContent).toContain('pages.invoices.pdfFailed')
-        expect(container.textContent).toContain('common.openPdf')
-        expect(container.textContent).not.toContain('pages.invoices.generateInvoice')
-        expect(container.textContent).not.toContain('adminInvoices.delete')
-        api.list.mockRejectedValue(new Error('Offline'))
-        await act(async () => { await client.refetchQueries() })
-        await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
-        expect(container.querySelectorAll('tbody tr')).toHaveLength(2)
-        expect(container.querySelector('.warning-banner')).not.toBeNull()
-        await act(async () => (container.querySelector('tbody a') as HTMLAnchorElement).click())
-        expect(JSON.parse(container.querySelector('output')!.textContent!)).toEqual({ from: '/me/invoices' })
     })
 
     it('retains one pagination layer over the complete admin dataset and stable sorting/filtering', async () => {

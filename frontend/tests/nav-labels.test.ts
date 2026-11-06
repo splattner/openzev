@@ -8,7 +8,7 @@ const LOCALES = { de, en, fr, it: itLocale }
 
 const COMMUNITY = ['overview', 'energyBalance', 'metering', 'billing', 'reports', 'participants', 'meteringPoints', 'tariffs', 'zevSettings', 'feasibility'] as const
 const PLATFORM = ['adminOverview', 'adminAccounts', 'adminTemplates', 'adminSystemSettings'] as const
-const PARTICIPANT = ['dashboard', 'myInvoices', 'annualStatement'] as const
+const PARTICIPANT = ['dashboard', 'myDocuments', 'annualStatement'] as const
 
 describe('sidebar labels', () => {
     for (const [name, locale] of Object.entries(LOCALES)) {

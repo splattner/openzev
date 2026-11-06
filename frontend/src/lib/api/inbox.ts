@@ -28,8 +28,8 @@ export async function getInboxDocument(id: string): Promise<DeliveredDocument> {
   return data
 }
 
-export async function downloadInboxDocument(id: string): Promise<Blob> {
-  const { data } = await api.get<Blob>(`/inbox/documents/${id}/file/`, { responseType: 'blob' })
+export async function downloadInboxDocument(id: string, signal?: AbortSignal): Promise<Blob> {
+  const { data } = await api.get<Blob>(`/inbox/documents/${id}/file/`, { responseType: 'blob', signal })
   return data
 }
 

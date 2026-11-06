@@ -16,7 +16,6 @@ vi.mock('../src/lib/managedZev', () => {
 })
 vi.mock('../src/pages/InvoicesPage', () => ({ InvoicesContent: () => createElement('div') }))
 vi.mock('../src/pages/BillingEmailsPage', () => ({ BillingEmailsPage: () => createElement('div') }))
-vi.mock('../src/features/inbox/OutboxTab', () => ({ OutboxTab: () => createElement('div') }))
 
 import { BillingHubPage } from '../src/pages/BillingHubPage'
 
@@ -53,12 +52,11 @@ describe('billing hub information architecture', () => {
         expect(tabs).toEqual([
             'pages.billingHub.tabs.invoices',
             'pages.billingHub.tabs.emails',
-            'pages.billingHub.tabs.documents',
         ])
         expect(container.textContent).not.toContain('pages.billingHub.tabs.periods')
     })
 
-    it.each(['invoices', 'emails', 'documents'] as const)('spaces the active %s panel', (tab) => {
+    it.each(['invoices', 'emails'] as const)('spaces the active %s panel', (tab) => {
         const container = mountHub(tab)
 
         const activeTab = container.querySelector('[role="tab"][aria-selected="true"]')!

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react'
@@ -10,24 +10,7 @@ vi.mock('react-i18next', () => ({
     useTranslation: () => ({ t: (k: string) => k }),
 }))
 
-const mockAuth = vi.fn()
-const mockFetchInvoices = vi.fn()
-const mockOpenInvoicePdf = vi.fn()
-
-vi.mock('../src/lib/auth', () => ({ useAuth: () => mockAuth() }))
-
-vi.mock('../src/lib/appSettings', () => ({
-    useAppSettings: () => ({ settings: {} }),
-    formatShortDate: (d: string) => d,
-}))
-
-vi.mock('../src/lib/api/invoices', () => ({
-    fetchInvoices: (...args: unknown[]) => mockFetchInvoices(...args),
-    openInvoicePdf: (...args: unknown[]) => mockOpenInvoicePdf(...args),
-}))
-
 import { SetupGuidance } from '../src/features/overview/SetupGuidance'
-import { MyInvoicesPage } from '../src/pages/MyInvoicesPage'
 
 function render(node: ReturnType<typeof createElement>, withMantine = false) {
     const container = document.createElement('div')
@@ -240,107 +223,6 @@ describe('SetupGuidance (manager start page)', () => {
             },
         }))
         expect(page.container.childElementCount).toBe(0)
-        page.unmount()
-    })
-})
-
-describe('MyInvoicesPage (participant own invoices)', () => {
-    beforeEach(() => {
-        vi.clearAllMocks()
-        mockAuth.mockReturnValue({
-            user: { id: 5, role: 'user', username: 'p@example.com', memberships: [{ zev: 'z0', zev_name: 'Z', zev_disabled: false, access: null, participants: [{ id: 'p1', valid_from: '2026-01-01', valid_to: null, live: true }] }] },
-        })
-    })
-
-    it('lists own invoices with detail links and PDF buttons', async () => {
-        mockFetchInvoices.mockResolvedValue([
-            {
-                id: '7',
-                invoice_number: 'RE-2026-001',
-                participant: 'p1',
-                period_start: '2026-08-01',
-                period_end: '2026-08-31',
-                total_chf: '42.00',
-                status: 'sent',
-                pdf_url: 'http://x/pdf',
-            },
-        ])
-        const page = render(createElement(MyInvoicesPage), true)
-        // Let the react-query observer update land (needs timer ticks, not
-        // just a microtask flush).
-        await act(async () => {
-            await new Promise((resolve) => setTimeout(resolve, 0))
-            await new Promise((resolve) => setTimeout(resolve, 0))
-        })
-        expect(page.text()).toContain('RE-2026-001')
-        expect(page.container.querySelector('a[href="/billing/invoices/7"]')).not.toBeNull()
-        // Fetch is unscoped: backend narrows participants to their own rows.
-        expect(mockFetchInvoices).toHaveBeenCalledWith(undefined)
-        page.unmount()
-    })
-
-    it('still lists invoices that have no PDF yet, with the PDF action hidden', async () => {
-        mockFetchInvoices.mockResolvedValue([
-            { id: '8', invoice_number: 'RE-2026-002', participant: 'p1', status: 'sent', pdf_url: null, total_chf: '1', period_start: '2026-08-01', period_end: '2026-08-31' },
-        ])
-        const page = render(createElement(MyInvoicesPage), true)
-        await act(async () => {
-            await new Promise((resolve) => setTimeout(resolve, 0))
-            await new Promise((resolve) => setTimeout(resolve, 0))
-        })
-        // List membership never depends on PDF availability.
-        expect(page.text()).toContain('RE-2026-002')
-        // A participant sees what to pay, never the workflow status.
-        expect(page.text()).toContain('invoice.payment.due')
-        expect(page.text()).not.toContain('invoice.status.sent')
-        expect(page.container.querySelector('a[href="/billing/invoices/8"]')).not.toBeNull()
-        expect(page.text()).not.toContain('pages.myInvoices.empty.title')
-        // But the PDF button is conditional on a stored document.
-        expect(page.text()).not.toContain('pages.myInvoices.openPdf')
-        expect(mockOpenInvoicePdf).not.toHaveBeenCalled()
-        page.unmount()
-    })
-
-    it('shows the empty state only when the backend returns no invoices', async () => {
-        mockFetchInvoices.mockResolvedValue([])
-        const page = render(createElement(MyInvoicesPage), true)
-        await act(async () => {
-            await new Promise((resolve) => setTimeout(resolve, 0))
-            await new Promise((resolve) => setTimeout(resolve, 0))
-        })
-        expect(page.text()).toContain('pages.myInvoices.empty.title')
-        page.unmount()
-    })
-
-    it('names the issuing community per row for multi-membership participants', async () => {
-        mockAuth.mockReturnValue({
-            user: {
-                id: 5, role: 'user', username: 'p@example.com',
-                memberships: ['First ZEV', 'Second ZEV'].map((name, index) => ({
-                    zev: `z${index}`, zev_name: name, zev_disabled: false, access: null, participants: [{ id: 'p9', valid_from: '2026-01-01', valid_to: null, live: true }],
-                })),
-            },
-        })
-        mockFetchInvoices.mockResolvedValue([
-            {
-                id: '9',
-                invoice_number: 'RE-2026-009',
-                participant: 'p9',
-                period_start: '2026-08-01',
-                period_end: '2026-08-31',
-                total_chf: '42.00',
-                status: 'sent',
-                pdf_url: null,
-                zev_name: 'Second ZEV',
-            },
-        ])
-        const page = render(createElement(MyInvoicesPage), true)
-        await act(async () => {
-            await new Promise((resolve) => setTimeout(resolve, 0))
-            await new Promise((resolve) => setTimeout(resolve, 0))
-        })
-        expect(page.text()).toContain('Second ZEV')
-        expect(page.text()).toContain('pages.myInvoices.col.community')
         page.unmount()
     })
 })

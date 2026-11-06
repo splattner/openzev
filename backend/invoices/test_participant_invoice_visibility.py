@@ -1,9 +1,10 @@
-"""A participant sees an invoice only once it has been sent to them (#861).
+"""The live invoice endpoints are for managers and admins (#862, phase 6).
 
-Drafts are the operator's working state and approved invoices are final but
-undelivered, so neither reaches the participant through the invoice list,
-detail, PDF download or their own annual statement. Owners and admins are not
-narrowed.
+A participant reads what was delivered to them from the document inbox, so the
+invoice list is empty for them and detail, PDF, annual statement and financial
+summary answer 404, whatever the invoice's status and whether or not they still
+take part. Owners and admins are not narrowed. Which invoices reach the inbox is
+tested in ``inbox`` (an invoice is delivered when it is sent, #861).
 """
 
 from datetime import date
@@ -18,10 +19,12 @@ from accounts.models import UserRole
 from invoices.annual_statement import generate_annual_statement_pdf
 from invoices.models import Invoice, InvoiceStatus
 from invoices.test_helpers import make_invoice, make_participant, make_zev
+from zev.models import Participant
 from testing.helpers import authenticate as auth, make_user
 
 INVOICES = "/api/v1/invoices/invoices/"
 ANNUAL_STATEMENT = "/api/v1/invoices/invoices/annual-statement/"
+FINANCIAL_SUMMARY = "/api/v1/invoices/invoices/financial-summary/"
 
 
 class ParticipantInvoiceVisibilityTests(TestCase):
@@ -54,11 +57,8 @@ class ParticipantInvoiceVisibilityTests(TestCase):
         self.assertEqual(response.status_code, 200, response.content)
         return {row["id"] for row in response.json()["results"]}
 
-    def test_participant_list_shows_only_sent_invoices(self):
-        self.assertEqual(
-            self._listed_ids(self.tenant),
-            {str(self.sent.id), str(self.paid.id), str(self.cancelled_after_sending.id)},
-        )
+    def test_participant_list_is_empty(self):
+        self.assertEqual(self._listed_ids(self.tenant), set())
 
     def test_owner_list_is_not_narrowed(self):
         self.assertEqual(
@@ -66,34 +66,40 @@ class ParticipantInvoiceVisibilityTests(TestCase):
             {str(invoice.id) for invoice in Invoice.objects.filter(zev=self.zev)},
         )
 
-    def test_participant_cannot_open_an_unsent_invoice(self):
+    def test_participant_cannot_open_any_invoice(self):
         auth(self.client, self.tenant)
-        for invoice in (self.draft, self.approved, self.cancelled_draft):
+        for invoice in (self.draft, self.approved, self.sent, self.paid, self.cancelled_after_sending):
             with self.subTest(status=invoice.status):
-                response = self.client.get(f"{INVOICES}{invoice.id}/")
-                self.assertEqual(response.status_code, 404)
+                self.assertEqual(self.client.get(f"{INVOICES}{invoice.id}/").status_code, 404)
 
-    def test_participant_opens_a_sent_invoice(self):
+    def test_participant_cannot_download_a_sent_invoice_pdf(self):
+        self.sent.pdf_file.save("sent.pdf", ContentFile(b"%PDF-1.4 sent"), save=True)
         auth(self.client, self.tenant)
-        response = self.client.get(f"{INVOICES}{self.sent.id}/")
-        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(self.client.get(f"{INVOICES}{self.sent.id}/pdf/").status_code, 404)
 
-    def test_participant_cannot_download_an_unsent_pdf(self):
-        self.draft.pdf_file.save("draft.pdf", ContentFile(b"%PDF-1.4 draft"), save=True)
+    def test_a_former_participant_reaches_nothing_either(self):
+        Participant.objects.filter(pk=self.participant.pk).update(valid_to=date(2026, 4, 30))
+        self.assertEqual(self._listed_ids(self.tenant), set())
         auth(self.client, self.tenant)
-        response = self.client.get(f"{INVOICES}{self.draft.id}/pdf/")
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(self.client.get(f"{INVOICES}{self.sent.id}/").status_code, 404)
 
-    def test_sent_status_without_sent_at_stays_visible(self):
-        # A sent/paid row whose sent_at was never stamped (older data) must not
-        # disappear from the participant's list.
-        Invoice.objects.filter(pk__in=[self.sent.pk, self.paid.pk]).update(sent_at=None)
-        listed = self._listed_ids(self.tenant)
-        self.assertIn(str(self.sent.id), listed)
-        self.assertIn(str(self.paid.id), listed)
+    def test_the_owner_still_opens_and_downloads(self):
+        self.sent.pdf_file.save("sent.pdf", ContentFile(b"%PDF-1.4 sent"), save=True)
+        auth(self.client, self.owner)
+        self.assertEqual(self.client.get(f"{INVOICES}{self.sent.id}/").status_code, 200)
+        self.assertEqual(self.client.get(f"{INVOICES}{self.sent.id}/pdf/").status_code, 200)
+
+    def test_a_manager_who_rents_elsewhere_gets_no_live_invoice_there(self):
+        other_owner = make_user("vis_other_owner", UserRole.USER)
+        other_zev = make_zev(other_owner, "Elsewhere")
+        rented = make_invoice(other_zev, make_participant(other_zev, user=self.owner), inv_status=InvoiceStatus.SENT)
+        Invoice.objects.filter(pk=rented.pk).update(sent_at=timezone.now())
+        self.assertNotIn(str(rented.id), self._listed_ids(self.owner))
+        auth(self.client, self.owner)
+        self.assertEqual(self.client.get(f"{INVOICES}{rented.id}/").status_code, 404)
 
 
-class ParticipantAnnualStatementSentOnlyTests(TestCase):
+class ParticipantAnnualStatementTests(TestCase):
     def setUp(self):
         self.owner = make_user("stmt_owner", UserRole.USER)
         self.tenant = make_user("stmt_tenant", UserRole.USER)
@@ -130,15 +136,32 @@ class ParticipantAnnualStatementSentOnlyTests(TestCase):
             {approved.invoice_number, self.sent.invoice_number},
         )
 
-    def test_participant_download_asks_for_sent_only(self):
+    def test_participant_download_is_refused_and_renders_nothing(self):
         client = APIClient()
         auth(client, self.tenant)
-        with mock.patch(
-            "invoices.views_reports.generate_annual_statement_pdf", return_value=b"%PDF-stub"
-        ) as generate:
+        with mock.patch("invoices.views_reports.generate_annual_statement_pdf") as generate:
             response = client.get(ANNUAL_STATEMENT, {"year": 2026})
-        self.assertEqual(response.status_code, 200)
-        self.assertIs(generate.call_args.kwargs["sent_only"], True)
+        self.assertEqual(response.status_code, 404)
+        generate.assert_not_called()
+
+    def test_participant_cannot_name_ids_to_get_around_it(self):
+        client = APIClient()
+        auth(client, self.tenant)
+        with mock.patch("invoices.views_reports.generate_annual_statement_pdf") as generate:
+            response = client.get(
+                ANNUAL_STATEMENT,
+                {"year": 2026, "zev_id": str(self.zev.id), "participant_id": str(self.participant.id)},
+            )
+        self.assertEqual(response.status_code, 404)
+        generate.assert_not_called()
+
+    def test_participant_financial_summary_is_refused(self):
+        client = APIClient()
+        auth(client, self.tenant)
+        with mock.patch("invoices.views_reports.generate_financial_summary_pdf") as generate:
+            response = client.get(FINANCIAL_SUMMARY, {"year": 2026})
+        self.assertEqual(response.status_code, 404)
+        generate.assert_not_called()
 
     def test_owner_download_is_not_narrowed(self):
         client = APIClient()
@@ -151,4 +174,4 @@ class ParticipantAnnualStatementSentOnlyTests(TestCase):
                 {"year": 2026, "zev_id": str(self.zev.id), "participant_id": str(self.participant.id)},
             )
         self.assertEqual(response.status_code, 200)
-        self.assertIs(generate.call_args.kwargs["sent_only"], False)
+        self.assertNotIn("sent_only", generate.call_args.kwargs)

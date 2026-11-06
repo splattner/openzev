@@ -110,33 +110,33 @@ def _get_participant_in_zev(participant_id, zev) -> tuple[Participant | None, Re
         return None, Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
 
 
-def _self_service(request) -> tuple[bool, Participant | None]:
-    """Whether this is a self-service download, and the caller's own row for it.
+def _is_participant_call(request) -> bool:
+    """Whether the caller would once have been served their own document here.
 
-    A caller who can view the ZEV it names is served as a manager. An account
-    that manages or views anything is self-service only for a ZEV it names and
-    holds a current participant row in; otherwise it is served as a manager
-    (naming another ZEV is refused there). An account that only participates is
-    always self-service: an explicit ZEV selects only its current row there;
-    without a ZEV it gets its first current row in an enabled community.
-    An unavailable selection gets a 404. An account that never took part is
-    served as a manager (#761).
+    The annual statement and the financial summary used to render a
+    participant's own, live. Since the document inbox (ADR 0045) a participant
+    reads what the operator issued to them (``inbox/documents/``), so these
+    endpoints are for managers and admins and answer a participant with 404.
+
+    A caller who can view the ZEV it names is a manager. An account that
+    manages or views anything is a participant call only for a ZEV it names and
+    holds a current participant row in. An account that only participates is
+    always one, as is a former participant. An account that never took part is
+    served as a manager (naming a ZEV it may not read is refused there, #761).
     """
     from zev.services import own_participant_for_user
 
     user = request.user
     zev_id = request.query_params.get("zev_id")
     if zev_id and access.can_view(user, zev_id):
-        return False, None
+        return False
     if user.is_admin or access.viewable_zev_ids(user):
-        participant = own_participant_for_user(user, zev_id=zev_id) if zev_id else None
-        return participant is not None, participant
-    participant = own_participant_for_user(user, zev_id=zev_id)
-    if participant is not None:
-        return True, participant
-    # A former participant has nothing left to ask about (404); an account
-    # that never took part is served by the manager branch (400 without ids).
-    return user.participations.exists(), None
+        return bool(zev_id) and own_participant_for_user(user, zev_id=zev_id) is not None
+    return user.participations.exists()
+
+
+def _participant_not_served() -> Response:
+    return Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
 
 
 def _pdf_response(pdf_bytes: bytes, filename: str, *, disposition: str) -> HttpResponse:
@@ -146,11 +146,9 @@ def _pdf_response(pdf_bytes: bytes, filename: str, *, disposition: str) -> HttpR
 
 
 class AnnualStatementView(APIView):
-    """Annual statement PDF for one participant.
-
-    A participant gets their own; an owner or admin must name both the ZEV and
-    the participant.
-    """
+    """Annual statement PDF for one participant, for owners and admins, who must
+    name both the ZEV and the participant. A participant gets theirs from the
+    document inbox, not here (404)."""
 
     permission_classes = [IsAuthenticated]
 
@@ -159,41 +157,35 @@ class AnnualStatementView(APIView):
         if error:
             return error
 
-        self_service, participant = _self_service(request)
-        if self_service:
-            if participant is None:
-                return Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
-            zev = participant.zev
-            sent_only = True
-        else:
-            sent_only = False
-            participant_id = request.query_params.get("participant_id")
-            zev_id = request.query_params.get("zev_id")
-            if not participant_id or not zev_id:
-                return Response(
-                    {"error": "participant_id and zev_id are required."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            zev, error = _get_authorised_zev(request, zev_id)
-            if error:
-                return error
-            participant, error = _get_participant_in_zev(participant_id, zev)
-            if error:
-                return error
+        if _is_participant_call(request):
+            return _participant_not_served()
+        participant_id = request.query_params.get("participant_id")
+        zev_id = request.query_params.get("zev_id")
+        if not participant_id or not zev_id:
+            return Response(
+                {"error": "participant_id and zev_id are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        zev, error = _get_authorised_zev(request, zev_id)
+        if error:
+            return error
+        participant, error = _get_participant_in_zev(participant_id, zev)
+        if error:
+            return error
 
         return _pdf_response(
-            generate_annual_statement_pdf(participant, zev, year, sent_only=sent_only),
+            generate_annual_statement_pdf(participant, zev, year),
             f"annual-statement-{year}-{participant.last_name}.pdf",
             disposition="inline",
         )
 
 
 class FinancialSummaryView(APIView):
-    """Annual financial summary PDF for a producer participant.
-
-    A participant gets their own. An owner or admin must name the ZEV, and may
-    name the participant; without one it falls back to their own record in that
-    ZEV, then to the participation of the ZEV's issuer on 31 December.
+    """Annual financial summary PDF for a producer participant, for owners and
+    admins (a participant gets theirs from the document inbox: 404 here). They
+    must name the ZEV, and may name the participant; without one it falls back
+    to their own record in that ZEV, then to the participation of the ZEV's
+    issuer on 31 December.
     """
 
     permission_classes = [IsAuthenticated]
@@ -203,38 +195,34 @@ class FinancialSummaryView(APIView):
         if error:
             return error
 
-        self_service, participant = _self_service(request)
-        if self_service:
-            if participant is None:
-                return Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
-            zev = participant.zev
-        else:
-            zev_id = request.query_params.get("zev_id")
-            if not zev_id:
-                return Response({"error": "zev_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if _is_participant_call(request):
+            return _participant_not_served()
+        zev_id = request.query_params.get("zev_id")
+        if not zev_id:
+            return Response({"error": "zev_id is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-            zev, error = _get_authorised_zev(request, zev_id)
+        zev, error = _get_authorised_zev(request, zev_id)
+        if error:
+            return error
+
+        participant_id = request.query_params.get("participant_id")
+        if participant_id:
+            participant, error = _get_participant_in_zev(participant_id, zev)
             if error:
                 return error
-
-            participant_id = request.query_params.get("participant_id")
-            if participant_id:
-                participant, error = _get_participant_in_zev(participant_id, zev)
-                if error:
-                    return error
-            else:
-                # Default to the caller's own record in this ZEV, then the
-                # issuer's participation in it.
-                participant = Participant.objects.filter(user=request.user, zev=zev).first()
-                if not participant:
-                    issuer = issuer_on(zev, date(year, 12, 31))
-                    if issuer is not None:
-                        participant = issuer.participations.order_by("-valid_from").first()
-                if not participant:
-                    return Response(
-                        {"error": "participant_id is required (no default participant found)."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+        else:
+            # Default to the caller's own record in this ZEV, then the
+            # issuer's participation in it.
+            participant = Participant.objects.filter(user=request.user, zev=zev).first()
+            if not participant:
+                issuer = issuer_on(zev, date(year, 12, 31))
+                if issuer is not None:
+                    participant = issuer.participations.order_by("-valid_from").first()
+            if not participant:
+                return Response(
+                    {"error": "participant_id is required (no default participant found)."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         return _pdf_response(
             generate_financial_summary_pdf(zev, participant, year),

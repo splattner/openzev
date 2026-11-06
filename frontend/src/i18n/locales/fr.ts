@@ -20,13 +20,14 @@ export const fr = {
         overview: 'Vue d\'ensemble',
         energyBalance: 'Bilan énergétique',
         setupGroup: 'Configuration',
+        personalGroup: 'Personnel',
         platformGroup: 'Plateforme',
         platformScope: 'Administration de la plateforme',
         scopedLabel: '{{scope}}\u00a0: {{label}}',
         metering: 'Mesures',
         billing: 'Facturation',
-        myInvoices: 'Mes factures',
         myDocuments: 'Mes documents',
+        documents: 'Documents',
         annualStatement: 'Décompte annuel',
         myMeteringPoints: 'Mes points de mesure',
         myEnergy: 'Mon système énergétique',
@@ -190,7 +191,7 @@ export const fr = {
     dashboard: {
         title: 'Tableau de bord',
         description: 'Commencez avec votre flux de facturation RCP ou RCPv suisse.',
-        participantDescription: 'Votre consommation, votre part issue du RCP et vos factures.',
+        participantDescription: 'Votre consommation et votre part issue du RCP.',
     },
     common: {
         timeHours: 'Heure',
@@ -773,12 +774,20 @@ export const fr = {
     },
     inbox: {
         title: 'Mes documents',
-        description: 'Tout ce que votre communauté vous a remis : factures, décomptes, contrats et avis.',
+        description: 'Tout ce que votre communauté vous a remis : factures avec montant et état du paiement, avoirs, décomptes, contrats et avis.',
         allCommunities: 'Toutes vos communautés',
         failed: 'Impossible de charger les documents.',
         empty: {
             title: 'Rien ne vous a encore été remis.',
             description: 'Les documents apparaissent ici dès que votre communauté vous les remet.',
+        },
+        col: {
+            community: 'Communauté',
+            amount: 'Montant',
+        },
+        credit: {
+            remaining: 'Restant : {{amount}}',
+            forInvoice: 'Pour la facture',
         },
         download: 'Télécharger',
         downloadLabel: 'Télécharger {{title}}',
@@ -925,36 +934,6 @@ export const fr = {
                 open: 'Ouvrir',
                 openFor: 'Ouvrir {{name}}',
                 meters: 'Points de mesure',
-            },
-        },
-        myInvoices: {
-            title: 'Mes factures',
-            allCommunities: 'Toutes vos communautés',
-            description: 'Factures qui vous ont été émises. Cliquez sur une facture pour voir les détails ou ouvrir le PDF.',
-            failed: 'Impossible de charger les factures.',
-            empty: {
-                title: 'Aucune facture pour l\'instant',
-                description: 'Dès que votre opérateur CEL émet une facture, elle apparaît ici.',
-            },
-            col: {
-                invoice: 'Facture',
-                period: 'Période',
-                total: 'Montant',
-                status: 'Paiement',
-                community: 'Communauté',
-                actions: 'Actions',
-            },
-            viewDetails: 'Voir les détails',
-            openPdf: 'Ouvrir la facture {{number}} en PDF',
-            credits: {
-                title: 'Avoirs',
-                description: 'Avoirs qui vous ont été émis. Le solde est déduit de votre prochaine facture.',
-                number: 'Avoir',
-                invoice: 'Pour la facture',
-                amount: 'Montant',
-                date: 'Date',
-                remaining: 'Solde',
-                status: 'Statut',
             },
         },
         adminCredentials: {
@@ -3593,7 +3572,6 @@ export const fr = {
             description: 'Consultez la production, la consommation, l’autoconsommation et les échanges réseau pour la période sélectionnée.',
         },
         dashboard: {
-            openInvoicePdf: 'Ouvrir le PDF de la facture {{number}}',
             participant: 'Participant',
             allParticipants: 'Tous les participants',
             resolution: 'Résolution',
@@ -3652,9 +3630,6 @@ export const fr = {
                 description: 'Consommation horaire moyenne sur la période de facturation — répartie entre énergie locale CEL et importation réseau.',
                 ownSystemNote: 'La ligne en pointillés montre la consommation selon le propre système de la personne (p. ex. Solar Manager), non relevée sur le compteur.',
             },
-            invoicesSection: 'Factures',
-            invoicesAllCommunitiesSection: 'Factures de tous les RCP',
-            failedInvoices: 'Impossible de charger les factures.',
             cockpit: {
                 title: 'Cockpit de facturation',
                 failed: 'Impossible de charger l\'état de la période.',
@@ -3731,16 +3706,6 @@ export const fr = {
                     participantExpiring: '{{name}} se termine le {{validTo}} — vérifiez les affectations de compteurs',
                 },
             },
-            noInvoices: 'Aucune facture disponible.',
-            invoiceCol: {
-                invoice: 'Facture',
-                period: 'Période',
-                total: 'Total',
-                status: 'Paiement',
-                community: 'Communauté',
-                actions: 'Actions',
-            },
-            viewDetails: 'Voir les détails',
             energyFlow: {
                 title: 'Flux d\'énergie',
                 gridImport: 'Import réseau',
@@ -3754,12 +3719,14 @@ export const fr = {
         reports: {
             title: 'Rapports',
             description: 'Consultez les analyses énergétiques et les documents annuels disponibles.',
-            participantDescription: 'Lisez et téléchargez vos documents annuels.',
+            participantDescription: 'Lisez et téléchargez les documents annuels que votre communauté a émis à votre intention.',
             year: 'Année',
             downloading: 'Génération…',
             download: 'Télécharger',
             preparingDocument: 'Préparation de {{document}} pour {{year}}…',
             documentTitle: '{{document}} — {{year}}',
+            issuedOn: 'Émis le {{date}}',
+            notIssued: 'Votre communauté n\'a pas encore émis votre {{document}} pour {{year}}. Il apparaîtra ici, et dans Mes documents, dès qu\'il sera disponible.',
             documentTabs: 'Documents annuels',
             annualStatement: {
                 title: 'Décompte annuel',
@@ -3837,8 +3804,10 @@ export const fr = {
             tabs: {
                 invoices: 'Factures',
                 emails: 'E-mails',
-                documents: 'Documents remis',
             },
+        },
+        participantDocuments: {
+            description: 'Ce que la communauté a remis à ses participants. Émettez ici les relevés annuels, les récapitulatifs fiscaux et l\'aperçu des tarifs, ou téléversez une communication.',
         },
         billingPeriods: {
             failed: 'Échec du chargement des périodes de facturation.',

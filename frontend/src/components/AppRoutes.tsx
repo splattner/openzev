@@ -17,6 +17,7 @@ const AccountProfilePage = lazy(async () => ({ default: (await import('../pages/
 const AdminOverviewHubPage = lazy(async () => ({ default: (await import('../pages/AdminOverviewHubPage')).AdminOverviewHubPage }))
 const AdminAccountsHubPage = lazy(async () => ({ default: (await import('../pages/AdminAccountsHubPage')).AdminAccountsHubPage }))
 const AdminTemplatesHubPage = lazy(async () => ({ default: (await import('../pages/AdminTemplatesHubPage')).AdminTemplatesHubPage }))
+const ParticipantDocumentsPage = lazy(async () => ({ default: (await import('../pages/ParticipantDocumentsPage')).ParticipantDocumentsPage }))
 const BillingHubPage = lazy(async () => ({ default: (await import('../pages/BillingHubPage')).BillingHubPage }))
 const FeasibilityCalculatorPage = lazy(async () => ({ default: (await import('../pages/FeasibilityCalculatorPage')).FeasibilityCalculatorPage }))
 const AdminSystemSettingsPage = lazy(async () => ({ default: (await import('../pages/AdminSystemSettingsPage')).AdminSystemSettingsPage }))
@@ -27,7 +28,6 @@ const ReportsPage = lazy(async () => ({ default: (await import('../pages/Reports
 const InvoiceDetailPage = lazy(async () => ({ default: (await import('../pages/InvoiceDetailPage')).InvoiceDetailPage }))
 const MyMeteringPointsPage = lazy(async () => ({ default: (await import('../pages/MyMeteringPointsPage')).MyMeteringPointsPage }))
 const DocumentsPage = lazy(async () => ({ default: (await import('../pages/DocumentsPage')).DocumentsPage }))
-const MyInvoicesPage = lazy(async () => ({ default: (await import('../pages/MyInvoicesPage')).MyInvoicesPage }))
 const LoginPage = lazy(async () => ({ default: (await import('../pages/LoginPage')).LoginPage }))
 const MeteringChartPage = lazy(async () => ({ default: (await import('../pages/MeteringChartPage')).MeteringChartPage }))
 const MeteringPointsPage = lazy(async () => ({ default: (await import('../pages/MeteringPointsPage')).MeteringPointsPage }))
@@ -257,11 +257,13 @@ export function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          {/* The participant documents moved out of the billing hub into a page of their own. */}
+          <Route path="billing/documents" element={<AliasNavigate to="/documents" />} />
           <Route
-            path="billing/documents"
+            path="documents"
             element={
               <ProtectedRoute allowedRoles={ZEV_SCOPE}>
-                <BillingHubPage tab="documents" />
+                <ParticipantDocumentsPage />
               </ProtectedRoute>
             }
           />
@@ -283,22 +285,16 @@ export function AppRoutes() {
               </ProtectedRoute>
             }
           />
-          {/* Recorded exception 2 (spec §4): participant's own invoices — reuses
-              the existing role-scoped backend list, no new grant. */}
-          <Route
-            path="me/invoices"
-            element={
-              <ProtectedRoute allowedRoles={['participant', 'former']}>
-                <MyInvoicesPage />
-              </ProtectedRoute>
-            }
-          />
+          {/* My invoices was folded into My documents (invoices and credit notes carry their amounts there); the
+              old address, the bell and bookmarks land on the list that has them. */}
+          <Route path="me/invoices" element={<AliasNavigate to="/me/documents" />} />
           {/* The participant document inbox (SPEC-2026-11-participant-document-inbox §7.1): what was
-              delivered to the account. A former participant keeps reading what it was sent. */}
+              delivered to the account. A former participant keeps reading what it was sent; a manager who
+              is also a participant reads what was addressed to them. */}
           <Route
             path="me/documents"
             element={
-              <ProtectedRoute allowedRoles={['participant', 'former']}>
+              <ProtectedRoute allowedRoles={[...ZEV_SCOPE, 'participant', 'former']}>
                 <DocumentsPage />
               </ProtectedRoute>
             }

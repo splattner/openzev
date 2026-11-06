@@ -1228,7 +1228,19 @@ class Command(BaseCommand):
                     participant=participant, kind=DocumentKind.OPERATOR,
                     title="Hausordnung Solaranlage", body=notice, file_name="hausordnung.pdf",
                 )
-            self.stdout.write(f"  Inbox: {delivered} invoices and credit notes backfilled, tariff overview and notice delivered")
+            # Anna's annual statement of the year just ended, so the participant's
+            # *Annual statement* page has a document to show (it reads the inbox).
+            from invoices.annual_statement import generate_annual_statement_pdf
+
+            year = today.year - 1
+            anna = main.participants.filter(user__email="anna@openzev.local").first()
+            if anna is not None:
+                deliver(
+                    participant=anna, kind=DocumentKind.ANNUAL_STATEMENT, title=f"Jahresabrechnung {year}",
+                    body=generate_annual_statement_pdf(anna, main, year, sent_only=True),
+                    file_name=f"jahresabrechnung-{year}.pdf", period=(date(year, 1, 1), date(year, 12, 31)),
+                )
+            self.stdout.write(f"  Inbox: {delivered} invoices and credit notes backfilled, tariff overview, notice and statement delivered")
         except Exception as exc:
             self.stdout.write(
                 self.style.WARNING(f"seed_demo: inbox skipped ({exc.__class__.__name__}: {exc})")

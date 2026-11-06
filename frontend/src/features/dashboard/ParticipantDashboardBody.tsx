@@ -2,12 +2,11 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { fetchHourlyProfile, fetchMeteringDashboardSummary } from '../../lib/api/metering'
-import { fetchInvoices } from '../../lib/api/invoices'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { formatKwh, formatPercentFigure } from '../../lib/numbers'
 import { dashboardKwhFigure, fromZevRate, kwhTick } from '../../lib/dashboardFormatting'
 import { useAuth } from '../../lib/auth'
-import { personalInvoiceFilter, selectedCommunityName } from '../../lib/membership'
+import { selectedCommunityName } from '../../lib/membership'
 import { useManagedZev } from '../../lib/managedZev'
 import { behindMeterHintKey, useEnergyDataEligibility } from '../../lib/supplementary'
 import { PageSkeleton } from '../../components/PageSkeleton'
@@ -18,7 +17,6 @@ import { ConsumptionSplitCard } from '../../components/dashboard/ConsumptionSpli
 import { OwnSystemNote } from '../../components/dashboard/OwnSystemNote'
 import { EnergyFlowCard } from '../../components/dashboard/EnergyFlowCard'
 import { HourlyProfileSection } from '../../components/dashboard/HourlyProfileSection'
-import { ParticipantInvoicesCard } from '../../components/dashboard/ParticipantInvoicesCard'
 import { type DashboardBodyProps, type DashboardBucket, useBucketLabelFormatters, useHourlyProfileRows } from './dashboardShared'
 import { ResolutionSelect } from './ResolutionSelect'
 
@@ -50,14 +48,6 @@ export function ParticipantDashboardBody({ interval, period, onPeriodChange, per
                 zevId: participantZevId,
             }),
         enabled: periodReady,
-    })
-    const isPersonalInvoice = personalInvoiceFilter(user)
-    const invoicesQuery = useQuery({
-        queryKey: queryKeys.invoices.mine(),
-        queryFn: () => fetchInvoices(undefined),
-        refetchInterval: (query) => query.state.data?.some(
-            (invoice) => isPersonalInvoice(invoice) && invoice.pdf_status === 'pending',
-        ) ? 15000 : false,
     })
     const hourlyProfileQuery = useQuery({
         queryKey: queryKeys.metering.hourlyProfile(period.from, period.to, selectedZevId || undefined),
@@ -98,7 +88,6 @@ export function ParticipantDashboardBody({ interval, period, onPeriodChange, per
         return pct === null ? null : { pct, zevKwh: consumed_from_zev_kwh, totalKwh: total_consumed_kwh }
     }, [summary])
     const hourlyProfileData = useHourlyProfileRows(hourlyProfileQuery.data?.hourly_profile)
-    const participantInvoices = invoicesQuery.data?.filter(isPersonalInvoice)
 
     return (
         <>
@@ -163,13 +152,6 @@ export function ParticipantDashboardBody({ interval, period, onPeriodChange, per
                 </>
             )}
             <HourlyProfileSection query={hourlyProfileQuery} data={hourlyProfileData} />
-            <ParticipantInvoicesCard
-                showCommunity={(user?.memberships?.length ?? 0) > 1}
-                invoices={participantInvoices}
-                isError={invoicesQuery.isError}
-                isRetrying={invoicesQuery.isFetching}
-                onRetry={() => void invoicesQuery.refetch()}
-            />
         </>
     )
 }

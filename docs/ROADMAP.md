@@ -229,7 +229,7 @@ This document tracks shipped features, active work, planned ideas, and deferred 
 | Participant dashboard (own energy split: local vs. grid, daily timeline, key totals) | `shipped` | — | — |
 | Average consumption chart | `shipped` | — | — |
 | Own metering point data view and energy charts | `shipped` | — | — |
-| Own invoice list and read access (status, amounts, PDF download), incl. My-invoices page (`/me/invoices`) | `shipped` | — | — |
+| Own invoice list and read access (status, amounts, PDF download), incl. a My-invoices page (`/me/invoices`, folded into My documents by #862) | `shipped` | — | — |
 | Passwordless participant invoice access (QR + magic link) | `shipped` | — | [spec](specs/2026-09-participant-invoice-access.md), #589 |
 | Contract PDF self-download | `shipped` | — | — |
 | Profile self-management (name, email) | `shipped` | — | — |

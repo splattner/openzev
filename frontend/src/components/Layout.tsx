@@ -6,6 +6,7 @@ import { Link, NavLink, Outlet, matchPath, useLocation, useMatch, useNavigate } 
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useCommunityAccess } from '../lib/communityAccess'
+import { ownParticipantIds } from '../lib/membership'
 import { useOptionalManagedZev } from '../lib/managedZev'
 import { useLiveEnabled } from '../lib/live'
 import { showMyEnergyEntry } from '../lib/myEnergy'
@@ -61,6 +62,7 @@ export function Layout() {
     const energyData = useEnergyDataEligibility()
     const selectedZevId = useOptionalManagedZev()?.selectedZevId
     // With the live flag on the list holds every held meter, so any capability (history or live) is a reason to show the entry.
+    const holdsParticipation = ownParticipantIds(user).size > 0
     const holdsOwnFlaggedMeter = energyData.eligible.some((point) => point.zev === selectedZevId && hasCapability(point))
     // Query the flag only for accounts with community-wide access.
     const feasibilityEnabledQuery = useQuery({
@@ -300,10 +302,8 @@ export function Layout() {
                                 {liveEnabled && <SidebarLink to="/my-energy" label={t('nav.liveEnergy')} icon={<LiveIcon />} collapsed={isNavigationCollapsed} />}
                                 <SidebarLink to="/metering/chart" label={t('nav.metering')} icon={<ChartIcon />} active={meteringActive} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/billing/invoices" label={t('nav.billing')} icon={<InvoiceIcon />} active={billingActive} collapsed={isNavigationCollapsed} />
+                                <SidebarLink to="/documents" label={t('nav.documents')} icon={<DocumentIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/reports" label={t('nav.reports')} icon={<ReportsIcon />} collapsed={isNavigationCollapsed} />
-                                {holdsOwnFlaggedMeter && (
-                                    <SidebarLink to="/me/metering-points" label={t('nav.myMeteringPoints')} icon={<PlugIcon />} collapsed={isNavigationCollapsed} />
-                                )}
                             </>
                         )}
 
@@ -315,19 +315,15 @@ export function Layout() {
                             <>
                                 <SidebarLink to="/" label={t('nav.dashboard')} icon={<DashboardIcon />} collapsed={isNavigationCollapsed} />
                                 {showMyEnergy && <SidebarLink to="/my-energy" label={t('nav.myEnergy')} icon={<LiveIcon />} collapsed={isNavigationCollapsed} />}
-                                <SidebarLink to="/me/invoices" label={t('nav.myInvoices')} icon={<InvoiceIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/me/documents" label={t('nav.myDocuments')} icon={<DocumentIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/me/statement" label={t('nav.annualStatement')} icon={<ReportsIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/me/metering-points" label={t('nav.myMeteringPoints')} icon={<PlugIcon />} active={myMeteringPointsActive} collapsed={isNavigationCollapsed} />
                             </>
                         )}
 
-                        {/* A former participant keeps only the invoices it was sent. */}
+                        {/* A former participant keeps only what was delivered to it. */}
                         {isFormerParticipant && (
-                            <>
-                                <SidebarLink to="/me/invoices" label={t('nav.myInvoices')} icon={<InvoiceIcon />} collapsed={isNavigationCollapsed} />
-                                <SidebarLink to="/me/documents" label={t('nav.myDocuments')} icon={<DocumentIcon />} collapsed={isNavigationCollapsed} />
-                            </>
+                            <SidebarLink to="/me/documents" label={t('nav.myDocuments')} icon={<DocumentIcon />} collapsed={isNavigationCollapsed} />
                         )}
 
                         {canManage && (
@@ -342,6 +338,20 @@ export function Layout() {
 
                         {canManage && feasibilityEnabledQuery.data === true && (
                             <SidebarLink to="/feasibility" label={t('nav.feasibility')} icon={<CalculatorIcon />} className="nav-standalone" collapsed={isNavigationCollapsed} />
+                        )}
+
+                        {/* A manager who is also a participant (here or elsewhere) has a personal side: their own
+                            meters and the documents addressed to them, apart from the community they manage. */}
+                        {canManage && (holdsOwnFlaggedMeter || holdsParticipation) && (
+                            <div className="nav-section nav-section-start" role="group" aria-label={t('nav.personalGroup')}>
+                                <div className="nav-group-label" aria-hidden="true">{t('nav.personalGroup')}</div>
+                                {holdsOwnFlaggedMeter && (
+                                    <SidebarLink to="/me/metering-points" label={t('nav.myMeteringPoints')} icon={<PlugIcon />} collapsed={isNavigationCollapsed} />
+                                )}
+                                {holdsParticipation && (
+                                    <SidebarLink to="/me/documents" label={t('nav.myDocuments')} icon={<DocumentIcon />} collapsed={isNavigationCollapsed} />
+                                )}
+                            </div>
                         )}
 
                         {user?.role === 'admin' && (

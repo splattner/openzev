@@ -151,12 +151,12 @@ class InvoiceStatusFilterScopingTests(_TwoPopulatedCommunitiesMixin, TestCase):
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(_rows(response), [])
 
-    def test_participant_sees_only_their_own_sent_invoices(self):
-        # An approved invoice is not yet delivered, so the status filter cannot
-        # surface it to a participant (#861).
+    def test_participant_sees_no_live_invoices(self):
+        # A participant reads their invoices from the document inbox (#862), so
+        # no status filter surfaces one here.
         response = self._as_participant_a().get(INVOICES, {"status": "approved,sent"})
         self.assertEqual(response.status_code, 200, response.content)
-        self.assertEqual({row["invoice_number"] for row in _rows(response)}, {"A-sent"})
+        self.assertEqual(_rows(response), [])
 
     def test_participant_naming_a_foreign_zev_gets_nothing(self):
         response = self._as_participant_a().get(INVOICES, {"zev_id": str(self.zev_b.id), "status": "approved,sent"})

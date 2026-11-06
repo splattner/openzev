@@ -45,25 +45,6 @@ export function documentYear(document: Pick<DeliveredDocument, 'period_start' | 
   return Number((document.period_start ?? document.delivered_at).slice(0, 4))
 }
 
-export interface YearGroup {
-  year: number
-  documents: DeliveredDocument[]
-}
-
-/** Newest year first; within a year the incoming order (newest delivery first) is kept. */
-export function groupByYear(documents: readonly DeliveredDocument[]): YearGroup[] {
-  const groups = new Map<number, DeliveredDocument[]>()
-  for (const document of documents) {
-    const year = documentYear(document)
-    const rows = groups.get(year)
-    if (rows) rows.push(document)
-    else groups.set(year, [document])
-  }
-  return [...groups.entries()]
-    .sort(([a], [b]) => b - a)
-    .map(([year, rows]) => ({ year, documents: rows }))
-}
-
 export function countByKind(documents: readonly DeliveredDocument[]): Record<DocumentKind, number> {
   const counts = Object.fromEntries(DOCUMENT_KINDS.map((kind) => [kind, 0])) as Record<DocumentKind, number>
   for (const document of documents) counts[document.kind] += 1

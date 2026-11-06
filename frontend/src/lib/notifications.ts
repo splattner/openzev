@@ -29,8 +29,8 @@ export function notificationLink(notification: Notification): string | null {
     switch (notification.target_type) {
         case 'invoice':
             if (notification.audience !== 'participant') return `/billing/invoices/${notification.target_id}`
-            // The invoice is in the inbox once it was delivered; an older notification still points at the list.
-            return notification.payload.document_id ? '/me/documents' : '/me/invoices'
+            // A participant reads the invoice in their documents (it was My invoices until #862).
+            return '/me/documents'
         case 'document':
             return '/me/documents'
         case 'metering_point':

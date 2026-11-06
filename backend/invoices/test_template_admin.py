@@ -670,7 +670,8 @@ class InvoicePdfDownloadTests(TestCase):
         self.assertEqual(resp["Content-Type"], "application/pdf")
         self.assertTrue(b"".join(resp.streaming_content).startswith(b"%PDF"))
 
-    def test_pdf_returns_200_for_own_participant(self):
+    def test_pdf_returns_404_for_own_participant_after_sending(self):
+        # The participant downloads it from the document inbox (#862); the live route is for managers.
         from invoices.models import InvoiceStatus
 
         self.invoice.status = InvoiceStatus.SENT
@@ -679,7 +680,7 @@ class InvoicePdfDownloadTests(TestCase):
         self._attach_pdf(self.invoice)
         auth(self.client, self.participant_user)
         resp = self.client.get(self._url(self.invoice))
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 404)
 
     def test_pdf_returns_404_for_own_participant_before_sending(self):
         # A draft's PDF exists for the operator's review only (#861).

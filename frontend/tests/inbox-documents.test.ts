@@ -4,7 +4,6 @@ import {
   documentStanding,
   documentYear,
   formatFileSize,
-  groupByYear,
   uploadFileProblem,
 } from '../src/features/inbox/documentPresentation'
 import { issueYears } from '../src/features/inbox/IssueReportsDialog'
@@ -24,24 +23,6 @@ describe('documentYear', () => {
   it('uses the period when there is one, else the delivery year', () => {
     expect(documentYear(doc({ period_start: '2025-01-01' }))).toBe(2025)
     expect(documentYear(doc())).toBe(2026)
-  })
-})
-
-describe('groupByYear', () => {
-  it('puts the newest year first and keeps the incoming order within a year', () => {
-    const groups = groupByYear([
-      doc({ id: 'a', period_start: '2025-01-01' }),
-      doc({ id: 'b' }),
-      doc({ id: 'c', period_start: '2025-02-01' }),
-      doc({ id: 'd' }),
-    ])
-    expect(groups.map((group) => group.year)).toEqual([2026, 2025])
-    expect(groups[0].documents.map((d) => d.id)).toEqual(['b', 'd'])
-    expect(groups[1].documents.map((d) => d.id)).toEqual(['a', 'c'])
-  })
-
-  it('is empty for no documents', () => {
-    expect(groupByYear([])).toEqual([])
   })
 })
 

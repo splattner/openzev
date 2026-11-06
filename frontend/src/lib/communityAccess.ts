@@ -89,6 +89,16 @@ export function relationToZev(user: User | null | undefined, zevId: string | nul
     return membership ? relationOf(membership) : undefined
 }
 
+/**
+ * Whether the account manages or views at least one community (or is an admin): the accounts that
+ * can read live invoices. A participant reads what was delivered to them instead (#862).
+ */
+export function hasCommunityWideAccess(user: User | null | undefined): boolean {
+    if (!user) return false
+    return user.role === 'admin'
+        || (user.memberships ?? []).some((membership) => !!membership.access || (membership.roles?.length ?? 0) > 0)
+}
+
 /** The account's shell role for a given community. */
 export function shellRoleForZev(user: User | null | undefined, zevId: string | null | undefined): ShellRole {
     return shellRoleFor(user, relationToZev(user, zevId))

@@ -20,13 +20,14 @@ export const de = {
         overview: 'Übersicht',
         energyBalance: 'Energiebilanz',
         setupGroup: 'Konfiguration',
+        personalGroup: 'Persönlich',
         platformGroup: 'Plattform',
         platformScope: 'Plattformverwaltung',
         scopedLabel: '{{scope}}: {{label}}',
         metering: 'Messdaten',
         billing: 'Abrechnung',
-        myInvoices: 'Meine Rechnungen',
         myDocuments: 'Meine Dokumente',
+        documents: 'Dokumente',
         annualStatement: 'Jahresabrechnung',
         myMeteringPoints: 'Meine Messpunkte',
         myEnergy: 'Mein Energiesystem',
@@ -190,7 +191,7 @@ export const de = {
     dashboard: {
         title: 'Dashboard',
         description: 'Starten Sie mit Ihrem Schweizer ZEV oder vZEV-Abrechnungsworkflow.',
-        participantDescription: 'Ihr Verbrauch, Ihr Anteil aus dem ZEV und Ihre Rechnungen.',
+        participantDescription: 'Ihr Verbrauch und Ihr Anteil aus dem ZEV.',
     },
     common: {
         timeHours: 'Stunde',
@@ -773,12 +774,20 @@ export const de = {
     },
     inbox: {
         title: 'Meine Dokumente',
-        description: 'Alles, was deine Gemeinschaft dir zugestellt hat: Rechnungen, Abrechnungen, Verträge und Mitteilungen.',
+        description: 'Alles, was deine Gemeinschaft dir zugestellt hat: Rechnungen mit Betrag und Zahlungsstand, Gutschriften, Abrechnungen, Verträge und Mitteilungen.',
         allCommunities: 'Alle deine Gemeinschaften',
         failed: 'Dokumente konnten nicht geladen werden.',
         empty: {
             title: 'Dir wurde noch nichts zugestellt.',
             description: 'Dokumente erscheinen hier, sobald deine Gemeinschaft sie zustellt.',
+        },
+        col: {
+            community: 'Gemeinschaft',
+            amount: 'Betrag',
+        },
+        credit: {
+            remaining: 'Verbleibend: {{amount}}',
+            forInvoice: 'Zur Rechnung',
         },
         download: 'Herunterladen',
         downloadLabel: '{{title}} herunterladen',
@@ -925,36 +934,6 @@ export const de = {
                 open: 'Öffnen',
                 openFor: '{{name}} öffnen',
                 meters: 'Messpunkte',
-            },
-        },
-        myInvoices: {
-            title: 'Meine Rechnungen',
-            allCommunities: 'Alle Ihre Gemeinschaften',
-            description: 'Rechnungen, die für Sie ausgestellt wurden. Klicken Sie auf eine Rechnung, um Details zu sehen oder das PDF zu öffnen.',
-            failed: 'Rechnungen konnten nicht geladen werden.',
-            empty: {
-                title: 'Noch keine Rechnungen',
-                description: 'Sobald Ihr ZEV-Betreiber eine Rechnung ausstellt, erscheint sie hier.',
-            },
-            col: {
-                invoice: 'Rechnung',
-                period: 'Periode',
-                total: 'Betrag',
-                status: 'Zahlung',
-                community: 'Gemeinschaft',
-                actions: 'Aktionen',
-            },
-            viewDetails: 'Details ansehen',
-            openPdf: 'Rechnung {{number}} als PDF öffnen',
-            credits: {
-                title: 'Gutschriften',
-                description: 'Gutschriften, die Ihnen ausgestellt wurden. Was übrig bleibt, wird mit Ihrer nächsten Rechnung verrechnet.',
-                number: 'Gutschrift',
-                invoice: 'Zur Rechnung',
-                amount: 'Betrag',
-                date: 'Datum',
-                remaining: 'Verbleibend',
-                status: 'Status',
             },
         },
         adminCredentials: {
@@ -3593,7 +3572,6 @@ export const de = {
             description: 'Produktion, Verbrauch, Eigenverbrauch und Netzaustausch für die ausgewählte Periode.',
         },
         dashboard: {
-            openInvoicePdf: 'PDF für Rechnung {{number}} öffnen',
             participant: 'Teilnehmer',
             allParticipants: 'Alle Teilnehmer',
             resolution: 'Auflösung',
@@ -3652,9 +3630,6 @@ export const de = {
                 description: 'Durchschnittlicher stündlicher Energiebezug über die Abrechnungsperiode — aufgeteilt in lokale ZEV-Energie und Netzbezug.',
                 ownSystemNote: 'Die gestrichelte Linie zeigt den Verbrauch laut dem eigenen System der Person (z. B. Solar Manager), nicht vom Zähler abgelesen.',
             },
-            invoicesSection: 'Rechnungen',
-            invoicesAllCommunitiesSection: 'Rechnungen aller ZEVs',
-            failedInvoices: 'Rechnungen konnten nicht geladen werden.',
             cockpit: {
                 title: 'Abrechnungs-Cockpit',
                 failed: 'Abrechnungsbereitschaft konnte nicht geladen werden.',
@@ -3731,16 +3706,6 @@ export const de = {
                     participantExpiring: '{{name}} endet am {{validTo}} — Messpunkt-Zuweisungen prüfen',
                 },
             },
-            noInvoices: 'Keine Rechnungen verfügbar.',
-            invoiceCol: {
-                invoice: 'Rechnung',
-                period: 'Zeitraum',
-                total: 'Gesamt',
-                status: 'Zahlung',
-                community: 'Gemeinschaft',
-                actions: 'Aktionen',
-            },
-            viewDetails: 'Details anzeigen',
             energyFlow: {
                 title: 'Energiefluss',
                 gridImport: 'Netzbezug',
@@ -3754,12 +3719,14 @@ export const de = {
         reports: {
             title: 'Berichte',
             description: 'Energieauswertungen und verfügbare Jahresdokumente anzeigen.',
-            participantDescription: 'Lesen Sie Ihre Jahresdokumente und laden Sie sie herunter.',
+            participantDescription: 'Lesen Sie die Jahresdokumente, die Ihre Gemeinschaft für Sie ausgestellt hat, und laden Sie sie herunter.',
             year: 'Jahr',
             downloading: 'Wird erstellt…',
             download: 'Herunterladen',
             preparingDocument: '{{document}} für {{year}} wird erstellt…',
             documentTitle: '{{document}} — {{year}}',
+            issuedOn: 'Ausgestellt am {{date}}',
+            notIssued: 'Ihre Gemeinschaft hat Ihnen noch keine {{document}} für {{year}} ausgestellt. Sie erscheint hier und unter Meine Dokumente, sobald sie vorliegt.',
             documentTabs: 'Jahresdokumente',
             annualStatement: {
                 title: 'Jahresabrechnung',
@@ -3837,8 +3804,10 @@ export const de = {
             tabs: {
                 invoices: 'Rechnungen',
                 emails: 'E-Mails',
-                documents: 'Zugestellte Dokumente',
             },
+        },
+        participantDocuments: {
+            description: 'Was die Gemeinschaft ihren Teilnehmenden zugestellt hat. Hier stellst du Jahresabrechnungen, Steuerübersichten und die Tarifübersicht aus oder lädst eine Mitteilung hoch.',
         },
         billingPeriods: {
             failed: 'Abrechnungsperioden konnten nicht geladen werden.',

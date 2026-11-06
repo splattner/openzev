@@ -8,7 +8,7 @@ import { PageSkeleton } from '../components/PageSkeleton'
 import {
   countByKind,
   DOCUMENT_KINDS,
-  groupByYear,
+  documentYear,
 } from '../features/inbox/documentPresentation'
 import { DocumentsList } from '../features/inbox/DocumentsList'
 import { listInboxDocuments } from '../lib/api/inbox'
@@ -30,6 +30,7 @@ export function DocumentsPage() {
   const { user } = useAuth()
   const [kind, setKind] = useState<KindFilter>('all')
   const [zevId, setZevId] = useState('')
+  const [year, setYear] = useState('')
 
   const query = useQuery({ queryKey: queryKeys.inbox.list('mine'), queryFn: () => listInboxDocuments() })
   const own = useMemo(() => ownParticipantIds(user), [user])
@@ -41,8 +42,10 @@ export function DocumentsPage() {
   const memberships = user?.memberships ?? []
   const showCommunity = memberships.length > 1
   const inCommunity = zevId ? documents.filter((document) => document.zev === zevId) : documents
-  const visible = kind === 'all' ? inCommunity : inCommunity.filter((document) => document.kind === kind)
-  const counts = countByKind(inCommunity)
+  const years = [...new Set(inCommunity.map(documentYear))].sort((a, b) => b - a)
+  const inYear = year ? inCommunity.filter((document) => String(documentYear(document)) === year) : inCommunity
+  const visible = kind === 'all' ? inYear : inYear.filter((document) => document.kind === kind)
+  const counts = countByKind(inYear)
 
   return (
     <div className="page-stack">
@@ -66,16 +69,25 @@ export function DocumentsPage() {
         </div>
       ) : (
         <>
-          <div className="actions-row">
+          <div className="actions-row actions-row-wrap">
             <FilterTabs<KindFilter>
               label={t('inbox.filter.kind')}
               value={kind}
               onChange={setKind}
               tabs={[
-                { value: 'all', label: t('inbox.filter.all'), count: inCommunity.length },
+                { value: 'all', label: t('inbox.filter.all'), count: inYear.length },
                 ...DOCUMENT_KINDS.map((value) => ({ value, label: t(`inbox.kind.${value}`), count: counts[value] })),
               ]}
             />
+            {years.length > 1 && (
+              <label>
+                <span className="visually-hidden">{t('inbox.outbox.year')}</span>
+                <select value={year} onChange={(event) => setYear(event.target.value)} aria-label={t('inbox.outbox.year')}>
+                  <option value="">{t('inbox.outbox.allYears')}</option>
+                  {years.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+            )}
             {showCommunity && (
               <label>
                 <span className="visually-hidden">{t('inbox.filter.community')}</span>
@@ -91,7 +103,7 @@ export function DocumentsPage() {
           {visible.length === 0 ? (
             <p className="muted">{t('inbox.filter.none')}</p>
           ) : (
-            <DocumentsList groups={groupByYear(visible)} showCommunity={showCommunity && !zevId} />
+            <DocumentsList documents={visible} showCommunity={showCommunity && !zevId} />
           )}
         </>
       )}

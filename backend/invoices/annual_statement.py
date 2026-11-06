@@ -583,8 +583,8 @@ def generate_annual_statement_pdf(
     """Generate an annual statement, reusing optional ZEV-wide batch data.
 
     ``sent_only`` limits the invoice figures to invoices already sent to the
-    participant — set for the participant's own download, which must not add
-    in drafts or approved-but-undelivered amounts (#861).
+    participant — set when the statement is issued to the participant's inbox, which
+    must not add in drafts or approved-but-undelivered amounts (#861).
     """
     lang = zev.invoice_language or "de"
     tr = ANNUAL_TRANSLATIONS.get(lang, ANNUAL_TRANSLATIONS["de"])

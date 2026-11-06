@@ -1,0 +1,67 @@
+/* Invoices and credit notes: a table on a wide screen, one small card each on a phone. */
+
+.doc-cards {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc-card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--border-default);
+}
+
+.doc-card:first-child {
+  border-top: 0;
+}
+
+.doc-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.doc-card-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-card-meta {
+  margin: 0;
+}
+
+.doc-card .button {
+  width: 100%;
+  justify-content: center;
+}
+
+.doc-issue {
+  margin-top: 0.25rem;
+}
+
+.doc-note {
+  display: block;
+}
+
+/* The amount column: the header sits over its right-aligned figures. */
+
+.doc-wide th.numeric {
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .doc-wide {
+    display: none;
+  }
+
+  .doc-cards {
+    display: block;
+    padding: 0 1rem;
+  }
+}

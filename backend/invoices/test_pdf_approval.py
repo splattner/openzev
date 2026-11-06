@@ -350,11 +350,14 @@ def test_owner_can_generate_a_missing_pdf_after_approval(
 
     if manual_send:
         assert owner_client.post(f"/api/v1/invoices/invoices/{invoice.pk}/mark-sent/").status_code == 200
-        authenticate(api_client, participant_user)
-        response = api_client.get(f"/api/v1/invoices/invoices/{invoice.pk}/")
+        # Marking it sent hands the participant a render through the inbox but leaves the
+        # invoice's own PDF as it was: none stored.
+        response = owner_client.get(f"/api/v1/invoices/invoices/{invoice.pk}/")
         assert response.status_code == 200
         assert response.data["pdf_url"] is None
         assert response.data["pdf_status"] == InvoicePdfStatus.NONE
+        authenticate(api_client, participant_user)
+        assert api_client.get(f"/api/v1/invoices/invoices/{invoice.pk}/").status_code == 404
 
     with patch("invoices.pdf.render_pdf", return_value=b"%PDF test"):
         response = owner_client.post(f"/api/v1/invoices/invoices/{invoice.pk}/generate-pdf/")

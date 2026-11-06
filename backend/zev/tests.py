@@ -2934,12 +2934,16 @@ class SeedDemoReseedTests(SeedDemoWindow, TestCase):
 			)
 			self.assertEqual(windows, [(maria_participation.pk, date(year, 3, 31)), (robin.pk, None)])
 
-		with self.subTest("Maria sees her own invoice and nothing else"):
+		with self.subTest("Maria reads her own invoice from the inbox and nothing else"):
 			client = APIClient()
 			client.force_authenticate(maria)
 			listing = client.get("/api/v1/invoices/invoices/").json()
-			self.assertEqual([row["id"] for row in listing["results"]], [str(maria_invoice.pk)])
-			self.assertEqual(client.get(f"/api/v1/invoices/invoices/{maria_invoice.pk}/").status_code, 200)
+			self.assertEqual(listing["results"], [])
+			self.assertEqual(client.get(f"/api/v1/invoices/invoices/{maria_invoice.pk}/").status_code, 404)
+			# What she was sent is in her inbox and only hers (the PDFs are mocked in this class,
+			# so which documents exist is tested in ``inbox``).
+			inbox = client.get("/api/v1/inbox/documents/").json()["results"]
+			self.assertTrue(all(row["participant"] == str(maria_participation.pk) for row in inbox))
 			other = Invoice.objects.filter(zev=flagship).exclude(participant=maria_participation).first()
 			self.assertEqual(client.get(f"/api/v1/invoices/invoices/{other.pk}/").status_code, 404)
 			access.invalidate(maria)

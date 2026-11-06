@@ -68,35 +68,27 @@ approving. It asks you to regenerate draft invoices that were created before a
 charge was added or changed, and warns about a charge nobody can be billed for
 (no member on its date). It stays out of the list for periods without charges.
 
-## Participant View: My Invoices
-
-Participants open **My invoices** (`/me/invoices`) in the sidebar to see the
-invoices issued to them — invoice number, period, total, whether payment is
-**due**, **overdue** or **paid**, and a link to the details. An invoice appears here once it has been sent: drafts and
-approved invoices that haven't gone out yet stay with the operator, and the
-participant's annual statement counts only sent invoices too. A sent invoice
-that is cancelled later stays listed, marked as cancelled. The PDF button
-appears only on rows that have a document. This sent-only list also applies
-when you manage another community where you are a participant.
-Click the invoice number or **View details** to open the invoice. **Open PDF**
-has a text label; invoices without a document show whether the PDF is being
-prepared, failed, or missing. A failed refresh keeps the last loaded invoices
-visible with a warning and **Retry**.
-Participants with several communities see which community issued each invoice.
-The list is read-only; the deep link `/billing/invoices/{id}` shows a
-participant only their own invoice (enforced by the backend), and its return
-link leads back to **My invoices**.
-
-![Participant My Invoices](screenshots/08c-my-invoices.png)
-
 ## Participant View: My Documents
 
-**My documents** (`/me/documents`) is the participant's mailbox: everything the
-community has delivered to them, grouped by year and newest first — sent
-invoices, credit notes, annual statements, financial summaries, tariff
-overviews, the participation contract, and notices from the operator. Each row shows the type,
-the delivery date and a **Download** button; use the type filter to narrow the
-list, and the community filter when you take part in more than one.
+**My documents** (`/me/documents`) is where a participant finds everything the
+community has delivered to them, invoices included, newest first, in the same
+table as the other lists: sent invoices, credit notes, annual statements,
+financial summaries, tariff overviews, the participation contract, and notices
+from the operator. Each row shows the type, the year, the delivery date and a
+**Download** button; use the type filter to narrow the list (**Invoice** gives
+the invoices alone), the year filter when documents span several years, and the
+community filter when you take part in more than one. On a phone each document
+is a small card.
+
+An **invoice** row shows its total and, where a credit note was set against it,
+the amount due beneath it, and whether payment is **due**, **overdue** or
+**paid**. A **credit note** row shows its amount, what is left of it, and where it
+was set against an invoice. These figures are read from the invoice or credit
+note, so they stay current; the PDF is the copy that was sent and does not
+change. An invoice appears once it has been sent (drafts and approved invoices
+that haven't gone out yet stay with the operator), a credit note once its PDF
+exists. There is no separate page for one invoice: the PDF carries the details,
+and an old link to an invoice or to **My invoices** takes a participant here.
 
 ![Participant My documents](screenshots/08l-my-documents.png)
 
@@ -110,7 +102,6 @@ list, and the community filter when you take part in more than one.
   stays listed, marked **Superseded**. A sent invoice that was cancelled stays
   listed, marked **Cancelled**. A notice the operator **withdrew** disappears from
   your list.
-- Invoices are still also listed under **My invoices**, with their payment state.
 
 ## Invoice Lifecycle
 
@@ -147,7 +138,7 @@ missing PDF automatically. **Mark sent** records manual delivery without
 generating a PDF; you can generate it afterwards. Later address or bank-detail
 changes do not change the approved document.
 
-## Billing Hub (Invoices · Emails · Delivered documents)
+## Billing Hub (Invoices · Emails)
 
 The sidebar entry **Billing** (`/billing/invoices`) opens the invoice-first
 billing hub. Its tabs are routes — each is directly linkable:
@@ -157,9 +148,9 @@ billing hub. Its tabs are routes — each is directly linkable:
   invoices: the latest email status per invoice, a filter by status, a
   failed-email banner, **View history** for the actual attempt log, and an
   inline **Retry** per failed latest attempt.
-- **Delivered documents** (`/billing/documents`) — what the community has
-  delivered to its participants, and when (see
-  [Delivered documents](#delivered-documents)).
+
+What the community has delivered to its participants has its own sidebar entry,
+**Documents** (see [Delivered documents](#delivered-documents)).
 
 The yearly whole-ZEV annual-statement ZIP is on **Reports** (see
 [Reports: Annual Report, Statements and Tax Overviews](#reports-annual-report-statements-and-tax-overviews)).
@@ -190,7 +181,7 @@ history panel.
 
 ## Delivered documents
 
-The **Delivered documents** tab answers "did Anna get her statement?". It lists
+The **Documents** page (`/documents`, in the sidebar right after **Billing**) answers "did Anna get her statement?". It lists
 every document delivered to the selected community's participants — with the
 participant, the type, the delivery date, who delivered it, and a **No account
 yet** badge for a participant who has no linked account (they will see the
@@ -609,10 +600,9 @@ and click **Correct invoice** in the **Credit notes** card, then choose:
 Enter a **reason**; it is printed on the credit note. Credit notes have their
 own numbers (prefix **CN** by default, changeable in the community settings
 under *Billing & payment*) and a PDF you can open from the card, based on the
-**Credit Note PDF Template** that admins can edit under *Templates*. Participants see their
-credit notes on the invoice and under **My invoices**; each one also appears in
-**My documents** (type *Credit note*) as soon as its PDF exists, and the
-participant is notified. That copy is fixed: rendering the credit note's PDF again later
+**Credit Note PDF Template** that admins can edit under *Templates*. Participants find their
+credit notes in **My documents** (type *Credit note*) as soon as the PDF exists,
+and are notified. That copy is fixed: rendering the credit note's PDF again later
 does not change what they were given.
 
 ![Credit note on a reversed invoice](screenshots/08g-invoice-credit-note.png)
@@ -740,18 +730,24 @@ Below the report, under **Annual documents**:
 
 ![Reports page](screenshots/23-reports.png)
 
-**Participants:** Open **Annual statement** (`/me/statement`) to read your own
-statement or select the **Tax Overview** tab. Use **Download PDF** to save the
-document. **Open in new tab** shows the same PDF. Select **Retry** if generation
-fails, or reload the page for fresh documents. The tax overview shows producers'
-net local-energy revenue and feed-in compensation. The annual statement and the
-tax overview count the same invoices as the annual report: those that have
-been approved and not cancelled, whether or not they are paid yet.
+**Participants:** Open **Annual statement** (`/me/statement`) to read the annual
+statement your community **issued** to you, or select the **Tax Overview** tab for
+the financial summary. The page shows the date it was issued; use **Download PDF**
+to save the document. **Open in new tab** shows the same PDF. The year list offers the years for which you have a document, and **Tax Overview**
+only appears if you have one (it is for producers). If your community has not
+issued anything yet, the page says so; it appears here and under **My documents**
+as soon as it does. Select **Retry** if loading fails.
+Issuing a statement again replaces the earlier one on this page (the earlier one
+stays under **My documents**, marked **Superseded**). The tax overview shows
+producers' net local-energy revenue and feed-in compensation. The statement and the
+tax overview count the same invoices as the annual report: those that have been
+approved and not cancelled, whether or not they are paid yet.
 
 ![Participant annual documents with embedded statement](screenshots/23b-participant-annual-statement.png)
 
-These documents use your consumption, invoices, and savings. They become
-available after billing. The selected community appears above the page title.
+These documents use your consumption, invoices, and savings. They are issued by
+your community's operator, usually after the year's billing. The selected community
+appears above the page title.
 
 ## Troubleshooting
 

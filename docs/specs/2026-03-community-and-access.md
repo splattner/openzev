@@ -294,8 +294,9 @@ no relationship       →  authenticated, no domain access
 `User.role` is `admin` or `user` (#761 step 7); nothing but `is_admin` reads
 it. An account without a grant passes no management gate (403), whatever it
 did before. `ZevViewSet.self_setup` is gated by `User.may_create_zev`. In the
-reports self-service rule (`invoices/views_reports.py _self_service`) an
-account with no current participant row gets 404 when it has an ended one,
+reports rule (`invoices/views_reports.py _is_participant_call`; since the document inbox, #862, a participant
+call is answered 404 and the participant reads the issued document from the inbox) an
+account with no current participant row also gets 404 when it has an ended one,
 and is served as a manager (400 without ids) when it never took part.
 `User.is_zev_owner` no longer exists.
 
@@ -394,7 +395,8 @@ Class attributes each viewset declares:
 | `MeteringPointViewSet` | `zev` | `assignments__participant` | distinct |
 | `MeteringPointAssignmentViewSet` | `metering_point__zev` | `participant` | |
 | `TariffViewSet` / `TariffPeriodViewSet` | `zev` / `tariff__zev` | `None` | |
-| `InvoiceViewSet` | `zev` | `participant` | `participant_visible = sent_to_participant()`, `participant_access_survives_end = True`, `viewer_allowed_actions = {"download_pdfs"}` |
+| `InvoiceViewSet` | `zev` | `None` (since #862 a participant reads their invoices from the document inbox) | `viewer_allowed_actions = {"download_pdfs"}` |
+| `CreditViewSet` | `zev` | `None` (as above) | |
 | `MeterReadingViewSet` | `metering_point__zev` | (custom `_participant_q`) | readings inside the window of an assignment the caller holds, on a current participant row |
 
 **Read rule** (safe methods, and `viewer_allowed_actions`): admin → every
@@ -426,10 +428,14 @@ route to keep it that way.
 The filter can only narrow: it adds a conjunctive `filter()` to the
 already-scoped queryset, so it is not a route to another tenant's data.
 
-**Participant-only narrowing (`participant_visible`):** `InvoiceViewSet` sets
-it to `invoices.models.sent_to_participant()`, so a participant sees an
-invoice only once it has been sent to them (#861), and — because invoices set
-`participant_access_survives_end` — keeps seeing those after leaving the ZEV.
+**Participant-only narrowing (`participant_visible`):** no live viewset uses it for invoices
+any more. Until #862 `InvoiceViewSet` set it to `invoices.models.sent_to_participant()` (a participant
+saw an invoice only once it was sent, #861, and kept it after leaving the ZEV); a participant now
+reads those from the document inbox (`inbox.DeliveredDocumentViewSet`, which sets
+`participant_visible = Q(withdrawn_at__isnull=True)`, `participant_access_survives_end` and
+`participant_survives_disabled_zev`), and `InvoiceViewSet` / `CreditViewSet` have no participant path,
+so a participant gets an empty list and 404 on every detail route.
+`sent_to_participant()` remains: it decides which invoices the inbox backfill and the annual statement count.
 
 ### 4.5 Write scoping (`ZevScopedQuerySetMixin`)
 
@@ -1357,10 +1363,10 @@ disabled. Records `zev.enable`.
   `Participant`/`MeteringPointAssignment` rows specifically — a participant
   already gets `403` from every method on those two regardless of ZEV state
   (§12.1), so there was nothing for this change to alter there.
-- Participant self-service annual statements and financial summaries also
-  exclude disabled ZEVs through `own_participant_for_user`. A participant-only
-  account with no eligible row gets 404; management access to that ZEV still
-  permits reports. Data-quality status excludes disabled ZEVs only from its
+- Annual statements and financial summaries are no longer served to a participant (#862): the
+  participant call is a 404 whether or not the ZEV is disabled, and the issued document is read
+  from the inbox (which stays readable for a disabled ZEV, ADR 0045). Management access to that ZEV
+  still permits reports. Data-quality status excludes disabled ZEVs only from its
   participant-assignment branch, preserving manager/viewer/admin visibility.
 - Managers and viewers keep read access everywhere (the grant branch of the
   scoping is untouched by the disabled-ZEV rules) but lose write access to every ZEV-scoped model —
@@ -1698,7 +1704,7 @@ reaches every ZEV-scope route and sees its pages read-only
 
 | Route | Allowed roles | Page component |
 |---|---|---|
-| `/` | any authenticated | `HomePage`: `OverviewPage` in ZEV scope, `DashboardPage` for current participants, `/me/invoices` redirect for former participants, `GuestHomePage` for shell role `none` (linking explanation + secondary account link) |
+| `/` | any authenticated | `HomePage`: `OverviewPage` in ZEV scope, `DashboardPage` for current participants, `/me/documents` redirect for former participants, `GuestHomePage` for shell role `none` (linking explanation + secondary account link) |
 | `/dashboard` | ZEV scope, `participant` | `DashboardPage` (manager title/navigation: Energy balance; participant root remains `/`) |
 | `/my-energy` | ZEV scope, `participant` | `MyEnergyPage` ("My energy system"): live energy of the selected community and the own-system history, Today / 7 days / Period via `?range=` (SPEC-2026-live-energy-data §7.1); shows notices while the live flag or the energy data feature is off |
 | `/live` | alias | `AliasNavigate` to `/my-energy` (query and hash kept) |
@@ -1726,16 +1732,17 @@ reaches every ZEV-scope route and sees its pages read-only
 | `/metering-data` | any authenticated | alias → `/metering/chart`, except `?tab=quality` → guarded `/metering/quality`; `tab` is always stripped, remaining params preserved |
 | `/imports` | ZEV scope | alias → `/metering/imports` (query preserved) |
 | `/tariffs` | ZEV scope | `TariffsPage` |
-| `/billing/invoices` · `/billing/emails` · `/billing/documents` | ZEV scope | `BillingHubPage tab=…` (invoices · email delivery/history + retry · delivered documents, the participant inbox's outbox: [participant document inbox §7.2](2026-11-participant-document-inbox.md)) |
+| `/billing/invoices` · `/billing/emails` | ZEV scope | `BillingHubPage tab=…` (invoices · email delivery/history + retry) |
+| `/documents` | ZEV scope | `ParticipantDocumentsPage` (what was delivered to the community's participants, and where to issue or upload: the participant inbox's outbox, [participant document inbox §7.2](2026-11-participant-document-inbox.md)); `/billing/documents`, the old billing tab, redirects here |
 | `/billing/statements` | any authenticated | alias → `/reports` (the annual-statement ZIP moved there with the other yearly documents) |
 | `/billing/periods` | ZEV scope | compatibility alias → `/`, where period work lives on manager Overview |
 | `/billing/invoices?period_start&period_end` | ZEV scope | deep link from the Overview period table preselects that period |
 | `/billing` | ZEV scope | alias → `/billing/invoices` |
 | `/invoices` | ZEV scope | alias → `/billing/invoices` (query preserved) |
-| `/invoices/:invoiceId` · `/billing/invoices/:invoiceId` | any authenticated | `InvoiceDetailPage` (own invoices only for participants, backend-enforced) |
+| `/invoices/:invoiceId` · `/billing/invoices/:invoiceId` | any authenticated | `InvoiceDetailPage` (managers and admins; a participant has no live invoice, #862) |
 | `/me/statement` | `participant` | `ReportsPage` (participant branch; impersonating admins carry the target account's relations) |
-| `/me/documents` | `participant`, `former` | `DocumentsPage` (what was delivered to the account; read-only list over `/api/v1/inbox/documents/`, own rows only; [participant document inbox §7.1](2026-11-participant-document-inbox.md)) |
-| `/me/invoices` | `participant`, `former` | `MyInvoicesPage` (own invoices, read-only; reuses the role-scoped invoice list — no new grant, recorded exception 2) |
+| `/me/documents` | `participant`, `former`, and the management shells for an account that holds a participation (nav entry only then) | `DocumentsPage` (what was delivered to the account; read-only list over `/api/v1/inbox/documents/`, own rows only; [participant document inbox §7.1](2026-11-participant-document-inbox.md)) |
+| `/me/invoices` | any authenticated | alias → `/me/documents` (My invoices was folded into My documents, #862; the bell, bookmarks and the former-participant home land there) |
 | `/me/metering-points` | `participant`, `manager`, `viewer`, `admin` | `MyMeteringPointsPage` (the participant's own metering points and the energy data setup of those with generation behind the meter; a management shell shows only the flagged meters the user holds personally; see [supplementary energy data §7.1](2026-10-supplementary-energy-data.md)) |
 | `/reports` | ZEV scope, `participant` | `ReportsPage` (participants: own downloads; owners/admins: annual ZEV report, tax overview, and annual-statement ZIP) |
 | `/login` | public | `LoginPage` |
@@ -1791,15 +1798,15 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 
 | Section | Condition |
 |---|---|
-| Overview (`/`), Energy balance (`/dashboard`), Metering (`/metering/chart`, active on `/metering/chart` + `/metering/quality` + `/metering/imports`), Billing (`/billing/invoices`, active on `/billing/*`), Reports | `isZevScope` (shell role `admin`, `manager` or `viewer`; the `/reports` route itself also allows participants) |
+| Overview (`/`), Energy balance (`/dashboard`), Metering (`/metering/chart`, active on `/metering/chart` + `/metering/quality` + `/metering/imports`), Billing (`/billing/invoices`, active on `/billing/*`), Documents (`/documents`, right after Billing; `nav.documents`), Reports | `isZevScope` (shell role `admin`, `manager` or `viewer`; the `/reports` route itself also allows participants) |
 | Live energy (`/my-energy`, right after Energy balance) | `isZevScope` + `live_energy_data_enabled` effective (`GET /metering/live/enabled/`) |
 | Account (`/account`) | shell role `none` (only nav entry; landing page explains the unlinked state) |
 | Dashboard (`/`) | shell role `participant` |
 | My energy system (`/my-energy`, right after Dashboard) | shell role `participant` (not `former`) + (live flag effective, or the energy data feature on and a held meter an own system can be connected to) |
-| My invoices (`/me/invoices`) | shell role `participant` or `former` |
-| My documents (`/me/documents`, after My invoices) | shell role `participant` or `former` (a former participant sees only these two entries: what it was sent stays readable, the inbox has no end date) |
+| My documents (`/me/documents`, after My energy system) | shell role `participant` or `former` (a former participant sees only these two entries: what it was sent stays readable, the inbox has no end date); also in a management shell, when the account holds a participation in any community (`ownParticipantIds`), in the *Personal* block (below) |
 | Annual statement (`/me/statement`) | shell role `participant` (consumption is available on the participant dashboard) |
-| My metering points (`/me/metering-points`) | shell role `participant` (not `former`); for a participant it also lights on `/metering/chart` and `/metering/points`, which they reach from it (they have no Metering hub entry); also `admin`, `manager` or `viewer` who personally hold a flagged metering point in the selected community while the energy data feature is on |
+| My metering points (`/me/metering-points`) | shell role `participant` (not `former`); for a participant it also lights on `/metering/chart` and `/metering/points`, which they reach from it (they have no Metering hub entry); also `admin`, `manager` or `viewer` who personally hold a flagged metering point in the selected community while the energy data feature is on, in the *Personal* block (below) |
+| Personal group (*Personal*, `nav.personalGroup`: My metering points and My documents), after the Setup group and Feasibility and before the Platform group | `isZevScope` and the account holds a flagged meter (My metering points) or a participation (My documents); empty, the group is not drawn. It keeps a manager's own side apart from the community they manage, and is styled like the Setup group |
 | Setup group (participants, metering points `/metering/points`, tariffs, ZEV settings `/zev-settings`) | `isZevScope` (audit logs live in the ZEV settings hub; no standalone entry) |
 | Feasibility (`/feasibility`, standalone entry below Setup) | `isZevScope` + `feasibility_calculator_enabled` (planning tool, not a setup step) |
 | Platform group (four entries: Overview `/admin`, Accounts `/admin/accounts`, Templates `/admin/templates`, Settings `/admin/system-settings`) | `role == 'admin'` (ZEVs/API keys/invoices/audit-logs/pdf+email templates live as hub tabs) |
@@ -1838,7 +1845,7 @@ fallbacks, the dirty-draft flow and fixed selections. Pages with the switch:
 Overview, Energy balance (`DashboardPage`), Metering chart and imports,
 Metering points, Billing hub and invoices, Reports, Participants, Tariffs, ZEV
 settings, and the owner audit log (not its `/admin` view). The invoice
-detail page (the invoice's own community), My invoices and every `/admin/*`
+detail page (the invoice's own community), My documents and every `/admin/*`
 page keep a plain eyebrow. The sidebar names no scope: it holds the logo, the
 navigation and the account. On mobile, Escape closes the sidebar drawer and
 returns focus to its menu button. Mobile navigation ignores the saved desktop
@@ -1864,10 +1871,10 @@ mark (the name as its tooltip) and expands the sidebar before opening. There is 
 holds only the mobile app bar (`.mobile-bar`, ≤768px: menu button plus the
 decorative logo lockup, sticky) and, during impersonation, the impersonation
 banner; on desktop it is empty otherwise.
-My invoices, the one participant page that lists across
+My documents, the one participant page that lists across
 every membership, shows the community name only when the account has exactly
 one membership (`soleCommunityName(user)`, from `/auth/me` `memberships`) and
-otherwise names the broader scope (`pages.myInvoices.allCommunities`), so a
+otherwise names the broader scope (`inbox.allCommunities`), so a
 single name never mislabels it. The participant dashboard, statement page,
 metering points and chart name the selected community, because they ask about
 it (`zev_id`): `selectedCommunityName` (`frontend/src/lib/membership.ts`) takes
@@ -2059,7 +2066,7 @@ a grant and disappear through a participant link.
 | User (list) | all (`IsAdmin`) | PermissionDenied | PermissionDenied | PermissionDenied |
 | ImportLog | all | read: all of the ZEV's, plus logs the caller imported; delete: logs of managed ZEVs (and own logs without a ZEV) | PermissionDenied | PermissionDenied |
 | MeterReading | all | all of the ZEV's | raw/chart readings only within own assignment dates (civil day); CRUD routes denied | PermissionDenied |
-| Invoice | all | all of the ZEV's | own invoices once sent (`sent_at` set or status `sent`/`paid`; #861), also after the row has ended | empty list |
+| Invoice | all | all of the ZEV's | none: empty list, 404 on detail (the invoices are in the document inbox, #862) | empty list |
 | AuditEvent | all | events of the ZEV | — | PermissionDenied |
 
 An account with no grant and no participant link passes no management gate

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import {
@@ -12,7 +12,7 @@ import {
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
-import { scopeNoteKey, shellRoleForZev } from '../lib/communityAccess'
+import { hasCommunityWideAccess, scopeNoteKey, shellRoleForZev } from '../lib/communityAccess'
 import { PdfPreview } from '../components/PdfPreview'
 import { InvoiceAccessLinkCard } from '../features/invoices/InvoiceAccessLinkCard'
 import { InvoiceAppliedCreditsCard } from '../features/invoices/InvoiceAppliedCreditsCard'
@@ -68,6 +68,12 @@ export function InvoiceDetailPage() {
     if (invoiceQuery.isLoading) {
         return <div className="page-stack">{pendingHeader}<PageSkeleton variant="card" /></div>
     }
+    // A participant has no live invoice (their invoices are delivered to the document inbox, #862):
+    // an old link, a saved bookmark or an email lands on the list that has them, not on an error
+    // that a retry cannot fix.
+    if (invoiceQuery.isError && user && !hasCommunityWideAccess(user)) {
+        return <Navigate to="/me/documents" replace />
+    }
     if (invoiceQuery.isError || !invoiceQuery.data) {
         return <div className="page-stack">{pendingHeader}<Notice tone="error" onRetry={() => void invoiceQuery.refetch()} isRetrying={invoiceQuery.isFetching}>{t('common.error')}</Notice></div>
     }
@@ -76,7 +82,7 @@ export function InvoiceDetailPage() {
 
     // Return link follows its origin (the invoice period it came from, or My
     // invoices); participants without
-    // one fall back to /me/invoices.
+    // one fall back to /me/documents.
     const invoiceShellRole = shellRoleForZev(user, invoiceQuery.data?.zev)
     // The invoice's own community, which may not be the selected one.
     const invoiceScopeNoteKey = scopeNoteKey(invoiceShellRole)
@@ -93,9 +99,9 @@ export function InvoiceDetailPage() {
             ? `/billing/invoices?period_start=${origin.period_start}&period_end=${origin.period_end}`
             : null
     const backHref = isParticipant
-        ? origin?.from === '/' || origin?.from === '/me/invoices' || origin?.from === '/me/statement' || origin?.from === '/me/documents'
+        ? origin?.from === '/' || origin?.from === '/me/statement' || origin?.from === '/me/documents'
             ? origin.from
-            : '/me/invoices'
+            : '/me/documents'
         : origin?.from === '/'
             ? '/'
             : user?.role === 'admin' && origin?.from === '/admin/invoices'

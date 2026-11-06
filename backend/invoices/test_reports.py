@@ -73,11 +73,11 @@ class AnnualStatementTests(ReportTestCase):
 
         self.assertEqual(resp.status_code, 403)
 
-    def test_participant_gets_their_own_without_naming_ids(self):
+    def test_participant_gets_nothing_here_their_statement_is_in_the_inbox(self):
         resp = self._get(ANNUAL_STATEMENT, self.puser, year=2026)
 
-        self.assertEqual(resp.status_code, 200)
-        self.assertIn("annual-statement-2026-Muster.pdf", resp["Content-Disposition"])
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.data["error"], "Participant not found.")
 
     def test_account_that_never_took_part_is_served_as_a_manager(self):
         """Without any participant row there is nothing to self-serve, so the
@@ -123,9 +123,8 @@ class AnnualStatementTests(ReportTestCase):
 
         self.assertEqual(self.client.get(ANNUAL_STATEMENT, {"year": 2026}).status_code, 401)
 
-    def test_statement_without_zev_id_serves_the_first_membership_by_surname(self):
-        """Surname ordering and UUID ordering disagree here; the statement
-        serves the ``Aar`` membership."""
+    def test_a_participant_in_two_communities_gets_nothing_in_either(self):
+        """The statements are issued to the inbox of each membership (#862)."""
         puser = make_user("rpt_multi", UserRole.USER)
         Participant.objects.create(
             id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
@@ -147,9 +146,10 @@ class AnnualStatementTests(ReportTestCase):
         )
 
         auth(self.client, puser)
-        statement = self.client.get(ANNUAL_STATEMENT, {"year": 2026})
-        self.assertEqual(statement.status_code, 200)
-        self.assertIn("annual-statement-2026-Aar.pdf", statement["Content-Disposition"])
+        self.assertEqual(self.client.get(ANNUAL_STATEMENT, {"year": 2026}).status_code, 404)
+        self.assertEqual(
+            self.client.get(ANNUAL_STATEMENT, {"year": 2026, "zev_id": str(self.zev.pk)}).status_code, 404
+        )
 
 
 class FinancialSummaryTests(ReportTestCase):

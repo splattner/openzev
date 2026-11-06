@@ -55,9 +55,9 @@ describe('role-aware home page', () => {
         expect(page.querySelector('[data-testid="guest"]')).toBeNull()
     })
 
-    it('sends a former participant to their invoices', () => {
+    it('sends a former participant to their documents', () => {
         const page = renderRole('former')
-        expect(page.querySelector('[data-testid="location"]')?.textContent).toBe('/me/invoices')
+        expect(page.querySelector('[data-testid="location"]')?.textContent).toBe('/me/documents')
         expect(page.querySelector('[data-testid="dashboard"]')).toBeNull()
         expect(page.querySelector('[data-testid="guest"]')).toBeNull()
     })

@@ -29,13 +29,14 @@ export const en = {
         overview: 'Overview',
         energyBalance: 'Energy balance',
         setupGroup: 'Setup',
+        personalGroup: 'Personal',
         platformGroup: 'Platform',
         platformScope: 'Platform administration',
         scopedLabel: '{{scope}}: {{label}}',
         metering: 'Metering',
         billing: 'Billing',
-        myInvoices: 'My invoices',
         myDocuments: 'My documents',
+        documents: 'Documents',
         annualStatement: 'Annual statement',
         myMeteringPoints: 'My metering points',
         myEnergy: 'My energy system',
@@ -199,7 +200,7 @@ export const en = {
     dashboard: {
         title: 'Dashboard',
         description: 'Start building your Swiss ZEV or vZEV billing workflow.',
-        participantDescription: 'Your consumption, your share from the ZEV, and your invoices.',
+        participantDescription: 'Your consumption and your share from the ZEV.',
     },
     common: {
         timeHours: 'Hour',
@@ -782,12 +783,20 @@ export const en = {
     },
     inbox: {
         title: 'My documents',
-        description: 'Everything your community has delivered to you: invoices, statements, contracts and notices.',
+        description: 'Everything your community has delivered to you: invoices with their amounts and payment state, credit notes, statements, contracts and notices.',
         allCommunities: 'All your communities',
         failed: 'Failed to load documents.',
         empty: {
             title: 'Nothing has been delivered to you yet.',
             description: 'Documents appear here as soon as your community delivers them.',
+        },
+        col: {
+            community: 'Community',
+            amount: 'Amount',
+        },
+        credit: {
+            remaining: 'Remaining: {{amount}}',
+            forInvoice: 'For invoice',
         },
         download: 'Download',
         downloadLabel: 'Download {{title}}',
@@ -934,36 +943,6 @@ export const en = {
                 open: 'Open',
                 openFor: 'Open {{name}}',
                 meters: 'Metering points',
-            },
-        },
-        myInvoices: {
-            title: 'My invoices',
-            allCommunities: 'All your communities',
-            description: 'Invoices issued to you. Click an invoice to view its details or open the PDF.',
-            failed: 'Failed to load invoices.',
-            empty: {
-                title: 'No invoices yet',
-                description: 'As soon as your ZEV operator issues an invoice, it appears here.',
-            },
-            col: {
-                invoice: 'Invoice',
-                period: 'Period',
-                total: 'Total',
-                status: 'Payment',
-                community: 'Community',
-                actions: 'Actions',
-            },
-            viewDetails: 'View details',
-            openPdf: 'Open invoice {{number}} as PDF',
-            credits: {
-                title: 'Credit notes',
-                description: 'Credit notes issued to you. What remains is deducted from your next invoice.',
-                number: 'Credit note',
-                invoice: 'For invoice',
-                amount: 'Amount',
-                date: 'Date',
-                remaining: 'Remaining',
-                status: 'Status',
             },
         },
         adminCredentials: {
@@ -3604,7 +3583,6 @@ export const en = {
             description: 'Review production, consumption, self-consumption, and grid exchange for the selected period.',
         },
         dashboard: {
-            openInvoicePdf: 'Open PDF for invoice {{number}}',
             participant: 'Participant',
             allParticipants: 'All participants',
             resolution: 'Resolution',
@@ -3663,9 +3641,6 @@ export const en = {
                 description: 'Average hourly energy draw over the billing period — split between local ZEV energy and grid import.',
                 ownSystemNote: 'The dashed line shows consumption as the participant\'s own system (for example Solar Manager) reports it, not read from the meter.',
             },
-            invoicesSection: 'Invoices',
-            invoicesAllCommunitiesSection: 'Invoices from all communities',
-            failedInvoices: 'Failed to load invoices.',
             cockpit: {
                 title: 'Billing cockpit',
                 failed: 'Failed to load period readiness.',
@@ -3742,16 +3717,6 @@ export const en = {
                     participantExpiring: '{{name}} ends {{validTo}} — check meter assignments',
                 },
             },
-            noInvoices: 'No invoices available.',
-            invoiceCol: {
-                invoice: 'Invoice',
-                period: 'Period',
-                total: 'Total',
-                status: 'Payment',
-                community: 'Community',
-                actions: 'Actions',
-            },
-            viewDetails: 'View details',
             energyFlow: {
                 title: 'Energy Flow',
                 gridImport: 'Grid Import',
@@ -3765,12 +3730,14 @@ export const en = {
         reports: {
             title: 'Reports',
             description: 'Review energy analytics and available annual documents.',
-            participantDescription: 'Read and download your annual documents.',
+            participantDescription: 'Read and download the annual documents your community has issued to you.',
             year: 'Year',
             downloading: 'Generating…',
             download: 'Download',
             preparingDocument: 'Preparing {{document}} for {{year}}…',
             documentTitle: '{{document}} — {{year}}',
+            issuedOn: 'Issued on {{date}}',
+            notIssued: 'Your community has not issued your {{document}} for {{year}} yet. It appears here, and in My documents, as soon as it does.',
             documentTabs: 'Annual documents',
             annualStatement: {
                 title: 'Annual Statement',
@@ -3848,8 +3815,10 @@ export const en = {
             tabs: {
                 invoices: 'Invoices',
                 emails: 'Emails',
-                documents: 'Delivered documents',
             },
+        },
+        participantDocuments: {
+            description: 'What the community has delivered to its participants. Issue the annual statements, financial summaries and tariff overview here, or upload a notice.',
         },
         billingPeriods: {
             failed: 'Failed to load billing periods.',

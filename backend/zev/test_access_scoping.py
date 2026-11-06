@@ -240,7 +240,8 @@ class MultiRelationshipScopingTests(GrantWorldMixin, TestCase):
         beta_bob.save()
         Invoice.objects.filter(pk=self.beta_draft.pk).update(status=InvoiceStatus.SENT)
         client = self.client_as("tenant")
-        self.assertEqual(_ids(client.get("/api/v1/invoices/invoices/")), {str(self.tenant_sent.pk), str(self.beta_draft.pk)})
+        # Their invoices of either community are in the document inbox, not on the live endpoint (#862).
+        self.assertEqual(_ids(client.get("/api/v1/invoices/invoices/")), set())
         self.assertEqual(
             _ids(client.get("/api/v1/zev/metering-points/")),
             {str(self.tenant_meter.pk), str(MeteringPoint.objects.get(meter_id="BETA-CONS-1").pk)},
@@ -255,8 +256,9 @@ class MultiRelationshipScopingTests(GrantWorldMixin, TestCase):
 
         invoices = _ids(client.get("/api/v1/invoices/invoices/"))
         self.assertTrue({str(pk) for pk in Invoice.objects.filter(zev=self.alpha).values_list("pk", flat=True)} <= invoices)
-        self.assertIn(str(beta_invoice.pk), invoices)
-        self.assertNotIn(str(self.beta_draft.pk), invoices)
+        # Renting in Beta gives no live access to Beta's invoices, not even the renter's own (#862).
+        self.assertFalse(invoices & {str(pk) for pk in Invoice.objects.filter(zev=self.beta).values_list("pk", flat=True)})
+        self.assertEqual(client.get(f"/api/v1/invoices/invoices/{beta_invoice.pk}/").status_code, 404)
         # Only Alpha's ZEV record: renting in Beta never reveals Beta's settings.
         self.assertEqual(_ids(client.get("/api/v1/zev/zevs/")), {str(self.alpha.pk)})
         # Beta's tariffs stay a manager-only resource.
@@ -270,9 +272,9 @@ class MultiRelationshipScopingTests(GrantWorldMixin, TestCase):
         self.assertEqual((dashboard.status_code, dashboard.json()["summary_kind"]), (200, "participant"))
         with mock.patch("invoices.views_reports.generate_annual_statement_pdf", return_value=b"%PDF") as generate:
             statement = client.get("/api/v1/invoices/invoices/annual-statement/", {"year": 2026, "zev_id": self.beta.pk})
-        self.assertEqual(statement.status_code, 200)
-        self.assertEqual(generate.call_args.args[0], beta_alice)
-        self.assertIs(generate.call_args.kwargs["sent_only"], True)
+        # The statement for the community they rent in is issued to their inbox (#862).
+        self.assertEqual(statement.status_code, 404)
+        generate.assert_not_called()
 
     def test_a_manager_of_two_communities_sees_both(self):
         ZevAccessGrant.objects.create(zev=self.beta, user=self.owner, role=ZevAccessRole.MANAGER)
@@ -295,10 +297,17 @@ class FormerParticipantTests(GrantWorldMixin, TestCase):
     def setUp(self):
         Participant.objects.filter(pk=self.tenant_participant.pk).update(valid_to=YESTERDAY)
 
-    def test_keeps_their_sent_invoices_only(self):
+    def test_keeps_their_sent_invoices_in_the_inbox_only(self):
+        from inbox.producers import deliver_invoice_document
+
+        deliver_invoice_document(self.tenant_sent, b"%PDF-1.7\n")
         client = self.client_as("tenant")
-        self.assertEqual(_ids(client.get("/api/v1/invoices/invoices/")), {str(self.tenant_sent.pk)})
-        self.assertEqual(client.get(f"/api/v1/invoices/invoices/{self.tenant_sent.pk}/").status_code, 200)
+        # No live access (#862) ...
+        self.assertEqual(_ids(client.get("/api/v1/invoices/invoices/")), set())
+        self.assertEqual(client.get(f"/api/v1/invoices/invoices/{self.tenant_sent.pk}/").status_code, 404)
+        # ... but what they were sent stays theirs to read (#761).
+        documents = client.get("/api/v1/inbox/documents/").data["results"]
+        self.assertEqual({str(row["invoice"]) for row in documents}, {str(self.tenant_sent.pk)})
 
     def test_loses_everything_else(self):
         client = self.client_as("tenant")

@@ -111,7 +111,7 @@ def credit_note_title(credit) -> str:
 def deliver_credit_document(credit, body: bytes, *, delivered_at=None):
     """Deliver ``body`` as ``credit``'s document. Idempotent by credit number: a re-render
     of the credit note's PDF never replaces what the participant already holds."""
-    source = credit.source_invoice
+    # No period: a credit note belongs to the year it was issued, not to the invoice it corrects.
     return deliver(
         participant=credit.participant,
         kind=DocumentKind.CREDIT_NOTE,
@@ -119,7 +119,6 @@ def deliver_credit_document(credit, body: bytes, *, delivered_at=None):
         body=body,
         file_name=f"credit_{credit.credit_number}.pdf",
         document_number=credit.credit_number,
-        period=(source.period_start, source.period_end) if source else None,
         delivered_at=delivered_at or credit.created_at,
     )
 

@@ -319,6 +319,8 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         expect(page.hasHref('/metering/imports')).toBe(false)
         expect(page.hasHref('/dashboard')).toBe(true)
         expect(page.hasHref('/billing/invoices')).toBe(true)
+        // What was delivered to participants has a page of its own, not a billing tab.
+        expect(page.hasHref('/documents')).toBe(true)
         expect(page.hasHref('/reports')).toBe(true)
         // Audit log is a ZEV-settings tab now (deep link only).
         expect(page.hasHref('/audit-logs')).toBe(false)
@@ -334,6 +336,8 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         const page = await renderLayout()
         try {
             expect(page.hasHref('/me/metering-points')).toBe(true)
+            const group = page.container.querySelector('[role="group"][aria-label="nav.personalGroup"]')
+            expect([...group!.querySelectorAll('a')].map((link) => link.getAttribute('href'))).toEqual(['/me/metering-points'])
         } finally {
             page.unmount()
         }
@@ -368,15 +372,46 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         }
     })
 
-    it('participant sees Dashboard, My invoices, My documents and Annual statement only', async () => {
+    it.each(['manager', 'viewer'] as const)('a %s who also holds a participation gets My documents; one who does not, none', async (persona) => {
+        mockSession(persona)
+        const base = mockAuth()
+        const withParticipation = (participants: unknown[]) => mockAuth.mockReturnValue({
+            ...base,
+            user: { ...base.user, memberships: [{ zev: ZEV.id, zev_name: ZEV.name, zev_disabled: false, access: persona, participants }] },
+        })
+
+        withParticipation([{ id: 'p1', valid_from: '2026-01-01', valid_to: null, live: true }])
+        const holding = await renderLayout()
+        try {
+            expect(holding.hasHref('/me/documents')).toBe(true)
+            // Their own side is a block of its own, apart from the community's navigation.
+            const group = holding.container.querySelector('[role="group"][aria-label="nav.personalGroup"]')
+            expect(group).not.toBeNull()
+            expect([...group!.querySelectorAll('a')].map((link) => link.getAttribute('href'))).toEqual(['/me/documents'])
+        } finally {
+            holding.unmount()
+        }
+
+        withParticipation([])
+        const plain = await renderLayout()
+        try {
+            expect(plain.hasHref('/me/documents')).toBe(false)
+            expect(plain.container.querySelector('[aria-label="nav.personalGroup"]')).toBeNull()
+        } finally {
+            plain.unmount()
+        }
+    })
+
+    it('participant sees Dashboard, My documents and Annual statement only', async () => {
         mockSession('participant')
         const page = await renderLayout()
         expect(page.hasHref('/')).toBe(true)
         expect(page.hasHref('/dashboard')).toBe(false)
-        expect(page.hasHref('/me/invoices')).toBe(true)
+        // Invoices are in My documents (no entry of their own since #862).
+        expect(page.hasHref('/me/invoices')).toBe(false)
         expect(page.hasHref('/me/documents')).toBe(true)
         expect(page.hasHref('/me/statement')).toBe(true)
-        for (const href of ['/reports', '/metering/imports', '/participants', '/tariffs', '/zev-settings', '/audit-logs', '/admin']) {
+        for (const href of ['/reports', '/documents', '/metering/imports', '/participants', '/tariffs', '/zev-settings', '/audit-logs', '/admin']) {
             expect(page.hasHref(href)).toBe(false)
         }
         // "My consumption" folded into the participant dashboard (phase 2):
@@ -398,7 +433,7 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
 
     it('does not highlight My metering points on other participant pages', async () => {
         mockSession('participant')
-        const page = await renderLayoutAt('/me/invoices')
+        const page = await renderLayoutAt('/me/documents')
         try {
             expect(page.link('/me/metering-points')?.classList.contains('active')).toBe(false)
         } finally {
@@ -406,17 +441,16 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         }
     })
 
-    it.each([false, true])('keeps former-participant invoice and document navigation accessible when collapsed=%s', async (collapsed) => {
+    it.each([false, true])('keeps former-participant document navigation accessible when collapsed=%s', async (collapsed) => {
         window.localStorage.setItem('openzev.sidebarCollapsed', String(collapsed))
         mockSession('former')
         const page = await renderLayout()
         try {
             const links = page.container.querySelectorAll('nav.nav-list a')
-            // What it was sent: the invoices and, since the inbox has no end date, the documents.
-            expect([...links].map((link) => link.getAttribute('href'))).toEqual(['/me/invoices', '/me/documents'])
-            expect(links[0].getAttribute('aria-label') ?? links[0].textContent).toBe('nav.myInvoices')
-            expect(links[0].getAttribute('title')).toBe(collapsed ? 'nav.myInvoices' : null)
-            expect(links[1].getAttribute('aria-label') ?? links[1].textContent).toBe('nav.myDocuments')
+            // What it was sent, invoices included: the inbox has no end date.
+            expect([...links].map((link) => link.getAttribute('href'))).toEqual(['/me/documents'])
+            expect(links[0].getAttribute('aria-label') ?? links[0].textContent).toBe('nav.myDocuments')
+            expect(links[0].getAttribute('title')).toBe(collapsed ? 'nav.myDocuments' : null)
         } finally {
             page.unmount()
         }

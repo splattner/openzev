@@ -124,12 +124,11 @@ A manager is **scoped** to the ZEVs it has access to:
 Participants can set a password or recover a forgotten one in **Account → Security**;
 see [password setup and recovery](03-participant-management.md#a-participant-forgot-their-password).
 
-The participant sidebar shows **Dashboard**, **My invoices**, **My documents**, and **Annual statement**; own consumption charts and trends stay reachable through the direct `/metering/chart` route.
+The participant sidebar shows **Dashboard**, **My documents**, and **Annual statement**; own consumption charts and trends stay reachable through the direct `/metering/chart` route.
 
 - **Dashboard:** View own energy consumption/production overview
-- **My invoices:** View and download own invoices (read-only; shows invoices even before a PDF exists)
-- **My documents:** Read and download what the community delivered to them (invoices, credit notes, statements, contract, notices); a former participant keeps this access
-- **Annual statement:** View their own annual statement and tax overview
+- **My documents:** Read and download what the community delivered to them (invoices with their amounts and payment state, credit notes, statements, contract, notices); a former participant keeps this access. A manager or viewer who is also a participant (in any community) finds **My documents** (and, with a flagged meter of their own, **My metering points**) in a separate **Personal** block of their menu, listing only what was addressed to them
+- **Annual statement:** Read the annual statement and tax overview their community issued to them
 - **Metering Data:** Direct route to own consumption charts and trends
 - **Account Profile:** Update personal information
 

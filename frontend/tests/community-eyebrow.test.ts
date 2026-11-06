@@ -361,16 +361,16 @@ describe('community eyebrow', { timeout: 30000 }, () => {
         unmount()
     })
 
-    it('my invoices names the broader scope with several memberships', async () => {
+    it('my documents names the broader scope with several memberships', async () => {
         mockParticipant(2)
-        const { container, unmount } = await renderAt('/me/invoices')
-        expect(container.querySelector('.page-stack .eyebrow')?.textContent).toBe('pages.myInvoices.allCommunities')
+        const { container, unmount } = await renderAt('/me/documents')
+        expect(container.querySelector('.page-stack .eyebrow')?.textContent).toBe('inbox.allCommunities')
         unmount()
     })
 
-    it('my invoices shows the community with a single membership', async () => {
+    it('my documents shows the community with a single membership', async () => {
         mockParticipant()
-        const { container, unmount } = await renderAt('/me/invoices')
+        const { container, unmount } = await renderAt('/me/documents')
         const eyebrow = container.querySelector('.page-stack .eyebrow')
         expect(eyebrow?.textContent).toBe('Member ZEV')
         unmount()

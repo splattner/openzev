@@ -138,8 +138,8 @@ class SingleRelationshipVisibilityMatrixTests(AccessWorldMixin, TestCase):
         tenant_sees = {
             # Only the meter the tenant holds an assignment for.
             "metering_points": {str(self.tenant_meter.pk)},
-            # Only their own invoices, and only once sent (#861).
-            "invoices": {str(self.tenant_sent.pk)},
+            # No live invoices: a participant reads theirs from the document inbox (#862).
+            "invoices": set(),
         }
         if name in tenant_sees:
             return tenant_sees[name] if role == "tenant" else set()
@@ -171,12 +171,12 @@ class SingleRelationshipVisibilityMatrixTests(AccessWorldMixin, TestCase):
             with self.subTest(row=label):
                 self.assertEqual(client.get(url).status_code, 404)
 
-    def test_tenant_opens_only_their_own_sent_invoice(self):
+    def test_tenant_opens_no_live_invoice(self):
         client = self.client_as("tenant")
         alice_invoice = Invoice.objects.get(zev=self.alpha, participant__party__first_name="Alice")
-        self.assertEqual(client.get(f"/api/v1/invoices/invoices/{self.tenant_sent.pk}/").status_code, 200)
-        self.assertEqual(client.get(f"/api/v1/invoices/invoices/{self.tenant_draft.pk}/").status_code, 404)
-        self.assertEqual(client.get(f"/api/v1/invoices/invoices/{alice_invoice.pk}/").status_code, 404)
+        for invoice in (self.tenant_sent, self.tenant_draft, alice_invoice):
+            with self.subTest(invoice=invoice.invoice_number):
+                self.assertEqual(client.get(f"/api/v1/invoices/invoices/{invoice.pk}/").status_code, 404)
 
     def test_zev_scoped_reports_matrix(self):
         period = {"period_start": "2026-01-01", "period_end": "2026-01-31"}
@@ -223,12 +223,13 @@ class SingleRelationshipVisibilityMatrixTests(AccessWorldMixin, TestCase):
                     if role == "guest":
                         self.assertEqual(body["zev_totals"]["produced_kwh"], 0)
 
-    def test_self_service_statement_matrix(self):
+    def test_statement_matrix(self):
         url = "/api/v1/invoices/invoices/annual-statement/"
         beta_bob = Participant.objects.get(zev=self.beta, party__first_name="Bob")
         with mock.patch("invoices.views_reports.generate_annual_statement_pdf", return_value=b"%PDF-stub"):
-            self.assertEqual(self.client_as("tenant").get(url, {"year": 2026}).status_code, 200)
-            # A guest is not treated as self-service (that keys on the
+            # A participant's statement is issued to their inbox (#862): nothing live to serve.
+            self.assertEqual(self.client_as("tenant").get(url, {"year": 2026}).status_code, 404)
+            # A guest is not treated as a participant call (that keys on the
             # participant role), so it lands in the manager branch, which
             # demands zev_id and participant_id.
             self.assertEqual(self.client_as("guest").get(url, {"year": 2026}).status_code, 400)
