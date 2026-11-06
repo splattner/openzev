@@ -88,7 +88,7 @@ note, so they stay current; the PDF is the copy that was sent and does not
 change. An invoice appears once it has been sent (drafts and approved invoices
 that haven't gone out yet stay with the operator), a credit note once its PDF
 exists. There is no separate page for one invoice: the PDF carries the details,
-and an old link to an invoice or to **My invoices** takes a participant here.
+and an old link to an invoice or to the former **My invoices** page takes a participant here.
 
 ![Participant My documents](screenshots/08l-my-documents.png)
 
