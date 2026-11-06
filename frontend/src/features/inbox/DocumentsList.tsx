@@ -131,7 +131,7 @@ export function DocumentsList({ documents, showCommunity }: { documents: readonl
               <th scope="col">{t('inbox.outbox.col.document')}</th>
               {showCommunity && <th scope="col">{t('inbox.col.community')}</th>}
               <th scope="col">{t('inbox.outbox.col.delivered')}</th>
-              {showAmount && <th scope="col">{t('inbox.col.amount')}</th>}
+              {showAmount && <th scope="col" className="numeric">{t('inbox.col.amount')}</th>}
               <th scope="col">{t('inbox.outbox.col.status')}</th>
               <th scope="col">{t('inbox.outbox.col.actions')}</th>
             </tr>

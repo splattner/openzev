@@ -86,6 +86,9 @@ describe('DocumentsPage (invoices and credit notes carry their amounts and where
     expect(api.list).toHaveBeenCalledWith()
     expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
     expect(container.querySelector('thead')?.textContent).toContain('inbox.col.amount')
+    // The header and its figures share a class, so the column header aligns over the numbers.
+    expect(container.querySelector('thead th.numeric')?.textContent).toBe('inbox.col.amount')
+    expect(container.querySelector('tbody td.numeric')).not.toBeNull()
     const row = container.querySelector('tbody tr')!.textContent!
     expect(row).toContain('INV-1')
     expect(row).toContain('CHF 108.10')

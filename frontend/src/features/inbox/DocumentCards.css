@@ -49,6 +49,12 @@
   display: block;
 }
 
+/* The amount column: the header sits over its right-aligned figures. */
+
+.doc-wide th.numeric {
+  text-align: right;
+}
+
 @media (max-width: 640px) {
   .doc-wide {
     display: none;
