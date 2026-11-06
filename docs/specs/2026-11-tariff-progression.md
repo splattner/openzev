@@ -350,6 +350,11 @@ the query with `TariffProgressionQuerySerializer` and delegates to
 `list` does with `tariff_pricing`). The response is built from plain dicts; there
 is no response serializer.
 
+Errors use the [tariff error contract](2026-03-tariffs-and-billing-engine.md#tariff-api-error-contract).
+The 422 response keeps its top-level `code: "too_many_bands"` for existing
+clients and carries one matching structured diagnostic; the code itself is
+not a second message. An inaccessible ZEV returns `not_found` with status 404.
+
 ### Query
 
 | Param | Type | Required | Notes |
@@ -483,6 +488,8 @@ no cache. Fetched dynamic prices are read, not written (§5.4a).
   added up anywhere.
 - States: loading skeleton; no tariffs for this energy type (message offering
   the other types); 422 `too_many_bands` (narrow the range); request error.
+  Request errors use `formatTariffError` to translate recognized codes and
+  preserve readable fallback diagnostics without displaying validation metadata.
   Read-only: there are no write controls, so viewers see exactly the same page.
 
 ### TypeScript types
@@ -734,7 +741,11 @@ average of the engine's `_DynamicSeries.price_at` over every quarter-hour);
 | `ProgressionComposition` (5) | Components under a category subtotal and a total; gross values; no price on that day; line choice only when there is one; percentage share and base |
 
 The user-guide screenshot `07g` is the capture test in `screenshots/capture.spec.ts`
-(`npm run screenshots`); there is no separate Playwright spec.
+(`npm run screenshots`).
+
+`screenshots/tariff-progression-errors.spec.ts` checks a structured 400 response
+on the actual page: a localized diagnostic without metadata, desktop and 400px
+screenshots, no horizontal overflow, and no unexpected console errors.
 
 ### Validation
 

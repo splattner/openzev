@@ -912,6 +912,10 @@ the pricing. See [ZEV Export and Import](17-zev-transfer.md).
 
 ### Updating a Tariff
 
+Tariff errors use your selected language where supported. Invalid bands are
+identified by number, and failed saves preserve your entries.
+Errors on the **Price progression** page also use your selected language where supported.
+
 Edit **future** tariffs freely:
 
 1. Click the tariff to open its detail pane

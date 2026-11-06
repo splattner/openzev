@@ -201,8 +201,9 @@ class TestRetention:
         v2 = make_source(api_version="v2_0_0")
         assert v1.pk != v2.pk
         v1.api_version = "v2_0_0"
-        with pytest.raises(ValidationError, match="immutable"):
+        with pytest.raises(ValidationError) as caught:
             v1.save()
+        assert caught.value.error_dict["api_version"][0].code == "source_identity"
 
     def test_a_source_still_referenced_by_a_tariff_cannot_be_deleted(self):
         # The points behind an issued invoice are its audit trail, and neither

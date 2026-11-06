@@ -9,6 +9,10 @@ import type { Tariff, TariffInput, TariffPeriod, TariffPeriodInput, TariffSeries
 import { queryKeys } from '../src/lib/api/queryKeys'
 
 const api = vi.hoisted(() => ({ save: vi.fn(), remove: vi.fn(), rename: vi.fn(), userId: 1 }))
+vi.mock('../src/lib/appSettings', async importOriginal => ({
+    ...await importOriginal<typeof import('../src/lib/appSettings')>(),
+    useAppSettings: () => ({ settings: { date_format_short: 'dd.MM.yyyy' } }),
+}))
 vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ user: { id: api.userId } }) }))
 vi.mock('../src/lib/api/tariffs', () => ({
     createTariff: api.save, updateTariff: api.save, deleteTariff: api.remove,

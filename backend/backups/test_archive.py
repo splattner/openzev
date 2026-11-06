@@ -63,6 +63,9 @@ class ArchiveShapeTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.world = build_world()
+        Zev.objects.filter(pk=cls.world.alpha.pk).update(
+            created_at=cls.world.alpha.created_at.replace(microsecond=123456),
+        )
         cls.raw, cls.manifest = build()
 
     def test_manifest_identifies_the_archive_as_an_instance_backup(self):

@@ -196,6 +196,9 @@ with values readable, no duplicate submission, retained form on failure. A
 pending save that outlives the pane applies only to its originating scope and
 editing instance.
 
+Tariff errors follow the [shared contract](2026-03-tariffs-and-billing-engine.md#tariff-api-error-contract),
+with localized field labels, configured dates and nested band indexes.
+
 ## 8. Pilot acceptance
 
 Use realistic data: a simple fixed fee, current plus scheduled prices, a

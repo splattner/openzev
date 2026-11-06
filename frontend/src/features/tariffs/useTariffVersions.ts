@@ -3,7 +3,8 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { createTariffVersion, duplicateTariff, renameTariffSeries } from '../../lib/api/tariffs'
 import { useAuth } from '../../lib/auth'
 import { useWriteScope } from '../../lib/useWriteScope'
-import { formatApiError } from '../../lib/api/errors'
+import { formatTariffError } from './errors'
+import { useAppSettings } from '../../lib/appSettings'
 import { invalidateTariffQueries } from './invalidate'
 import type { Tariff, TariffSeries, TariffVersion, TariffVersionInput } from '../../types/api'
 
@@ -26,6 +27,7 @@ type Params = {
 
 export function useTariffVersions({ selectedZevId, canWrite = true, queryClient, pushToast, t, onSaved }: Params) {
   const { user } = useAuth()
+  const { settings } = useAppSettings()
   const { scope, isCurrent, assertWritable } = useWriteScope({ selectedZevId, canWrite, accountId: user?.id }, t('common.error'))
   const [dialog, setDialog] = useState<VersionDialog>(null)
   // A failure that belongs to the open form: shown in it, not only as a toast.
@@ -59,7 +61,7 @@ export function useTariffVersions({ selectedZevId, canWrite = true, queryClient,
 
   function failed(message: string, error: unknown, variables: Submitted) {
     if (isCurrent(variables.scope) && variables.session === session.current) {
-      setSaveError(formatApiError(error, message))
+      setSaveError(formatTariffError(error, message, t, settings))
     }
   }
 

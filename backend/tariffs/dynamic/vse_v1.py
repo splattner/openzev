@@ -49,7 +49,12 @@ PRICE_QUANTUM = Decimal("0.00001")
 
 
 class DynamicTariffResponseError(ValueError):
-    """The payload cannot be read as a version 1 tariff response."""
+    """The remote tariff response or selected configuration is invalid."""
+
+    def __init__(self, message, *, code="invalid_dynamic_response", params=None):
+        super().__init__(message)
+        self.code = code
+        self.params = params or {}
 
 
 @dataclass(frozen=True)

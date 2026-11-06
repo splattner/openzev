@@ -7,7 +7,8 @@ import {
   discoverDynamicTariffSource,
   updateDynamicTariffSource,
 } from '../../lib/api/tariffs'
-import { formatApiError } from '../../lib/api/errors'
+import { formatTariffError } from './errors'
+import { useAppSettings } from '../../lib/appSettings'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { useToast } from '../../lib/toast'
 import type {
@@ -57,6 +58,7 @@ function componentKey(component: DynamicSourceDiscovery['components'][number]): 
  */
 export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: FormProps) {
   const { t } = useTranslation()
+  const { settings } = useAppSettings()
   const queryClient = useQueryClient()
   const { pushToast } = useToast()
   const [step, setStep] = useState<1 | 2>(1)
@@ -105,7 +107,7 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
       setStep(2)
     },
     onError: (error) => pushToast(
-      formatApiError(error, t('pages.dynamicSources.discovery.error')),
+      formatTariffError(error, t('pages.dynamicSources.discovery.error'), t, settings),
       'error',
     ),
   })
@@ -151,7 +153,7 @@ export function DynamicSourceForm({ onClose, onSaved, source, onDirtyChange }: F
       onClose()
     },
     onError: (error) => pushToast(
-      formatApiError(error, t('pages.dynamicSources.saveError')),
+      formatTariffError(error, t('pages.dynamicSources.saveError'), t, settings),
       'error',
     ),
   })

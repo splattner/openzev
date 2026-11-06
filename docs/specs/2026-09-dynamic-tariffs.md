@@ -800,6 +800,13 @@ positive coverage and maintenance-link permissions.
   and capture submitted inputs, and follow the shared
   [dialog contract](2026-04-frontend-management-page-design.md#dialog-behavior).
 
+Source and linked-tariff failures use the shared
+[tariff API error contract](2026-03-tariffs-and-billing-engine.md#tariff-api-error-contract).
+Source deletion and invoice-protected price clearing have distinct codes; linked
+source errors carry tariff/community counts. Remote diagnostics retain safe text,
+while `log_detail` stays private. Stored `last_fetch_error` and asynchronous tasks
+are unchanged.
+
 ## 11. Transfer archive
 
 `Tariff.dynamic_source` travels as a nested **natural key**

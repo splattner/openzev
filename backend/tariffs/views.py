@@ -6,7 +6,7 @@ from uuid import uuid4
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError as DRFValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError as DRFValidationError
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
@@ -49,6 +49,7 @@ from .serializers import (
 )
 from .series import active_version, find_gaps, plan_new_version, series_key, sort_versions
 from .tasks import fetch_dynamic_prices
+from .errors import TariffErrorResponseMixin, error_detail, exception_detail, model_validation_error
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.mixins import AuditedUpdateMixin
 from audit.services import record_audit_event
@@ -57,6 +58,18 @@ from audit.services import record_audit_event
 # Every audit event in this module is a tariff event; bind the category once.
 _record_tariff_event = partial(record_audit_event, action_category=AuditActionCategory.TARIFF)
 logger = logging.getLogger(__name__)
+
+
+def _source_busy_response():
+    return Response(
+        {
+            "detail": error_detail(
+                "This source is currently being fetched. Try again shortly.",
+                "source_busy",
+            )
+        },
+        status=status.HTTP_409_CONFLICT,
+    )
 
 
 def _record_period_created(request, period):
@@ -84,9 +97,18 @@ MAX_PRICE_HISTORY_DAYS_BY_API_VERSION = {
 
 def _parse_required_date(raw, field: str):
     """Parse an ISO date, raising a DRF error the client can act on."""
-    parsed = parse_date(str(raw)) if raw else None
+    try:
+        parsed = parse_date(str(raw)) if raw else None
+    except ValueError:
+        parsed = None
     if parsed is None:
-        raise DRFValidationError({field: [f'{field} is required as an ISO date (YYYY-MM-DD).']})
+        raise DRFValidationError(
+            {
+                field: [
+                    error_detail("Enter a valid ISO date (YYYY-MM-DD).", "invalid_date")
+                ]
+            }
+        )
     return parsed
 
 
@@ -95,9 +117,7 @@ def _save_or_400(tariff) -> None:
     try:
         tariff.save()
     except DjangoValidationError as exc:
-        raise DRFValidationError(
-            exc.message_dict if hasattr(exc, 'message_dict') else exc.messages
-        ) from exc
+        raise model_validation_error(exc, serializer=TariffSerializer(instance=tariff)) from exc
 
 
 def _apply_price_overrides(tariff, data: dict) -> None:
@@ -124,7 +144,10 @@ def _copy_or_replace_periods(source, target, periods_data) -> None:
     if target.dynamic_source_id:
         if periods_data:
             raise DRFValidationError(
-                "A tariff priced from a fetched series cannot carry price bands."
+                error_detail(
+                    "A tariff priced from a fetched series cannot carry price bands.",
+                    "dynamic_bands",
+                )
             )
         return
 
@@ -145,16 +168,20 @@ def _copy_or_replace_periods(source, target, periods_data) -> None:
         ])
         return
 
-    for period_data in periods_data:
+    for index, period_data in enumerate(periods_data):
         payload = dict(period_data)
         payload.pop('id', None)
         payload['tariff'] = str(target.pk)
         serializer = TariffPeriodSerializer(data=payload)
-        serializer.is_valid(raise_exception=True)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except DRFValidationError as exc:
+            raise DRFValidationError({"periods": [{} for _ in range(index)] + [exc.detail]}) from exc
         serializer.save()
 
 
-class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
+class TariffViewSet(TariffErrorResponseMixin, AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
+    tariff_error_statuses = {"progression": (404, 422)}
     serializer_class = TariffSerializer
     permission_classes = [IsAuthenticated, HasZevAccess]
     zev_lookup = "zev"
@@ -219,8 +246,8 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
         ):
             raise DRFValidationError({
                 "detail": (
-                    "This tariff priced a non-cancelled invoice from its dynamic source. "
-                    "End its validity instead of deleting it."
+                    error_detail("This tariff priced a non-cancelled invoice from its dynamic source. "
+                    "End its validity instead of deleting it.", "billed_delete")
                 )
             })
         tariff_id = str(instance.pk)
@@ -316,7 +343,7 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
 
         zev = Zev.objects.filter(pk=data['zev_id']).first()
         if zev is None or not access.can_view(request.user, zev):
-            return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+            raise NotFound()
 
         tariffs = self.get_queryset().filter(zev=zev).prefetch_related('periods')
         try:
@@ -327,8 +354,13 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
             )
         except TooManyBands as error:
             return Response(
-                {'detail': f'Too many distinct bands to chart ({error}). Choose a narrower date range.',
-                 'code': 'too_many_bands'},
+                {
+                    'detail': error_detail(
+                        f'Too many distinct bands to chart ({error}). Choose a narrower date range.',
+                        'too_many_bands',
+                    ),
+                    'code': 'too_many_bands',
+                },
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
         return Response(payload)
@@ -350,9 +382,16 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
         )
         if any(version.valid_from == valid_from for version in siblings):
             return Response(
-                {'valid_from': [
-                    f'A version of "{source.name}" already starts on {valid_from.isoformat()}.'
-                ]},
+                {
+                    "valid_from": [
+                        error_detail(
+                            f'A version of "{source.name}" already starts on {valid_from.isoformat()}.',
+                            "duplicate_date",
+                            name=source.name,
+                            date=valid_from.isoformat(),
+                        )
+                    ]
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -364,7 +403,7 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
             if window.predecessor_valid_to is not None:
                 predecessor = next(v for v in siblings if v.pk == window.predecessor_id)
                 predecessor.valid_to = window.predecessor_valid_to
-                predecessor.save()
+                _save_or_400(predecessor)
 
             new_version = Tariff(
                 zev_id=source.zev_id,
@@ -380,7 +419,7 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
                 dynamic_source=source.dynamic_source,
             )
             _apply_price_overrides(new_version, request.data)
-            new_version.save()
+            _save_or_400(new_version)
             _copy_or_replace_periods(source, new_version, request.data.get('periods'))
 
         _record_tariff_event(
@@ -417,10 +456,20 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
         self.assert_target_not_disabled(source)
         name = str(request.data.get('name') or '').strip()
         if not name:
-            return Response({'name': ['A name is required.']}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"name": [error_detail("A name is required.", "name_required")]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if name == source.name:
             return Response(
-                {'name': ['Use new-version to add another version under the same name.']},
+                {
+                    "name": [
+                        error_detail(
+                            "Use new-version to add another version under the same name.",
+                            "use_new_version",
+                        )
+                    ]
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -481,7 +530,10 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
         self.assert_target_not_disabled(source)
         name = str(request.data.get('name') or '').strip()
         if not name:
-            return Response({'name': ['A name is required.']}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"name": [error_detail("A name is required.", "name_required")]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         old_name = source.name
         if name == old_name:
@@ -496,7 +548,15 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
         )
         if clash.exists():
             return Response(
-                {'name': [f'A tariff named "{name}" already exists in this ZEV.']},
+                {
+                    "name": [
+                        error_detail(
+                            f'A tariff named "{name}" already exists in this ZEV.',
+                            "name_exists",
+                            name=name,
+                        )
+                    ]
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -522,7 +582,7 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
         source.refresh_from_db()
         return Response(TariffSerializer(source, context={'request': request}).data)
 
-class TariffPeriodViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
+class TariffPeriodViewSet(TariffErrorResponseMixin, AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     serializer_class = TariffPeriodSerializer
     permission_classes = [IsAuthenticated, HasZevAccess]
     zev_lookup = "tariff__zev"
@@ -565,9 +625,10 @@ class TariffPeriodViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.M
         )
 
 
-class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
+class DynamicTariffSourceViewSet(TariffErrorResponseMixin, viewsets.ReadOnlyModelViewSet):
     """Manage global shared sources and inspect the prices they materialize."""
 
+    tariff_error_statuses = {"recheck": (409,), "destroy": (409,), "clear_prices": (409,), "fetch": (503,)}
     serializer_class = DynamicTariffSourceSerializer
     permission_classes = [IsAuthenticated, HasZevAccess]
 
@@ -605,14 +666,22 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
 
     def _require_admin(self, request):
         if not request.user.is_admin:
-            raise PermissionDenied("Only administrators can operate shared price sources.")
+            raise PermissionDenied(
+                error_detail(
+                    "Only administrators can operate shared price sources.",
+                    "admin_source",
+                )
+            )
 
     def _require_source_reader(self, request, source):
         if request.user.is_admin:
             return
         if not source.tariffs.filter(zev_id__in=access.viewable_zev_ids(request.user)).exists():
             raise PermissionDenied(
-                "This price history is only available through a tariff in your ZEV."
+                error_detail(
+                    "This price history is only available through a tariff in your ZEV.",
+                    "history_access",
+                )
             )
 
     def create(self, request, *args, **kwargs):
@@ -621,7 +690,7 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
         try:
             source, created, warnings = create_or_reuse_source(**serializer.validated_data)
         except (TariffFetchError, DynamicTariffResponseError, PriceSeriesConflict) as exc:
-            raise DRFValidationError({"url": [str(exc)]}) from exc
+            raise DRFValidationError({"url": [exception_detail(exc)]}) from exc
 
         if created:
             _record_tariff_event(
@@ -658,7 +727,7 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
         try:
             result = discover_endpoint(**serializer.validated_data)
         except (TariffFetchError, DynamicTariffResponseError) as exc:
-            raise DRFValidationError({"url": [str(exc)]}) from exc
+            raise DRFValidationError({"url": [exception_detail(exc)]}) from exc
         return Response({
             "api_version": result.api_version,
             "version_detected": result.version_detected,
@@ -689,14 +758,11 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
         before_supports_range = source.supports_range
         with dynamic_source_lock(source.pk) as acquired:
             if not acquired:
-                return Response(
-                    {"detail": "This source is currently being fetched. Try again shortly."},
-                    status=status.HTTP_409_CONFLICT,
-                )
+                return _source_busy_response()
             try:
                 source, warnings = recheck_source_capabilities(source)
             except (TariffFetchError, DynamicTariffResponseError) as exc:
-                raise DRFValidationError({"url": [str(exc)]}) from exc
+                raise DRFValidationError({"url": [exception_detail(exc)]}) from exc
 
         _record_tariff_event(
             request=request,
@@ -771,9 +837,27 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
         date_to = query.validated_data.get("date_to", timezone.localdate())
         date_from = query.validated_data.get("date_from", date_to - timedelta(days=default_span))
         if date_from > date_to:
-            raise DRFValidationError({"date_to": ["date_to must be on or after date_from."]})
+            raise DRFValidationError(
+                {
+                    "date_to": [
+                        error_detail(
+                            "date_to must be on or after date_from.", "date_range"
+                        )
+                    ]
+                }
+            )
         if (date_to - date_from).days >= max_days:
-            raise DRFValidationError({"date_to": [f"Price history is limited to {max_days} days."]})
+            raise DRFValidationError(
+                {
+                    "date_to": [
+                        error_detail(
+                            f"Price history is limited to {max_days} days.",
+                            "history_limit",
+                            count=max_days,
+                        )
+                    ]
+                }
+            )
 
         window_start, window_end = period_window(date_from, date_to)
         points = source.points.filter(
@@ -829,9 +913,17 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         expected = source.label.strip()
         if serializer.validated_data["confirmation"].strip() != expected:
-            raise DRFValidationError({
-                "confirmation": [f'Type "{expected}" exactly to confirm.']
-            })
+            raise DRFValidationError(
+                {
+                    "confirmation": [
+                        error_detail(
+                            f'Type "{expected}" exactly to confirm.',
+                            "confirmation_mismatch",
+                            name=expected,
+                        )
+                    ]
+                }
+            )
         return serializer.validated_data
 
     def destroy(self, request, *args, **kwargs):
@@ -842,10 +934,10 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
 
         in_use = Response(
             {
-                "detail": (
+                "detail": error_detail(
                     "This source is retained by a tariff or an invoice's price evidence, "
                     "including cancelled invoices. Disable automatic refreshes to retire it "
-                    "while keeping its provenance."
+                    "while keeping its provenance.", "source_protected"
                 )
             },
             status=status.HTTP_409_CONFLICT,
@@ -853,18 +945,16 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
         linked = source.tariffs.count()
         if linked:
             zevs = source.tariffs.values("zev_id").distinct().count()
-            in_use.data["detail"] = (
+            in_use.data["detail"] = error_detail(
                 f"This source still prices {linked} tariff(s) in {zevs} community/ies. "
-                "Repoint or remove those tariffs first."
+                "Repoint or remove those tariffs first.", "source_in_use",
+                tariff_count=linked, community_count=zevs,
             )
             return in_use
 
         with dynamic_source_lock(source.pk) as acquired:
             if not acquired:
-                return Response(
-                    {"detail": "This source is currently being fetched. Try again shortly."},
-                    status=status.HTTP_409_CONFLICT,
-                )
+                return _source_busy_response()
             # Counted inside the lock so the number written to the audit trail
             # is the number actually destroyed.
             deleted_points = source.points.count()
@@ -900,15 +990,12 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
 
         with dynamic_source_lock(source.pk) as acquired:
             if not acquired:
-                return Response(
-                    {"detail": "This source is currently being fetched. Try again shortly."},
-                    status=status.HTTP_409_CONFLICT,
-                )
+                return _source_busy_response()
             try:
                 deleted = clear_source_points(source)
             except PriceSeriesConflict as exc:
                 return Response(
-                    {"detail": str(exc)},
+                    {"detail": error_detail(str(exc), "prices_in_use")},
                     status=status.HTTP_409_CONFLICT,
                 )
 
@@ -952,7 +1039,12 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
                 metadata={"backfill": backfill},
             )
             return Response(
-                {"detail": "The fetch could not be queued. Try again shortly."},
+                {
+                    "detail": error_detail(
+                        "The fetch could not be queued. Try again shortly.",
+                        "fetch_unavailable",
+                    )
+                },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 

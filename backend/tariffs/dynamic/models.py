@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import uuid
 
+from ..model_errors import model_error
 from django.core.exceptions import ValidationError
 from django.db import models
 
@@ -145,23 +146,28 @@ class DynamicTariffSource(models.Model):
         # re-enabled. Fetching also refuses it, including manual refreshes.
         if (self.api_version == DynamicApiVersion.V2_0_0 and not self.tariff_name.strip()
                 and (self._state.adding or self.enabled)):
-            errors["tariff_name"] = V2_PRODUCT_REQUIRED
+            errors["tariff_name"] = model_error(V2_PRODUCT_REQUIRED, "product_required")
         if self.api_version == DynamicApiVersion.BFE_RMP:
             if self.tariff_name not in BFE_RMP_TECHNOLOGIES:
-                errors["tariff_name"] = BFE_RMP_TECHNOLOGY_REQUIRED
+                errors["tariff_name"] = model_error(BFE_RMP_TECHNOLOGY_REQUIRED, "technology")
             # The publication prices exported energy and nothing else. Without
             # this a source could be filed as, say, ``grid`` and would then
             # pass ``Tariff._dynamic_source_errors`` for grid *consumption* —
             # billing what a producer is paid as what a consumer owes.
             if self.tariff_type not in BFE_RMP_TARIFF_TYPES:
-                errors["tariff_type"] = BFE_RMP_TARIFF_TYPE_REQUIRED
+                errors["tariff_type"] = model_error(BFE_RMP_TARIFF_TYPE_REQUIRED, "bfe_feed_in")
         if not self._state.adding:
             original = type(self).objects.get(pk=self.pk)
             for field in ("url", "api_version", "tariff_type", "tariff_name"):
                 if getattr(self, field) != getattr(original, field):
-                    errors[field] = "Source identity is immutable; create a replacement source."
+                    errors[field] = model_error(
+                        "Create a replacement source to change its URL, API version, type or product.",
+                        "source_identity",
+                    )
         if self.request_mode == DynamicRequestMode.EXACT_URL and self.supports_range:
-            errors["supports_range"] = "An exact-URL source cannot support range queries."
+            errors["supports_range"] = model_error(
+                "An exact-URL source cannot support range queries.", "source_range"
+            )
         if errors:
             raise ValidationError(errors)
 

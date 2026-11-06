@@ -10,7 +10,9 @@ import {
 } from '../../lib/api/tariffs'
 import { useAuth } from '../../lib/auth'
 import { useWriteScope } from '../../lib/useWriteScope'
-import { formatApiError, formatApiErrorRest, splitIndexedErrors, type ItemFieldErrors } from '../../lib/api/errors'
+import type { ItemFieldErrors } from '../../lib/api/errors'
+import { formatTariffError, formatTariffErrorData, splitTariffBandErrors } from './errors'
+import { useAppSettings } from '../../lib/appSettings'
 import { invalidateTariffQueries } from './invalidate'
 import type { Tariff, TariffInput, TariffPeriod, TariffPeriodInput } from '../../types/api'
 
@@ -63,6 +65,7 @@ export function useTariffCrud({
   onPeriodSaved,
 }: TariffCrudParams) {
   const { user } = useAuth()
+  const { settings } = useAppSettings()
   const { scope, isCurrent, assertWritable } = useWriteScope({ selectedZevId, canWrite, accountId: user?.id }, t('common.error'))
   const [editingTariffId, setEditingTariffId] = useState<string | null>(null)
   const [editingPeriodId, setEditingPeriodId] = useState<string | null>(null)
@@ -129,12 +132,12 @@ export function useTariffCrud({
       if (isCurrent(variables.scope) && variables.session === session.current) {
         // A band the server refused is marked on its own row; the notice only
         // carries what is left (or says that bands were refused).
-        const { items, rest } = splitIndexedErrors(error, 'initial_periods')
+        const { items, rest } = splitTariffBandErrors(error, t, settings)
         if (items) {
           setSaveBandErrors(items)
-          setSaveError(formatApiErrorRest(rest, t('pages.tariffs.messages.bandsRejected')))
+          setSaveError(formatTariffErrorData(rest, t('pages.tariffs.messages.bandsRejected'), t, settings))
         } else {
-          setSaveError(formatApiError(error, t('pages.tariffs.messages.saveFailed')))
+          setSaveError(formatTariffError(error, t('pages.tariffs.messages.saveFailed'), t, settings))
         }
       }
     },
@@ -153,7 +156,7 @@ export function useTariffCrud({
       if (variables.id === editingTariffId) closeTariffForm()
     },
     onError: (error, variables) => {
-      if (isCurrent(variables.scope)) pushToast(formatApiError(error, t('pages.tariffs.messages.deleteFailed')), 'error')
+      if (isCurrent(variables.scope)) pushToast(formatTariffError(error, t('pages.tariffs.messages.deleteFailed'), t, settings), 'error')
     },
   })
 
@@ -181,7 +184,7 @@ export function useTariffCrud({
     },
     onError: (error, variables) => {
       if (isCurrent(variables.scope) && variables.session === session.current) {
-        setSaveError(formatApiError(error, t('pages.tariffs.messages.periodSaveFailed')))
+        setSaveError(formatTariffError(error, t('pages.tariffs.messages.periodSaveFailed'), t, settings))
       }
     },
   })
@@ -198,7 +201,7 @@ export function useTariffCrud({
       if (variables.id === editingPeriodId) closePeriodForm()
     },
     onError: (error, variables) => {
-      if (isCurrent(variables.scope)) pushToast(formatApiError(error, t('pages.tariffs.messages.periodDeleteFailed')), 'error')
+      if (isCurrent(variables.scope)) pushToast(formatTariffError(error, t('pages.tariffs.messages.periodDeleteFailed'), t, settings), 'error')
     },
   })
 

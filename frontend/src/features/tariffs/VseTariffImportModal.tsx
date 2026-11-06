@@ -1,3 +1,5 @@
+import { formatTariffError } from './errors'
+import { useAppSettings } from '../../lib/appSettings'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -46,13 +48,10 @@ const STATUS_BADGE: Record<VseTariffCandidateStatus, string> = {
     unsupported: 'badge-danger',
 }
 
-function errorDetail(error: unknown, fallback: string): string {
-    const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-    return typeof detail === 'string' && detail ? detail : fallback
-}
 
 export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: VseTariffImportModalProps) {
     const { t } = useTranslation()
+    const { settings } = useAppSettings()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
 
@@ -77,7 +76,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
             setYear(null)
         },
         onError: (error) =>
-            pushToast(errorDetail(error, t('pages.tariffs.import.errors.previewFailed')), 'error'),
+            pushToast(formatTariffError(error, t('pages.tariffs.import.errors.previewFailed'), t, settings), 'error'),
     })
 
     const applyMutation = useMutation({
@@ -90,7 +89,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
             }
         },
         onError: (error) =>
-            pushToast(errorDetail(error, t('pages.tariffs.import.errors.applyFailed')), 'error'),
+            pushToast(formatTariffError(error, t('pages.tariffs.import.errors.applyFailed'), t, settings), 'error'),
     })
 
     const years = useMemo(() => candidateYears(preview?.candidates ?? []), [preview])

@@ -1380,6 +1380,83 @@ usable cached scope after refresh failures. Missing selection never means all
 communities in the management series filter. Retained tariff/period/version submit
 callbacks and each mutation's API dispatch check the current scope token.
 
+### Tariff API error contract
+
+Tariff, period and shared dynamic-source viewsets, plus VSE preview/apply,
+return their existing error statuses. Dictionary field-error properties are
+preserved alongside `validation_errors`, a flat list of
+`{code, field, path, params, message}`. Top-level message arrays change root
+shape: they are wrapped under `detail` before returning metadata. Clients must
+accept this wrapper rather than relying on an array root. The browser accepts
+both shapes; other API consumers must account for this compatibility change.
+
+```json
+{
+  "initial_periods": [{}, {"time_to": ["A band takes both a start and an end time, or neither: without times it prices all other hours."]}],
+  "validation_errors": [{
+    "code": "band_time_pair",
+    "field": "time_to",
+    "path": ["initial_periods", 1, "time_to"],
+    "params": {},
+    "message": "A band takes both a start and an end time, or neither: without times it prices all other hours."
+  }]
+}
+```
+
+`path` follows the original error tree: field names and zero-based nested
+indexes, without indexes for individual message strings. A wrapped root message
+retains `path: []`; an originally supplied `detail` message has `["detail"]`.
+`field` is the last field name, or null for root messages, `detail`,
+`non_field_errors` and `__all__`. Empty `{}` placeholders are skipped without
+changing following band indexes. Replacement `periods` on version/duplicate
+requests retain their indexes, and failed requests roll back tariff/band writes.
+
+Native DRF codes are preserved. Field-specific `invalid` becomes `invalid_date`,
+`invalid_time`, `invalid_number` or `invalid_url`. Length/digit limits carry numeric
+`count`; numeric bounds carry `value`, with Decimal bounds encoded as exact
+strings. Model conversion allows only contract parameters and excludes native
+validator inputs and model objects. Serializer validation and model saves share
+field annotation. Fixed-price errors carry the submitted or existing/copied
+`billing_mode`, including partial updates and version/duplicate actions.
+
+| Parameterized codes | Parameters |
+|---|---|
+| `flat_timed_conflict`, `catch_all_conflict` | `months`: month numbers 1–12 |
+| `duplicate_date` | `name`, `date`: ISO date |
+| `name_exists`, `overlap`, `series_identity`, `confirmation_mismatch` | `name` |
+| `history_limit`, native length/digit limits | `count`: numeric limit |
+| `http_status`, `host_unresolved`, `document_size` | `status`, `host`, `size` (MB), respectively |
+| `source_in_use` | `tariff_count`, `community_count`: integer dependency counts |
+
+Business codes cover tariff rules, imports, permissions and source operations.
+`source_protected` prevents source deletion while tariffs or invoice evidence
+retain it. `prices_in_use` prevents clearing prices needed by a non-cancelled
+invoice, including a draft. These conditions have distinct user explanations.
+
+Clients translate recognized codes using allowlisted, validated parameters;
+unusable parameters preserve the readable `message`. Codes and technical logs
+are not translated. Unknown codes, including the provider/parser diagnostic
+`invalid_dynamic_response`, retain their safe messages. Uncoded responses and
+malformed/empty metadata preserve all readable field messages and band context;
+the band splitter applies the same all-or-nothing metadata check as the formatter.
+Inline bands are matched by their full path, including non-field messages;
+unconsumed diagnostics remain in the notice. Root response metadata such as
+`code` is never treated as a diagnostic. Progression retains its legacy
+`too_many_bands` response code alongside one structured diagnostic.
+The progression page also uses `formatTariffError` for other request failures,
+so field-error responses do not expose the structured metadata in its notice.
+`empty` uses its path: `initial_periods` requests a band, `selections` requests a
+tariff selection, and other lists receive a generic nonempty-list message.
+Clients must not parse English message text or display metadata as diagnostics.
+Remote `log_detail` remains server-only. Other apps retain their error handling.
+
+OpenAPI permits legacy `detail` and other field-error properties alongside the
+structured list. Common statuses are 400/401/403, with 404 on detail operations
+and imports. Source delete/clear/recheck and import apply advertise 409; manual
+fetch advertises 503; progression advertises 404/422. Successful response schemas
+remain unchanged. Error files and bodies without readable string diagnostics
+are left untouched.
+
 ## 7. Invoice line-item construction
 
 ### 7.1 Item type mapping

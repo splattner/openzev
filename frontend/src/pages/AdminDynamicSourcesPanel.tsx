@@ -20,7 +20,7 @@ import {
   queueDynamicSourceFetch,
   recheckDynamicTariffSource,
 } from '../lib/api/tariffs'
-import { formatApiError } from '../lib/api/errors'
+import { formatTariffError } from '../features/tariffs/errors'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useToast } from '../lib/toast'
@@ -73,7 +73,7 @@ export function AdminDynamicSourcesPanel() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.dynamicSources() })
       await queryClient.invalidateQueries({ queryKey: ['admin', 'audit-events'] })
     },
-    onError: (error) => pushToast(formatApiError(error, t('pages.dynamicSources.fetchError')), 'error'),
+    onError: (error) => pushToast(formatTariffError(error, t('pages.dynamicSources.fetchError'), t, settings), 'error'),
   })
 
   const recheckMutation = useMutation({
@@ -86,7 +86,7 @@ export function AdminDynamicSourcesPanel() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.dynamicSources() })
       await queryClient.invalidateQueries({ queryKey: ['admin', 'audit-events'] })
     },
-    onError: (error) => pushToast(formatApiError(error, t('pages.dynamicSources.recheckError')), 'error'),
+    onError: (error) => pushToast(formatTariffError(error, t('pages.dynamicSources.recheckError'), t, settings), 'error'),
   })
 
   const clearMutation = useMutation({
@@ -96,7 +96,7 @@ export function AdminDynamicSourcesPanel() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.dynamicSources() })
       await queryClient.invalidateQueries({ queryKey: ['admin', 'audit-events'] })
     },
-    onError: (error) => pushToast(formatApiError(error, t('pages.dynamicSources.clearError')), 'error'),
+    onError: (error) => pushToast(formatTariffError(error, t('pages.dynamicSources.clearError'), t, settings), 'error'),
   })
 
   const deleteMutation = useMutation({
@@ -106,7 +106,7 @@ export function AdminDynamicSourcesPanel() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.dynamicSources() })
       await queryClient.invalidateQueries({ queryKey: ['admin', 'audit-events'] })
     },
-    onError: (error) => pushToast(formatApiError(error, t('pages.dynamicSources.deleteError')), 'error'),
+    onError: (error) => pushToast(formatTariffError(error, t('pages.dynamicSources.deleteError'), t, settings), 'error'),
   })
 
   const activityQuery = useQuery({

@@ -42,6 +42,17 @@ class DiscoveryTests(SimpleTestCase):
         self.assertEqual(result.points, [])
 
     @mock.patch("tariffs.dynamic.discovery.fetch_tariff_document")
+    def test_multiple_products_require_a_coded_selection(self, fetch):
+        payload = fixture("vse_v2_grid")
+        alternative = json.loads(json.dumps(payload["prices"][0]))
+        alternative["grid"]["tariff_name"] = "alternative"
+        payload["prices"].append(alternative)
+        fetch.return_value = payload, "digest"
+        with self.assertRaises(DynamicTariffResponseError) as caught:
+            probe_source_configuration("https://prices.example.test/tariffs", tariff_type="grid")
+        self.assertEqual(caught.exception.code, "product_selection_required")
+
+    @mock.patch("tariffs.dynamic.discovery.fetch_tariff_document")
     def test_an_exact_v2_url_can_verify_its_named_product_without_query_support(self, fetch):
         def answer(url):
             if "?" in url:
