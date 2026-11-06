@@ -178,6 +178,7 @@ class DocumentViewSet(
             participants = list(issuing.current_participants(zev))
             if not participants:
                 raise ValidationError({"audience": ["This ZEV has no participants to deliver to."]})
+        participants = issuing.one_per_person(participants)
         upload = data["file"]
         stored = store_file(zev, upload.read(), upload.name or "")
         batch_id = uuid.uuid4()
@@ -343,4 +344,4 @@ class IssueTariffOverviewView(IssueView):
             participants = _participants_of(zev, data["participant_ids"])
         if not participants:
             raise ValidationError({"detail": "This ZEV has no participants to deliver to."})
-        return issuing.issue_tariff_overview(zev, participants, user)
+        return issuing.issue_tariff_overview(zev, issuing.one_per_person(participants), user)

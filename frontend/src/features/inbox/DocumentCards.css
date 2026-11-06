@@ -49,6 +49,13 @@
   display: block;
 }
 
+/* Two buttons share a line while there is room and stack when there is not, so the table
+   never grows wider than its sheet and clips the second one. */
+
+.doc-wide .doc-actions-col .actions-row {
+  flex-wrap: wrap;
+}
+
 /* The amount column: the header sits over its right-aligned figures. */
 
 .doc-wide th.numeric {

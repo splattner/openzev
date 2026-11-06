@@ -61,6 +61,30 @@ class UploadTests(TestCase):
         self.assertEqual({row.delivered_by_id for row in rows}, {self.owner.pk})
         self.assertEqual(rows[0].title, "House rules")
 
+    def test_a_person_with_two_participant_rows_gets_one_copy(self):
+        # Ben's flat and his parking space: one account, one inbox.
+        flat = make_participant(self.zev, user=self.account, first="Anna", last="A2")
+        response = self.post()
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(response.json()["delivered"], 2)
+        rows = DeliveredDocument.objects.filter(kind=DocumentKind.OPERATOR)
+        self.assertEqual(rows.filter(participant__user=self.account).count(), 1)
+        self.assertFalse(rows.filter(participant=flat).exists())
+
+    def test_selecting_both_rows_of_one_person_still_gives_one_copy(self):
+        second = make_participant(self.zev, user=self.account, first="Anna", last="A2")
+
+        response = self.post(audience="selected", participant_ids=[str(self.anna.pk), str(second.pk)])
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(response.json()["delivered"], 1)
+
+    def test_rows_without_an_account_are_not_merged(self):
+        make_participant(self.zev, first="Ben", last="B2")
+
+        self.assertEqual(self.post().json()["delivered"], 3)
+
     def test_upload_selected_delivers_only_to_the_chosen(self):
         response = self.post(audience="selected", participant_ids=[str(self.ben.pk)])
 

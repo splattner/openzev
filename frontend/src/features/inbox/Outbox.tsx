@@ -17,7 +17,7 @@ import { useManagedZev } from '../../lib/managedZev'
 import { useToast } from '../../lib/toast'
 import type { DeliveredDocument, DocumentKind } from '../../types/api'
 import { participantLabel } from './AudienceFields'
-import { DOCUMENT_KINDS, documentYear, KIND_ICON } from './documentPresentation'
+import { DOCUMENT_KINDS, documentStanding, documentYear, KIND_ICON } from './documentPresentation'
 import { StandingBadge, useDownloadDocument } from './DocumentsList'
 import { IssueReportsDialog, issueYears } from './IssueReportsDialog'
 import { UploadDocumentDialog } from './UploadDocumentDialog'
@@ -85,6 +85,12 @@ export function Outbox() {
   }
 
   const documents = documentsQuery.data ?? []
+  const isWithoutAccount = (document: DeliveredDocument) => {
+    const addressee = document.participant ? byId.get(document.participant) : undefined
+    return addressee != null && addressee.user == null
+  }
+  // The Status column only earns its width when a row has something to say.
+  const showStatus = documents.some((document) => documentStanding(document) !== null || isWithoutAccount(document))
   const years = issueYears(today)
   const filtered = !!(participantId || kind || year)
 
@@ -147,20 +153,19 @@ export function Outbox() {
                   <th scope="col">{t('inbox.outbox.col.document')}</th>
                   <th scope="col">{t('inbox.outbox.col.participant')}</th>
                   <th scope="col">{t('inbox.outbox.col.delivered')}</th>
-                  <th scope="col">{t('inbox.outbox.col.status')}</th>
-                  <th scope="col">{t('inbox.outbox.col.actions')}</th>
+                  {showStatus && <th scope="col">{t('inbox.outbox.col.status')}</th>}
+                  <th scope="col" className="doc-actions-col">{t('inbox.outbox.col.actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {documents.map((document) => {
-                  const addressee = document.participant ? byId.get(document.participant) : undefined
-                  const withoutAccount = addressee != null && addressee.user == null
+                  const withoutAccount = isWithoutAccount(document)
                   return (
                     <tr key={document.id}>
                       <td>
                         <FontAwesomeIcon icon={KIND_ICON[document.kind]} fixedWidth aria-hidden="true" />{' '}
                         {document.title}
-                        <small className="muted" style={{ display: 'block' }}>
+                        <small className="muted doc-note">
                           {t(`inbox.kind.${document.kind}`)} · {documentYear(document)}
                         </small>
                       </td>
@@ -168,14 +173,16 @@ export function Outbox() {
                       <td>
                         {formatShortDate(document.delivered_at.slice(0, 10), settings)}
                         {document.delivered_by_name && (
-                          <small className="muted" style={{ display: 'block' }}>{document.delivered_by_name}</small>
+                          <small className="muted doc-note">{document.delivered_by_name}</small>
                         )}
                       </td>
-                      <td>
-                        <StandingBadge document={document} />
-                        {withoutAccount && <span className="badge badge-neutral">{t('inbox.outbox.noAccount')}</span>}
-                      </td>
-                      <td>
+                      {showStatus && (
+                        <td>
+                          <StandingBadge document={document} />
+                          {withoutAccount && <span className="badge badge-neutral">{t('inbox.outbox.noAccount')}</span>}
+                        </td>
+                      )}
+                      <td className="doc-actions-col">
                         <div className="actions-row">
                           <button
                             type="button"
@@ -205,8 +212,7 @@ export function Outbox() {
           </div>
           <ul className="doc-cards">
             {documents.map((document) => {
-              const addressee = document.participant ? byId.get(document.participant) : undefined
-              const withoutAccount = addressee != null && addressee.user == null
+              const withoutAccount = isWithoutAccount(document)
               return (
                 <li key={document.id} className="doc-card">
                   <div className="doc-card-head">

@@ -1201,6 +1201,7 @@ class Command(BaseCommand):
         """
         from django.utils import timezone
 
+        from inbox.issuing import one_per_person
         from invoices.pdf_render import render_pdf
         from invoices.tariff_overview import generate_tariff_overview_pdf
         from zev.access import live_participant_q
@@ -1219,7 +1220,9 @@ class Command(BaseCommand):
                 "</body></html>"
             )
             today = timezone.localdate()
-            for participant in main.participants.filter(live_participant_q(), user__isnull=False).select_related("zev"):
+            # One copy per person, as the upload and the tariff overview deliver: Ben holds two rows.
+            audience = main.participants.filter(live_participant_q(), user__isnull=False).select_related("zev")
+            for participant in one_per_person(audience):
                 deliver(
                     participant=participant, kind=DocumentKind.TARIFF_OVERVIEW,
                     title=f"Tarifübersicht {today:%d.%m.%Y}", body=overview, file_name="tarifuebersicht.pdf",
