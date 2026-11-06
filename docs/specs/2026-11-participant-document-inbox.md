@@ -18,7 +18,7 @@
 | 0 | This spec and ADR 0045 | — |
 | 1 | `inbox` app: model, `deliver()` service, scoping, read and outbox API, backups (incl. per-ZEV restore), ZEV purge, audit | — |
 | 1b | Transfer archive format 11 (`delivered_documents`) | stacked on #1206 |
-| 2 | Producers: invoice sent / superseded, explicit contract delivery, backfill command | — |
+| 2 | Producers: invoice sent, explicit contract delivery, backfill command | stacked on #1207 |
 | 3 | Operator documents (upload, withdraw), issued annual statement / financial summary / tariff overview | — |
 | 4 | Frontend: participant *Documents* page, manager outbox, upload and issue dialogs | — |
 | 5 | Links and notifications: public invoice link and invoice email resolve to the inbox entry, `document.delivered` | — |
@@ -191,7 +191,7 @@ Validation for `POST`:
 | `/api/v1/inbox/issue/annual-statement/` | POST | manager of `zev` | Body `{ zev, year, participant_ids? , notify? }`; omitted `participant_ids` = every participant with billed invoices that year. Renders with the existing `generate_annual_statement_pdf(..., sent_only=True)` and stores the bytes. Re-issuing a year supersedes the earlier row |
 | `/api/v1/inbox/issue/financial-summary/` | POST | manager of `zev` | Same, for producer participants (existing eligibility rule of `FinancialSummaryView`) |
 | `/api/v1/inbox/issue/tariff-overview/` | POST | manager of `zev` | Body `{ zev, notify? }`; delivers the current tariff overview to every current participant |
-| `/api/v1/inbox/documents/deliver-contract/` | POST | manager of `zev` | Body `{ contract_issue }`; delivers that stored version to its participant. Refuses a version that is not the participant's latest (409) so an outdated contract is not handed over |
+| `/api/v1/inbox/documents/deliver-contract/` | POST | manager of `zev` | Body `{ contract_issue }`; delivers that stored version to its participant. Refuses a version that is not the participant's latest (409) so an outdated contract is not handed over. An unknown issue and one of another ZEV both answer 404; a disabled ZEV refuses a manager (400) but not an admin; delivering the same version again answers 200 with `delivered: 0`. The first delivery answers 201 |
 
 **Contracts are delivered explicitly, not on issue.** A `ContractIssue` is minted whenever a manager downloads the contract (`issue_contract_pdf` in the participant `contract` action), including to preview or print it for signing. Delivering at that moment would put a contract into the participant's inbox before the operator has handed it over. (This refines #862, which proposed delivery "when a `ContractIssue` version is issued".)
 
@@ -226,13 +226,13 @@ Managers and admins keep every one of these. `participant_visible`, `participant
 | Source | Hook | Behaviour |
 |---|---|---|
 | Invoice emailed | `workflow.record_email_delivery` when `first_delivery` | `deliver(kind="invoice", body=<the attachment bytes>, delivered_at=sent_at)`. The email task already reads `invoice.pdf_file`; it passes those same bytes. A resent email does not create a row |
-| Invoice marked sent by hand | `workflow.mark_invoice_sent` | Delivers `invoice.pdf_file`, rendering it first with `save_invoice_pdf` when missing. If rendering fails the transition still succeeds (the invoice is the deliverable), the failure is audited, and `inbox_backfill` picks it up |
-| Invoice cancelled and replaced | `cancel_invoice` and the replacement link (`replaces` / `replaced_by`, #388) | When the replacement is **sent**, `supersede(old_row, new_row)`. A cancelled invoice that was never replaced stays in the inbox, marked cancelled through its invoice status (`invoice_status` in the serializer). Nothing is deleted (ADR 0037) |
-| Contract | `POST /inbox/documents/deliver-contract/` | `deliver(kind="contract", contract_issue=...)`; no copy |
+| Invoice marked sent by hand | `workflow.mark_invoice_sent` | Delivers `invoice.pdf_file`, or a render from `generate_pdf` when it is missing (not stored on the invoice). If rendering fails the transition still succeeds (the invoice is the deliverable), the failure is audited, and `inbox_backfill` picks it up |
+| Invoice cancelled | `cancel_invoice` | Nothing to do: a sent invoice that is cancelled stays in the inbox, marked cancelled through its invoice status (`invoice_status` in the serializer). Nothing is deleted (ADR 0037). There is no replacement link between invoices (a sent invoice is corrected by a credit note, `correct_invoice`), so `supersede()` has no invoice producer; it serves reports only |
+| Contract | `POST /inbox/documents/deliver-contract/` | `deliver(kind="contract", contract_issue=...)`; no copy. Title and document number are the contract's document number |
 | Reports | `POST /inbox/issue/*` | `deliver(...)` / `supersede(...)` |
 | Operator document | `POST /inbox/documents/` | one `deliver` per recipient, same stored file |
 
-Every producer is wrapped like the notification producers (`@best_effort`): a failure to deliver is audited and never rolls back the workflow transition it hangs off.
+The two invoice producers live in `inbox/producers.py` (`deliver_sent_invoice`, which never raises): a failure to deliver is logged, audited as a `FAILED` `inbox.document.delivered` event on the invoice, and never rolls back the workflow transition it hangs off. `record_email_delivery(invoice, sent_at, *, document=None)` takes the attached bytes from the email task (which keeps what it attached), delivers on the first delivery whatever the status has become, and passes `delivered_at=sent_at`; a resend is a no-op. `mark_invoice_sent` delivers the stored PDF, or a render of the invoice from `generate_pdf` when there is none. The render is not stored on the invoice: `pdf_file` stays empty (cleared on approval, generated on request), so marking an invoice as sent changes nothing about the invoice's own PDF.
 
 ### 6.3 Interaction with anonymisation (#793)
 
@@ -257,7 +257,7 @@ Decision for this spec, to be honoured by #793:
 
 ### 6.6 Backfill
 
-`python manage.py openzev_inbox_backfill [--zev ID] [--dry-run]`, also callable as a Celery task. For each invoice matching `sent_to_participant()` with a stored `pdf_file` and no row, it delivers with `delivered_at = sent_at or approved_at`. Invoices whose file is missing from storage are listed in the report and skipped; they remain reachable through the live path until phase 6, and the **cut-over PR is blocked until the report is empty or accepted by the operator**. It does not touch contracts (explicit delivery) or reports (never issued before). Idempotent by the unique constraints.
+`python manage.py openzev_inbox_backfill [--zev ID] [--dry-run]`, also callable as the Celery task `inbox.tasks.inbox_backfill_task` (logic in `inbox/backfill.py`, `backfill_invoices()` returning a `BackfillReport`). For each invoice matching `sent_to_participant()` with a stored `pdf_file` and no row, it delivers with `delivered_at = sent_at or approved_at or updated_at`. It never renders. Invoices with no `pdf_file` (`no_document`) or whose file is missing from storage (`file_missing`) are listed in the report and skipped; they remain reachable through the live path until phase 6, and the **cut-over PR is blocked until the report is empty or accepted by the operator**. It does not touch contracts (explicit delivery) or reports (never issued before). Idempotent by the unique constraints.
 
 ## 7. Frontend
 
@@ -409,13 +409,21 @@ All counts are planned; the final numbers replace them when each phase lands.
 
 `test_upload_all_creates_a_row_per_current_participant`, `test_upload_selected_rejects_participant_of_other_zev`, `test_upload_rejects_non_pdf_magic_bytes`, `test_upload_rejects_oversize`, `test_upload_rejects_empty`, `test_upload_ignores_client_content_type`, `test_upload_refused_for_disabled_zev`, `test_later_participant_gets_no_backlog`, `test_response_counts_recipients_without_account`, `test_download_headers` (attachment, nosniff, no-store).
 
-### Backend — `inbox/test_producers.py` (≈12)
+### Backend — `inbox/test_producers.py` (increment 2, 9 tests)
 
-`test_email_delivery_delivers_attachment_bytes`, `test_stored_bytes_equal_email_attachment`, `test_resent_email_does_not_add_a_row`, `test_mark_sent_delivers_stored_pdf`, `test_mark_sent_renders_missing_pdf`, `test_mark_sent_survives_render_failure`, `test_generate_pdf_after_sending_does_not_change_the_delivered_file`, `test_replacement_supersedes_earlier_row`, `test_cancelled_without_replacement_keeps_row`, `test_deliver_contract_references_issue_without_copy`, `test_deliver_contract_refuses_outdated_version`, `test_issue_annual_statement_supersedes_on_reissue`.
+`EmailDeliveryTests`: `test_email_delivery_delivers_attachment_bytes`, `test_stored_bytes_equal_email_attachment`, `test_resent_email_does_not_add_a_row`, `test_a_later_render_does_not_change_the_delivered_file`, `test_a_failed_delivery_does_not_break_recording_the_email`. `MarkSentTests`: `test_mark_sent_delivers_stored_pdf`, `test_mark_sent_renders_missing_pdf`, `test_mark_sent_survives_render_failure`, `test_a_sent_invoice_that_is_cancelled_stays_in_the_inbox_marked_cancelled`.
+
+### Backend — `inbox/test_deliver_contract.py` (increment 2, 12 tests)
+
+By reference without a copy, the participant can open it, a participant without an account is counted, idempotent (200, `delivered: 0`), an outdated version is refused (409) while the newer one is accepted, the participant and a manager of another ZEV and an unknown id all get 404, a malformed id is 400, a disabled ZEV refuses a manager but not an admin, and an anonymous caller is refused. Issuing a contract on its own delivers nothing.
+
+### Backend — `inbox/test_issue_reports.py` (phase 3, planned)
+
+`test_issue_annual_statement_supersedes_on_reissue`, plus the same for the financial summary and the tariff overview, and the eligibility rule of each.
 
 ### Backend — other
 
-- `inbox/test_backfill.py` (≈5): creates rows for sent invoices, skips missing files and reports them, `--dry-run` writes nothing, idempotent, `delivered_at` equals `sent_at`.
+- `inbox/test_backfill.py` (increment 2, 8 tests): creates rows for sent invoices dated by `sent_at`, leaves drafts and approved invoices alone, skips and reports missing documents (`no_document`, `file_missing`), `--dry-run` writes nothing, idempotent, the date falls back to approval, `--zev` limits the run, the command prints what it skipped.
 - `backups/test_archive.py`: the existing coverage tests pass with the model and file field registered (increment 1).
 - `zev/test_transfer_delivered_documents.py` (increment 1b, 20 tests): export / import round trip at format 11 (bytes, history, supersession chain, contract held as a file, invoice link), a v10 archive imports without rows, and rejected archives (checksum, missing member, non-PDF, kind, participant, count) leave no files behind.
 - `notifications/test_producers.py`: `invoice.sent` payload carries `document_id`; `document.delivered` dedupes (≈3).

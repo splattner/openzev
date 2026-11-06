@@ -486,7 +486,7 @@ Validation: `period_start` must be before `period_end`. On creation the engine a
 | Method | URL | Permission | Pre-condition | Side effects |
 |---|---|---|---|---|
 | `POST` | `/invoices/{id}/approve/` | `HasZevAccess` | `status == draft` | → `approved` |
-| `POST` | `/invoices/{id}/mark-sent/` | `HasZevAccess` | `status == approved` | → `sent`, `sent_at = now()` |
+| `POST` | `/invoices/{id}/mark-sent/` | `HasZevAccess` | `status == approved` | → `sent`, `sent_at = now()`; delivers the invoice into the participant inbox (`inbox.producers.deliver_sent_invoice`, rendering the PDF for the inbox when there is none, without storing it on the invoice; a failure is audited and never undoes the transition) |
 | `POST` | `/invoices/{id}/mark-paid/` | `HasZevAccess` | `status == sent` | Optional body `{paid_on}` (default today); books the outstanding amount as one `mark_paid` payment (none for a zero outstanding amount) → `paid`. Audit metadata `{payment_id, amount_chf, paid_on}` |
 | `POST` | `/invoices/{id}/cancel/` | `HasZevAccess` | `status ∉ {paid, cancelled}`, no payments | → `cancelled` |
 | `POST` | `/invoices/{id}/correct/` | `HasZevAccess` (write-scoped: managers) | `status == paid`, or `sent` with payments; total > 0; reason required; an adjustment needs `0 < amount_chf ≤ paid − credited` | Body `{kind: reversal \| adjustment, reason, amount_chf?}`; `201 {invoice, credit}`. A reversal credits the cash received (less earlier credits), cancels the invoice and releases the credit applied to it; an invoice settled by credit alone is reversed without a credit note (`credit: null`). An adjustment is capped by cash. The credit PDF is queued on commit. Audit `invoice.correct` (metadata adds `released_chf`) |
@@ -917,9 +917,13 @@ Total rendered output is not capped; repeated fields can amplify it.
    the already-delivered message) or marks the `EmailLog` `"failed"`
    (`#576`; see ADR 0004):
    - Update `EmailLog`: `status = "sent"`, `sent_at = now()`.
-   - `record_email_delivery(invoice, sent_at)`: update `Invoice.sent_at`;
-     if `status == approved` → **auto-transition to `sent`** (locked against
-     a concurrent status change — `#572`, §5.3).
+   - `record_email_delivery(invoice, sent_at, document=<attached bytes>)`: update
+     `Invoice.sent_at`; if `status == approved` → **auto-transition to `sent`**
+     (locked against a concurrent status change — `#572`, §5.3). On the first
+     delivery the attached bytes also become the invoice's document in the
+     participant inbox (SPEC-2026-11-participant-document-inbox §6.2), whatever
+     the status has become; a resend adds nothing, and a failure to deliver is
+     audited without affecting the recorded email.
    - Record a `SUCCESS` `invoice.email_sent` audit event.
 10. **On a bookkeeping failure** (any write in step 9 raises): log the
     exception and record a `FAILED` `invoice.email_sent` audit event whose

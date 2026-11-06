@@ -5,16 +5,20 @@ import uuid
 from django.db.models import Q
 from django.http import FileResponse
 from drf_spectacular.utils import OpenApiParameter, extend_schema
-from rest_framework import mixins, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
 from config.http import sanitize_filename
-from zev.scoping import ZevScopedQuerySetMixin
+from invoices.models import ContractIssue
+from zev.access import can_manage
+from zev.scoping import ZevScopedQuerySetMixin, assert_zev_not_disabled
 
 from .models import DeliveredDocument, DocumentKind
-from .serializers import DeliveredDocumentSerializer
+from .serializers import DeliveredDocumentSerializer, DeliverContractSerializer, DeliveryResultSerializer
+from .services import deliver
 
 _TRUE = {"1", "true", "yes"}
 
@@ -102,3 +106,54 @@ class DocumentViewSet(
         response["X-Content-Type-Options"] = "nosniff"
         response["Cache-Control"] = "private, no-store"
         return response
+
+    @extend_schema(request=DeliverContractSerializer, responses={201: DeliveryResultSerializer, 200: DeliveryResultSerializer})
+    @action(detail=False, methods=["post"], url_path="deliver-contract")
+    def deliver_contract(self, request):
+        """Hand a stored contract version to its participant, by reference (no copy).
+
+        Delivered explicitly: a ``ContractIssue`` is also minted when a manager
+        previews the contract, which must not reach the participant. Only the
+        participant's latest version can be delivered, so an outdated contract
+        is not handed over by mistake.
+        """
+        serializer = DeliverContractSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        issue = (
+            ContractIssue.objects.select_related("zev", "participant__party", "participant__zev")
+            .filter(pk=serializer.validated_data["contract_issue"])
+            .first()
+        )
+        # The same answer for "no such issue" and "not yours", so ids cannot be probed.
+        if issue is None or issue.zev is None or not can_manage(request.user, issue.zev):
+            raise NotFound()
+        participant = issue.participant
+        if participant is None:
+            raise ValidationError({"contract_issue": ["This contract's participant no longer exists."]})
+        assert_zev_not_disabled(request.user, issue.zev)
+        latest = ContractIssue.objects.filter(participant=participant).order_by("-version").first()
+        if latest is not None and latest.pk != issue.pk:
+            return Response(
+                {"detail": f"Version {issue.version} is outdated: the latest contract is version {latest.version}."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        batch_id = uuid.uuid4()
+        document, created = deliver(
+            participant=participant,
+            kind=DocumentKind.CONTRACT,
+            title=issue.document_number,
+            document_number=issue.document_number,
+            contract_issue=issue,
+            delivered_by=request.user,
+            batch_id=batch_id,
+        )
+        payload = {
+            "batch_id": document.batch_id or batch_id,
+            "delivered": 1 if created else 0,
+            "without_account": 1 if created and participant.user_id is None else 0,
+            "documents": [document],
+        }
+        return Response(
+            DeliveryResultSerializer(payload, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
