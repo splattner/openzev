@@ -25,6 +25,9 @@ from accounts.models import FeatureFlag, VatRate
 from allocation.validity import active_during, business_tz, civil_date, period_start_dt, period_window, wall_clock
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
 from audit.services import record_audit_event
+from inbox.backfill import backfill_invoices
+from inbox.models import DeliveredDocument, DocumentKind
+from inbox.services import deliver, remove_file_if_unreferenced
 from invoices.contract_pdf import issue_contract_pdf
 from invoices.engine import generate_invoice, generate_invoices_for_zev
 from invoices.models import (
@@ -1189,6 +1192,48 @@ class Command(BaseCommand):
                 created += 1
         self.stdout.write(f"  Invoice PDFs: {created}")
 
+    def _seed_inbox(self, zevs) -> None:
+        """Fill the participant inbox: the sent invoices that have a document, a tariff overview
+        and a notice for every current participant of the main community.
+
+        Rows from an earlier run are cleared first (their invoices were regenerated), so a
+        re-seed never lists a document twice.
+        """
+        from django.utils import timezone
+
+        from invoices.pdf_render import render_pdf
+        from invoices.tariff_overview import generate_tariff_overview_pdf
+        from zev.access import live_participant_q
+
+        try:
+            old_files = {name for name in DeliveredDocument.objects.filter(zev__in=zevs).values_list("file", flat=True) if name}
+            DeliveredDocument.objects.filter(zev__in=zevs).delete()
+            for name in old_files:
+                remove_file_if_unreferenced(name)
+            delivered = sum(backfill_invoices(zev=zev).delivered for zev in zevs)
+            main = zevs[0]
+            overview = generate_tariff_overview_pdf(main)
+            notice = render_pdf(
+                "<html><body style='font-family: sans-serif'><h1>Hausordnung Solaranlage</h1>"
+                "<p>Bitte Waschmaschine und Geschirrspüler wenn möglich um die Mittagszeit laufen lassen.</p>"
+                "</body></html>"
+            )
+            today = timezone.localdate()
+            for participant in main.participants.filter(live_participant_q(), user__isnull=False).select_related("zev"):
+                deliver(
+                    participant=participant, kind=DocumentKind.TARIFF_OVERVIEW,
+                    title=f"Tarifübersicht {today:%d.%m.%Y}", body=overview, file_name="tarifuebersicht.pdf",
+                )
+                deliver(
+                    participant=participant, kind=DocumentKind.OPERATOR,
+                    title="Hausordnung Solaranlage", body=notice, file_name="hausordnung.pdf",
+                )
+            self.stdout.write(f"  Inbox: {delivered} invoices backfilled, tariff overview and notice delivered")
+        except Exception as exc:
+            self.stdout.write(
+                self.style.WARNING(f"seed_demo: inbox skipped ({exc.__class__.__name__}: {exc})")
+            )
+
     def _scaled_kwh(self, profile: Profile, factor: float) -> Profile:
         """A main-community profile at another amplitude (one shape per meter kind)."""
 
@@ -1686,6 +1731,8 @@ class Command(BaseCommand):
             status__in=[InvoiceStatus.SENT, InvoiceStatus.PAID],
         ).values_list("pk", flat=True))
         transaction.on_commit(lambda: self._seed_invoice_pdfs(invoice_ids), robust=True)
+        # After the PDFs: the inbox keeps the stored document of every sent invoice.
+        transaction.on_commit(lambda: self._seed_inbox([zev, second_zev]), robust=True)
 
         # Reset the demo trail first (including anything a presenter clicked
         # during a previous session): this command is the demo's reset button.

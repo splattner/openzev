@@ -214,12 +214,17 @@ class DocumentViewSet(
         """
         serializer = DeliverContractSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        issue = (
-            ContractIssue.objects.select_related("zev", "participant__party", "participant__zev")
-            .filter(pk=serializer.validated_data["contract_issue"])
-            .first()
-        )
-        # The same answer for "no such issue" and "not yours", so ids cannot be probed.
+        issues = ContractIssue.objects.select_related("zev", "participant__party", "participant__zev")
+        if "participant" in serializer.validated_data:
+            # The participant's latest issued version: what a manager sees as "the contract".
+            issue = (
+                issues.filter(participant_id=serializer.validated_data["participant"])
+                .order_by("-version")
+                .first()
+            )
+        else:
+            issue = issues.filter(pk=serializer.validated_data["contract_issue"]).first()
+        # The same answer for "no such issue", "no contract issued yet" and "not yours", so ids cannot be probed.
         if issue is None or issue.zev is None or not can_manage(request.user, issue.zev):
             raise NotFound()
         participant = issue.participant

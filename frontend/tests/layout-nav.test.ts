@@ -368,12 +368,13 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         }
     })
 
-    it('participant sees Dashboard, My invoices and Annual statement only', async () => {
+    it('participant sees Dashboard, My invoices, My documents and Annual statement only', async () => {
         mockSession('participant')
         const page = await renderLayout()
         expect(page.hasHref('/')).toBe(true)
         expect(page.hasHref('/dashboard')).toBe(false)
         expect(page.hasHref('/me/invoices')).toBe(true)
+        expect(page.hasHref('/me/documents')).toBe(true)
         expect(page.hasHref('/me/statement')).toBe(true)
         for (const href of ['/reports', '/metering/imports', '/participants', '/tariffs', '/zev-settings', '/audit-logs', '/admin']) {
             expect(page.hasHref(href)).toBe(false)
@@ -405,16 +406,17 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         }
     })
 
-    it.each([false, true])('keeps former-participant invoice navigation accessible when collapsed=%s', async (collapsed) => {
+    it.each([false, true])('keeps former-participant invoice and document navigation accessible when collapsed=%s', async (collapsed) => {
         window.localStorage.setItem('openzev.sidebarCollapsed', String(collapsed))
         mockSession('former')
         const page = await renderLayout()
         try {
             const links = page.container.querySelectorAll('nav.nav-list a')
-            expect(links).toHaveLength(1)
-            expect(links[0].getAttribute('href')).toBe('/me/invoices')
+            // What it was sent: the invoices and, since the inbox has no end date, the documents.
+            expect([...links].map((link) => link.getAttribute('href'))).toEqual(['/me/invoices', '/me/documents'])
             expect(links[0].getAttribute('aria-label') ?? links[0].textContent).toBe('nav.myInvoices')
             expect(links[0].getAttribute('title')).toBe(collapsed ? 'nav.myInvoices' : null)
+            expect(links[1].getAttribute('aria-label') ?? links[1].textContent).toBe('nav.myDocuments')
         } finally {
             page.unmount()
         }

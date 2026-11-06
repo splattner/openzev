@@ -26,6 +26,7 @@ import {
     sendOnboardingLink,
     updateParticipant,
 } from '../lib/api/zev'
+import axios from 'axios'
 import { apiErrorPayload, formatApiError } from '../lib/api/errors'
 import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
@@ -35,6 +36,7 @@ import { useCommunityAccess, useScopeNote } from '../lib/communityAccess'
 import { queryKeys } from '../lib/api/queryKeys'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
+import { deliverContract } from '../lib/api/inbox'
 import { useToast } from '../lib/toast'
 import { todayBusinessIso } from '../lib/dates'
 import { formatParticipantName } from '../lib/participantFormat'
@@ -393,6 +395,21 @@ export function ParticipantsPage() {
         ).catch(() => pushToast(t('pages.participants.contractDownloadError'), 'error'))
     }
 
+    function deliverContractToInbox(participant: Participant) {
+        // Delivered on purpose, never when the contract is issued: issuing also happens to preview it.
+        deliverContract(participant.id)
+            .then((result) => pushToast(
+                t(result.delivered > 0 ? 'inbox.deliverContract.delivered' : 'inbox.deliverContract.alreadyDelivered'),
+                'success',
+            ))
+            .catch((error: unknown) => pushToast(
+                axios.isAxiosError(error) && error.response?.status === 404
+                    ? t('inbox.deliverContract.notIssued')
+                    : formatApiError(error, t('common.error')),
+                'error',
+            ))
+    }
+
     function confirmDeleteParticipant(participant: Participant, displayName: string) {
         confirm({
             title: t('pages.participants.deleteTitle'),
@@ -456,6 +473,7 @@ export function ParticipantsPage() {
                     : undefined}
                 onStartEdit={startEdit}
                 onDownloadContract={downloadContract}
+                onDeliverContract={deliverContractToInbox}
                 onSendOnboardingLink={(participantId) => sendLinkMutation.mutate({ participantId, scope })}
                 onCopyOnboardingLink={(participantId) => copyLinkMutation.mutate({ participantId, scope })}
                 onRevokeOnboardingLink={(participantId) => revokeLinkMutation.mutate({ participantId, scope })}

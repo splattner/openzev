@@ -27,6 +27,7 @@ from zev.management.commands.seed_demo import (
 	quarter_start,
 	years_before,
 )
+from inbox.models import DeliveredDocument
 from invoices.models import ContractIssue, Credit, EmailLog, Invoice, InvoiceReadingImpact, InvoiceStatus
 from metering.models import ImportLog, MeterReading, QuarantinedReading, ReadingDirection, ReadingResolution
 from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
@@ -3024,7 +3025,12 @@ class SeedDemoEndToEndTests(SeedDemoWindow, TestCase):
 			status__in=[InvoiceStatus.SENT, InvoiceStatus.PAID],
 		)
 		self.assertEqual(len(referenced), annas.count())
-		self.assertEqual(stored, referenced)
+		# Invoice PDFs and the inbox's copies are separate files with their own lifecycle: a re-seed
+		# keeps exactly the current ones of each and leaves no stale inbox copy behind.
+		self.assertEqual({name for name in stored if not name.startswith("inbox/")}, referenced)
+		inbox_referenced = set(DeliveredDocument.objects.exclude(file="").values_list("file", flat=True))
+		self.assertTrue(inbox_referenced)
+		self.assertEqual({name for name in stored if name.startswith("inbox/")}, inbox_referenced)
 
 	def test_a_failed_reseed_preserves_invoice_rows_and_files(self):
 		with tempfile.TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media), mock.patch(

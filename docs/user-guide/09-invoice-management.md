@@ -89,6 +89,29 @@ link leads back to **My invoices**.
 
 ![Participant My Invoices](screenshots/08c-my-invoices.png)
 
+## Participant View: My Documents
+
+**My documents** (`/me/documents`) is the participant's mailbox: everything the
+community has delivered to them, grouped by year and newest first — sent
+invoices, annual statements, financial summaries, tariff overviews, the
+participation contract, and notices from the operator. Each row shows the type,
+the delivery date and a **Download** button; use the type filter to narrow the
+list, and the community filter when you take part in more than one.
+
+![Participant My documents](screenshots/08l-my-documents.png)
+
+- A document is a **copy of what was delivered**. Opening an invoice here shows
+  the document you were sent, even if the invoice PDF was regenerated later.
+- Documents do not expire and are not removed when you leave a community: a
+  former participant can still open what was delivered to them.
+- A **document delivered before your account was linked** appears as soon as it
+  is linked.
+- A document that was replaced by a newer one (an annual statement issued again)
+  stays listed, marked **Superseded**. A sent invoice that was cancelled stays
+  listed, marked **Cancelled**. A notice the operator **withdrew** disappears from
+  your list.
+- Invoices are still also listed under **My invoices**, with their payment state.
+
 ## Invoice Lifecycle
 
 Invoices progress through a controlled workflow:
@@ -124,7 +147,7 @@ missing PDF automatically. **Mark sent** records manual delivery without
 generating a PDF; you can generate it afterwards. Later address or bank-detail
 changes do not change the approved document.
 
-## Billing Hub (Invoices · Emails)
+## Billing Hub (Invoices · Emails · Delivered documents)
 
 The sidebar entry **Billing** (`/billing/invoices`) opens the invoice-first
 billing hub. Its tabs are routes — each is directly linkable:
@@ -134,6 +157,9 @@ billing hub. Its tabs are routes — each is directly linkable:
   invoices: the latest email status per invoice, a filter by status, a
   failed-email banner, **View history** for the actual attempt log, and an
   inline **Retry** per failed latest attempt.
+- **Delivered documents** (`/billing/documents`) — what the community has
+  delivered to its participants, and when (see
+  [Delivered documents](#delivered-documents)).
 
 The yearly whole-ZEV annual-statement ZIP is on **Reports** (see
 [Reports: Annual Report, Statements and Tax Overviews](#reports-annual-report-statements-and-tax-overviews)).
@@ -161,6 +187,43 @@ starts. It updates automatically when the next delivery attempt is recorded.
 Invoice rows themselves show only the latest delivery state (the **Sent** step
 of their progress); detailed attempts and errors are kept in the Emails tab's
 history panel.
+
+## Delivered documents
+
+The **Delivered documents** tab answers "did Anna get her statement?". It lists
+every document delivered to the selected community's participants — with the
+participant, the type, the delivery date, who delivered it, and a **No account
+yet** badge for a participant who has no linked account (they will see the
+document once an account is linked). Filter by participant, type and year;
+**Download** opens the exact delivered file.
+
+![Delivered documents](screenshots/08k-delivered-documents.png)
+
+Invoices arrive here by themselves when they are sent, by email or by
+**Mark as sent**. Everything else you deliver on purpose:
+
+- **Upload document** — a PDF (up to 10 MB) with a title, for everyone in the
+  community or for chosen participants. Only people who are participants **now**
+  receive it; someone who joins later gets nothing. The result says how many
+  received it and how many of them have no account yet.
+- **Issue documents** — the **annual statement** for a year (one per participant
+  who was sent an invoice that year), the **financial summary** (one per producer),
+  or the **tariff overview** (the tariffs valid today, for every current
+  participant). Issuing again replaces the earlier document in the participant's
+  list; the earlier one stays visible to them as superseded. Statements and
+  summaries are rendered when you issue them, so issue them once the year's
+  invoices are final.
+- **Withdraw** — takes an uploaded notice back from participants (for example sent
+  to the wrong person). The record and the file are kept and the row stays here,
+  marked as withdrawn. Invoices, statements and the other issued documents are
+  corrected by issuing again, never withdrawn.
+- **Deliver contract to inbox** — in the action menu of a participant on the
+  **Participants** page. It delivers the participant's latest issued contract; it
+  is never automatic, because the contract is also issued whenever you download
+  it to preview or print it. If no contract has been issued yet, download it
+  first.
+
+Viewers can read this tab but not upload, issue, withdraw or deliver.
 
 ## Period-Based Invoice View
 

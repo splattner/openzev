@@ -1,0 +1,61 @@
+/* ── Participant document list (SPEC-2026-11-participant-document-inbox §7.1) ── */
+
+.inbox-years {
+  display: grid;
+  gap: 1rem;
+}
+
+.inbox-year-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.inbox-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.inbox-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.inbox-row:first-child {
+  border-top: 0;
+}
+
+.inbox-row-icon {
+  color: var(--text-muted);
+}
+
+.inbox-row-title {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.inbox-row-meta {
+  margin: 0.15rem 0 0;
+  font-size: 0.9rem;
+}
+
+/* One column on a phone, the download a full-width row action. */
+@media (max-width: 30rem) {
+  .inbox-row {
+    grid-template-columns: auto 1fr;
+  }
+
+  .inbox-row-action {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: center;
+  }
+}

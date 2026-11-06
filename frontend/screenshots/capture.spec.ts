@@ -541,6 +541,23 @@ test.describe('User Guide Screenshots', () => {
     await screenshotFull(page, '08c-my-invoices')
   })
 
+  // 08k — what the community delivered, for the manager (the inbox's outbox tab).
+  test('08k-delivered-documents', async ({ page }) => {
+    await navigateTo(page, '/billing/documents')
+    await page.waitForSelector('tbody tr', { timeout: 10_000 })
+    await page.waitForTimeout(400)
+    await screenshotFull(page, '08k-delivered-documents')
+  })
+
+  // 08l — the participant's document inbox (via impersonation).
+  test('08l-my-documents', async ({ page }) => {
+    await impersonateDemoParticipant(page, { requireSentInvoice: true })
+    await navigateTo(page, '/me/documents')
+    await page.waitForSelector('.inbox-row', { timeout: 10_000 })
+    await page.waitForTimeout(400)
+    await screenshotFull(page, '08l-my-documents')
+  })
+
   // 09 — Imports
   test('09-imports', async ({ page }) => {
     await navigateTo(page, '/metering/imports')

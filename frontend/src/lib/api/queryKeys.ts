@@ -63,6 +63,10 @@ export const queryKeys = {
     restores: () => ['backups', 'restores'] as const,
     restore: (id: string) => ['backups', 'restores', id] as const,
   },
+  inbox: {
+    all: ['inbox'] as const,
+    list: (scope: 'mine' | 'outbox', filters: object = {}) => ['inbox', 'list', scope, filters] as const,
+  },
   invoices: {
     lists: () => ['invoices', 'list'] as const,
     list: (zevId?: string, status?: string) => ['invoices', 'list', zevId ?? 'all', status ?? 'all'] as const,
