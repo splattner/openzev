@@ -88,8 +88,9 @@ loaded rows visible with a warning and **Retry**.
 The amounts and the payment state are read from the invoice, so they stay
 current; the PDF is the copy that was sent and does not change. The list is
 read-only. There is no separate page for one invoice any more: the PDF carries
-the details, and the deep link `/billing/invoices/{id}` is for the operator
-(a participant who opens it gets an error).
+the details, and an old link to `/billing/invoices/{id}` takes a participant to
+**My invoices**. On a phone each invoice is a small card with a full-width
+**Download**.
 
 ![Participant My Invoices](screenshots/08c-my-invoices.png)
 
@@ -747,9 +748,10 @@ Below the report, under **Annual documents**:
 **Participants:** Open **Annual statement** (`/me/statement`) to read the annual
 statement your community **issued** to you, or select the **Tax Overview** tab for
 the financial summary. The page shows the date it was issued; use **Download PDF**
-to save the document. **Open in new tab** shows the same PDF. If your community has
-not issued the document for the selected year yet, the page says so; it appears here
-and under **My documents** as soon as it does. Select **Retry** if loading fails.
+to save the document. **Open in new tab** shows the same PDF. The year list offers the years for which you have a document, and **Tax Overview**
+only appears if you have one (it is for producers). If your community has not
+issued anything yet, the page says so; it appears here and under **My documents**
+as soon as it does. Select **Retry** if loading fails.
 Issuing a statement again replaces the earlier one on this page (the earlier one
 stays under **My documents**, marked **Superseded**). The tax overview shows
 producers' net local-energy revenue and feed-in compensation. The statement and the

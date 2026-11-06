@@ -934,7 +934,7 @@ export const fr = {
             failed: 'Impossible de charger les factures.',
             empty: {
                 title: 'Aucune facture pour l\'instant',
-                description: 'Dès que votre opérateur CEL émet une facture, elle apparaît ici.',
+                description: 'Les factures qui vous sont remises apparaissent ici, avec leur montant et leur état de paiement.',
             },
             col: {
                 invoice: 'Facture',

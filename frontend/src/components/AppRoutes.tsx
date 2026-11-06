@@ -294,11 +294,12 @@ export function AppRoutes() {
             }
           />
           {/* The participant document inbox (SPEC-2026-11-participant-document-inbox §7.1): what was
-              delivered to the account. A former participant keeps reading what it was sent. */}
+              delivered to the account. A former participant keeps reading what it was sent; a manager who
+              is also a participant reads what was addressed to them. */}
           <Route
             path="me/documents"
             element={
-              <ProtectedRoute allowedRoles={['participant', 'former']}>
+              <ProtectedRoute allowedRoles={[...ZEV_SCOPE, 'participant', 'former']}>
                 <DocumentsPage />
               </ProtectedRoute>
             }

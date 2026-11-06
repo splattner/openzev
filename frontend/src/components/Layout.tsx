@@ -6,6 +6,7 @@ import { Link, NavLink, Outlet, matchPath, useLocation, useMatch, useNavigate } 
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useCommunityAccess } from '../lib/communityAccess'
+import { ownParticipantIds } from '../lib/membership'
 import { useOptionalManagedZev } from '../lib/managedZev'
 import { useLiveEnabled } from '../lib/live'
 import { showMyEnergyEntry } from '../lib/myEnergy'
@@ -61,6 +62,7 @@ export function Layout() {
     const energyData = useEnergyDataEligibility()
     const selectedZevId = useOptionalManagedZev()?.selectedZevId
     // With the live flag on the list holds every held meter, so any capability (history or live) is a reason to show the entry.
+    const holdsParticipation = ownParticipantIds(user).size > 0
     const holdsOwnFlaggedMeter = energyData.eligible.some((point) => point.zev === selectedZevId && hasCapability(point))
     // Query the flag only for accounts with community-wide access.
     const feasibilityEnabledQuery = useQuery({
@@ -303,6 +305,11 @@ export function Layout() {
                                 <SidebarLink to="/reports" label={t('nav.reports')} icon={<ReportsIcon />} collapsed={isNavigationCollapsed} />
                                 {holdsOwnFlaggedMeter && (
                                     <SidebarLink to="/me/metering-points" label={t('nav.myMeteringPoints')} icon={<PlugIcon />} collapsed={isNavigationCollapsed} />
+                                )}
+                                {/* A manager who is also a participant (here or elsewhere) is addressed documents like any
+                                    participant; the outbox under Billing shows what was sent to everyone. */}
+                                {holdsParticipation && (
+                                    <SidebarLink to="/me/documents" label={t('nav.myDocuments')} icon={<DocumentIcon />} collapsed={isNavigationCollapsed} />
                                 )}
                             </>
                         )}

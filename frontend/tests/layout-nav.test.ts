@@ -368,6 +368,31 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         }
     })
 
+    it.each(['manager', 'viewer'] as const)('a %s who also holds a participation gets My documents; one who does not, none', async (persona) => {
+        mockSession(persona)
+        const base = mockAuth()
+        const withParticipation = (participants: unknown[]) => mockAuth.mockReturnValue({
+            ...base,
+            user: { ...base.user, memberships: [{ zev: ZEV.id, zev_name: ZEV.name, zev_disabled: false, access: persona, participants }] },
+        })
+
+        withParticipation([{ id: 'p1', valid_from: '2026-01-01', valid_to: null, live: true }])
+        const holding = await renderLayout()
+        try {
+            expect(holding.hasHref('/me/documents')).toBe(true)
+        } finally {
+            holding.unmount()
+        }
+
+        withParticipation([])
+        const plain = await renderLayout()
+        try {
+            expect(plain.hasHref('/me/documents')).toBe(false)
+        } finally {
+            plain.unmount()
+        }
+    })
+
     it('participant sees Dashboard, My invoices, My documents and Annual statement only', async () => {
         mockSession('participant')
         const page = await renderLayout()

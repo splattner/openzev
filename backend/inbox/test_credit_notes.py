@@ -54,10 +54,8 @@ class DeliveryOnRenderTests(CreditNoteBase):
         self.assertEqual(document.title, credit.credit_number)
         self.assertEqual(document.document_number, credit.credit_number)
         self.assertEqual(document.delivered_at, credit.created_at)
-        self.assertEqual(
-            (document.period_start, document.period_end),
-            (credit.source_invoice.period_start, credit.source_invoice.period_end),
-        )
+        # No period: it sorts under the year it was issued, not the year of the invoice it corrects.
+        self.assertEqual((document.period_start, document.period_end), (None, None))
         with document.open_file() as handle, credit.pdf_file.open("rb") as stored:
             self.assertEqual(handle.read(), stored.read())
 

@@ -943,7 +943,7 @@ export const en = {
             failed: 'Failed to load invoices.',
             empty: {
                 title: 'No invoices yet',
-                description: 'As soon as your ZEV operator issues an invoice, it appears here.',
+                description: 'Invoices delivered to you appear here, with their amounts and payment state.',
             },
             col: {
                 invoice: 'Invoice',

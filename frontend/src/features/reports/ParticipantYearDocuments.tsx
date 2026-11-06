@@ -207,6 +207,24 @@ export function issuedDocumentFor(
     .sort((a, b) => b.delivered_at.localeCompare(a.delivered_at))[0]
 }
 
+/** The years for which the account has a current document of one of ``kinds``, newest first. */
+export function issuedYears(
+  documents: readonly DeliveredDocument[],
+  kinds: ReadonlyArray<DocumentDescriptor['inboxKind']>,
+  ownIds: ReadonlySet<string>,
+  zevId?: string,
+): number[] {
+  const found = new Set<number>()
+  for (const document of documents) {
+    if (!(kinds as readonly string[]).includes(document.kind)) continue
+    if (document.participant == null || !ownIds.has(document.participant)) continue
+    if (zevId && document.zev !== zevId) continue
+    if (document.superseded_at || document.withdrawn_at || !document.period_start) continue
+    found.add(Number(document.period_start.slice(0, 4)))
+  }
+  return [...found].sort((a, b) => b - a)
+}
+
 export function ParticipantYearDocuments({ userId, zevId, year, years, onYearChange }: ParticipantYearDocumentsProps) {
   const { t } = useTranslation()
   const { user } = useAuth()
@@ -218,6 +236,20 @@ export function ParticipantYearDocuments({ userId, zevId, year, years, onYearCha
   })
   const ownIds = useMemo(() => ownParticipantIds(user), [user])
 
+  // Only what was issued is on offer: the years that have a document, and the tax overview tab only
+  // for someone who has one at all (it is for producers). Until the list is there, or when nothing
+  // was issued, the page keeps the plain year list and says so in the panel.
+  const documents = query.data
+  const issued = useMemo(
+    () => (documents ? issuedYears(documents, ['annual_statement', 'financial_summary'], ownIds, zevId) : []),
+    [documents, ownIds, zevId],
+  )
+  const offeredYears = issued.length > 0 ? issued : years
+  const shownYear = offeredYears.includes(year) ? year : offeredYears[0]
+  const hasSummary = !!documents && issuedYears(documents, ['financial_summary'], ownIds, zevId).length > 0
+  const descriptors = hasSummary ? DESCRIPTORS : DESCRIPTORS.filter((descriptor) => descriptor.kind === 'annual-statement')
+  const shownKind = descriptors.some((descriptor) => descriptor.kind === active) ? active : 'annual-statement'
+
   return (
     <div className="page-stack">
       <div className="actions-row">
@@ -225,8 +257,8 @@ export function ParticipantYearDocuments({ userId, zevId, year, years, onYearCha
           className="participant-document-year"
           id="participant-year-select"
           label={t('pages.reports.year')}
-          years={years}
-          value={year}
+          years={offeredYears}
+          value={shownYear}
           onChange={onYearChange}
         />
       </div>
@@ -235,10 +267,10 @@ export function ParticipantYearDocuments({ userId, zevId, year, years, onYearCha
         <Notice tone="error" onRetry={() => void query.refetch()} isRetrying={query.isFetching}>{t('inbox.failed')}</Notice>
       )}
       {query.isLoading && <PageSkeleton variant="card" />}
-      {query.data && (
+      {documents && (
       <section id="yearly-documents-preview" aria-label={t('pages.reports.participantDescription')}>
         <AppTabs
-          value={active}
+          value={shownKind}
           onChange={(value) => {
             if (value === 'annual-statement' || value === 'tax-overview') setActive(value)
           }}
@@ -246,19 +278,19 @@ export function ParticipantYearDocuments({ userId, zevId, year, years, onYearCha
           activateTabWithKeyboard={false}
         >
           <AppTabs.List aria-label={t('pages.reports.documentTabs')}>
-            {DESCRIPTORS.map((descriptor) => (
+            {descriptors.map((descriptor) => (
               <AppTabs.Tab key={descriptor.kind} value={descriptor.kind}>
                 {t(descriptor.titleKey)}
               </AppTabs.Tab>
             ))}
           </AppTabs.List>
-          {DESCRIPTORS.map((descriptor) => (
+          {descriptors.map((descriptor) => (
             <AnnualDocumentPanel
-              key={`${descriptor.kind}-${userId}-${zevId ?? ''}-${year}`}
+              key={`${descriptor.kind}-${userId}-${zevId ?? ''}-${shownYear}`}
               descriptor={descriptor}
-              year={year}
-              document={issuedDocumentFor(query.data, descriptor.inboxKind, year, ownIds, zevId)}
-              active={active === descriptor.kind}
+              year={shownYear}
+              document={issuedDocumentFor(documents, descriptor.inboxKind, shownYear, ownIds, zevId)}
+              active={shownKind === descriptor.kind}
             />
           ))}
         </AppTabs>

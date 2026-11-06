@@ -934,7 +934,7 @@ export const it = {
             failed: 'Impossibile caricare le fatture.',
             empty: {
                 title: 'Ancora nessuna fattura',
-                description: 'Non appena il gestore del CEE emette una fattura, appare qui.',
+                description: 'Le fatture che ti vengono recapitate compaiono qui, con importo e stato del pagamento.',
             },
             col: {
                 invoice: 'Fattura',

@@ -78,15 +78,17 @@ function useIssuedDocuments() {
 
 const OWN_PARTICIPATION = { memberships: [{ zev: 'zev-1', zev_name: 'Demo', participants: [{ id: 'p1' }] }] }
 
-function renderReportsPage(component = ReportsPage) {
+function renderReportsPage(component = ReportsPage, documents: unknown[] = issuedDocuments()) {
     const container = document.createElement('div')
     document.body.appendChild(container)
+    // What the list request answers when the page asks again in the background.
+    vi.mocked(inboxApi.listInboxDocuments).mockResolvedValue(documents as never)
     const client = new QueryClient()
     // The issued documents are already loaded, as when the participant opens the page again: these
     // tests are about the preview lifecycle, not about the list request.
     client.setQueryData(
         queryKeys.inbox.list('mine', { kinds: ['annual_statement', 'financial_summary'] }),
-        issuedDocuments(),
+        documents,
     )
     const root = createRoot(container)
     const render = (target = component) => createElement(
@@ -770,5 +772,59 @@ describe('ReportsPage participant annual documents', () => {
         expect(second.holder.querySelector('iframe')).toBeTruthy()
         expect(invoicesApi.downloadAnnualStatement).toHaveBeenCalledTimes(1)
         second.unmount()
+    })
+})
+
+describe('ReportsPage participant: only what was issued is on offer', () => {
+    beforeEach(() => {
+        document.body.innerHTML = ''
+        vi.clearAllMocks()
+        useIssuedDocuments()
+        mockParticipant()
+    })
+
+    const statementsOnly = (...years: number[]) => issuedDocuments().filter(
+        (document) => document.kind === 'annual_statement' && years.includes(Number(document.period_start.slice(0, 4))),
+    )
+
+    it('offers the years that have a document and no tax overview tab for someone with none', async () => {
+        const lastYear = new Date().getFullYear() - 1
+        const { container, unmount } = renderReportsPage(ReportsPage, statementsOnly(lastYear - 1, lastYear - 3))
+        await flush()
+
+        const select = container.querySelector('select') as HTMLSelectElement
+        expect(Array.from(select.options).map((option) => option.value)).toEqual([String(lastYear - 1), String(lastYear - 3)])
+        // The default year (last year) has none, so the newest issued year is shown instead.
+        expect(select.value).toBe(String(lastYear - 1))
+        expect(Array.from(container.querySelectorAll('[role="tab"]')).map((tab) => tab.textContent)).toEqual([
+            'pages.reports.annualStatement.title',
+        ])
+        expect(inboxApi.downloadInboxDocument).toHaveBeenCalledWith(`statement-${lastYear - 1}`, expect.any(AbortSignal))
+        unmount()
+    })
+
+    it('shows the tax overview tab once a financial summary exists in any year', async () => {
+        const thisYear = new Date().getFullYear()
+        const documents = [
+            ...statementsOnly(thisYear - 1),
+            ...issuedDocuments().filter((document) => document.id === `summary-${thisYear - 3}`),
+        ]
+        const { container, unmount } = renderReportsPage(ReportsPage, documents)
+        await flush()
+
+        expect(Array.from(container.querySelectorAll('[role="tab"]')).map((tab) => tab.textContent)).toEqual([
+            'pages.reports.annualStatement.title',
+            'pages.reports.financialSummary.title',
+        ])
+        unmount()
+    })
+
+    it('keeps the plain year list and says so when nothing was issued', async () => {
+        const { container, unmount } = renderReportsPage(ReportsPage, [])
+        await flush()
+
+        expect((container.querySelector('select') as HTMLSelectElement).options.length).toBe(5)
+        expect(container.textContent).toContain('pages.reports.notIssued')
+        unmount()
     })
 })

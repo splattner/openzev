@@ -934,7 +934,7 @@ export const de = {
             failed: 'Rechnungen konnten nicht geladen werden.',
             empty: {
                 title: 'Noch keine Rechnungen',
-                description: 'Sobald Ihr ZEV-Betreiber eine Rechnung ausstellt, erscheint sie hier.',
+                description: 'Rechnungen, die dir zugestellt wurden, erscheinen hier, mit Betrag und Zahlungsstand.',
             },
             col: {
                 invoice: 'Rechnung',

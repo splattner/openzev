@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import {
@@ -12,7 +12,7 @@ import {
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
-import { scopeNoteKey, shellRoleForZev } from '../lib/communityAccess'
+import { hasCommunityWideAccess, scopeNoteKey, shellRoleForZev } from '../lib/communityAccess'
 import { PdfPreview } from '../components/PdfPreview'
 import { InvoiceAccessLinkCard } from '../features/invoices/InvoiceAccessLinkCard'
 import { InvoiceAppliedCreditsCard } from '../features/invoices/InvoiceAppliedCreditsCard'
@@ -67,6 +67,12 @@ export function InvoiceDetailPage() {
     const pendingHeader = <PageHeader title={t('pages.invoices.title')} />
     if (invoiceQuery.isLoading) {
         return <div className="page-stack">{pendingHeader}<PageSkeleton variant="card" /></div>
+    }
+    // A participant has no live invoice (their invoices are delivered to the document inbox, #862):
+    // an old link, a saved bookmark or an email lands on the list that has them, not on an error
+    // that a retry cannot fix.
+    if (invoiceQuery.isError && user && !hasCommunityWideAccess(user)) {
+        return <Navigate to="/me/invoices" replace />
     }
     if (invoiceQuery.isError || !invoiceQuery.data) {
         return <div className="page-stack">{pendingHeader}<Notice tone="error" onRetry={() => void invoiceQuery.refetch()} isRetrying={invoiceQuery.isFetching}>{t('common.error')}</Notice></div>

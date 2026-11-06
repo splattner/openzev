@@ -17,7 +17,7 @@ vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: vi.fn() }) })
 vi.mock('../src/lib/appSettings', () => ({ useAppSettings: () => ({ settings: {} }), formatShortDate: (date: string) => date }))
 
 import { MyInvoicesPage } from '../src/pages/MyInvoicesPage'
-import { issuedDocumentFor } from '../src/features/reports/ParticipantYearDocuments'
+import { issuedDocumentFor, issuedYears } from '../src/features/reports/ParticipantYearDocuments'
 
 function user(zevs: string[] = ['Community A'], participant = 'p1') {
   return {
@@ -212,5 +212,32 @@ describe('issuedDocumentFor (the annual document a participant reads)', () => {
   it('reads within one community when asked to', () => {
     const rows = [statement({ id: 'a', zev: 'z0' }), statement({ id: 'b', zev: 'z1' })]
     expect(issuedDocumentFor(rows, 'annual_statement', 2025, own, 'z1')?.id).toBe('b')
+  })
+})
+
+describe('issuedYears (the years a participant can pick)', () => {
+  const own = new Set(['p1'])
+  const row = (overrides: Partial<DeliveredDocument>) =>
+    invoiceRow({ kind: 'annual_statement', invoice: null, invoice_status: null, invoice_figures: null, ...overrides })
+
+  it('lists the years of the account\'s current documents of those kinds, newest first', () => {
+    const rows = [
+      row({ id: 'a', period_start: '2023-01-01' }),
+      row({ id: 'b', period_start: '2025-01-01' }),
+      row({ id: 'c', period_start: '2025-01-01', kind: 'financial_summary' }),
+    ]
+    expect(issuedYears(rows, ['annual_statement', 'financial_summary'], own)).toEqual([2025, 2023])
+    expect(issuedYears(rows, ['financial_summary'], own)).toEqual([2025])
+  })
+
+  it('ignores other people, other communities, replaced and withdrawn documents and ones with no period', () => {
+    const rows = [
+      row({ id: 'a', participant: 'other', period_start: '2024-01-01' }),
+      row({ id: 'b', zev: 'z9', period_start: '2024-01-01' }),
+      row({ id: 'c', period_start: '2024-01-01', superseded_at: '2025-02-01T00:00:00Z' }),
+      row({ id: 'd', period_start: '2024-01-01', withdrawn_at: '2025-02-01T00:00:00Z' }),
+      row({ id: 'e', period_start: null }),
+    ]
+    expect(issuedYears(rows, ['annual_statement'], own, 'z0')).toEqual([])
   })
 })
